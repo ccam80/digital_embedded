@@ -110,7 +110,6 @@ export class SchmittTriggerDriverElement implements PoolBackedAnalogElement {
   readonly poolBacked = true as const;
   readonly stateSchema = SCHMITT_TRIGGER_SCHEMA;
   readonly stateSize = SCHMITT_TRIGGER_SCHEMA.size;
-  readonly participatesInLoad = true;
 
   label = "";
   _pinNodes: Map<string, number>;

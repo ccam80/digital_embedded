@@ -23,8 +23,8 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
   type ComponentLayout,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { Circuit, CustomShapeData } from "../../core/circuit.js";
 import type { ShapeMode } from "./shape-renderer.js";
@@ -500,7 +500,7 @@ export function executeSubcircuit(
 export function buildSubcircuitComponentDef(
   name: string,
   definition: SubcircuitDefinition,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   const propertyDefs: PropertyDefinition[] = [
     {
       key: "label",

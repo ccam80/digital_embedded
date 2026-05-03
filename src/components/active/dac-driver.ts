@@ -106,7 +106,6 @@ export class DACDriverElement implements PoolBackedAnalogElement {
   readonly poolBacked = true as const;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
-  readonly participatesInLoad = true;
 
   label = "";
   _pinNodes: Map<string, number>;

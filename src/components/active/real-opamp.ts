@@ -10,21 +10,19 @@
  *   - Slew rate limiting (clamped integrator)
  *   - Output resistance (R_out)
  *   - Output current limiting (|I_out| â‰¤ I_max)
- *   - Rail saturation (output clamps to V_supply Â± V_sat)
+ *   - Rail saturation (output clamps to V_supply Â± V_sat) via railLim
  *
- * Implementation strategy  single-pole rolloff as a companion-model integrator:
- *   The gain stage is modelled as a first-order low-pass filter on V_diff.
- *   An internal node V_int integrates toward A_OL * (V_diff + V_os) with
- *   time constant Ï„ = A_OL / (2Ï€ * GBW).  In MNA this becomes a capacitor
- *   companion model:  C_eq = Ï„ * G_int,  where G_int = 1/R_int (a small
- *   internal resistance chosen for numerical stability).
+ * State is held entirely in StatePool slots (REAL_OPAMP_SCHEMA, 8 slots) per
+ * ss1.1; the class is a PoolBackedAnalogElement. There is no `accept()` method-
+ * the bottom-of-load() history write idiom (ngspice CKTstate0,
+ * dioload.c:325-326, bjtload.c:744-746) handles slot promotion via StatePool
+ * rotation.
  *
- *   For DC analysis the integrator settles and V_int = A_OL * V_diff (ideal
- *   VCVS), which is exactly what we want.
- *
- * Slew rate:
- *   At each timestep the change in V_int is clamped to SR * dt.  When
- *   clamped, the integrator current is limited accordingly.
+ * The post-init rail-limit block uses the ngspice MODEINIT* gate
+ * (dioload.c:139-205): railLim is only invoked when none of the init bits
+ * (MODEINITSMSIG, MODEINITTRAN, MODEINITJCT, MODEINITFIX, MODEINITPRED) are
+ * set. When railLim clips, ctx.noncon is incremented and a
+ * LimitingEvent { limitType: "railLim" } is pushed to the limitingCollector.
  *
  * .MODEL support:
  *   Standard op-amp models (741, LM358, TL072, OPA2134) are pre-defined.
@@ -34,17 +32,6 @@
  *     SR    slew rate in V/s (default 0.5e6)
  *     Vos   input offset voltage in V (default 1e-3)
  *     Ibias  input bias current in A (default 80e-9)
- *
- * Node layout passed to analogFactory:
- *   [0] = in+   (non-inverting input)
- *   [1] = in-   (inverting input)
- *   [2] = out   (output)
- *   [3] = Vcc+  (positive supply)
- *   [4] = Vcc-  (negative supply)
- *   [5] = V_int (internal gain-stage node  allocated by analog compiler)
- *
- * branchIdx is -1 (no extra MNA branch rows needed; the output is a Norton
- * equivalent, not a voltage-source branch).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -58,14 +45,53 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { MODETRAN } from "../../solver/analog/ckt-mode.js";
+import {
+  MODETRAN,
+  MODEINITSMSIG,
+  MODEINITTRAN,
+  MODEINITJCT,
+  MODEINITFIX,
+  MODEINITPRED,
+} from "../../solver/analog/ckt-mode.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+import { railLim, type LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// State-pool schema (8 slots per Component C1)
+// ---------------------------------------------------------------------------
+
+export const REAL_OPAMP_SCHEMA = defineStateSchema("RealOpAmpElement", [
+  { name: "VINT",         doc: "Integrator state (post-companion update)",                init: { kind: "zero" } },
+  { name: "VOUT",         doc: "Post-railLim output voltage",                              init: { kind: "zero" } },
+  { name: "VOUT_LIMITED", doc: "Observability slot for railLim output",                    init: { kind: "zero" } },
+  { name: "GEQ_INT",      doc: "Recomputed each load(); slot for observability",           init: { kind: "zero" } },
+  { name: "AEFF",         doc: "Effective gain after companion / slew adjustments",        init: { kind: "zero" } },
+  { name: "OUT_SAT_FLAG", doc: "1 when output is rail-saturated, else 0",                  init: { kind: "zero" } },
+  { name: "I_LIMIT_FLAG", doc: "1 when output current limit is engaged, else 0",           init: { kind: "zero" } },
+  { name: "SLEW_FLAG",    doc: "1 when slew-rate limiting clamped the integrator delta",   init: { kind: "zero" } },
+]) satisfies StateSchema;
+
+const SLOT_VINT         = 0;
+const SLOT_VOUT         = 1;
+const SLOT_VOUT_LIMITED = 2;
+const SLOT_GEQ_INT      = 3;
+const SLOT_AEFF         = 4;
+const SLOT_OUT_SAT_FLAG = 5;
+const SLOT_I_LIMIT_FLAG = 6;
+const SLOT_SLEW_FLAG    = 7;
 
 // ---------------------------------------------------------------------------
 // Built-in op-amp model presets
@@ -147,8 +173,8 @@ export const { paramDefs: REAL_OPAMP_PARAM_DEFS, defaults: REAL_OPAMP_DEFAULTS }
     iBias:    { default: 80e-9, unit: "A",   description: "Input bias current" },
   },
   secondary: {
-    rIn:      { default: 2e6,   unit: "Î",   description: "Input resistance" },
-    rOut:     { default: 75,    unit: "Î",   description: "Output resistance" },
+    rIn:      { default: 2e6,   unit: "Î©",   description: "Input resistance" },
+    rOut:     { default: 75,    unit: "Î©",   description: "Output resistance" },
     iMax:     { default: 25e-3, unit: "A",   description: "Output current limit" },
     vSatPos:  { default: 1.5,   unit: "V",   description: "Positive rail saturation drop" },
     vSatNeg:  { default: 1.5,   unit: "V",   description: "Negative rail saturation drop" },
@@ -270,70 +296,397 @@ export class RealOpAmpElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.5 });
     ctx.drawText("V+", 2.4, -1.0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("V\u2212", 2.4, 1.0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("Vâˆ’", 2.4, 1.0, { horizontal: "left", vertical: "middle" });
 
     ctx.restore();
   }
 }
 
 // ---------------------------------------------------------------------------
-// createRealOpAmpElement  AnalogElement factory
+// RealOpAmpAnalogElement- PoolBackedAnalogElement implementation
 // ---------------------------------------------------------------------------
 
 /**
- * Create the MNA analog element for a real op-amp.
+ * MNA implementation of the real op-amp.
  *
  * Node assignment (1-based, 0 = ground):
- *   nodeIds[0] = in+   (non-inverting input)
- *   nodeIds[1] = in-   (inverting input)
- *   nodeIds[2] = out   (output)
- *   nodeIds[3] = Vcc+  (positive supply)
- *   nodeIds[4] = Vcc-  (negative supply)
+ *   _pinNodes.get("in+")  = non-inverting input
+ *   _pinNodes.get("in-")  = inverting input
+ *   _pinNodes.get("out")  = output
+ *   _pinNodes.get("Vcc+") = positive supply
+ *   _pinNodes.get("Vcc-") = negative supply
  *
- * MNA formulation  Norton/VCVS hybrid with proper Jacobian:
+ * MNA formulation- Norton/VCVS hybrid with proper Jacobian:
  *
  * Input stage:
  *   - R_in conductance between in+ and in-
  *   - Bias current sources I_bias stamped at the input nodes
  *
  * Gain stage (DC: same as ideal op-amp VCVS; transient: companion integrator):
- *
- *   In the unsaturated, non-current-limited region the gain stage provides:
+ *   In the unsaturated, non-current-limited region the gain stage provides
  *     V_out = A_eff * (V_diff + V_os)
- *   where A_eff = aol in DC, and is modified by the companion integrator in transient.
- *
- *   The NR linearization at operating point (Vinp0, Vinn0, Vout0):
- *     MNA row for out:
- *       G[out,out] += G_out
- *       G[out,in+] -= A_eff * G_out           (Jacobian: output depends on in+)
- *       G[out,in-] += A_eff * G_out           (Jacobian: output depends on in-)
- *       RHS[out]   += G_out * (V_int - A_eff * (Vinp0 - Vinn0))
- *
- *   This is the standard NR linearization: f(x) = f(x0) + f'(x0)*(x-x0).
- *   The Jacobian entries allow NR to find the virtual-ground solution in one
- *   or a few iterations, exactly as for the ideal op-amp.
- *
- *   V_int is an internal state variable that tracks the gain-stage output
- *   voltage with slew-rate clamping and rail saturation applied.
+ *   The NR linearization at operating point (Vinp0, Vinn0, Vout0) stamps
+ *   G_out on the diagonal and -A_eff*G_out / +A_eff*G_out coupling against the
+ *   inputs, with RHS = G_out * (V_int - A_eff*(Vinp0 - Vinn0)).
  *
  * Saturation:
- *   When V_out â‰¥ V_supply+ - V_sat or V_out â‰¤ V_supply- + V_sat:
- *   the Jacobian coupling is zeroed and a Norton current drives V_out to rail.
+ *   Output rail saturation is enforced by the railLim post-init pass on V_out
+ *   matching the dioload.c:139-205 mode-mask gate. railLim emits
+ *   LimitingEvent { limitType: "railLim" } and increments ctx.noncon when
+ *   clipping occurs.
  *
  * Current limiting:
- *   When |I_out| > I_max: inject a constant current Â±I_max instead.
+ *   When |I_out| > I_max during saturation the RHS clamps to Â±I_max instead of
+ *   the rail-driven Norton current.
  *
  * Transient:
  *   A_eff is reduced by the companion integrator's bandwidth-limiting factor.
- *   The effective gain at frequency Ï‰ is A_OL / (1 + jÏ‰*Ï„), implemented as
- *   a first-order backward-Euler update of V_int each timestep with slew-rate clamping.
+ *   The effective gain at frequency Ï‰ is A_OL / (1 + jÏ‰*Ï„), implemented as a
+ *   first-order backward-Euler update of V_int each timestep with slew-rate
+ *   clamping. Slew "previous" voltage is read from s1[VINT] (last-accepted).
  */
+export class RealOpAmpAnalogElement implements PoolBackedAnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number> = new Map();
+  _stateBase: number = -1;
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly poolBacked = true as const;
+  readonly stateSchema = REAL_OPAMP_SCHEMA;
+  readonly stateSize = REAL_OPAMP_SCHEMA.size;
+  elementIndex?: number;
+
+  // Cached parameter record (mutable via setParam).
+  private readonly p: Record<string, number>;
+
+  // Source scale for source-stepping- captured each load(), consumed by getPinCurrents().
+  private _lastSrcFact = 1;
+
+  // Cached TSTALLOC handles- allocated once in setup(), used every NR iteration.
+  private _hInpInp = -1;
+  private _hInnInn = -1;
+  private _hInpInn = -1;
+  private _hInnInp = -1;
+  private _hOutOut = -1;
+  private _hOutInp = -1;
+  private _hOutInn = -1;
+
+  private _pool!: StatePoolRef;
+
+  constructor(pinNodes: ReadonlyMap<string, number>, p: Record<string, number>) {
+    this._pinNodes = new Map(pinNodes);
+    this.p = p;
+  }
+
+  setup(ctx: SetupContext): void {
+    if (this._stateBase === -1) {
+      this._stateBase = ctx.allocStates(this.stateSize);
+    }
+    const solver = ctx.solver;
+    const nInp = this._pinNodes.get("in+")!;
+    const nInn = this._pinNodes.get("in-")!;
+    const nOut = this._pinNodes.get("out")!;
+
+    // Input resistance stamp: conductance between nInp and nInn.
+    if (nInp > 0) this._hInpInp = solver.allocElement(nInp, nInp);
+    if (nInn > 0) this._hInnInn = solver.allocElement(nInn, nInn);
+    if (nInp > 0 && nInn > 0) {
+      this._hInpInn = solver.allocElement(nInp, nInn);
+      this._hInnInp = solver.allocElement(nInn, nInp);
+    }
+    // Output conductance and gain-stage Jacobian coupling.
+    if (nOut > 0) {
+      this._hOutOut = solver.allocElement(nOut, nOut);
+      if (nInp > 0) this._hOutInp = solver.allocElement(nOut, nInp);
+      if (nInn > 0) this._hOutInn = solver.allocElement(nOut, nInn);
+    }
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    applyInitialValues(REAL_OPAMP_SCHEMA, pool, this._stateBase, {});
+  }
+
+  load(ctx: LoadContext): void {
+    const p = this.p;
+    const solver = ctx.solver;
+    const voltages = ctx.rhsOld;
+    const scale = ctx.srcFact;
+    this._lastSrcFact = scale;
+
+    const base = this._stateBase;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+
+    const nInp = this._pinNodes.get("in+")!;
+    const nInn = this._pinNodes.get("in-")!;
+    const nOut = this._pinNodes.get("out")!;
+    const nVccP = this._pinNodes.get("Vcc+")!;
+    const nVccN = this._pinNodes.get("Vcc-")!;
+
+    const G_in   = 1 / Math.max(p.rIn,  1e-9);
+    const G_out  = 1 / Math.max(p.rOut, 1e-9);
+    const iMax   = Math.max(p.iMax,   1e-12);
+    const vSatPos = Math.max(p.vSatPos, 0);
+    const vSatNeg = Math.max(p.vSatNeg, 0);
+    const aol    = Math.max(p.aol, 1);
+
+    // Companion coefficient. During transient NR: geq_int = tau/dt. During DC: 0.
+    let geq_int: number;
+    if ((ctx.cktMode & MODETRAN) && ctx.dt > 0) {
+      const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
+      geq_int = tau / ctx.dt;
+    } else {
+      geq_int = 0;
+    }
+
+    // Operating-point voltages from the current NR-iterate.
+    const vInp  = voltages[nInp];
+    const vInn  = voltages[nInn];
+    const vVccP = voltages[nVccP];
+    const vVccN = voltages[nVccN];
+    let   vOut  = voltages[nOut];
+
+    const vDiff = vInp - vInn;
+    const vOsScaled = p.vos * scale;
+
+    const vRailPos = vVccP - vSatPos;
+    const vRailNeg = vVccN + vSatNeg;
+
+    // Slew "previous" reads s1[VINT] (post-rotation last-accepted). No *_PREV slot.
+    const vIntPrev = s1[base + SLOT_VINT];
+
+    let vInt: number;
+    let aEff: number;
+    let slewLimited: boolean;
+
+    if (geq_int > 0) {
+      // Transient: re-evaluate slew state from current NR-iterate voltages.
+      const g = geq_int;
+      const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
+      const dt = tau / g;
+      const slewLimit = Math.max(p.slewRate, 1e-6) * dt;
+      const target = (aol * (vDiff + vOsScaled) + g * vIntPrev) / (1 + g);
+      const delta = target - vIntPrev;
+      const clampedDelta = Math.max(-slewLimit, Math.min(slewLimit, delta));
+      slewLimited = Math.abs(delta) > slewLimit;
+      vInt = vIntPrev + clampedDelta;
+      aEff = slewLimited ? 0 : aol / (1 + g);
+
+      if (vVccP > vVccN) {
+        vInt = Math.max(vRailNeg, Math.min(vRailPos, vInt));
+      } else {
+        vInt = Math.max(-1000, Math.min(1000, vInt));
+      }
+    } else {
+      vInt = aol * (vDiff + vOsScaled);
+      aEff = aol;
+      slewLimited = false;
+      if (vVccP > vVccN) {
+        vInt = Math.max(vRailNeg, Math.min(vRailPos, vInt));
+      } else {
+        vInt = Math.max(-1000, Math.min(1000, vInt));
+      }
+    }
+
+    // Post-init rail-limit on vOut. Mode-mask gate matches dioload.c:139-205:
+    // railLim is invoked only when none of MODEINIT* (SMSIG, TRAN, JCT, FIX,
+    // PRED) are set- i.e. on the post-init NR iterations.
+    const initBits = ctx.cktMode & (
+      MODEINITSMSIG | MODEINITTRAN | MODEINITJCT | MODEINITFIX | MODEINITPRED
+    );
+    if (initBits === 0) {
+      const vOutOld = s1[base + SLOT_VOUT];
+      const r = railLim(vOut, vOutOld, vRailPos, vRailNeg);
+      const vOutBefore = vOut;
+      vOut = r.value;
+      if (r.limited) {
+        ctx.noncon.value++;
+        if (ctx.limitingCollector) {
+          const event: LimitingEvent = {
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label ?? "",
+            junction: "OUT",
+            limitType: "railLim",
+            vBefore: vOutBefore,
+            vAfter: vOut,
+            wasLimited: true,
+          };
+          ctx.limitingCollector.push(event);
+        }
+      }
+    }
+    s0[base + SLOT_VOUT_LIMITED] = vOut;
+
+    // Determine saturation / current-limit flags from the post-railLim vOut.
+    let outputSaturated = false;
+    let outputClampLevel = 0;
+    if (vVccP > vVccN && vOut >= vRailPos) {
+      outputSaturated  = true;
+      outputClampLevel = vRailPos;
+    } else if (vVccP > vVccN && vOut <= vRailNeg) {
+      outputSaturated  = true;
+      outputClampLevel = vRailNeg;
+    }
+
+    let currentLimited = false;
+    let iOutLimited = 0;
+    if (outputSaturated) {
+      const iOutNow = (outputClampLevel - vOut) * G_out;
+      if (Math.abs(iOutNow) > iMax) {
+        currentLimited = true;
+        iOutLimited    = iOutNow > 0 ? iMax : -iMax;
+      }
+    }
+
+    // Linear topology stamps using cached handles.
+    if (this._hInpInp >= 0) solver.stampElement(this._hInpInp,  G_in);
+    if (this._hInnInn >= 0) solver.stampElement(this._hInnInn,  G_in);
+    if (this._hInpInn >= 0) solver.stampElement(this._hInpInn, -G_in);
+    if (this._hInnInp >= 0) solver.stampElement(this._hInnInp, -G_in);
+    if (this._hOutOut >= 0) solver.stampElement(this._hOutOut, G_out);
+
+    // Input bias currents
+    const iBiasScaled = Math.abs(p.iBias) * scale;
+    if (nInp > 0) stampRHS(ctx.rhs, nInp, -iBiasScaled);
+    if (nInn > 0) stampRHS(ctx.rhs, nInn, -iBiasScaled);
+
+    if (nOut > 0) {
+      // Gain-stage output
+      if (outputSaturated) {
+        stampRHS(ctx.rhs, nOut, outputClampLevel * G_out);
+      } else if (currentLimited) {
+        stampRHS(ctx.rhs, nOut, iOutLimited);
+      } else if (slewLimited) {
+        stampRHS(ctx.rhs, nOut, vInt * G_out);
+      } else {
+        // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
+        const aEffScaled = aEff * scale;
+        const ieq = geq_int > 0
+          ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
+          : 0;
+        if (this._hOutInp >= 0) solver.stampElement(this._hOutInp, -aEffScaled * G_out);
+        if (this._hOutInn >= 0) solver.stampElement(this._hOutInn,  aEffScaled * G_out);
+        stampRHS(ctx.rhs, nOut, ieq + aEffScaled * G_out * p.vos * scale);
+      }
+    }
+
+    // ngspice CKTstate0 idiom- bottom-of-load history writes (bjtload.c:744-746,
+    // dioload.c:325-326). vInt clamp at the integrator stage above is preserved-
+    // it does not signal noncon.
+    s0[base + SLOT_VINT]         = vInt;
+    s0[base + SLOT_VOUT]         = vOut;
+    s0[base + SLOT_GEQ_INT]      = geq_int;
+    s0[base + SLOT_AEFF]         = aEff;
+    s0[base + SLOT_OUT_SAT_FLAG] = outputSaturated ? 1 : 0;
+    s0[base + SLOT_I_LIMIT_FLAG] = currentLimited ? 1 : 0;
+    s0[base + SLOT_SLEW_FLAG]    = slewLimited ? 1 : 0;
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    // pinLayout order: in-, in+, out, Vcc+, Vcc-
+    //
+    // Input resistance G_in is stamped between nInp and nInn.
+    // Current into element at each input terminal from the resistor:
+    //   I_resistor_at_nInn = (vInn - vInp) * G_in
+    //   I_resistor_at_nInp = (vInp - vInn) * G_in
+    // Bias currents: stampRHS injects -iBias into each node  element draws +iBias.
+    //
+    // Output (Norton equivalent, G_out stamped on diagonal to ground):
+    //   Normal/slewing:        Norton target = vInt  I_out = (vOut - vInt) * G_out
+    //   Saturated (no limit):  Norton target = outputClampLevel  I_out = (vOut - outputClampLevel) * G_out
+    //   Current limited:       RHS carries iOutLimited directly (injects INTO node)
+    //                           element draws -iOutLimited; diagonal G_out drives to ground
+    //                           I_out = vOut * G_out - iOutLimited
+    //
+    // Supply pins: by KCL the sum of all 5 pin currents must be zero.
+    // Total supply current = -(I_inn + I_inp + I_out).
+    // Split by output polarity: Vcc+ provides current when output sources,
+    // Vcc- sinks current when output sinks.
+
+    const p = this.p;
+    const nInp = this._pinNodes.get("in+")!;
+    const nInn = this._pinNodes.get("in-")!;
+    const nOut = this._pinNodes.get("out")!;
+    const nVccP = this._pinNodes.get("Vcc+")!;
+    const nVccN = this._pinNodes.get("Vcc-")!;
+
+    const vInp = nInp > 0 ? rhs[nInp] : 0;
+    const vInn = nInn > 0 ? rhs[nInn] : 0;
+    const vOut = nOut > 0 ? rhs[nOut] : 0;
+
+    const G_in  = 1 / Math.max(p.rIn,  1e-9);
+    const G_out = 1 / Math.max(p.rOut, 1e-9);
+    const iBiasScaled = Math.abs(p.iBias) * this._lastSrcFact;
+
+    const base = this._stateBase;
+    const s1 = this._pool.states[1];
+    const vInt           = s1[base + SLOT_VINT];
+    const outputSaturated = s1[base + SLOT_OUT_SAT_FLAG] !== 0;
+    const currentLimited  = s1[base + SLOT_I_LIMIT_FLAG] !== 0;
+
+    // Recompute the saturation clamp level for current accounting using the
+    // latest accepted supply voltages.
+    const vVccP = nVccP > 0 ? rhs[nVccP] : 0;
+    const vVccN = nVccN > 0 ? rhs[nVccN] : 0;
+    const vRailPos = vVccP - Math.max(p.vSatPos, 0);
+    const vRailNeg = vVccN + Math.max(p.vSatNeg, 0);
+    let outputClampLevel = 0;
+    if (outputSaturated) {
+      outputClampLevel = vOut >= vRailPos ? vRailPos : vRailNeg;
+    }
+    let iOutLimited = 0;
+    if (currentLimited) {
+      const iMax = Math.max(p.iMax, 1e-12);
+      const iOutNow = (outputClampLevel - vOut) * G_out;
+      iOutLimited = iOutNow > 0 ? iMax : -iMax;
+    }
+
+    // Input pin currents (resistor + bias)
+    const iInn = (nInn > 0 ? (vInn - vInp) * G_in : 0) + iBiasScaled;
+    const iInp = (nInp > 0 ? (vInp - vInn) * G_in : 0) + iBiasScaled;
+
+    // Output pin current (into element)
+    let iOut: number;
+    if (nOut <= 0) {
+      iOut = 0;
+    } else if (currentLimited) {
+      iOut = vOut * G_out - iOutLimited;
+    } else if (outputSaturated) {
+      iOut = (vOut - outputClampLevel) * G_out;
+    } else {
+      iOut = (vOut - vInt) * G_out;
+    }
+
+    // Supply currents: enforce KCL (sum of all pin currents = 0)
+    const iSupplyTotal = -(iInn + iInp + iOut);
+    let iVccP: number;
+    let iVccN: number;
+    if (iSupplyTotal >= 0) {
+      iVccP = nVccP > 0 ? iSupplyTotal : 0;
+      iVccN = 0;
+    } else {
+      iVccP = 0;
+      iVccN = nVccN > 0 ? iSupplyTotal : 0;
+    }
+
+    return [iInn, iInp, iOut, iVccP, iVccN];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this.p) this.p[key] = value;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createRealOpAmpElement  PoolBackedAnalogElement factory
+// ---------------------------------------------------------------------------
+
 export function createRealOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
-  // Extract parameters from model param partition
+): PoolBackedAnalogElement {
   const p: Record<string, number> = {
     aol:      props.getModelParam<number>("aol"),
     gbw:      props.getModelParam<number>("gbw"),
@@ -360,283 +713,7 @@ export function createRealOpAmpElement(
     }
   }
 
-  const nInn  = pinNodes.get("in-")!;  // inverting input
-  const nInp  = pinNodes.get("in+")!;  // non-inverting input
-  const nOut  = pinNodes.get("out")!;  // output
-  const nVccP = pinNodes.get("Vcc+")!; // positive supply
-  const nVccN = pinNodes.get("Vcc-")!; // negative supply
-
-  // Internal gain-stage state  not an MNA node.
-  // Updated each NR iteration inside load().
-  let vInt = 0;
-
-  // Operating point voltages
-  let vInp  = 0;
-  let vInn  = 0;
-  let vVccP = 15;
-  let vVccN = -15;
-  let vOut  = 0;
-
-  // Saturation state (determined from V_out)
-  let outputSaturated  = false;
-  let outputClampLevel = 0;
-
-  // Current limiting state
-  let currentLimited = false;
-  let iOutLimited    = 0;
-
-  // Slew rate limiting state (transient only)
-  let slewLimited = false;
-  let _vOutPrev = 0; void _vOutPrev;      // output voltage at previous accepted timestep
-
-  // Source scale for source-stepping DC convergence  read from ctx.srcFact
-  // (ngspice CKTsrcFact) in load() and cached for getPinCurrents().
-  let lastSrcFact = 1;
-
-  // Transient: effective gain reduced from A_OL by bandwidth limiting.
-  // In DC mode (no companion): aEff = p.aol. In transient: aEff < p.aol.
-  let aEff = p.aol;
-
-  // backward-Euler companion model for the gain-stage integrator.
-  // geq_int > 0 only during transient; 0 during DC.
-  let geq_int  = 0;
-  let vIntPrev = 0;
-
-  function readNode(rhs: Float64Array, n: number): number {
-    return rhs[n];
-  }
-
-  // Cached TSTALLOC handles — allocated once in setup(), used every NR iteration.
-  let hInpInp = -1;  // (nInp, nInp) — input resistance G_in diagonal
-  let hInnInn = -1;  // (nInn, nInn) — input resistance G_in diagonal
-  let hInpInn = -1;  // (nInp, nInn) — input resistance off-diagonal
-  let hInnInp = -1;  // (nInn, nInp) — input resistance off-diagonal
-  let hOutOut  = -1; // (nOut, nOut)  — output conductance G_out diagonal
-  let hOutInp  = -1; // (nOut, nInp)  — gain-stage Jacobian coupling
-  let hOutInn  = -1; // (nOut, nInn)  — gain-stage Jacobian coupling
-
-  return {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(ctx: SetupContext): void {
-      const solver = ctx.solver;
-      // Input resistance stamp: conductance between nInp and nInn.
-      if (nInp > 0) hInpInp = solver.allocElement(nInp, nInp);
-      if (nInn > 0) hInnInn = solver.allocElement(nInn, nInn);
-      if (nInp > 0 && nInn > 0) {
-        hInpInn = solver.allocElement(nInp, nInn);
-        hInnInp = solver.allocElement(nInn, nInp);
-      }
-      // Output conductance and gain-stage Jacobian coupling.
-      if (nOut > 0) {
-        hOutOut = solver.allocElement(nOut, nOut);
-        if (nInp > 0) hOutInp = solver.allocElement(nOut, nInp);
-        if (nInn > 0) hOutInn = solver.allocElement(nOut, nInn);
-      }
-    },
-
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      const voltages = ctx.rhsOld;
-      const scale = ctx.srcFact;
-      lastSrcFact = scale;
-      const G_in   = 1 / Math.max(p.rIn,  1e-9);
-      const G_out  = 1 / Math.max(p.rOut, 1e-9);
-      const iMax   = Math.max(p.iMax,   1e-12);
-      const vSatPos = Math.max(p.vSatPos, 0);
-      const vSatNeg = Math.max(p.vSatNeg, 0);
-      const aol    = Math.max(p.aol, 1);
-
-      // Update companion coefficient at the start of each NR iteration.
-      // During transient NR: geq_int = tau/dt. During DC: geq_int = 0 (no
-      // history term, pure VCVS).
-      if ((ctx.cktMode & MODETRAN) && ctx.dt > 0) {
-        const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
-        geq_int = tau / ctx.dt;
-      } else {
-        geq_int = 0;
-      }
-
-      // Evaluate operating point from current NR-iterate voltages.
-      vInp  = readNode(voltages, nInp);
-      vInn  = readNode(voltages, nInn);
-      vVccP = readNode(voltages, nVccP);
-      vVccN = readNode(voltages, nVccN);
-      vOut  = readNode(voltages, nOut);
-
-      const vDiff = vInp - vInn;
-      const vOsScaled = p.vos * scale;
-
-      const vRailPos = vVccP - vSatPos;
-      const vRailNeg = vVccN + vSatNeg;
-
-      if (geq_int > 0) {
-        // Transient: re-evaluate slew state from current NR-iterate voltages.
-        const g = geq_int;
-        const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
-        const dt = tau / g;
-        const slewLimit = Math.max(p.slewRate, 1e-6) * dt;
-        const target = (aol * (vDiff + vOsScaled) + g * vIntPrev) / (1 + g);
-        const delta = target - vIntPrev;
-        const clampedDelta = Math.max(-slewLimit, Math.min(slewLimit, delta));
-        slewLimited = Math.abs(delta) > slewLimit;
-        vInt = vIntPrev + clampedDelta;
-        aEff = slewLimited ? 0 : aol / (1 + g);
-
-        if (vVccP > vVccN) {
-          vInt = Math.max(vRailNeg, Math.min(vRailPos, vInt));
-        } else {
-          vInt = Math.max(-1000, Math.min(1000, vInt));
-        }
-      } else {
-        vInt = aol * (vDiff + vOsScaled);
-        aEff = aol;
-        slewLimited = false;
-        if (vVccP > vVccN) {
-          vInt = Math.max(vRailNeg, Math.min(vRailPos, vInt));
-        } else {
-          vInt = Math.max(-1000, Math.min(1000, vInt));
-        }
-      }
-
-      if (vVccP > vVccN && vOut >= vRailPos) {
-        outputSaturated  = true;
-        outputClampLevel = vRailPos;
-      } else if (vVccP > vVccN && vOut <= vRailNeg) {
-        outputSaturated  = true;
-        outputClampLevel = vRailNeg;
-      } else {
-        outputSaturated  = false;
-        outputClampLevel = 0;
-      }
-
-      if (outputSaturated) {
-        const iOutNow = (outputClampLevel - vOut) * G_out;
-        if (Math.abs(iOutNow) > iMax) {
-          currentLimited = true;
-          iOutLimited    = iOutNow > 0 ? iMax : -iMax;
-        } else {
-          currentLimited = false;
-          iOutLimited    = 0;
-        }
-      } else {
-        currentLimited = false;
-        iOutLimited    = 0;
-      }
-
-      // Linear topology stamps using cached handles.
-      // Input resistance between in+ and in-
-      if (hInpInp >= 0) solver.stampElement(hInpInp,  G_in);
-      if (hInnInn >= 0) solver.stampElement(hInnInn,  G_in);
-      if (hInpInn >= 0) solver.stampElement(hInpInn, -G_in);
-      if (hInnInp >= 0) solver.stampElement(hInnInp, -G_in);
-      // Output conductance G_out (always present for NR stability)
-      if (hOutOut >= 0) solver.stampElement(hOutOut, G_out);
-
-      // Input bias currents
-      const iBiasScaled = Math.abs(p.iBias) * scale;
-      if (nInp > 0) stampRHS(ctx.rhs, nInp, -iBiasScaled);
-      if (nInn > 0) stampRHS(ctx.rhs, nInn, -iBiasScaled);
-
-      if (nOut <= 0) return;
-
-      // Gain-stage output
-      if (outputSaturated) {
-        stampRHS(ctx.rhs, nOut, outputClampLevel * G_out);
-      } else if (currentLimited) {
-        stampRHS(ctx.rhs, nOut, iOutLimited);
-      } else if (slewLimited) {
-        stampRHS(ctx.rhs, nOut, vInt * G_out);
-      } else {
-        // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
-        const aEffScaled = aEff * scale;
-        const ieq = geq_int > 0
-          ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
-          : 0;
-        if (hOutInp >= 0) solver.stampElement(hOutInp, -aEffScaled * G_out);
-        if (hOutInn >= 0) solver.stampElement(hOutInn,  aEffScaled * G_out);
-        stampRHS(ctx.rhs, nOut, ieq + aEffScaled * G_out * p.vos * scale);
-      }
-    },
-
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      // Record the accepted-timestep vInt and output voltage so the next
-      // step's backward-Euler history term uses the converged state.
-      vIntPrev = vInt;
-      _vOutPrev = readNode(ctx.rhs, nOut);
-    },
-
-    getPinCurrents(_rhs: Float64Array): number[] {
-      // pinLayout order: in-, in+, out, Vcc+, Vcc-
-      //
-      // Input resistance G_in is stamped between nInp and nInn.
-      // Current into element at each input terminal from the resistor:
-      //   I_resistor_at_nInn = (vInn - vInp) * G_in
-      //   I_resistor_at_nInp = (vInp - vInn) * G_in
-      // Bias currents: stampRHS injects -iBias into each node  element draws +iBias.
-      //
-      // Output (Norton equivalent, G_out stamped on diagonal to ground):
-      //   Normal/slewing:        Norton target = vInt  I_out = (vOut - vInt) * G_out
-      //   Saturated (no limit):  Norton target = outputClampLevel  I_out = (vOut - outputClampLevel) * G_out
-      //   Current limited:       RHS carries iOutLimited directly (injects INTO node)
-      //                           element draws -iOutLimited; diagonal G_out drives to ground
-      //                           I_out = vOut * G_out - iOutLimited
-      //
-      // Supply pins: by KCL the sum of all 5 pin currents must be zero.
-      // Total supply current = -(I_inn + I_inp + I_out).
-      // Split by output polarity: Vcc+ provides current when output sources,
-      // Vcc- sinks current when output sinks.
-
-      const G_in  = 1 / Math.max(p.rIn,  1e-9);
-      const G_out = 1 / Math.max(p.rOut, 1e-9);
-      const iBiasScaled = Math.abs(p.iBias) * lastSrcFact;
-
-      // Input pin currents (resistor + bias)
-      const iInn = (nInn > 0 ? (vInn - vInp) * G_in : 0) + iBiasScaled;
-      const iInp = (nInp > 0 ? (vInp - vInn) * G_in : 0) + iBiasScaled;
-
-      // Output pin current (into element)
-      let iOut: number;
-      if (nOut <= 0) {
-        iOut = 0;
-      } else if (currentLimited) {
-        // G_out diagonal stamps V_out to ground effectively; RHS carries iOutLimited
-        // into node. Current into element = vOut * G_out - iOutLimited.
-        iOut = vOut * G_out - iOutLimited;
-      } else if (outputSaturated) {
-        iOut = (vOut - outputClampLevel) * G_out;
-      } else {
-        // Normal or slewing: Norton target = vInt
-        iOut = (vOut - vInt) * G_out;
-      }
-
-      // Supply currents: enforce KCL (sum of all pin currents = 0)
-      const iSupplyTotal = -(iInn + iInp + iOut);
-      // Vcc+ sources positive current (flows into Vcc+ pin when element draws from it)
-      // Vcc- sinks negative current. Split by sign of total supply demand.
-      let iVccP: number;
-      let iVccN: number;
-      if (iSupplyTotal >= 0) {
-        // Positive supply provides the current
-        iVccP = nVccP > 0 ? iSupplyTotal : 0;
-        iVccN = 0;
-      } else {
-        // Negative supply provides the current
-        iVccP = 0;
-        iVccN = nVccN > 0 ? iSupplyTotal : 0;
-      }
-
-      return [iInn, iInp, iOut, iVccP, iVccN];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
-    },
-  };
+  return new RealOpAmpAnalogElement(pinNodes, p);
 }
 
 // ---------------------------------------------------------------------------
@@ -676,7 +753,7 @@ const REAL_OPAMP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // RealOpAmpDefinition
 // ---------------------------------------------------------------------------
 
-export const RealOpAmpDefinition: ComponentDefinition = {
+export const RealOpAmpDefinition: StandaloneComponentDefinition = {
   name: "RealOpAmp",
   typeId: -1,
   category: ComponentCategory.ACTIVE,

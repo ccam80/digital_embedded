@@ -133,7 +133,6 @@ const ADC_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 export class ADCDriverElement implements PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly poolBacked = true as const;
-  readonly participatesInLoad = true;
   // Per-instance schema- one per distinct bits value (memoised module-scope).
   readonly stateSchema: StateSchema;
   readonly stateSize: number;

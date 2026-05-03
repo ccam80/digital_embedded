@@ -100,7 +100,6 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
   readonly poolBacked = true as const;
   readonly stateSchema = COMPARATOR_SCHEMA;
   readonly stateSize = COMPARATOR_SCHEMA.size;
-  readonly participatesInLoad = true;
 
   label = "";
   _pinNodes: Map<string, number>;

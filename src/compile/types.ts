@@ -8,7 +8,7 @@ import type { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { Point, PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
-import type { ComponentDefinition, DigitalModel, AnalogFactory } from "../core/registry.js";
+import type { ComponentDefinition, StandaloneComponentDefinition, DigitalModel, AnalogFactory } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
@@ -126,7 +126,7 @@ export interface Diagnostic {
 // ---------------------------------------------------------------------------
 
 import type { PropertyBag } from "../core/properties.js";
-import type { AnalogElement } from "../core/analog-types.js";
+import type { AnalogElement } from "../solver/analog/element.js";
 
 /**
  * Compiler-internal representation of an analog model that can be stamped
@@ -152,7 +152,7 @@ export interface MnaModel {
 // Re-export imported types for downstream consumers of this module
 // ---------------------------------------------------------------------------
 
-export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, AnalogFactory };
+export type { Wire, CircuitElement, ComponentDefinition, StandaloneComponentDefinition, DigitalModel, AnalogFactory };
 export type { PinElectricalSpec };
 export type { CompiledDigitalDomain, CompiledAnalogDomain };
 
@@ -223,7 +223,7 @@ export interface ConnectivityGroup {
  */
 export interface PartitionedComponent {
   element: CircuitElement;
-  definition: ComponentDefinition;
+  definition: StandaloneComponentDefinition;
   modelKey: string;
   model: DigitalModel | MnaModel | null;
   resolvedPins: ResolvedGroupPin[];

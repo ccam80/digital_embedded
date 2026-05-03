@@ -12,10 +12,11 @@
  *   mutload.c         - MUT load (off-diagonal coupling stamps)
  */
 
-import type { PoolBackedAnalogElement, AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement, AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";

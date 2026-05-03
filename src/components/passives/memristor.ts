@@ -1,28 +1,28 @@
-/**
+﻿/**
  * Memristor analog component  Joglekar window function model.
  *
  * The memristor's resistance depends on an internal state variable w
  * (normalised, 0 to 1) representing the boundary between doped and undoped
  * regions. The state evolves with current:
  *
- *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
+ *   dw/dt = Âµ_v Â· R_on / DÂ² Â· i(t) Â· f_p(w)
  *
- * where f_p(w) = 1 − (2w − 1)^(2p) is the Joglekar window function of
- * order p, enforcing 0 ≤ w ≤ 1. The resistance is:
+ * where f_p(w) = 1 âˆ’ (2w âˆ’ 1)^(2p) is the Joglekar window function of
+ * order p, enforcing 0 â‰¤ w â‰¤ 1. The resistance is:
  *
- *   R(w) = R_on · w + R_off · (1 − w)
+ *   R(w) = R_on Â· w + R_off Â· (1 âˆ’ w)
  *
  * which can equivalently be written using conductance:
  *
- *   G(w) = w · (1/R_on − 1/R_off) + 1/R_off
+ *   G(w) = w Â· (1/R_on âˆ’ 1/R_off) + 1/R_off
  *
  * The memristor stamps its state-dependent conductance inside load() every
- * NR iteration. The engine calls accept() once per accepted timestep to
- * integrate w forward by Euler forward.
+ * NR iteration. State variable w integrates at the bottom of load() reading
+ * s1, writing s0.
  *
  * MNA topology:
- *   _pinNodes.get("A") = node_A  (positive terminal)
- *   _pinNodes.get("B") = node_B  (negative terminal)
+ *   _pinNodes.get("pos") = node_pos  (positive terminal)
+ *   _pinNodes.get("neg") = node_neg  (negative terminal)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -35,13 +35,29 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+
+// ---------------------------------------------------------------------------
+// State-pool schema
+// ---------------------------------------------------------------------------
+
+export const MEMRISTOR_SCHEMA = defineStateSchema("MemristorElement", [
+  { name: "W", doc: "Normalised doped-region boundary (0=undoped, 1=fully doped)", init: { kind: "zero" } },
+]) satisfies StateSchema;
+
+const SLOT_W = 0;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -49,27 +65,30 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: MEMRISTOR_PARAM_DEFS, defaults: MEMRISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    rOn:         { default: 100,    unit: "Ω",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
-    rOff:        { default: 16000,  unit: "Ω",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
+    rOn:         { default: 100,    unit: "Î©",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
+    rOff:        { default: 16000,  unit: "Î©",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
     initialState:{ default: 0.5,                     description: "Initial normalised doped-region boundary (0=undoped, 1=fully doped)", min: 0 },
   },
   secondary: {
-    mobility:    { default: 1e-14,                   description: "Ionic mobility in m² per V·s", min: 1e-20 },
+    mobility:    { default: 1e-14,                   description: "Ionic mobility in mÂ² per VÂ·s", min: 1e-20 },
     deviceLength:{ default: 10e-9,                   description: "Device thickness in metres", min: 1e-12 },
     windowOrder: { default: 1,                       description: "Joglekar window function order p (integer >= 1)", min: 1 },
   },
 });
 
 // ---------------------------------------------------------------------------
-// MemristorElement  AnalogElement implementation
+// MemristorElement  PoolBackedAnalogElement implementation
 // ---------------------------------------------------------------------------
 
-export class MemristorElement implements AnalogElement {
+export class MemristorElement implements PoolBackedAnalogElement {
   label: string = "";
   _pinNodes: Map<string, number> = new Map();
   _stateBase: number = -1;
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly poolBacked = true as const;
+  readonly stateSchema = MEMRISTOR_SCHEMA;
+  readonly stateSize = MEMRISTOR_SCHEMA.size;
 
   private _hPP: number = -1;
   private _hNN: number = -1;
@@ -81,9 +100,9 @@ export class MemristorElement implements AnalogElement {
   private mobility: number;
   private deviceLength: number;
   private windowOrder: number;
+  private initialState: number;
 
-  /** Normalised state variable: 0 = fully undoped, 1 = fully doped. */
-  private _w: number;
+  private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
@@ -92,43 +111,49 @@ export class MemristorElement implements AnalogElement {
     this.mobility     = props.hasModelParam("mobility")     ? props.getModelParam<number>("mobility")     : MEMRISTOR_DEFAULTS["mobility"]!;
     this.deviceLength = props.hasModelParam("deviceLength") ? props.getModelParam<number>("deviceLength") : MEMRISTOR_DEFAULTS["deviceLength"]!;
     this.windowOrder  = props.hasModelParam("windowOrder")  ? props.getModelParam<number>("windowOrder")  : MEMRISTOR_DEFAULTS["windowOrder"]!;
-    const initialState = props.hasModelParam("initialState") ? props.getModelParam<number>("initialState") : MEMRISTOR_DEFAULTS["initialState"]!;
-    this._w = Math.max(0, Math.min(1, initialState));
+    const w0 = props.hasModelParam("initialState") ? props.getModelParam<number>("initialState") : MEMRISTOR_DEFAULTS["initialState"]!;
+    this.initialState = Math.max(0, Math.min(1, w0));
   }
 
   /**
-   * Resistance at current state.
-   * R(w) = R_on · w + R_off · (1 − w)
+   * Resistance at current pool state.
+   * R(w) = R_on Â· w + R_off Â· (1 âˆ’ w)
    */
-  resistance(): number {
-    return this.rOn * this._w + this.rOff * (1 - this._w);
+  resistanceAt(w: number): number {
+    return this.rOn * w + this.rOff * (1 - w);
   }
 
   /**
-   * Conductance at current state.
-   * G(w) = w · (1/R_on − 1/R_off) + 1/R_off
+   * Conductance at current pool state.
+   * G(w) = w Â· (1/R_on âˆ’ 1/R_off) + 1/R_off
    */
-  conductance(): number {
-    return this._w * (1 / this.rOn - 1 / this.rOff) + 1 / this.rOff;
-  }
-
-  /** Current normalised state variable w (read-only access for tests). */
-  get w(): number {
-    return this._w;
+  conductanceAt(w: number): number {
+    return w * (1 / this.rOn - 1 / this.rOff) + 1 / this.rOff;
   }
 
   setup(ctx: SetupContext): void {
-    const solver = ctx.solver;
-    const aNode = this._pinNodes.get("A")!;  // A pin — RESposNode
-    const bNode = this._pinNodes.get("B")!;  // B pin — RESnegNode
-
-    // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
-    if (aNode !== 0) this._hPP = solver.allocElement(aNode, aNode);
-    if (bNode !== 0) this._hNN = solver.allocElement(bNode, bNode);
-    if (aNode !== 0 && bNode !== 0) {
-      this._hPN = solver.allocElement(aNode, bNode);
-      this._hNP = solver.allocElement(bNode, aNode);
+    if (this._stateBase === -1) {
+      this._stateBase = ctx.allocStates(this.stateSize);
     }
+
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("pos")!;  // pos pin - RESposNode
+    const negNode = this._pinNodes.get("neg")!;  // neg pin - RESnegNode
+
+    // ressetup.c:46-49 TSTALLOC sequence, line-for-line.
+    if (posNode !== 0) this._hPP = solver.allocElement(posNode, posNode);
+    if (negNode !== 0) this._hNN = solver.allocElement(negNode, negNode);
+    if (posNode !== 0 && negNode !== 0) {
+      this._hPN = solver.allocElement(posNode, negNode);
+      this._hNP = solver.allocElement(negNode, posNode);
+    }
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    applyInitialValues(MEMRISTOR_SCHEMA, pool, this._stateBase, {});
+    // Apply initial state from params into s0 slot W
+    pool.state0[this._stateBase + SLOT_W] = this.initialState;
   }
 
   setParam(key: string, value: number): void {
@@ -137,56 +162,61 @@ export class MemristorElement implements AnalogElement {
     else if (key === "mobility") this.mobility = value;
     else if (key === "deviceLength") this.deviceLength = value;
     else if (key === "windowOrder") this.windowOrder = value;
-    else if (key === "initialState") this._w = Math.max(0, Math.min(1, value));
+    else if (key === "initialState") {
+      this.initialState = Math.max(0, Math.min(1, value));
+      if (this._stateBase !== -1 && this._pool) {
+        this._pool.state0[this._stateBase + SLOT_W] = this.initialState;
+      }
+    }
   }
 
   /**
    * Unified load()  stamps the state-dependent conductance every NR iteration.
    *
-   * The memristor is nonlinear but not reactive: dw/dt integration happens in
-   * accept() once per accepted timestep, not in the NR inner loop.
+   * Reads w from s1 (last-accepted) for stamp stability across the NR loop.
+   * Integrates w at the bottom of load() reading s1, writing s0.
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const G = this.conductance();
+    const base = this._stateBase;
+    const s1 = this._pool.states[1];
+    const s0 = this._pool.states[0];
+
+    const wOld = s1[base + SLOT_W];
+    const G = this.conductanceAt(wOld);
 
     if (this._hPP !== -1) solver.stampElement(this._hPP, G);
     if (this._hNN !== -1) solver.stampElement(this._hNN, G);
     if (this._hPN !== -1) solver.stampElement(this._hPN, -G);
     if (this._hNP !== -1) solver.stampElement(this._hNP, -G);
-  }
 
-  /**
-   * Euler forward integration of the state variable w once per accepted timestep.
-   * The engine calls accept() exactly once per accepted step with the converged
-   * terminal voltages on ctx.rhs.
-   *
-   *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
-   *   f_p(w) = 1 − (2w − 1)^(2p)
-   */
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const nA = this._pinNodes.get("A")!;
-    const nB = this._pinNodes.get("B")!;
-    const voltages = ctx.rhs;
-    const vA = voltages[nA];
-    const vB = voltages[nB];
-    const vAB = vA - vB;
-    const current = this.conductance() * vAB;
+    // ngspice CKTstate0 idiom - bjtload.c:744-746, dioload.c:325-326
+    const posNode = this._pinNodes.get("pos")!;
+    const negNode = this._pinNodes.get("neg")!;
+    const voltages = ctx.rhsOld;
+    const vPos = voltages[posNode];
+    const vNeg = voltages[negNode];
+    const vAB = vPos - vNeg;
+    const iIter = G * vAB;
 
     const p = this.windowOrder;
-    const twoWMinus1 = 2 * this._w - 1;
+    const D = this.deviceLength;
+    const twoWMinus1 = 2 * wOld - 1;
     const fp = 1 - Math.pow(twoWMinus1, 2 * p);
-
-    const dWdt = (this.mobility * this.rOn) / (this.deviceLength * this.deviceLength) * current * fp;
-    this._w = Math.max(0, Math.min(1, this._w + dWdt * ctx.dt));
+    const dw = (this.mobility * this.rOn) / (D * D) * iIter * fp;
+    const dt = ctx.dt ?? 0;
+    const wNew = Math.max(0, Math.min(1, wOld + dw * dt));
+    s0[base + SLOT_W] = wNew;
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nA = this._pinNodes.get("A")!;
-    const nB = this._pinNodes.get("B")!;
-    const vA = rhs[nA];
-    const vB = rhs[nB];
-    const I = this.conductance() * (vA - vB);
+    const posNode = this._pinNodes.get("pos")!;
+    const negNode = this._pinNodes.get("neg")!;
+    const vPos = rhs[posNode];
+    const vNeg = rhs[negNode];
+    const s1 = this._pool.states[1];
+    const wOld = s1[this._stateBase + SLOT_W];
+    const I = this.conductanceAt(wOld) * (vPos - vNeg);
     return [I, -I];
   }
 }
@@ -199,7 +229,7 @@ function buildMemristorPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "A",
+      label: "pos",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
@@ -208,7 +238,7 @@ function buildMemristorPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "B",
+      label: "neg",
       defaultBitWidth: 1,
       position: { x: 4, y: 0 },
       isNegatable: false,
@@ -251,15 +281,15 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    const vA = signals?.getPinVoltage("A");
-    const vB = signals?.getPinVoltage("B");
+    const vA = signals?.getPinVoltage("pos");
+    const vB = signals?.getPinVoltage("neg");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Falstad MemristorElm: total width 4 grid units (64px ÷ 16).
-    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px ÷ 16 = 3).
-    // Body spans x=13 (16px leads on each end), hs=10px÷16=0.625 grid units.
+    // Falstad MemristorElm: total width 4 grid units (64px Ã· 16).
+    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px Ã· 16 = 3).
+    // Body spans x=13 (16px leads on each end), hs=10pxÃ·16=0.625 grid units.
     // Zigzag body: 4 full teeth, each 8px = 0.5 grid units wide.
-    // Segment x positions (px ÷ 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
+    // Segment x positions (px Ã· 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
     // (body subdivided into 8 half-teeth of 5px = 0.3125 grid units)
 
     if (hasVoltage && ctx.setLinearGradient) {
@@ -271,7 +301,7 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
       ctx.setColor("COMPONENT");
     }
 
-    // Lead A: (0,0)  (1,0)
+    // Lead pos: (0,0)  (1,0)
     ctx.drawLine(0, 0, 1, 0);
 
     // Zigzag body: x positions at 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
@@ -289,7 +319,7 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
       }
     }
 
-    // Lead B: (3,0)  (4,0)
+    // Lead neg: (3,0)  (4,0)
     ctx.drawLine(3, 0, 4, 0);
 
     ctx.restore();
@@ -305,7 +335,7 @@ export function createMemristorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
+): PoolBackedAnalogElement {
   return new MemristorElement(pinNodes, props);
 }
 
@@ -317,10 +347,10 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "mobility",
     type: PropertyType.FLOAT,
-    label: "Mobility µ_v (m²/V·s)",
+    label: "Mobility Âµ_v (mÂ²/VÂ·s)",
     defaultValue: 1e-14,
     min: 1e-20,
-    description: "Ionic mobility in m² per V·s",
+    description: "Ionic mobility in mÂ² per VÂ·s",
   },
   {
     key: "deviceLength",
@@ -336,7 +366,7 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Window order p",
     defaultValue: 1,
     min: 1,
-    description: "Joglekar window function order p (integer ≥ 1)",
+    description: "Joglekar window function order p (integer â‰¥ 1)",
   },
   {
     key: "label",
@@ -369,7 +399,7 @@ function memristorCircuitFactory(props: PropertyBag): MemristorCircuitElement {
   return new MemristorCircuitElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const MemristorDefinition: ComponentDefinition = {
+export const MemristorDefinition: StandaloneComponentDefinition = {
   name: "Memristor",
   typeId: -1,
   factory: memristorCircuitFactory,
@@ -390,5 +420,4 @@ export const MemristorDefinition: ComponentDefinition = {
     },
   },
   defaultModel: "behavioral",
-  ngspiceNodeMap: { A: "pos", B: "neg" },
 };

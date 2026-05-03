@@ -6,18 +6,10 @@
  * triggers on falling input). The hysteresis band V_TH - V_TL prevents
  * spurious switching on noisy inputs.
  *
- * Hysteresis state machine:
- *   If _outputHigh && V_in < V_TL   switch to low
- *   If !_outputHigh && V_in > V_TH  switch to high
- *   Otherwise                        hold current state
- *
- * Non-inverting: output HIGH when _outputHigh.
- * Inverting:     output HIGH when !_outputHigh (sense is flipped).
- *
- * Output modelled via DigitalOutputPinModel (Norton equivalent with C_out
- * companion). Input modelled via DigitalInputPinModel (loading + C_in
- * companion). Both use a built-in ResolvedPinElectrical derived from
- * component properties.
+ * Architecture: declarative netlist composing one `SchmittTriggerDriver`
+ * leaf with explicit `Capacitor` instances for input/output companion
+ * capacitance. The driver carries the hysteresis state in StatePool slots;
+ * the parent composite has no MNA math.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -31,22 +23,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { collectPinModelChildren, DigitalOutputPinModel, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
-import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { defineStateSchema } from "../../solver/analog/state-schema.js";
-import type { StateSchema } from "../../solver/analog/state-schema.js";
-import type { AnalogCapacitorElement } from "../passives/capacitor.js";
-
-const SCHMITT_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("SchmittComposite", [
-  { name: "OUTPUT_HIGH", doc: "Hysteresis latch: 1.0 = output high, 0.0 = output low", init: { kind: "zero" } },
-]);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -58,198 +38,60 @@ export const { paramDefs: SCHMITT_PARAM_DEFS, defaults: SCHMITT_DEFAULTS } = def
     vTL:  { default: 1.0, unit: "V", description: "Falling input threshold" },
     vOH:  { default: 3.3, unit: "V", description: "Output high voltage" },
     vOL:  { default: 0.0, unit: "V", description: "Output low voltage" },
-    rOut: { default: 50,  unit: "Î", description: "Output impedance" },
+    rOut: { default: 50,  unit: "Î©", description: "Output impedance" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// buildPinElectrical  construct ResolvedPinElectrical from component props
+// SCHMITT_INVERTING_NETLIST / SCHMITT_NON_INVERTING_NETLIST
+//
+// Ports: in, out, gnd. Internal nets: nDrive (driver output before rOut).
+// Sub-elements:
+//   drv  - SchmittTriggerDriver (behavioural leaf, holds hysteresis state)
+//   cIn  - Capacitor on input pin (5pF default)
+//   rOut - Resistor between driver output and out pin
+//   cOut - Capacitor on output pin (5pF default)
 // ---------------------------------------------------------------------------
 
-/**
- * Build a ResolvedPinElectrical from the mutable params record.
- *
- * Fields not covered by the Schmitt trigger's own properties use sensible
- * CMOS 3.3V defaults (rIn=10MÎ, cIn=5pF, cOut=5pF, rHiZ=10MÎ).
- */
-function buildOutputSpec(p: Record<string, number>): ResolvedPinElectrical {
-  return {
-    rOut:  Math.max(p.rOut, 1e-9),
-    cOut:  5e-12,
-    rIn:   1e7,
-    cIn:   5e-12,
-    vOH:   p.vOH,
-    vOL:   p.vOL,
-    vIH:   p.vTH,
-    vIL:   p.vTL,
-    rHiZ:  1e7,
-  };
-}
+export const SCHMITT_INVERTING_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["in", "out", "gnd"],
+  params: { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut: 50, cIn: 5e-12, cOut: 5e-12 },
+  elements: [
+    { typeId: "SchmittTriggerDriver", modelRef: "default", subElementName: "drv",
+      params: { vTH: "vTH", vTL: "vTL", vOH: "vOH", vOL: "vOL", inverting: 1 } },
+    { typeId: "Capacitor", modelRef: "default", subElementName: "cIn",  params: { C: "cIn"  } },
+    { typeId: "Resistor",  modelRef: "default", subElementName: "rOut", params: { R: "rOut" } },
+    { typeId: "Capacitor", modelRef: "default", subElementName: "cOut", params: { C: "cOut" } },
+  ],
+  internalNetCount: 1,
+  internalNetLabels: ["nDrive"],
+  netlist: [
+    [0, 3, 2],   // drv:  in=in(0), out=nDrive(3), gnd=gnd(2)
+    [0, 2],      // cIn:  pos=in(0),    neg=gnd(2)
+    [3, 1],      // rOut: pos=nDrive(3), neg=out(1)
+    [1, 2],      // cOut: pos=out(1),   neg=gnd(2)
+  ],
+} as MnaSubcircuitNetlist;
 
-function buildInputSpec(p: Record<string, number>): ResolvedPinElectrical {
-  return {
-    rOut:  50,
-    cOut:  5e-12,
-    rIn:   1e7,
-    cIn:   5e-12,
-    vOH:   p.vOH,
-    vOL:   p.vOL,
-    vIH:   p.vTH,
-    vIL:   p.vTL,
-    rHiZ:  1e7,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// createSchmittTriggerElement  AnalogElement factory
-// ---------------------------------------------------------------------------
-
-/**
- * Create the MNA element for a Schmitt trigger.
- *
- * @param pinNodes  - map of pin label  MNA node ID (1-based)
- * @param props     - Component properties
- * @param inverting - true  inverting (output opposes input sense)
- */
-function createSchmittTriggerElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  inverting: boolean,
-): PoolBackedAnalogElement {
-  const p: Record<string, number> = {
-    vTH:  props.getModelParam<number>("vTH"),
-    vTL:  props.getModelParam<number>("vTL"),
-    vOH:  props.getModelParam<number>("vOH"),
-    vOL:  props.getModelParam<number>("vOL"),
-    rOut: props.getModelParam<number>("rOut"),
-  };
-
-  const nIn  = pinNodes.get("in")!;  // input node (1-based, 0=ground)
-  const nOut = pinNodes.get("out")!; // output node (1-based, 0=ground)
-
-  const outputSpec = buildOutputSpec(p);
-  const inputSpec  = buildInputSpec(p);
-
-  const outModel = new DigitalOutputPinModel(outputSpec);
-  const inModel  = new DigitalInputPinModel(inputSpec, true);
-
-  // DigitalOutputPinModel.init / DigitalInputPinModel.init expect 1-based MNA node IDs
-  if (nOut > 0) outModel.init(nOut, -1);
-  if (nIn  > 0) inModel.init(nIn, 0);
-
-  // Initial state: output low
-  let _outputHigh = false;
-  outModel.setLogicLevel(inverting ? _outputHigh : _outputHigh);
-
-  function readNode(rhs: Float64Array, n: number): number {
-    return rhs[n];
-  }
-
-  function updateOutputLevel(): void {
-    // Non-inverting: output HIGH when _outputHigh
-    // Inverting: output HIGH when !_outputHigh
-    const driveHigh = inverting ? !_outputHigh : _outputHigh;
-    outModel.setLogicLevel(driveHigh);
-  }
-
-  // Initialise output model to vOL
-  updateOutputLevel();
-
-  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([inModel, outModel]);
-  const childStateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
-  // Composite owns 1 slot for OUTPUT_HIGH hysteresis latch; children own the rest.
-  const totalStateSize = SCHMITT_COMPOSITE_SCHEMA.size + childStateSize;
-
-  // Pool reference for state access in load() and initState().
-  let _schmittPool: StatePoolRef;
-  let _schmittBase = 0;
-
-  return {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(ctx: SetupContext): void {
-      // Allocate 1 composite-level state slot for OUTPUT_HIGH latch.
-      this._stateBase = ctx.allocStates(SCHMITT_COMPOSITE_SCHEMA.size);
-      // Forward to pin models so they allocate their TSTALLOC entries.
-      if (nIn  > 0) inModel.setup(ctx);
-      if (nOut > 0) outModel.setup(ctx);
-      // Forward to CAP children of pin models.
-      for (const child of childElements) {
-        child.setup(ctx);
-      }
-    },
-
-    poolBacked: true as const,
-    stateSchema: SCHMITT_COMPOSITE_SCHEMA,
-    stateSize: totalStateSize,
-
-    initState(_pool: StatePoolRef): void {
-      _schmittPool = _pool;
-      _schmittBase = this._stateBase;
-      // Initialize OUTPUT_HIGH slot to 0 (output starts low).
-      _pool.state0[_schmittBase] = 0.0;
-      let offset = _schmittBase + SCHMITT_COMPOSITE_SCHEMA.size;
-      for (const child of childElements) {
-        child._stateBase = offset;
-        child.initState(_pool);
-        offset += child.stateSize;
-      }
-    },
-
-    load(ctx: LoadContext): void {
-      const voltages = ctx.rhsOld;
-      const vIn = readNode(voltages, nIn);
-
-      // ngspice DEVload-local register promotion of CKTstate0 (cktdefs.h:82-85).
-      // Hoist the live ring slot once per load() entry.
-      const s0 = _schmittPool.states[0];
-
-      // Read hysteresis state from pool (state0 = current NR iterate).
-      const outputHigh = s0[_schmittBase] >= 0.5;
-      let nextHigh = outputHigh;
-      if (outputHigh && vIn < p.vTL) {
-        nextHigh = false;
-      } else if (!outputHigh && vIn > p.vTH) {
-        nextHigh = true;
-      }
-
-      if (nextHigh !== outputHigh) {
-        s0[_schmittBase] = nextHigh ? 1.0 : 0.0;
-        _outputHigh = nextHigh;
-        updateOutputLevel();
-      }
-
-      // Linear loading: input resistance + output drive (Norton equivalent)
-      if (nIn > 0)  inModel.load(ctx);
-      if (nOut > 0) outModel.load(ctx);
-
-      for (const child of childElements) { child.load(ctx); }
-    },
-
-    accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // Input pin: conductance 1/rIn from nIn to ground  I_in = V_in / rIn
-      const vIn = readNode(rhs, nIn);
-      const iIn = nIn > 0 ? vIn / outputSpec.rIn : 0;
-
-      // Output pin: Norton equivalent  I_out = (V_out - V_target) / rOut
-      const vOut = readNode(rhs, nOut);
-      const targetVoltage = outModel.currentVoltage;
-      const iOut = nOut > 0 ? (vOut - targetVoltage) / outputSpec.rOut : 0;
-
-      return [iIn, iOut];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
-    },
-  };
-}
+export const SCHMITT_NON_INVERTING_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["in", "out", "gnd"],
+  params: { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut: 50, cIn: 5e-12, cOut: 5e-12 },
+  elements: [
+    { typeId: "SchmittTriggerDriver", modelRef: "default", subElementName: "drv",
+      params: { vTH: "vTH", vTL: "vTL", vOH: "vOH", vOL: "vOL", inverting: 0 } },
+    { typeId: "Capacitor", modelRef: "default", subElementName: "cIn",  params: { C: "cIn"  } },
+    { typeId: "Resistor",  modelRef: "default", subElementName: "rOut", params: { R: "rOut" } },
+    { typeId: "Capacitor", modelRef: "default", subElementName: "cOut", params: { C: "cOut" } },
+  ],
+  internalNetCount: 1,
+  internalNetLabels: ["nDrive"],
+  netlist: [
+    [0, 3, 2],   // drv:  in=in(0), out=nDrive(3), gnd=gnd(2)
+    [0, 2],      // cIn:  pos=in(0),    neg=gnd(2)
+    [3, 1],      // rOut: pos=nDrive(3), neg=out(1)
+    [1, 2],      // cOut: pos=out(1),   neg=gnd(2)
+  ],
+} as MnaSubcircuitNetlist;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -302,18 +144,14 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    // All coordinates derived from Falstad reference (px / 16 = grid units):
-    // Total span 64px = 4gu. Triangle: left x=1, tip x=2.6875, height Â±1.
-    // Bubble: cx=2.875, r0.18375. Lead2 starts at 3.125.
-    // Hysteresis symbol (grid units): step from 1.25 to 1.8125 to 1.4375 to 2.0
     const PX = 1 / 16;
 
-    const triLeft  = 1.0;               // 16px
-    const triTip   = 43 * PX;           // 2.6875 gu
-    const triH     = 1.0;               // Â±1 gu
-    const bubCx    = 46 * PX;           // 2.875 gu
-    const bubR     = 2.94 * PX;         // ~0.18375 gu
-    const lead2x   = 50 * PX;           // 3.125 gu
+    const triLeft  = 1.0;
+    const triTip   = 43 * PX;
+    const triH     = 1.0;
+    const bubCx    = 46 * PX;
+    const bubR     = 2.94 * PX;
+    const lead2x   = 50 * PX;
 
     const vIn  = signals?.getPinVoltage("in");
     const vOut = signals?.getPinVoltage("out");
@@ -321,32 +159,24 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Input lead: 0  triLeft
     drawColoredLead(ctx, signals, vIn, 0, 0, triLeft, 0);
-
-    // Output lead: lead2x  4
     drawColoredLead(ctx, signals, vOut, lead2x, 0, 4, 0);
 
-    // Body  triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
-    // Falstad polyline: (16,-16)(16,16)(43,0)  only 2 segments, no closing edge
     ctx.drawLine(triLeft, -triH, triLeft, triH);
     ctx.drawLine(triLeft,  triH, triTip,  0);
-    // Bubble (inverter circle)  drawn as arc to match Falstad rasterization
     ctx.drawArc(bubCx, 0, bubR, 0, 2 * Math.PI);
 
-    // Hysteresis symbol  matches Falstad polyline exactly:
-    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px  /16 for gu
-    const hx1 = 20 * PX;  // 1.25
-    const hx2 = 29 * PX;  // 1.8125
-    const hx3 = 32 * PX;  // 2.0
-    const hx4 = 23 * PX;  // 1.4375
-    const hy  =  3 * PX;  // 0.1875
-    ctx.drawLine(hx1, -hy, hx2, -hy);  // top horizontal
-    ctx.drawLine(hx2, -hy, hx2,  hy);  // right vertical
-    ctx.drawLine(hx2,  hy, hx3,  hy);  // bottom-right horizontal
-    ctx.drawLine(hx3,  hy, hx4,  hy);  // bottom connecting segment
-    ctx.drawLine(hx4,  hy, hx4, -hy);  // left vertical
+    const hx1 = 20 * PX;
+    const hx2 = 29 * PX;
+    const hx3 = 32 * PX;
+    const hx4 = 23 * PX;
+    const hy  =  3 * PX;
+    ctx.drawLine(hx1, -hy, hx2, -hy);
+    ctx.drawLine(hx2, -hy, hx2,  hy);
+    ctx.drawLine(hx2,  hy, hx3,  hy);
+    ctx.drawLine(hx3,  hy, hx4,  hy);
+    ctx.drawLine(hx4,  hy, hx4, -hy);
 
     ctx.restore();
   }
@@ -372,14 +202,12 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    // All coordinates derived from Falstad reference (px / 16 = grid units):
-    // Total span 64px = 4gu. No bubble (non-inverting). Lead2 starts at 45px.
     const PX = 1 / 16;
 
-    const triLeft  = 1.0;               // 16px
-    const triTip   = 43 * PX;           // 2.6875 gu
-    const triH     = 1.0;               // Â±1 gu
-    const lead2x   = 45 * PX;           // 2.8125 gu
+    const triLeft  = 1.0;
+    const triTip   = 43 * PX;
+    const triH     = 1.0;
+    const lead2x   = 45 * PX;
 
     const vIn  = signals?.getPinVoltage("in");
     const vOut = signals?.getPinVoltage("out");
@@ -387,30 +215,23 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Input lead: 0  triLeft
     drawColoredLead(ctx, signals, vIn, 0, 0, triLeft, 0);
-
-    // Output lead: lead2x  4
     drawColoredLead(ctx, signals, vOut, lead2x, 0, 4, 0);
 
-    // Body  triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
-    // Falstad polyline: (16,-16)(16,16)(43,0)  only 2 segments, no closing edge
     ctx.drawLine(triLeft, -triH, triLeft, triH);
     ctx.drawLine(triLeft,  triH, triTip,  0);
 
-    // Hysteresis symbol  matches Falstad polyline exactly:
-    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px  /16 for gu
-    const hx1 = 20 * PX;  // 1.25
-    const hx2 = 29 * PX;  // 1.8125
-    const hx3 = 32 * PX;  // 2.0
-    const hx4 = 23 * PX;  // 1.4375
-    const hy  =  3 * PX;  // 0.1875
-    ctx.drawLine(hx1, -hy, hx2, -hy);  // top horizontal
-    ctx.drawLine(hx2, -hy, hx2,  hy);  // right vertical
-    ctx.drawLine(hx2,  hy, hx3,  hy);  // bottom-right horizontal
-    ctx.drawLine(hx3,  hy, hx4,  hy);  // bottom connecting segment
-    ctx.drawLine(hx4,  hy, hx4, -hy);  // left vertical
+    const hx1 = 20 * PX;
+    const hx2 = 29 * PX;
+    const hx3 = 32 * PX;
+    const hx4 = 23 * PX;
+    const hy  =  3 * PX;
+    ctx.drawLine(hx1, -hy, hx2, -hy);
+    ctx.drawLine(hx2, -hy, hx2,  hy);
+    ctx.drawLine(hx2,  hy, hx3,  hy);
+    ctx.drawLine(hx3,  hy, hx4,  hy);
+    ctx.drawLine(hx4,  hy, hx4, -hy);
 
     ctx.restore();
   }
@@ -447,7 +268,7 @@ const SCHMITT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ComponentDefinitions
 // ---------------------------------------------------------------------------
 
-export const SchmittInvertingDefinition: ComponentDefinition = {
+export const SchmittInvertingDefinition: StandaloneComponentDefinition = {
   name: "SchmittInverting",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -467,9 +288,8 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
   models: {},
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createSchmittTriggerElement(pinNodes, props, true),
+      kind: "netlist",
+      netlist: SCHMITT_INVERTING_NETLIST,
       paramDefs: SCHMITT_PARAM_DEFS,
       params: SCHMITT_DEFAULTS,
     },
@@ -477,7 +297,7 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
   defaultModel: "behavioral",
 };
 
-export const SchmittNonInvertingDefinition: ComponentDefinition = {
+export const SchmittNonInvertingDefinition: StandaloneComponentDefinition = {
   name: "SchmittNonInverting",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -497,9 +317,8 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
   models: {},
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createSchmittTriggerElement(pinNodes, props, false),
+      kind: "netlist",
+      netlist: SCHMITT_NON_INVERTING_NETLIST,
       paramDefs: SCHMITT_PARAM_DEFS,
       params: SCHMITT_DEFAULTS,
     },
