@@ -87,6 +87,7 @@ export interface SimulationCoordinator {
     readonly wireSignalMap: ReadonlyMap<Wire, SignalAddress>;
     readonly labelSignalMap: ReadonlyMap<string, SignalAddress>;
     readonly labelToCircuitElement: ReadonlyMap<string, CircuitElement>;
+    readonly pinSignalMap: ReadonlyMap<string, SignalAddress>;
     readonly diagnostics: readonly Diagnostic[];
   };
 
@@ -193,6 +194,13 @@ export interface SimulationCoordinator {
    * fresh engine instance). No-op when no analog backend is active.
    */
   setSimTime(t: number): void;
+
+  /**
+   * Configure the digital snapshot ring-buffer size in bytes. No-op when no
+   * digital backend is active. Used by the engine-settings dialog and on
+   * controller startup to apply the persisted budget.
+   */
+  setSnapshotBudget(bytes: number): void;
 
   /**
    * Current engine lifecycle state (unified across backends).

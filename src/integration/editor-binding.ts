@@ -41,8 +41,8 @@ export interface EditorBinding {
   bind(
     _circuit: Circuit,
     coordinator: SimulationCoordinator,
-    wireSignalMap: Map<Wire, SignalAddress>,
-    pinSignalMap: Map<string, SignalAddress>,
+    wireSignalMap: ReadonlyMap<Wire, SignalAddress>,
+    pinSignalMap: ReadonlyMap<string, SignalAddress>,
   ): void;
 
   /** Disconnect from the coordinator and clear all mappings. */
@@ -87,14 +87,14 @@ export interface EditorBinding {
 
 class EditorBindingImpl implements EditorBinding {
   private _coordinator: SimulationCoordinator | null = null;
-  private _wireSignalMap: Map<Wire, SignalAddress> = new Map();
-  private _pinSignalMap: Map<string, SignalAddress> = new Map();
+  private _wireSignalMap: ReadonlyMap<Wire, SignalAddress> = new Map();
+  private _pinSignalMap: ReadonlyMap<string, SignalAddress> = new Map();
 
   bind(
     _circuit: Circuit,
     coordinator: SimulationCoordinator,
-    wireSignalMap: Map<Wire, SignalAddress>,
-    pinSignalMap: Map<string, SignalAddress>,
+    wireSignalMap: ReadonlyMap<Wire, SignalAddress>,
+    pinSignalMap: ReadonlyMap<string, SignalAddress>,
   ): void {
     this._coordinator = coordinator;
     this._wireSignalMap = wireSignalMap;

@@ -687,6 +687,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._clockManager.advanceClocks((this._digital as DigitalEngine).getSignalArray());
   }
 
+  setSnapshotBudget(bytes: number): void {
+    if (this._digital === null) return;
+    (this._digital as DigitalEngine).setSnapshotBudget(bytes);
+  }
+
   /** Resolve CircuitElement → compiled element index via cached inverted map. */
   private _resolveElementIndex(element: CircuitElement): number {
     if (this._elementIndexCache === null) {

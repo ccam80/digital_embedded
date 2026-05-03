@@ -237,7 +237,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
 
 
     for (const qi of QUICK_INSERT) {
-      const def = registry.get(qi.type);
+      const def = registry.getStandalone(qi.type);
       if (!def) continue;
       items.push({
         label: qi.label,
@@ -289,7 +289,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
             ctx.clipboard = copyToClipboard(
               [...selection.getSelectedElements()],
               [...selection.getSelectedWires()],
-              (typeId: string) => registry.get(typeId),
+              (typeId: string) => registry.getStandalone(typeId),
             );
           }, enabled: true },
           { label: 'Delete', shortcut: 'Del', action: () => {
@@ -1179,7 +1179,7 @@ function buildSettingsDialog(ctx: AppContext, deps: MTDeps): void {
     const scaleMode = (currentScaleSelect?.value === 'logarithmic' ? 'logarithmic' : 'linear') as 'linear' | 'logarithmic';
     const newSettings = { snapshotBudgetMb: budgetMb, oscillationLimit: oscLimit, currentSpeedScale: speedScale, currentScaleMode: scaleMode };
     simController.saveEngineSettings(newSettings);
-    (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)?.setSnapshotBudget?.(budgetMb * 1024 * 1024);
+    facade.getCoordinator().setSnapshotBudget(budgetMb * 1024 * 1024);
     simController.applyCurrentVizSettings(newSettings);
     if (logicFamilySelect) {
       const preset = getLogicFamilyPreset(logicFamilySelect.value);

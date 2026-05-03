@@ -10,7 +10,7 @@ import type { AppContext } from './app-context.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import { EngineState } from '../core/engine-interface.js';
 import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
-import type { CompiledCircuitUnified, SignalValue } from '../compile/types.js';
+import type { SignalValue } from '../compile/types.js';
 import { CurrentFlowAnimator } from '../editor/current-animation.js';
 import { VoltageRangeTracker } from '../editor/voltage-range.js';
 import { voltageToColor } from '../editor/voltage-color.js';
@@ -154,8 +154,7 @@ export function initSimulationController(
 
   // Apply saved settings on startup
   const initialEngineSettings = loadEngineSettings();
-  (facade.getCoordinator() as unknown as { setSnapshotBudget?(n: number): void } | null)
-    ?.setSnapshotBudget?.(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
+  facade.getCoordinator().setSnapshotBudget(initialEngineSettings.snapshotBudgetMb * 1024 * 1024);
 
   // -------------------------------------------------------------------------
   // Helper: friendly error messages for analog pipeline failures
@@ -318,8 +317,7 @@ export function initSimulationController(
           return false;
         }
 
-        const fullUnified = unified as unknown as CompiledCircuitUnified;
-        binding.bind(circuit, coordinator, fullUnified.wireSignalMap, fullUnified.pinSignalMap);
+        binding.bind(circuit, coordinator, unified.wireSignalMap, unified.pinSignalMap);
 
         // Drive DC OP- this triggers MNAEngine._setup(), which runs post-setup
         // topology detectors (voltage-source-loop, inductor-loop,
@@ -421,11 +419,8 @@ export function initSimulationController(
     }
 
     const savedPins = new Map<string, SignalValue>();
-    const fullUnified = coordinator.compiled as unknown as CompiledCircuitUnified;
-    if (fullUnified.pinSignalMap) {
-      for (const [pinKey, addr] of fullUnified.pinSignalMap) {
-        savedPins.set(pinKey, coordinator.readSignal(addr));
-      }
+    for (const [pinKey, addr] of coordinator.compiled.pinSignalMap) {
+      savedPins.set(pinKey, coordinator.readSignal(addr));
     }
 
     const savedSimTime = coordinator.simTime;
@@ -446,7 +441,7 @@ export function initSimulationController(
 
     // 4. Restore surviving signals in the new coordinator.
     const newCoordinator = facade.getCoordinator();
-    const newCompiled = newCoordinator.compiled as unknown as CompiledCircuitUnified;
+    const newCompiled = newCoordinator.compiled;
 
     // Restore labeled signals.
     for (const [label, value] of savedLabels) {
@@ -457,12 +452,10 @@ export function initSimulationController(
     }
 
     // Restore pin-level signals (covers unlabeled components too).
-    if (newCompiled.pinSignalMap) {
-      for (const [pinKey, value] of savedPins) {
-        const addr = newCompiled.pinSignalMap.get(pinKey);
-        if (addr) {
-          newCoordinator.writeSignal(addr, value);
-        }
+    for (const [pinKey, value] of savedPins) {
+      const addr = newCompiled.pinSignalMap.get(pinKey);
+      if (addr) {
+        newCoordinator.writeSignal(addr, value);
       }
     }
 

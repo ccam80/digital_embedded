@@ -74,6 +74,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
     wireSignalMap: new Map<Wire, SignalAddress>(),
     labelSignalMap: new Map<string, SignalAddress>(),
     labelToCircuitElement: new Map<string, import('../core/element.js').CircuitElement>(),
+    pinSignalMap: new Map<string, SignalAddress>(),
     diagnostics: [] as import('../compile/types.js').Diagnostic[],
     digital: null,
     analog: null,
@@ -211,4 +212,10 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   // -------------------------------------------------------------------------
 
   setSimTime(_t: number): void { /* no-op */ }
+
+  // -------------------------------------------------------------------------
+  // Snapshot budget
+  // -------------------------------------------------------------------------
+
+  setSnapshotBudget(_bytes: number): void { /* no-op */ }
 }
