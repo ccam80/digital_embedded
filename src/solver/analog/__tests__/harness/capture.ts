@@ -19,9 +19,9 @@ import type {
   NRAttempt,
   NRPhase,
   NRAttemptOutcome,
-  LimitingEvent,
   IntegrationCoefficients,
 } from "./types.js";
+import type { LimitingEvent } from "../../newton-raphson.js";
 import { normalizeDeviceType } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------

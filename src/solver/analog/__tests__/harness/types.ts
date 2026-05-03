@@ -9,6 +9,7 @@
 import type { PostIterationHook } from "./capture.js";
 import type { MNAEngine } from "../../analog-engine.js";
 import type { IntegrationMethod } from "../../integration.js";
+import type { LimitingEvent } from "../../newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // Asymmetric step presence (Goal B)
@@ -150,17 +151,6 @@ export interface TopologySnapshot {
 }
 
 // ---------------------------------------------------------------------------
-// Limiting event- captured per junction per NR iteration
-// ---------------------------------------------------------------------------
-
-// Single source of truth lives at src/solver/analog/newton-raphson.ts.
-// Imported then re-exported so the symbol resolves both inside this file
-// (used by IterationSnapshot / AttemptDetail) and for harness consumers
-// importing from this barrel without taking a direct NR dependency.
-import type { LimitingEvent } from "../../newton-raphson.js";
-export type { LimitingEvent };
-
-// ---------------------------------------------------------------------------
 // Per-iteration snapshot
 // ---------------------------------------------------------------------------
 
@@ -241,6 +231,14 @@ export interface IterationSnapshot {
    * (ngspice side). Undefined for non-accepted or DC-OP iterations.
    */
   lteDt?: number;
+  /**
+   * Raw NR iteration index from the ngspice instrumentation callback. Set only
+   * on snapshots produced by the ngspice bridge; used internally by
+   * `NgspiceBridge.assembleStep()` to locate the corresponding raw iteration
+   * record when computing per-step integration coefficients. Not populated by
+   * our-engine snapshots and not exposed in any comparator output.
+   */
+  _rawIteration?: number;
 }
 
 /** Device state for one element at one iteration. */

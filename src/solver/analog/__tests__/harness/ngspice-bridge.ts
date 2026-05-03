@@ -33,9 +33,9 @@ import type {
   RawNgspiceTopology,
   IntegrationCoefficients,
   MatrixEntry,
-  LimitingEvent,
 } from "./types.js";
-import type { IntegrationMethod } from "../../../../core/analog-types.js";
+import type { IntegrationMethod } from "../../integration.js";
+import type { LimitingEvent } from "../../newton-raphson.js";
 import { bitsToName } from "../../ckt-mode.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
@@ -639,7 +639,7 @@ export class NgspiceBridge {
         // Find the raw iteration for the last accepted iteration
         this._iterations.find(r =>
           r.simTimeStart === step.stepStartTime &&
-          r.iteration === (lastRaw as any)?._rawIteration
+          r.iteration === lastRaw?._rawIteration
         ) ?? this._iterations.find(r => r.simTimeStart === step.stepStartTime),
       );
       const integCoeff: IntegrationCoefficients = {
@@ -832,8 +832,7 @@ export class NgspiceBridge {
         convergenceFailedElements: [],
         ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices ?? [],
       };
-      // Stash raw fields needed for later (not on the public type)
-      (iterSnap as any)._rawIteration = raw.iteration;
+      iterSnap._rawIteration = raw.iteration;
 
       currentStep.pendingAttempt!.iterations.push(iterSnap);
 
