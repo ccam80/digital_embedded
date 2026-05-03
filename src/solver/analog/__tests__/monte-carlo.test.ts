@@ -41,7 +41,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const props = new PropertyBag();
   props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
   const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
-  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+  return factory(new Map([["pos", nodeA], ["neg", nodeB]]), props, () => 0);
 }
 
 function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {

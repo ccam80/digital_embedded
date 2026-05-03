@@ -896,21 +896,14 @@ function buildAnalogNodeMapFromPartition(
     }
   }
 
-  // Build labelToNodeId and labelPinNodes from all labeled components in
-  // the partition.
-  //
-  // IMPLEMENTATION FAILURE- does not match ngspice spec.
-  // Original excuse: "`labelToNodeId` preserves the legacy single-node-per-label semantics for internal consumers"
-  // Remedy: re-implement per spec. Do not weaken tests. Do not patch symptoms.
-  // See spec/reviews/ for the finding that identified this.
-  // `labelToNodeId` maps a label to the MNA node of the element's first resolved pin.
-  //
-  // `labelPinNodes` is the richer form used by the unified compile step to
-  // build `labelSignalMap` entries: for each label it records every resolved
-  // pin with `{pinLabel, nodeId}`. This lets downstream code distinguish
-  // 1-pin, 2-pin, and 3+ pin components so `readSignal(label)` can return
-  // V_acrossthe element for 2-pin passives and reject bare labels on
-  // multi-pin elements (forcing callers to use `label:pin` form).
+  // Build labelToNodeId and labelPinNodes from all labeled components in the
+  // partition. Mirrors ngspice's two-namespace semantics: node names and
+  // device names are distinct namespaces, and a label that unambiguously
+  // identifies a single MNA node only does so for a 1-pin element (Port, In,
+  // Out, Ground). A multi-pin device label refers to a device, not a node, so
+  // its bare label has no node mapping; per pin we register a `label:pinLabel`
+  // entry instead. This keeps labelToNodeId consistent with labelSignalMap
+  // (compile.ts:390-397).
   const labelToNodeId = new Map<string, number>();
   const labelPinNodes = new Map<string, Array<{ pinLabel: string; nodeId: number }>>();
   for (const pc of partition.components) {
@@ -919,17 +912,18 @@ function buildAnalogNodeMapFromPartition(
     if (!label) continue;
     if (pc.resolvedPins.length === 0) continue;
 
-    const rp0 = pc.resolvedPins[0]!;
-    const key0 = `${rp0.worldPosition.x},${rp0.worldPosition.y}`;
-    const nodeId0 = positionToNodeId.get(key0) ?? 0;
-    labelToNodeId.set(label, nodeId0);
-
     const pins: Array<{ pinLabel: string; nodeId: number }> = [];
     for (const rp of pc.resolvedPins) {
       const k = `${rp.worldPosition.x},${rp.worldPosition.y}`;
-      pins.push({ pinLabel: rp.pinLabel, nodeId: positionToNodeId.get(k) ?? 0 });
+      const nodeId = positionToNodeId.get(k) ?? 0;
+      pins.push({ pinLabel: rp.pinLabel, nodeId });
+      labelToNodeId.set(`${label}:${rp.pinLabel}`, nodeId);
     }
     labelPinNodes.set(label, pins);
+
+    if (pins.length === 1) {
+      labelToNodeId.set(label, pins[0]!.nodeId);
+    }
   }
 
   return { nodeCount, groupToNodeId, wireToNodeId, labelToNodeId, labelPinNodes, positionToNodeId };

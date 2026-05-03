@@ -49,9 +49,16 @@ export interface AcParams {
   fStart: number;
   /** Stop frequency in Hz. */
   fStop: number;
-  /** Label of the AC voltage source providing excitation. */
+  /** Label resolving to the MNA node where the AC stimulus is injected.
+   *  Per the ngspice two-namespace contract: must be a label that maps
+   *  unambiguously to a single node. For a 1-pin labeled element (Port,
+   *  In, Out, Ground) use the bare label. For a multi-pin device (e.g. a
+   *  voltage source `V1`) use the pin-form `V1:pos`- the bare device
+   *  label has no node mapping under labelToNodeId. */
   sourceLabel: string;
-  /** Labels of nodes to measure (output nodes). */
+  /** Labels resolving to MNA nodes to measure. Same contract as
+   *  `sourceLabel`: bare label for 1-pin elements, `label:pinLabel` for
+   *  individual pins on multi-pin devices. */
   outputNodes: string[];
 }
 
@@ -152,7 +159,9 @@ export class AcAnalysis {
         makeDiagnostic("ac-no-source", "error", `AC source '${params.sourceLabel}' not found`, {
           explanation:
             `No node with label '${params.sourceLabel}' was found in the circuit. ` +
-            "Specify the label of a voltage source node as the AC excitation source.",
+            "Specify a label that resolves to a single MNA node: a 1-pin " +
+            "labeled element (Port, In, Out), or pin-form like `V1:pos` " +
+            "for a specific terminal of a multi-pin device.",
         }),
       );
       return this._emptyResult(params, diagnostics.getDiagnostics());

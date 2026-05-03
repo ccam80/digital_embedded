@@ -95,7 +95,7 @@ function makeElement(
 function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
   return {
     label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
@@ -125,7 +125,7 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
 function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
   return {
     label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: branchIdx,
     ngspiceLoadOrder: 0,
@@ -152,7 +152,7 @@ function makeBaseDef(name: string) {
     attributeMap: [] as import("../../../core/registry.js").AttributeMapping[],
     category: "MISC" as unknown as ComponentCategory,
     helpText: "",
-    factory: ((_props: PropertyBag) => { throw new Error("not used in tests"); }) as unknown as import("../../../core/registry.js").ComponentDefinition["factory"],
+    factory: ((_props: PropertyBag) => { throw new Error("not used in tests"); }) as unknown as import("../../../core/registry.js").StandaloneComponentDefinition["factory"],
   };
 }
 
@@ -227,7 +227,7 @@ function buildTestRegistry(): ComponentRegistry {
     },
   });
 
-  // AND gate — digital-only
+  // AND gate- digital-only
   registry.register({
     ...makeBaseDef("And"),
     pinLayout: [
@@ -308,7 +308,7 @@ describe("AnalogCompiler", () => {
 
     const labelIn:  Map<string, PropertyValue> = new Map([["label", "V_in"]]);
     const labelOut: Map<string, PropertyValue> = new Map([["label", "V_mid"]]);
-    // AnalogR was NOT in the old whitelist — it must be discoverable via labelToNodeId.
+    // AnalogR was NOT in the old whitelist- it must be discoverable via labelToNodeId.
     // Spec acceptance criterion: "A labeled resistor's node voltage is discoverable via labelToNodeId"
     const labelR: Map<string, PropertyValue> = new Map([["label", "R_mid"]]);
 
@@ -317,7 +317,7 @@ describe("AnalogCompiler", () => {
     // analog partition. Without them, Ground is excluded (neutral +
     // touchesAnalog check) and node numbering has no ground reference.
     const vs    = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
-    const r1    = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }], labelR, registry);
+    const r1    = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0, label: "pos" }, { x: 20, y: 0, label: "neg" }], labelR, registry);
     const inEl  = makeElement("In",      "in1",  [{ x: 10, y: 0 }], labelIn, registry);
     const outEl = makeElement("Out",     "out1", [{ x: 20, y: 0 }], labelOut, registry);
     const gnd   = makeElement("Ground",  "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
@@ -340,11 +340,14 @@ describe("AnalogCompiler", () => {
     expect(compiled.labelToNodeId.get("V_in")).toBeGreaterThan(0);
     expect(compiled.labelToNodeId.get("V_mid")).toBeGreaterThan(0);
 
-    // Spec: a labeled resistor (AnalogR) — not in the old whitelist — must also
-    // appear in labelToNodeId so its node voltage is discoverable at runtime.
-    expect(compiled.labelToNodeId.has("R_mid")).toBe(true);
-    // The resistor sits at x=10 (node >0), so its mapped node is non-ground
-    expect(compiled.labelToNodeId.get("R_mid")).toBeGreaterThan(0);
+    // ngspice-spec semantic: a 2-pin device label refers to a device, not a
+    // node. The bare label `R_mid` is NOT registered. Each pin appears under
+    // `R_mid:<pinLabel>` so callers can address either terminal explicitly.
+    expect(compiled.labelToNodeId.has("R_mid")).toBe(false);
+    expect(compiled.labelToNodeId.has("R_mid:pos")).toBe(true);
+    expect(compiled.labelToNodeId.has("R_mid:neg")).toBe(true);
+    expect(compiled.labelToNodeId.get("R_mid:pos")).toBeGreaterThan(0);
+    expect(compiled.labelToNodeId.get("R_mid:neg")).toBeGreaterThan(0);
   });
 
   it("detects_floating_node", () => {
@@ -364,7 +367,7 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 30, y: 0 }, { x: 30, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    // Compiler must not throw — emits a warning diagnostic instead
+    // Compiler must not throw- emits a warning diagnostic instead
     expect(() => compileUnified(circuit, registry)).not.toThrow();
 
     const compiled = compileUnified(circuit, registry).analog!;
@@ -390,7 +393,7 @@ describe("AnalogCompiler", () => {
     circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
     circuit.addWire(new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 }));
 
-    // Compiler must not throw — emits an error diagnostic
+    // Compiler must not throw- emits an error diagnostic
     expect(() => compileUnified(circuit, registry)).not.toThrow();
 
     const compiled = compileUnified(circuit, registry).analog!;
@@ -471,7 +474,7 @@ describe("AnalogCompiler", () => {
   });
 
   it("rejects_non_analog_circuit", () => {
-    // compileUnified is the unified entry point — it handles all engineTypes.
+    // compileUnified is the unified entry point- it handles all engineTypes.
     // A digital circuit with no digital-model components compiles to null analog
     // and null digital (no components in either partition).
     const circuit = new Circuit();
@@ -486,7 +489,7 @@ describe("AnalogCompiler", () => {
     const { circuit, registry } = buildResistorDividerCircuit();
     const compiled = compileUnified(circuit, registry).analog!;
 
-    // 3 elements (Vs, R1, R2 — Ground is skipped)
+    // 3 elements (Vs, R1, R2- Ground is skipped)
     for (let i = 0; i < compiled.elements.length; i++) {
       expect(compiled.elementToCircuitElement.has(i)).toBe(true);
     }
@@ -519,7 +522,7 @@ describe("AnalogCompiler", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4.1 — _pinLoading threading tests
+// Task 6.4.1- _pinLoading threading tests
 // ---------------------------------------------------------------------------
 
 /**
@@ -615,7 +618,7 @@ function buildPinLoadingCircuit(
   return { circuit, registry: reg };
 }
 
-describe("Task 6.4.1 — _pinLoading threaded to behavioural factory", () => {
+describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
   it("pin_loading_threaded_for_behavioural_gate_all_mode", () => {
     let capturedPinLoading: Record<string, boolean> | undefined;
 
