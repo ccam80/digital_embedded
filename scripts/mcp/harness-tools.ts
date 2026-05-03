@@ -1,4 +1,4 @@
-// harness-tools.ts — MCP tool registration for ngspice comparison harness
+// harness-tools.ts- MCP tool registration for ngspice comparison harness
 
 import { existsSync } from "fs";
 import { resolve } from "path";
@@ -29,7 +29,7 @@ function serializeSummary(summary: SessionSummary) {
         failedSteps: summary.convergence.ours.failedSteps,
         avgIterations: formatNumber(summary.convergence.ours.avgIterations),
         maxIterations: summary.convergence.ours.maxIterations,
-        worstStep: (summary.convergence.ours as any).worstStep ?? -1,
+        worstStep: summary.convergence.ours.worstStep,
       },
       ngspice: {
         totalSteps: summary.convergence.ngspice.totalSteps,
@@ -37,7 +37,7 @@ function serializeSummary(summary: SessionSummary) {
         failedSteps: summary.convergence.ngspice.failedSteps,
         avgIterations: formatNumber(summary.convergence.ngspice.avgIterations),
         maxIterations: summary.convergence.ngspice.maxIterations,
-        worstStep: (summary.convergence.ngspice as any).worstStep ?? -1,
+        worstStep: summary.convergence.ngspice.worstStep,
       },
     },
     firstDivergence: summary.firstDivergence
@@ -161,8 +161,8 @@ export function registerHarnessTools(
       });
 
       // Build topology output from session internals
-      const topology = (session as any)._ourTopology;
-      const engine = (session as any)._engine;
+      const topology = session.ourTopology;
+      const engine = session.engine;
 
       const components = topology.elements.map((el: any) => {
         const engineEl = (engine?.elements ?? [])[el.index];
@@ -286,7 +286,7 @@ export function registerHarnessTools(
     {
       title: "Describe Circuit Topology",
       description:
-        "Return full circuit topology metadata for the session — components with " +
+        "Return full circuit topology metadata for the session- components with " +
         "their pin assignments and slot names, and nodes with connectivity. Does not " +
         "require harness_run to be called first.",
       inputSchema: z.object({
@@ -297,16 +297,14 @@ export function registerHarnessTools(
       const entry = harnessState.get(args.handle, "harness_describe");
       const { session } = entry;
 
-      const topology = (session as any)._ourTopology;
-      const engine = (session as any)._engine;
-      const nodeMap: Array<{
-        ourIndex: number;
-        ngspiceIndex: number;
-        label: string;
-        ngspiceName: string;
-      }> = (session as any)._nodeMap ?? [];
+      const topology = session.ourTopology;
+      const engine = session.engine;
+      const nodeMap = session.nodeMap;
 
-      const components = topology.elements.map((el: any) => {
+      // Build a flat descriptor for each element, then group internalOnly
+      // sub-elements (identified by the <parentLabel>:<subElementName> label
+      // convention stamped by compiler.ts setLabel) under their parent composite.
+      const flatDescs = topology.elements.map((el: any) => {
         const engineEl = (engine?.elements ?? [])[el.index];
         const slots: string[] =
           engineEl && isPoolBacked(engineEl)
@@ -322,14 +320,65 @@ export function registerHarnessTools(
               : topology.nodeLabels.get(nodeId) ?? `node${nodeId}`,
           nodeIndex: nodeId,
         }));
+        const colonIdx = el.label.indexOf(":");
+        const parentLabel = colonIdx !== -1 ? el.label.slice(0, colonIdx) : null;
+        const subElementName = colonIdx !== -1 ? el.label.slice(colonIdx + 1) : null;
         return {
           label: el.label,
           index: el.index,
           type: el.type ?? "unknown",
           pins,
           slots,
+          parentLabel,
+          subElementName,
         };
       });
+
+      // Separate top-level components from sub-elements.
+      const topLevelMap = new Map<string, any>();
+      const subElementsByParent = new Map<string, any[]>();
+
+      for (const desc of flatDescs) {
+        if (desc.parentLabel !== null) {
+          let group = subElementsByParent.get(desc.parentLabel);
+          if (!group) {
+            group = [];
+            subElementsByParent.set(desc.parentLabel, group);
+          }
+          group.push({
+            label: desc.label,
+            subElementName: desc.subElementName,
+            index: desc.index,
+            type: desc.type,
+            pins: desc.pins,
+            slots: desc.slots,
+          });
+        } else {
+          topLevelMap.set(desc.label, {
+            label: desc.label,
+            index: desc.index,
+            type: desc.type,
+            pins: desc.pins,
+            slots: desc.slots,
+          });
+        }
+      }
+
+      // Attach sub-elements to their parent composite entries.
+      for (const [parentLabel, subs] of subElementsByParent) {
+        const parent = topLevelMap.get(parentLabel);
+        if (parent) {
+          parent.subElements = subs;
+        } else {
+          // Parent composite not found at top level; surface sub-elements
+          // directly so no data is lost.
+          for (const sub of subs) {
+            topLevelMap.set(sub.label, sub);
+          }
+        }
+      }
+
+      const components = [...topLevelMap.values()];
 
       const nodes: Array<{
         label: string;
@@ -402,7 +451,7 @@ export function registerHarnessTools(
       title: "Session Map",
       description:
         "Return the paired session shape: step counts, per-step attempt lists, " +
-        "and timing for both engines. Lightweight — no iteration data included. " +
+        "and timing for both engines. Lightweight- no iteration data included. " +
         "Use harness_get_step for per-step detail and harness_get_attempt for iterations.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle from harness_start"),
@@ -435,7 +484,7 @@ export function registerHarnessTools(
           "Step index (0-based). Mutually exclusive with 'time'.",
         ),
         time: z.number().optional().describe(
-          "Simulation time in seconds — finds the nearest step by stepEndTime. " +
+          "Simulation time in seconds- finds the nearest step by stepEndTime. " +
           "Mutually exclusive with 'index'.",
         ),
         side: z.enum(["ours", "ngspice"]).optional().describe(
@@ -463,7 +512,7 @@ export function registerHarnessTools(
       // emits it as `null`, which would otherwise break consumers asserting
       // numeric attempt-end norms. Mirrors the divergenceNorm handling below.
       // Branch norm is NaN whenever the circuit has no branch rows
-      // (matrixSize === nodeCount + 1) — common for purely resistive/passive
+      // (matrixSize === nodeCount + 1)- common for purely resistive/passive
       // fixtures with no V-source or inductor elements.
       const normalizeAttempt = <T extends { endNodeNorm: number; endBranchNorm: number }>(
         a: T,
@@ -501,7 +550,7 @@ export function registerHarnessTools(
         "Identifies the attempt by step index, phase name, and position within that phase. " +
         "Supports iteration range and pagination.\n\n" +
         "Slice filters (nodes / component) narrow the returned rhs, residual, and matrix to a " +
-        "K-node subspace. Both filters may be combined — their index sets are unioned, deduplicated, " +
+        "K-node subspace. Both filters may be combined- their index sets are unioned, deduplicated, " +
         "and sorted. Omit both to return the full matrix regardless of circuit size.\n\n" +
         "nodes: array of node names (string) or 1-based node ids (integer). String lookup is " +
         "case-insensitive; segment match (split by '/') is used when no exact match exists. " +
@@ -569,7 +618,7 @@ export function registerHarnessTools(
         return JSON.stringify({ handle: args.handle, attempt: normalizedDetail });
       }
 
-      const topology = (entry.session as any)._ourTopology;
+      const topology = entry.session.ourTopology;
       const resolved = resolveSlice(sliceFilter, topology);
 
       if (resolved.matrixIndices.length === 0) {
@@ -599,7 +648,7 @@ export function registerHarnessTools(
     }),
   );
 
-  // harness_query and harness_compare_matrix removed — replaced by harness_session_map / harness_get_step / harness_get_attempt
+  // harness_query and harness_compare_matrix removed- replaced by harness_session_map / harness_get_step / harness_get_attempt
 
   // -------------------------------------------------------------------------
   // harness_export
@@ -634,8 +683,8 @@ export function registerHarnessTools(
         throw new Error(`harness_export: run harness_run first before exporting`);
       }
 
-      const topology = (session as any)._ourTopology;
-      const engine = (session as any)._engine;
+      const topology = session.ourTopology;
+      const engine = session.engine;
       const summary = session.getSummary();
 
       // Build topology components (detailed)

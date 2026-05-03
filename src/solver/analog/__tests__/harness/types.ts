@@ -154,9 +154,11 @@ export interface TopologySnapshot {
 // ---------------------------------------------------------------------------
 
 // Single source of truth lives at src/solver/analog/newton-raphson.ts.
-// Re-exported here so harness consumers can import LimitingEvent from this
-// barrel without taking a direct dependency on the NR module.
-export type { LimitingEvent } from "../../newton-raphson.js";
+// Imported then re-exported so the symbol resolves both inside this file
+// (used by IterationSnapshot / AttemptDetail) and for harness consumers
+// importing from this barrel without taking a direct NR dependency.
+import type { LimitingEvent } from "../../newton-raphson.js";
+export type { LimitingEvent };
 
 // ---------------------------------------------------------------------------
 // Per-iteration snapshot
@@ -507,8 +509,8 @@ export interface SessionSummary {
   presenceCounts: { both: number; oursOnly: number; ngspiceOnly: number };
   worstStepStartTimeDelta: number;
   convergence: {
-    ours: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number };
-    ngspice: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number };
+    ours: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number; worstStep: number };
+    ngspice: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number; worstStep: number };
   };
   firstDivergence: { stepIndex: number; iterationIndex: number; stepStartTime: number; worstLabel: string; absDelta: number } | null;
   totals: { compared: number; passed: number; failed: number };

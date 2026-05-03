@@ -81,7 +81,7 @@ import type {
   AttemptQuery,
 } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
-import type { IntegrationMethod } from "../../../../core/analog-types.js";
+import type { IntegrationMethod } from "../../integration.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -2569,6 +2569,8 @@ export class ComparisonSession {
   get ngspiceSession(): CaptureSession | null { return this._ngSession; }
   get ngspiceSessionAligned(): CaptureSession | null { return this._ngSessionReindexed; }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
+  get ourTopology(): TopologySnapshot { return this._ourTopology; }
+  get engine(): MNAEngine { return this._engine; }
 
   // ---------------------------------------------------------------------------
   // Internal helpers
