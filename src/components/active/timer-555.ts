@@ -21,16 +21,8 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams } from "../../core/model-params.js";
-
-// Sub-element: discharge BJT- bjtsetup.c:347-465 (NPN Gummel-Poon)
-import {
-  createBjtL0Element,
-} from "../semiconductors/bjt.js";
-
-// Suppress unused-import warning- kept to anchor the rename gate (J-031 step 1)
-void createBjtL0Element;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -55,7 +47,7 @@ export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = d
 // ---------------------------------------------------------------------------
 
 export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist {
-  const elements: any[] = [
+  const elements: SubcircuitElement[] = [
     { typeId: "Resistor",            modelRef: "default",    subElementName: "rDiv1", params: { R: 5000 } },
     { typeId: "Resistor",            modelRef: "default",    subElementName: "rDiv2", params: { R: 5000 } },
     { typeId: "Resistor",            modelRef: "default",    subElementName: "rDiv3", params: { R: 5000 } },
@@ -100,7 +92,7 @@ export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist 
     internalNetCount: 4,
     internalNetLabels: ["nLower", "nComp1Out", "nComp2Out", "nDisBase"],
     netlist,
-  } as MnaSubcircuitNetlist;
+  };
 }
 
 // ---------------------------------------------------------------------------

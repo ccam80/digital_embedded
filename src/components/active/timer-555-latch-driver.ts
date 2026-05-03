@@ -1,10 +1,12 @@
 /**
- * Timer555LatchDriver — RS flip-flop + discharge-BJT base driver
- * extracted from Timer555CompositeElement.load() (timer-555.ts:586-651).
+ * Timer555LatchDriver — RS flip-flop + discharge-BJT base driver leaf.
  *
- * Reads comparator outputs, drives latch state, stamps the discharge
- * transistor's base voltage via a (disBase, disBase) conductance, and
- * emits the OUT pin's logic level via OUTPUT_LOGIC_LEVEL.
+ * Consumed by `buildTimer555Netlist` in `timer-555.ts` as the `latchDrv`
+ * sub-element of the 555-timer composite. Reads comparator outputs, drives
+ * latch state, stamps the discharge transistor's base voltage via a
+ * (disBase, disBase) conductance, and emits the OUT pin's logic level via
+ * the `OUTPUT_LOGIC_LEVEL` slot (consumed by the sibling
+ * `DigitalOutputPinLoaded` via `siblingState`).
  *
  * ngspice peer: bsrcload.c (behavioural source).
  *
