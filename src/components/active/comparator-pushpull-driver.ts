@@ -1,33 +1,26 @@
 /**
- * ComparatorDriver- open-collector driver leaf for the analog comparator
- * composite. The push-pull variant lives in
- * `comparator-pushpull-driver.ts`.
+ * ComparatorPushPullDriver- push-pull driver leaf for the analog comparator
+ * composite. Companion to the open-collector `ComparatorDriver` in
+ * `comparator-driver.ts`.
  *
  * Per Composite M24 (phase-composite-architecture.md), J-020. Emitted by
- * `COMPARATOR_OPEN_COLLECTOR_NETLIST` as the sole sub-element.
+ * `COMPARATOR_PUSH_PULL_NETLIST` as the sole sub-element.
  *
- * Hybrid Template D: matrix stamping + state-bearing latch/hysteresis.
- * Reads input voltages from `rhsOld`, applies hysteresis to compute a new
- * latch state, smooths the response via `OUTPUT_WEIGHT` over `responseTime`,
- * and stamps a Norton conductance on the output node based on the prior-step
- * weight (s1, per the StatePool migration shape).
+ * Stamp model differs from open-collector:
+ * - Open-collector: G = w/rSat at (out, out), no RHS. Active LOW only;
+ *   inactive state is high-Z and needs an external pull-up.
+ * - Push-pull (this file): G = 1/rSat at (out, out), RHS = G * vTarget.
+ *   The output is driven to a smoothed target between vOL and vOH, with
+ *   the smoothing tracked by the existing `OUTPUT_WEIGHT` slot:
+ *     vTarget = (1 - w) * vOH + w * vOL
+ *   When latch=0 (v+ above threshold), w trends 0 and vTarget → vOH.
+ *   When latch=1 (v+ below threshold, asserted), w trends 1 and vTarget → vOL.
+ *   Latch semantic preserved from the open-collector path: latch=1 means
+ *   "asserted/sinking" per the schema doc; in push-pull that maps to "drive
+ *   the output low".
  *
- * Hysteresis (from `comparator.ts` docstring):
- *   V_TH = v_minus + vos + hysteresis/2  (trip on rising V+)
- *   V_TL = v_minus + vos - hysteresis/2  (trip on falling V+)
- *
- * Weight integration:
- *   wNew = wOld + (dt / (tau + dt)) * (target - wOld)
- *   where tau = responseTime, target = latch. At dt=0 (DC) wNew = wOld.
- *
- * Stamp: G_eff = s1[OUTPUT_WEIGHT] / rSat at (out, out); no RHS (output
- * sinks to GND through rSat when latch=1; otherwise high-Z requires
- * external pull-up).
- *
- * Schema source: `COMPARATOR_SCHEMA` is owned by the parent (the
- * comparator's hysteresis is a chip-level property); this driver imports
- * it. Slot names `OUTPUT_LATCH` / `OUTPUT_WEIGHT` are authoritative; the
- * J-020 spec text "OUTPUT_LOGIC_LEVEL" predates the schema split.
+ * Hysteresis and weight integration are identical to the open-collector
+ * driver- only the matrix/RHS contribution differs.
  */
 
 import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
@@ -36,56 +29,59 @@ import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { applyInitialValues } from "../../solver/analog/state-schema.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 import { COMPARATOR_SCHEMA } from "./comparator.js";
 
 // ---------------------------------------------------------------------------
-// Slot constants- resolved from the schema owned by comparator.ts.
+// Slot constants- shared schema with the open-collector driver.
 // ---------------------------------------------------------------------------
 
 const SLOT_OUTPUT_LATCH  = COMPARATOR_SCHEMA.indexOf.get("OUTPUT_LATCH")!;
 const SLOT_OUTPUT_WEIGHT = COMPARATOR_SCHEMA.indexOf.get("OUTPUT_WEIGHT")!;
 
 // ---------------------------------------------------------------------------
-// Pin layout- mirrors the parent's COMPARATOR_OPEN_COLLECTOR_NETLIST
-// connectivity row `[0, 1, 2]` mapping to ports `[in+, in-, out]`.
+// Pin layout- mirrors the parent's push-pull netlist connectivity row
+// `[0, 1, 2]` mapping to ports `[in+, in-, out]`.
 // ---------------------------------------------------------------------------
 
-const COMPARATOR_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
+const COMPARATOR_PUSHPULL_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "in+", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "in-", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
 // ---------------------------------------------------------------------------
-// Param defs- subset of the parent's COMPARATOR_PARAM_DEFS that this driver
-// actually consumes. vOH / vOL are not declared here; they are only consumed
-// by the push-pull driver in `comparator-pushpull-driver.ts`.
+// Param defs- full param surface including vOH / vOL for push-pull drive.
 // ---------------------------------------------------------------------------
 
-const COMPARATOR_DRIVER_PARAM_DEFS: ParamDef[] = [
+const COMPARATOR_PUSHPULL_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "hysteresis",   default: 0 },
   { key: "vos",          default: 0.001 },
   { key: "rSat",         default: 50 },
   { key: "responseTime", default: 1e-6 },
+  { key: "vOH",          default: 3.3 },
+  { key: "vOL",          default: 0 },
 ];
 
-const COMPARATOR_DRIVER_DEFAULTS: Record<string, number> = {
+const COMPARATOR_PUSHPULL_DRIVER_DEFAULTS: Record<string, number> = {
   hysteresis: 0,
   vos: 0.001,
   rSat: 50,
   responseTime: 1e-6,
+  vOH: 3.3,
+  vOL: 0,
 };
 
 const MIN_RSAT = 1e-9;
 
 // ---------------------------------------------------------------------------
-// ComparatorDriverElement
+// ComparatorPushPullDriverElement
 // ---------------------------------------------------------------------------
 
-export class ComparatorDriverElement implements PoolBackedAnalogElement {
+export class ComparatorPushPullDriverElement implements PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly poolBacked = true as const;
   readonly stateSchema = COMPARATOR_SCHEMA;
@@ -100,19 +96,22 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
   private _vos: number;
   private _rSat: number;
   private _tau: number;
+  private _vOH: number;
+  private _vOL: number;
   private _pool!: StatePoolRef;
 
-  // Single matrix handle: (out, out). Open-collector model stamps the
-  // weighted conductance on the output diagonal only- no cross-coupling
-  // to in+/in- (those are pure read-only inputs into the latch logic).
+  // Single matrix handle: (out, out). Push-pull always stamps the full
+  // 1/rSat conductance; the latch/weight steers the RHS injection.
   private _hOutOut = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
-    this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_DRIVER_DEFAULTS["hysteresis"]!;
-    this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_DRIVER_DEFAULTS["vos"]!;
-    this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
-    this._tau        = props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_DRIVER_DEFAULTS["responseTime"]!;
+    this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["hysteresis"]!;
+    this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vos"]!;
+    this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
+    this._tau        = props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["responseTime"]!;
+    this._vOH        = props.hasModelParam("vOH")          ? props.getModelParam<number>("vOH")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vOH"]!;
+    this._vOL        = props.hasModelParam("vOL")          ? props.getModelParam<number>("vOL")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vOL"]!;
   }
 
   setup(ctx: SetupContext): void {
@@ -134,17 +133,11 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
       case "vos":          this._vos = value; break;
       case "rSat":         this._rSat = Math.max(value, MIN_RSAT); break;
       case "responseTime": this._tau = value; break;
+      case "vOH":          this._vOH = value; break;
+      case "vOL":          this._vOL = value; break;
     }
   }
 
-  /**
-   * load()- hybrid Template D shape.
-   *
-   * Stamp uses s1[OUTPUT_WEIGHT] (J-021 ss1.1 StatePool migration shape:
-   * stamp from prior step, integrate forward, write s0 at the bottom).
-   * Latch transitions evaluate against the current rhsOld iterate; weight
-   * integrates forward via the J-021 trapezoidal recurrence.
-   */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const s0 = this._pool.states[0];
@@ -153,6 +146,7 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
 
     const vPlus  = rhsOld[this._pinNodes.get("in+")!];
     const vMinus = rhsOld[this._pinNodes.get("in-")!];
+    const outNode = this._pinNodes.get("out")!;
 
     // Hysteresis thresholds.
     const half = this._hysteresis * 0.5;
@@ -165,23 +159,24 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
     if (latchOld === 0 && vPlus >= vTh)      latchNew = 1;
     else if (latchOld === 1 && vPlus < vTl)  latchNew = 0;
 
-    // Stamp open-collector conductance using prior-step weight (s1).
-    // G_eff = w * (1/rSat) at (out, out); no RHS (pulls to GND via rSat).
+    // Push-pull Norton stamp: G = 1/rSat always; RHS injects G*vTarget where
+    // vTarget is smoothed between vOH (latch=0, output high) and vOL
+    // (latch=1, output asserted low). Smoothing uses the prior-step weight
+    // (s1) per the StatePool migration convention.
     const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    if (this._hOutOut !== -1) {
-      const gEff = wOld / this._rSat;
-      ctx.solver.stampElement(this._hOutOut, gEff);
+    if (this._hOutOut !== -1 && outNode !== 0) {
+      const G = 1 / this._rSat;
+      const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
+      ctx.solver.stampElement(this._hOutOut, G);
+      stampRHS(ctx.rhs, outNode, G * vTarget);
     }
 
-    // Weight integration- J-021 trapezoidal recurrence.
-    // alpha = dt / (tau + dt); wNew = wOld + alpha * (target - wOld).
-    // dt = 0 (DC) -> alpha = 0 -> wNew = wOld (weight held; latch still updates).
+    // Weight integration- trapezoidal recurrence shared with open-collector.
     const dt = ctx.dt;
     const alpha = dt > 0 ? dt / (this._tau + dt) : 0;
     const wNew = wOld + alpha * (latchNew - wOld);
 
-    // Bottom-of-load writes- every slot mutated this step writes to s0
-    // exactly once.
+    // Bottom-of-load writes.
     s0[base + SLOT_OUTPUT_LATCH]  = latchNew;
     s0[base + SLOT_OUTPUT_WEIGHT] = wNew;
   }
@@ -190,9 +185,10 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
     const outNode = this._pinNodes.get("out")!;
     const s1 = this._pool.states[1];
     const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
-    const gEff = wOld / this._rSat;
-    const I = gEff * rhs[outNode];
-    // Inputs are pure reads (no current); output sinks I to ground when active.
+    const G = 1 / this._rSat;
+    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
+    // Norton-equivalent current at the output port: I_out = G * (vNode - vTarget).
+    const I = G * (rhs[outNode] - vTarget);
     return [0, 0, I];
   }
 }
@@ -201,18 +197,18 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
 // ComponentDefinition
 // ---------------------------------------------------------------------------
 
-export const ComparatorDriverDefinition: ComponentDefinition = {
-  name: "ComparatorDriver",
+export const ComparatorPushPullDriverDefinition: ComponentDefinition = {
+  name: "ComparatorPushPullDriver",
   typeId: -1,
   internalOnly: true,
-  pinLayout: COMPARATOR_DRIVER_PIN_LAYOUT,
+  pinLayout: COMPARATOR_PUSHPULL_DRIVER_PIN_LAYOUT,
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: COMPARATOR_DRIVER_PARAM_DEFS,
-      params: COMPARATOR_DRIVER_DEFAULTS,
+      paramDefs: COMPARATOR_PUSHPULL_DRIVER_PARAM_DEFS,
+      params: COMPARATOR_PUSHPULL_DRIVER_DEFAULTS,
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
-        new ComparatorDriverElement(pinNodes, props),
+        new ComparatorPushPullDriverElement(pinNodes, props),
     },
   },
   defaultModel: "default",

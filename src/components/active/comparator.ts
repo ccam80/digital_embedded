@@ -173,12 +173,34 @@ export class ComparatorElement extends AbstractCircuitElement {
 // Netlist
 // ---------------------------------------------------------------------------
 
-export const COMPARATOR_NETLIST: MnaSubcircuitNetlist = {
+export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
   ports: ["in+", "in-", "out"],
   params: { ...COMPARATOR_DEFAULTS },
   elements: [
     {
       typeId: "ComparatorDriver",
+      modelRef: "default",
+      subElementName: "drv",
+      params: {
+        hysteresis:   "hysteresis",
+        vos:          "vos",
+        rSat:         "rSat",
+        responseTime: "responseTime",
+      },
+    } as MnaSubcircuitNetlist["elements"][number] & { subElementName: string },
+  ],
+  internalNetCount: 0,
+  netlist: [
+    [0, 1, 2], // drv: in+=0, in-=1, out=2
+  ],
+};
+
+export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["in+", "in-", "out"],
+  params: { ...COMPARATOR_DEFAULTS },
+  elements: [
+    {
+      typeId: "ComparatorPushPullDriver",
       modelRef: "default",
       subElementName: "drv",
       params: {
@@ -239,7 +261,8 @@ export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
 
   helpText:
     "Analog Comparator  3-terminal (in+, in-, out). " +
-    "Switches output based on V+ vs V-. Open-collector output requires external pull-up. " +
+    "Switches output based on V+ vs V-. Open-collector output requires external pull-up; " +
+    "push-pull drives directly to vOH/vOL. " +
     "Optional hysteresis prevents output chatter on noisy inputs.",
 
   factory(props: PropertyBag): ComparatorElement {
@@ -250,7 +273,13 @@ export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "open-collector": {
       kind: "netlist",
-      netlist: COMPARATOR_NETLIST,
+      netlist: COMPARATOR_OPEN_COLLECTOR_NETLIST,
+      paramDefs: COMPARATOR_PARAM_DEFS,
+      params: COMPARATOR_DEFAULTS,
+    },
+    "push-pull": {
+      kind: "netlist",
+      netlist: COMPARATOR_PUSH_PULL_NETLIST,
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_DEFAULTS,
     },

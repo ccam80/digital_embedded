@@ -60,14 +60,14 @@ export class BehavioralJKFlipflopDriverElement implements PoolBackedAnalogElemen
   _stateBase = -1;
   branchIndex = -1;
 
-  private readonly _vIH: number;
-  private readonly _vIL: number;
+  private _vIH: number;
+  private _vIL: number;
   private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
-    this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
-    this._vIL = props.hasModelParam("vIL") ? props.getModelParam<number>("vIL") : 0.8;
+    this._vIH = props.getModelParam<number>("vIH");
+    this._vIL = props.getModelParam<number>("vIL");
   }
 
   setup(ctx: SetupContext): void {
@@ -126,7 +126,10 @@ export class BehavioralJKFlipflopDriverElement implements PoolBackedAnalogElemen
     return new Array(this._pinNodes.size).fill(0);
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    if (key === "vIH") this._vIH = value;
+    else if (key === "vIL") this._vIL = value;
+  }
 }
 
 export const BehavioralJKFlipflopDriverDefinition: ComponentDefinition = {

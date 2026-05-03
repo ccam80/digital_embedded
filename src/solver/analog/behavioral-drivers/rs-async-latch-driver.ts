@@ -4,16 +4,13 @@
  *
  * Every load() pass:
  *   S=0, R=0 → hold
- *   S=1, R=0 → q=1
- *   S=0, R=1 → q=0
- *   S=1, R=1 → forbidden- hold (the recovered original additionally emitted
- *              an "rs-flipflop-both-set" diagnostic; the diagnostic path is
- *              not preserved in the pool-backed model).
+ *   S=1, R=0 → q=1, ~q=0
+ *   S=0, R=1 → q=0, ~q=1
+ *   S=1, R=1 → forbidden state Q=~Q=0 (matches parent's digital `executeRSAsync`
+ *              behavior; both outputs forced low when both inputs are high).
  *
  * Per Composite M17 (phase-composite-architecture.md), J-155
- * (contracts_group_10.md). Behavior migrated from
- * `.recovery/behavioral-flipflop-rs-async.ts.orig`'s
- * `BehavioralRSAsyncLatchElement`.
+ * (contracts_group_10.md).
  */
 
 import {
@@ -88,7 +85,8 @@ export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElem
     const vS  = rhsOld[this._pinNodes.get("S")!] - gnd;
     const vR  = rhsOld[this._pinNodes.get("R")!] - gnd;
 
-    let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
+    let q  = s1[base + SLOT_Q]        >= 0.5 ? 1 : 0;
+    let nq = s1[base + SLOT_OUT_NQ]   >= 0.5 ? 1 : 0;
 
     const sHigh = vS >= this._vIH;
     const sLow  = vS <  this._vIL;
@@ -97,18 +95,25 @@ export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElem
 
     if ((sHigh || sLow) && (rHigh || rLow)) {
       if (sHigh && rHigh) {
-        // Forbidden- hold previous q.
+        // Forbidden state: both outputs forced LOW (matches parent
+        // executeRSAsync). The Q/~Q invariant breaks here on purpose -
+        // SLOT_OUT_NQ is the source of truth for ~Q so it can hold 0
+        // independently across steps.
+        q  = 0;
+        nq = 0;
       } else if (sHigh) {
-        q = 1;
+        q  = 1;
+        nq = 0;
       } else if (rHigh) {
-        q = 0;
+        q  = 0;
+        nq = 1;
       }
-      // both low → hold
+      // both low → hold (q and nq retain prior s1 values)
     }
 
     s0[base + SLOT_Q]      = q;
     s0[base + SLOT_OUT_Q]  = q;
-    s0[base + SLOT_OUT_NQ] = 1 - q;
+    s0[base + SLOT_OUT_NQ] = nq;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

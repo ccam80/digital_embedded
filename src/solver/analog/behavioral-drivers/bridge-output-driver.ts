@@ -192,8 +192,16 @@ export class BridgeOutputDriverElement implements PoolBackedAnalogElement {
 
   /** Hot-update a single electrical parameter. */
   setParam(key: string, value: number): void {
-    if (key in this._spec) {
-      (this._spec as unknown as Record<string, number>)[key] = value;
+    switch (key) {
+      case "rOut": this._spec.rOut = value; break;
+      case "cOut": this._spec.cOut = value; break;
+      case "rIn":  this._spec.rIn  = value; break;
+      case "cIn":  this._spec.cIn  = value; break;
+      case "vOH":  this._spec.vOH  = value; break;
+      case "vOL":  this._spec.vOL  = value; break;
+      case "vIH":  this._spec.vIH  = value; break;
+      case "vIL":  this._spec.vIL  = value; break;
+      case "rHiZ": this._spec.rHiZ = value; break;
     }
   }
 

@@ -268,6 +268,7 @@ import { BehavioralDAsyncFlipflopDriverDefinition } from "../solver/analog/behav
 import { DACDriverDefinition } from "./active/dac-driver.js";
 import { ADCDriverDefinition } from "./active/adc-driver.js";
 import { ComparatorDriverDefinition } from "./active/comparator-driver.js";
+import { ComparatorPushPullDriverDefinition } from "./active/comparator-pushpull-driver.js";
 import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.js";
 
 // Transformer coupling sub-element (internalOnly)
@@ -557,6 +558,7 @@ export function createDefaultRegistry(
   registry.register(DACDriverDefinition);
   registry.register(ADCDriverDefinition);
   registry.register(ComparatorDriverDefinition);
+  registry.register(ComparatorPushPullDriverDefinition);
   registry.register(SchmittTriggerDriverDefinition);
 
   // Transformer coupling sub-element (internalOnly)
