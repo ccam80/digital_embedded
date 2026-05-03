@@ -1034,7 +1034,7 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /** Restore simulation time (used by hot-recompile). */
-  set simTime(t: number) {
+  setSimTime(t: number): void {
     this._simTime = t;
     const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
     if (cac?.timeRef) cac.timeRef.value = t;

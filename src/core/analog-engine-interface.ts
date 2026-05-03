@@ -343,6 +343,11 @@ export interface AnalogEngine extends Engine {
   /** Current simulation time in seconds. Advances after each accepted step. */
   readonly simTime: number;
 
+  /** Restore simulation time (used by hot-recompile to carry simTime across
+   *  a fresh engine instance). Implementations must also propagate the new
+   *  value to any cached time reference inside the compiled circuit. */
+  setSimTime(t: number): void;
+
   /** Last accepted timestep in seconds. Updated after each `step()` call. */
   readonly lastDt: number;
 

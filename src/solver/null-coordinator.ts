@@ -1,5 +1,5 @@
 /**
- * NullSimulationCoordinator — a no-op implementation of SimulationCoordinator.
+ * NullSimulationCoordinator- a no-op implementation of SimulationCoordinator.
  *
  * Used as the initial value of DefaultSimulatorFacade._coordinator so that
  * all consumers can call coordinator methods without null-checking. Signal
@@ -23,10 +23,11 @@ import type { SignalAddress, SignalValue } from '../compile/types.js';
 import type { AcParams, AcResult } from './analog/ac-analysis.js';
 import type { Wire } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
+import type { LimitingEvent } from './analog/newton-raphson.js';
 
 export class NullSimulationCoordinator implements SimulationCoordinator {
   // -------------------------------------------------------------------------
-  // Lifecycle — no-ops
+  // Lifecycle- no-ops
   // -------------------------------------------------------------------------
 
   step(): void { /* no circuit compiled */ }
@@ -42,7 +43,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   getState(): EngineState { return EngineState.STOPPED; }
 
   // -------------------------------------------------------------------------
-  // Signal I/O — throw to surface misconfiguration
+  // Signal I/O- throw to surface misconfiguration
   // -------------------------------------------------------------------------
 
   readSignal(_addr: SignalAddress): SignalValue {
@@ -66,7 +67,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   }
 
   // -------------------------------------------------------------------------
-  // Compiled output — empty maps, no engines
+  // Compiled output- empty maps, no engines
   // -------------------------------------------------------------------------
 
   readonly compiled = {
@@ -79,14 +80,14 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   };
 
   // -------------------------------------------------------------------------
-  // Observers — no-ops
+  // Observers- no-ops
   // -------------------------------------------------------------------------
 
   addMeasurementObserver(_observer: MeasurementObserver): void { /* no-op */ }
   removeMeasurementObserver(_observer: MeasurementObserver): void { /* no-op */ }
 
   // -------------------------------------------------------------------------
-  // Capability queries — all false
+  // Capability queries- all false
   // -------------------------------------------------------------------------
 
   supportsMicroStep(): boolean { return false; }
@@ -95,7 +96,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   supportsDcOp(): boolean { return false; }
 
   // -------------------------------------------------------------------------
-  // Feature execution — no-ops / null
+  // Feature execution- no-ops / null
   // -------------------------------------------------------------------------
 
   microStep(): void { /* no-op */ }
@@ -111,7 +112,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
     // null coordinator has nothing to initialize
   }
 
-  // §1.11 Convergence logging
+  // ss1.11 Convergence logging
   getElementLabel(_index: number): string | undefined { return undefined; }
   supportsConvergenceLog(): boolean { return false; }
   setConvergenceLogEnabled(_enabled: boolean): void { /* no-op */ }
@@ -138,7 +139,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   }
 
   // -------------------------------------------------------------------------
-  // Speed — neutral defaults
+  // Speed- neutral defaults
   // -------------------------------------------------------------------------
 
   speed: number = 1e-3;
@@ -191,4 +192,23 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   // -------------------------------------------------------------------------
 
   getCurrentResolverContext(): CurrentResolverContext | null { return null; }
+
+  // -------------------------------------------------------------------------
+  // Limiting capture
+  // -------------------------------------------------------------------------
+
+  setLimitingCapture(_enabled: boolean): void { /* no-op */ }
+  getLimitingEvents(): readonly LimitingEvent[] { return Object.freeze([]); }
+
+  // -------------------------------------------------------------------------
+  // Runtime diagnostics
+  // -------------------------------------------------------------------------
+
+  getRuntimeDiagnostics(): readonly import('../compile/types.js').Diagnostic[] { return Object.freeze([]); }
+
+  // -------------------------------------------------------------------------
+  // Sim time
+  // -------------------------------------------------------------------------
+
+  setSimTime(_t: number): void { /* no-op */ }
 }

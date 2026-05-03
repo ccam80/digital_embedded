@@ -1,5 +1,5 @@
 /**
- * SimulationController — compile/bind, simulation loop, speed control, analog viz.
+ * SimulationController- compile/bind, simulation loop, speed control, analog viz.
  *
  * Owns: compileAndBind, invalidateCompiled, startSimulation, stopSimulation,
  * _startRenderLoop, analog visualization, speed control UI, toolbar sim buttons,
@@ -63,7 +63,7 @@ export interface SimulationController {
 // ---------------------------------------------------------------------------
 
 export interface SimControllerCallbacks {
-  /** Tear down viewer panels — they hold stale net IDs after recompile. */
+  /** Tear down viewer panels- they hold stale net IDs after recompile. */
   disposeViewers(): void;
   /**
    * Rebuild viewer panels after a successful compile, if the viewer panel is
@@ -75,7 +75,7 @@ export interface SimControllerCallbacks {
 }
 
 // ---------------------------------------------------------------------------
-// parseTimeValue — parse SI time strings like "5m", "100u", "1n" → seconds
+// parseTimeValue- parse SI time strings like "5m", "100u", "1n" → seconds
 // ---------------------------------------------------------------------------
 
 /**
@@ -173,14 +173,14 @@ export function initSimulationController(
       const list = componentNames.length > 0
         ? ` Components in circuit: ${componentNames.join(', ')}.`
         : '';
-      return `A component has an unconnected pin — check that every pin sits exactly ` +
+      return `A component has an unconnected pin- check that every pin sits exactly ` +
         `on a wire endpoint. Rotated or moved components often leave pins dangling.${list}`;
     }
 
     if (raw.includes('unknown component type')) {
       const match = raw.match(/"([^"]+)"/);
       const typeName = match ? match[1] : 'unknown';
-      return `Couldn't find the component type "${typeName}" — check that it's ` +
+      return `Couldn't find the component type "${typeName}"- check that it's ` +
         `registered and spelled correctly.`;
     }
 
@@ -284,60 +284,98 @@ export function initSimulationController(
     disposeAnalog();
 
     try {
-      facade.compile(circuit);
-      const coordinator = facade.getCoordinator();
-      const unified = coordinator.compiled;
+        facade.compile(circuit);
+        const coordinator = facade.getCoordinator();
+        const unified = coordinator.compiled;
 
-      const compileErrors = unified.diagnostics.filter(d => d.severity === 'error');
-      const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
+        const compileErrors = unified.diagnostics.filter(d => d.severity === 'error');
+        const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
 
-      if (compileErrors.length > 0) {
-        const combined = compileErrors.map(d => d.message).join('\n');
-        console.error('Compilation diagnostics:', compileErrors);
-        ctx.showStatus(`Circuit problem: ${combined}`, true);
-      }
-
-      const allDiags = [...compileErrors, ...compileWarnings];
-      if (allDiags.length > 0) {
-        if (compileWarnings.length > 0) {
-          console.warn('Compilation warnings:', compileWarnings.map(d => d.message));
+        if (compileErrors.length > 0) {
+          const combined = compileErrors.map(d => d.message).join('\n');
+          console.error('Compilation diagnostics:', compileErrors);
+          ctx.showStatus(`Circuit problem: ${combined}`, true);
         }
-        const resolverCtx = coordinator.getCurrentResolverContext();
-        if (resolverCtx !== null) {
-          const wireToNodeId = new Map<Wire, number>();
-          for (const [wire, addr] of unified.wireSignalMap) {
-            if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
+
+        const compileTimeAllDiags = [...compileErrors, ...compileWarnings];
+        if (compileTimeAllDiags.length > 0) {
+          if (compileWarnings.length > 0) {
+            console.warn('Compilation warnings:', compileWarnings.map(d => d.message));
           }
-          renderPipeline.populateDiagnosticOverlays(allDiags, wireToNodeId);
+          const resolverCtx = coordinator.getCurrentResolverContext();
+          if (resolverCtx !== null) {
+            const wireToNodeId = new Map<Wire, number>();
+            for (const [wire, addr] of unified.wireSignalMap) {
+              if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
+            }
+            renderPipeline.populateDiagnosticOverlays(compileTimeAllDiags, wireToNodeId);
+          }
+          renderPipeline.scheduleRender();
         }
-        renderPipeline.scheduleRender();
-      }
 
-      if (compileErrors.length > 0) {
-        facade.invalidate();
-        return false;
-      }
+        if (compileErrors.length > 0) {
+          facade.invalidate();
+          return false;
+        }
 
-      // Cast to full CompiledCircuitUnified to access pinSignalMap (the coordinator-types
-      // interface only exposes a narrowed ReadonlyMap subset).
-      const fullUnified = unified as unknown as CompiledCircuitUnified;
-      binding.bind(circuit, coordinator, fullUnified.wireSignalMap, fullUnified.pinSignalMap);
+        const fullUnified = unified as unknown as CompiledCircuitUnified;
+        binding.bind(circuit, coordinator, fullUnified.wireSignalMap, fullUnified.pinSignalMap);
 
-      const dcResult = facade.getDcOpResult();
-      ctx.compiledDirty = false;
-      if (dcResult && !dcResult.converged) {
-        ctx.showStatus('Warning: DC operating point did not converge — results may be inaccurate', true);
-      } else {
-        ctx.clearStatus();
-      }
+        // Drive DC OP- this triggers MNAEngine._setup(), which runs post-setup
+        // topology detectors (voltage-source-loop, inductor-loop,
+        // competing-voltage-constraints) and emits via the engine's
+        // DiagnosticCollector. The coordinator mirrors those emissions into its
+        // own collector (see coordinator.ts onDiagnostic wiring).
+        const dcResult = facade.getDcOpResult();
+        ctx.compiledDirty = false;
 
-      callbacks.rebuildViewersIfOpen();
+        // Read runtime diagnostics emitted during init/setup/dcOp.
+        const runtimeDiags = coordinator.getRuntimeDiagnostics();
+        const runtimeErrors = runtimeDiags.filter(d => d.severity === 'error');
+        const runtimeWarnings = runtimeDiags.filter(d => d.severity === 'warning');
 
-      if (callbacks.applyPreRunState) {
-        callbacks.applyPreRunState(facade.getCoordinator());
-      }
+        if (runtimeErrors.length > 0) {
+          const combined = runtimeErrors.map(d => d.message).join('\n');
+          console.error('Runtime diagnostics:', runtimeErrors);
+          ctx.showStatus(`Circuit problem: ${combined}`, true);
+        } else if (runtimeWarnings.length > 0) {
+          console.warn('Runtime warnings:', runtimeWarnings.map(d => d.message));
+        }
 
-      return true;
+        // Re-render diagnostic overlays so runtime codes (errors + warnings)
+        // appear on the canvas alongside any compile-time warnings.
+        const allRuntimeDiags = [...runtimeErrors, ...runtimeWarnings];
+        const overlayDiags = [...compileTimeAllDiags, ...allRuntimeDiags];
+        if (overlayDiags.length > 0) {
+          const resolverCtx = coordinator.getCurrentResolverContext();
+          if (resolverCtx !== null) {
+            const wireToNodeId = new Map<Wire, number>();
+            for (const [wire, addr] of unified.wireSignalMap) {
+              if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
+            }
+            renderPipeline.populateDiagnosticOverlays(overlayDiags, wireToNodeId);
+          }
+          renderPipeline.scheduleRender();
+        }
+
+        if (runtimeErrors.length > 0) {
+          facade.invalidate();
+          return false;
+        }
+
+        if (dcResult && !dcResult.converged) {
+          ctx.showStatus('Warning: DC operating point did not converge- results may be inaccurate', true);
+        } else if (compileTimeAllDiags.length === 0 && runtimeDiags.length === 0) {
+          ctx.clearStatus();
+        }
+
+        callbacks.rebuildViewersIfOpen();
+
+        if (callbacks.applyPreRunState) {
+          callbacks.applyPreRunState(facade.getCoordinator());
+        }
+
+        return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('Compilation failed:', msg, err);
@@ -363,14 +401,14 @@ export function initSimulationController(
   }
 
   // -------------------------------------------------------------------------
-  // hotRecompile — recompile without killing a running simulation
+  // hotRecompile- recompile without killing a running simulation
   // -------------------------------------------------------------------------
 
   function hotRecompile(): void {
     const coordinator = facade.getCoordinator();
     const wasRunning = coordinator.getState() === EngineState.RUNNING;
 
-    // If sim isn't running, nothing to preserve — just invalidate.
+    // If sim isn't running, nothing to preserve- just invalidate.
     if (!wasRunning) {
       invalidateCompiled();
       return;
@@ -430,7 +468,7 @@ export function initSimulationController(
 
     // Restore sim time if analog is present.
     if (savedSimTime !== null) {
-      (newCoordinator as unknown as { setSimTime(t: number): void }).setSimTime(savedSimTime);
+      newCoordinator.setSimTime(savedSimTime);
     }
 
     // 5. Resume.
@@ -714,7 +752,7 @@ export function initSimulationController(
     }
   });
 
-  // Preset click handler — selects time only, does not step
+  // Preset click handler- selects time only, does not step
   stepDropdown?.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('.step-preset') as HTMLElement | null;
     if (!target) return;

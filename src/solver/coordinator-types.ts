@@ -1,5 +1,5 @@
 /**
- * SimulationCoordinator interface — unified simulation contract for all
+ * SimulationCoordinator interface- unified simulation contract for all
  * circuit types (digital-only, analog-only, mixed-signal).
  *
  * The coordinator wraps both backend engines and the bridge cross-reference
@@ -14,6 +14,7 @@ import { EngineState } from "../core/engine-interface.js";
 import type { DcOpResult } from "../core/analog-engine-interface.js";
 import type { StepRecord } from "./analog/convergence-log.js";
 import type { Diagnostic, SignalAddress, SignalValue } from "../compile/types.js";
+import type { LimitingEvent } from "./analog/newton-raphson.js";
 import type { AcParams, AcResult } from "./analog/ac-analysis.js";
 import type { Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
@@ -23,7 +24,7 @@ import type { PhaseAwareCaptureHook } from "./analog/__tests__/harness/types.js"
 export type { PhaseAwareCaptureHook };
 
 /**
- * Result of computeFrameSteps — describes how to advance simulation this frame.
+ * Result of computeFrameSteps- describes how to advance simulation this frame.
  *
  * simTimeGoal is the target simTime to reach; budgetMs limits wall time per frame.
  */
@@ -89,6 +90,14 @@ export interface SimulationCoordinator {
     readonly diagnostics: readonly Diagnostic[];
   };
 
+  /** Read-only snapshot of diagnostics emitted by the analog engine's
+   *  runtime DiagnosticCollector since coordinator construction. Includes
+   *  bridge-time, setup-time, and run-time codes (`bridge-missing-inner-pin`,
+   *  `voltage-source-loop`, `inductor-loop`, `competing-voltage-constraints`,
+   *  `convergence-failed`, `reactive-state-outside-pool`). Distinct from
+   *  `compiled.diagnostics`, which carries only compile-time codes. */
+  getRuntimeDiagnostics(): readonly Diagnostic[];
+
   /** Register a measurement observer (notified after each step). */
   addMeasurementObserver(observer: MeasurementObserver): void;
 
@@ -96,7 +105,7 @@ export interface SimulationCoordinator {
   removeMeasurementObserver(observer: MeasurementObserver): void;
 
   // -------------------------------------------------------------------------
-  // §1.1 Capability queries
+  // ss1.1 Capability queries
   // -------------------------------------------------------------------------
 
   /** True when the coordinator can perform a micro-step (gate-level single evaluation). */
@@ -112,7 +121,7 @@ export interface SimulationCoordinator {
   supportsDcOp(): boolean;
 
   // -------------------------------------------------------------------------
-  // §1.2 Unified feature execution (replace backend reach-through)
+  // ss1.2 Unified feature execution (replace backend reach-through)
   // -------------------------------------------------------------------------
 
   /** Execute a single micro-step (digital gate-level). No-op if not supported. */
@@ -131,7 +140,7 @@ export interface SimulationCoordinator {
   applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void;
 
   // -------------------------------------------------------------------------
-  // §1.11 Convergence logging
+  // ss1.11 Convergence logging
   // -------------------------------------------------------------------------
 
   /** Return a human-readable label for analog element at the given index, or undefined. */
@@ -180,13 +189,19 @@ export interface SimulationCoordinator {
   readonly simTime: number | null;
 
   /**
+   * Restore analog sim time (used by hot-recompile to carry simTime across a
+   * fresh engine instance). No-op when no analog backend is active.
+   */
+  setSimTime(t: number): void;
+
+  /**
    * Current engine lifecycle state (unified across backends).
    * RUNNING if any backend is RUNNING. ERROR if any backend is ERROR.
    */
   getState(): EngineState;
 
   // -------------------------------------------------------------------------
-  // §1.3 Unified signal snapshot (replace _snapshotSignals branching)
+  // ss1.3 Unified signal snapshot (replace _snapshotSignals branching)
   // -------------------------------------------------------------------------
 
   /**
@@ -238,7 +253,7 @@ export interface SimulationCoordinator {
   formatSpeed(): { value: string; unit: string };
 
   // -------------------------------------------------------------------------
-  // §1.5 Clock management
+  // ss1.5 Clock management
   // -------------------------------------------------------------------------
 
   /**
@@ -248,7 +263,7 @@ export interface SimulationCoordinator {
   advanceClocks(): void;
 
   // -------------------------------------------------------------------------
-  // §1.6 Visualization context (replace analog render setup in consumers)
+  // ss1.6 Visualization context (replace analog render setup in consumers)
   // -------------------------------------------------------------------------
 
   /**
@@ -278,7 +293,7 @@ export interface SimulationCoordinator {
   updateVoltageTracking(): void;
 
   // -------------------------------------------------------------------------
-  // §1.7 Slider context (replace analogCompiled.elementToCircuitElement iteration)
+  // ss1.7 Slider context (replace analogCompiled.elementToCircuitElement iteration)
   // -------------------------------------------------------------------------
 
   /**
@@ -311,7 +326,7 @@ export interface SimulationCoordinator {
   setSourceByLabel(label: string, paramKey: string, value: number): void;
 
   // -------------------------------------------------------------------------
-  // §1.8 Measurement signal reading (for ScopePanel)
+  // ss1.8 Measurement signal reading (for ScopePanel)
   // -------------------------------------------------------------------------
 
   /**
@@ -333,7 +348,7 @@ export interface SimulationCoordinator {
   readElementPower(elementIndex: number): number | null;
 
   // -------------------------------------------------------------------------
-  // §1.9 Snapshot management (for TimingDiagramPanel time-cursor scrubbing)
+  // ss1.9 Snapshot management (for TimingDiagramPanel time-cursor scrubbing)
   // -------------------------------------------------------------------------
 
   /**
@@ -348,7 +363,7 @@ export interface SimulationCoordinator {
   restoreSnapshot(id: SnapshotId): void;
 
   // -------------------------------------------------------------------------
-  // §1.10 Current resolver context (replace direct AnalogEngine reach-through)
+  // ss1.10 Current resolver context (replace direct AnalogEngine reach-through)
   // -------------------------------------------------------------------------
 
   /**
@@ -356,6 +371,9 @@ export interface SimulationCoordinator {
    * Returns null if no analog domain is present.
    */
   getCurrentResolverContext(): CurrentResolverContext | null;
+
+  setLimitingCapture(enabled: boolean): void;
+  getLimitingEvents(): readonly LimitingEvent[];
 }
 
 /**

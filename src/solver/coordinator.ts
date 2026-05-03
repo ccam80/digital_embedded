@@ -23,6 +23,8 @@ import type { StepRecord } from './analog/convergence-log.js';
 import { BitVector } from '../core/signal.js';
 import { FacadeError } from '../headless/types.js';
 import { DiagnosticCollector } from './analog/diagnostics.js';
+import type { LimitingEvent } from './analog/newton-raphson.js';
+import type { Diagnostic } from '../compile/types.js';
 import type { SimulationCoordinator, FrameStepResult, CurrentResolverContext, SliderPropertyDescriptor, PhaseAwareCaptureHook } from './coordinator-types.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
@@ -50,10 +52,15 @@ const ANALOG_PROPERTY_UNITS: Record<string, string> = {
 
 /**
  * Per-bridge-adapter state for top-level digital↔analog bridges.
- * Tracks previous bit for hysteresis in the indeterminate voltage band.
+ * Tracks previous bit for hysteresis in the indeterminate voltage band
+ * (analog→digital direction) and the previous logic level fed to the
+ * analog stamp (digital→analog direction) so edge transitions can post
+ * an analog breakpoint and avoid trapezoidal ringing across the
+ * discontinuity.
  */
 interface TopLevelBridgeState {
   prevBit: number;
+  prevDaHigh: boolean;
 }
 
 export class DefaultSimulationCoordinator implements SimulationCoordinator {
@@ -89,7 +96,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._registry = registry ?? null;
     this._compiled = compiled;
     this._bridges = compiled.bridges;
-    this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0 }));
+    this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0, prevDaHigh: false }));
 
     // Resolve MNA bridge adapters from the compiled analog circuit.
     // Each BridgeAdapter descriptor maps to the adapters registered under its
@@ -136,6 +143,13 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       const mnaEngine = this._analog as MNAEngine;
       if (typeof mnaEngine.onDiagnostic === 'function') {
         this._diagnostics = this._createDiagnosticProxy();
+        // Mirror engine-emitted diagnostics into the coordinator's collector
+        // so consumers see post-setup topology codes, convergence-failed, and
+        // reactive-state-outside-pool through a single channel
+        // (coordinator.getRuntimeDiagnostics()) without reaching into the engine.
+        mnaEngine.onDiagnostic((d) => {
+          this._diagnostics?.emit(d);
+        });
       }
     }
 
@@ -171,13 +185,13 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   /**
    * Returns the internal digital engine for use by solver-internal code only.
-   * Consumers must not call this — use capability queries and coordinator methods.
+   * Consumers must not call this- use capability queries and coordinator methods.
    */
   getDigitalEngine(): SimulationEngine | null { return this._digital; }
 
   /**
    * Returns the internal analog engine for use by solver-internal code only.
-   * Consumers must not call this — use readSignal, readElementCurrent, etc.
+   * Consumers must not call this- use readSignal, readElementCurrent, etc.
    */
   getAnalogEngine(): AnalogEngine | null { return this._analog; }
 
@@ -192,6 +206,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._analog?.reset();
     for (const state of this._topLevelBridgeStates) {
       state.prevBit = 0;
+      state.prevDaHigh = false;
     }
     this._stepCount = 0;
     this._voltageMin = Infinity;
@@ -208,7 +223,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   step(): void {
     // The warm-start transient DCOP (ngspice dctran.c:230-360 firsttime block)
-    // is owned by MNAEngine.step() — it runs the DCOP and falls through into
+    // is owned by MNAEngine.step()- it runs the DCOP and falls through into
     // the first transient iteration on the first call after init/reset, then
     // skips the DCOP on subsequent calls. The coordinator is the digital/
     // analog bridge layer and has no ngspice analog here.
@@ -227,7 +242,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     }
 
     // Stagnation guard: if the analog engine completed step() but simTime
-    // did not advance, all internal retries were exhausted — the engine
+    // did not advance, all internal retries were exhausted- the engine
     // cannot make progress from this state. Fail immediately rather than
     // burning CPU repeating identical failures.
     if (this._analog !== null && this._analog.simTime === analogTimeBefore) {
@@ -281,7 +296,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
           code: 'bridge-missing-inner-pin',
           severity: 'error',
           message: `No BridgeInputAdapter for boundary group ${bridge.boundaryGroupId}`,
-          explanation: 'An analog-to-digital bridge has no registered BridgeInputAdapter. This indicates a compilation error — the bridge was not fully assembled.',
+          explanation: 'An analog-to-digital bridge has no registered BridgeInputAdapter. This indicates a compilation error- the bridge was not fully assembled.',
           suggestions: [],
         });
         continue;
@@ -306,6 +321,19 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       if (bridge.direction !== 'digital-to-analog') continue;
       const raw = digital.getSignalRaw(bridge.digitalNetId);
       const high = raw !== 0;
+      const state = this._topLevelBridgeStates[i]!;
+      // On a logic-level transition, post an analog breakpoint at the
+      // current analog simTime. The next getClampedDt sees almostEqualUlps
+      // and applies the at-breakpoint clamp (CKTorder = 1, dt clamped via
+      // saveDelta), so the analog engine takes a clean order-1 small-dt
+      // step across the discontinuity instead of trapezoidal-integrating
+      // through a jump in the bridge stamp's target voltage. Mirrors the
+      // CKTsetBreak pattern used by every analog source (pulse, clock,
+      // pwl)- bridges were the missing case.
+      if (high !== state.prevDaHigh) {
+        analog.addBreakpoint(analog.simTime);
+        state.prevDaHigh = high;
+      }
       const adapters = this._resolvedBridgeAdapters[i]!;
       const outputAdapter = adapters.find(
         (a): a is BridgeOutputAdapter => 'setLogicLevel' in a,
@@ -375,9 +403,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   /**
    * Current analysis phase, updated at each step boundary.
-   * "dcop"      — DC operating point (initial or re-solve)
-   * "tranInit"  — Transient initialization (first few steps at t=0)
-   * "tranFloat" — Transient free-running (t > 0)
+   * "dcop"     - DC operating point (initial or re-solve)
+   * "tranInit" - Transient initialization (first few steps at t=0)
+   * "tranFloat"- Transient free-running (t > 0)
    */
   get analysisPhase(): "dcop" | "tranInit" | "tranFloat" {
     return this._analysisPhase;
@@ -413,7 +441,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   /**
    * Standalone DC operating-point analysis (matches ngspice `.op` →
    * `dcop.c::DCop` → `CKTop(MODEDCOP|MODEINITJCT, MODEDCOP|MODEINITFLOAT)`).
-   * Each invocation runs a fresh DCOP — ngspice rebuilds the bias point
+   * Each invocation runs a fresh DCOP- ngspice rebuilds the bias point
    * for every `.op` directive and does not reuse cached results across
    * jobs. Distinct from the transient-boot DCOP that step() lazily runs
    * (which uses MODETRANOP and only seeds transient state).
@@ -430,7 +458,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   // -------------------------------------------------------------------------
-  // §1.11 Convergence logging
+  // ss1.11 Convergence logging
   // -------------------------------------------------------------------------
 
   getElementLabel(index: number): string | undefined {
@@ -544,7 +572,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   /** Restore analog sim time (used by hot-recompile). No-op if no analog engine. */
   setSimTime(t: number): void {
     if (this._analog === null) return;
-    (this._analog as unknown as { simTime: number }).simTime = t;
+    this._analog.setSimTime(t);
     this._simTimeTarget = t;
   }
 
@@ -730,7 +758,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (this._analog === null || this._registry === null) return [];
     const elementIndex = this._resolveElementIndex(element);
     if (elementIndex === -1) return [];
-    const def = this._registry.get(element.typeId);
+    const def = this._registry.getStandalone(element.typeId);
     if (!def) return [];
     const bag = element.getProperties();
     const result: SliderPropertyDescriptor[] = [];
@@ -749,7 +777,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
         result.push({
           elementIndex,
           key: pd.key,
-          label: pd.label,
+          label: pd.label ?? pd.key,
           currentValue,
           unit: pd.unit ?? ANALOG_PROPERTY_UNITS[pd.key] ?? '',
           logScale: true,
@@ -852,7 +880,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
             }
           }
           if (!bridgeHandled) {
-            // No bridge adapter matched — the element may hold pin models
+            // No bridge adapter matched- the element may hold pin models
             // internally (e.g. behavioral analog models). Forward the full
             // composite key so the element can route it via delegatePinSetParam.
             const el = compiledAnalog.elements[elementIndex];
@@ -922,6 +950,31 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
    */
   setDiagnosticCollector(collector: DiagnosticCollector): void {
     this._diagnostics = collector;
+  }
+
+  /**
+   * Read-only snapshot of all engine-emitted diagnostics accumulated since
+   * this coordinator was constructed. Implements
+   * `SimulationCoordinator.getRuntimeDiagnostics()`.
+   */
+  getRuntimeDiagnostics(): readonly Diagnostic[] {
+    return this._diagnostics?.getDiagnostics() ?? [];
+  }
+
+  setLimitingCapture(enabled: boolean): void {
+    if (this._analog === null) return;
+    const mnaEngine = this._analog as MNAEngine;
+    if (enabled) {
+      mnaEngine.limitingCollector = [] as LimitingEvent[];
+    } else {
+      mnaEngine.limitingCollector = null;
+    }
+  }
+
+  getLimitingEvents(): readonly LimitingEvent[] {
+    if (this._analog === null) return Object.freeze([]);
+    const mnaEngine = this._analog as MNAEngine;
+    return mnaEngine.limitingCollector ?? Object.freeze([]);
   }
 
   /**
