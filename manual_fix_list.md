@@ -356,33 +356,33 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 ### 4b. `buildFixture` shared factory (NEW FILE)
 
-- [ ] `src/solver/analog/__tests__/fixtures/build-fixture.ts` -- NEW FILE. Single entry point for all test fixture construction. Shape:
+- [x] `src/solver/analog/__tests__/fixtures/build-fixture.ts` -- NEW FILE. **Done 2026-05-03.** Single entry point for all analog/mixed test fixture construction. Final shape:
   ```ts
   export interface FixtureOptions {
-    /** Inline CircuitSpec (passed directly to facade.build). */
-    build?: (registry: ComponentRegistry) => Circuit;
-    /** Path to a .dts file under e2e/fixtures or src/test-utils/fixtures. */
+    /** Path to a .dts file. PREFERRED over `build` where possible. */
     dtsPath?: string;
-    /** Override SimulationParams (e.g. tStop, maxStep, gmin). */
+    /** Build a Circuit programmatically; mutually exclusive with dtsPath. */
+    build?: (registry: ComponentRegistry, facade: DefaultSimulatorFacade) => Circuit;
+    /** Override SimulationParams (tStop, maxStep, gmin). */
     params?: Partial<SimulationParams>;
-    /** Skip the boot DCOP if a test specifically needs an un-converged state.
-     *  Defaults to false (always run DCOP). */
-    skipDcOp?: boolean;
   }
   export interface Fixture {
     facade: DefaultSimulatorFacade;
     coordinator: DefaultSimulationCoordinator;
     engine: MNAEngine;
-    pool: StatePool;
+    pool: StatePool;                                  // always non-null
     circuit: ConcreteCompiledAnalogCircuit;
-    /** Element index → label, for state-capture lookups. */
     elementLabels: ReadonlyMap<number, string>;
   }
   export function buildFixture(opts: FixtureOptions): Fixture { ... }
   ```
-  Internals: lift the pattern from `hwr-fixture.ts:24-67` — `new DefaultSimulatorFacade(registry)`, `facade.build({...})` or `facade.loadFromDts(dtsPath)`, `facade.compile(circuit)`, then pull `coordinator`, `engine`, `compiled.statePool`, `elementLabels` off the result. Acceptance: tsc clean, 1 unit test that asserts the returned `pool.state1` mirrors the schema-declared initial values for `analog-fuse` (the regression that motivated this).
+  **Deviations from original spec (locked):**
+  - **Dropped `skipDcOp` / `skipBoot` entirely.** No escape hatches. There is no legitimate reason for a test to want pre-`_setup()` engine state; that was poison-pattern thinking — the very thing §4 deleted. Tests that need to verify post-setup-pre-DCOP behavior must do so via the public engine surface (matrix introspection, DcOpResult, captureElementStates, etc.) on a fully-warm-started fixture.
+  - **Always warm-start via `coordinator.step()`.** This is the only path that triggers `_setup()` (allocates pool, runs `initState`) AND `_transientDcop()` (DCOP convergence) AND `_seedFromDcop`'s `state1.set(state0)` AND the first transient step. The standalone `dcOperatingPoint()` deliberately omits the `state1.set(state0)` seed (mirrors ngspice `dcop.c:127`); only `step()` reaches the transient warm-start.
+  - **Acceptance criterion changed:** the original spec mandated "1 unit test that asserts `pool.state1` mirrors the schema-declared initial values for `analog-fuse`". That assertion is incompatible with both (a) the latent `analog-fuse.ts:163-167` boot-blown bug (load() reads conductOld from s1 on first DCOP iter when s1 is still zero, overwriting the init-applied s0[CONDUCT]=1 to 0) and (b) §4d's deletion of the schema-init mechanism. The acceptance test instead pins down the OBSERVABLE warm-start contract on a clean circuit (VS=5V → R=1k → C=1μF → GND): node voltage at cap = 5V, pool.state0/state1[V] both = 5V, matrix has resistor's G=1e-3 stamp, elementLabels resolves user-authored labels, params override observably bounds simTime, single-ownership invariant holds, dtsPath round-trip via facade.serialize. 8 tests passing.
+  - **Latent bugs surfaced (need user decision):** (1) `analog-fuse.ts:163-167` boots fuses in "blown" state under the production engine — load() reads s1 on first DCOP NR iter before s1 is seeded; either fix in `load()` (read s0 not s1 on first iter), or accept until §4d migrates CONDUCT to an `_intact: boolean` instance field. (2) Test files that hand-roll `new StatePool(...)` directly (transmission-line.test.ts ×3, polarized-cap.test.ts ×5, inductor.test.ts, transformer.test.ts, capacitor.test.ts, ccvs.test.ts, cccs.test.ts, coordinator-bridge.test.ts, coordinator.test.ts) are §3 poison-pattern violators — they bypass buildFixture and must be migrated when those files are touched (per §3 warning).
 
-- [ ] `src/solver/analog/__tests__/harness/hwr-fixture.ts` -- Convert to a thin wrapper: `export const buildHwrFixture = () => buildFixture({ build: hwrCircuit })`, where `hwrCircuit` is the existing inline VS→R→D spec extracted as a const. Acceptance: existing callers of `buildHwrFixture` (3 files: `convergence-regression.test.ts`, `harness/query-methods.test.ts`, `harness/stream-verification.test.ts`) continue to type-check unchanged; structural-parity gate not regressed.
+- [x] `src/solver/analog/__tests__/harness/hwr-fixture.ts` -- **Done 2026-05-03.** Converted to thin wrapper: `buildHwrCircuit(facade)` exported as the canonical VS→R→D spec; `buildHwrFixture()` returns `buildFixture({ build: ... })`. Returns the full `Fixture` shape (was previously `{ circuit, pool, engine }`); existing callers destructure subsets and type-check unchanged. **Spec correction:** original spec listed 3 callers (convergence-regression.test.ts, harness/query-methods.test.ts, harness/stream-verification.test.ts) — actual count is 6: `convergence-regression.test.ts`, `harness/boot-step.test.ts`, `harness/harness-integration.test.ts`, `harness/lte-retry-grouping.test.ts`, `harness/nr-retry-grouping.test.ts`, `harness/query-methods.test.ts` (NOT `stream-verification.test.ts`, which doesn't import buildHwrFixture). 4 of those 6 now pass cleanly under the warm-started fixture: `boot-step` 8/8, `lte-retry-grouping` 8/8, `nr-retry-grouping` 7/7, `query-methods` 65/65 (latter required folding in a duplicated `buildHwrCircuit` with stale `r1:A`/`r1:B` pin labels — a J-061 ripple miss). The remaining 2 (`harness-integration` failing on a `test-helpers.js` import — §4a casualty, §4c migration; `convergence-regression` mixed: most tests fixed by reading diode anode via element label not hardcoded `getNodeVoltage(2)` + RC-circuit pin rename, but four tests still fail on `ComparisonSession.getAttempt({ phase: "dcopDirect" })` returning `undefined` — comparison-harness phase-enum drift, separate §4c investigation).
 
 ### 4c. Per-file callsite migration (33 files; mechanical via `buildFixture`)
 
@@ -438,6 +438,17 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [ ] `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` (2)
 - [ ] `src/solver/analog/__tests__/rc-ac-transient.test.ts` (3)
 
+#### §4c gap-fills (surfaced 2026-05-03 — §3 poison-pattern audit)
+
+> The §4c list above was generated from "files importing the deleted helpers". Six additional files hand-roll `new StatePool(...)` directly without importing the deleted helpers, so they were missed. Added here for completeness. They are §3 poison-pattern violators per the §3 warning.
+
+- [ ] `src/components/passives/__tests__/inductor.test.ts` — hand-rolls `new StatePool(Math.max(re.stateSize, 1))` at line 112; uses the pool to drive setup/load directly. Migrate to `buildFixture` pattern. Coordinate with existing J-049 UC-7 retention entry.
+- [ ] `src/components/passives/__tests__/capacitor.test.ts` — hand-rolls `new StatePool(Math.max(re.stateSize, 1))` at line 127; same pattern as inductor. Migrate to `buildFixture`. Coordinate with existing J-047 UC-7 retention entry.
+- [ ] `src/components/active/__tests__/ccvs.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 177 inside a custom CompiledAnalogCircuit literal. Migrate to `buildFixture`. Coordinate with existing J-010 (UC-1 mutation) so both land in the same pass.
+- [ ] `src/components/active/__tests__/cccs.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 176; same pattern as ccvs. Coordinate with existing J-009.
+- [ ] `src/solver/__tests__/coordinator-bridge.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 164. Not on any prior list. Migrate to `buildFixture`.
+- [ ] `src/compile/__tests__/coordinator.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 505. Not on any prior list. Migrate to `buildFixture`.
+
 ### 4d. Schema-init mechanism removal (ngspice-faithful)
 
 - [ ] `src/solver/analog/state-schema.ts` — drop the `init` field from `SlotDescriptor` and the `SlotInit` discriminated union; delete `applyInitialValues`. State arrays start zero, period. Non-zero startup constants live in instance-struct fields populated in `setup()`, mirroring `bjtsetup.c:48` (`here->BJTmode = ON`). The DCOP pass populates `state0` via the bottom-of-load CKTstate0 idiom; `analog-engine.ts:1437` does `state1.set(state0)` once after DCOP per `dctran.c:349-350`. That is the entire seeding contract.
@@ -445,6 +456,12 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [ ] `src/components/passives/__tests__/analog-fuse.test.ts` — drop the `pool.state1.set(pool.state0)` seeds added 2026-05-03; they exist only because of the schema-init mechanism. Re-route via `buildFixture` (4c).
 - [ ] Audit every other pool-backed element for non-`zero` schema initials and migrate to instance-struct + `setup()` initialization. Targets: any callsite of `defineStateSchema(...)` whose slots use `init: { kind: "constant", ... }` or `init: { kind: "fromParams", ... }`. Real-opamp / memristor / spark-gap / ntc-thermistor / comparator must be checked as part of their respective J-IDs in 2b.
 - [ ] J-178 / G1 / G7 spec text in `spec/phase-component-model-correctness-job.md` — the ss1.1 contract currently mandates schema-declared initial values via `applyInitialValues`. Rewrite to forbid them: schema slots are zero-initial; non-zero constants belong in instance fields set in `setup()`. Reviewer must reject any future ss1.1-shaped migration that lands a `init: { kind: "constant" }` declaration.
+
+### 4e. Engine quirks surfaced during §4 — separate triage
+
+> Reserved for genuine engine divergences from ngspice surfaced while migrating tests. None currently filed.
+>
+> **2026-05-03 — false alarm retracted:** an earlier entry claimed `dcOperatingPoint()` was path-dependent. Verified empirically (probe in `dcop-path-probe.test.ts`, since deleted): all three scenarios (fresh engine, warm-started, warm-started+reset) converge to identical vAnode = 0.692868V in 5 iterations on the HWR circuit. digiTS already matches the ngspice contract: `MODEINITJCT` in device load functions provides the fresh start, no rhsOld zeroing required (mirroring `cktop.c:46` direct-NR + `dioload.c:130-136` MODEINITJCT dispatch). The `convergence-regression.test.ts` HWR-DCOP test failure was a stale node-ID (`getNodeVoltage(2)` reads source side; the diode anode is at node 1 under current compile-pass node numbering), not an engine bug.
 
 ## Unclassified (needs user triage)
 
