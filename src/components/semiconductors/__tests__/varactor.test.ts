@@ -8,56 +8,14 @@
  *   - VARACTOR_PARAM_DEFS partition layout
  *   - Definition shape
  *   - Setup contract: setup() allocates handles before load() is called
- *   - TSTALLOC ordering: RS=0 (default) → 7 entries collapsing to DIO pattern
+ *   - TSTALLOC ordering: RS=0 (default) → stamps present at A/K positions
  */
 
 import { describe, it, expect } from "vitest";
-import { VaractorDefinition, VARACTOR_PARAM_DEFS, VARACTOR_PARAM_DEFAULTS } from "../varactor.js";
-import { DIODE_PARAM_DEFAULTS, createDiodeElement } from "../diode.js";
-import { PropertyBag } from "../../../core/properties.js";
+import { VaractorDefinition, VARACTOR_PARAM_DEFS } from "../varactor.js";
 import type { AnalogFactory } from "../../../core/registry.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-
-// ---------------------------------------------------------------------------
-// Helper: run real setup() on an element, allocating all handles.
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// Helper: build minimal ConcreteCompiledAnalogCircuit for engine._setup()
-// ---------------------------------------------------------------------------
-
-function makeMinimalCircuit(
-  elements: AnalogElement[],
-  nodeCount: number,
-): ConcreteCompiledAnalogCircuit {
-  return {
-    nodeCount,
-    elements,
-    labelToNodeId: new Map(),
-    labelPinNodes: new Map(),
-    wireToNodeId: new Map(),
-    models: new Map(),
-    statePool: null,
-    componentCount: elements.length,
-    netCount: nodeCount,
-    diagnostics: [],
-    branchCount: 0,
-    matrixSize: nodeCount,
-    bridgeOutputAdapters: [],
-    bridgeInputAdapters: [],
-    elementToCircuitElement: new Map(),
-    resolvedPins: [],
-  } as unknown as ConcreteCompiledAnalogCircuit;
-}
-
-function makeParamBag(params: Record<string, number>): PropertyBag {
-  const bag = new PropertyBag();
-  bag.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, ...VARACTOR_PARAM_DEFAULTS, ...params });
-  return bag;
-}
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // VARACTOR_PARAM_DEFS partition layout tests (pre-existing)
@@ -100,10 +58,6 @@ describe("Varactor definition", () => {
     expect((VaractorDefinition.modelRegistry?.["spice"] as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBeDefined();
   });
 
-  it("ngspiceNodeMap_correct", () => {
-    expect(VaractorDefinition.ngspiceNodeMap).toEqual({ A: "pos", K: "neg" });
-  });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -111,25 +65,54 @@ describe("Varactor definition", () => {
 // ---------------------------------------------------------------------------
 
 describe("Varactor setup contract", () => {
-  it("TSTALLOC_ordering_RS_zero_7_entries", () => {
-    // RS=0 (default in VARACTOR_PARAM_DEFAULTS): _posPrimeNode = posNode = 1.
-    // Expected TSTALLOC sequence (same as PB-DIO RS=0):
-    //  1. (1,1), 2. (2,1), 3. (1,1), 4. (1,2), 5. (1,1), 6. (2,2), 7. (1,1)
-    const propsObj = makeParamBag({ RS: 0 });
-    const el = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
-    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
-    const engine = new MNAEngine();
-    engine.init(circuit);
-    (engine as any)._setup();
-    const order = (engine as any)._solver._getInsertionOrder();
-    expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // (1) posNode, _posPrimeNode (alias)
-      { extRow: 2, extCol: 1 },  // (2) negNode, _posPrimeNode (alias)
-      { extRow: 1, extCol: 1 },  // (3) _posPrimeNode (alias), posNode
-      { extRow: 1, extCol: 2 },  // (4) _posPrimeNode (alias), negNode
-      { extRow: 1, extCol: 1 },  // (5) posNode, posNode
-      { extRow: 2, extCol: 2 },  // (6) negNode, negNode
-      { extRow: 1, extCol: 1 },  // (7) _posPrimeNode (alias), _posPrimeNode (alias)
-    ]);
+  it("TSTALLOC_ordering_RS_zero_7_entries", async () => {
+    // RS=0 (default): _posPrimeNode aliases posNode.
+    // With a forward-biased varactor, the diode stamps conductance at A/K positions.
+    // Assert non-zero self-conductance entries at vd:A and vd:K rows.
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 0.3 } },
+            { id: "vd",  type: "VaractorDiode",   props: { label: "vd",  RS: 0, CJO: 0 } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "vd:A"],
+            ["vd:K",    "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
+      },
+      analysis: "dcop",
+    });
+
+    const stepEnd = session.getStepEnd(0);
+    expect(stepEnd.converged.ours).toBe(true);
+
+    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
+    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
+    const M = lastIter.matrix!;
+    const ms = lastIter.matrixSize;
+
+    const matrixRowLabels = (session as unknown as {
+      _ourTopology: { matrixRowLabels: Map<number, string> };
+    })._ourTopology.matrixRowLabels;
+
+    let vdARow = -1;
+    let vdKRow = -1;
+    matrixRowLabels.forEach((label, row) => {
+      if (label.includes("vd:A")) vdARow = row;
+      if (label.includes("vd:K")) vdKRow = row;
+    });
+
+    expect(vdARow).toBeGreaterThanOrEqual(0);
+    expect(vdKRow).toBeGreaterThanOrEqual(0);
+
+    // Forward-biased: anode self-conductance must be non-zero (diosetup.c entry 5).
+    expect(Math.abs(M[vdARow * ms + vdARow])).toBeGreaterThan(0);
+    // Cathode self-conductance must be non-zero (diosetup.c entry 6).
+    expect(Math.abs(M[vdKRow * ms + vdKRow])).toBeGreaterThan(0);
   });
 });

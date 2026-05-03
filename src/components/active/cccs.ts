@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Current-Controlled Current Source (CCCS) analog component.
  *
  * Four-terminal element: sense+ and sense- form the current sense port;
@@ -40,12 +40,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -57,7 +57,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: CCCS_PARAM_DEFS, defaults: CCCS_DEFAULTS } = defineModelParams({
   primary: {
-    currentGain: { default: 1.0, description: "Linear current gain β" },
+    currentGain: { default: 1.0, description: "Linear current gain Î²" },
   },
 });
 
@@ -177,10 +177,10 @@ export class CCCSAnalogElement extends ControlledSourceElement {
    * Stamp NR-linearized Norton equivalent for the controlled current output.
    * Port of cccsload.c value-side- no allocElement calls.
    *
-   * I_out ≈ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
+   * I_out â‰ˆ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
    *
    * G sub-matrix (controlling branch COLUMN linked to output node ROWS):
-   *   G[posNode, contBranch] -= gm    (−gm stamps so current flows INTO posNode)
+   *   G[posNode, contBranch] -= gm    (âˆ’gm stamps so current flows INTO posNode)
    *   G[negNode, contBranch] += gm
    *
    * RHS (Norton constant term):
@@ -275,7 +275,7 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body- polyline box (1,-1)→(5,-1)→(5,3)→(1,3)→(1,-1)
+    // Body- polyline box (1,-1)â†’(5,-1)â†’(5,3)â†’(1,3)â†’(1,-1)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -298,9 +298,9 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("sense−", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("senseâˆ’", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out−",   4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("outâˆ’",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -341,7 +341,7 @@ const CCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // CCCSDefinition
 // ---------------------------------------------------------------------------
 
-export const CCCSDefinition: ComponentDefinition = {
+export const CCCSDefinition: StandaloneComponentDefinition = {
   name: "CCCS",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -375,7 +375,6 @@ export const CCCSDefinition: ComponentDefinition = {
       },
       paramDefs: CCCS_PARAM_DEFS,
       params: CCCS_DEFAULTS,
-      ngspiceNodeMap: { "out+": "pos", "out-": "neg" },
     },
   },
   defaultModel: "behavioral",

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AC Voltage Source  time-varying independent voltage source.
  *
  * Supports four waveforms: sine, square, triangle, sawtooth.
@@ -27,10 +27,11 @@ import { formatSI } from "../../editor/si-format.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
@@ -108,7 +109,7 @@ export function computeWaveformValue(
   const arg = 2 * Math.PI * frequency * t + phase;
   switch (waveform) {
     case "sine":
-      // ngspice vsrcload.c:159 — operand order is `FREQ*time * 2.0 * M_PI + phase`,
+      // ngspice vsrcload.c:159- operand order is `FREQ*time * 2.0 * M_PI + phase`,
       // not `2*PI*FREQ*time + phase`. Floating-point multiply is non-associative,
       // so the difference is observable as 1 ULP in the argument and propagates
       // through sin to a 1-ULP source voltage that drifts the entire MNA solve.
@@ -166,7 +167,7 @@ export function computeWaveformValue(
       // piecewise-linear form is bit-exact against a SPICE PULSE(V1 V2 TD halfP
       // halfP 0 period) emission  indispensable for .tran parity against
       // ngspice (computing via asin(sin(...)) instead drifts by ~1 ulp per
-      // sample due to the irrational-π rounding chain).
+      // sample due to the irrational-Ï€ rounding chain).
       if (frequency <= 0) return dcOffset - amplitude;
       const period = 1 / frequency;
       const halfPeriod = period / 2;
@@ -613,25 +614,27 @@ export function makeAcVoltageSourceElement(
       const posNode    = element._pinNodes.get("pos")!;
       const negNode    = element._pinNodes.get("neg")!;
 
-      // Port of vsrcset.c:40-43 — idempotent branch allocation
+      // Port of vsrcset.c:40-43- idempotent branch allocation
       if (element.branchIndex === -1) {
         element.branchIndex = ctx.makeCur(element.label, "branch");
       }
       const branchNode = element.branchIndex;
 
-      // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+      // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
       _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
       _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
       _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
       _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
     },
 
-    findBranchFor(_name: string, ctx: SetupContext): number {
+    findBranchFor(name: string, ctx: SetupContext): number {
       // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
-      if (element.branchIndex === -1) {
-        element.branchIndex = ctx.makeCur(element.label, "branch");
+      const dev = ctx.findDevice(name);
+      if (!dev) return 0;
+      if (dev.branchIndex === -1) {
+        dev.branchIndex = ctx.makeCur(name, "branch");
       }
-      return element.branchIndex;
+      return dev.branchIndex;
     },
 
     _parsedExpr: parsedExpr,
@@ -663,7 +666,7 @@ export function makeAcVoltageSourceElement(
       // when MODEDCOP|MODEDCTRANCURVE bits are set with a DC value present. digiTS's
       // AC source folds dcOffset into the waveform computation, so we treat the
       // combined output as having an effective DC content and gate srcFact across
-      // all three source-stepping modes — matching the §A.13 canonical pattern.
+      // all three source-stepping modes- matching the ssA.13 canonical pattern.
       // Outside these modes (regular MODETRAN steps, MODEAC), srcFact must NOT be
       // applied: AC small-signal analysis goes through stampAc / vsrcacld.c which
       // never multiplies by srcFact (vsrcacld.c:29-30).
@@ -687,7 +690,7 @@ export function makeAcVoltageSourceElement(
       solver.stampElement(_hNegBr, -1.0);
       solver.stampElement(_hBrPos, +1.0);
       solver.stampElement(_hBrNeg, -1.0);
-      // vsrcload.c:416 — RHS
+      // vsrcload.c:416- RHS
       ctx.rhs[element.branchIndex] += v;
     },
 
@@ -723,7 +726,7 @@ export function makeAcVoltageSourceElement(
             break;
           case "sawtooth": {
             // PULSE-aligned sawtooth (Fix 2): start of fall at tMod=riseSpan,
-            // end of fall / start of next rise at tMod=period (≡ 0 of next cycle).
+            // end of fall / start of next rise at tMod=period (â‰¡ 0 of next cycle).
             const riseSpan = period - fallTime;
             offsets = [riseSpan, period];
             break;
@@ -938,7 +941,7 @@ export function makeAcVoltageSourceElement(
 // AcVoltageSourceDefinition
 // ---------------------------------------------------------------------------
 
-export const AcVoltageSourceDefinition: ComponentDefinition = {
+export const AcVoltageSourceDefinition: StandaloneComponentDefinition = {
   name: "AcVoltageSource",
   typeId: -1,
   category: ComponentCategory.SOURCES,
@@ -960,7 +963,6 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
       factory: makeAcVoltageSourceElement,
       paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: AC_VOLTAGE_SOURCE_DEFAULTS,
-      ngspiceNodeMap: { neg: "neg", pos: "pos" },
     },
   },
   defaultModel: "behavioral",

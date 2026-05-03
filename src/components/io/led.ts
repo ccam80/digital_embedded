@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LED component- single-color indicator.
  *
  * Renders as a circle with configurable color. Lit state derives from the
@@ -20,10 +20,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
 import {
   createDiodeElement,
   DIODE_PARAM_DEFS,
@@ -166,7 +166,7 @@ function createLedAnalogElementViaDiode(
   props: PropertyBag,
   getTime: () => number,
 ): AnalogElement {
-  // Inject K=0 (cathode → ground); remap "in" → "A".
+  // Inject K=0 (cathode â†’ ground); remap "in" â†’ "A".
   const remappedPinNodes = new Map<string, number>([
     ["A", pinNodes.get("in")!],
     ["K", 0],
@@ -225,7 +225,7 @@ function ledFactory(props: PropertyBag): LedElement {
   return new LedElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const LedDefinition: ComponentDefinition = {
+export const LedDefinition: StandaloneComponentDefinition = {
   name: "LED",
   typeId: -1,
   factory: ledFactory,
@@ -237,7 +237,6 @@ export const LedDefinition: ComponentDefinition = {
     "LED  single-color light-emitting diode indicator.\n" +
     "Lights up (filled circle) when the input is non-zero.\n" +
     "Color is configurable. Label is shown above the component.",
-  ngspiceNodeMap: { in: "pos" },
   models: {
     digital: { executeFn: executeLed, inputSchema: ["in"], outputSchema: [] },
   },

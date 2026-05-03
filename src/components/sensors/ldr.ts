@@ -27,8 +27,8 @@
  *   load(ctx)  stamps conductance 1/R(lux) between terminals every NR iteration
  */
 
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -36,7 +36,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -355,7 +355,7 @@ function ldrCircuitFactory(props: PropertyBag): LDRCircuitElement {
   return new LDRCircuitElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const LDRDefinition: ComponentDefinition = {
+export const LDRDefinition: StandaloneComponentDefinition = {
   name: "LDR",
   typeId: -1,
   factory: ldrCircuitFactory,
@@ -373,7 +373,6 @@ export const LDRDefinition: ComponentDefinition = {
       factory: createLDRElement,
       paramDefs: LDR_PARAM_DEFS,
       params: LDR_DEFAULTS,
-      ngspiceNodeMap: { pos: "pos", neg: "neg" },
     },
   },
   defaultModel: "behavioral",

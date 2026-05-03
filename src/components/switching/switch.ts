@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Switch component -- SPST switch with mechanical symbol rendering.
  *
  * Like PlainSwitch but with the standard mechanical switch symbol:
@@ -21,12 +21,28 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import {
+  defineStateSchema,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+
+// ---------------------------------------------------------------------------
+// State-pool schema
+// ---------------------------------------------------------------------------
+
+export const SWITCH_SCHEMA = defineStateSchema("Switch", [
+  { name: "CLOSED", doc: "Switch closed state (1=closed, 0=open)", init: { kind: "zero" } },
+]) satisfies StateSchema;
+
+const SLOT_CLOSED = 0;
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -260,7 +276,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Î)",
+    label: "Ron (ÃŽ)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -268,7 +284,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Î)",
+    label: "Roff (ÃŽ)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -308,11 +324,14 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
+  readonly poolBacked = true as const;
+  readonly stateSchema = SWITCH_SCHEMA;
+  readonly stateSize = 1;
+
   private readonly _ron: number;
   private readonly _roff: number;
   private readonly _normallyClosed: boolean;
-  private _closed: boolean;
-  private _effectivelyClosed: boolean;
+  private _pool!: StatePoolRef;
 
   // Voltage-controlled state. _pendingCtrlVoltage stores the latest value passed
   // to setCtrlVoltage(); _useCtrlVoltage gates load() consumption (true while
@@ -326,8 +345,9 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   private _pendingCtrlVoltage: number = 0;
   private _useCtrlVoltage: boolean = false;
   private _forcedState: boolean | null = null;
+  private _pendingClosed: boolean | null = null;
 
-  // Matrix handles allocated in setup() — port of swsetup.c:59-62 TSTALLOC sequence
+  // Matrix handles allocated in setup()- port of swsetup.c:59-62 TSTALLOC sequence
   private _hPP: number = -1;
   private _hPN: number = -1;
   private _hNP: number = -1;
@@ -338,18 +358,20 @@ export class SwitchAnalogElement implements SpstAnalogElement {
     this._ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
     this._roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
     this._normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-    this._closed = props.getOrDefault<boolean>("closed", false);
-    this._effectivelyClosed = this._normallyClosed ? !this._closed : this._closed;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
   }
 
   setup(ctx: SetupContext): void {
     const posNode = this._pinNodes.get("A1")!;
     const negNode = this._pinNodes.get("B1")!;
 
-    // Port of swsetup.c:47-48 — state slot allocation
-    this._stateBase = ctx.allocStates(2);  // SW_NUM_STATES = 2
+    // Port of swsetup.c:47-48- state slot allocation
+    this._stateBase = ctx.allocStates(1);  // SWITCH_SCHEMA: 1 slot (CLOSED)
 
-    // Port of swsetup.c:59-62 — TSTALLOC sequence (line-for-line)
+    // Port of swsetup.c:59-62- TSTALLOC sequence (line-for-line)
     this._hPP = ctx.solver.allocElement(posNode, posNode); // SWposNode, SWposNode
     this._hPN = ctx.solver.allocElement(posNode, negNode); // SWposNode, SWnegNode
     this._hNP = ctx.solver.allocElement(negNode, posNode); // SWnegNode, SWposNode
@@ -357,25 +379,39 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   }
 
   load(ctx: LoadContext): void {
+    const s1 = ctx.state1;
+    const s0 = ctx.state0;
+    const base = this._stateBase;
+
+    // Apply pending state writes before reading s1.
+    if (this._pendingClosed !== null) {
+      s0[base + SLOT_CLOSED] = this._pendingClosed ? 1 : 0;
+      this._pendingClosed = null;
+    }
+
     // Hot-patch consumption: when setCtrlVoltage() is the active driver, derive
     // the switch state from _pendingCtrlVoltage every NR iteration. Mirrors
     // ngspice swload.c which evaluates SWcontVoltage live each iteration. With
     // ngspice default thresholds (SWonThreshold = SWoffThreshold = 0V) and no
     // hysteresis, the switch is closed for v > 0 and open for v <= 0 (inverted
-    // when normallyClosed). _forcedState (one-shot) takes precedence; otherwise
-    // _useCtrlVoltage gates the voltage-controlled path; otherwise the boolean
-    // _effectivelyClosed (set by setClosed / constructor) drives behavior.
+    // when normallyClosed).
     if (this._useCtrlVoltage) {
       const v = this._pendingCtrlVoltage;
       const closeFromVoltage = this._normallyClosed ? v <= 0 : v > 0;
-      this._effectivelyClosed = closeFromVoltage;
+      s0[base + SLOT_CLOSED] = closeFromVoltage ? 1 : 0;
     }
 
-    const on = this._forcedState !== null ? this._forcedState : this._effectivelyClosed;
+    // Read s1[CLOSED] to pick Ron vs Roff. The switch's stamp is stable across
+    // the NR loop because s1 doesn't change within a step.
+    const on = this._forcedState !== null ? this._forcedState : s1[base + SLOT_CLOSED] >= 0.5;
     this._forcedState = null;
+
+    // Bottom-of-load history write.
+    s0[base + SLOT_CLOSED] = on ? 1 : 0;
+
     const G = on ? 1 / this._ron : 1 / this._roff;
 
-    // Port of swload.c:149-152 — stamp through cached handles
+    // Port of swload.c:149-152- stamp through cached handles
     ctx.solver.stampElement(this._hPP, +G);
     ctx.solver.stampElement(this._hPN, -G);
     ctx.solver.stampElement(this._hNP, -G);
@@ -383,8 +419,8 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   }
 
   setClosed(closed: boolean): void {
-    this._closed = closed;
-    this._effectivelyClosed = this._normallyClosed ? !this._closed : this._closed;
+    const effectivelyClosed = this._normallyClosed ? !closed : closed;
+    this._pendingClosed = effectivelyClosed;
     this._useCtrlVoltage = false;  // boolean driver supersedes voltage driver
   }
 
@@ -401,10 +437,11 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   getPinCurrents(rhs: Float64Array): number[] {
     const posNode = this._pinNodes.get("A1")!;
     const negNode = this._pinNodes.get("B1")!;
-    const on = this._effectivelyClosed;
-    const G = on ? 1 / this._ron : 1 / this._roff;
     const vA = rhs[posNode];
     const vB = rhs[negNode];
+    const s1 = this._pool.states[1];
+    const on = s1[this._stateBase + SLOT_CLOSED] >= 0.5;
+    const G = on ? 1 / this._ron : 1 / this._roff;
     const I = G * (vA - vB);
     return [I, -I];
   }
@@ -430,7 +467,7 @@ function switchFactory(props: PropertyBag): SwitchElement {
   );
 }
 
-export const SwitchDefinition: ComponentDefinition = {
+export const SwitchDefinition: StandaloneComponentDefinition = {
   name: "Switch",
   typeId: -1,
   factory: switchFactory,
@@ -438,7 +475,6 @@ export const SwitchDefinition: ComponentDefinition = {
   propertyDefs: SWITCH_PROPERTY_DEFS,
   attributeMap: SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  ngspiceNodeMap: { A1: "pos", B1: "neg" },
   helpText:
     "Switch (SPST) -- a manually controlled single-pole single-throw switch.\n" +
     "When closed, terminals A and B are connected (bus nets merged).\n" +
@@ -460,7 +496,6 @@ export const SwitchDefinition: ComponentDefinition = {
       factory: (pinNodes, props, _getTime) => new SwitchAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
-      ngspiceNodeMap: { A1: "pos", B1: "neg" },
     },
   },
   defaultModel: "digital",

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Voltage-Controlled Voltage Source (VCVS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -29,7 +29,7 @@
  * after linearizing around the current operating point. Combined with the
  * Jacobian entries, the branch equation becomes:
  *   V_out+ - V_out- - f'(Vctrl0)*V_ctrl = f(Vctrl0) - f'(Vctrl0)*Vctrl0
- * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). ∎
+ * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). âˆŽ
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -43,13 +43,13 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -62,6 +62,21 @@ export const { paramDefs: VCVS_PARAM_DEFS, defaults: VCVS_DEFAULTS } = defineMod
     gain: { default: 1.0, description: "Linear voltage gain" },
   },
 });
+
+export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_PARAM_DEFAULTS } =
+  defineModelParams({ primary: {} });
+
+/** High-gain VCVS comparator gain (1e6). */
+const VCVS_COMP_GAIN = 1e6;
+
+export function makeVcvsComparatorExpression(): {
+  expr: ReturnType<typeof parseExpression>;
+  deriv: ReturnType<typeof parseExpression>;
+} {
+  const raw = parseExpression(`${VCVS_COMP_GAIN} * V(ctrl)`);
+  const d = simplify(differentiate(raw, "V(ctrl)"));
+  return { expr: raw, deriv: d };
+}
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -122,7 +137,7 @@ function buildVCVSPinDeclarations(): PinDeclaration[] {
 export class VCVSAnalogElement extends ControlledSourceElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
 
-  // TSTALLOC handles — allocated in setup(), written in load()
+  // TSTALLOC handles- allocated in setup(), written in load()
   // vcvsset.c:53-58 line-for-line
   private _hPIbr:   number = -1; // B[posNode, branch]      :53
   private _hNIbr:   number = -1; // B[negNode, branch]      :54
@@ -177,13 +192,13 @@ export class VCVSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp the Jacobian and NR-linearized RHS for the output branch.
-   * Port of vcvsload.c, value-side only — no allocElement calls.
+   * Port of vcvsload.c, value-side only- no allocElement calls.
    *
    * Branch equation: V_out+ - V_out- - f'(Vctrl)*V_ctrl = f(Vctrl0) - f'*Vctrl0
    *
    * C sub-matrix Jacobian entries (control node columns in branch row k):
-   *   C[k, nCtrlP] -= f'     ∂(branch_eq)/∂V_ctrlP = -f'
-   *   C[k, nCtrlN] += f'     ∂(branch_eq)/∂V_ctrlN = +f'
+   *   C[k, nCtrlP] -= f'     âˆ‚(branch_eq)/âˆ‚V_ctrlP = -f'
+   *   C[k, nCtrlN] += f'     âˆ‚(branch_eq)/âˆ‚V_ctrlN = +f'
    *
    * RHS[k] = f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -207,7 +222,7 @@ export class VCVSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output port current is the branch variable.
    * Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. ∎
+   * KCL: 0 + 0 + I_out - I_out = 0. âˆŽ
    */
   getPinCurrents(rhs: Float64Array): number[] {
     const iOut = rhs[this.branchIndex];
@@ -216,7 +231,7 @@ export class VCVSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCVSElement — CircuitElement
+// VCVSElement- CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCVSElement extends AbstractCircuitElement {
@@ -252,7 +267,7 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — open polyline box (1,-1)(5,-1)(5,3)(1,3) (no left edge)
+    // Body- open polyline box (1,-1)(5,-1)(5,3)(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -274,9 +289,9 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("ctrl+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ctrl−", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrlâˆ’", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",  4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out−",  4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("outâˆ’",  4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -317,7 +332,7 @@ const VCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // VCVSDefinition
 // ---------------------------------------------------------------------------
 
-export const VCVSDefinition: ComponentDefinition = {
+export const VCVSDefinition: StandaloneComponentDefinition = {
   name: "VCVS",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -327,7 +342,7 @@ export const VCVSDefinition: ComponentDefinition = {
   attributeMap: VCVS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Voltage Source — output voltage is an expression of " +
+    "Voltage-Controlled Voltage Source- output voltage is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCVSElement {
@@ -351,7 +366,17 @@ export const VCVSDefinition: ComponentDefinition = {
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
-      ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" },
+    },
+    "comparator": {
+      kind: "inline",
+      factory: (pinNodes, _props, _getTime) => {
+        const { expr, deriv } = makeVcvsComparatorExpression();
+        const el = new VCVSAnalogElement(expr, deriv, "V(ctrl)", "voltage");
+        el._pinNodes = new Map(pinNodes);
+        return el;
+      },
+      paramDefs: COMPARATOR_PARAM_DEFS,
+      params: COMPARATOR_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

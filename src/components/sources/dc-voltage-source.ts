@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DC Voltage Source  ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
@@ -23,11 +23,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -154,13 +155,13 @@ const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// makeDcVoltageSource — canonical inline-factory (§A.13 / §A.3: 3-arg form)
+// makeDcVoltageSource- canonical inline-factory (ssA.13 / ssA.3: 3-arg form)
 // ---------------------------------------------------------------------------
 
 /**
  * Constructs a DC voltage source analog element.
  *
- * Canonical inline-factory pattern per §A.13. Three-arg form per §A.3.
+ * Canonical inline-factory pattern per ssA.13. Three-arg form per ssA.3.
  */
 export function makeDcVoltageSource(
   pinNodes: ReadonlyMap<string, number>,
@@ -169,7 +170,7 @@ export function makeDcVoltageSource(
 ): AnalogElement {
   const p = { voltage: props.getModelParam<number>("voltage") };
 
-  // TSTALLOC handles — closure-local, NOT object fields.
+  // TSTALLOC handles- closure-local, NOT object fields.
   let _hPosBr = -1, _hNegBr = -1, _hBrNeg = -1, _hBrPos = -1;
 
   const el: AnalogElement = {
@@ -184,24 +185,27 @@ export function makeDcVoltageSource(
       const posNode = el._pinNodes.get("pos")!;
       const negNode = el._pinNodes.get("neg")!;
 
-      // Port of vsrcset.c:40-43 — idempotent branch allocation
+      // Port of vsrcset.c:40-43- idempotent branch allocation
       if (el.branchIndex === -1) {
         el.branchIndex = ctx.makeCur(el.label, "branch");
       }
       const k = el.branchIndex;
 
-      // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+      // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
       _hPosBr = ctx.solver.allocElement(posNode, k);    // VSRCposNode, VSRCbranch
       _hNegBr = ctx.solver.allocElement(negNode, k);    // VSRCnegNode, VSRCbranch
       _hBrNeg = ctx.solver.allocElement(k, negNode);    // VSRCbranch,  VSRCnegNode
       _hBrPos = ctx.solver.allocElement(k, posNode);    // VSRCbranch,  VSRCposNode
     },
 
-    findBranchFor(_name: string, ctx: SetupContext): number {
-      if (el.branchIndex === -1) {
-        el.branchIndex = ctx.makeCur(el.label, "branch");
+    findBranchFor(name: string, ctx: SetupContext): number {
+      // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+      const dev = ctx.findDevice(name);
+      if (!dev) return 0;
+      if (dev.branchIndex === -1) {
+        dev.branchIndex = ctx.makeCur(name, "branch");
       }
-      return el.branchIndex;
+      return dev.branchIndex;
     },
 
     setParam(key: string, value: number): void {
@@ -234,10 +238,10 @@ export function makeDcVoltageSource(
 }
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition
+// StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
-export const DcVoltageSourceDefinition: ComponentDefinition = {
+export const DcVoltageSourceDefinition: StandaloneComponentDefinition = {
   name: "DcVoltageSource",
   typeId: -1,
   category: ComponentCategory.SOURCES,
@@ -265,7 +269,6 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
       factory: makeDcVoltageSource,
       paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: DC_VOLTAGE_SOURCE_DEFAULTS,
-      ngspiceNodeMap: { neg: "neg", pos: "pos" },
     },
   },
   defaultModel: "behavioral",

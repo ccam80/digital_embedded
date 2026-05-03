@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Variable Rail  user-adjustable DC voltage source.
  *
  * Designed for live parameter slider integration: changing the rail voltage
@@ -25,10 +25,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 
@@ -231,10 +232,10 @@ export function makeVariableRailElement(
 }
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition
+// StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
-export const VariableRailDefinition: ComponentDefinition = {
+export const VariableRailDefinition: StandaloneComponentDefinition = {
   name: "VariableRail",
   typeId: -1,
   category: ComponentCategory.SOURCES,
@@ -256,7 +257,6 @@ export const VariableRailDefinition: ComponentDefinition = {
       factory: makeVariableRailElement,
       paramDefs: VARIABLE_RAIL_PARAM_DEFS,
       params: VARIABLE_RAIL_DEFAULTS,
-      ngspiceNodeMap: { pos: "pos" },
     },
   },
   defaultModel: "behavioral",

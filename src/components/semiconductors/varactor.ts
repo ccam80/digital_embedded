@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Varactor Diode- component definition only.
  *
  * Per spec/architectural-alignment.md ssF2 (APPROVED FIX): the varactor is
@@ -23,7 +23,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import {
@@ -52,7 +52,7 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
     },
     secondary: {
       N:   { default: DIODE_PARAM_DEFAULTS.N,    description: "Emission coefficient" },
-      RS:  { default: DIODE_PARAM_DEFAULTS.RS,   unit: "Ω", description: "Ohmic (series) resistance" },
+      RS:  { default: DIODE_PARAM_DEFAULTS.RS,   unit: "Î©", description: "Ohmic (series) resistance" },
       BV:  { default: DIODE_PARAM_DEFAULTS.BV,   unit: "V", description: "Reverse breakdown voltage" },
       IBV: { default: DIODE_PARAM_DEFAULTS.IBV,  unit: "A", description: "Reverse breakdown current" },
       NBV: { default: DIODE_PARAM_DEFAULTS.NBV,             description: "Breakdown emission coefficient (default=N)" },
@@ -121,7 +121,7 @@ export class VaractorElement extends AbstractCircuitElement {
     // Body (triangle, plate bars) stays COMPONENT color
     ctx.setColor("COMPONENT");
 
-    // Diode triangle: tip at platef=0.6 along lead1(1.5)→lead2(2.5) = x:2.1
+    // Diode triangle: tip at platef=0.6 along lead1(1.5)â†’lead2(2.5) = x:2.1
     const hs = 0.5;
     ctx.drawPolygon([
       { x: 1.5, y: -hs },
@@ -197,7 +197,7 @@ function varactorCircuitFactory(props: PropertyBag): VaractorElement {
   return new VaractorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const VaractorDefinition: ComponentDefinition = {
+export const VaractorDefinition: StandaloneComponentDefinition = {
   name: "VaractorDiode",
   typeId: -1,
   factory: varactorCircuitFactory,
@@ -209,7 +209,6 @@ export const VaractorDefinition: ComponentDefinition = {
     "Varactor Diode- voltage-controlled junction capacitance (ngspice DIO model).\n" +
     "C_j(V_R) = CJO / (1 - V_d/VJ)^M\n" +
     "Uses the same load path as the standard Diode with varactor-tuned defaults.",
-  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -217,7 +216,6 @@ export const VaractorDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: VARACTOR_PARAM_DEFS,
       params: VARACTOR_PARAM_DEFAULTS,
-      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

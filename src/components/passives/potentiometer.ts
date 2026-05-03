@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Potentiometer analog component.
  *
  * A three-terminal linear element modelled as two series resistors sharing a
  * common wiper node. The wiper position (0.0-1.0) determines the resistance split:
- *   R_top = R × position
- *   R_bottom = R × (1 - position)
+ *   R_top = R Ã— position
+ *   R_bottom = R Ã— (1 - position)
  *
  * Both resistances are clamped to a minimum to prevent division by zero.
  */
@@ -19,11 +19,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -39,7 +39,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: POTENTIOMETER_PARAM_DEFS, defaults: POTENTIOMETER_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 10000, unit: "Ω", description: "Total resistance in ohms", min: 1e-9 },
+    resistance: { default: 10000, unit: "Î©", description: "Total resistance in ohms", min: 1e-9 },
     position:   { default: 0.5,              description: "Wiper position (0.0 = full bottom, 1.0 = full top)", min: 0, max: 1 },
   },
 });
@@ -57,7 +57,7 @@ function buildPotentiometerPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "A",
+      label: "pos",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
@@ -66,7 +66,7 @@ function buildPotentiometerPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "B",
+      label: "neg",
       defaultBitWidth: 1,
       position: { x: 4, y: 0 },
       isNegatable: false,
@@ -121,7 +121,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 
     // Falstad PotElm: total span (0,0)(64,0) px = (0,0)(4,0) gu.
     // Lead wires: 0..16px and 48..64px = 0..1 gu and 3..4 gu.
-    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks ±8px = ±0.5 gu.
+    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks Â±8px = Â±0.5 gu.
     // Wiper pin W at (32,-16) px = (2,-1) gu.
     const PX = 1 / 16;
     const hs = 8 * PX; // 0.5 gu
@@ -197,9 +197,9 @@ class AnalogPotentiometerElement implements AnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const aNode = this._pinNodes.get("A")!;  // A pin- R_AW posNode
-    const wNode = this._pinNodes.get("W")!;  // W pin- shared wiper node
-    const bNode = this._pinNodes.get("B")!;  // B pin- R_WB negNode
+    const aNode = this._pinNodes.get("pos")!;  // pos pin- R_AW posNode
+    const wNode = this._pinNodes.get("W")!;    // W pin- shared wiper node
+    const bNode = this._pinNodes.get("neg")!;  // neg pin- R_WB negNode
 
     // R_AW- ressetup.c:46-49 (A as posNode, W as negNode)
     this._hAW_PP = solver.allocElement(aNode, aNode);  // (RESposNode, RESposNode)
@@ -241,9 +241,9 @@ class AnalogPotentiometerElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const aNode = this._pinNodes.get("A")!;  // A pin
-    const wNode = this._pinNodes.get("W")!;  // W (wiper) pin
-    const bNode = this._pinNodes.get("B")!;  // B pin
+    const aNode = this._pinNodes.get("pos")!;  // pos pin
+    const wNode = this._pinNodes.get("W")!;    // W (wiper) pin
+    const bNode = this._pinNodes.get("neg")!;  // neg pin
 
     const vA = rhs[aNode];
     const vW = rhs[wNode];
@@ -313,7 +313,7 @@ function potentiometerCircuitFactory(props: PropertyBag): PotentiometerElement {
   return new PotentiometerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PotentiometerDefinition: ComponentDefinition = {
+export const PotentiometerDefinition: StandaloneComponentDefinition = {
   name: "Potentiometer",
   typeId: -1,
   factory: potentiometerCircuitFactory,
@@ -322,7 +322,7 @@ export const PotentiometerDefinition: ComponentDefinition = {
   attributeMap: POTENTIOMETER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Potentiometer  voltage divider with 3 terminals (A, wiper, B).\n" +
+    "Potentiometer  voltage divider with 3 terminals (pos, wiper, neg).\n" +
     "Position determines the voltage division between top and bottom resistances.",
   models: {},
   modelRegistry: {

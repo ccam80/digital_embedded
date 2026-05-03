@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Schottky barrier diode analog component.
  *
  * Electrically identical to the standard diode (Shockley equation) but with
@@ -20,7 +20,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import { createDiodeElement } from "./diode.js";
@@ -36,7 +36,7 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
     N:   { default: 1.05,             description: "Emission coefficient" },
   },
   secondary: {
-    RS:  { default: 1,     unit: "Ω", description: "Ohmic (series) resistance" },
+    RS:  { default: 1,     unit: "Î©", description: "Ohmic (series) resistance" },
     CJO: { default: 1e-12, unit: "F", description: "Zero-bias junction capacitance" },
     VJ:  { default: 0.6,   unit: "V", description: "Junction built-in potential" },
     M:   { default: 0.5,              description: "Grading coefficient" },
@@ -204,7 +204,7 @@ function schottkyCircuitFactory(props: PropertyBag): SchottkyElement {
   return new SchottkyElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const SchottkyDiodeDefinition: ComponentDefinition = {
+export const SchottkyDiodeDefinition: StandaloneComponentDefinition = {
   name: "SchottkyDiode",
   typeId: -1,
   factory: schottkyCircuitFactory,
@@ -216,7 +216,6 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
     "Schottky Diode \u2014 metal-semiconductor junction with low forward voltage.\n" +
     "Same Shockley equation as standard diode but with Schottky defaults:\n" +
     "IS=1e-8, N=1.05, BV=40V, RS=1\u03A9, CJO=1pF.",
-  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -224,7 +223,6 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
       factory: createSchottkyElement,
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
-      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

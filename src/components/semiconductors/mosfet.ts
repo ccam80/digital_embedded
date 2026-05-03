@@ -31,16 +31,18 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -2002,7 +2004,7 @@ function pmosCircuitFactory(props: PropertyBag): PmosfetElement {
   return new PmosfetElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const NmosfetDefinition: ComponentDefinition = {
+export const NmosfetDefinition: StandaloneComponentDefinition = {
   name: "NMOS",
   typeId: -1,
   factory: nmosCircuitFactory,
@@ -2015,7 +2017,6 @@ export const NmosfetDefinition: ComponentDefinition = {
     "Pins: D (drain), G (gate), S (source).\n" +
     "Primary: VTO, KP, LAMBDA, W, L.\n" +
     "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, UO, FC, and more.",
-  ngspiceNodeMap: { G: "g", S: "s", D: "d" },
   models: {},
   modelRegistry: {
     "spice-l1": {
@@ -2024,7 +2025,6 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: MOSFET_NMOS_DEFAULTS,
 
-      ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "2N7000": {
       kind: "inline",
@@ -2032,7 +2032,6 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_2N7000,
 
-      ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "BS170": {
       kind: "inline",
@@ -2040,7 +2039,6 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_BS170,
 
-      ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "IRF530N": {
       kind: "inline",
@@ -2048,7 +2046,6 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF530N,
 
-      ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "IRF540N": {
       kind: "inline",
@@ -2056,7 +2053,6 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF540N,
 
-      ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "IRFZ44N": {
       kind: "inline",
@@ -2064,13 +2060,12 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRFZ44N,
 
-      ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
   },
   defaultModel: "spice-l1",
 };
 
-export const PmosfetDefinition: ComponentDefinition = {
+export const PmosfetDefinition: StandaloneComponentDefinition = {
   name: "PMOS",
   typeId: -1,
   factory: pmosCircuitFactory,
@@ -2083,7 +2078,6 @@ export const PmosfetDefinition: ComponentDefinition = {
     "Pins: D (drain), G (gate), S (source).\n" +
     "Primary: VTO, KP, LAMBDA, W, L.\n" +
     "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, UO, FC, and more.",
-  ngspiceNodeMap: { G: "g", D: "d", S: "s" },
   models: {},
   modelRegistry: {
     "spice-l1": {
@@ -2092,7 +2086,6 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: MOSFET_PMOS_DEFAULTS,
 
-      ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "BS250": {
       kind: "inline",
@@ -2100,7 +2093,6 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_BS250,
 
-      ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRF9520": {
       kind: "inline",
@@ -2108,7 +2100,6 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF9520,
 
-      ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRFP9240": {
       kind: "inline",
@@ -2116,7 +2107,6 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRFP9240,
 
-      ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRF5210": {
       kind: "inline",
@@ -2124,7 +2114,6 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF5210,
 
-      ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRF4905": {
       kind: "inline",
@@ -2132,7 +2121,6 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF4905,
 
-      ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
   },
   defaultModel: "spice-l1",

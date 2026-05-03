@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Zener diode analog component  Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
@@ -22,10 +22,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import {
   MODEINITJCT,
   MODEINITFIX,
@@ -38,7 +39,7 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { createDiodeElement } from "./diode.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
@@ -48,7 +49,7 @@ import { defineStateSchema, applyInitialValues } from "../../solver/analog/state
 const CONSTboltz = 1.3806226e-23;
 const CHARGE = 1.6021918e-19;
 const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
-const REFTEMP = 300.15;         // 27 °C reference temperature
+const REFTEMP = 300.15;         // 27 Â°C reference temperature
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -64,7 +65,7 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
     IBV: { default: 1e-3, unit: "A", description: "Current at breakdown voltage" },
-    TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
+    TCV: { default: 0,    unit: "V/Â°C", description: "Breakdown voltage temperature coefficient" },
     TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
   },
   secondary: {
@@ -82,7 +83,7 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
     N:   { default: 1,                   description: "Emission coefficient" },
   },
   secondary: {
-    RS:  { default: 0,        unit: "Î",  description: "Ohmic (series) resistance" },
+    RS:  { default: 0,        unit: "ÃŽ",  description: "Ohmic (series) resistance" },
     CJO: { default: 0,        unit: "F",  description: "Zero-bias junction capacitance" },
     VJ:  { default: 1,        unit: "V",  description: "Junction built-in potential" },
     M:   { default: 0.5,                  description: "Grading coefficient" },
@@ -127,7 +128,7 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
  * @param IS    Temperature-scaled saturation current (DIOtSatCur)
  * @param vt    Thermal voltage at circuit temperature
  * @param TCV   Voltage temperature coefficient (DIOtcv), default 0
- * @param dt    Temperature deviation from TNOM in °C (T - TNOM)
+ * @param dt    Temperature deviation from TNOM in Â°C (T - TNOM)
  */
 function computeTBV(
   BV: number,
@@ -262,7 +263,7 @@ export function createZenerElement(
       base = zenerElement._stateBase;
 
       // Internal node- diosetup.c:204-224
-      // ngspice gating: RS > 0 → allocate anode-prime node
+      // ngspice gating: RS > 0 â†’ allocate anode-prime node
       if (params.RS === 0 || !params.RS) {
         _posPrimeNode = posNode;
       } else {
@@ -451,7 +452,7 @@ export function createZenerElement(
       // Stamps through pre-allocated handles from setup()
       //
       // Series-resistance T-model (gspr) gating mirrors dioload.c:98 and the
-      // setup-side gating at diosetup.c:204 (DIOresist == 0 → no prime node).
+      // setup-side gating at diosetup.c:204 (DIOresist == 0 â†’ no prime node).
       // When RS == 0, _posPrimeNode aliases the external anode (zener.ts:264)
       // and the prime-side stamps collapse to no-ops- gspr is skipped to match.
       // When RS > 0, the seven stamps below mirror dioload.c:431-441 line for
@@ -589,7 +590,7 @@ export class ZenerElement extends AbstractCircuitElement {
     // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0cath1
     // interpPointSingle(a,b,f,g): point at fraction f along ab, offset g perpendicular (along x for vertical bar)
     // Perpendicular to cath0cath1 (which is vertical) is horizontal
-    // Wing tips at ±11/16 = ±0.6875 grid units (from Falstad pixel coords ±11 at 16px/unit)
+    // Wing tips at Â±11/16 = Â±0.6875 grid units (from Falstad pixel coords Â±11 at 16px/unit)
     const wing0 = {
       x: cath0.x - hs,
       y: -11 / 16,
@@ -672,7 +673,7 @@ function zenerCircuitFactory(props: PropertyBag): ZenerElement {
   return new ZenerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ZenerDiodeDefinition: ComponentDefinition = {
+export const ZenerDiodeDefinition: StandaloneComponentDefinition = {
   name: "ZenerDiode",
   typeId: -1,
   factory: zenerCircuitFactory,
@@ -685,7 +686,6 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Reverse-cubic: Id = -IS*(1 + (3*nVt/(vd*e))^3)\n" +
     "Breakdown (Vd < -tBV): Id = -IS * exp(-(Vd+tBV)/(NBV*Vt))",
-  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -693,14 +693,12 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: ZENER_SPICE_L1_PARAM_DEFS,
       params: ZENER_SPICE_L1_DEFAULTS,
-      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
     "simplified": {
       kind: "inline",
       factory: createZenerElement,
       paramDefs: ZENER_PARAM_DEFS,
       params: ZENER_PARAM_DEFAULTS,
-      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

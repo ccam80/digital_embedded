@@ -113,9 +113,6 @@ export type ModelEntry =
       branchCount?: number | ((props: PropertyBag) => number);
       /** SPICE-emission overrides for this model. */
       spice?: ModelEmissionSpec;
-      /** Maps digiTS pin label → ngspice node-variable suffix.
-       *  Mirrors the same field on ComponentDefinition for per-model overrides. */
-      ngspiceNodeMap?: Record<string, string>;
     }
   | {
       kind: "netlist";
@@ -367,9 +364,6 @@ export interface ComponentDefinition {
    *  factory wins. Standalone components express variable shape on the
    *  element class via `getPins()`, not here. */
   pinLayoutFactory?: (props: PropertyBag) => PinDeclaration[];
-  /** Maps digiTS pin label → ngspice node-variable suffix.
-   *  See doc on StandaloneComponentDefinition for the full contract. */
-  ngspiceNodeMap?: Record<string, string>;
 }
 
 /**

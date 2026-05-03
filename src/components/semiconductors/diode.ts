@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Diode analog component  Shockley equation with NR linearization.
  *
  * Implements the ideal diode equation:
@@ -26,10 +26,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod, LoadContext, PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   MODEINITJCT,
@@ -47,7 +49,7 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -108,7 +110,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     N:   { default: 1,                 description: "Emission coefficient" },
   },
   secondary: {
-    RS:  { default: 0,    unit: "Î",  description: "Ohmic (series) resistance" },
+    RS:  { default: 0,    unit: "ÃŽ",  description: "Ohmic (series) resistance" },
     CJO: { default: 0,    unit: "F",  description: "Zero-bias junction capacitance" },
     VJ:  { default: 1,    unit: "V",  description: "Junction built-in potential" },
     M:   { default: 0.5,              description: "Grading coefficient" },
@@ -461,10 +463,10 @@ export function createDiodeElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
 
-  // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
+  // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
   let _posPrimeNode = nodeAnode;
 
-  // TSTALLOC handles — closure-local, set during setup(), read inside load()
+  // TSTALLOC handles- closure-local, set during setup(), read inside load()
   let _hPosPP  = -1;
   let _hNegPP  = -1;
   let _hPPPos  = -1;
@@ -473,7 +475,7 @@ export function createDiodeElement(
   let _hNegNeg = -1;
   let _hPPPP   = -1;
 
-  // Internal node labels — recorded during setup() when RS > 0
+  // Internal node labels- recorded during setup() when RS > 0
   const internalLabels: string[] = [];
 
   const element: PoolBackedAnalogElement = {
@@ -493,7 +495,7 @@ export function createDiodeElement(
       const posNode = element._pinNodes.get("A")!;
       const negNode = element._pinNodes.get("K")!;
 
-      // State slots — diosetup.c:198-199 (*states += DIOstateCount; here->DIOstate = *states)
+      // State slots- diosetup.c:198-199 (*states += DIOstateCount; here->DIOstate = *states)
       // Idempotent guard mirrors mutual-inductor.ts:94-95. When a composite
       // (e.g. polarized-cap) pre-partitions _stateBase into its own state
       // region before forwarding setup(), don't re-allocate and waste slots.
@@ -502,8 +504,8 @@ export function createDiodeElement(
       }
       base = element._stateBase;
 
-      // Internal node — diosetup.c:204-224
-      // ngspice gating: RC (series resistance) > 0 → allocate anode-prime node
+      // Internal node- diosetup.c:204-224
+      // ngspice gating: RC (series resistance) > 0 â†’ allocate anode-prime node
       if (params.RS === 0) {
         _posPrimeNode = posNode;
       } else {
@@ -511,7 +513,7 @@ export function createDiodeElement(
         internalLabels.push("internal");
       }
 
-      // TSTALLOC sequence — diosetup.c:232-238
+      // TSTALLOC sequence- diosetup.c:232-238
       _hPosPP  = solver.allocElement(posNode,       _posPrimeNode); // (1)
       _hNegPP  = solver.allocElement(negNode,       _posPrimeNode); // (2)
       _hPPPos  = solver.allocElement(_posPrimeNode, posNode);       // (3)
@@ -606,7 +608,12 @@ export function createDiodeElement(
 
       if (pnjlimLimited) ctx.noncon.value++;
 
-      if (ctx.limitingCollector) {
+      // dioload.c:139-205 (post-init else{} block where pnjlim is invoked),
+      // dioload.c:411 (CKTnoncon++ gating): emit limiting event only under the
+      // same MODEINIT* mask that pnjlim itself uses.
+      const skipLimitingMask = MODEINITJCT | MODEINITSMSIG | MODEINITTRAN
+        | ((mode & MODEINITFIX) && params.OFF ? MODEINITFIX : 0);
+      if (!(mode & skipLimitingMask) && ctx.limitingCollector) {
         ctx.limitingCollector.push({
           elementIndex: element.elementIndex ?? -1,
           label: element.label ?? "",
@@ -1000,7 +1007,7 @@ function diodeCircuitFactory(props: PropertyBag): DiodeElement {
   return new DiodeElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DiodeDefinition: ComponentDefinition = {
+export const DiodeDefinition: StandaloneComponentDefinition = {
   name: "Diode",
   typeId: -1,
   factory: diodeCircuitFactory,
@@ -1012,7 +1019,6 @@ export const DiodeDefinition: ComponentDefinition = {
     "Diode  Shockley equation with NR linearization.\n" +
     "Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Model parameters: IS, N, CJO, VJ, M, TT, FC.",
-  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -1020,7 +1026,6 @@ export const DiodeDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
-      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

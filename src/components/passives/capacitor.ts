@@ -18,11 +18,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { PoolBackedAnalogElement, IntegrationMethod } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -32,7 +33,7 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -162,6 +163,13 @@ const SLOT_V    = 2;
 const SLOT_Q    = 3;
 const SLOT_CCAP = 4;
 
+/**
+ * This class is the runtime element produced by the registered
+ * `Capacitor` `StandaloneComponentDefinition`'s factory - see
+ * `createCapacitorElement` below. It is the canonical capacitor
+ * stamp; do not introduce a parallel non-registered capacitor
+ * class.
+ */
 export class AnalogCapacitorElement implements PoolBackedAnalogElement {
   branchIndex: number = -1;
   _stateBase: number = -1;
@@ -183,7 +191,7 @@ export class AnalogCapacitorElement implements PoolBackedAnalogElement {
   private _M: number;
   private _pool!: StatePoolRef;
 
-  // Cached matrix-entry handles — allocated in setup() per capsetup.c:114-117.
+  // Cached matrix-entry handles- allocated in setup() per capsetup.c:114-117.
   private _hPP: number = -1;
   private _hNN: number = -1;
   private _hPN: number = -1;
@@ -440,7 +448,7 @@ function capacitorCircuitFactory(props: PropertyBag): CapacitorElement {
   return new CapacitorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const CapacitorDefinition: ComponentDefinition = {
+export const CapacitorDefinition: StandaloneComponentDefinition = {
   name: "Capacitor",
   typeId: -1,
   factory: capacitorCircuitFactory,
@@ -452,7 +460,6 @@ export const CapacitorDefinition: ComponentDefinition = {
     "Capacitor  reactive element with companion model.\n" +
     "Stamps equivalent conductance and history current source at each timestep.",
   models: {},
-  ngspiceNodeMap: { pos: "pos", neg: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",

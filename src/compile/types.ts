@@ -143,9 +143,6 @@ export interface MnaModel {
     props: PropertyBag,
     getTime: () => number,
   ) => AnalogElement;
-  /** Optional pin-label → ngspice-node-suffix map. See
-   *  01-pin-mapping.md for the registry. */
-  ngspiceNodeMap?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------

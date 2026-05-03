@@ -20,12 +20,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -214,10 +214,10 @@ export function makeCurrentSource(
 }
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition
+// StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
-export const CurrentSourceDefinition: ComponentDefinition = {
+export const CurrentSourceDefinition: StandaloneComponentDefinition = {
   name: "CurrentSource",
   typeId: -1,
   category: ComponentCategory.SOURCES,
@@ -245,7 +245,6 @@ export const CurrentSourceDefinition: ComponentDefinition = {
       factory: makeCurrentSource,
       paramDefs: CURRENT_SOURCE_PARAM_DEFS,
       params: CURRENT_SOURCE_DEFAULTS,
-      ngspiceNodeMap: { neg: "neg", pos: "pos" },
     },
   },
   defaultModel: "behavioral",

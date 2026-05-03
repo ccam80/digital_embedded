@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Current-Controlled Voltage Source (CCVS) analog component.
  *
  * Four-terminal element: sense+ and sense- form the current sense port;
@@ -41,12 +41,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -58,7 +58,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: CCVS_PARAM_DEFS, defaults: CCVS_DEFAULTS } = defineModelParams({
   primary: {
-    transresistance: { default: 1000, unit: "Ω", description: "Linear transresistance" },
+    transresistance: { default: 1000, unit: "Î©", description: "Linear transresistance" },
   },
 });
 
@@ -176,7 +176,7 @@ export class CCVSAnalogElement extends ControlledSourceElement {
 
   protected override _stampLinear(solver: SparseSolver): void {
     // Stamp B/C incidence for the own output voltage source branch.
-    // Values are constant topology entries (±1); stamp every load() call.
+    // Values are constant topology entries (Â±1); stamp every load() call.
     solver.stampElement(this._hPIbr,  1);  // B[posNode, ownBranch]
     solver.stampElement(this._hNIbr, -1);  // B[negNode, ownBranch]
     solver.stampElement(this._hIbrN, -1);  // C[ownBranch, negNode]
@@ -277,7 +277,7 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body- open polyline box (1,-1)→(5,-1)→(5,3)→(1,3) (no left edge)
+    // Body- open polyline box (1,-1)â†’(5,-1)â†’(5,3)â†’(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -299,9 +299,9 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("sense−", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("senseâˆ’", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out−",   4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("outâˆ’",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -342,7 +342,7 @@ const CCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // CCVSDefinition
 // ---------------------------------------------------------------------------
 
-export const CCVSDefinition: ComponentDefinition = {
+export const CCVSDefinition: StandaloneComponentDefinition = {
   name: "CCVS",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -376,7 +376,6 @@ export const CCVSDefinition: ComponentDefinition = {
       },
       paramDefs: CCVS_PARAM_DEFS,
       params: CCVS_DEFAULTS,
-      ngspiceNodeMap: { "out+": "pos", "out-": "neg" },
     },
   },
   defaultModel: "behavioral",

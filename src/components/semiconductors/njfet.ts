@@ -25,17 +25,19 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -1017,14 +1019,14 @@ export const NJFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition
+// StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function njfetCircuitFactory(props: PropertyBag): NJfetElement {
   return new NJfetElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const NJfetDefinition: ComponentDefinition = {
+export const NJfetDefinition: StandaloneComponentDefinition = {
   name: "NJFET",
   typeId: -1,
   factory: njfetCircuitFactory,
@@ -1036,7 +1038,6 @@ export const NJfetDefinition: ComponentDefinition = {
     "N-channel JFET  Shichman-Hodges model with gate junction.\n" +
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
-  ngspiceNodeMap: { G: "gate", S: "source", D: "drain" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -1044,7 +1045,6 @@ export const NJfetDefinition: ComponentDefinition = {
       factory: createNJfetElement,
       paramDefs: NJFET_PARAM_DEFS,
       params: NJFET_PARAM_DEFAULTS,
-      ngspiceNodeMap: { G: "gate", S: "source", D: "drain" },
     },
   },
   defaultModel: "spice",

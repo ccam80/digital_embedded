@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Voltage-Controlled Current Source (VCCS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -29,7 +29,7 @@
  *     RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
  *
  * At convergence (Vctrl = Vctrl0) the current injected into out+ equals
- * f(Vctrl0), which is the desired output current. ∎
+ * f(Vctrl0), which is the desired output current. âˆŽ
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -43,13 +43,13 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -204,7 +204,7 @@ export class VCCSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output current is f(V_ctrl) evaluated at the
    * current operating point. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. ∎
+   * KCL: 0 + 0 + I_out - I_out = 0. âˆŽ
    */
   getPinCurrents(_rhs: Float64Array): number[] {
     const iOut = this._compiledExpr(this._ctx);
@@ -269,9 +269,9 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("ctrl+", 1.2, -1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ctrl−", 1.2, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrlâˆ’", 1.2, 1, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",  4.8, -1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out−",  4.8, 1, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("outâˆ’",  4.8, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -312,7 +312,7 @@ const VCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // VCCSDefinition
 // ---------------------------------------------------------------------------
 
-export const VCCSDefinition: ComponentDefinition = {
+export const VCCSDefinition: StandaloneComponentDefinition = {
   name: "VCCS",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -346,7 +346,6 @@ export const VCCSDefinition: ComponentDefinition = {
       },
       paramDefs: VCCS_PARAM_DEFS,
       params: VCCS_DEFAULTS,
-      ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" },
     },
   },
   defaultModel: "behavioral",

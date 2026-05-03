@@ -17,7 +17,9 @@ import {
 } from "../potentiometer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { makeSimpleCtx, makeLoadCtx, makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 
 // ---------------------------------------------------------------------------
@@ -64,7 +66,7 @@ describe("Potentiometer", () => {
       props.setModelParam("position", 0.5);
 
       const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2], ["W", 3]]),
+        new Map([["pos", 1], ["neg", 2], ["W", 3]]),
         props,
         () => 0,
       );
@@ -95,7 +97,7 @@ describe("Potentiometer", () => {
       props.setModelParam("position", 0);
 
       const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2], ["W", 3]]),
+        new Map([["pos", 1], ["neg", 2], ["W", 3]]),
         props,
         () => 0,
       );
@@ -107,8 +109,8 @@ describe("Potentiometer", () => {
       analogElement.load(ctx);
 
       // Nodes are 1-based: A=1, W=3, B=2. Top resistor (R_AW): A(1) ↔ W(3). Bottom resistor (R_WB): W(3) ↔ B(2).
-      // Top resistance is 0, clamped to 1e-9: G_AW = 1/(1e-9) = 1e9 — A(1) ↔ W(3)
-      // Bottom resistance is 10000: G_WB = 1/10000 = 0.0001 — W(3) ↔ B(2)
+      // Top resistance is 0, clamped to 1e-9: G_AW = 1/(1e-9) = 1e9- A(1) ↔ W(3)
+      // Bottom resistance is 10000: G_WB = 1/10000 = 0.0001- W(3) ↔ B(2)
       const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
       const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
 
@@ -124,7 +126,7 @@ describe("Potentiometer", () => {
       props.setModelParam("position", 1);
 
       const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2], ["W", 3]]),
+        new Map([["pos", 1], ["neg", 2], ["W", 3]]),
         props,
         () => 0,
       );
@@ -136,8 +138,8 @@ describe("Potentiometer", () => {
       analogElement.load(ctx);
 
       // Nodes are 1-based: A=1, W=3, B=2. Top resistor (R_AW): A(1) ↔ W(3). Bottom resistor (R_WB): W(3) ↔ B(2).
-      // Top resistance is 10000: G_AW = 1/10000 = 0.0001 — A(1) ↔ W(3)
-      // Bottom resistance is 0, clamped to 1e-9: G_WB = 1/(1e-9) = 1e9 — W(3) ↔ B(2)
+      // Top resistance is 10000: G_AW = 1/10000 = 0.0001- A(1) ↔ W(3)
+      // Bottom resistance is 0, clamped to 1e-9: G_WB = 1/(1e-9) = 1e9- W(3) ↔ B(2)
       const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
       const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
 
@@ -201,76 +203,56 @@ describe("Potentiometer", () => {
 });
 
 // ---------------------------------------------------------------------------
-// potentiometer_load_dcop_parity — C4.1 / Task 6.2.1
+// potentiometer_load_dcop_parity- C4.1 / Task 6.2.1
 //
 // Pot at wiper=0.5, 10kΩ total. Each half is 5kΩ → G = 1/5000.
-// Nodes: A=1, B=2, W=3.  matrixSize=3 (no branch rows needed).
 //
-// NGSPICE reference: ngspice resload.c stamps G=1/R at (pos,pos), (neg,neg),
-// and -G at (pos,neg), (neg,pos) for each resistor sub-element.
-// Potentiometer = two series resistors sharing wiper node W.
-//   Top resistor (A↔W):  G_top = 1/R_top = 1/(10000*0.5) = 1/5000
+// NGSPICE reference: resload.c:16-41 (function RESload, four stamps per
+// resistor segment). Potentiometer = two series resistors sharing wiper W.
+//   Top resistor (A↔W):   G_top = 1/R_top = 1/(10000*0.5) = 1/5000
 //   Bottom resistor (W↔B): G_bottom = 1/R_bottom = 1/(10000*0.5) = 1/5000
-// The factory calls new AnalogPotentiometerElement([A, B, W], R, position)
-// where the second arg is the wiper (middle) node.
-// Node indices in solver (0-based): A=0, B=1, W=2.
+// Diagonal totals: (rA,rA)=G_AW, (rB,rB)=G_WB, (rW,rW)=G_AW+G_WB.
 // ---------------------------------------------------------------------------
 
 describe("potentiometer_load_dcop_parity", () => {
-  it("wiper=0.5 10kΩ pot G_top=G_bottom=1/5000 bit-exact", () => {
-    const props = new PropertyBag();
-    props.setModelParam("resistance", 10000);
-    props.setModelParam("position", 0.5);
-
-    // Factory constructs AnalogPotentiometerElement([A_node, B_node, W_node], R, pos)
-    // = ([1, 2, 3], 10000, 0.5) → _pinNodes: A=1, B=2, W=3
-    const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2], ["W", 3]]),
-      props,
-      () => 0,
-    );
-
-    const stampCtx = makeSimpleCtx({
-      elements: [analogElement],
-      matrixSize: 3,
-      nodeCount: 3,
+  it("wiper=0.5 10kΩ pot G_top=G_bottom=1/5000 bit-exact", async () => {
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 1.0 } },
+            { id: "pot", type: "Potentiometer",   props: { label: "pot", resistance: 10000, position: 0.5 } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "pot:pos"],
+            ["pot:neg", "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
+      },
+      analysis: "dcop",
     });
-    analogElement.load(stampCtx.loadCtx);
-    const stamps = stampCtx.solver.getCSCNonZeros();
 
-    // NGSPICE ref: G = 1/R = 1 / (R_total * position) = 1 / (10000 * 0.5)
-    // This is a single IEEE-754 division: 1 / 5000.
-    const NGSPICE_G_REF = 1 / 5000;
-
-    // Nodes are 1-based: A=1, B=2, W=3. getCSCNonZeros returns raw 1-based row/col.
-    // Factory: new AnalogPotentiometerElement([A=1, B=2, W=3], 10000, 0.5).
-    // Top resistor (A↔W in code = pinNodeIds[0]↔pinNodeIds[1] = A=1↔B=2): stamps at rows/cols 1 and 2.
-    // Bottom resistor (W↔B in code = pinNodeIds[1]↔pinNodeIds[2] = B=2↔W=3): stamps at rows/cols 2 and 3.
-    // So: diag[1]=G_top, diag[2]=G_top+G_bottom, diag[3]=G_bottom.
-
-    const eAA = stamps.find((e) => e.row === 1 && e.col === 1);
-    expect(eAA).toBeDefined();
-    expect(eAA!.value).toBe(NGSPICE_G_REF);
-
-    // B is the middle node — receives G_top from the A–B segment and G_bottom from the B–W segment.
-    const eBB = stamps.find((e) => e.row === 2 && e.col === 2);
-    expect(eBB).toBeDefined();
-    expect(eBB!.value).toBe(NGSPICE_G_REF + NGSPICE_G_REF);
-
-    const eWW = stamps.find((e) => e.row === 3 && e.col === 3);
-    expect(eWW).toBeDefined();
-    expect(eWW!.value).toBe(NGSPICE_G_REF);
-
-    // Off-diagonal entries -G_top (A↔B cross terms, 1-based indices 1↔2)
-    const eAB = stamps.find((e) => e.row === 1 && e.col === 2);
-    expect(eAB!.value).toBe(-NGSPICE_G_REF);
-    const eBA = stamps.find((e) => e.row === 2 && e.col === 1);
-    expect(eBA!.value).toBe(-NGSPICE_G_REF);
-
-    // Off-diagonal entries -G_bottom (B↔W cross terms, 1-based indices 2↔3)
-    const eBW = stamps.find((e) => e.row === 2 && e.col === 3);
-    expect(eBW!.value).toBe(-NGSPICE_G_REF);
-    const eWB = stamps.find((e) => e.row === 3 && e.col === 2);
-    expect(eWB!.value).toBe(-NGSPICE_G_REF);
+    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
+    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
+    const N = lastIter.matrixSize - 2;
+    const M = lastIter.matrix!;
+    const rowOf = (tag: string) => {
+      for (const [row, label] of session.ourTopology.matrixRowLabels.entries()) {
+        if (label.includes(tag)) return row;
+      }
+      throw new Error(`row not found: ${tag}`);
+    };
+    const rA = rowOf("pot:pos");
+    const rB = rowOf("pot:neg");
+    const rW = rowOf("pot:W");
+    const G = 1 / 5000;
+    expect(M[rA * N + rA]).toBe(G);
+    expect(M[rB * N + rB]).toBe(G);
+    expect(M[rW * N + rW]).toBe(G + G);   // 0.0004- wiper shared diagonal
+    expect(M[rA * N + rW]).toBe(-G);
+    expect(M[rW * N + rB]).toBe(-G);
   });
 });

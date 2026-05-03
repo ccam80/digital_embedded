@@ -1,18 +1,18 @@
-/**
+﻿/**
  * Fuse- unified digital/analog fuse component.
  *
  * Digital engine: bidirectional switch controlled by the `blown` property.
  *   state[stBase] = blown ? 0 : 1; the bus resolver merges/splits nets.
  *
- * Analog engine: I²t thermal model (AnalogFuseElement). The analog element
+ * Analog engine: IÂ²t thermal model (AnalogFuseElement). The analog element
  *   writes `_thermalRatio` and `blown` back into the shared PropertyBag
  *   each timestep, so the visual layer shows heat glow and the digital
  *   engine picks up the blown state on the next step.
  *
  * Visual phases:
  *   Cold (ratio < 0.3)    - normal sine wave, component color
- *   Warming (0.3 → 0.9)   - thickening line, color lerps to orange/red
- *   Critical (0.9 → 1.0)  - red, thick, slight vertex jitter
+ *   Warming (0.3 â†’ 0.9)   - thickening line, color lerps to orange/red
+ *   Critical (0.9 â†’ 1.0)  - red, thick, slight vertex jitter
  *   Blown                  - gap in middle, warped endpoints, smoke puff
  *
  * Pins:
@@ -31,7 +31,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
@@ -85,7 +85,7 @@ const COLOR_WARM: [number, number, number] = [255, 160, 0];     // orange
 const COLOR_HOT: [number, number, number] = [255, 40, 0];       // red
 const COLOR_CHARRED: [number, number, number] = [60, 50, 45];   // dark charred brown
 
-/** Map thermalRatio (0→1) to a heat color CSS string. */
+/** Map thermalRatio (0â†’1) to a heat color CSS string. */
 function heatColor(ratio: number): string {
   if (ratio < 0.3) return lerpRgb(COLOR_COLD, COLOR_COLD, 0);
   if (ratio < 0.7) {
@@ -168,7 +168,7 @@ export class FuseElement extends AbstractCircuitElement {
     label: string,
     thermalRatio: number,
   ): void {
-    // Line thickness increases with heat: 1 → 2.5
+    // Line thickness increases with heat: 1 â†’ 2.5
     const lineWidth = 1 + thermalRatio * 1.5;
     ctx.setLineWidth(lineWidth);
 
@@ -230,7 +230,7 @@ export class FuseElement extends AbstractCircuitElement {
     const pts = sinePoints();
     const mid = Math.floor(SEGMENTS / 2); // break at center
 
-    // Left stub: segments 0 → mid-1, last point droops down
+    // Left stub: segments 0 â†’ mid-1, last point droops down
     for (let i = 0; i < mid - 1; i++) {
       ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
@@ -241,7 +241,7 @@ export class FuseElement extends AbstractCircuitElement {
       leftEnd.x + 0.02, leftEnd.y + 0.12,
     );
 
-    // Right stub: segments mid+1 → end, first point droops up
+    // Right stub: segments mid+1 â†’ end, first point droops up
     const rightStart = pts[mid + 1];
     ctx.drawLine(
       rightStart.x - 0.02, rightStart.y - 0.12,
@@ -277,7 +277,7 @@ export class FuseElement extends AbstractCircuitElement {
     const duration = 1.5;
     if (elapsed > duration) return; // animation complete
 
-    const progress = elapsed / duration; // 0→1
+    const progress = elapsed / duration; // 0â†’1
     const opacity = Math.max(0, 1 - progress);
 
     // 5 smoke particles rising from the break point
@@ -317,7 +317,7 @@ export class FuseElement extends AbstractCircuitElement {
 // executeFuse- flat simulation function
 //
 // Reads the blown property and writes the closed flag into state[stBase]
-// for the bus resolver: blown=false → 1 (closed), blown=true → 0 (open).
+// for the bus resolver: blown=false â†’ 1 (closed), blown=true â†’ 0 (open).
 // ---------------------------------------------------------------------------
 
 export function executeFuse(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -361,7 +361,7 @@ const FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "rCold",
     type: PropertyType.FLOAT,
-    label: "Cold Resistance (Ω)",
+    label: "Cold Resistance (Î©)",
     defaultValue: 0.01,
     min: 1e-12,
     description: "Resistance when fuse is intact (analog mode)",
@@ -369,7 +369,7 @@ const FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "rBlown",
     type: PropertyType.FLOAT,
-    label: "Blown Resistance (Ω)",
+    label: "Blown Resistance (Î©)",
     defaultValue: 1e9,
     min: 1,
     description: "Resistance when fuse has blown (analog mode)",
@@ -385,10 +385,10 @@ const FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "i2tRating",
     type: PropertyType.FLOAT,
-    label: "I²t Rating (A²·s)",
+    label: "IÂ²t Rating (AÂ²Â·s)",
     defaultValue: 1e-4,
     min: 1e-12,
-    description: "Energy rating: fuse blows when accumulated I²·t exceeds this value (10ms at 100mA)",
+    description: "Energy rating: fuse blows when accumulated IÂ²Â·t exceeds this value (10ms at 100mA)",
   },
   {
     key: "label",
@@ -407,7 +407,7 @@ function fuseFactory(props: PropertyBag): FuseElement {
   return new FuseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const FuseDefinition: ComponentDefinition = {
+export const FuseDefinition: StandaloneComponentDefinition = {
   name: "Fuse",
   typeId: -1,
   factory: fuseFactory,
@@ -416,9 +416,9 @@ export const FuseDefinition: ComponentDefinition = {
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText:
-    "Fuse- one-time irreversible switch with I²t thermal model.\n" +
+    "Fuse- one-time irreversible switch with IÂ²t thermal model.\n" +
     "Digital: blown property controls open/closed.\n" +
-    "Simplified: blows when accumulated I²t exceeds the rating.",
+    "Simplified: blows when accumulated IÂ²t exceeds the rating.",
   models: {
     digital: {
       executeFn: executeFuse,
@@ -429,14 +429,12 @@ export const FuseDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
-  ngspiceNodeMap: { out1: "pos", out2: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",
       factory: (pinNodes, props, getTime) => createAnalogFuseElement(pinNodes, props, getTime),
       paramDefs: ANALOG_FUSE_PARAM_DEFS,
       params: ANALOG_FUSE_DEFAULTS,
-      ngspiceNodeMap: { out1: "pos", out2: "neg" },
     },
   },
   defaultModel: "digital",

@@ -3,6 +3,7 @@
  *
  * Stamps a conductance matrix: G = 1/R at four positions in the MNA matrix.
  * Two-terminal element with no branch variable (branchIndex = -1).
+ * Two-terminal pins are labelled pos (positive terminal) and neg (negative terminal).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -16,11 +17,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -49,7 +50,7 @@ function buildResistorPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "A",
+      label: "pos",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
@@ -58,7 +59,7 @@ function buildResistorPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "B",
+      label: "neg",
       defaultBitWidth: 1,
       position: { x: 4, y: 0 },
       isNegatable: false,
@@ -103,8 +104,8 @@ export class ResistorElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    const vA = signals?.getPinVoltage("A");
-    const vB = signals?.getPinVoltage("B");
+    const vA = signals?.getPinVoltage("pos");
+    const vB = signals?.getPinVoltage("neg");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
     // Lead wires  colored by their respective node voltages
@@ -146,7 +147,7 @@ export class ResistorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// ResistorAnalogElement — AnalogElement class implementation
+// ResistorAnalogElement- AnalogElement class implementation
 // ---------------------------------------------------------------------------
 
 class ResistorAnalogElement implements AnalogElement {
@@ -174,10 +175,10 @@ class ResistorAnalogElement implements AnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("A")!;  // RESposNode
-    const negNode = this._pinNodes.get("B")!;  // RESnegNode
+    const posNode = this._pinNodes.get("pos")!;  // RESposNode
+    const negNode = this._pinNodes.get("neg")!;  // RESnegNode
 
-    // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
+    // ressetup.c:46-49- TSTALLOC sequence, line-for-line.
     this._hPP = solver.allocElement(posNode, posNode);  // (RESposNode, RESposNode)
     this._hNN = solver.allocElement(negNode, negNode);  // (RESnegNode, RESnegNode)
     this._hPN = solver.allocElement(posNode, negNode);  // (RESposNode, RESnegNode)
@@ -193,7 +194,7 @@ class ResistorAnalogElement implements AnalogElement {
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    // resload.c:34-37 — value-side stamps through cached handles.
+    // resload.c:34-37- value-side stamps through cached handles.
     solver.stampElement(this._hPP, this._G);
     solver.stampElement(this._hNN, this._G);
     solver.stampElement(this._hPN, -this._G);
@@ -201,8 +202,8 @@ class ResistorAnalogElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this._pinNodes.get("A")!;
-    const n1 = this._pinNodes.get("B")!;
+    const n0 = this._pinNodes.get("pos")!;
+    const n1 = this._pinNodes.get("neg")!;
     const vA = rhs[n0];
     const vB = rhs[n1];
     const I = this._G * (vA - vB);
@@ -260,7 +261,7 @@ function resistorCircuitFactory(props: PropertyBag): ResistorElement {
   return new ResistorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ResistorDefinition: ComponentDefinition = {
+export const ResistorDefinition: StandaloneComponentDefinition = {
   name: "Resistor",
   typeId: -1,
   factory: resistorCircuitFactory,
@@ -272,7 +273,6 @@ export const ResistorDefinition: ComponentDefinition = {
     "Resistor  stamps conductance G=1/R into the MNA matrix.\n" +
     "Minimum resistance is clamped to 1e-9 Î.",
   models: {},
-  ngspiceNodeMap: { A: "pos", B: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",
