@@ -15,12 +15,6 @@
  * is covered by the ngspice comparison harness (`harness_*` MCP tools,
  * `src/solver/analog/__tests__/ngspice-parity/*`). Auto-deleted per
  * category-1 §4c rules.
- *
- * The §4e siblingBranch labelRef-snapshot bug that previously blocked the
- * behavioural transient cases is resolved post-Wave-10: the compiler now
- * resolves `${labelRef.value}:${subElementName}` at the leaf's setup() time
- * (after `setLabel` has run) instead of at sub-element construction time.
- * Behavioural coverage below is therefore restored.
  */
 
 import { describe, it, expect } from "vitest";
@@ -80,13 +74,6 @@ describe("TappedTransformerDefinition", () => {
 
 // ---------------------------------------------------------------------------
 // Behavioural coverage — exercises the netlist composite end-to-end.
-//
-// The TappedTransformer decomposes into 3x Inductor (L1, L2, L3) plus 3x
-// TransformerCoupling (MUT12, MUT13, MUT23). Each TransformerCoupling
-// resolves two siblingBranch refs via the compiler's labelRef channel; if
-// those refs resolve to an empty parent prefix (the §4e Bug 2 failure mode),
-// `ctx.findBranch(":L2")` returns 0 and setup() throws. Successful DC-OP
-// convergence below proves the labelRef path is intact.
 // ---------------------------------------------------------------------------
 
 function nodeOf(fix: Fixture, label: string): number {
@@ -146,11 +133,7 @@ describe("TappedTransformer behavioural", () => {
   it("centre_tap_voltage_with_grounded_CT", () => {
     // P2 and CT held to ground via direct GND ties. With ideal coupled
     // inductors (DC short), the primary inductor forces V(P1)=V(P2)=0 at
-    // steady state, so the V_source falls entirely across rser. The check
-    // here is structural-correctness: V(P2) and V(CT) sit at ground (their
-    // imposed potentials), and the netlist composite reaches DC-OP without
-    // hitting `ctx.findBranch(":L2") returned 0`. Successful convergence
-    // proves the labelRef siblingBranch path is intact post-Wave-10.
+    // steady state, so V_source falls entirely across rser.
     const fix = buildFixture({
       build: (_r, facade) => buildTappedTransformerBench(facade, {
         vSource: 10.0, rLoad: 1e6, turnsRatio: 2.0, rSeries: 100,
@@ -191,19 +174,9 @@ describe("TappedTransformer behavioural", () => {
   });
 
   it("secondary_swings_under_transient_drive", async () => {
-    // Drive the primary with a sinusoid; observe that both secondary halves
-    // (S1 and S2) actually swing around the centre tap during the transient
-    // run. This proves:
-    //   (a) the labelRef siblingBranch path resolves at setup() time
-    //       (otherwise TransformerCoupling.setup() throws);
-    //   (b) the mutual-inductance stamps couple primary energy into both
-    //       secondary halves (otherwise S1 / S2 stay clamped at the CT
-    //       potential and never swing).
-    //
-    // Topology mirrors the working transformer.test.ts AC bench: AC source
-    // straight onto the primary, secondary halves loaded via rs1 / rs2, CT
-    // grounded to fix the midpoint. uic:true skips DC-OP and lets the AC
-    // source ramp from t=0 (matching transformer.test.ts).
+    // Drive the primary with a sinusoid; both secondary halves (S1, S2)
+    // must swing around the grounded centre tap. CT grounded fixes the
+    // midpoint; uic:true skips DC-OP and lets the AC source ramp from t=0.
     const facadeBuild = (_r: unknown, facade: DefaultSimulatorFacade): Circuit =>
       facade.build({
         components: [
@@ -249,10 +222,8 @@ describe("TappedTransformer behavioural", () => {
       params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
     });
 
-    // Sample both secondary nodes via the coordinator's public sampling
-    // surface (mirrors transformer.test.ts). With CT=0V and the coupled
-    // inductors driven sinusoidally, an ideal symmetric secondary swings
-    // bipolar around the grounded centre tap.
+    // With CT=0V and the coupled inductors driven sinusoidally, an ideal
+    // symmetric secondary swings bipolar around the grounded centre tap.
     const times = Array.from({ length: totalSamples }, (_, i) =>
       (i + 1) * (tStop / totalSamples),
     );
@@ -278,12 +249,8 @@ describe("TappedTransformer behavioural", () => {
       if (sample.s2 < minS2) minS2 = sample.s2;
     }
 
-    // Each secondary half swings positive AND negative — proves
-    // mutual-inductance stamps couple primary energy through the
-    // labelRef-resolved branch indices on both sides of the centre tap.
-    // The exact swing magnitude depends on the 3x3 coupling matrix and the
-    // secondary load impedance; the architectural assertion is that energy
-    // reaches both halves and that swing crosses zero.
+    // Each secondary half must swing positive AND negative — energy reaches
+    // both halves through the mutual-inductance stamps and crosses zero.
     expect(maxS1).toBeGreaterThan(1e-4);
     expect(minS1).toBeLessThan(-1e-4);
     expect(maxS2).toBeGreaterThan(1e-4);

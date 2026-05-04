@@ -2,21 +2,9 @@
  * Regression test for the Relay's RelayCoupling siblingBranch / siblingState
  * actuation path.
  *
- * The Relay netlist (`RELAY_NETLIST` in `relay.ts`) emits a RelayCoupling
- * sub-element with two compiler-resolved refs:
- *   coilBranch:   { kind: "siblingBranch", subElementName: "coilL" }
- *   switchClosed: { kind: "siblingState",  subElementName: "contactSW",
- *                   slotName: "CLOSED" }
- *
- * Pre-Wave-10 the compiler resolved `${labelRef.value}:${subElementName}` at
- * sub-element construction time, when `labelRef.value` was still the empty
- * string. RelayCoupling's setup() then called
- * `ctx.findBranch(":coilL")` and `findBranch` returned 0 — the threshold
- * comparison effectively saw zero coil current and the switch never closed.
- *
- * This test wires up a coil bench that drives current well above the default
- * pull-in threshold (pullInI = 0.05A) and asserts that the Switch's CLOSED
- * pool slot transitions 0 -> 1 after the warm-start step.
+ * Drives the coil current well above the default pull-in threshold
+ * (pullInI = 0.05A) and asserts that the Switch's CLOSED pool slot
+ * transitions 0 -> 1 after the warm-start step.
  */
 
 import { describe, it, expect } from "vitest";
@@ -62,12 +50,7 @@ function buildRelayBench(facade: DefaultSimulatorFacade, vCoil: number): Circuit
   });
 }
 
-/**
- * Locate the Switch sub-element inside the expanded relay composite. After
- * SubcircuitWrapperElement.setLabel() runs, every sub-element carries label
- * `${parentLabel}:${subElementName}` — for the Relay netlist that's
- * `relay:contactSW`.
- */
+/** Locate the Switch sub-element inside the expanded relay composite. */
 function findContactSwitch(fix: Fixture): SwitchAnalogElement {
   const elements = fix.circuit.elements;
   for (const el of elements) {
@@ -92,13 +75,6 @@ describe("Relay RelayCoupling siblingBranch/siblingState actuation", () => {
     });
 
     const sw = findContactSwitch(fix);
-
-    // Pool slot CLOSED transitioned from its 0 initial value to 1, proving
-    // (a) labelRef siblingBranch path resolves at setup() time
-    //     (otherwise RelayCoupling.setup() throws on findBranch == 0);
-    // (b) coil branch index is non-zero so RelayCoupling reads a non-zero
-    //     current value;
-    // (c) siblingState path correctly identifies the Switch's CLOSED slot.
     const closed = fix.pool.state1[sw._stateBase + SLOT_CLOSED];
     expect(closed).toBe(1);
   });
