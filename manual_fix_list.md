@@ -663,7 +663,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 >
 > **Architectural decision:** Collapse `interface AnalogElement` + `abstract class AbstractAnalogElement` into a single `abstract class AnalogElement` with (a) a private `__brand` field (TS treats classes with `private` members nominally, closing structural conformance) and (b) `#pinNodes` as a true ECMAScript private field exposed through a `ReadonlyMap` getter. Same treatment for the pool-backed pair. Migrate every class-based implementer regardless of current netlist usage. Migrate compiler internal `AnalogElement` literals (patcher leaf, internal-net allocator) to real classes. The patcher's writes go through closure-captured `Map` references in `patchWork`, never through `el.pinNodes` — the `ReadonlyMap` getter is therefore safe and protective.
 >
-> **Scale:** 543 `_pinNodes` references across 143 files (count drops materially after Wave 11a deletes the nfet/pfet/triode/transformer parent classes; re-measure before launching Phase A); 10 unmigrated standalone production files (Wave 9, post-rebaseline; nfet/pfet/mutual-inductor moved to Wave 11a scope where their parent classes disappear, so the implements→extends migration on those three would be wasted motion); 2 interfaces to delete; 1 base class rename; 1 field privacy transformation; 3 compiler-internal literals to convert.
+> **Scale:** 543 `_pinNodes` references across 143 files (count drops materially after Wave 11a deletes the nfet/pfet/triode/transformer parent classes; re-measure before launching Phase A); 10 unmigrated standalone production files (Wave 9, post-rebaseline; nfet/pfet/mutual-inductor moved to Wave 11a scope where their parent classes disappear, so the implements→extends migration on those three would be wasted motion); 2 interfaces to delete; 1 base class rename; 1 field privacy transformation; 3 compiler-internal literals to convert (Wave 10); **16 production object-literal factory leaves (Wave 11b, audit-discovered 2026-05-04 post-§4f-Wave-8 — original spec enumerated 4 file-rows; expanded list below).**
 
 #### 4g Wave 0a — Rebaseline + redundant-implements sweep (mechanical, one commit)
 
@@ -771,14 +771,35 @@ The compiler's ad-hoc `AnalogElement` object literals are exactly the allocator-
 
 - [ ] `src/components/passives/transformer.ts` + `src/components/passives/mutual-inductor.ts` — paired migration. Emit `InductorSubElement(L1)` + `InductorSubElement(L2)` + `MutualInductorElement(K)` as three top-level sub-elements. **Exemplar already exists**: `tapped-transformer.ts` is `kind: "netlist"` and emits the equivalent shape; copy the structure. The L1/L2 windings each get their own `_pinNodes` Map via the compiler patcher; the K coupling element reads L1/L2 branch indices via the sibling-branch ref pattern (cf. `optocoupler.ts` photocurrent CCCS / `relay-resistor.ts` coil branch — note these sibling-branch reads are themselves the subject of §4e Bug 2 / Wave 10 `labelPatchWork`, so order Wave 10 before this row).
 
-##### 11b — Object-literal factory leaves: literal → class extending `AbstractAnalogElement` (5 files, exemplar = the Wave 10 compiler-leaf transform)
+##### 11b — Object-literal factory leaves: literal → class extending `AbstractAnalogElement` (16 file-sites, audit-discovered 2026-05-04, exemplar = the Wave 10 compiler-leaf transform)
 
 > **Universal recipe.** Replace `return { _pinNodes: new Map(pinNodes), label: "", _stateBase: -1, branchIndex: -1, ngspiceLoadOrder: …, setup, load, getPinCurrents, setParam }` with a local class extending `AbstractAnalogElement` (or `AbstractPoolBackedAnalogElement` if pool-backed), then `return new XElement(pinNodes, props)`. Method bodies move onto the class verbatim. The defensive copy disappears because `super(pinNodes)` stores by reference. **Exactly the Wave 8 mock-migration recipe applied to production object literals.**
 
-- [ ] `src/components/active/opamp.ts:208` — single literal in `createOpAmpElement`. Pattern B (no state pool). Standard `(pinNodes, props)` ctor.
-- [ ] `src/components/active/ota.ts:186` — single literal. Pattern B. Standard ctor.
-- [ ] `src/components/semiconductors/mosfet.ts:277, 384` — TWO literals in different model factories (likely L1/L2 model variants; check each model's state usage to determine A vs B per-literal).
-- [ ] `src/components/active/analog-switch.ts:859` — single literal in factory. Audit: confirm whether it's a defensive-copy or a constructor-time wiring; classify accordingly. (Line 859 is high; may indicate a multi-factory file like mosfet.)
+> **Audit note (2026-05-04, post §4f Wave 8 + §4g Wave 0a commit `ff2d25d7`).** The original 11b enumeration (4 file rows) was bounded by "currently visible while authoring §4g". A repo-wide grep for `_pinNodes:\s*new Map` and `:\s*(Pool)?AnalogElement\s*=\s*\{` outside `__tests__/` and `compiler.ts` (the latter is Wave 10 scope) surfaced **16 file-sites** spanning 14 unique production files. Original spec rows for `mosfet.ts:277,384` and `analog-switch.ts:859` carried line drift / file confusion — corrected below. The expanded list captures everything blocking Wave 11's umbrella zero-smell gate.
+
+> **Wave 8 dependency:** `bjt.ts:580/584` (L0) and `bjt.ts:1202/1206` (L1) are the specific blockers for the 3 retained `as AnalogElement & { label?: string; elementIndex?: number }` intersection casts in `src/components/semiconductors/__tests__/bjt.test.ts:409,460,2750`. Migrating those two literals to `AbstractPoolBackedAnalogElement` lets the test casts drop cleanly (`label`/`elementIndex` are declared on the abstract base; the cast becomes redundant). The bjt.ts subset is self-contained — no Wave 9 / Wave 10 dependency — and is the **minimum-viable closure for §4f Wave 8** if landed alone.
+
+###### Pattern A (pool-backed) — `PoolBackedAnalogElement = { ... }` factory literals (7 file-sites)
+
+- [ ] `src/components/semiconductors/bjt.ts:580` (`el0`, L0 model factory) + `:584` (`_pinNodes`). **Unblocks Wave 8 final gate.** Pattern A. Spec §3 entry J-071 (line 321) — BJT factory rename at 24 sites in bjt.test.ts — should re-audit after this lands; the test file's intersection casts drop in the same pass.
+- [ ] `src/components/semiconductors/bjt.ts:1202` (`el1`, L1 model factory) + `:1206` (`_pinNodes`). **Unblocks Wave 8 final gate.** Pattern A. Same notes as `:580`.
+- [ ] `src/components/semiconductors/diode.ts:480` (`element`) + `:484` (`_pinNodes`). Pattern A. Confirm state schema (DIODE+CAP GEQ slots per §4d audit).
+- [ ] `src/components/semiconductors/zener.ts:244` (`zenerElement`) + `:248` (`_pinNodes`). Pattern A. Confirm GEQ slot schema.
+- [ ] `src/components/semiconductors/mosfet.ts:859` (`_pinNodes`). Pattern A (MOSFET MODE slot). **Spec drift correction:** original 11b row said "`:277, 384` — TWO literals in different model factories (likely L1/L2 model variants)". Current grep finds ONE literal at `:859`; the file may have been consolidated or the original spec row had file/line confusion (the `:277,:384` pair is actually in `analog-switch.ts`). Re-audit when migrating: confirm single-literal vs multi-model.
+- [ ] `src/components/semiconductors/njfet.ts:330` (`_pinNodes`). Pattern A. Standard `(pinNodes, props)` ctor.
+- [ ] `src/components/semiconductors/pjfet.ts:304` (`_pinNodes`). Pattern A. Standard ctor.
+
+###### Pattern B (plain `AnalogElement`) — factory literals returning bare `AnalogElement` (9 file-sites)
+
+- [ ] `src/components/active/opamp.ts:203` (`el`) + `:208` (`_pinNodes`). Pattern B. Standard `(pinNodes, props)` ctor. *(Originally enumerated.)*
+- [ ] `src/components/active/ota.ts:186` (`_pinNodes`). Pattern B. Standard ctor. *(Originally enumerated.)*
+- [ ] `src/components/active/analog-switch.ts:277` (`_pinNodes`, first model factory) + `:384` (`_pinNodes`, second model factory). Pattern B. **Spec drift correction:** original 11b row said "`:859` — single literal in factory ... may indicate a multi-factory file like mosfet". Current grep confirms TWO literals at `:277,:384` (SPST and SPDT model factories), not at `:859`. The original `:859` line number was wrong (likely the analog-switch line was confused with mosfet's literal location). Migrate as TWO Pattern B classes.
+- [ ] `src/components/sources/dc-voltage-source.ts:176` (`el`) + `:180` (`_pinNodes`). Pattern B. Confirm whether the lazy `findBranchFor` accessor (vsrcfbr.c:26-39 port; cf. §4c CCCS/CCVS migration note line 450) needs to live on the class or on a sibling — keep verbatim for first pass.
+- [ ] `src/components/sources/current-source.ts:177` (`el`) + `:182` (`_pinNodes`). Pattern B. Standard ctor.
+- [ ] `src/components/sources/ac-voltage-source.ts:610` (`_pinNodes: new Map<string, number>(pinNodes)`). Pattern B. Note explicit `<string, number>` generic — preserve in class ctor parameter type.
+- [ ] `src/components/sources/variable-rail.ts:177` (`_pinNodes`). Pattern B. Standard ctor. Confirm hot-loadable `voltage` setParam continues to route through `coordinator.setComponentProperty` post-migration (§4c gap-fill exemplar at line 420).
+- [ ] `src/components/io/ground.ts:112` (`el`) + `:115` (`_pinNodes`). Pattern B. Single-pin element. Standard ctor.
+- [ ] `src/components/io/clock.ts:271` (`_pinNodes: new Map<string, number>([["out", nodePos]])`). Pattern B. **Non-standard ctor:** literal constructs the pin-node Map inline from a positional `nodePos` argument rather than receiving a `pinNodes` Map. Class ctor must either accept the same `nodePos: number` argument and construct the Map internally (preferred, preserves call-site signature) or accept the constructed Map (changes the factory shape). Choose the option that minimises factory-call-site churn.
 
 ##### 11 dependency notes
 
