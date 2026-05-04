@@ -292,7 +292,7 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
   // Oriented: A=nNeg, K=nPos so it conducts when cap is reverse-biased.
   private readonly _clampDiode: PoolBackedAnalogElement;
 
-  private readonly _emitDiagnostic: (diag: Diagnostic) => void;
+  private _emitDiagnostic: (diag: Diagnostic) => void = () => {};
   private _reverseBiasDiagEmitted: boolean = false;
 
   /**
@@ -300,17 +300,18 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
    * @param esr            - Equivalent series resistance in ohms
    * @param rLeak          - Leakage resistance in ohms (V_rated / I_leak)
    * @param reverseMax     - Reverse voltage threshold in volts (positive value)
-   * @param emitDiagnostic - Callback invoked when polarity violation is detected
    * @param IC             - PC-W3-5: Initial condition voltage (capload.c:46-51)
    * @param M              - PC-W3-6: Multiplicity factor (capload.c:44)
    * @param clampDiode     - Pre-constructed clamp diode sub-element
+   *
+   * The runtime diagnostic channel is installed by the engine via
+   * `setDiagnosticEmitter()` after construction (RuntimeDiagnosticAware).
    */
   constructor(
     capacitance: number,
     esr: number,
     rLeak: number,
     reverseMax: number,
-    emitDiagnostic: (diag: Diagnostic) => void,
     IC: number,
     M: number,
     clampDiode: PoolBackedAnalogElement,
@@ -321,8 +322,13 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
     this.reverseMax = reverseMax;
     this._IC = IC;
     this._M = M;
-    this._emitDiagnostic = emitDiagnostic;
     this._clampDiode = clampDiode;
+  }
+
+  /** RuntimeDiagnosticAware: engine wires this in MNAEngine.init() so that
+   *  reverse-biased-cap emissions reach coordinator.getRuntimeDiagnostics(). */
+  setDiagnosticEmitter(emit: (diag: Diagnostic) => void): void {
+    this._emitDiagnostic = emit;
   }
 
   setup(ctx: SetupContext): void {
@@ -615,7 +621,6 @@ function createPolarizedCapElement(
     p.esr,
     rLeak,
     p.reverseMax,
-    () => {},
     p.IC,
     p.M,
     clampDiode,

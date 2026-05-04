@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GraphicCard component- memory-mapped graphics framebuffer with double buffering.
  *
  * Inputs:
@@ -40,17 +40,17 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java GraphicCard uses GenericShape: 5 inputs (A, str, C, ld, B), 1 output (D), width=3
-// symmetric (1 output) → offs = floor(5/2) = 2
+// symmetric (1 output) â†’ offs = floor(5/2) = 2
 // Input positions: A@(0,0), str@(0,1), C@(0,2), ld@(0,3), B@(0,4)
 // Output position: D@(3,2)  [offs=2]
-// → COMP_WIDTH=3, COMP_HEIGHT=5
+// â†’ COMP_WIDTH=3, COMP_HEIGHT=5
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -273,8 +273,8 @@ export class GraphicCardElement extends AbstractCircuitElement {
 
   /**
    * Returns a snapshot of the display bank's pixel data.
-   * bank=false → bank 0 (indices 0..bankSize-1)
-   * bank=true  → bank 1 (indices bankSize..2*bankSize-1)
+   * bank=false â†’ bank 0 (indices 0..bankSize-1)
+   * bank=true  â†’ bank 1 (indices bankSize..2*bankSize-1)
    */
   getDisplayBank(bank: boolean): Uint32Array {
     const offset = bank ? this.bankSize : 0;
@@ -354,7 +354,7 @@ export function executeGraphicCard(
 }
 
 // ---------------------------------------------------------------------------
-// GRAPHIC_CARD_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag
+// GRAPHIC_CARD_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag
 // ---------------------------------------------------------------------------
 
 export const GRAPHIC_CARD_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -422,14 +422,14 @@ const GRAPHIC_CARD_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// GraphicCardDefinition- ComponentDefinition for registry registration
+// GraphicCardDefinition- StandaloneComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function graphicCardFactory(props: PropertyBag): GraphicCardElement {
   return new GraphicCardElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const GraphicCardDefinition: ComponentDefinition = {
+export const GraphicCardDefinition: StandaloneComponentDefinition = {
   name: "GraphicCard",
   typeId: -1,
   factory: graphicCardFactory,

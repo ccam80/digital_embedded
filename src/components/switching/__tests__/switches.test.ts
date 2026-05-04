@@ -21,17 +21,13 @@ import {
   executeSwitch,
   SwitchDefinition,
   SWITCH_ATTRIBUTE_MAPPINGS,
-  SwitchAnalogElement,
 } from "../switch.js";
-import type { SpstAnalogElement } from "../switch.js";
 import {
   SwitchDTElement,
   executeSwitchDT,
   SwitchDTDefinition,
   SWITCH_DT_ATTRIBUTE_MAPPINGS,
-  SwitchDTAnalogElement,
 } from "../switch-dt.js";
-import type { SpdtAnalogElement } from "../switch-dt.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
@@ -724,103 +720,111 @@ describe("RegistryAliases", () => {
 });
 
 // ===========================================================================
-// Analog Switch tests- use real setup path (W3 contract)
+// Analog Switch + SwitchDT tests- §4c migration, 2026-05-03
+//
+// The previous engine-impersonator block (`AnalogSwitch` / `AnalogSPDT`)
+// drove `el.setup(ctx)` and `el.load(ctx)` directly through hand-rolled
+// SetupContext/LoadContext mocks and asserted on the private SparseSolver
+// `_getInsertionOrder()` shape (TSTALLOC PP/PN/NP/NN sequence). That is a
+// §4 violation (no test calls element.setup()/element.load() directly) and
+// a §3 poison pattern (matrix-handle order is an engine-internal contract
+// already covered bit-exact by the ngspice harness). Per the §4a precedent
+// for inductor/capacitor, those engine-impersonator tests are deleted. In
+// their place: behavioural circuits routed through `buildFixture` that
+// observe Ron / Roff / NC inversion via DC operating-point node voltages.
+//
+// Integration test (`switched_resistor_divider`) is migrated 1:1 onto the
+// public surface: `buildFixture({ build })` + `coordinator.dcOperatingPoint()`
+// + `engine.getNodeVoltage(...)`.
 // ===========================================================================
 
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import {
-  makeSimpleCtx,
-} from "../../../solver/analog/__tests__/test-helpers.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Inline resistor helper- ssA.13 contract shape (no exported factory exists).
-// ---------------------------------------------------------------------------
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext): void {
-      const a = el._pinNodes.get("A")!;
-      const b = el._pinNodes.get("B")!;
-      if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
-      if (b !== 0) _hBB = ctx.solver.allocElement(b, b);
-      if (a !== 0 && b !== 0) {
-        _hAB = ctx.solver.allocElement(a, b);
-        _hBA = ctx.solver.allocElement(b, a);
-      }
-    },
-    load(ctx): void {
-      if (_hAA !== -1) ctx.solver.stampElement(_hAA,  G);
-      if (_hBB !== -1) ctx.solver.stampElement(_hBB,  G);
-      if (_hAB !== -1) ctx.solver.stampElement(_hAB, -G);
-      if (_hBA !== -1) ctx.solver.stampElement(_hBA, -G);
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
-  };
-  return el;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: build a SetupContext backed by a real SparseSolver.
-// Used to exercise setup() in isolation before calling load().
+// Circuit factories. SPST (Switch) and SPDT (SwitchDT) both expose the
+// `behavioral` analog model entry; setting `model: "behavioral"` overrides
+// the digital `defaultModel` so the analog factory wires into the unified
+// compiler. Ron / Roff plumb through the property bag.
 // ---------------------------------------------------------------------------
 
-function makeSetupCtx(solver: SparseSolver): { ctx: SetupContext; stateCount: () => number } {
-  // Initialize the solver structure before allocating elements.
-  // _initStructure() is called by CKTCircuitContext constructor in production;
-  // in test-only setup paths we must call it directly.
-  (solver as any)._initStructure();
-  let states = 0;
-  let nodeMax = 100;
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeMax; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeMax; },
-    allocStates(n: number): number {
-      const off = states;
-      states += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  return { ctx, stateCount: () => states };
-}
-
-function makeSpstProps(overrides: {
-  closed?: boolean;
+interface SpstDividerParams {
+  vSource: number;
+  closed: boolean;
   Ron?: number;
   Roff?: number;
   normallyClosed?: boolean;
-} = {}): PropertyBag {
-  const props = new PropertyBag();
-  props.set("closed", overrides.closed ?? false);
-  props.set("Ron", overrides.Ron ?? 1);
-  props.set("Roff", overrides.Roff ?? 1e9);
-  if (overrides.normallyClosed !== undefined) props.set("normallyClosed", overrides.normallyClosed);
-  return props;
+  rLoad?: number;
 }
 
-// ---------------------------------------------------------------------------
-// makeVsrc- DC voltage source helper
-// ---------------------------------------------------------------------------
-function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+function buildSpstDivider(facade: DefaultSimulatorFacade, p: SpstDividerParams): Circuit {
+  // VS → switch(A1→B1) → rload → GND. Closed: V(B1) ≈ Vs * rLoad/(Ron+rLoad);
+  // open: V(B1) ≈ Vs * rLoad/(Roff+rLoad) ≈ 0 for Roff=1e9 and rLoad=1k.
+  const swProps: Record<string, string | number | boolean> = {
+    label: "sw1",
+    model: "behavioral",
+    closed: p.closed,
+    Ron: p.Ron ?? 1,
+    Roff: p.Roff ?? 1e9,
+  };
+  if (p.normallyClosed !== undefined) swProps.normallyClosed = p.normallyClosed;
+  return facade.build({
+    components: [
+      { id: "vs",   type: "DcVoltageSource", props: { label: "vs1",   voltage: p.vSource } },
+      { id: "sw",   type: "Switch",          props: swProps },
+      { id: "rl",   type: "Resistor",        props: { label: "rl",    resistance: p.rLoad ?? 1000 } },
+      { id: "gnd",  type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "sw:A1"],
+      ["sw:B1",  "rl:pos"],
+      ["rl:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
+  });
+}
+
+interface SpdtDividerParams {
+  vSource: number;
+  closed: boolean;
+  Ron?: number;
+  Roff?: number;
+  rLoadB?: number;
+  rLoadC?: number;
+}
+
+function buildSpdtDivider(facade: DefaultSimulatorFacade, p: SpdtDividerParams): Circuit {
+  // VS → SPDT(A1) ; SPDT(B1) → rLoadB → GND ; SPDT(C1) → rLoadC → GND.
+  //
+  // SPDT semantics (switch-dt.ts SwitchDTAnalogElement): closed=true ⇒ AB
+  // closed (Ron) and AC open (Roff); closed=false ⇒ AB open and AC closed.
+  // With Vs=10V and rLoadB=rLoadC=1k:
+  //   closed=true  → V(B1) ≈ 10·1k/(1+1k) ≈ 9.99V , V(C1) ≈ 0V
+  //   closed=false → V(B1) ≈ 0V               , V(C1) ≈ 9.99V
+  return facade.build({
+    components: [
+      { id: "vs",   type: "DcVoltageSource", props: { label: "vs1",  voltage: p.vSource } },
+      { id: "sw",   type: "SwitchDT",        props: { label: "sw1",  model: "behavioral", closed: p.closed, Ron: p.Ron ?? 1, Roff: p.Roff ?? 1e9 } },
+      { id: "rb",   type: "Resistor",        props: { label: "rb",   resistance: p.rLoadB ?? 1000 } },
+      { id: "rc",   type: "Resistor",        props: { label: "rc",   resistance: p.rLoadC ?? 1000 } },
+      { id: "gnd",  type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "sw:A1"],
+      ["sw:B1",  "rb:pos"],
+      ["rb:neg", "gnd:out"],
+      ["sw:C1",  "rc:pos"],
+      ["rc:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
+  });
+}
+
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
 }
 
 describe("AnalogSwitch", () => {
@@ -831,257 +835,123 @@ describe("AnalogSwitch", () => {
     expect(SwitchDTDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
-  it("closed_stamps_ron", () => {
-    const props = makeSpstProps({ closed: true, Ron: 1 });
-    const el = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), props);
+  it("closed_conducts_via_ron", () => {
+    // Vs=10V, Ron=1Ω, rLoad=1kΩ. V(B1) = 10 * 1000 / (1 + 1000) ≈ 9.9900V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpstDivider(facade, {
+        vSource: 10, closed: true, Ron: 1, Roff: 1e9, rLoad: 1000,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    // Read insertion order BEFORE any further _initStructure calls.
-    const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(order).toHaveLength(4); // PP, PN, NP, NN
-
-    // Handles are private (ssA.9); verify setup ran via observable state fields.
-    expect(el._stateBase).toBeGreaterThanOrEqual(0);
-    expect(el.branchIndex).toBe(-1); // SW has no branch row
+    const vB = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
+    expect(vB).toBeCloseTo(10 * 1000 / 1001, 3);
   });
 
-  it("open_stamps_roff_conductance_is_smaller", () => {
-    const propsOpen = makeSpstProps({ closed: false, Roff: 1e9 });
-    const elOpen = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), propsOpen);
+  it("open_blocks_via_roff", () => {
+    // Vs=10V, Roff=1e9Ω, rLoad=1kΩ. V(B1) = 10 * 1000 / (1e9 + 1000) ≈ 1e-5V.
+    // The pull-down through rLoad to ground dominates; the open switch passes
+    // negligible current.
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpstDivider(facade, {
+        vSource: 10, closed: false, Ron: 1, Roff: 1e9, rLoad: 1000,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const propsClosed = makeSpstProps({ closed: true, Ron: 1 });
-    const elClosed = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), propsClosed);
-
-    const solverOpen = new SparseSolver();
-    const { ctx: ctxOpen } = makeSetupCtx(solverOpen);
-    elOpen.setup(ctxOpen);
-
-    const solverClosed = new SparseSolver();
-    const { ctx: ctxClosed } = makeSetupCtx(solverClosed);
-    elClosed.setup(ctxClosed);
-
-    // G_roff = 1/1e9 = 1e-9, G_ron = 1/1 = 1.0
-    // Both elements get the same TSTALLOC shape- 4 handles
-    const orderOpen = (solverOpen as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    const orderClosed = (solverClosed as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(orderOpen).toHaveLength(4);
-    expect(orderClosed).toHaveLength(4);
-    expect(orderOpen).toEqual(orderClosed);
+    const vB = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
+    // Strict observable: open-switch leakage gives V(B1) far below the
+    // closed-switch divider voltage. 1e-3 V is six orders below 9.99V.
+    expect(Math.abs(vB)).toBeLessThan(1e-3);
   });
 
-  it("toggle_changes_conductance", () => {
-    const props = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const el = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), props) as SpstAnalogElement;
+  it("normallyClosed_inverts_conductance", () => {
+    // closed=false + normallyClosed=true ⇒ effectively closed at rest, so
+    // V(B1) sits at the closed-divider voltage rather than the open one.
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpstDivider(facade, {
+        vSource: 10, closed: false, normallyClosed: true,
+        Ron: 1, Roff: 1e9, rLoad: 1000,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    const loadCtxClosed = makeSimpleCtx({ solver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(loadCtxClosed.loadCtx);
-
-    el.setClosed(false);
-    const loadCtxOpen = makeSimpleCtx({ solver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(loadCtxOpen.loadCtx);
-
-    // After toggle, _forcedState=null and _effectivelyClosed=false, so Roff applies.
-    // Verify setup ran (public field) and no branch row allocated (SW topology).
-    expect(el._stateBase).toBeGreaterThanOrEqual(0);
-    expect(el.branchIndex).toBe(-1);
+    const vB = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
+    expect(vB).toBeCloseTo(10 * 1000 / 1001, 3);
   });
 
-  it("normallyClosed_inverts_analog_conductance", () => {
-    const props = new PropertyBag();
-    props.set("closed", false);       // user state: not pressed
-    props.set("normallyClosed", true); // NC: effectively closed at rest
-    props.set("Ron", 1);
-    props.set("Roff", 1e9);
+  it("ron_value_propagates_to_divider_voltage", () => {
+    // Ron=100Ω → V(B1) = 10 * 1000/1100 ≈ 9.0909V (clearly distinct from
+    // Ron=1's 9.9900V). Proves Ron property plumbs through to the analog
+    // model rather than being silently ignored.
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpstDivider(facade, {
+        vSource: 10, closed: true, Ron: 100, Roff: 1e9, rLoad: 1000,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const el = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), props);
-
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    // NC + closed=false → effectively closed → handles allocated at PP,PN,NP,NN
-    const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(order).toHaveLength(4);
-    expect(order[0]).toEqual({ extRow: 1, extCol: 1 }); // PP
-    expect(order[1]).toEqual({ extRow: 1, extCol: 2 }); // PN
-    expect(order[2]).toEqual({ extRow: 2, extCol: 1 }); // NP
-    expect(order[3]).toEqual({ extRow: 2, extCol: 2 }); // NN
-  });
-
-  it("setup_allocates_2_state_slots", () => {
-    const props = makeSpstProps();
-    const el = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), props);
-
-    const solver = new SparseSolver();
-    const { ctx, stateCount } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    expect(stateCount()).toBe(2); // SW_NUM_STATES = 2
-    expect(el._stateBase).toBe(0);
-  });
-
-  it("tstalloc_sequence_pp_pn_np_nn", () => {
-    const props = makeSpstProps({ closed: false });
-    const el = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), props);
-
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(order).toEqual([
-      { extRow: 1, extCol: 1 }, // PP
-      { extRow: 1, extCol: 2 }, // PN
-      { extRow: 2, extCol: 1 }, // NP
-      { extRow: 2, extCol: 2 }, // NN
-    ]);
+    const vB = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
+    expect(vB).toBeCloseTo(10 * 1000 / 1100, 3);
   });
 });
 
 describe("AnalogSPDT", () => {
-  it("common_to_c_when_open", () => {
-    // closed=false → SW_AB has Roff (open), SW_AC has Ron (closed)
-    const props = new PropertyBag();
-    props.set("closed", false);
-    props.set("Ron", 1);
-    props.set("Roff", 1e9);
+  it("closed_routes_to_b", () => {
+    // closed=true ⇒ AB closed (Ron), AC open (Roff). V(B1) ≈ 9.99V, V(C1) ≈ 0.
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpdtDivider(facade, {
+        vSource: 10, closed: true, Ron: 1, Roff: 1e9,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const el = new SwitchDTAnalogElement(new Map([["A1", 1], ["B1", 2], ["C1", 3]]), props) as SpdtAnalogElement;
-
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    // 8 handles total: 4 for SW_AB + 4 for SW_AC
-    const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(order).toHaveLength(8);
-    // SW_AB sequence: (1,1),(1,2),(2,1),(2,2)
-    expect(order[0]).toEqual({ extRow: 1, extCol: 1 });
-    expect(order[1]).toEqual({ extRow: 1, extCol: 2 });
-    expect(order[2]).toEqual({ extRow: 2, extCol: 1 });
-    expect(order[3]).toEqual({ extRow: 2, extCol: 2 });
-    // SW_AC sequence: (1,1),(1,3),(3,1),(3,3)
-    expect(order[4]).toEqual({ extRow: 1, extCol: 1 });
-    expect(order[5]).toEqual({ extRow: 1, extCol: 3 });
-    expect(order[6]).toEqual({ extRow: 3, extCol: 1 });
-    expect(order[7]).toEqual({ extRow: 3, extCol: 3 });
+    const vB = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
+    const vC = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:C1"));
+    expect(vB).toBeCloseTo(10 * 1000 / 1001, 3);
+    expect(Math.abs(vC)).toBeLessThan(1e-3);
   });
 
-  it("common_to_b_when_closed", () => {
-    // closed=true → SW_AB has Ron (closed), SW_AC has Roff (open)
-    const props = new PropertyBag();
-    props.set("closed", true);
-    props.set("Ron", 1);
-    props.set("Roff", 1e9);
+  it("open_routes_to_c", () => {
+    // closed=false ⇒ AB open (Roff), AC closed (Ron). V(B1) ≈ 0, V(C1) ≈ 9.99V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpdtDivider(facade, {
+        vSource: 10, closed: false, Ron: 1, Roff: 1e9,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const el = new SwitchDTAnalogElement(new Map([["A1", 1], ["B1", 2], ["C1", 3]]), props);
-
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(order).toHaveLength(8);
-  });
-
-  it("spdt_tstalloc_sequence_8_entries", () => {
-    // PB-SW-DT: SW_AB 4 entries then SW_AC 4 entries
-    const props = new PropertyBag();
-    props.set("closed", false);
-    props.set("Ron", 1);
-    props.set("Roff", 1e9);
-
-    const el = new SwitchDTAnalogElement(new Map([["A1", 1], ["B1", 2], ["C1", 3]]), props);
-
-    const solver = new SparseSolver();
-    const { ctx } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
-    expect(order).toEqual([
-      // SW_AB- swsetup.c:59-62, first pass (posNode=1, negNode=2)
-      { extRow: 1, extCol: 1 }, // swAB._hPP
-      { extRow: 1, extCol: 2 }, // swAB._hPN
-      { extRow: 2, extCol: 1 }, // swAB._hNP
-      { extRow: 2, extCol: 2 }, // swAB._hNN
-      // SW_AC- swsetup.c:59-62, second pass (posNode=1, negNode=3)
-      { extRow: 1, extCol: 1 }, // swAC._hPP
-      { extRow: 1, extCol: 3 }, // swAC._hPN
-      { extRow: 3, extCol: 1 }, // swAC._hNP
-      { extRow: 3, extCol: 3 }, // swAC._hNN
-    ]);
-  });
-
-  it("spdt_setup_allocates_4_state_slots", () => {
-    const props = new PropertyBag();
-    props.set("closed", false);
-    props.set("Ron", 1);
-    props.set("Roff", 1e9);
-
-    const el = new SwitchDTAnalogElement(new Map([["A1", 1], ["B1", 2], ["C1", 3]]), props);
-
-    const solver = new SparseSolver();
-    const { ctx, stateCount } = makeSetupCtx(solver);
-    el.setup(ctx);
-
-    expect(stateCount()).toBe(4); // 2 per sub-element × 2 sub-elements
+    const vB = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
+    const vC = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:C1"));
+    expect(Math.abs(vB)).toBeLessThan(1e-3);
+    expect(vC).toBeCloseTo(10 * 1000 / 1001, 3);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Integration test- switched resistor divider using makeSimpleCtx + solveDcOp
-//
-// SwitchAnalogElement.setup() is called after CKTCircuitContext construction
-// (which calls _initStructure), ensuring handles are valid before load().
-// makeDcVoltageSource and the local makeResistor follow the ssA.13 contract:
-// handles are allocated in setup(), stamped in load().
+// Integration- switched resistor divider via the public engine surface.
+// 10V → Switch (closed, Ron=1Ω) → 1kΩ → GND. V across R = 10·1000/1001 ≈ 9.99V.
+// (Replaces the previous makeSimpleCtx / solveDcOp / hand-rolled-elements
+// approach; semantics-preserving 1:1 migration.)
 // ---------------------------------------------------------------------------
-
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 
 describe("Integration", () => {
   it("switched_resistor_divider", () => {
-    // 10V → SPST switch (closed, Ron=1Ω) → 1kΩ → ground
-    // DC OP: V across R = 10 * 1000/1001 ≈ 9.99V
-    //
-    // matrixSize=3: node1(1), node2(2), branch-row for vs(3).
-    // startBranch=3 so makeCur() assigns row 3 to the voltage source.
-
-    const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const swEl = new SwitchAnalogElement(
-      new Map([["A1", 1], ["B1", 2]]),
-      switchProps,
-    ) as SpstAnalogElement;
-
-    const vs = makeVsrc(1, 0, 10);  // 10V: node1→gnd
-    const r = makeResistor(2, 0, 1000);          // 1kΩ: node2→gnd
-
-    const solver = new SparseSolver();
-
-    // makeSimpleCtx constructs CKTCircuitContext (calls _initStructure), then runs
-    // setupAll on all elements. startBranch=3 places the voltage-source branch row
-    // at index 3, matching matrixSize=3.
-    const ctx = makeSimpleCtx({
-      solver,
-      elements: [vs as unknown as AnalogElement, swEl as unknown as AnalogElement, r as unknown as AnalogElement],
-      nodeCount: 2,
-      matrixSize: 3,
-      branchCount: 1,
-      startBranch: 3,
+    const fix = buildFixture({
+      build: (_r, facade) => buildSpstDivider(facade, {
+        vSource: 10, closed: true, Ron: 1, Roff: 1e9, rLoad: 1000,
+      }),
     });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    // dcopVoltages (aliased by dcopResult.nodeVoltages) holds the final DC OP solution.
-    const vAcrossR = ctx.dcopResult.nodeVoltages[2];
+    const vAcrossR = fix.engine.getNodeVoltage(nodeOf(fix, "sw1:B1"));
     expect(vAcrossR).toBeGreaterThan(9.98);
     expect(vAcrossR).toBeLessThanOrEqual(10.0);
   });

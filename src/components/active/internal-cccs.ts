@@ -18,7 +18,7 @@
  *   G[neg, b_sense] -= gain
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -49,13 +49,8 @@ const INTERNAL_CCCS_PIN_LAYOUT: PinDeclaration[] = [
 // InternalCccsElement
 // ---------------------------------------------------------------------------
 
-export class InternalCccsElement implements AnalogElement {
+export class InternalCccsElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   /** Gain (CTR). Hot-loadable via setParam("gain", v). */
   private _gain: number;
@@ -70,7 +65,7 @@ export class InternalCccsElement implements AnalogElement {
   private _hNegSense = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._gain = props.hasModelParam("gain") ? props.getModelParam<number>("gain") : 1;
     // siblingBranch resolution: compiler stamps "${parentLabel}:${subName}"
     // into the regular prop partition (compiler.ts:391-394).

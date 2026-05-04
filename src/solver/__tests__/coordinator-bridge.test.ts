@@ -4,258 +4,140 @@
  * Verifies that DefaultSimulationCoordinator uses BridgeOutputAdapter and
  * BridgeInputAdapter from compiledAnalog.bridgeAdaptersByGroupId instead of
  * inline voltage read/write logic.
+ *
+ * §4-compliant: every test reaches the bridge adapter through a fully
+ * compiled & warm-started fixture (`buildFixture`). Adapter-only property
+ * checks (`rOut`, threshold reads, hot-load setParam) call methods that are
+ * pure reads with no engine-state side effects, so they remain
+ * adapter-direct. Anything that touches MNA stamping / RHS values is
+ * observed at the engine boundary by stepping the real coordinator and
+ * reading node voltages.
  */
 
-import { describe, it, expect } from "vitest";
-import { DefaultSimulationCoordinator } from "../coordinator.js";
-import { makeBridgeOutputAdapter, makeBridgeInputAdapter } from "../analog/bridge-adapter.js";
+import { describe, it, expect, vi } from "vitest";
 import type { BridgeOutputAdapter, BridgeInputAdapter } from "../analog/bridge-adapter.js";
-import { ConcreteCompiledAnalogCircuit } from "../analog/compiled-analog-circuit.js";
-import { StatePool } from "../analog/state-pool.js";
-import type { FlatComponentLayout } from "../digital/compiled-circuit.js";
-import type { CompiledCircuitUnified, BridgeAdapter } from "../../compile/types.js";
-import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import { MODEDCOP, MODEINITFLOAT } from "../analog/ckt-mode.js";
-import { SparseSolver } from "../analog/sparse-solver.js";
-import { loadCtxFromFields } from "../analog/__tests__/test-helpers.js";
-
-const CMOS: ResolvedPinElectrical = {
-  rOut: 50, cOut: 0, rIn: 1e7, cIn: 0,
-  vOH: 3.3, vOL: 0.0, vIH: 2.0, vIL: 0.8, rHiZ: 1e9,
-};
-
-// Adapter node and branch assignments used throughout
-const NODE_ID = 1;
-const BRANCH_IDX = 2;
+import type { ConcreteCompiledAnalogCircuit } from "../analog/compiled-analog-circuit.js";
+import { buildFixture } from "../analog/__tests__/fixtures/build-fixture.js";
+import type { Fixture } from "../analog/__tests__/fixtures/build-fixture.js";
+import { BitVector } from "../../core/signal.js";
 
 // ---------------------------------------------------------------------------
-// makeCtx helper
+// Real digital→analog bridge fixture
 // ---------------------------------------------------------------------------
-
-function makeCtx(solver: SparseSolver, rhs?: Float64Array) {
-  const rhsBuf = rhs ?? new Float64Array(8);
-  return loadCtxFromFields({
-    solver: solver as any,
-    rhs: rhsBuf,
-    rhsOld: rhsBuf,
-    matrix: solver as any,
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    dt: 0,
-    method: 'trapezoidal' as const,
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    time: 0,
-    temp: 300.15,
-    vt: 0.025852,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Minimal mock engines
-// ---------------------------------------------------------------------------
-
-function makeMockAnalogEngine(initialVoltage = 0) {
-  let _nodeVoltage = initialVoltage;
-  let _simTime = 0;
-  return {
-    get simTime() { return _simTime; },
-    getNodeVoltage(_nodeId: number) { return _nodeVoltage; },
-    setNodeVoltage(v: number) { _nodeVoltage = v; },
-    addBreakpoint(_t: number) {},
-    step() { _simTime += 1e-6; },
-    start() {}, stop() {}, reset() {}, dispose() {},
-    init(_c: unknown) {},
-    getState() { return 0; },
-    dcOperatingPoint() {
-      return { converged: true, method: 'direct' as const, iterations: 1, nodeVoltages: new Float64Array(4), diagnostics: [] };
-    },
-    acAnalysis(_p: unknown) { return null; },
-    configure(_p: unknown) {},
-    getElementCurrent(_i: number) { return 0; },
-    getBranchCurrent(_i: number) { return 0; },
-    getElementPower(_i: number) { return 0; },
-    getElementPinCurrents(_i: number): number[] { return []; },
-    onDiagnostic: undefined,
-  };
-}
-
-function makeMockDigitalEngine(initialNetValue = 0) {
-  const signals: Record<number, number> = { 0: initialNetValue };
-  return {
-    getSignalRaw(netId: number) { return signals[netId] ?? 0; },
-    setSignalValue(netId: number, bv: unknown) {
-      const raw = typeof bv === 'object' && bv !== null && 'raw' in bv
-        ? (bv as { raw: number }).raw
-        : (bv as number);
-      signals[netId] = raw;
-    },
-    step() {},
-    start() {}, stop() {}, reset() {}, dispose() {},
-    init(_c: unknown) {},
-    getState() { return 0; },
-    microStep() {},
-    runToBreak() {},
-    saveSnapshot() { return 0; },
-    restoreSnapshot(_id: number) {},
-    getSignalArray() { return new Uint32Array(4); },
-    addChangeListener(_l: unknown) {},
-    removeChangeListener(_l: unknown) {},
-    addMeasurementObserver(_o: unknown) {},
-    removeMeasurementObserver(_o: unknown) {},
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Build a minimal CompiledCircuitUnified for bridge testing
-// ---------------------------------------------------------------------------
-
-type MockAnalogEngine = ReturnType<typeof makeMockAnalogEngine>;
-type MockDigitalEngine = ReturnType<typeof makeMockDigitalEngine>;
+//
+// Topology:
+//
+//   In(A) ──out──► Rload(50Ω) ──► node_X ──► Rpull(1MΩ) ──► Ground
+//
+// The `In` component has only a digital model; the `Rload` resistor has only
+// an analog model. The wire between `A:out` and `Rload:pos` therefore
+// produces a real cross-domain boundary group, which the unified compiler
+// turns into a `BridgeOutputAdapter` (digital→analog direction).
+//
+// `Rpull = 1MΩ` to ground gives every test an *observable* analog node
+// voltage at `Rload:neg`:
+//
+//   * Driven HIGH:  V(node_X) ≈ vOH · Rpull / (rOut + Rload + Rpull) ≈ vOH
+//                   (rOut + Rload ≪ Rpull, so the divider barely loads it)
+//   * Driven LOW:   V(node_X) ≈ 0 V
+//   * Hi-Z:         V(node_X) ≈ 0 V (only the pull-down to ground; the
+//                   bridge contributes no current)
+//
+// The contrast between driven-HIGH (≈ vOH) and Hi-Z (≈ 0 V) is the
+// observable proof that `setHighZ(true)` disables the bridge's current
+// contribution at the engine surface — without ever calling
+// `outputAdapter.setup()` or `outputAdapter.load()` directly.
 
 interface BridgeFixture {
-  unified: CompiledCircuitUnified;
-  outputAdapter: BridgeOutputAdapter;
-  inputAdapter: BridgeInputAdapter;
-  mockAnalog: MockAnalogEngine;
-  mockDigital: MockDigitalEngine;
+  readonly fix: Fixture;
+  readonly outputAdapter: BridgeOutputAdapter;
+  readonly inputAdapter: BridgeInputAdapter | undefined;
+  readonly nodeXId: number;
+  readonly inputNetId: number;
+  readonly bitWidth: number;
 }
-
-function buildBridgeFixture(
-  direction: BridgeAdapter['direction'],
-  initialAnalogVoltage = 0,
-  initialDigitalValue = 0,
-): BridgeFixture {
-  const BOUNDARY_GROUP_ID = 42;
-  const DIGITAL_NET_ID = 0;
-  const ANALOG_NODE_ID = 1;
-  const BIT_WIDTH = 1;
-
-  const outputAdapter = makeBridgeOutputAdapter(CMOS, ANALOG_NODE_ID, BRANCH_IDX, false);
-  const inputAdapter = makeBridgeInputAdapter(CMOS, ANALOG_NODE_ID, false);
-
-  const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> =
-    direction === 'digital-to-analog' ? [outputAdapter] : [inputAdapter];
-
-  const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>([
-    [BOUNDARY_GROUP_ID, adapters],
-  ]);
-
-  const compiledAnalog = new ConcreteCompiledAnalogCircuit({
-    nodeCount: 1,
-    elements: [],
-    labelToNodeId: new Map(),
-    wireToNodeId: new Map(),
-    models: new Map(),
-    elementToCircuitElement: new Map(),
-    bridgeAdaptersByGroupId,
-    statePool: new StatePool(0),
-  });
-
-  const bridge: BridgeAdapter = {
-    boundaryGroupId: BOUNDARY_GROUP_ID,
-    digitalNetId: DIGITAL_NET_ID,
-    analogNodeId: ANALOG_NODE_ID,
-    direction,
-    bitWidth: BIT_WIDTH,
-    electricalSpec: {
-      rOut: CMOS.rOut,
-      vOH: CMOS.vOH,
-      vOL: CMOS.vOL,
-      vIH: CMOS.vIH,
-      vIL: CMOS.vIL,
-    },
-  };
-
-  const mockAnalog = makeMockAnalogEngine(initialAnalogVoltage);
-  const mockDigital = makeMockDigitalEngine(initialDigitalValue);
-
-  const minimalLayout: FlatComponentLayout = {
-    inputCount: () => 0,
-    inputOffset: () => 0,
-    outputCount: () => 0,
-    outputOffset: () => 0,
-    stateOffset: () => 0,
-    getSwitchClassification: () => 0,
-    getProperty: () => undefined,
-    wiringTable: new Int32Array(0),
-    setSwitchClassification: () => {},
-  } as unknown as FlatComponentLayout;
-
-  const unified: CompiledCircuitUnified = {
-    digital: {
-      netCount: 1,
-      componentCount: 0,
-      totalStateSlots: 0,
-      signalArraySize: 1,
-      typeIds: new Uint16Array(0),
-      executeFns: [],
-      sampleFns: [],
-      wiringTable: new Int32Array(0),
-      layout: minimalLayout,
-      evaluationOrder: [],
-      sequentialComponents: new Uint32Array(0),
-      netWidths: new Uint8Array([1]),
-      sccSnapshotBuffer: new Uint32Array(0),
-      delays: new Uint32Array(0),
-      componentToElement: new Map(),
-      wireToNetId: new Map(),
-      pinNetMap: new Map(),
-      resetComponentIndices: new Uint32Array(0),
-      busResolver: null,
-      multiDriverNets: new Set(),
-      switchComponentIndices: new Uint32Array(0),
-      switchClassification: new Uint8Array(0),
-      shadowNetCount: 0,
-      typeNames: [],
-    } as unknown as import('../../compile/types.js').CompiledDigitalDomain,
-    analog: compiledAnalog,
-    bridges: [bridge],
-    wireSignalMap: new Map(),
-    labelSignalMap: new Map(),
-    labelToCircuitElement: new Map(),
-    pinSignalMap: new Map(),
-    diagnostics: [],
-    allCircuitElements: [],
-  };
-
-  return { unified, outputAdapter, inputAdapter, mockAnalog, mockDigital };
-}
-
-// ---------------------------------------------------------------------------
-// TestableCoordinator — injects mock engines post-construction
-// ---------------------------------------------------------------------------
 
 /**
- * DefaultSimulationCoordinator constructs real DigitalEngine and MNAEngine
- * internally. This subclass overrides getDigitalEngine/getAnalogEngine so
- * that _stepMixed (which uses those accessors... but actually uses the private
- * fields _digital and _analog) cannot be redirected at the accessor level.
- *
- * For this test suite we therefore test the bridge adapter logic directly
- * rather than through the full _stepMixed path, which would require a real
- * compiled circuit. We verify:
- *   1. The adapters are correctly placed in bridgeAdaptersByGroupId.
- *   2. The adapter API (readLogicLevel, setLogicLevel, setParam, setHighZ)
- *      works as the coordinator would call it.
- *   3. The coordinator constructor successfully resolves adapters from
- *      bridgeAdaptersByGroupId by constructing a coordinator with the fixture.
+ * Build a real mixed-signal fixture and return the (single) bridge adapter
+ * the unified compiler produced. Used by every digital→analog test below.
  */
-class TestableCoordinator extends DefaultSimulationCoordinator {
-  constructor(unified: CompiledCircuitUnified) {
-    super(unified);
+function buildOutputBridgeFixture(): BridgeFixture {
+  const fix = buildFixture({
+    build: (_registry, facade) => facade.build({
+      components: [
+        { id: 'A',     type: 'In',       props: { label: 'A', bitWidth: 1 } },
+        { id: 'Rload', type: 'Resistor', props: { label: 'Rload', resistance: 50 } },
+        { id: 'Rpull', type: 'Resistor', props: { label: 'Rpull', resistance: 1e6 } },
+        { id: 'gnd',   type: 'Ground' },
+      ],
+      connections: [
+        ['A:out',     'Rload:pos'],   // digital→analog boundary
+        ['Rload:neg', 'Rpull:pos'],
+        ['Rpull:neg', 'gnd:out'],
+      ],
+    }),
+  });
+
+  const compiled = fix.coordinator.compiled;
+  expect(compiled.bridges.length).toBeGreaterThan(0);
+  const bridge = compiled.bridges.find(b => b.direction === 'digital-to-analog');
+  if (bridge === undefined) {
+    throw new Error('buildOutputBridgeFixture: no digital-to-analog bridge produced');
   }
+
+  const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
+  const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId);
+  if (adapters === undefined) {
+    throw new Error(`buildOutputBridgeFixture: no adapters for group ${bridge.boundaryGroupId}`);
+  }
+  const outputAdapter = adapters.find(
+    (a): a is BridgeOutputAdapter => 'setLogicLevel' in a,
+  );
+  if (outputAdapter === undefined) {
+    throw new Error('buildOutputBridgeFixture: bridge has no BridgeOutputAdapter');
+  }
+  const inputAdapter = adapters.find(
+    (a): a is BridgeInputAdapter => 'readLogicLevel' in a,
+  );
+
+  // node_X = analog side of the bridge = `Rload:pos`. We assert via
+  // `Rload:neg` (the same net under DCOP because the path from Rload:pos to
+  // node_X is just the resistor; with Rpull=1MΩ ≫ Rload=50Ω the divider
+  // makes V(Rload:neg) within 50 ppm of V(Rload:pos) when driven HIGH).
+  // We read the bridge's own analog node directly via getAnalogNodeVoltage.
+
+  return {
+    fix,
+    outputAdapter,
+    inputAdapter,
+    nodeXId: bridge.analogNodeId,
+    inputNetId: bridge.digitalNetId,
+    bitWidth: bridge.bitWidth,
+  };
+}
+
+/**
+ * Step the coordinator until the analog node voltage at `nodeId` settles to
+ * within `tol` of itself across two consecutive steps, or `maxSteps` runs
+ * out. Returns the final voltage. Centralises the warm-start advance so
+ * each test reads a steady-state value rather than a transient sample.
+ */
+function stepToSteadyState(
+  fix: Fixture,
+  nodeId: number,
+  maxSteps = 200,
+  tol = 1e-6,
+): number {
+  const analog = fix.coordinator.getAnalogEngine();
+  if (analog === null) throw new Error('stepToSteadyState: no analog engine');
+  let prev = analog.getNodeVoltage(nodeId);
+  for (let i = 0; i < maxSteps; i++) {
+    fix.coordinator.step();
+    const cur = analog.getNodeVoltage(nodeId);
+    if (Math.abs(cur - prev) < tol) return cur;
+    prev = cur;
+  }
+  return prev;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,152 +145,254 @@ class TestableCoordinator extends DefaultSimulationCoordinator {
 // ---------------------------------------------------------------------------
 
 describe('bridge adapter: digital output drives analog node', () => {
-  it('outputAdapter.setLogicLevel(true) drives vOH on the branch RHS', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const solver = new SparseSolver();
-    solver._initStructure();
-    outputAdapter.setLogicLevel(true);
-    solver._resetForAssembly();
-    outputAdapter.load(makeCtx(solver));
-  });
-
   it('outputAdapter rOut matches CMOS spec (drive impedance for vOH)', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(outputAdapter.rOut).toBe(CMOS.rOut);
+    const { outputAdapter, fix } = buildOutputBridgeFixture();
+    // Default CMOS family rOut = 50Ω (set in src/core/pin-electrical.ts).
+    expect(outputAdapter.rOut).toBe(50);
+    fix.coordinator.dispose();
   });
 
-  it('outputAdapter outputNodeId matches analog node ID assigned at construction', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(outputAdapter.outputNodeId).toBe(NODE_ID);
+  it('outputAdapter outputNodeId matches the bridge descriptor analogNodeId', () => {
+    const { outputAdapter, nodeXId, fix } = buildOutputBridgeFixture();
+    expect(outputAdapter.outputNodeId).toBe(nodeXId);
+    fix.coordinator.dispose();
   });
 
-  it('outputAdapter in bridgeAdaptersByGroupId is the exact same instance', () => {
-    const { unified, outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const compiledAnalog = unified.analog as ConcreteCompiledAnalogCircuit;
-    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(42)!;
+  it('outputAdapter in bridgeAdaptersByGroupId is the exact same instance the coordinator resolved', () => {
+    const { fix, outputAdapter } = buildOutputBridgeFixture();
+    const compiled = fix.coordinator.compiled;
+    const bridge = compiled.bridges.find(b => b.direction === 'digital-to-analog')!;
+    const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
+    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
     const found = adapters.find((a): a is BridgeOutputAdapter => 'setLogicLevel' in a);
     expect(found).toBe(outputAdapter);
+    fix.coordinator.dispose();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Test 2: analog voltage thresholds to digital via bridge input adapter
+// Test 2: analog→digital threshold semantics live on the input adapter
 // ---------------------------------------------------------------------------
+//
+// These are pure-read property tests on the adapter API, with no
+// engine-state side effects. To exercise the analog→digital direction we
+// hand-build a one-off fixture inline (Resistor divider drives an `Out`
+// pin, which has only a digital model — that wire becomes the boundary).
+
+function buildInputBridgeFixture(): {
+  fix: Fixture;
+  inputAdapter: BridgeInputAdapter;
+} {
+  const fix = buildFixture({
+    build: (_registry, facade) => facade.build({
+      components: [
+        { id: 'vs',  type: 'DcVoltageSource', props: { label: 'VS', voltage: 3.3 } },
+        { id: 'r',   type: 'Resistor',        props: { label: 'R', resistance: 1000 } },
+        { id: 'Y',   type: 'Out',             props: { label: 'Y', bitWidth: 1 } },
+        { id: 'gnd', type: 'Ground' },
+      ],
+      connections: [
+        ['vs:pos', 'r:pos'],
+        ['r:neg',  'Y:in'],   // analog→digital boundary
+        ['vs:neg', 'gnd:out'],
+      ],
+    }),
+  });
+  const compiled = fix.coordinator.compiled;
+  const bridge = compiled.bridges.find(b => b.direction === 'analog-to-digital');
+  if (bridge === undefined) {
+    throw new Error('buildInputBridgeFixture: no analog-to-digital bridge produced');
+  }
+  const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
+  const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
+  const inputAdapter = adapters.find((a): a is BridgeInputAdapter => 'readLogicLevel' in a);
+  if (inputAdapter === undefined) {
+    throw new Error('buildInputBridgeFixture: bridge has no BridgeInputAdapter');
+  }
+  return { fix, inputAdapter };
+}
 
 describe('bridge adapter: analog voltage thresholds to digital via inputAdapter', () => {
   it('voltage above vIH → readLogicLevel returns true (logic 1)', () => {
-    const { inputAdapter } = buildBridgeFixture('analog-to-digital');
-    expect(inputAdapter.readLogicLevel(CMOS.vIH + 0.5)).toBe(true);
+    const { inputAdapter, fix } = buildInputBridgeFixture();
+    // Default CMOS vIH = 2.0V (src/core/pin-electrical.ts).
+    expect(inputAdapter.readLogicLevel(2.5)).toBe(true);
+    fix.coordinator.dispose();
   });
 
   it('voltage below vIL → readLogicLevel returns false (logic 0)', () => {
-    const { inputAdapter } = buildBridgeFixture('analog-to-digital');
-    expect(inputAdapter.readLogicLevel(CMOS.vIL - 0.1)).toBe(false);
+    const { inputAdapter, fix } = buildInputBridgeFixture();
+    // Default CMOS vIL = 0.8V.
+    expect(inputAdapter.readLogicLevel(0.5)).toBe(false);
+    fix.coordinator.dispose();
   });
 
   it('voltage in indeterminate band → readLogicLevel returns undefined', () => {
-    const { inputAdapter } = buildBridgeFixture('analog-to-digital');
-    const midVoltage = (CMOS.vIH + CMOS.vIL) / 2;
-    expect(inputAdapter.readLogicLevel(midVoltage)).toBeUndefined();
+    const { inputAdapter, fix } = buildInputBridgeFixture();
+    expect(inputAdapter.readLogicLevel(1.4)).toBeUndefined();
+    fix.coordinator.dispose();
   });
 
-  it('inputAdapter in bridgeAdaptersByGroupId is the exact same instance', () => {
-    const { unified, inputAdapter } = buildBridgeFixture('analog-to-digital');
-    const compiledAnalog = unified.analog as ConcreteCompiledAnalogCircuit;
-    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(42)!;
+  it('inputAdapter in bridgeAdaptersByGroupId is the exact same instance the coordinator resolved', () => {
+    const { fix, inputAdapter } = buildInputBridgeFixture();
+    const compiled = fix.coordinator.compiled;
+    const bridge = compiled.bridges.find(b => b.direction === 'analog-to-digital')!;
+    const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
+    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
     const found = adapters.find((a): a is BridgeInputAdapter => 'readLogicLevel' in a);
     expect(found).toBe(inputAdapter);
+    fix.coordinator.dispose();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Test 3: setParam("rOut") on bridge adapter updates loading
+// Test 3: setParam updates electrical parameters
 // ---------------------------------------------------------------------------
 
 describe('bridge adapter: setParam updates electrical parameters', () => {
   it('setParam("rOut", newValue) changes rOut on outputAdapter', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(outputAdapter.rOut).toBe(CMOS.rOut);
+    const { outputAdapter, fix } = buildOutputBridgeFixture();
+    const before = outputAdapter.rOut;
     outputAdapter.setParam('rOut', 100);
     expect(outputAdapter.rOut).toBe(100);
+    expect(outputAdapter.rOut).not.toBe(before);
+    fix.coordinator.dispose();
   });
 
   it('setParam("rIn", newValue) changes rIn on inputAdapter', () => {
-    const { inputAdapter } = buildBridgeFixture('analog-to-digital');
-    expect(inputAdapter.rIn).toBe(CMOS.rIn);
+    const { inputAdapter, fix } = buildInputBridgeFixture();
+    const before = inputAdapter.rIn;
     inputAdapter.setParam('rIn', 5e6);
     expect(inputAdapter.rIn).toBe(5e6);
-  });
-
-  it('setParam("vOH") on outputAdapter changes the branch RHS when stamped high', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const solver = new SparseSolver();
-    solver._initStructure();
-    outputAdapter.setLogicLevel(true);
-    outputAdapter.setParam('vOH', 5.0);
-    solver._resetForAssembly();
-    outputAdapter.load(makeCtx(solver));
-  });
-
-  it('coordinator constructor resolves bridge adapters from bridgeAdaptersByGroupId', () => {
-    const { unified, outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const coordinator = new TestableCoordinator(unified);
-    const compiledAnalog = coordinator.compiled.analog as ConcreteCompiledAnalogCircuit;
-    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(42)!;
-    expect(adapters).toContain(outputAdapter);
-    coordinator.dispose();
+    expect(inputAdapter.rIn).not.toBe(before);
+    fix.coordinator.dispose();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Test 4: hi-z output stops driving analog node
+// Test 4: hi-Z output stops driving analog node
+//
+// These are the §4-compliant rewrites of the deleted direct-`.load()` /
+// direct-`.setup()` engine-impersonator tests. The driven-HIGH vs Hi-Z
+// contrast is observed at the engine boundary — `analog.getNodeVoltage()`
+// after stepping the real coordinator to steady state.
 // ---------------------------------------------------------------------------
 
-describe('bridge adapter: hi-z output stops driving analog node', () => {
-  it('setHighZ(true) switches branch equation to I=0 mode', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    outputAdapter.setHighZ(true);
-    const solver = new SparseSolver();
-    solver._initStructure();
-    const rhs = new Float64Array(8);
-    solver._resetForAssembly();
-    outputAdapter.load(makeCtx(solver, rhs));
-    // Hi-Z mode: branch RHS must be 0
-    expect(rhs[BRANCH_IDX]).toBe(0);
-    // Hi-Z mode: stamp(branchIdx, branchIdx, 1)
-    const entries = solver.getCSCNonZeros();
-    expect(entries.some(e => e.row === BRANCH_IDX && e.col === BRANCH_IDX && e.value === 1)).toBe(true);
+describe('bridge adapter: hi-Z output stops driving analog node', () => {
+  it('setHighZ(true) collapses analog node voltage from ~vOH to ~0V (vs driven HIGH)', () => {
+    const f = buildOutputBridgeFixture();
+
+    // 1. Driven HIGH baseline: digital `A` = 1, hi-Z = false.
+    f.fix.coordinator.writeByLabel('A', { type: 'digital', value: 1 });
+    f.outputAdapter.setHighZ(false);
+    const vDrivenHigh = stepToSteadyState(f.fix, f.nodeXId);
+
+    // CMOS vOH = 3.3V; the resistor divider rOut=50Ω, Rload=50Ω, Rpull=1MΩ
+    // so V(node_X) = vOH · 1e6 / (50 + 50 + 1e6) ≈ 3.2997 V.
+    expect(vDrivenHigh).toBeGreaterThan(3.0);
+    expect(vDrivenHigh).toBeLessThanOrEqual(3.3);
+
+    // 2. Switch to Hi-Z: bridge contributes no current; only Rpull → GND.
+    f.outputAdapter.setHighZ(true);
+    const vHiZ = stepToSteadyState(f.fix, f.nodeXId);
+
+    // The pull-down to ground dominates → V(node_X) ≈ 0 V.
+    expect(Math.abs(vHiZ)).toBeLessThan(1e-3);
+
+    // The contrast is the observable proof that hi-Z disables the bridge.
+    expect(vDrivenHigh - vHiZ).toBeGreaterThan(2.0);
+
+    f.fix.coordinator.dispose();
   });
 
-  it('setHighZ(true) then setLogicLevel(false) keeps branch RHS at 0 while hi-z', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    outputAdapter.setHighZ(true);
-    outputAdapter.setLogicLevel(false);
-    const solver = new SparseSolver();
-    solver._initStructure();
-    const rhs = new Float64Array(8);
-    solver._resetForAssembly();
-    outputAdapter.load(makeCtx(solver, rhs));
-    // Hi-Z overrides logic level — branch RHS stays 0
-    expect(rhs[BRANCH_IDX]).toBe(0);
-  });
+  it('setHighZ(true) holds analog node at ~0V regardless of digital signal level', () => {
+    const f = buildOutputBridgeFixture();
 
-  it('setHighZ(false) after setHighZ(true) restores driven mode', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    outputAdapter.setHighZ(true);
-    outputAdapter.setHighZ(false);
-    outputAdapter.setLogicLevel(false);
-    const solver = new SparseSolver();
-    solver._initStructure();
-    solver._resetForAssembly();
-    outputAdapter.load(makeCtx(solver));
-    // Drive mode restored: branch RHS must be vOL
+    // Lock the bridge into hi-Z first.
+    f.outputAdapter.setHighZ(true);
+
+    // Drive digital signal LOW and step to steady state.
+    f.fix.coordinator.writeByLabel('A', { type: 'digital', value: 0 });
+    const vLowHiZ = stepToSteadyState(f.fix, f.nodeXId);
+    expect(Math.abs(vLowHiZ)).toBeLessThan(1e-3);
+
+    // Now drive digital signal HIGH — hi-Z must still suppress the drive.
+    f.fix.coordinator.writeByLabel('A', { type: 'digital', value: 1 });
+    const vHighHiZ = stepToSteadyState(f.fix, f.nodeXId);
+    expect(Math.abs(vHighHiZ)).toBeLessThan(1e-3);
+
+    f.fix.coordinator.dispose();
   });
 
   it('after setHighZ(true), rOut is unchanged (hi-z uses rHiZ from spec internally)', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
+    const { outputAdapter, fix } = buildOutputBridgeFixture();
     const rOutBefore = outputAdapter.rOut;
     outputAdapter.setHighZ(true);
     expect(outputAdapter.rOut).toBe(rOutBefore);
+    fix.coordinator.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 5: digital→analog edge transitions post analog breakpoints
+// ---------------------------------------------------------------------------
+
+/**
+ * Regression guard: when a digital→analog bridge sees a logic-level transition,
+ * `_stepMixed` must call `analog.addBreakpoint(simTime)` so the next analog
+ * step lands on the discontinuity (CKTorder=1 + dt clamp). Without this,
+ * trapezoidal integration smears the gate edge across whatever dt the
+ * controller had picked, producing parasitic ringing on inductor currents in
+ * switching converters. Mirrors the CKTsetBreak pattern used by every analog
+ * source (pulse, clock, pwl).
+ */
+describe('coordinator: digital→analog bridge edges register analog breakpoints', () => {
+  it('posts addBreakpoint on logic level transition, no duplicate on steady-state', () => {
+    const f = buildOutputBridgeFixture();
+    const analog = f.fix.coordinator.getAnalogEngine()!;
+    const digital = f.fix.coordinator.getDigitalEngine()!;
+    const spy = vi.spyOn(analog, 'addBreakpoint');
+
+    // First step: digital signal is 0, prevDaHigh starts false → no transition.
+    f.fix.coordinator.step();
+    const afterSteadyLow = spy.mock.calls.length;
+
+    // Drive digital signal high → next _stepMixed must post a breakpoint.
+    digital.setSignalValue(f.inputNetId, BitVector.fromNumber(1, f.bitWidth));
+    f.fix.coordinator.step();
+    const afterRisingEdge = spy.mock.calls.length;
+    expect(afterRisingEdge).toBeGreaterThan(afterSteadyLow);
+
+    // Hold high → no further breakpoint.
+    digital.setSignalValue(f.inputNetId, BitVector.fromNumber(1, f.bitWidth));
+    f.fix.coordinator.step();
+    expect(spy.mock.calls.length).toBe(afterRisingEdge);
+
+    // Drive low → falling edge posts another breakpoint.
+    digital.setSignalValue(f.inputNetId, BitVector.fromNumber(0, f.bitWidth));
+    f.fix.coordinator.step();
+    expect(spy.mock.calls.length).toBeGreaterThan(afterRisingEdge);
+
+    f.fix.coordinator.dispose();
+  });
+
+  it('reset() clears prevDaHigh so the next high level re-posts a breakpoint', () => {
+    const f = buildOutputBridgeFixture();
+    const analog = f.fix.coordinator.getAnalogEngine()!;
+    const digital = f.fix.coordinator.getDigitalEngine()!;
+
+    // Drive high once so prevDaHigh latches true.
+    digital.setSignalValue(f.inputNetId, BitVector.fromNumber(1, f.bitWidth));
+    f.fix.coordinator.step();
+
+    f.fix.coordinator.reset();
+    const spy = vi.spyOn(analog, 'addBreakpoint');
+
+    // After reset, prevDaHigh is false. Driving high again must post a breakpoint.
+    digital.setSignalValue(f.inputNetId, BitVector.fromNumber(1, f.bitWidth));
+    f.fix.coordinator.step();
+    expect(spy.mock.calls.length).toBeGreaterThan(0);
+
+    f.fix.coordinator.dispose();
   });
 });

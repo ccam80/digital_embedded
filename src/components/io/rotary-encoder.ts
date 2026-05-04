@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RotEncoder component- rotary encoder with quadrature output.
  *
  * Interactive component: user rotates the encoder (CW or CCW) via
@@ -14,7 +14,7 @@
  *
  * The encoder has no simulation executeFn beyond producing the
  * current quadrature state from an internal position counter.
- * internalStateCount: 1 (current position 0–3)
+ * internalStateCount: 1 (current position 0â€“3)
  *
  * Output A = bit 1 of Gray(position), Output B = bit 0 of Gray(position).
  */
@@ -31,7 +31,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -43,7 +43,7 @@ const COMP_WIDTH = 3;
 const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
-// Quadrature table: position (0-3) → [A, B]
+// Quadrature table: position (0-3) â†’ [A, B]
 // ---------------------------------------------------------------------------
 
 export const QUADRATURE_TABLE: readonly [number, number][] = [
@@ -113,7 +113,7 @@ export class RotaryEncoderElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Outer rectangle: (0,-1) → (0,2) → (-3,2) → (-3,-1)
+    // Outer rectangle: (0,-1) â†’ (0,2) â†’ (-3,2) â†’ (-3,-1)
     // body LEFT of pins at x=0
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(-3, -1, 3, 3, true);
@@ -199,7 +199,7 @@ function rotaryEncoderFactory(props: PropertyBag): RotaryEncoderElement {
   return new RotaryEncoderElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RotaryEncoderDefinition: ComponentDefinition = {
+export const RotaryEncoderDefinition: StandaloneComponentDefinition = {
   name: "RotEncoder",
   typeId: -1,
   factory: rotaryEncoderFactory,

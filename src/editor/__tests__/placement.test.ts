@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { PlacementMode } from "@/editor/placement";
 import { Circuit } from "@/core/circuit";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation } from "@/core/pin";
@@ -37,7 +37,7 @@ function makeStubElement(position: Point = { x: 0, y: 0 }): CircuitElement {
   };
 }
 
-function makeMockDefinition(): ComponentDefinition {
+function makeMockDefinition(): StandaloneComponentDefinition {
   return {
     name: "MockComp",
     typeId: -1,

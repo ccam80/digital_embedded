@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ProgramMemory- ROM with address auto-increment for instruction fetch.
  *
  * On each rising clock edge, the internal address register increments
@@ -35,7 +35,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import { getBackingStore } from "./ram.js";
@@ -268,7 +268,7 @@ function programMemoryFactory(props: PropertyBag): ProgramMemoryElement {
   return new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ProgramMemoryDefinition: ComponentDefinition = {
+export const ProgramMemoryDefinition: StandaloneComponentDefinition = {
   name: "ProgramMemory",
   typeId: -1,
   factory: programMemoryFactory,

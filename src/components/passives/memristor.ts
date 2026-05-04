@@ -37,10 +37,11 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import { MODEDC } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
@@ -91,13 +92,8 @@ const MIN_WINDOW_P   = 1;
 // MemristorElement  PoolBackedAnalogElement implementation
 // ---------------------------------------------------------------------------
 
-export class MemristorElement implements PoolBackedAnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
+export class MemristorElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly poolBacked = true as const;
   readonly stateSchema = MEMRISTOR_SCHEMA;
   readonly stateSize = MEMRISTOR_SCHEMA.size;
 
@@ -113,10 +109,8 @@ export class MemristorElement implements PoolBackedAnalogElement {
   private windowOrder: number;
   private initialState: number;
 
-  private _pool!: StatePoolRef;
-
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     const rOn          = props.hasModelParam("rOn")          ? props.getModelParam<number>("rOn")          : MEMRISTOR_DEFAULTS["rOn"]!;
     const rOff         = props.hasModelParam("rOff")         ? props.getModelParam<number>("rOff")         : MEMRISTOR_DEFAULTS["rOff"]!;
     const mobility     = props.hasModelParam("mobility")     ? props.getModelParam<number>("mobility")     : MEMRISTOR_DEFAULTS["mobility"]!;
@@ -165,8 +159,8 @@ export class MemristorElement implements PoolBackedAnalogElement {
     }
   }
 
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
+  override initState(pool: StatePoolRef): void {
+    super.initState(pool);
     // Apply initial state from params into s0 slot W
     pool.state0[this._stateBase + SLOT_W] = this.initialState;
   }
@@ -195,7 +189,19 @@ export class MemristorElement implements PoolBackedAnalogElement {
    * Unified load()  stamps the state-dependent conductance every NR iteration.
    *
    * Reads w from s1 (last-accepted) for stamp stability across the NR loop.
-   * Integrates w at the bottom of load() reading s1, writing s0.
+   * Integrates w at the bottom of load() reading s1, writing s0 — but ONLY in
+   * transient mode. In any DC analysis (MODEDCOP / MODETRANOP / MODEDCTRANCURVE)
+   * dt = 0 and the W integration would unconditionally overwrite the seeded
+   * `state0[W] = initialState` with `s1[W] + 0 = 0` (s1 is zero-init at the
+   * point _seedFromDcop runs `state1.set(state0)`). DCOP must be a memoryless
+   * resistive linearisation around `initialState`, so the integration is gated
+   * out of the DC family. Mirrors the inductor's `!(mode & MODEDC)` gate
+   * (inductor.ts:319) and ngspice's MODEDC bypass (cktdefs.h:170-172).
+   *
+   * Latent fold-in (2026-05-03 §4e, surfaced by §3 poison-pattern migration of
+   * memristor.test.ts): without the gate, every DCOP collapsed W to 0,
+   * regardless of the user-set `initialState` prop, and the memristor
+   * presented R_off to the rest of the circuit at the operating point.
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
@@ -203,13 +209,24 @@ export class MemristorElement implements PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const s0 = this._pool.states[0];
 
-    const wOld = s1[base + SLOT_W];
+    // In DCOP s1 is still zero (the engine's _seedFromDcop runs `state1.set(
+    // state0)` only AFTER DCOP converges), so the seeded `state0[W] =
+    // initialState` is the only valid source of W during the DC NR loop.
+    const inDc = (ctx.cktMode & MODEDC) !== 0;
+    const wOld = inDc ? s0[base + SLOT_W] : s1[base + SLOT_W];
     const G = this.conductanceAt(wOld);
 
     if (this._hPP !== -1) solver.stampElement(this._hPP, G);
     if (this._hNN !== -1) solver.stampElement(this._hNN, G);
     if (this._hPN !== -1) solver.stampElement(this._hPN, -G);
     if (this._hNP !== -1) solver.stampElement(this._hNP, -G);
+
+    if (inDc) {
+      // No state evolution at the DC operating point — preserve the seeded
+      // state0[W] verbatim so _seedFromDcop's state1.set(state0) propagates
+      // initialState into transient.
+      return;
+    }
 
     // ngspice CKTstate0 idiom - bjtload.c:744-746, dioload.c:325-326
     const posNode = this._pinNodes.get("pos")!;

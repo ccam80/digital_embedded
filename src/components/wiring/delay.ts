@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Delay component- pass-through with configurable delay.
  *
  * In level-by-level simulation: passes input to output unchanged (combinational).
@@ -26,7 +26,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -98,7 +98,7 @@ export class DelayElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Rectangle: (0.05,-0.5) → (1.95,0.5)
+    // Rectangle: (0.05,-0.5) â†’ (1.95,0.5)
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
@@ -208,7 +208,7 @@ function delayFactory(props: PropertyBag): DelayElement {
   return new DelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DelayDefinition: ComponentDefinition = {
+export const DelayDefinition: StandaloneComponentDefinition = {
   name: "Delay",
   typeId: -1,
   factory: delayFactory,

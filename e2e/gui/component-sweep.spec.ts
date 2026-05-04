@@ -1,12 +1,12 @@
 /**
- * Component sweep E2E tests — Phase 5 of the test plan.
+ * Component sweep E2E tests- Phase 5 of the test plan.
  *
  * Parametrized tests that place every component type from the palette,
  * and for width-configurable components, test at multiple bit widths.
  *
- * 5A — Placement Sweep: every type can be placed from the palette
- * 5B — Bit-Width Variation Sweep: width-configurable components at multiple widths
- * 5C — Per-Component Engine Mode Sweep: dual-engine components in each mode
+ * 5A- Placement Sweep: every type can be placed from the palette
+ * 5B- Bit-Width Variation Sweep: width-configurable components at multiple widths
+ * 5C- Per-Component Engine Mode Sweep: dual-engine components in each mode
  *
  * See spec/e2e-circuit-assembly-test-plan.md for full plan.
  */
@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
 import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
 
 // ===========================================================================
-// 5A — Component type lists by category
+// 5A- Component type lists by category
 // ===========================================================================
 
 const LOGIC = ['And', 'Or', 'Not', 'NAnd', 'NOr', 'XOr', 'XNOr'];
@@ -115,7 +115,7 @@ const ALL_SWEEP_TYPES: Array<{ type: string; category: string }> = [
 ];
 
 // ===========================================================================
-// 5B — Bit-width variation matrix
+// 5B- Bit-width variation matrix
 //
 // Each entry defines: component type, internal property key for width,
 // widths to test. Pin names are derived from the registry via resolveTestPins().
@@ -133,7 +133,7 @@ interface WidthTestEntry {
 }
 
 const WIDTH_MATRIX: WidthTestEntry[] = [
-  // Gates — bitWidth controls all I/O pin widths
+  // Gates- bitWidth controls all I/O pin widths
   { type: 'And',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
   { type: 'Or',   propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
   { type: 'XOr',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
@@ -146,14 +146,14 @@ const WIDTH_MATRIX: WidthTestEntry[] = [
   { type: 'In',  propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
   { type: 'Out', propKey: 'bitWidth', widths: [1, 2, 4, 8, 16, 32] },
 
-  // Arithmetic — bitWidth controls operand + result widths
+  // Arithmetic- bitWidth controls operand + result widths
   { type: 'Add',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
   { type: 'Sub',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
   { type: 'Mul',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
   { type: 'Div',                propKey: 'bitWidth', widths: [1, 4, 8, 16, 32] },
   { type: 'MagnitudeComparator', propKey: 'bitWidth', widths: [1, 4, 8, 16] },
 
-  // Counters — bitWidth controls output width, clock input is always 1-bit
+  // Counters- bitWidth controls output width, clock input is always 1-bit
   { type: 'Counter',       propKey: 'bitWidth', widths: [2, 4, 8, 16], inputPinWidth: 1 },
   { type: 'CounterPreset', propKey: 'bitWidth', widths: [2, 4, 8, 16], inputPinWidth: 1 },
 
@@ -176,13 +176,13 @@ const WIDTH_MATRIX: WidthTestEntry[] = [
   { type: 'Delay',           propKey: 'bitWidth',     widths: [1, 4, 8, 16] },
   { type: 'BusSplitter',     propKey: 'bitWidth',     widths: [2, 4, 8, 16] },
 
-  // DAC/ADC — bits property (internal key: 'bits', label: 'Resolution (bits)')
+  // DAC/ADC- bits property (internal key: 'bits', label: 'Resolution (bits)')
   { type: 'DAC', propKey: 'bits', widths: [4, 8] },
   { type: 'ADC', propKey: 'bits', widths: [4, 8] },
 ];
 
 // ---------------------------------------------------------------------------
-// resolveTestPins — derives input/output pin labels from the registry
+// resolveTestPins- derives input/output pin labels from the registry
 // ---------------------------------------------------------------------------
 
 /**
@@ -245,12 +245,12 @@ async function resolveTestPins(
     return { inputPin: 'a', outputPin: 'mul', srcWidth: width, dstWidth: outWidth };
   }
 
-  // In: output-only component — no input pin to wire.
+  // In: output-only component- no input pin to wire.
   if (entry.type === 'In') {
     return { inputPin: '', outputPin: 'out', srcWidth: width, dstWidth: width };
   }
 
-  // Out: input-only component — no output pin to wire.
+  // Out: input-only component- no output pin to wire.
   if (entry.type === 'Out') {
     return { inputPin: 'in', outputPin: '', srcWidth: width, dstWidth: width };
   }
@@ -377,7 +377,7 @@ const SPLITTER_MATRIX: SplitterEntry[] = [
 const TUNNEL_WIDTHS = [1, 4, 8, 16];
 
 // ===========================================================================
-// 5C — Dual-engine component list
+// 5C- Dual-engine component list
 // ===========================================================================
 
 interface DualEngineEntry {
@@ -403,7 +403,7 @@ const DUAL_ENGINE_TYPES: DualEngineEntry[] = [
 ];
 
 // ===========================================================================
-// 5B — Per-component expected-output logic for signal propagation checks
+// 5B- Per-component expected-output logic for signal propagation checks
 //
 // The WIDTH_MATRIX test wires SRC→DUT:inputPin and DUT:outputPin→DST.
 // For multi-input components only ONE input is wired; the others default to 0.
@@ -470,7 +470,7 @@ function expectedOutput(type: string, inputVal: number, width: number): number |
     case 'In':   return null;
     case 'Out':  return null;
 
-    // Unknown type — skip rather than guess wrong
+    // Unknown type- skip rather than guess wrong
     default:     return null;
   }
 }
@@ -488,13 +488,13 @@ test.describe('Component sweep tests', () => {
   });
 
   // =========================================================================
-  // 5A — Placement + Compilation Sweep
+  // 5A- Placement + Compilation Sweep
   //
   // For every registered component type, verify it can be found in the
   // palette and placed on the canvas via a genuine UI click sequence.
   // =========================================================================
 
-  test.describe('5A — Placement Sweep', () => {
+  test.describe('5A- Placement Sweep', () => {
 
     for (const { type, category } of ALL_SWEEP_TYPES) {
       test(`${category}/${type} can be placed from palette`, async () => {
@@ -514,14 +514,14 @@ test.describe('Component sweep tests', () => {
   });
 
   // =========================================================================
-  // 5B — Bit-Width Variation Sweep
+  // 5B- Bit-Width Variation Sweep
   //
   // For width-configurable components, place the component, set its width
   // property via the property popup, wire matching-width In/Out, compile,
   // and verify no errors.
   // =========================================================================
 
-  test.describe('5B — Bit-Width Variation Sweep', () => {
+  test.describe('5B- Bit-Width Variation Sweep', () => {
 
     // -----------------------------------------------------------------------
     // Standard width-property components (single property controls width)
@@ -559,12 +559,12 @@ test.describe('Component sweep tests', () => {
 
           // Extra pins required by specific component types to avoid unconnected-input errors
           if (entry.type === 'D_FF_AS' || entry.type === 'JK_FF_AS') {
-            // Clock pin must be driven — tie it low via a Const
+            // Clock pin must be driven- tie it low via a Const
             await builder.placeLabeled('Const', 3, 14, 'CLK_TIE');
             await builder.drawWire('CLK_TIE', 'out', 'DUT', 'C');
           }
           if (entry.type === 'Driver' || entry.type === 'DriverInvSel') {
-            // sel pin must be driven — tie it high so signal passes through
+            // sel pin must be driven- tie it high so signal passes through
             await builder.placeLabeled('Const', 3, 14, 'SEL_TIE');
             await builder.setComponentProperty('SEL_TIE', 'Value', 1);
             await builder.drawWire('SEL_TIE', 'out', 'DUT', 'sel');
@@ -752,37 +752,48 @@ test.describe('Component sweep tests', () => {
   });
 
   // =========================================================================
-  // 5C — Per-Component Engine Mode Sweep
+  // 5C- Per-Component Engine Mode Sweep
   //
   // For every component with dual-engine support, test in each available
   // engine context. Place the component, optionally set simulation mode,
   // compile, and verify no errors.
   // =========================================================================
 
-  test.describe('5C — Per-Component Engine Mode Sweep', () => {
+  test.describe('5C- Per-Component Engine Mode Sweep', () => {
 
     for (const entry of DUAL_ENGINE_TYPES) {
       for (const mode of entry.modes) {
         test(`${entry.type} works in ${mode} mode`, async () => {
-          // Place the component
           await builder.placeLabeled(entry.type, 10, 8, 'DUT');
 
-          // For gates/flip-flops in non-digital mode, set simulation model
-          // via the property panel row labelled "Model" (added dynamically by
-          // showModelSelector; internal key is 'model').
-          // Gates have "cmos" model, flip-flops have "behavioral" model.
           if (mode !== 'digital' && (mode === 'cmos' || mode === 'behavioral')) {
             await builder.setComponentProperty('DUT', 'Model', mode);
           }
 
-          // Verify placement succeeded
+          if (mode === 'cmos') {
+            await builder.placeLabeled('DcVoltageSource', 3, 4, 'VDD_SRC');
+            await builder.setComponentProperty('VDD_SRC', 'voltage', 3.3);
+            await builder.drawWire('VDD_SRC', 'pos', 'DUT', 'VDD');
+
+            await builder.placeLabeled('Ground', 3, 16, 'GND_TIE');
+            await builder.drawWire('GND_TIE', 'out', 'DUT', 'GND');
+
+            await builder.placeLabeled('DcVoltageSource', 3, 8, 'IN1_SRC');
+            await builder.setComponentProperty('IN1_SRC', 'voltage', 0);
+            await builder.drawWire('IN1_SRC', 'pos', 'DUT', 'In_1');
+
+            if (entry.type !== 'Not') {
+              await builder.placeLabeled('DcVoltageSource', 3, 12, 'IN2_SRC');
+              await builder.setComponentProperty('IN2_SRC', 'voltage', 0);
+              await builder.drawWire('IN2_SRC', 'pos', 'DUT', 'In_2');
+            }
+          }
+
           const info = await builder.getCircuitInfo();
           const dut = info.elements.find(e => e.label === 'DUT');
           expect(dut, `Component ${entry.type} not found after placement`).toBeTruthy();
           expect(dut!.typeId).toBe(entry.type);
 
-          // Compile and step — may produce unconnected-input warnings but
-          // should not crash or produce type errors
           await builder.stepViaUI();
         });
       }

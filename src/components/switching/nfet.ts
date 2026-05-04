@@ -1,9 +1,9 @@
-/**
+﻿/**
  * NFET- N-channel MOSFET voltage-controlled switch.
  *
  * Gate input G controls source-drain connection:
- *   G=1 → conducting (closed): D and S connected
- *   G=0 → non-conducting (open): D and S disconnected
+ *   G=1 â†’ conducting (closed): D and S connected
+ *   G=0 â†’ non-conducting (open): D and S disconnected
  *
  * Pins:
  *   Input:        G  (gate, 1-bit)
@@ -22,11 +22,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 
@@ -114,11 +114,11 @@ export class NFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Drain lead: (1,0) → (0.4,0) → (0.4,0.25)
+    // Drain lead: (1,0) â†’ (0.4,0) â†’ (0.4,0.25)
     ctx.drawLine(1, 0, 0.4, 0);
     ctx.drawLine(0.4, 0, 0.4, 0.25);
 
-    // Source lead: (1,2) → (0.4,2) → (0.4,1.75)
+    // Source lead: (1,2) â†’ (0.4,2) â†’ (0.4,1.75)
     ctx.drawLine(1, 2, 0.4, 2);
     ctx.drawLine(0.4, 2, 0.4, 1.75);
 
@@ -131,7 +131,7 @@ export class NFETElement extends AbstractCircuitElement {
     // Gate lead (THIN): (0.75,1) to (1,1)- connects channel to G pin at (1,1)
     ctx.drawLine(0.75, 1, 1, 1);
 
-    // N-channel arrow (filled triangle): (0.6,1) → (0.85,0.9) → (0.85,1.1)
+    // N-channel arrow (filled triangle): (0.6,1) â†’ (0.85,0.9) â†’ (0.85,1.1)
     ctx.drawPolygon([
       { x: 0.6, y: 1 },
       { x: 0.85, y: 0.9 },
@@ -154,7 +154,7 @@ export class NFETElement extends AbstractCircuitElement {
 //
 // Input layout: [G=0]
 // State layout: [closedFlag=0]
-// G=1 → closed=1; G=0 → closed=0
+// G=1 â†’ closed=1; G=0 â†’ closed=0
 // ---------------------------------------------------------------------------
 
 export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -184,7 +184,7 @@ export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Arr
 // NFETSWSubElement- SW sub-element used by NFET and PFET composites.
 //
 // Implements the single SW sub-element decomposition per PB-NFET / PB-PFET.
-// Pin keys: "D" → SWposNode (drain), "S" → SWnegNode (source).
+// Pin keys: "D" â†’ SWposNode (drain), "S" â†’ SWnegNode (source).
 // ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
 // ---------------------------------------------------------------------------
 
@@ -337,7 +337,7 @@ const NFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Ω)",
+    label: "Ron (Î©)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms",
@@ -345,7 +345,7 @@ const NFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Ω)",
+    label: "Roff (Î©)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms",
@@ -363,7 +363,7 @@ function nfetFactory(props: PropertyBag): NFETElement {
   return new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const NFETDefinition: ComponentDefinition = {
+export const NFETDefinition: StandaloneComponentDefinition = {
   name: "NFET",
   typeId: -1,
   factory: nfetFactory,
@@ -371,7 +371,7 @@ export const NFETDefinition: ComponentDefinition = {
   propertyDefs: NFET_PROPERTY_DEFS,
   attributeMap: NFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "NFET- N-channel MOSFET. G=1 → conducting.",
+  helpText: "NFET- N-channel MOSFET. G=1 â†’ conducting.",
   models: {
     digital: {
       executeFn: executeNFET,

@@ -3,7 +3,7 @@
  */
 
 import { Circuit, Wire } from '../core/circuit.js';
-import type { ComponentRegistry, ComponentDefinition, AttributeMapping } from '../core/registry.js';
+import type { ComponentRegistry, StandaloneComponentDefinition, AttributeMapping } from '../core/registry.js';
 import { resolveComponentDef } from '../core/resolve-component.js';
 import type { PropertyValue } from '../core/properties.js';
 import { PropertyBag, PropertyType } from '../core/properties.js';
@@ -122,7 +122,7 @@ export class CircuitBuilder {
    * attributeMap entry are passed through with a console warning.
    */
   private translateProps(
-    definition: ComponentDefinition,
+    definition: StandaloneComponentDefinition,
     props: Record<string, PropertyValue>,
   ): Record<string, PropertyValue> {
     if (!props || Object.keys(props).length === 0) return props;
@@ -772,8 +772,8 @@ export class CircuitBuilder {
   /**
    * Query the registry for a component type's definition.
    */
-  describeComponent(typeName: string): ComponentDefinition | undefined {
-    return this.registry.get(typeName);
+  describeComponent(typeName: string): StandaloneComponentDefinition | undefined {
+    return this.registry.getStandalone(typeName);
   }
 
   /**
@@ -840,7 +840,7 @@ export class CircuitBuilder {
    * (e.g. initializeBackingStores) always see the canonical type.
    */
   private coercePropertyValue(
-    definition: ComponentDefinition,
+    definition: StandaloneComponentDefinition,
     key: string,
     value: PropertyValue,
   ): PropertyValue {

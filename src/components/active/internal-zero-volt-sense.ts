@@ -17,7 +17,7 @@
  *   +1 at (b, pos), -1 at (b, neg)   — KVL row (V_pos - V_neg = 0)
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -38,13 +38,8 @@ const INTERNAL_ZERO_VOLT_SENSE_PIN_LAYOUT: PinDeclaration[] = [
 // InternalZeroVoltSenseElement
 // ---------------------------------------------------------------------------
 
-export class InternalZeroVoltSenseElement implements AnalogElement {
+export class InternalZeroVoltSenseElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   // Cached matrix-entry handles — mirror vsrcsetup.c TSTALLOC sequence for
   // a standard two-node voltage source with one branch row.
@@ -54,7 +49,7 @@ export class InternalZeroVoltSenseElement implements AnalogElement {
   private _hBN = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
   }
 
   setup(ctx: SetupContext): void {

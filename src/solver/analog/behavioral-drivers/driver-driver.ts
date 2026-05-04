@@ -29,8 +29,7 @@ import {
 } from "../state-schema.js";
 import { logicLevel } from "./edge-detect.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
-import type { StatePoolRef } from "../state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -78,33 +77,22 @@ const DRIVER_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralDriverDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralDriverDriverElement implements PoolBackedAnalogElement {
+export class BehavioralDriverDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private _vIH: number;
   private _vIL: number;
-  private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
     this._vIL = props.hasModelParam("vIL") ? props.getModelParam<number>("vIL") : 0.8;
   }
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {

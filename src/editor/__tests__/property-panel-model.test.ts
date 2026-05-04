@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for PropertyPanel model-aware display (T5).
  */
 
@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { PropertyPanel } from '../property-panel.js';
 import { PropertyBag, PropertyType } from '@/core/properties.js';
 import type { CircuitElement } from '@/core/element.js';
-import type { ComponentDefinition, ModelEntry, ParamDef } from '@/core/registry.js';
+import type { StandaloneComponentDefinition, ModelEntry, ParamDef } from '@/core/registry.js';
 
 type AnyListener = (...args: unknown[]) => void;
 
@@ -58,12 +58,12 @@ function makeBehavioralEntry(overrides?: Partial<Record<string, number>>): Model
   return { kind: 'inline', factory: () => { throw new Error('not used'); }, paramDefs: [PRIMARY_PARAM, SECONDARY_PARAM, UNIT_PARAM], params: { BF: 100, NF: 1, IS: 1e-14, ...overrides } };
 }
 
-function makeBjtDef(hasDigital = false): ComponentDefinition {
-  return { name: 'NpnBJT', typeId: -1, factory: () => { throw new Error('x'); }, pinLayout: [], propertyDefs: [], attributeMap: [], category: 'SEMICONDUCTORS' as never, helpText: '', models: hasDigital ? { digital: {} as never } : {}, modelRegistry: { behavioral: makeBehavioralEntry() }, defaultModel: 'behavioral' } as unknown as ComponentDefinition;
+function makeBjtDef(hasDigital = false): StandaloneComponentDefinition {
+  return { name: 'NpnBJT', typeId: -1, factory: () => { throw new Error('x'); }, pinLayout: [], propertyDefs: [], attributeMap: [], category: 'SEMICONDUCTORS' as never, helpText: '', models: hasDigital ? { digital: {} as never } : {}, modelRegistry: { behavioral: makeBehavioralEntry() }, defaultModel: 'behavioral' } as unknown as StandaloneComponentDefinition;
 }
 
-function makeNoRegistryDef(): ComponentDefinition {
-  return { name: 'Resistor', typeId: -1, factory: () => { throw new Error('x'); }, pinLayout: [], propertyDefs: [], attributeMap: [], category: 'PASSIVES' as never, helpText: '', models: {} } as unknown as ComponentDefinition;
+function makeNoRegistryDef(): StandaloneComponentDefinition {
+  return { name: 'Resistor', typeId: -1, factory: () => { throw new Error('x'); }, pinLayout: [], propertyDefs: [], attributeMap: [], category: 'PASSIVES' as never, helpText: '', models: {} } as unknown as StandaloneComponentDefinition;
 }
 
 let doc: ReturnType<typeof makeDocument>;
@@ -122,13 +122,13 @@ describe('showModelSelector advanced parameters', () => {
   it('Advanced Parameters toggle present', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 100, NF: 1, IS: 1e-14 });
     panel.showModelSelector(el, makeBjtDef());
-    expect(doc.findByText('▶ Advanced Parameters')).toBeDefined();
+    expect(doc.findByText('â–¶ Advanced Parameters')).toBeDefined();
   });
   it('no Advanced Parameters when only primary params', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 100, IS: 1e-14 });
     const entry: ModelEntry = { kind: 'inline', factory: () => { throw new Error('x'); }, paramDefs: [PRIMARY_PARAM, UNIT_PARAM], params: { BF: 100, IS: 1e-14 } };
     panel.showModelSelector(el, { ...makeBjtDef(), modelRegistry: { behavioral: entry } });
-    expect(doc.findByText('▶ Advanced Parameters')).toBeUndefined();
+    expect(doc.findByText('â–¶ Advanced Parameters')).toBeUndefined();
   });
 });
 
@@ -153,14 +153,14 @@ describe('showModelSelector reset to default', () => {
     const ch: Array<{ key: string; newVal: unknown }> = [];
     panel.onPropertyChange((key, _o, v) => ch.push({ key, newVal: v }));
     panel.showModelSelector(el, makeBjtDef());
-    doc.findByTagName('button').filter(b => b.textContent === '↺')[0]!.dispatchEvent('click');
+    doc.findByTagName('button').filter(b => b.textContent === 'â†º')[0]!.dispatchEvent('click');
     const r = ch.find(c => c.key === 'model:BF')!;
     expect(r.newVal).toBe(100);
   });
   it('reset writes default to model partition', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 200, NF: 1, IS: 1e-14 });
     panel.showModelSelector(el, makeBjtDef());
-    doc.findByTagName('button').filter(b => b.textContent === '↺')[0]!.dispatchEvent('click');
+    doc.findByTagName('button').filter(b => b.textContent === 'â†º')[0]!.dispatchEvent('click');
     expect(el.getProperties().getModelParam('BF')).toBe(100);
   });
 });
@@ -215,13 +215,13 @@ describe('showModelSelector param commit on blur', () => {
 
 describe('showModelSelector dropdown sources (Task 3.5)', () => {
   it('lists all static modelRegistry keys in dropdown', () => {
-    const def: ComponentDefinition = {
+    const def: StandaloneComponentDefinition = {
       ...makeBjtDef(false),
       modelRegistry: {
         behavioral: makeBehavioralEntry(),
         cmos: makeBehavioralEntry(),
       },
-    } as unknown as ComponentDefinition;
+    } as unknown as StandaloneComponentDefinition;
     panel.showModelSelector(makeElement('behavioral'), def);
     const opts = doc.findSelects()[0]!.children.map(o => o.value);
     expect(opts).toContain('behavioral');

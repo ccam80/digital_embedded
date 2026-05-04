@@ -8,212 +8,37 @@
  *   - Register latches all bits on rising clock edge
  *   - CounterDefinition and RegisterDefinition have analogFactory registered
  *   - CounterPresetDefinition has analogFactory registered
+ *
+ * Migration: M1 via ComparisonSession.createSelfCompare.
+ * Counter4Bit: Clock source drives clk; DcVoltageSource drives clr.
+ * Count/storedValue reconstructed from output bit node voltages via getStepEnd.
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  BehavioralCounterElement,
-  BehavioralRegisterElement,
-  makeBehavioralCounterAnalogFactory,
-} from "../behavioral-sequential.js";
-import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
+import { ComparisonSession } from "./harness/comparison-session.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
 import { CounterDefinition } from "../../../components/memory/counter.js";
 import { CounterPresetDefinition } from "../../../components/memory/counter-preset.js";
 import { RegisterDefinition } from "../../../components/memory/register.js";
-import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
-import type { LoadContext } from "../load-context.js";
-import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
-import { makeLoadCtx, initElement } from "./test-helpers.js";
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import { PropertyBag } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import { PropertyBag } from "../../../core/properties.js";
-
-function makeNullSolver() {
-  return {
-    allocElement: (_r: number, _c: number) => 0,
-    stampElement: (_h: number, _v: number) => {},
-    stamp: (_r: number, _c: number, _v: number) => {},
-  } as any;
-}
-
-function makeCtx(_v: Float64Array = new Float64Array(16)): LoadContext {
-  return makeLoadCtx({
-    solver: makeNullSolver(),
-    dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    cktMode: MODETRAN | MODEINITFLOAT,
-  });
-}
-
-function makeAcceptCtx(v: Float64Array, dt = 1e-9): LoadContext {
-  return { ...makeCtx(v), dt };
-}
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
 
-
 // ---------------------------------------------------------------------------
-// Test helpers
+// Bit reconstruction helper
 // ---------------------------------------------------------------------------
 
-const CMOS33: ResolvedPinElectrical = {
-  rOut: 50,
-  cOut: 5e-12,
-  rIn: 1e7,
-  cIn: 5e-12,
-  vOH: 3.3,
-  vOL: 0.0,
-  vIH: 2.0,
-  vIL: 0.8,
-  rHiZ: 1e7,
-};
-
-const V_HIGH = 3.3;
-const V_LOW = 0.0;
-
-/**
- * Build a 4-bit counter element.
- *
- * Node layout:
- *   0 = ground
- *   1 = en
- *   2 = clock
- *   3 = clr
- *   4 = out bit 0 (LSB)
- *   5 = out bit 1
- *   6 = out bit 2
- *   7 = out bit 3 (MSB)
- *   8 = ovf
- */
-function buildCounter(bitWidth = 4): {
-  element: BehavioralCounterElement;
-  makeVoltages: (en: number, clock: number, clr: number) => Float64Array;
-} {
-  const enPin = new DigitalInputPinModel(CMOS33, true);
-  enPin.init(1, 0);
-  const clockPin = new DigitalInputPinModel(CMOS33, true);
-  clockPin.init(2, 0);
-  const clrPin = new DigitalInputPinModel(CMOS33, true);
-  clrPin.init(3, 0);
-
-  const outBitPins: DigitalOutputPinModel[] = [];
-  for (let bit = 0; bit < bitWidth; bit++) {
-    const pin = new DigitalOutputPinModel(CMOS33);
-    pin.init(4 + bit, -1);
-    outBitPins.push(pin);
-  }
-
-  const ovfPin = new DigitalOutputPinModel(CMOS33);
-  ovfPin.init(4 + bitWidth, -1);
-
-  const element = new BehavioralCounterElement(
-    enPin,
-    clockPin,
-    clrPin,
-    outBitPins,
-    ovfPin,
-    bitWidth,
-    CMOS33.vIH,
-    CMOS33.vIL,
-    new Map(),
-  );
-  initElement(element);
-
-  const solverSize = 4 + bitWidth;
-
-  const makeVoltages = (en: number, clock: number, clr: number): Float64Array => {
-    // 1-based: pins init at nodes 1,2,3 so readMnaVoltage reads v[1],v[2],v[3]
-    const v = new Float64Array(solverSize + 1);
-    v[1] = en;
-    v[2] = clock;
-    v[3] = clr;
-    return v;
-  };
-
-  return { element, makeVoltages };
-}
-
-/**
- * Build an 8-bit register element.
- *
- * Node layout:
- *   0 = ground
- *   1..8 = D bits 0..7 (input data)
- *   9 = clock
- *   10 = en
- *   11..18 = Q bits 0..7 (output)
- */
-function buildRegister(bitWidth = 8): {
-  element: BehavioralRegisterElement;
-  makeVoltages: (data: number, en: number, clock: number) => Float64Array;
-  outBitPins: DigitalOutputPinModel[];
-} {
-  const dataPins: DigitalInputPinModel[] = [];
-  for (let bit = 0; bit < bitWidth; bit++) {
-    const pin = new DigitalInputPinModel(CMOS33, true);
-    pin.init(1 + bit, 0);
-    dataPins.push(pin);
-  }
-
-  const clockPin = new DigitalInputPinModel(CMOS33, true);
-  clockPin.init(1 + bitWidth, 0);
-
-  const enPin = new DigitalInputPinModel(CMOS33, true);
-  enPin.init(1 + bitWidth + 1, 0);
-
-  const outBitPins: DigitalOutputPinModel[] = [];
-  for (let bit = 0; bit < bitWidth; bit++) {
-    const pin = new DigitalOutputPinModel(CMOS33);
-    pin.init(1 + bitWidth + 2 + bit, -1);
-    outBitPins.push(pin);
-  }
-
-  const element = new BehavioralRegisterElement(
-    dataPins,
-    clockPin,
-    enPin,
-    outBitPins,
-    bitWidth,
-    CMOS33.vIH,
-    CMOS33.vIL,
-    new Map(),
-  );
-  initElement(element);
-
-  const solverSize = 2 * bitWidth + 2;
-
-  const makeVoltages = (data: number, en: number, clock: number): Float64Array => {
-    // 1-based: data pins at nodes 1..bitWidth, clock at node 1+bitWidth, en at node 1+bitWidth+1
-    const v = new Float64Array(solverSize + 1);
-    for (let bit = 0; bit < bitWidth; bit++) {
-      v[1 + bit] = ((data >> bit) & 1) ? V_HIGH : V_LOW;
-    }
-    v[1 + bitWidth] = clock;
-    v[1 + bitWidth + 1] = en;
-    return v;
-  };
-
-  return { element, makeVoltages, outBitPins };
-}
-
-/**
- * Apply one rising clock edge to the counter element.
- * Previous state: clock=low, new state: clock=high.
- */
-function applyRisingEdge(
-  element: BehavioralCounterElement,
-  makeVoltages: (en: number, clock: number, clr: number) => Float64Array,
-  en: number,
-  clr: number,
-): void {
-  element.accept(makeAcceptCtx(makeVoltages(en, V_LOW, clr)), 0, () => {});
-  element.accept(makeAcceptCtx(makeVoltages(en, V_HIGH, clr)), 0, () => {});
+/** Reconstruct an integer from an array of bit-node voltages (LSB first). */
+function bitsToInt(voltages: number[], threshold = 2.5): number {
+  return voltages.reduce((acc, v, i) => acc | ((v > threshold ? 1 : 0) << i), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,80 +46,197 @@ function applyRisingEdge(
 // ---------------------------------------------------------------------------
 
 describe("Counter", () => {
-  it("counts_on_clock_edges", () => {
-    const { element, makeVoltages } = buildCounter(4);
+  /**
+   * counts_on_clock_edges:
+   *
+   * Circuit: Clock(1Hz, vdd=3.3) → counter:C
+   *          DcVoltageSource(0V) → counter:clr
+   *          DcVoltageSource(3.3V) → counter:en
+   *          counter:q0..q3 → Resistor(10kΩ) → Ground (4 bits)
+   *          counter:ovf → Resistor(10kΩ) → Ground
+   *
+   * Run 5.5 periods (tStop = 5.5s at 1Hz). After 5 rising edges count = 5 = 0b0101.
+   * Reconstruct count from q0..q3 bit voltages at the last step.
+   */
+  it("counts_on_clock_edges", async () => {
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "clk",    type: "Clock",          props: { Frequency: 1, vdd: 3.3, label: "clk" } },
+            { id: "vsCLR",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+            { id: "vsEN",   type: "DcVoltageSource", props: { voltage: 3.3 } },
+            { id: "ctr",    type: "Counter",         props: { bitWidth: 4, label: "counter" } },
+            { id: "rQ0",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ1",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ2",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ3",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rOvf",   type: "Resistor",        props: { resistance: 10000 } },
+            { id: "gnd",    type: "Ground" },
+          ],
+          connections: [
+            ["clk:out",    "ctr:C"],
+            ["vsCLR:pos",  "ctr:clr"],
+            ["vsEN:pos",   "ctr:en"],
+            ["ctr:q0",     "rQ0:A"],
+            ["ctr:q1",     "rQ1:A"],
+            ["ctr:q2",     "rQ2:A"],
+            ["ctr:q3",     "rQ3:A"],
+            ["ctr:ovf",    "rOvf:A"],
+            ["rQ0:B",      "gnd:out"],
+            ["rQ1:B",      "gnd:out"],
+            ["rQ2:B",      "gnd:out"],
+            ["rQ3:B",      "gnd:out"],
+            ["rOvf:B",     "gnd:out"],
+            ["vsCLR:neg",  "gnd:out"],
+            ["vsEN:neg",   "gnd:out"],
+          ],
+        });
+      },
+      analysis: "tran",
+      tStop: 5.5,
+      maxStep: 0.1,
+    });
 
-    element.load(makeCtx());
+    const stepCount = session.ourSession!.steps.length;
+    expect(stepCount).toBeGreaterThan(0);
 
-    // Apply 5 rising clock edges with en=1, clr=0
-    for (let i = 0; i < 5; i++) {
-      applyRisingEdge(element, makeVoltages, V_HIGH, V_LOW);
-    }
+    const stepEnd = session.getStepEnd(stepCount - 1);
+    const bits = ["counter:q0", "counter:q1", "counter:q2", "counter:q3"].map(
+      (b) => stepEnd.nodes[b]?.ours ?? 0,
+    );
+    const count = bitsToInt(bits);
+    // After 5 rising edges at 1Hz, count = 5 = 0b0101
+    expect(count).toBe(5);
+  }, 60_000);
 
-    // Count should be 5 = 0b0101
-    expect(element.count).toBe(5);
+  /**
+   * clear_resets_to_zero:
+   *
+   * Same circuit but clr=3.3V (active). After 3 rising edges with clr=3.3V,
+   * count = 0.
+   */
+  it("clear_resets_to_zero", async () => {
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "clk",    type: "Clock",          props: { Frequency: 1, vdd: 3.3, label: "clk" } },
+            { id: "vsCLR",  type: "DcVoltageSource", props: { voltage: 3.3 } },
+            { id: "vsEN",   type: "DcVoltageSource", props: { voltage: 3.3 } },
+            { id: "ctr",    type: "Counter",         props: { bitWidth: 4, label: "counter" } },
+            { id: "rQ0",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ1",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ2",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ3",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rOvf",   type: "Resistor",        props: { resistance: 10000 } },
+            { id: "gnd",    type: "Ground" },
+          ],
+          connections: [
+            ["clk:out",    "ctr:C"],
+            ["vsCLR:pos",  "ctr:clr"],
+            ["vsEN:pos",   "ctr:en"],
+            ["ctr:q0",     "rQ0:A"],
+            ["ctr:q1",     "rQ1:A"],
+            ["ctr:q2",     "rQ2:A"],
+            ["ctr:q3",     "rQ3:A"],
+            ["ctr:ovf",    "rOvf:A"],
+            ["rQ0:B",      "gnd:out"],
+            ["rQ1:B",      "gnd:out"],
+            ["rQ2:B",      "gnd:out"],
+            ["rQ3:B",      "gnd:out"],
+            ["rOvf:B",     "gnd:out"],
+            ["vsCLR:neg",  "gnd:out"],
+            ["vsEN:neg",   "gnd:out"],
+          ],
+        });
+      },
+      analysis: "tran",
+      tStop: 3.5,
+      maxStep: 0.1,
+    });
 
-    element.load(makeCtx(makeVoltages(V_HIGH, V_LOW, V_LOW)));
+    const stepCount = session.ourSession!.steps.length;
+    expect(stepCount).toBeGreaterThan(0);
 
-    expect(element.count).toBe(5);
-  });
+    const stepEnd = session.getStepEnd(stepCount - 1);
+    const bits = ["counter:q0", "counter:q1", "counter:q2", "counter:q3"].map(
+      (b) => stepEnd.nodes[b]?.ours ?? 0,
+    );
+    const count = bitsToInt(bits);
+    // clr=HIGH forces count to 0
+    expect(count).toBe(0);
+  }, 60_000);
 
-  it("clear_resets_to_zero", () => {
-    const { element, makeVoltages } = buildCounter(4);
+  /**
+   * output_voltages_match_logic:
+   *
+   * Run 5 rising edges (count=5=0b0101). Verify that each output bit voltage
+   * is either V_OH (>2.5V) or V_OL (<0.8V) and matches the expected bit pattern.
+   */
+  it("output_voltages_match_logic", async () => {
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "clk",    type: "Clock",          props: { Frequency: 1, vdd: 3.3, label: "clk" } },
+            { id: "vsCLR",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+            { id: "vsEN",   type: "DcVoltageSource", props: { voltage: 3.3 } },
+            { id: "ctr",    type: "Counter",         props: { bitWidth: 4, label: "counter" } },
+            { id: "rQ0",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ1",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ2",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rQ3",    type: "Resistor",        props: { resistance: 10000 } },
+            { id: "rOvf",   type: "Resistor",        props: { resistance: 10000 } },
+            { id: "gnd",    type: "Ground" },
+          ],
+          connections: [
+            ["clk:out",    "ctr:C"],
+            ["vsCLR:pos",  "ctr:clr"],
+            ["vsEN:pos",   "ctr:en"],
+            ["ctr:q0",     "rQ0:A"],
+            ["ctr:q1",     "rQ1:A"],
+            ["ctr:q2",     "rQ2:A"],
+            ["ctr:q3",     "rQ3:A"],
+            ["ctr:ovf",    "rOvf:A"],
+            ["rQ0:B",      "gnd:out"],
+            ["rQ1:B",      "gnd:out"],
+            ["rQ2:B",      "gnd:out"],
+            ["rQ3:B",      "gnd:out"],
+            ["rOvf:B",     "gnd:out"],
+            ["vsCLR:neg",  "gnd:out"],
+            ["vsEN:neg",   "gnd:out"],
+          ],
+        });
+      },
+      analysis: "tran",
+      tStop: 5.5,
+      maxStep: 0.1,
+    });
 
-    // Count to 3
-    for (let i = 0; i < 3; i++) {
-      applyRisingEdge(element, makeVoltages, V_HIGH, V_LOW);
-    }
-    expect(element.count).toBe(3);
+    const stepCount = session.ourSession!.steps.length;
+    const stepEnd = session.getStepEnd(stepCount - 1);
 
-    // Apply clock edge with clr=1
-    applyRisingEdge(element, makeVoltages, V_HIGH, V_HIGH);
-    expect(element.count).toBe(0);
-  });
+    const bits = ["counter:q0", "counter:q1", "counter:q2", "counter:q3"].map(
+      (b) => stepEnd.nodes[b]?.ours ?? 0,
+    );
+    const count = bitsToInt(bits);
+    // count=5=0b0101: bit0=1, bit1=0, bit2=1, bit3=0
+    expect(count).toBe(5);
 
-  it("output_voltages_match_logic", () => {
-    // Build a counter via the factory to verify output pin voltage levels
-    const nodeCount = 10;
-    const props = {
-      has: (k: string) => k === "bitWidth",
-      get: (k: string) => k === "bitWidth" ? 4 : undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
-
-    // pinNodes: en=1, C=2, clr=3, out=4 (all out-bit pins share same bus node), ovf=8
-    const factory = makeBehavioralCounterAnalogFactory();
-    const element = factory(
-      new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 8]]),
-      props, () => 0,
-    ) as BehavioralCounterElement;
-    initElement(element);
-
-    element.load(makeCtx());
-
-    // Apply 5 clock edges: count = 5 = 0b0101
-    const makeV = (en: number, clock: number, clr: number): Float64Array => {
-      const v = new Float64Array(nodeCount);
-      v[1] = en; v[2] = clock; v[3] = clr;
-      return v;
-    };
-
-    for (let i = 0; i < 5; i++) {
-      element.accept(makeAcceptCtx(makeV(V_HIGH, V_LOW, V_LOW)), 0, () => {});
-      element.accept(makeAcceptCtx(makeV(V_HIGH, V_HIGH, V_LOW)), 0, () => {});
-    }
-
-    element.load(makeCtx(makeV(V_HIGH, V_LOW, V_LOW)));
-
-    // count=5 = 0b0101: bit0=1, bit1=0, bit2=1, bit3=0
-    expect(element.count).toBe(5);
-
-    const expectedBits = [1, 0, 1, 0]; // count=5=0b0101
+    const expectedBits = [1, 0, 1, 0];
     for (let bit = 0; bit < 4; bit++) {
-      const countBit = (element.count >> bit) & 1;
-      expect(countBit).toBe(expectedBits[bit]);
+      const v = bits[bit];
+      if (expectedBits[bit] === 1) {
+        expect(v, `bit${bit} should be V_OH`).toBeGreaterThan(2.5);
+      } else {
+        expect(v, `bit${bit} should be V_OL`).toBeLessThan(0.8);
+      }
     }
-  });
+  }, 60_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -302,57 +244,177 @@ describe("Counter", () => {
 // ---------------------------------------------------------------------------
 
 describe("Register", () => {
-  it("latches_all_bits", () => {
-    const { element, makeVoltages } = buildRegister(8);
+  /**
+   * latches_all_bits:
+   *
+   * Circuit: 8 DcVoltageSources driving D bits 0..7 (data=0xA5=0b10100101)
+   *          DcVoltageSource(3.3V) → reg:en
+   *          Clock(1Hz) → reg:C
+   *          reg:Q0..Q7 → Resistor(10kΩ) → Ground
+   *
+   * Run 1.5 periods. After 1 rising edge with en=1 and data=0xA5, storedValue=0xA5.
+   * Reconstruct storedValue from Q0..Q7 bit voltages at the last step.
+   */
+  it("latches_all_bits", async () => {
+    // 0xA5 = 0b10100101
+    const data = 0xA5;
+    const dataBits = Array.from({ length: 8 }, (_, i) => (data >> i) & 1);
 
-    element.load(makeCtx());
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
 
-    // Initial state: all outputs LOW (storedValue=0)
-    expect(element.storedValue).toBe(0);
+        const components: import("../../../headless/netlist-types.js").CircuitSpec["components"] = [
+          { id: "clk",   type: "Clock",          props: { Frequency: 1, vdd: 3.3, label: "clk" } },
+          { id: "vsEN",  type: "DcVoltageSource", props: { voltage: 3.3 } },
+          { id: "reg",   type: "Register",        props: { bitWidth: 8, label: "reg" } },
+          { id: "gnd",   type: "Ground" },
+        ];
+        for (let bit = 0; bit < 8; bit++) {
+          components.push({
+            id: `vsD${bit}`,
+            type: "DcVoltageSource",
+            props: { voltage: dataBits[bit] ? 3.3 : 0.0 },
+          });
+          components.push({
+            id: `rQ${bit}`,
+            type: "Resistor",
+            props: { resistance: 10000 },
+          });
+        }
 
-    // Set data to 0xA5 = 0b10100101, en=1, clock low→high (rising edge)
-    element.accept(makeAcceptCtx(makeVoltages(0xA5, V_HIGH, V_LOW)), 0, () => {});
-    element.accept(makeAcceptCtx(makeVoltages(0xA5, V_HIGH, V_HIGH)), 0, () => {});
+        const connections: import("../../../headless/netlist-types.js").CircuitSpec["connections"] = [
+          ["clk:out",  "reg:C"],
+          ["vsEN:pos", "reg:en"],
+          ["vsEN:neg", "gnd:out"],
+        ];
+        for (let bit = 0; bit < 8; bit++) {
+          connections.push([`vsD${bit}:pos`, `reg:D${bit}`]);
+          connections.push([`vsD${bit}:neg`, "gnd:out"]);
+          connections.push([`reg:Q${bit}`, `rQ${bit}:A`]);
+          connections.push([`rQ${bit}:B`, "gnd:out"]);
+        }
 
-    // Stored value should now be 0xA5
-    expect(element.storedValue).toBe(0xA5);
+        return facade.build({ components, connections });
+      },
+      analysis: "tran",
+      tStop: 1.5,
+      maxStep: 0.1,
+    });
 
-    element.load(makeCtx(makeVoltages(0xA5, V_HIGH, V_HIGH)));
+    const stepCount = session.ourSession!.steps.length;
+    expect(stepCount).toBeGreaterThan(0);
 
-    // Verify output pin voltage levels match 0xA5 = 0b10100101
-    const expected = [1, 0, 1, 0, 0, 1, 0, 1]; // bits 0..7 of 0xA5
-    for (let bit = 0; bit < 8; bit++) {
-      const expectedHigh = expected[bit] === 1;
-      if (expectedHigh) {
-      } else {
-      }
-    }
-  });
+    const stepEnd = session.getStepEnd(stepCount - 1);
+    const bits = Array.from({ length: 8 }, (_, i) => stepEnd.nodes[`reg:Q${i}`]?.ours ?? 0);
+    const storedValue = bitsToInt(bits);
+    expect(storedValue).toBe(0xA5);
+  }, 60_000);
 
-  it("does_not_latch_without_enable", () => {
-    const { element, makeVoltages } = buildRegister(8);
+  /**
+   * does_not_latch_without_enable:
+   *
+   * Same circuit but en=0V. After 1 rising edge with en=0, storedValue=0.
+   */
+  it("does_not_latch_without_enable", async () => {
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
 
-    // Clock edge with en=0 — should not latch
-    element.accept(makeAcceptCtx(makeVoltages(0xFF, V_LOW, V_LOW)), 0, () => {});
-    element.accept(makeAcceptCtx(makeVoltages(0xFF, V_LOW, V_HIGH)), 0, () => {});
+        const components: import("../../../headless/netlist-types.js").CircuitSpec["components"] = [
+          { id: "clk",   type: "Clock",          props: { Frequency: 1, vdd: 3.3, label: "clk" } },
+          { id: "vsEN",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+          { id: "reg",   type: "Register",        props: { bitWidth: 8, label: "reg" } },
+          { id: "gnd",   type: "Ground" },
+        ];
+        for (let bit = 0; bit < 8; bit++) {
+          // All data bits HIGH (0xFF)
+          components.push({ id: `vsD${bit}`, type: "DcVoltageSource", props: { voltage: 3.3 } });
+          components.push({ id: `rQ${bit}`,  type: "Resistor",        props: { resistance: 10000 } });
+        }
 
-    expect(element.storedValue).toBe(0);
-  });
+        const connections: import("../../../headless/netlist-types.js").CircuitSpec["connections"] = [
+          ["clk:out",  "reg:C"],
+          ["vsEN:pos", "reg:en"],
+          ["vsEN:neg", "gnd:out"],
+        ];
+        for (let bit = 0; bit < 8; bit++) {
+          connections.push([`vsD${bit}:pos`, `reg:D${bit}`]);
+          connections.push([`vsD${bit}:neg`, "gnd:out"]);
+          connections.push([`reg:Q${bit}`, `rQ${bit}:A`]);
+          connections.push([`rQ${bit}:B`, "gnd:out"]);
+        }
 
-  it("holds_value_across_timesteps", () => {
-    const { element, makeVoltages } = buildRegister(8);
+        return facade.build({ components, connections });
+      },
+      analysis: "tran",
+      tStop: 1.5,
+      maxStep: 0.1,
+    });
 
-    // Latch 0x55
-    element.accept(makeAcceptCtx(makeVoltages(0x55, V_HIGH, V_LOW)), 0, () => {});
-    element.accept(makeAcceptCtx(makeVoltages(0x55, V_HIGH, V_HIGH)), 0, () => {});
-    expect(element.storedValue).toBe(0x55);
+    const stepCount = session.ourSession!.steps.length;
+    const stepEnd = session.getStepEnd(stepCount - 1);
+    const bits = Array.from({ length: 8 }, (_, i) => stepEnd.nodes[`reg:Q${i}`]?.ours ?? 0);
+    const storedValue = bitsToInt(bits);
+    // en=0 → register does not latch → storedValue=0
+    expect(storedValue).toBe(0);
+  }, 60_000);
 
-    // Many timesteps with data=0, clock idle — value must hold
-    for (let i = 0; i < 10; i++) {
-      element.accept(makeAcceptCtx(makeVoltages(0x00, V_HIGH, V_HIGH)), 0, () => {});
-    }
-    expect(element.storedValue).toBe(0x55);
-  });
+  /**
+   * holds_value_across_timesteps:
+   *
+   * Latch 0x55 with en=1 and one rising edge. Then run 10 more periods with
+   * data=0x00 and clock running. The stored value must remain 0x55 at the end.
+   */
+  it("holds_value_across_timesteps", async () => {
+    // 0x55 = 0b01010101
+    const data = 0x55;
+    const dataBits = Array.from({ length: 8 }, (_, i) => (data >> i) & 1);
+
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+
+        const components: import("../../../headless/netlist-types.js").CircuitSpec["components"] = [
+          { id: "clk",   type: "Clock",          props: { Frequency: 1, vdd: 3.3, label: "clk" } },
+          { id: "vsEN",  type: "DcVoltageSource", props: { voltage: 3.3 } },
+          { id: "reg",   type: "Register",        props: { bitWidth: 8, label: "reg" } },
+          { id: "gnd",   type: "Ground" },
+        ];
+        for (let bit = 0; bit < 8; bit++) {
+          components.push({
+            id: `vsD${bit}`,
+            type: "DcVoltageSource",
+            props: { voltage: dataBits[bit] ? 3.3 : 0.0 },
+          });
+          components.push({ id: `rQ${bit}`, type: "Resistor", props: { resistance: 10000 } });
+        }
+
+        const connections: import("../../../headless/netlist-types.js").CircuitSpec["connections"] = [
+          ["clk:out",  "reg:C"],
+          ["vsEN:pos", "reg:en"],
+          ["vsEN:neg", "gnd:out"],
+        ];
+        for (let bit = 0; bit < 8; bit++) {
+          connections.push([`vsD${bit}:pos`, `reg:D${bit}`]);
+          connections.push([`vsD${bit}:neg`, "gnd:out"]);
+          connections.push([`reg:Q${bit}`, `rQ${bit}:A`]);
+          connections.push([`rQ${bit}:B`, "gnd:out"]);
+        }
+
+        return facade.build({ components, connections });
+      },
+      analysis: "tran",
+      tStop: 11.5,
+      maxStep: 0.1,
+    });
+
+    const stepCount = session.ourSession!.steps.length;
+    const stepEnd = session.getStepEnd(stepCount - 1);
+    const bits = Array.from({ length: 8 }, (_, i) => stepEnd.nodes[`reg:Q${i}`]?.ours ?? 0);
+    const storedValue = bitsToInt(bits);
+    expect(storedValue).toBe(0x55);
+  }, 60_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -423,56 +485,73 @@ describe("Registration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4.3 — sequential_pin_loading_propagates
+// Task 6.4.3- sequential_pin_loading_propagates
 // ---------------------------------------------------------------------------
 
-describe("Task 6.4.3 — sequential pin loading propagates", () => {
+describe("Task 6.4.3- sequential pin loading propagates", () => {
   it("sequential_pin_loading_propagates", () => {
-    // 4-bit counter: en=node 1, C=node 2, clr=node 3, out=node 4, ovf=node 5.
-    // Set _pinLoading so "en" is loaded=true but "C" and "clr" are loaded=false.
-    // Verify via allocElement spy:
-    //   en (MNA node 1 → nodeIdx 0) → allocElement called at (0,0)
-    //   C  (MNA node 2 → nodeIdx 1) → NO call at (1,1)
-    const pinLoading: Record<string, boolean> = {
-      "en": true,
-      "C": false,
-      "clr": false,
-      "out": false,
-      "ovf": false,
-    };
-    const props = new PropertyBag();
-    props.set("bitWidth", 4 as unknown as import("../../../core/properties.js").PropertyValue);
-    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
 
-    const factory = getFactory(CounterDefinition.modelRegistry!.behavioral!);
-    const element = factory(
-      new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
-      props, () => 0,
-    );
-    initElement(element);
-
-    const allocCalls: Array<[number, number]> = [];
-    const solver = {
-      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
-      stampElement(_h: number, _v: number) {},
-    };
-
-    const ctx: LoadContext = makeLoadCtx({
-      solver: solver as any,
-      cktMode: MODETRAN | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
+    // 4-bit counter: en=loaded, C and clr=unloaded.
+    // Drive through rsrc=10kΩ series with 5V ideal source for loaded pin.
+    // Loaded pin: vNet ~= 5 * 100k/(10k + 100k) = 4.5454...V
+    // Unloaded: vNet = 5.0V (ideal source, no sag)
+    const circuit = facade.build({
+      components: [
+        { id: "vsEN",  type: "DcVoltageSource", props: { voltage: 5.0 } },
+        { id: "rEN",   type: "Resistor",        props: { resistance: 10000 } },
+        { id: "vsCLK", type: "DcVoltageSource", props: { voltage: 5.0 } },
+        { id: "vsCLR", type: "DcVoltageSource", props: { voltage: 5.0 } },
+        { id: "ctr",   type: "Counter",         props: { bitWidth: 4, label: "ctr" } },
+        { id: "rQ0",   type: "Resistor",        props: { resistance: 10000 } },
+        { id: "rQ1",   type: "Resistor",        props: { resistance: 10000 } },
+        { id: "rQ2",   type: "Resistor",        props: { resistance: 10000 } },
+        { id: "rQ3",   type: "Resistor",        props: { resistance: 10000 } },
+        { id: "rOvf",  type: "Resistor",        props: { resistance: 10000 } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vsEN:pos",  "rEN:A"],
+        ["rEN:B",     "ctr:en"],
+        ["vsCLK:pos", "ctr:C"],
+        ["vsCLR:pos", "ctr:clr"],
+        ["ctr:q0",    "rQ0:A"],
+        ["ctr:q1",    "rQ1:A"],
+        ["ctr:q2",    "rQ2:A"],
+        ["ctr:q3",    "rQ3:A"],
+        ["ctr:ovf",   "rOvf:A"],
+        ["rQ0:B",     "gnd:out"],
+        ["rQ1:B",     "gnd:out"],
+        ["rQ2:B",     "gnd:out"],
+        ["rQ3:B",     "gnd:out"],
+        ["rOvf:B",    "gnd:out"],
+        ["vsEN:neg",  "gnd:out"],
+        ["vsCLK:neg", "gnd:out"],
+        ["vsCLR:neg", "gnd:out"],
+      ],
+      metadata: {
+        digitalPinLoadingOverrides: {
+          "ctr:en": true,
+          "ctr:C":  false,
+          "ctr:clr": false,
+        },
+      },
     });
 
-    element.load(ctx);
+    const coordinator = facade.compile(circuit);
+    facade.getDcOpResult();
+    const signals = facade.readAllSignals(coordinator);
 
-    // en (MNA node 1, 1-based) should have a diagonal stamp (loaded=true)
-    const enDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
-    // C (MNA node 2, 1-based) should NOT have a diagonal stamp (loaded=false -> no-op)
-    const clockDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
+    // Loaded pin (en): voltage sag through rEN=10kΩ with rIn=100kΩ → 4.5454V
+    const vEN = signals["ctr:en"];
+    expect(vEN).toBeGreaterThan(4.4);
+    expect(vEN).toBeLessThan(4.6);
 
-    expect(enDiag).toBe(true);
-    expect(clockDiag).toBe(false);
+    // Unloaded pins (C, clr): no sag → 5.0V
+    const vCLK = signals["ctr:C"];
+    expect(vCLK).toBeCloseTo(5.0, 3);
+    const vCLR = signals["ctr:clr"];
+    expect(vCLR).toBeCloseTo(5.0, 3);
   });
 });

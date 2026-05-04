@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tunnel component- named wire connection.
  *
  * Two Tunnels with the same label in the same circuit are electrically connected.
@@ -22,7 +22,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -30,10 +30,10 @@ import {
 // Layout constants- matching Digital's TunnelShape
 // ---------------------------------------------------------------------------
 
-/** Triangle half-height in grid units (Digital: SIZE2 - 2 = 8px ≈ 0.4 grid). */
+/** Triangle half-height in grid units (Digital: SIZE2 - 2 = 8px â‰ˆ 0.4 grid). */
 const ARROW_HALF_H = 0.4;
 
-/** Triangle width in grid units (Digital: HEIGHT * sqrt(3) ≈ 0.7 grid). */
+/** Triangle width in grid units (Digital: HEIGHT * sqrt(3) â‰ˆ 0.7 grid). */
 const ARROW_W = 0.7;
 
 
@@ -106,7 +106,7 @@ export class TunnelElement extends AbstractCircuitElement {
       false,
     );
 
-    // Label to the right of the triangle, counter-rotated at 180° to stay upright
+    // Label to the right of the triangle, counter-rotated at 180Â° to stay upright
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.6 });
@@ -192,7 +192,7 @@ function tunnelFactory(props: PropertyBag): TunnelElement {
   return new TunnelElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TunnelDefinition: ComponentDefinition = {
+export const TunnelDefinition: StandaloneComponentDefinition = {
   name: "Tunnel",
   typeId: -1,
   factory: tunnelFactory,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RegisterFile- edge-triggered register file with two read ports and one write port.
  *
  * Contains 2^addrBits registers, each of width bitWidth.
@@ -26,7 +26,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -279,14 +279,14 @@ const REGISTER_FILE_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RegisterFileDefinition- ComponentDefinition
+// RegisterFileDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function registerFileFactory(props: PropertyBag): RegisterFileElement {
   return new RegisterFileElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RegisterFileDefinition: ComponentDefinition = {
+export const RegisterFileDefinition: StandaloneComponentDefinition = {
   name: "RegisterFile",
   typeId: -1,
   factory: registerFileFactory,

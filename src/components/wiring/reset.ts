@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Reset component- during initialization, output is held low (or high if inverted).
  * After init, output transitions to its post-reset state.
  *
@@ -28,7 +28,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -202,7 +202,7 @@ function resetFactory(props: PropertyBag): ResetElement {
   return new ResetElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ResetDefinition: ComponentDefinition = {
+export const ResetDefinition: StandaloneComponentDefinition = {
   name: "Reset",
   typeId: -1,
   factory: resetFactory,

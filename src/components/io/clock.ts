@@ -18,11 +18,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
@@ -385,7 +385,7 @@ export function makeAnalogClockElement(
 // ClockDefinition
 // ---------------------------------------------------------------------------
 
-export const ClockDefinition: ComponentDefinition = {
+export const ClockDefinition: StandaloneComponentDefinition = {
   name: "Clock",
   typeId: -1,
   factory: clockFactory,

@@ -15,7 +15,7 @@
  *
  */
 
-import type { IntegrationMethod } from "./element.js";
+import type { IntegrationMethod } from "./integration.js";
 import type { NodeVoltageHistory } from "./integration.js";
 
 // ---------------------------------------------------------------------------

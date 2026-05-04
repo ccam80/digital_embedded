@@ -11,7 +11,7 @@ import type { CircuitElement } from "@/core/element";
 import type { Rotation } from "@/core/pin";
 import { pinWorldPosition } from "@/core/pin";
 import { Wire, Circuit } from "@/core/circuit";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { PropertyBag } from "@/core/properties";
 import { snapToGrid } from "@/editor/coordinates";
 import { renameLabelsOnCopy } from "@/editor/label-renamer";
@@ -30,7 +30,7 @@ export type { EditCommand };
  */
 export interface ClipboardEntry {
   /** The component definition, used to call factory() when pasting. */
-  readonly definition: ComponentDefinition;
+  readonly definition: StandaloneComponentDefinition;
   /** Snapshot of property values at time of copy. */
   readonly properties: PropertyBag;
   /** Position relative to the first element in the clipboard (for group paste). */
@@ -238,7 +238,7 @@ export function deleteSelection(
 export function copyToClipboard(
   elements: CircuitElement[],
   wires: Wire[],
-  definitionResolver: (typeId: string) => ComponentDefinition | undefined,
+  definitionResolver: (typeId: string) => StandaloneComponentDefinition | undefined,
 ): ClipboardData {
   if (elements.length === 0) {
     return { entries: [], wires: [] };

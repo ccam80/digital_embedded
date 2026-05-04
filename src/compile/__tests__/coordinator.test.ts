@@ -20,11 +20,10 @@ import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
-import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
-import { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
-import { StatePool } from '../../solver/analog/state-pool.js';
+import type { SignalAddress } from '../types.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough, executeAnd2 } from '../../test-fixtures/execute-stubs.js';
+import { buildFixture } from '../../solver/analog/__tests__/fixtures/build-fixture.js';
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
   const bag = new PropertyBag();
@@ -491,46 +490,43 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
 // ===========================================================================
 
 /**
- * Build a minimal ConcreteCompiledAnalogCircuit with no elements, suitable
- * for mixed-signal tests that only need both backends to exist.
+ * Build a real mixed-signal fixture through `buildFixture`: an isolated
+ * digital island (AND gate driving an Out probe) coexists with an isolated
+ * analog island (DcVoltageSource → Resistor → Ground). The two islands have
+ * NO connection, so the unified compiler emits zero cross-domain bridges
+ * (`bridges: []`) while still producing both digital and analog domains.
+ *
+ * `buildFixture` warm-starts the analog engine with one `coordinator.step()`
+ * before returning. The mixed-signal tests below take the post-warmstart
+ * coordinator straight from the fixture and exercise the public surface
+ * (step / reset / dispose / observers) on it.
  */
-function buildMinimalAnalogDomain(): ConcreteCompiledAnalogCircuit {
-  return new ConcreteCompiledAnalogCircuit({
-    nodeCount: 1,
-    elements: [makeResistorAnalogEl(1, 0, 1e6)],
-    labelToNodeId: new Map(),
-    wireToNodeId: new Map(),
-    models: new Map(),
-    elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
+function buildMixedFixture() {
+  return buildFixture({
+    build: (_registry, facade) => facade.build({
+      components: [
+        // Analog island: voltage source through a resistor to ground.
+        { id: 'vs',  type: 'DcVoltageSource', props: { label: 'VA', voltage: 1 } },
+        { id: 'r1',  type: 'Resistor',        props: { label: 'R1', resistance: 1000 } },
+        { id: 'gnd', type: 'Ground' },
+        // Digital island: AND gate with two inputs and an output probe.
+        { id: 'A',    type: 'In',  props: { label: 'A', bitWidth: 1 } },
+        { id: 'B',    type: 'In',  props: { label: 'B', bitWidth: 1 } },
+        { id: 'gate', type: 'And' },
+        { id: 'Y',    type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+      ],
+      connections: [
+        // Analog connections (no overlap with the digital island).
+        ['vs:pos', 'r1:pos'],
+        ['r1:neg', 'gnd:out'],
+        ['vs:neg', 'gnd:out'],
+        // Digital connections (no overlap with the analog island).
+        ['A:out',    'gate:In_1'],
+        ['B:out',    'gate:In_2'],
+        ['gate:out', 'Y:in'],
+      ],
+    }),
   });
-}
-
-/**
- * Assemble a CompiledCircuitUnified that has both digital and analog backends
- * with no bridges. The digital domain comes from a real AND-gate compilation;
- * the analog domain is a minimal stub.
- */
-function buildMixedCompiledUnified(): CompiledCircuitUnified {
-  const digitalRegistry = buildDigitalRegistry();
-  const digitalCircuit = buildAndGateCircuit(digitalRegistry);
-  const digitalUnified = compileUnified(digitalCircuit, digitalRegistry);
-  // The AND-gate circuit is digital-only, so analog must be null here.
-  expect(digitalUnified.digital).not.toBeNull();
-
-  const analogDomain = buildMinimalAnalogDomain();
-
-  return {
-    digital: digitalUnified.digital,
-    analog: analogDomain,
-    bridges: [],
-    wireSignalMap: new Map([...digitalUnified.wireSignalMap]),
-    labelSignalMap: new Map([...digitalUnified.labelSignalMap]),
-    labelToCircuitElement: new Map(),
-    pinSignalMap: new Map([...digitalUnified.pinSignalMap]),
-    allCircuitElements: [...digitalUnified.allCircuitElements],
-    diagnostics: [],
-  };
 }
 
 // ===========================================================================
@@ -539,50 +535,49 @@ function buildMixedCompiledUnified(): CompiledCircuitUnified {
 
 describe('DefaultSimulationCoordinator - mixed-signal', () => {
   it('has both digital and analog engines for mixed circuit', () => {
-    const unified = buildMixedCompiledUnified();
-    const coord = new DefaultSimulationCoordinator(unified);
-    expect(coord.getDigitalEngine()).not.toBeNull();
-    expect(coord.getAnalogEngine()).not.toBeNull();
-    coord.dispose();
+    const fix = buildMixedFixture();
+    expect(fix.coordinator.getDigitalEngine()).not.toBeNull();
+    expect(fix.coordinator.getAnalogEngine()).not.toBeNull();
+    fix.coordinator.dispose();
   });
 
   it('step works without bridges when both backends exist', () => {
-    const unified = buildMixedCompiledUnified();
-    expect(unified.bridges).toHaveLength(0);
-    const coord = new DefaultSimulationCoordinator(unified);
-    // With no bridges, _stepMixed takes the early return path: digital.step() + analog.step()
-    expect(() => coord.step()).not.toThrow();
-    expect(() => coord.step()).not.toThrow();
-    coord.dispose();
+    const fix = buildMixedFixture();
+    // Sanity check: the two domains share no nets, so there are no bridges.
+    expect(fix.coordinator.compiled.bridges).toHaveLength(0);
+    // With no bridges, _stepMixed takes the early return path:
+    // digital.step() + analog.step(). Note buildFixture already ran one
+    // warm-start step; further steps must continue working.
+    expect(() => fix.coordinator.step()).not.toThrow();
+    expect(() => fix.coordinator.step()).not.toThrow();
+    fix.coordinator.dispose();
   });
 
   it('reset clears bridge state and notifies observers', () => {
-    const unified = buildMixedCompiledUnified();
-    const coord = new DefaultSimulationCoordinator(unified);
+    const fix = buildMixedFixture();
     const onStep = vi.fn();
     const onReset = vi.fn();
-    coord.addMeasurementObserver({ onStep, onReset });
+    fix.coordinator.addMeasurementObserver({ onStep, onReset });
 
-    coord.step();
-    coord.step();
-    coord.step();
+    fix.coordinator.step();
+    fix.coordinator.step();
+    fix.coordinator.step();
     expect(onStep).toHaveBeenCalledTimes(3);
 
-    coord.reset();
+    fix.coordinator.reset();
     expect(onReset).toHaveBeenCalledTimes(1);
 
     // After reset, step count restarts from 1
-    coord.step();
+    fix.coordinator.step();
     expect(onStep.mock.calls[3]![0]).toBe(1);
 
-    coord.dispose();
+    fix.coordinator.dispose();
   });
 
   it('dispose cleans up both backends without throwing', () => {
-    const unified = buildMixedCompiledUnified();
-    const coord = new DefaultSimulationCoordinator(unified);
-    coord.step();
-    expect(() => coord.dispose()).not.toThrow();
+    const fix = buildMixedFixture();
+    fix.coordinator.step();
+    expect(() => fix.coordinator.dispose()).not.toThrow();
   });
 });
 

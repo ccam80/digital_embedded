@@ -21,7 +21,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -167,11 +167,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 // AnalogPotentiometerElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-class AnalogPotentiometerElement implements AnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
+class AnalogPotentiometerElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private R: number;
@@ -185,7 +181,7 @@ class AnalogPotentiometerElement implements AnalogElement {
   private _hWB_PN: number = -1;  private _hWB_NP: number = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, resistance: number, position: number) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this.R = resistance;
     this.pos = Math.max(0, Math.min(1, position));
 

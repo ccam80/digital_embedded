@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SixteenSeg component- direct-drive 16-segment alphanumeric display.
  *
  * 16 segment inputs (a1, a2, b, c, d1, d2, e, f, g, h, i, j, k, l, m, dp).
@@ -30,7 +30,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -281,7 +281,7 @@ function sixteenSegFactory(props: PropertyBag): SixteenSegElement {
   return new SixteenSegElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const SixteenSegDefinition: ComponentDefinition = {
+export const SixteenSegDefinition: StandaloneComponentDefinition = {
   name: "SixteenSeg",
   typeId: -1,
   factory: sixteenSegFactory,

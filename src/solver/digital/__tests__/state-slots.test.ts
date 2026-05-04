@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for state slot allocation (Task 1.1).
  *
  * Verifies that the compiler allocates state slots after all net IDs,
@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { StandaloneComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import { PropertyType } from "@/core/properties";
 import type { PinDeclaration } from "@/core/pin";
@@ -93,7 +93,7 @@ function makeDefinition(
   pins: PinDeclaration[],
   executeFn: ExecuteFunction = noopExecFn,
   stateSlotCount?: number | ((props: PropertyBagType) => number),
-): Omit<ComponentDefinition, "typeId"> & { typeId: number } {
+): Omit<StandaloneComponentDefinition, "typeId"> & { typeId: number } {
   return {
     name,
     typeId: -1,
@@ -113,10 +113,10 @@ function makeDefinition(
   };
 }
 
-function makeRegistry(...defs: (Omit<ComponentDefinition, "typeId"> & { typeId: number })[]): ComponentRegistry {
+function makeRegistry(...defs: (Omit<StandaloneComponentDefinition, "typeId"> & { typeId: number })[]): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const def of defs) {
-    registry.register(def as ComponentDefinition);
+    registry.register(def as StandaloneComponentDefinition);
   }
   return registry;
 }
@@ -133,15 +133,15 @@ describe("StateSlotAllocation", () => {
 
     // Build circuit: 2 AND gates + 1 DFF, all isolated (no wires)
     const circuit = new Circuit();
-    const and1 = registry.get("And")!.factory(new PropertyBag());
+    const and1 = registry.getStandalone("And")!.factory(new PropertyBag());
     and1.position = { x: 0, y: 0 };
     circuit.addElement(and1);
 
-    const and2 = registry.get("And")!.factory(new PropertyBag());
+    const and2 = registry.getStandalone("And")!.factory(new PropertyBag());
     and2.position = { x: 10, y: 0 };
     circuit.addElement(and2);
 
-    const dff = registry.get("DFF")!.factory(new PropertyBag());
+    const dff = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dff.position = { x: 20, y: 0 };
     circuit.addElement(dff);
 
@@ -158,11 +158,11 @@ describe("StateSlotAllocation", () => {
     const registry = makeRegistry(dffDef);
 
     const circuit = new Circuit();
-    const dff1 = registry.get("DFF")!.factory(new PropertyBag());
+    const dff1 = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dff1.position = { x: 0, y: 0 };
     circuit.addElement(dff1);
 
-    const dff2 = registry.get("DFF")!.factory(new PropertyBag());
+    const dff2 = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dff2.position = { x: 20, y: 0 };
     circuit.addElement(dff2);
 
@@ -183,11 +183,11 @@ describe("StateSlotAllocation", () => {
     const registry = makeRegistry(andDef, dffDef);
 
     const circuit = new Circuit();
-    const and1 = registry.get("And")!.factory(new PropertyBag());
+    const and1 = registry.getStandalone("And")!.factory(new PropertyBag());
     and1.position = { x: 0, y: 0 };
     circuit.addElement(and1);
 
-    const dff = registry.get("DFF")!.factory(new PropertyBag());
+    const dff = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dff.position = { x: 20, y: 0 };
     circuit.addElement(dff);
 
@@ -218,11 +218,11 @@ describe("StateSlotAllocation", () => {
     const registry = makeRegistry(andDef, dffDef);
 
     const circuit = new Circuit();
-    const and1 = registry.get("And")!.factory(new PropertyBag());
+    const and1 = registry.getStandalone("And")!.factory(new PropertyBag());
     and1.position = { x: 0, y: 0 };
     circuit.addElement(and1);
 
-    const dff = registry.get("DFF")!.factory(new PropertyBag());
+    const dff = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dff.position = { x: 20, y: 0 };
     circuit.addElement(dff);
 
@@ -261,7 +261,7 @@ describe("StateSlotAllocation", () => {
     const inst2 = createTestElementFromDecls("DynComp", crypto.randomUUID(), dynamicPins(), props2, { x: 20, y: 0 });
     circuit.addElement(inst2);
 
-    registry.get("DynComp")!.propertyDefs = [
+    registry.getStandalone("DynComp")!.propertyDefs = [
       { key: "size", label: "Size", type: PropertyType.INT, defaultValue: 4 },
     ];
 

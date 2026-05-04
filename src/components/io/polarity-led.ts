@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PolarityAwareLED component- LED with anode/cathode orientation.
  *
  * Lights up when anode input is high AND cathode input is low.
@@ -17,7 +17,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -142,7 +142,7 @@ export class PolarityLedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePolarityLed- anode=1 and cathode=0 → lit
+// executePolarityLed- anode=1 and cathode=0 â†’ lit
 // ---------------------------------------------------------------------------
 
 export function executePolarityLed(
@@ -205,7 +205,7 @@ function polarityLedFactory(props: PropertyBag): PolarityLedElement {
   return new PolarityLedElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PolarityLedDefinition: ComponentDefinition = {
+export const PolarityLedDefinition: StandaloneComponentDefinition = {
   name: "PolarityAwareLED",
   typeId: -1,
   factory: polarityLedFactory,
@@ -215,7 +215,7 @@ export const PolarityLedDefinition: ComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "PolarityAwareLED- LED that considers anode/cathode orientation.\n" +
-    "Lights up when anode is high AND cathode is low (current flows anode→cathode).\n" +
+    "Lights up when anode is high AND cathode is low (current flows anodeâ†’cathode).\n" +
     "Color is configurable.",
   models: {
     digital: { executeFn: executePolarityLed, inputSchema: ["A", "K"], outputSchema: [] },

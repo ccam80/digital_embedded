@@ -22,8 +22,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
-import type { StatePoolRef } from "../state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -51,28 +50,19 @@ const T_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
-export class BehavioralTFlipflopDriverElement implements PoolBackedAnalogElement {
+export class BehavioralTFlipflopDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = SCHEMA.size;
 
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
-
   private _vIH: number;
-  private _vIL: number;
   private readonly _forceToggle: 0 | 1;
-  private _pool!: StatePoolRef;
 
   private _firstSample: boolean = true;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
     this._forceToggle = props.hasModelParam("forceToggle")
       ? (props.getModelParam<number>("forceToggle") >= 0.5 ? 1 : 0)
       : 0;
@@ -80,10 +70,6 @@ export class BehavioralTFlipflopDriverElement implements PoolBackedAnalogElement
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {
@@ -123,7 +109,6 @@ export class BehavioralTFlipflopDriverElement implements PoolBackedAnalogElement
 
   setParam(key: string, value: number): void {
     if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
   }
 }
 

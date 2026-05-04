@@ -117,47 +117,47 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
     // --- Single-letter placement shortcuts (no Ctrl/Meta) ---
     if (!e.ctrlKey && !e.metaKey) {
       if (e.key === 'i' || e.key === 'I') {
-        const def = ctx.registry.get('In');
+        const def = ctx.registry.getStandalone('In');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 'o' || e.key === 'O') {
-        const def = ctx.registry.get('Out');
+        const def = ctx.registry.getStandalone('Out');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 'c' || e.key === 'C') {
-        const def = ctx.registry.get('Capacitor');
+        const def = ctx.registry.getStandalone('Capacitor');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === '1') {
-        const def = ctx.registry.get('Const');
+        const def = ctx.registry.getStandalone('Const');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 'v' || e.key === 'V') {
-        const def = ctx.registry.get('VoltageSource');
+        const def = ctx.registry.getStandalone('VoltageSource');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === '+') {
-        const def = ctx.registry.get('VDD');
+        const def = ctx.registry.getStandalone('VDD');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 'l' || e.key === 'L') {
-        const def = ctx.registry.get('Inductor');
+        const def = ctx.registry.getStandalone('Inductor');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 't' || e.key === 'T') {
-        const def = ctx.registry.get('Tunnel');
+        const def = ctx.registry.getStandalone('Tunnel');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 'g' || e.key === 'G') {
-        const def = ctx.registry.get('Ground');
+        const def = ctx.registry.getStandalone('Ground');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
@@ -169,12 +169,12 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         return;
       }
       if (e.key === 'p' || e.key === 'P') {
-        const def = ctx.registry.get('Port');
+        const def = ctx.registry.getStandalone('Port');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
       if (e.key === 'R') {
-        const def = ctx.registry.get('Resistor');
+        const def = ctx.registry.getStandalone('Resistor');
         if (def) { ctx.placement.start(def); ctx.scheduleRender(); }
         return;
       }
@@ -251,7 +251,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         ctx.clipboard = copyToClipboard(
           [...ctx.selection.getSelectedElements()],
           [...ctx.selection.getSelectedWires()],
-          (typeId: string) => ctx.registry.get(typeId),
+          (typeId: string) => ctx.registry.getStandalone(typeId),
         );
       }
       return;
@@ -264,7 +264,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         ctx.clipboard = copyToClipboard(
           [...ctx.selection.getSelectedElements()],
           [...ctx.selection.getSelectedWires()],
-          (typeId: string) => ctx.registry.get(typeId),
+          (typeId: string) => ctx.registry.getStandalone(typeId),
         );
         const elements = [...ctx.selection.getSelectedElements()];
         const wires: Wire[] = [...ctx.selection.getSelectedWires()];

@@ -1,5 +1,5 @@
 /**
- * Tests for MNAEngine — the concrete AnalogEngine implementation.
+ * Tests for MNAEngine- the concrete AnalogEngine implementation.
  *
  * All circuit fixtures live in `./fixtures/analog-fixtures.ts`. Tests use
  * either:
@@ -14,25 +14,45 @@
  * _setup() is the single owner. See analog-fixtures.ts for the contract.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import * as NiPredModule from "../ni-pred.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import {
   compileDivider,
   compileDiode,
-  dividerCircuit,
   rcCircuit,
   diodeCircuit,
   fuseCircuit,
   wrapHandElements,
 } from "./fixtures/analog-fixtures.js";
+import { DefaultSimulationCoordinator } from "../../coordinator.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
+import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
+
+/** Acquire a MNAEngine from a pre-compiled analog circuit without constructing
+ *  MNAEngine directly- routes through DefaultSimulationCoordinator per UC-1. */
+function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
+  const coordinator = new DefaultSimulationCoordinator({
+    digital: null,
+    analog: compiled,
+    bridges: [],
+    wireSignalMap: new Map(),
+    labelSignalMap: new Map(),
+    labelToCircuitElement: new Map(),
+    pinSignalMap: new Map(),
+    diagnostics: [],
+    allCircuitElements: [],
+  });
+  return coordinator.getAnalogEngine() as MNAEngine;
+}
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
@@ -40,7 +60,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const el: AnalogElement = {
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     setup(ctx: SetupContext): void {
@@ -70,23 +90,17 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 }
 
 // ---------------------------------------------------------------------------
-// MNAEngine — core behaviour
+// MNAEngine- core behaviour
 // ---------------------------------------------------------------------------
 
 describe("MNAEngine", () => {
-  let engine: MNAEngine;
-
-  beforeEach(() => {
-    engine = new MNAEngine();
-  });
-
   // -------------------------------------------------------------------------
   // DC operating point
   // -------------------------------------------------------------------------
 
   it("dc_op_resistor_divider_via_compiler", () => {
     const compiled = compileDivider({ R1: 1000, R2: 1000, V: 5 });
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
@@ -98,7 +112,7 @@ describe("MNAEngine", () => {
 
   it("dc_op_diode_circuit_via_compiler", () => {
     const compiled = compileDiode({ R: 1000, V: 5 });
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
@@ -110,7 +124,7 @@ describe("MNAEngine", () => {
   });
 
   it("dc_op_returns_result", () => {
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
@@ -123,7 +137,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("transient_rc_decay", () => {
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
 
     const RC = 1e-3;
     let steps = 0;
@@ -142,7 +156,7 @@ describe("MNAEngine", () => {
   });
 
   it("sim_time_advances", () => {
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
 
     expect(engine.simTime).toBe(0);
     for (let i = 0; i < 10; i++) engine.step();
@@ -150,7 +164,7 @@ describe("MNAEngine", () => {
   });
 
   it("last_dt_reflects_adaptive_step", () => {
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
     engine.step();
 
     expect(engine.lastDt).toBeGreaterThan(0);
@@ -162,7 +176,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("reset_clears_state", () => {
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
     engine.dcOperatingPoint();
 
     for (let i = 0; i < 5; i++) engine.step();
@@ -180,7 +194,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("configure_changes_tolerances", () => {
-    engine.init(diodeCircuit());
+    const engine = engineFrom(diodeCircuit());
 
     engine.configure({ reltol: 1e-6 });
     const result = engine.dcOperatingPoint();
@@ -194,7 +208,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("diagnostics_emitted_on_dc_op", () => {
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
 
     const received: string[] = [];
     engine.onDiagnostic((diag) => received.push(diag.code));
@@ -208,7 +222,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("breakpoint_honored", () => {
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
 
     const targetTime = 50e-6;
     engine.addBreakpoint(targetTime);
@@ -229,7 +243,8 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("get_branch_current", () => {
-    engine.init(dividerCircuit());
+    const compiled = compileDivider({ R1: 1000, R2: 1000, V: 5 });
+    const engine = engineFrom(compiled);
     engine.dcOperatingPoint();
 
     // Vs=5V, R1+R2=2kΩ → |I| = 2.5mA
@@ -242,9 +257,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("engine_state_transitions", () => {
-    expect(engine.getState()).toBe(EngineState.STOPPED);
-
-    engine.init(dividerCircuit());
+    const engine = engineFrom(rcCircuit());
     expect(engine.getState()).toBe(EngineState.STOPPED);
 
     engine.start();
@@ -258,10 +271,10 @@ describe("MNAEngine", () => {
   });
 
   it("change_listeners_notified", () => {
+    const engine = engineFrom(rcCircuit());
     const states: EngineState[] = [];
 
     engine.addChangeListener((s) => states.push(s));
-    engine.init(dividerCircuit());
     engine.start();
     engine.stop();
     engine.reset();
@@ -272,13 +285,13 @@ describe("MNAEngine", () => {
   });
 
   it("remove_change_listener_works", () => {
+    const engine = engineFrom(rcCircuit());
     const states: EngineState[] = [];
     const listener = (s: EngineState) => states.push(s);
 
     engine.addChangeListener(listener);
     engine.removeChangeListener(listener);
 
-    engine.init(dividerCircuit());
     engine.start();
 
     expect(states).toHaveLength(0);
@@ -289,7 +302,7 @@ describe("MNAEngine", () => {
   // -------------------------------------------------------------------------
 
   it("predictor_off_uses_last_converged_guess", () => {
-    engine.init(diodeCircuit());
+    const engine = engineFrom(diodeCircuit());
     engine.configure({ predictor: false });
 
     for (let i = 0; i < 20; i++) {
@@ -340,7 +353,7 @@ describe("MNAEngine", () => {
       ],
     });
 
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
     engine.dcOperatingPoint();
 
     const target = 300e-6;
@@ -358,7 +371,7 @@ describe("MNAEngine", () => {
   });
 
   it("predictor_off_rc_regression", () => {
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
 
     const RC = 1e-3;
     let steps = 0;
@@ -383,7 +396,7 @@ describe("MNAEngine", () => {
       V: 5, rCold: 1.0, rBlown: 1e9, i2tRating: 1e-8, rLoad: 9.0,
     });
 
-    engine.init(circuit);
+    const engine = engineFrom(circuit);
 
     expect(fuse.blown).toBe(false);
     expect(fuse.currentResistance).toBeLessThan(2); // close to rCold=1Ω
@@ -399,15 +412,14 @@ describe("MNAEngine", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SimulationRunner integration — the full compileUnified pipeline
+// SimulationRunner integration- the full compileUnified pipeline
 // ---------------------------------------------------------------------------
 
 describe("runner_integration", () => {
   it("resolves_label_to_node_voltage", () => {
     const compiled = compileDivider({ R1: 1000, R2: 1000, V: 5 });
 
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
 
     const dcResult = engine.dcOperatingPoint();
     expect(dcResult.converged).toBe(true);
@@ -424,8 +436,7 @@ describe("runner_integration", () => {
 
 describe("rc_transient_without_separate_loops", () => {
   it("rc_transient_without_separate_loops", () => {
-    const engine = new MNAEngine();
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
 
     for (let i = 0; i < 100; i++) {
       engine.step();
@@ -441,8 +452,7 @@ describe("rc_transient_without_separate_loops", () => {
 
 describe("xfact_computed_from_deltaOld", () => {
   it("xfact_computed_from_deltaOld", () => {
-    const engine = new MNAEngine();
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
     engine.dcOperatingPoint();
 
     for (let i = 0; i < 3; i++) engine.step();
@@ -459,8 +469,7 @@ describe("xfact_computed_from_deltaOld", () => {
 
 describe("method_stable_across_ringing", () => {
   it("method_stable_across_ringing", () => {
-    const engine = new MNAEngine();
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
 
     for (let i = 0; i < 50; i++) {
       engine.step();
@@ -475,8 +484,7 @@ describe("first_step_uses_order_1", () => {
   it("first_step_uses_order_1", () => {
     // ngspice dctran.c:315 sets CKTorder = 1 at transient entry; niinteg.c:20-21
     // gives the order-1 trap coefficients ag[0] = 1/dt, ag[1] = -1/dt.
-    const engine = new MNAEngine();
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
     engine.dcOperatingPoint();
 
     expect(engine.integrationOrder).toBe(1);
@@ -486,16 +494,41 @@ describe("first_step_uses_order_1", () => {
   });
 });
 
+describe("MNAEngine exposes accessors after first dcop", () => {
+  it("MNAEngine exposes accessors after first dcop", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vs1", type: "DcVoltageSource", props: { label: "vs1", voltage: 5 } },
+        { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+        { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 1000 } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [
+        ["vs1:pos", "r1:pos"],
+        ["r1:neg",  "r2:pos"],
+        ["r2:neg",  "gnd:out"],
+        ["vs1:neg", "gnd:out"],
+      ],
+      metadata: {},
+    });
+    const coordinator = facade.compile(circuit) as DefaultSimulationCoordinator;
+    const engine = coordinator.getAnalogEngine() as MNAEngine;
+    coordinator.dcOperatingPoint();
+    expect(engine.statePool).toBeDefined();
+  });
+});
+
 describe("predictor_gate_off_by_default", () => {
   it("predictor_gate_off_by_default", () => {
-    // Spy on the real predictVoltages — it must not be invoked when
+    // Spy on the real predictVoltages- it must not be invoked when
     // predictor: false. (Phase 5 review: the previous _voltages /
     // _prevVoltages structural check was an implementation-detail test.)
     const spy = vi.spyOn(NiPredModule, "predictVoltages");
 
     try {
-      const engine = new MNAEngine();
-      engine.init(rcCircuit());
+      const engine = engineFrom(rcCircuit());
       engine.configure({ predictor: false });
 
       for (let i = 0; i < 10; i++) {
@@ -513,8 +546,7 @@ describe("predictor_gate_off_by_default", () => {
 
 describe("no_closures_in_step", () => {
   it("no_closures_in_step", () => {
-    const engine = new MNAEngine();
-    engine.init(rcCircuit());
+    const engine = engineFrom(rcCircuit());
     engine.dcOperatingPoint();
     engine.start();
 

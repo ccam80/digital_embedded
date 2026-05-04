@@ -43,8 +43,8 @@ import {
 } from "../mosfet.js";
 
 // ---------------------------------------------------------------------------
-// setupMosfetElement — run real setup() on the element and return it with
-// its solver. The solver is the one setup() allocated handles on — pass it
+// setupMosfetElement- run real setup() on the element and return it with
+// its solver. The solver is the one setup() allocated handles on- pass it
 // to makeDcOpCtx so stamps land in the same sparse structure.
 // ---------------------------------------------------------------------------
 
@@ -167,7 +167,7 @@ function makeNmosAtVgs_Vds(
   voltages[2] = vgs;  // V(node2=G) = Vgs
   voltages[3] = 0;    // V(node3=S) = 0
 
-  // Iterate to converge voltage limiting — reuse same solver across calls
+  // Iterate to converge voltage limiting- reuse same solver across calls
   for (let i = 0; i < 50; i++) {
     element.load(makeDcOpCtx(voltages, 4, solver));
     voltages[1] = vds;
@@ -233,7 +233,7 @@ describe("NMOS", () => {
   it("three_terminal_node_indices", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj, () => 0);
-    // _pinNodes is the single topology source per §A.4.
+    // _pinNodes is the single topology source per ssA.4.
     expect(element._pinNodes.get("G")).toBe(2);
     expect(element._pinNodes.get("D")).toBe(1);
     expect(element._pinNodes.get("S")).toBe(3);
@@ -1033,7 +1033,7 @@ function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> & { setu
 }
 
 /** Create an NMOS element with real setup() and a bound StatePool.
- *  Pin map: G=2, S=3, D=1. The returned solver is the one setup() ran on —
+ *  Pin map: G=2, S=3, D=1. The returned solver is the one setup() ran on-
  *  pass it to makeWave62Ctx via setupSolver when the test checks matrix entries. */
 function makeNmosElement62(params: Record<string, number> = {}): {
   element: any;
@@ -1051,7 +1051,7 @@ function makeNmosElement62(params: Record<string, number> = {}): {
 }
 
 /** Create a PMOS element with real setup() and a bound StatePool.
- *  Pin map: G=2, S=3, D=1. The returned solver is the one setup() ran on —
+ *  Pin map: G=2, S=3, D=1. The returned solver is the one setup() ran on-
  *  pass it to makeWave62Ctx via setupSolver when the test checks matrix entries. */
 function makePmosElement62(params: Record<string, number> = {}): {
   element: any;
@@ -1069,13 +1069,25 @@ function makePmosElement62(params: Record<string, number> = {}): {
   return { element: core as any, pool, solver };
 }
 
-// Slot index constants matching MOSFET_SCHEMA order (mirrored from mosfet.ts).
-const S_VBD  = 0,  S_VBS  = 1,  S_VGS  = 2,  S_VDS  = 3;
-const S_CAPGS= 4,  S_QGS  = 5,  S_CQGS = 6;
-const S_CAPGD= 7,  S_QGD  = 8,  S_CQGD = 9;
-const S_CAPGB= 10, S_QGB  = 11, S_CQGB = 12;
-const S_QBD  = 13, S_CQBD = 14, S_QBS  = 15, S_CQBS = 16;
-const S_CD   = 17;
+// Slot indices resolved through MOSFET_SCHEMA.indexOf (schema lookup, not raw imports).
+const S_VBD   = MOSFET_SCHEMA.indexOf.get("VBD")!;
+const S_VBS   = MOSFET_SCHEMA.indexOf.get("VBS")!;
+const S_VGS   = MOSFET_SCHEMA.indexOf.get("VGS")!;
+const S_VDS   = MOSFET_SCHEMA.indexOf.get("VDS")!;
+const S_CAPGS = MOSFET_SCHEMA.indexOf.get("CAPGS")!;
+const S_QGS   = MOSFET_SCHEMA.indexOf.get("QGS")!;
+const S_CQGS  = MOSFET_SCHEMA.indexOf.get("CQGS")!;
+const S_CAPGD = MOSFET_SCHEMA.indexOf.get("CAPGD")!;
+const S_QGD   = MOSFET_SCHEMA.indexOf.get("QGD")!;
+const S_CQGD  = MOSFET_SCHEMA.indexOf.get("CQGD")!;
+const S_CAPGB = MOSFET_SCHEMA.indexOf.get("CAPGB")!;
+const S_QGB   = MOSFET_SCHEMA.indexOf.get("QGB")!;
+const S_CQGB  = MOSFET_SCHEMA.indexOf.get("CQGB")!;
+const S_QBD   = MOSFET_SCHEMA.indexOf.get("QBD")!;
+const S_CQBD  = MOSFET_SCHEMA.indexOf.get("CQBD")!;
+const S_QBS   = MOSFET_SCHEMA.indexOf.get("QBS")!;
+const S_CQBS  = MOSFET_SCHEMA.indexOf.get("CQBS")!;
+const S_CD    = MOSFET_SCHEMA.indexOf.get("CD")!;
 
 // ---------------------------------------------------------------------------
 // Task 6.2.1: M-1  MODEINITPRED limiting routing

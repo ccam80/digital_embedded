@@ -23,8 +23,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
-import type { StatePoolRef } from "../state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -76,25 +75,18 @@ const BUTTON_LED_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralButtonLEDDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralButtonLEDDriverElement implements PoolBackedAnalogElement {
+export class BehavioralButtonLEDDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _inNode: number;
   private readonly _gndNode: number;
   private _vIH: number;
   private _vIL: number;
-  private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._inNode  = pinNodes.get("in")!;
     this._gndNode = pinNodes.get("gnd")!;
     this._vIH = props.getModelParam<number>("vIH");
@@ -103,10 +95,6 @@ export class BehavioralButtonLEDDriverElement implements PoolBackedAnalogElement
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   /**

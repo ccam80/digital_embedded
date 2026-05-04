@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PowerSupply component- VCC/GND source enforcer for CMOS circuits.
  *
  * Has two inputs: VDD (must be 1) and GND (must be 0).
@@ -19,16 +19,16 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java PowerSupply uses GenericShape: 2 inputs (VDD, GND), 0 outputs, width=3
-// Non-symmetric (0 outputs) → offs=0
+// Non-symmetric (0 outputs) â†’ offs=0
 // VDD@(0,0), GND@(0,1)
-// → COMP_WIDTH=3, COMP_HEIGHT=2
+// â†’ COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
 
@@ -183,7 +183,7 @@ function powerSupplyFactory(props: PropertyBag): PowerSupplyElement {
   return new PowerSupplyElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PowerSupplyDefinition: ComponentDefinition = {
+export const PowerSupplyDefinition: StandaloneComponentDefinition = {
   name: "PowerSupply",
   typeId: -1,
   factory: powerSupplyFactory,

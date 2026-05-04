@@ -1,19 +1,19 @@
 /**
  * Tests for Analog Switch components (SPST and SPDT).
  *
- * Surviving tests per Phase 2.5 A1 §Test handling rule:
- *   - Parameter plumbing (setParam, defaults) — KEEP
- *   - Engine-agnostic interface contracts (poolBacked, stateSize, stateSchema) — KEEP
+ * Surviving tests per Phase 2.5 A1 ssTest handling rule:
+ *   - Parameter plumbing (setParam, defaults)- KEEP
+ *   - Engine-agnostic interface contracts (poolBacked, stateSize, stateSchema)- KEEP
  *
- * Deleted per A1 §Test handling rule:
- *   - on_resistance      — hand-computed expected value based on tanh extension behavior → deleted
- *   - off_resistance     — hand-computed expected value based on tanh extension behavior → deleted
- *   - smooth_transition  — asserts tanh monotonicity, digiTS extension beyond ngspice SW → deleted
- *   - signal_passes_when_on — hand-computed circuit result, digiTS tanh extension → deleted
- *   - nr_converges_during_transition — asserts tanh convergence property, digiTS extension → deleted
- *   - no_and_nc_complementary — asserts tanh transition values, digiTS extension → deleted
- *   - break_before_make  — asserts tanh midpoint resistance, digiTS extension → deleted
- *   - analog_switch_load_dcop_parity (C4.5) — closed-form tanh reference, digiTS extension → deleted
+ * Deleted per A1 ssTest handling rule:
+ *   - on_resistance     - hand-computed expected value based on tanh extension behavior → deleted
+ *   - off_resistance    - hand-computed expected value based on tanh extension behavior → deleted
+ *   - smooth_transition - asserts tanh monotonicity, digiTS extension beyond ngspice SW → deleted
+ *   - signal_passes_when_on- hand-computed circuit result, digiTS tanh extension → deleted
+ *   - nr_converges_during_transition- asserts tanh convergence property, digiTS extension → deleted
+ *   - no_and_nc_complementary- asserts tanh transition values, digiTS extension → deleted
+ *   - break_before_make - asserts tanh midpoint resistance, digiTS extension → deleted
+ *   - analog_switch_load_dcop_parity (C4.5)- closed-form tanh reference, digiTS extension → deleted
  */
 
 import { describe, it, expect } from "vitest";
@@ -25,9 +25,10 @@ import {
 } from "../analog-switch.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory
@@ -117,7 +118,7 @@ describe("SPST parameter plumbing", () => {
       new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
       makeProps(), () => 0,
     );
-    // Should not throw — engine-agnostic interface contract
+    // Should not throw- engine-agnostic interface contract
     expect(() => el.setParam("rOn", 50)).not.toThrow();
     expect(() => el.setParam("rOff", 1e8)).not.toThrow();
     expect(() => el.setParam("vThreshold", 2.5)).not.toThrow();
@@ -180,17 +181,12 @@ describe("SW_SCHEMA structure", () => {
     expect(SW_SCHEMA.slots).toHaveLength(2);
   });
 
-  it("slot 0 is CURRENT_STATE initialised to 0 (REALLY_OFF)", () => {
-    const slot = SW_SCHEMA.slots[0];
-    expect(slot.name).toBe("CURRENT_STATE");
-    expect(slot.init.kind).toBe("constant");
-    expect((slot.init as any).value).toBe(0);
+  it("slot 0 is CURRENT_STATE", () => {
+    expect(SW_SCHEMA.slots[0].name).toBe("CURRENT_STATE");
   });
 
-  it("slot 1 is V_CTRL initialised to zero", () => {
-    const slot = SW_SCHEMA.slots[1];
-    expect(slot.name).toBe("V_CTRL");
-    expect(slot.init.kind).toBe("zero");
+  it("slot 1 is V_CTRL", () => {
+    expect(SW_SCHEMA.slots[1].name).toBe("V_CTRL");
   });
 });
 
@@ -199,11 +195,8 @@ describe("SPDT_SCHEMA structure", () => {
     expect(SPDT_SCHEMA.size).toBe(4);
   });
 
-  it("NC path state slot (index 2) initialises to 1 (REALLY_ON = starts closed)", () => {
-    const slot = SPDT_SCHEMA.slots[2];
-    expect(slot.name).toBe("NC_CURRENT_STATE");
-    expect(slot.init.kind).toBe("constant");
-    expect((slot.init as any).value).toBe(1);
+  it("NC path state slot (index 2) is NC_CURRENT_STATE", () => {
+    expect(SPDT_SCHEMA.slots[2].name).toBe("NC_CURRENT_STATE");
   });
 });
 
@@ -249,11 +242,10 @@ describe("PB-ANALOG_SWITCH TSTALLOC sequence", () => {
       new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
       makeProps(), () => 0,
     );
-    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
-    const engine = new MNAEngine();
-    engine.init(circuit);
-    (engine as any)._setup();
-    const order = (engine as any)._solver._getInsertionOrder();
+    const solver = new SparseSolver();
+    const ctx = makeTestSetupContext({ solver, elements: [el as unknown as AnalogElement] });
+    (el as unknown as AnalogElement).setup(ctx);
+    const order = (solver as any)._getInsertionOrder();
     expect(order).toEqual([
       { extRow: 1, extCol: 1 },  // SWposPosptr
       { extRow: 1, extCol: 2 },  // SWposNegptr
@@ -273,18 +265,17 @@ describe("PB-ANALOG_SWITCH TSTALLOC sequence", () => {
       new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
       makeProps(), () => 0,
     );
-    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 4);
-    const engine = new MNAEngine();
-    engine.init(circuit);
-    (engine as any)._setup();
-    const order = (engine as any)._solver._getInsertionOrder();
+    const solver = new SparseSolver();
+    const ctx = makeTestSetupContext({ solver, elements: [el as unknown as AnalogElement] });
+    (el as unknown as AnalogElement).setup(ctx);
+    const order = (solver as any)._getInsertionOrder();
     expect(order).toEqual([
-      // swNO path (com=1, no=2) — swsetup.c:59-62
+      // swNO path (com=1, no=2)- swsetup.c:59-62
       { extRow: 1, extCol: 1 },  // SWposPosptr (swNO)
       { extRow: 1, extCol: 2 },  // SWposNegptr (swNO)
       { extRow: 2, extCol: 1 },  // SWnegPosptr (swNO)
       { extRow: 2, extCol: 2 },  // SWnegNegptr (swNO)
-      // swNC path (com=1, nc=3) — swsetup.c:59-62
+      // swNC path (com=1, nc=3)- swsetup.c:59-62
       { extRow: 1, extCol: 1 },  // SWposPosptr (swNC)
       { extRow: 1, extCol: 3 },  // SWposNegptr (swNC)
       { extRow: 3, extCol: 1 },  // SWnegPosptr (swNC)

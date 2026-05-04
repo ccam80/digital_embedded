@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Const component- constant value source.
  *
  * Writes a fixed value to its output on every simulation step.
@@ -17,7 +17,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -158,7 +158,7 @@ function constFactory(props: PropertyBag): ConstElement {
   return new ConstElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ConstDefinition: ComponentDefinition = {
+export const ConstDefinition: StandaloneComponentDefinition = {
   name: "Const",
   typeId: -1,
   factory: constFactory,

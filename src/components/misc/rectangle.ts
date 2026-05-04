@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Rectangle annotation component- visual grouping box on the canvas.
  *
  * Rectangle has no simulation behavior: no pins, no executeFn state changes.
@@ -21,7 +21,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -101,7 +101,7 @@ export function executeRectangle(
 }
 
 // ---------------------------------------------------------------------------
-// RECTANGLE_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
+// RECTANGLE_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const RECTANGLE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -169,7 +169,7 @@ const RECTANGLE_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RectangleDefinition- ComponentDefinition for registry registration
+// RectangleDefinition- StandaloneComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function rectangleFactory(props: PropertyBag): RectangleElement {
@@ -182,7 +182,7 @@ function rectangleFactory(props: PropertyBag): RectangleElement {
   );
 }
 
-export const RectangleDefinition: ComponentDefinition = {
+export const RectangleDefinition: StandaloneComponentDefinition = {
   name: "Rectangle",
   typeId: -1,
   factory: rectangleFactory,

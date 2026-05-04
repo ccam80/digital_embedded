@@ -8,7 +8,7 @@
  *   cancel()                          - animate back and clean up
  */
 
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import type { Point } from "@/core/renderer-interface";
 import { screenToWorld } from "./coordinates.js";
 import type { Viewport } from "./viewport.js";
@@ -20,14 +20,14 @@ import type { Viewport } from "./viewport.js";
 export class PaletteDragController {
   private _ghost: HTMLElement | null = null;
   private _dimmedItem: HTMLElement | null = null;
-  private _def: ComponentDefinition | null = null;
+  private _def: StandaloneComponentDefinition | null = null;
   private _originRect: DOMRect | null = null;
 
   get isDragging(): boolean {
     return this._ghost !== null;
   }
 
-  get definition(): ComponentDefinition | null {
+  get definition(): StandaloneComponentDefinition | null {
     return this._def;
   }
 
@@ -39,7 +39,7 @@ export class PaletteDragController {
    * @param clientX   Current touch client X.
    * @param clientY   Current touch client Y.
    */
-  start(def: ComponentDefinition, itemEl: HTMLElement, clientX: number, clientY: number): void {
+  start(def: StandaloneComponentDefinition, itemEl: HTMLElement, clientX: number, clientY: number): void {
     this.cancel(); // Clean up any previous drag
 
     this._def = def;

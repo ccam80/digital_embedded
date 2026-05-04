@@ -319,6 +319,15 @@ const CCCS_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Expression defining output current as function of I(sense). Default: I(sense).",
   },
   {
+    key: "senseSourceLabel",
+    type: PropertyType.STRING,
+    label: "Sense source label",
+    defaultValue: "",
+    description:
+      "Label of the controlling VSRC/CCVS/VCVS/IND whose branch current is sensed. " +
+      "Required- setup() throws if empty.",
+  },
+  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -332,9 +341,10 @@ const CCCS_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const CCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "expression",  propertyKey: "expression",  convert: (v) => v },
-  { xmlName: "currentGain", propertyKey: "currentGain", convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "Label",       propertyKey: "label",       convert: (v) => v },
+  { xmlName: "expression",       propertyKey: "expression",       convert: (v) => v },
+  { xmlName: "currentGain",      propertyKey: "currentGain",      convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "senseSourceLabel", propertyKey: "senseSourceLabel", convert: (v) => v },
+  { xmlName: "Label",            propertyKey: "label",            convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -371,6 +381,12 @@ export const CCCSDefinition: StandaloneComponentDefinition = {
         const deriv = simplify(differentiate(rawExpr, "I(sense)"));
         const el = new CCCSAnalogElement(rawExpr, deriv, "I(sense)", "current");
         el._pinNodes = new Map(pinNodes);
+        // Wire the sense-source link via the public setParam path so the
+        // build-spec entry point can drive CCCS without reaching past the
+        // factory boundary. Empty string = unset; setup() will throw with
+        // the canonical error.
+        const senseLabel = props.getOrDefault<string>("senseSourceLabel", "");
+        el.setParam("senseSourceLabel", senseLabel);
         return el;
       },
       paramDefs: CCCS_PARAM_DEFS,

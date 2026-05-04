@@ -1,9 +1,9 @@
-/**
+﻿/**
  * LightBulb component- incandescent bulb indicator.
  *
  * Rendered as a circle with filament cross lines.
  * Brightness is conceptually proportional to input value; visually it is
- * either off (input=0) or on (input≠0) since the canvas renderer is binary.
+ * either off (input=0) or on (inputâ‰ 0) since the canvas renderer is binary.
  * 1-bit input.
  */
 
@@ -19,7 +19,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -166,7 +166,7 @@ function lightBulbFactory(props: PropertyBag): LightBulbElement {
   return new LightBulbElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const LightBulbDefinition: ComponentDefinition = {
+export const LightBulbDefinition: StandaloneComponentDefinition = {
   name: "LightBulb",
   typeId: -1,
   factory: lightBulbFactory,

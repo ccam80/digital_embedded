@@ -15,9 +15,10 @@ import {
   DEFAULT_SIMULATION_PARAMS,
   type SimulationParams,
 } from "@/core/analog-engine-interface";
-import { MNAEngine } from "@/solver/analog/analog-engine";
+import { DefaultSimulatorFacade } from "@/headless/default-facade";
+import { createDefaultRegistry } from "@/components/register-all";
 
-describe("resolveSimulationParams — ngspice traninit.c:23-32 parity", () => {
+describe("resolveSimulationParams- ngspice traninit.c:23-32 parity", () => {
   it("user-supplied maxTimeStep passes through unmodified", () => {
     const r = resolveSimulationParams({
       ...DEFAULT_SIMULATION_PARAMS,
@@ -110,13 +111,32 @@ describe("resolveSimulationParams — ngspice traninit.c:23-32 parity", () => {
   });
 });
 
-describe("MNAEngine.configure — auto-derivation survives the merge", () => {
-  it("re-derives when configure provides tStop without maxTimeStep", () => {
-    const engine = new MNAEngine();
+describe("MNAEngine.configure- auto-derivation survives the merge", () => {
+  async function buildEngine() {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 1 } },
+        { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [
+        ["vs:pos", "r1:pos"],
+        ["r1:neg", "gnd:out"],
+        ["vs:neg", "gnd:out"],
+      ],
+    });
+    const coordinator = await facade.compile(circuit);
+    return coordinator.getAnalogEngine()!;
+  }
+
+  it("re-derives when configure provides tStop without maxTimeStep", async () => {
+    const engine = await buildEngine();
     // First configure: just tolerances. _params.maxTimeStep stays at the
     // static default because no transient inputs are present.
     engine.configure({ reltol: 1e-3 });
-    // Second configure: provides tStop+outputStep without maxTimeStep —
+    // Second configure: provides tStop+outputStep without maxTimeStep-
     // must re-fire auto-derivation, not silently keep the static default.
     engine.configure({ tStop: 100e-3, outputStep: 1e-3 });
     // (params is private; cast to access for verification.)
@@ -126,15 +146,15 @@ describe("MNAEngine.configure — auto-derivation survives the merge", () => {
     expect(p.firstStep).toBe(1e-4);
   });
 
-  it("explicit maxTimeStep override passes through configure", () => {
-    const engine = new MNAEngine();
+  it("explicit maxTimeStep override passes through configure", async () => {
+    const engine = await buildEngine();
     engine.configure({ tStop: 100e-3, outputStep: 1e-3, maxTimeStep: 7e-7 });
     const p = (engine as unknown as { _params: { maxTimeStep: number } })._params;
     expect(p.maxTimeStep).toBe(7e-7);
   });
 
-  it("non-transient configure call does not disturb existing maxTimeStep", () => {
-    const engine = new MNAEngine();
+  it("non-transient configure call does not disturb existing maxTimeStep", async () => {
+    const engine = await buildEngine();
     engine.configure({ tStop: 100e-3, outputStep: 1e-3 });
     engine.configure({ reltol: 5e-4 });
     const p = (engine as unknown as { _params: { maxTimeStep: number; reltol: number } })._params;

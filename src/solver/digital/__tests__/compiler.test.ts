@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for circuit compiler (task 3.2.1) and Tarjan/topological-sort
  * utilities (task 3.2.1 sub-components).
  *
@@ -13,7 +13,7 @@ import { findSCCs } from "../tarjan.js";
 import { topologicalSort } from "../topological-sort.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { StandaloneComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
@@ -68,7 +68,7 @@ function outputOnlyPin(label: string, position: { x: number; y: number }): PinDe
 }
 
 // ---------------------------------------------------------------------------
-// Helpers: build minimal ComponentDefinition
+// Helpers: build minimal StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function makeDefinition(
@@ -76,7 +76,7 @@ function makeDefinition(
   pins: PinDeclaration[],
   executeFn: ExecuteFunction = noopExecFn,
   defaultDelay?: number,
-): Omit<ComponentDefinition, "typeId"> & { typeId: number } {
+): Omit<StandaloneComponentDefinition, "typeId"> & { typeId: number } {
   return {
     name,
     typeId: -1,
@@ -100,10 +100,10 @@ function makeDefinition(
 // Registry builder
 // ---------------------------------------------------------------------------
 
-function makeRegistry(...defs: (Omit<ComponentDefinition, "typeId"> & { typeId: number })[]): ComponentRegistry {
+function makeRegistry(...defs: (Omit<StandaloneComponentDefinition, "typeId"> & { typeId: number })[]): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const def of defs) {
-    registry.register(def as ComponentDefinition);
+    registry.register(def as StandaloneComponentDefinition);
   }
   return registry;
 }
@@ -147,7 +147,7 @@ describe("Compiler", () => {
   // compilesChainedGates
   // -------------------------------------------------------------------------
   it("compilesChainedGates", () => {
-    // Chain: NOT(A) → AND(_, B) → nothing
+    // Chain: NOT(A) â†’ AND(_, B) â†’ nothing
     // NOT output at (2,0) connects to AND input at (10,0) via a wire.
     // Each gate is positioned so their pins don't accidentally overlap.
 
@@ -204,8 +204,8 @@ describe("Compiler", () => {
     // SR latch: two NOR gates cross-connected.
     // NOR1 at (0,0): inputs at (0,0), (0,1); output at (2,0)
     // NOR2 at (8,0): inputs at (8,0), (8,1); output at (10,0)
-    // Wire: NOR1 output (2,0) → NOR2 input (8,0)
-    // Wire: NOR2 output (10,0) → NOR1 input (0,1)
+    // Wire: NOR1 output (2,0) â†’ NOR2 input (8,0)
+    // Wire: NOR2 output (10,0) â†’ NOR1 input (0,1)
 
     const norDef = makeDefinition("Nor", twoInputPins());
     const registry = makeRegistry(norDef);
@@ -217,9 +217,9 @@ describe("Compiler", () => {
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
-    // NOR1 output (2,0) → NOR2 input-a (8,0)
+    // NOR1 output (2,0) â†’ NOR2 input-a (8,0)
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
-    // NOR2 output (10,0) → NOR1 input-b (0,1)
+    // NOR2 output (10,0) â†’ NOR1 input-b (0,1)
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 0, y: 1 }));
 
     const compiled = compileUnified(circuit, registry).digital!;
@@ -245,7 +245,7 @@ describe("Compiler", () => {
     // same net ID.
     // NOT gate at (0,0): input at (0,0), output at (2,0)
     // AND gate at (8,0): input-a at (8,0), input-b at (8,1), output at (10,0)
-    // Wire: (2,0) → (8,0)
+    // Wire: (2,0) â†’ (8,0)
 
     const notDef = makeDefinition("Not", notPins());
     const andDef = makeDefinition("And", twoInputPins());
@@ -287,8 +287,8 @@ describe("Compiler", () => {
     const registry = makeRegistry(notDef, andDef);
 
     // Get type IDs (auto-assigned: Not=0, And=1)
-    const notTypeId = registry.get("Not")!.typeId;
-    const andTypeId = registry.get("And")!.typeId;
+    const notTypeId = registry.getStandalone("Not")!.typeId;
+    const andTypeId = registry.getStandalone("And")!.typeId;
 
     const circuit = new Circuit();
     circuit.addElement(createTestElementFromDecls("Not", "not-1", notPins()));
@@ -317,7 +317,7 @@ describe("Compiler", () => {
     // Circuit with In(label="A") and Out(label="S").
     // In at (0,0): output pin at (0,0)- drives value into the circuit
     // Out at (10,0): input pin at (10,0)- reads value from circuit
-    // Wire: (0,0) → (10,0) connects them
+    // Wire: (0,0) â†’ (10,0) connects them
 
     const inPins = inputOnlyPin("A", { x: 0, y: 0 });
     const outPins = outputOnlyPin("S", { x: 0, y: 0 });
@@ -443,7 +443,7 @@ describe("Tarjan", () => {
   // findsSimpleCycle
   // -------------------------------------------------------------------------
   it("findsSimpleCycle", () => {
-    // adjacency [[1],[0]]- 0→1 and 1→0, one SCC [0,1]
+    // adjacency [[1],[0]]- 0â†’1 and 1â†’0, one SCC [0,1]
     const sccs = findSCCs([[1], [0]]);
     expect(sccs.length).toBe(1);
     const scc = sccs[0]!;
@@ -456,7 +456,7 @@ describe("Tarjan", () => {
   // findsNoCycleInDAG
   // -------------------------------------------------------------------------
   it("findsNoCycleInDAG", () => {
-    // 0→1→2- three singleton SCCs (no cycles)
+    // 0â†’1â†’2- three singleton SCCs (no cycles)
     const sccs = findSCCs([[1], [2], []]);
     expect(sccs.length).toBe(3);
     // Each SCC should be a singleton
@@ -469,8 +469,8 @@ describe("Tarjan", () => {
   // reverseTopologicalOrder
   // -------------------------------------------------------------------------
   it("reverseTopologicalOrder", () => {
-    // 0→1→2 (DAG). Tarjan returns in reverse topological order.
-    // In a chain A→B→C, reverse topological means C appears before B before A.
+    // 0â†’1â†’2 (DAG). Tarjan returns in reverse topological order.
+    // In a chain Aâ†’Bâ†’C, reverse topological means C appears before B before A.
     const sccs = findSCCs([[1], [2], []]);
 
     // Build a map from node to SCC index in the returned array
@@ -492,7 +492,7 @@ describe("Tarjan", () => {
   // handlesDisconnectedGraph
   // -------------------------------------------------------------------------
   it("handlesDisconnectedGraph", () => {
-    // 0→1 and 2→3- two separate components
+    // 0â†’1 and 2â†’3- two separate components
     const sccs = findSCCs([[1], [], [3], []]);
     expect(sccs.length).toBe(4);
     for (const scc of sccs) {
@@ -504,7 +504,7 @@ describe("Tarjan", () => {
   // handlesSelfLoop
   // -------------------------------------------------------------------------
   it("handlesSelfLoop", () => {
-    // Node 0 has a self-loop (0→0). It forms its own SCC.
+    // Node 0 has a self-loop (0â†’0). It forms its own SCC.
     const sccs = findSCCs([[0]]);
     expect(sccs.length).toBe(1);
     expect(sccs[0]!.length).toBe(1);
@@ -515,7 +515,7 @@ describe("Tarjan", () => {
   // handlesLargerCycle
   // -------------------------------------------------------------------------
   it("handlesLargerCycle", () => {
-    // 0→1→2→0- one SCC of size 3
+    // 0â†’1â†’2â†’0- one SCC of size 3
     const sccs = findSCCs([[1], [2], [0]]);
     expect(sccs.length).toBe(1);
     expect(sccs[0]!.length).toBe(3);
@@ -531,7 +531,7 @@ describe("TopologicalSort", () => {
   // sortsLinearChain
   // -------------------------------------------------------------------------
   it("sortsLinearChain", () => {
-    // 0→1→2: 0 must come before 1, 1 before 2
+    // 0â†’1â†’2: 0 must come before 1, 1 before 2
     const order = topologicalSort([[1], [2], []]);
     expect(order).toEqual([0, 1, 2]);
   });
@@ -540,8 +540,8 @@ describe("TopologicalSort", () => {
   // sortsDiamondDAG
   // -------------------------------------------------------------------------
   it("sortsDiamondDAG", () => {
-    // Diamond: 0→{1,2}→3
-    // adjacency: 0→[1,2], 1→[3], 2→[3], 3→[]
+    // Diamond: 0â†’{1,2}â†’3
+    // adjacency: 0â†’[1,2], 1â†’[3], 2â†’[3], 3â†’[]
     const order = topologicalSort([[1, 2], [3], [3], []]);
     // 0 must come first, 3 must come last
     expect(order[0]).toBe(0);
@@ -555,7 +555,7 @@ describe("TopologicalSort", () => {
   // throwsOnCycle
   // -------------------------------------------------------------------------
   it("throwsOnCycle", () => {
-    // 0→1→0- cycle, should throw
+    // 0â†’1â†’0- cycle, should throw
     expect(() => topologicalSort([[1], [0]])).toThrow(/cycle detected/);
   });
 
@@ -640,7 +640,7 @@ function buildPartition(
   }
 
   const partitionedComponents: PartitionedComponent[] = elements.map((el, i) => {
-    const def = registry.get(el.typeId)!;
+    const def = registry.getStandalone(el.typeId)!;
     const decls = pinDeclarationsList[i]!;
     const resolvedPins: ResolvedGroupPin[] = decls.map((decl, j) => ({
       elementIndex: i,
@@ -655,7 +655,7 @@ function buildPartition(
     }));
     return {
       element: el,
-      definition: def as ComponentDefinition,
+      definition: def as StandaloneComponentDefinition,
       model: def.models!.digital! as import("@/core/registry").DigitalModel,
       modelKey: "digital",
       resolvedPins,
@@ -694,7 +694,7 @@ describe("compileDigitalPartition", () => {
   // singleGatePartitionMatchesCircuitCompiler
   // -------------------------------------------------------------------------
   it("singleGatePartitionMatchesCircuitCompiler", () => {
-    // AND gate with no connections: 3 isolated pins → 3 groups/nets
+    // AND gate with no connections: 3 isolated pins â†’ 3 groups/nets
     const andDef = makeDefinition("And", twoInputPins());
     const registry = makeRegistry(andDef);
 
@@ -725,7 +725,7 @@ describe("compileDigitalPartition", () => {
   // connectedGatesProduceSharedNet
   // -------------------------------------------------------------------------
   it("connectedGatesProduceSharedNet", () => {
-    // NOT → AND: NOT output and AND input-a share group 1
+    // NOT â†’ AND: NOT output and AND input-a share group 1
     // Groups: NOT.in=0, NOT.out+AND.a=1, AND.b=2, AND.out=3
     const notDef = makeDefinition("Not", notPins());
     const andDef = makeDefinition("And", twoInputPins());
@@ -749,7 +749,7 @@ describe("compileDigitalPartition", () => {
     const compiled = compileDigitalPartition(partition, registry);
 
     expect(compiled.componentCount).toBe(2);
-    // 4 groups → 4 nets
+    // 4 groups â†’ 4 nets
     expect(compiled.netCount).toBe(4);
 
     // NOT output and AND first input share net (group 1)
@@ -767,7 +767,7 @@ describe("compileDigitalPartition", () => {
   // evaluationOrderRespectsDependency
   // -------------------------------------------------------------------------
   it("evaluationOrderRespectsDependency", () => {
-    // NOT → AND: NOT must evaluate before AND
+    // NOT â†’ AND: NOT must evaluate before AND
     const notDef = makeDefinition("Not", notPins());
     const andDef = makeDefinition("And", twoInputPins());
     const registry = makeRegistry(notDef, andDef);
@@ -803,7 +803,7 @@ describe("compileDigitalPartition", () => {
   // feedbackLoopDetected
   // -------------------------------------------------------------------------
   it("feedbackLoopDetected", () => {
-    // SR latch: NOR1 output → NOR2 input-a (group 1), NOR2 output → NOR1 input-b (group 3)
+    // SR latch: NOR1 output â†’ NOR2 input-a (group 1), NOR2 output â†’ NOR1 input-b (group 3)
     // Groups: NOR1.in0=0, NOR1.out+NOR2.in0=1, NOR2.in1=2, NOR2.out+NOR1.in1=3
     const norDef = makeDefinition("Nor", twoInputPins());
     const registry = makeRegistry(norDef);
@@ -876,7 +876,7 @@ describe("compileDigitalPartition", () => {
   // -------------------------------------------------------------------------
   it("matchesCircuitCompilerOutputForChainedGates", () => {
     // Build via compileUnified and via compileDigitalPartition, compare results.
-    // NOT(0,0) → AND(8,0): wire from (2,0) to (8,0)
+    // NOT(0,0) â†’ AND(8,0): wire from (2,0) to (8,0)
 
     const notDef = makeDefinition("Not", notPins());
     const andDef = makeDefinition("And", twoInputPins());
@@ -940,7 +940,7 @@ describe("compileDigitalPartition", () => {
   // bitWidthMismatchThrows
   // -------------------------------------------------------------------------
   it("bitWidthMismatchThrowsInPartition", () => {
-    // 1-bit output connected to 8-bit input in the same group → BitsException
+    // 1-bit output connected to 8-bit input in the same group â†’ BitsException
     const singleBitOutPins: PinDeclaration[] = [
       { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ];
@@ -1008,8 +1008,8 @@ describe("Compiler- feedback wire mapping", () => {
     // NOR2 at (6,0): inputs at (6,0) and (6,1), output at (8,0)
     //
     // Wires:
-    //   NOR1 output (2,0) → NOR2 input-a (6,0)   [direct]
-    //   NOR2 output (8,0) → (8,1) → (0,1) → NOR1 input-b (0,1)  [feedback, multi-segment]
+    //   NOR1 output (2,0) â†’ NOR2 input-a (6,0)   [direct]
+    //   NOR2 output (8,0) â†’ (8,1) â†’ (0,1) â†’ NOR1 input-b (0,1)  [feedback, multi-segment]
 
     const norDef = makeDefinition("NOr", twoInputPins());
     const registry = makeRegistry(norDef);
@@ -1020,11 +1020,11 @@ describe("Compiler- feedback wire mapping", () => {
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
-    // Wire: NOR1 output → NOR2 input-a (forward)
+    // Wire: NOR1 output â†’ NOR2 input-a (forward)
     const w1 = new Wire({ x: 2, y: 0 }, { x: 6, y: 0 });
     circuit.addWire(w1);
 
-    // Wire: NOR2 output → NOR1 input-b (feedback, two segments with corner)
+    // Wire: NOR2 output â†’ NOR1 input-b (feedback, two segments with corner)
     const w2 = new Wire({ x: 8, y: 0 }, { x: 8, y: 1 });  // down
     const w3 = new Wire({ x: 8, y: 1 }, { x: 0, y: 1 });   // across to NOR1 input-b
     circuit.addWire(w2);
@@ -1040,7 +1040,7 @@ describe("Compiler- feedback wire mapping", () => {
 
     // The forward wire net should connect NOR1 output and NOR2 input-a
     const net1 = compiled.wireToNetId.get(w1)!;
-    // The feedback wires should share the same net (NOR2 output → NOR1 input-b)
+    // The feedback wires should share the same net (NOR2 output â†’ NOR1 input-b)
     const net2 = compiled.wireToNetId.get(w2)!;
     const net3 = compiled.wireToNetId.get(w3)!;
     expect(net2).toBe(net3);
@@ -1057,8 +1057,8 @@ describe("Compiler- feedback wire mapping", () => {
     // NOR1 at (0,0): in0 world=(0,1), in1 world=(0,3), out world=(4,2)
     // NOR2 at (10,0): in0 world=(10,1), in1 world=(10,3), out world=(14,2)
     //
-    // Forward: NOR1.out (4,2) → NOR2.in0 (10,1) via corner at (7,2)→(7,1)
-    // Feedback: NOR2.out (14,2) → NOR1.in1 (0,3) via corners
+    // Forward: NOR1.out (4,2) â†’ NOR2.in0 (10,1) via corner at (7,2)â†’(7,1)
+    // Feedback: NOR2.out (14,2) â†’ NOR1.in1 (0,3) via corners
 
     const norPins: PinDeclaration[] = [
       { direction: PinDirection.INPUT, label: "in0", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -1075,7 +1075,7 @@ describe("Compiler- feedback wire mapping", () => {
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
-    // Forward: NOR1.out (4,2) → corner (7,2) → corner (7,1) → NOR2.in0 (10,1)
+    // Forward: NOR1.out (4,2) â†’ corner (7,2) â†’ corner (7,1) â†’ NOR2.in0 (10,1)
     const wf1 = new Wire({ x: 4, y: 2 }, { x: 7, y: 2 });
     const wf2 = new Wire({ x: 7, y: 2 }, { x: 7, y: 1 });
     const wf3 = new Wire({ x: 7, y: 1 }, { x: 10, y: 1 });
@@ -1083,7 +1083,7 @@ describe("Compiler- feedback wire mapping", () => {
     circuit.addWire(wf2);
     circuit.addWire(wf3);
 
-    // Feedback: NOR2.out (14,2) → (14,5) → (0,5) → (0,3) = NOR1.in1
+    // Feedback: NOR2.out (14,2) â†’ (14,5) â†’ (0,5) â†’ (0,3) = NOR1.in1
     const wb1 = new Wire({ x: 14, y: 2 }, { x: 14, y: 5 });
     const wb2 = new Wire({ x: 14, y: 5 }, { x: 0, y: 5 });
     const wb3 = new Wire({ x: 0, y: 5 }, { x: 0, y: 3 });

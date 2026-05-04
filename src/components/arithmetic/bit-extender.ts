@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BitExtender component- sign-extend or zero-extend from narrower to wider width.
  *
  * Ports from Digital's BitExtender.java:
@@ -24,7 +24,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -126,7 +126,7 @@ const BIT_EXTENDER_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];
 
-export const BitExtenderDefinition: ComponentDefinition = {
+export const BitExtenderDefinition: StandaloneComponentDefinition = {
   name: "BitExtender",
   typeId: -1,
   factory: (props) => new BitExtenderElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),

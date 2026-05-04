@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PullDown component- pulls a floating net to logic 0.
  *
  * In Digital, PullDown is "only a placeholder. Has no connections to the model!"
@@ -24,7 +24,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -179,7 +179,7 @@ function pullDownFactory(props: PropertyBag): PullDownElement {
   return new PullDownElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PullDownDefinition: ComponentDefinition = {
+export const PullDownDefinition: StandaloneComponentDefinition = {
   name: "PullDown",
   typeId: -1,
   factory: pullDownFactory,

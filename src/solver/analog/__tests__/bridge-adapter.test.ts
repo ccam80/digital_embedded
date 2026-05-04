@@ -18,7 +18,6 @@ import {
   makeBridgeInputAdapter,
 } from "../bridge-adapter.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
-import { StatePool } from "../state-pool.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { loadCtxFromFields, makeTestSetupContext, setupAll } from "./test-helpers.js";
 
@@ -57,7 +56,7 @@ function makeCtx(solver: SparseSolver, rhs?: Float64Array) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared spec — CMOS 3.3V
+// Shared spec- CMOS 3.3V
 // ---------------------------------------------------------------------------
 
 const CMOS_3V3: ResolvedPinElectrical = {
@@ -171,10 +170,6 @@ describe("BridgeOutputAdapter", () => {
     });
     setupAll([adapter], setupCtx);
 
-    const pool = new StatePool(adapter.stateSize);
-    adapter._stateBase = 0;
-    adapter.initState(pool);
-
     solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
@@ -196,7 +191,7 @@ describe("BridgeOutputAdapter", () => {
     adapter.load(makeCtx(solver));
 
     const entries = solver.getCSCNonZeros();
-    // Node diagonal must be zero — no rOut conductance when unloaded
+    // Node diagonal must be zero- no rOut conductance when unloaded
     const nodeDiag = entries
       .filter((e) => e.row === NODE_IDX && e.col === NODE_IDX)
       .reduce((acc, e) => acc + e.value, 0);
@@ -235,9 +230,6 @@ describe("BridgeOutputAdapter", () => {
     });
     setupAll([adapter], setupCtx);
 
-    const pool = new StatePool(adapter.stateSize);
-    adapter._stateBase = 0;
-    adapter.initState(pool);
     const rhs = new Float64Array(8);
     solver._resetForAssembly();
     adapter.load(makeCtx(solver, rhs));
@@ -267,10 +259,6 @@ describe("BridgeOutputAdapter", () => {
     });
     setupAll([adapter], setupCtx);
 
-    const pool = new StatePool(adapter.stateSize);
-    adapter._stateBase = 0;
-    adapter.initState(pool);
-
     solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
@@ -287,7 +275,7 @@ describe("BridgeOutputAdapter", () => {
     // With default vIH=2.0, voltage 2.1 is above threshold
     expect(adapter.readLogicLevel(2.1)).toBe(true);
 
-    // Raise threshold to 2.5 — 2.1 is now indeterminate (between 0.8 and 2.5)
+    // Raise threshold to 2.5- 2.1 is now indeterminate (between 0.8 and 2.5)
     adapter.setParam("vIH", 2.5);
     expect(adapter.readLogicLevel(2.1)).toBeUndefined();
 

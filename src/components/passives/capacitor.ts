@@ -21,7 +21,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -33,7 +33,6 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -169,14 +168,8 @@ const SLOT_CCAP = 4;
  * stamp; do not introduce a parallel non-registered capacitor
  * class.
  */
-export class AnalogCapacitorElement implements PoolBackedAnalogElement {
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-  label: string = "";
-
+export class AnalogCapacitorElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly poolBacked = true as const;
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;
 
@@ -188,7 +181,6 @@ export class AnalogCapacitorElement implements PoolBackedAnalogElement {
   private _TNOM: number;
   private _SCALE: number;
   private _M: number;
-  private _pool!: StatePoolRef;
 
   // Cached matrix-entry handles- allocated in setup() per capsetup.c:114-117.
   private _hPP: number = -1;
@@ -197,7 +189,7 @@ export class AnalogCapacitorElement implements PoolBackedAnalogElement {
   private _hNP: number = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._nominalC = props.hasModelParam("capacitance") ? props.getModelParam<number>("capacitance") : CAPACITOR_DEFAULTS["capacitance"]!;
     this._IC       = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
     this._TC1      = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
@@ -230,10 +222,6 @@ export class AnalogCapacitorElement implements PoolBackedAnalogElement {
       this._hPN = ctx.solver.allocElement(posNode, negNode);
       this._hNP = ctx.solver.allocElement(negNode, posNode);
     }
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

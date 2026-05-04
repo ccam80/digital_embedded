@@ -23,8 +23,8 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import type { LoadContext } from "./element.js";
+import type { AnalogElement } from "./element.js";
+import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
 import type { ExprNode } from "./expression.js";
 import { compileExpression } from "./expression-evaluate.js";

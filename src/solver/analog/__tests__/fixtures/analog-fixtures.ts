@@ -3,13 +3,13 @@
  *
  * Two construction paths:
  *
- *   1. compile* helpers — production path: build a Circuit from real
+ *   1. compile* helpers- production path: build a Circuit from real
  *      ComponentDefinitions and run compileUnified. Use these for any test
  *      whose intent is "engine behaviour on a real-shape circuit".
  *
- *   2. wrapHandElements — direct-element path for tests that need to inject
+ *   2. wrapHandElements- direct-element path for tests that need to inject
  *      a custom AnalogElement (acceptStep stubs, fuses, etc.). Builds a real
- *      ConcreteCompiledAnalogCircuit with a placeholder StatePool — the
+ *      ConcreteCompiledAnalogCircuit with a placeholder StatePool- the
  *      engine's _setup() allocates the canonical pool and writes it back
  *      (single-ownership invariant in MNAEngine._setup).
  *
@@ -121,7 +121,7 @@ function compileOrThrow(circuit: Circuit, registry: ComponentRegistry): Concrete
 }
 
 // ---------------------------------------------------------------------------
-// Direct-element wrapper — uses the real ConcreteCompiledAnalogCircuit ctor
+// Direct-element wrapper- uses the real ConcreteCompiledAnalogCircuit ctor
 // with a StatePool(0) placeholder. MNAEngine._setup() allocates the real
 // pool and writes it back to compiled.statePool, so engine + cac end up
 // pointing at the same object (single ownership).
@@ -144,12 +144,12 @@ export function wrapHandElements(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Hand-element circuit recipes — tests requiring direct element control.
+// Hand-element circuit recipes- tests requiring direct element control.
 // Most tests should prefer the production-path compile* helpers below.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Inline production factory helpers — used by hand-element circuit recipes.
+// Inline production factory helpers- used by hand-element circuit recipes.
 // These replace the deleted positional-argument helpers from test-helpers.js.
 // ---------------------------------------------------------------------------
 
@@ -163,7 +163,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const props = new PropertyBag();
   props.replaceModelParams({ resistance });
   const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { factory: AnalogFactory }).factory;
-  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+  return factory(new Map([["pos", nodeA], ["neg", nodeB]]), props, () => 0);
 }
 
 function createTestCapacitor(capacitance: number, posNode: number, negNode: number): AnalogElement {

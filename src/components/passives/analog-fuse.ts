@@ -37,14 +37,13 @@
  *                   Mirrors vsrcacct.c:24-310.
  */
 
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -84,13 +83,8 @@ const MIN_RESISTANCE = 1e-12;
 // AnalogFuseElement- MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogFuseElement implements PoolBackedAnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
+export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly poolBacked = true as const;
   readonly stateSchema = ANALOG_FUSE_SCHEMA;
   readonly stateSize = ANALOG_FUSE_SCHEMA.size;
   setParam(_key: string, _value: number): void {}
@@ -108,9 +102,7 @@ export class AnalogFuseElement implements PoolBackedAnalogElement {
   private _intact: boolean = true;
   private _diagEmitted: boolean = false;
 
-  private _pool!: StatePoolRef;
-
-  private readonly _emitDiagnostic: (diag: Diagnostic) => void;
+  private _emitDiagnostic: (diag: Diagnostic) => void = () => {};
   private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
   /**
@@ -118,23 +110,29 @@ export class AnalogFuseElement implements PoolBackedAnalogElement {
    * @param rCold          - Cold (intact) resistance in ohms
    * @param rBlown         - Blown (open) resistance in ohms
    * @param i2tRating      - I²t energy rating in A²·s
-   * @param emitDiagnostic - Callback invoked when fuse blows
    * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
+   *
+   * The runtime diagnostic channel is installed by the engine via
+   * `setDiagnosticEmitter()` after construction (RuntimeDiagnosticAware).
    */
   constructor(
     pinNodes: ReadonlyMap<string, number>,
     rCold: number,
     rBlown: number,
     i2tRating: number,
-    emitDiagnostic?: (diag: Diagnostic) => void,
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);
-    this._emitDiagnostic = emitDiagnostic ?? (() => {});
     this._onStateChange = onStateChange ?? null;
+  }
+
+  /** RuntimeDiagnosticAware: engine wires this in MNAEngine.init() so that
+   *  fuse-blown emissions reach coordinator.getRuntimeDiagnostics(). */
+  setDiagnosticEmitter(emit: (diag: Diagnostic) => void): void {
+    this._emitDiagnostic = emit;
   }
 
   setup(ctx: SetupContext): void {
@@ -151,10 +149,6 @@ export class AnalogFuseElement implements PoolBackedAnalogElement {
     this._hNN = solver.allocElement(negNode, negNode);  // (RESnegNode, RESnegNode)
     this._hPN = solver.allocElement(posNode, negNode);  // (RESposNode, RESnegNode)
     this._hNP = solver.allocElement(negNode, posNode);  // (RESnegNode, RESposNode)
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {
@@ -309,7 +303,6 @@ function buildAnalogFuseElement(
     p.rCold,
     p.rBlown,
     p.i2tRating,
-    undefined,
     (blown, thermalRatio) => {
       props.set("_thermalRatio", thermalRatio);
       if (blown) {

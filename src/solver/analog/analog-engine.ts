@@ -34,7 +34,7 @@ import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 import { CKTCircuitContext } from "./ckt-context.js";
 import type { AnalogElement } from "./element.js";
-import { isPoolBacked } from "./element.js";
+import { isPoolBacked, isRuntimeDiagnosticAware } from "./element.js";
 import { buildTopologyInfo, runPostSetupDetectors } from "./topology-diagnostics.js";
 import type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
 export type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
@@ -143,6 +143,19 @@ export class MNAEngine implements AnalogEngine {
     this._history = new HistoryStore(elements.length);
     this._diagnostics = new DiagnosticCollector();
     this._convergenceLog.clear();
+
+    // Wire the runtime-diagnostic channel into every element that opts in
+    // (RuntimeDiagnosticAware). Mirrors the timeRef pattern: compile-time
+    // factories cannot reference the engine's collector (it's constructed
+    // here, post-compile), so the engine pushes the emit closure into each
+    // element after construction. Coordinator surfaces emissions via
+    // getRuntimeDiagnostics() through the existing onDiagnostic subscription.
+    const emitToCollector = (d: Diagnostic): void => this._diagnostics.emit(d);
+    for (const el of elements) {
+      if (isRuntimeDiagnosticAware(el)) {
+        el.setDiagnosticEmitter(emitToCollector);
+      }
+    }
 
     this._simTime = 0;
     this._lastDt = 0;
@@ -1168,6 +1181,17 @@ export class MNAEngine implements AnalogEngine {
     // NR still reads the stale constructor-captured reltol/iabstol/voltTol.
     if (this._ctx) {
       this._ctx.refreshTolerances(this._params);
+      // ngspice cktdefs.h:185- MODEUIC is an orthogonal mode bit preserved
+      // across every analysis-mode reset (dcop.c:82, dctran.c:346, acan.c:285
+      // all do `(CKTmode & MODEUIC) | …`). When `configure()` toggles
+      // params.uic mid-life (the ngspice-equivalent of re-running .tran with a
+      // different UIC argument), refresh the bit on the context so the next
+      // _transientDcop() / step() picks it up. Without this update the
+      // post-compile configure() override silently does nothing because the
+      // CKTCircuitContext was constructed with the pre-configure params.
+      const wantUic = (this._params.uic ?? false) ? MODEUIC : 0;
+      this._ctx.cktMode = (this._ctx.cktMode & ~MODEUIC) | wantUic;
+      this._ctx.loadCtx.cktMode = this._ctx.cktMode;
     }
     // ngspice cktdojob.c sets CKTfinalTime per .tran job before dctran reads it.
     // Our compile() seeds the sentinel with whatever tStop was known at compile

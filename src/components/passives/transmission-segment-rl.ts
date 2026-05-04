@@ -23,11 +23,10 @@
  * the extra series-resistance contribution to the branch diagonal.
  */
 
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -80,20 +79,13 @@ const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 // TransmissionSegmentRLElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentRLElement implements PoolBackedAnalogElement {
+export class TransmissionSegmentRLElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly poolBacked = true as const;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
-
   private _R: number;
   private _L: number;
-  private _pool!: StatePoolRef;
 
   private _hPIbr   = -1;
   private _hNIbr   = -1;
@@ -102,8 +94,7 @@ export class TransmissionSegmentRLElement implements PoolBackedAnalogElement {
   private _hIbrIbr = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    // Store by reference (see transmission-segment-l.ts for full rationale).
-    this._pinNodes = pinNodes as Map<string, number>;
+    super(pinNodes);
     this._R = Math.max(props.getModelParam<number>("R"), MIN_RESISTANCE);
     this._L = Math.max(props.getModelParam<number>("L"), MIN_INDUCTANCE);
   }
@@ -126,10 +117,6 @@ export class TransmissionSegmentRLElement implements PoolBackedAnalogElement {
     this._hIbrN   = solver.allocElement(b, negNode);
     this._hIbrP   = solver.allocElement(b, posNode);
     this._hIbrIbr = solver.allocElement(b, b);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

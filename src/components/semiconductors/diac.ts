@@ -1,9 +1,9 @@
-/**
- * Diac analog component — bidirectional trigger diode.
+﻿/**
+ * Diac analog component- bidirectional trigger diode.
  *
  * Blocks in both directions until |V| exceeds breakover voltage V_BO,
  * then conducts with negative-resistance snap.
- * Symmetric device — no gate terminal.
+ * Symmetric device- no gate terminal.
  *
  * Implemented as a composite of two antiparallel DIO sub-elements:
  *   D_fwd: posNode=A, negNode=B  (conducts for positive V(A,B))
@@ -22,101 +22,35 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
-  createDiodeElement,
   DIODE_PARAM_DEFS,
   DIODE_PARAM_DEFAULTS,
 } from "./diode.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
+
+export { DIODE_PARAM_DEFS as DIAC_PARAM_DEFS, DIODE_PARAM_DEFAULTS as DIAC_PARAM_DEFAULTS };
 
 // ---------------------------------------------------------------------------
-// createDiacElement  AnalogElement factory
+// DIAC_NETLIST  MnaSubcircuitNetlist declaration
 // ---------------------------------------------------------------------------
 
-export function createDiacElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  getTime: () => number,
-): AnalogElement {
-  const nodeA = pinNodes.get("A")!; // terminal A
-  const nodeB = pinNodes.get("B")!; // terminal B
-
-  // D_fwd: A=anode(pos), B=cathode(neg)  ngspiceNodeMap: { A: "pos", B: "neg" }
-  const fwdNodes: ReadonlyMap<string, number> = new Map([
-    ["A", nodeA],
-    ["K", nodeB],
-  ]);
-
-  // D_rev: B=anode(pos), A=cathode(neg)  ngspiceNodeMap: { B: "pos", A: "neg" }
-  const revNodes: ReadonlyMap<string, number> = new Map([
-    ["A", nodeB],
-    ["K", nodeA],
-  ]);
-
-  const parentLabel = props.getOrDefault<string>("label", "D");
-  const fwdLabel = `${parentLabel}#D_fwd`;
-  const revLabel = `${parentLabel}#D_rev`;
-
-  const dFwd = createDiodeElement(fwdNodes, props, getTime);
-  const dRev = createDiodeElement(revNodes, props, getTime);
-
-  // Attach labels so setup()/load() diagnostics attribute correctly
-  dFwd.label = fwdLabel;
-  dRev.label = revLabel;
-
-  // Cast to unknown first so TypeScript accepts the extra `getSubElements` method
-  // that is not part of the AnalogElement interface but is needed by allocateStatePool.
-  return ({
-    label: "",
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-
-    setup(ctx: SetupContext): void {
-      dFwd.setup(ctx);   // D_fwd: DIO with posNode=A, negNode=B
-      dRev.setup(ctx);   // D_rev: DIO with posNode=B, negNode=A
-    },
-
-    load(ctx: LoadContext): void {
-      dFwd.load(ctx);
-      dRev.load(ctx);
-    },
-
-    checkConvergence(ctx: LoadContext): boolean {
-      const fwdOk = dFwd.checkConvergence ? dFwd.checkConvergence(ctx) : true;
-      const revOk = dRev.checkConvergence ? dRev.checkConvergence(ctx) : true;
-      return fwdOk && revOk;
-    },
-
-    getPinCurrents(_rhs: Float64Array): number[] {
-      // pinLayout order: [A (terminal 1), B (terminal 2)]
-      const fwdCurrents = dFwd.getPinCurrents ? dFwd.getPinCurrents(_rhs) : [0, 0];
-      const revCurrents = dRev.getPinCurrents ? dRev.getPinCurrents(_rhs) : [0, 0];
-      // D_fwd: A-pin current from A→B, D_rev: A-pin current from B→A
-      // Net current at A = fwd[0] + rev[1] (rev[1] is current at D_rev's K=nodeA)
-      // Net current at B = fwd[1] + rev[0]
-      return [
-        fwdCurrents[0] + revCurrents[1],
-        fwdCurrents[1] + revCurrents[0],
-      ];
-    },
-
-    setParam(key: string, value: number): void {
-      // Forward shared model parameters to both sub-elements
-      dFwd.setParam?.(key, value);
-      dRev.setParam?.(key, value);
-    },
-
-    getSubElements(): readonly AnalogElement[] {
-      return [dFwd, dRev];
-    },
-  } as unknown as AnalogElement);
-}
+export const DIAC_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["A", "B"],
+  params: { ...DIODE_PARAM_DEFAULTS },
+  elements: [
+    { typeId: "Diode", modelRef: "spice", subElementName: "D_fwd",
+      params: { IS: "IS", N: "N", RS: "RS", CJO: "CJO", VJ: "VJ", M: "M", TT: "TT", FC: "FC", BV: "BV", IBV: "IBV", NBV: "NBV", IKF: "IKF", IKR: "IKR", EG: "EG", XTI: "XTI", KF: "KF", AF: "AF", TNOM: "TNOM", ISW: "ISW", NSW: "NSW", AREA: "AREA", OFF: "OFF", IC: "IC", TEMP: "TEMP" } },
+    { typeId: "Diode", modelRef: "spice", subElementName: "D_rev",
+      params: { IS: "IS", N: "N", RS: "RS", CJO: "CJO", VJ: "VJ", M: "M", TT: "TT", FC: "FC", BV: "BV", IBV: "IBV", NBV: "NBV", IKF: "IKF", IKR: "IKR", EG: "EG", XTI: "XTI", KF: "KF", AF: "AF", TNOM: "TNOM", ISW: "ISW", NSW: "NSW", AREA: "AREA", OFF: "OFF", IC: "IC", TEMP: "TEMP" } },
+  ],
+  internalNetCount: 0,
+  netlist: [
+    [0, 1],  // D_fwd: A=A,  K=B
+    [1, 0],  // D_rev: A=B,  K=A
+  ],
+};
 
 // ---------------------------------------------------------------------------
 // DiacElement  CircuitElement implementation
@@ -249,7 +183,7 @@ function diacCircuitFactory(props: PropertyBag): DiacElement {
   return new DiacElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DiacDefinition: ComponentDefinition = {
+export const DiacDefinition: StandaloneComponentDefinition = {
   name: "Diac",
   typeId: -1,
   factory: diacCircuitFactory,
@@ -258,17 +192,17 @@ export const DiacDefinition: ComponentDefinition = {
   attributeMap: DIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Diac — bidirectional trigger diode.\n" +
+    "Diac- bidirectional trigger diode.\n" +
     "Pins: A (terminal 1), B (terminal 2).\n" +
     "Blocks until |V| > BV (breakover voltage), then conducts bidirectionally.",
   models: {},
   modelRegistry: {
-    "spice": {
-      kind: "inline",
-      factory: createDiacElement,
+    default: {
+      kind: "netlist",
+      netlist: DIAC_NETLIST,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "spice",
+  defaultModel: "default",
 };

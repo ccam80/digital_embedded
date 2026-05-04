@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Triode vacuum tube analog component- Koren model.
  *
  * The Koren model is the standard for audio amplifier simulation. The plate
  * current depends on both plate voltage and grid voltage via:
  *
- *   E1 = V_PK / K_P · ln(1 + exp(K_P · (1/µ + V_GK / sqrt(K_VB + V_PK²))))
+ *   E1 = V_PK / K_P Â· ln(1 + exp(K_P Â· (1/Âµ + V_GK / sqrt(K_VB + V_PKÂ²))))
  *   I_P = (E1 / K_G1)^EX   when E1 > 0, else 0
  *
  * The triode is a three-terminal device:
@@ -13,7 +13,7 @@
  *   pinNodes.get("K") = cathode
  *
  * Topology (per PB-TRIODE.md and plan.md "Resolved decisions"):
- *   1× VCCS sub-element (transconductance gm: control = G–K, output = P–K)
+ *   1Ã— VCCS sub-element (transconductance gm: control = Gâ€“K, output = Pâ€“K)
  *   + 2 extra gds output-conductance handles on (P,P) and (K,P).
  *
  * Total matrix entries allocated in setup() = 4 (VCCS) + 2 (gds) = 6.
@@ -30,10 +30,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -58,14 +58,14 @@ const VGK_MAX_STEP = 1.0;
 
 export const { paramDefs: TRIODE_PARAM_DEFS, defaults: TRIODE_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    mu:  { default: 100,  description: "Amplification factor µ" },
+    mu:  { default: 100,  description: "Amplification factor Âµ" },
     kp:  { default: 600,  description: "Koren K_P parameter controlling plate-voltage sensitivity" },
     kg1: { default: 1060, description: "Koren K_G1 transconductance scaling factor" },
   },
   secondary: {
-    kvb: { default: 300,  description: "Koren K_VB parameter (V²) for grid-plate interaction" },
+    kvb: { default: 300,  description: "Koren K_VB parameter (VÂ²) for grid-plate interaction" },
     ex:  { default: 1.4,  description: "Koren current exponent EX" },
-    rGI: { default: 2000, unit: "Ω", description: "Grid input resistance (limits grid current when V_GK > 0)" },
+    rGI: { default: 2000, unit: "Î©", description: "Grid input resistance (limits grid current when V_GK > 0)" },
   },
 });
 
@@ -98,7 +98,7 @@ function computeTriodeOp(
   // Koren E1 inner argument
   const innerArg = kp * (1 / mu + vgk / Math.sqrt(kvb + vpkSafe * vpkSafe));
 
-  // E1 = V_PK/K_P · ln(1 + exp(innerArg)), clamped to prevent overflow
+  // E1 = V_PK/K_P Â· ln(1 + exp(innerArg)), clamped to prevent overflow
   const clampedArg = Math.min(innerArg, 500);
   const logTerm = Math.log1p(Math.exp(clampedArg));
   const e1 = (vpkSafe / kp) * logTerm;
@@ -108,12 +108,12 @@ function computeTriodeOp(
 
   // --- Analytical Jacobian for NR linearisation ---
   //
-  // Let sq = sqrt(kvb + vpkSafe²), so dSq/dVpk = vpkSafe/sq.
+  // Let sq = sqrt(kvb + vpkSafeÂ²), so dSq/dVpk = vpkSafe/sq.
   // innerArg = kp*(1/mu + vgk/sq)
-  // d(innerArg)/dVpk = kp * vgk * (-1/sq²) * (vpkSafe/sq) = -kp*vgk*vpkSafe/sq³
+  // d(innerArg)/dVpk = kp * vgk * (-1/sqÂ²) * (vpkSafe/sq) = -kp*vgk*vpkSafe/sqÂ³
   //
-  // dE1/dVpk = logTerm/kp + (vpkSafe/kp)*sigmoid*(-kp*vgk*vpkSafe/sq³)
-  //          = logTerm/kp - vpkSafe²*vgk*sigmoid/sq³
+  // dE1/dVpk = logTerm/kp + (vpkSafe/kp)*sigmoid*(-kp*vgk*vpkSafe/sqÂ³)
+  //          = logTerm/kp - vpkSafeÂ²*vgk*sigmoid/sqÂ³
   //   where sigmoid = exp(innerArg)/(1+exp(innerArg))
 
   const sq = Math.sqrt(kvb + vpkSafe * vpkSafe);
@@ -139,11 +139,7 @@ function computeTriodeOp(
 // TriodeElement- composite analog element
 // ---------------------------------------------------------------------------
 
-class TriodeElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
+class TriodeElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
 
   /** VCCS sub-element carrying the 4 transconductance handles. */
@@ -180,7 +176,7 @@ class TriodeElement implements AnalogElement {
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
   ) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._nodeP = pinNodes.get("P")!; // plate
     this._nodeG = pinNodes.get("G")!; // grid
     this._nodeK = pinNodes.get("K")!; // cathode
@@ -384,20 +380,20 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // All coordinates in grid units (Falstad pixels ÷ 16)
+    // All coordinates in grid units (Falstad pixels Ã· 16)
     // Reference: TriodeElm in fixtures/falstad-shapes.json
     // Origin: G pin at (0, 0), point2 at (4, 0)
 
-    // Envelope circle: center (4, 0), r = 23.52/16 ≈ 1.47
+    // Envelope circle: center (4, 0), r = 23.52/16 â‰ˆ 1.47
     ctx.drawCircle(4.0, 0.0, 23.52 / 16, false);
 
-    // Plate lead: (4, -2) → (4, -0.5)
+    // Plate lead: (4, -2) â†’ (4, -0.5)
     ctx.drawLine(4.0, -2.0, 4.0, -0.5);
 
-    // Plate bar: (2.875, -0.5) → (5.125, -0.5)
+    // Plate bar: (2.875, -0.5) â†’ (5.125, -0.5)
     ctx.drawLine(2.875, -0.5, 5.125, -0.5);
 
-    // Grid lead: (0, 0) → (2.5, 0)
+    // Grid lead: (0, 0) â†’ (2.5, 0)
     ctx.drawLine(0.0, 0.0, 2.5, 0.0);
 
     // Grid dashes (3 segments)
@@ -405,13 +401,13 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
     ctx.drawLine(3.8125, 0.0, 4.1875, 0.0);
     ctx.drawLine(4.8125, 0.0, 5.1875, 0.0);
 
-    // Cathode vertical: (3, 2) → (3, 0.5)
+    // Cathode vertical: (3, 2) â†’ (3, 0.5)
     ctx.drawLine(3.0, 2.0, 3.0, 0.5);
 
-    // Cathode horizontal: (3, 0.5) → (5, 0.5)
+    // Cathode horizontal: (3, 0.5) â†’ (5, 0.5)
     ctx.drawLine(3.0, 0.5, 5.0, 0.5);
 
-    // Cathode stub: (5, 0.5) → (5, 0.625)
+    // Cathode stub: (5, 0.5) â†’ (5, 0.625)
     ctx.drawLine(5.0, 0.5, 5.0, 0.625);
 
     ctx.restore();
@@ -473,14 +469,14 @@ export const TRIODE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition
+// StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function triodeCircuitFactory(props: PropertyBag): TriodeCircuitElement {
   return new TriodeCircuitElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TriodeDefinition: ComponentDefinition = {
+export const TriodeDefinition: StandaloneComponentDefinition = {
   name: "Triode",
   typeId: -1,
   factory: triodeCircuitFactory,
@@ -491,7 +487,7 @@ export const TriodeDefinition: ComponentDefinition = {
   helpText:
     "Triode vacuum tube- Koren model.\n" +
     "Pins: P (plate), G (grid), K (cathode).\n" +
-    "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
+    "Standard 12AX7 defaults: Âµ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
   models: {},
   modelRegistry: {
     "koren": {

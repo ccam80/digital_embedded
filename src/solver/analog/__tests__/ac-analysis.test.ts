@@ -19,8 +19,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
 import type { AcCompiledCircuit } from "../ac-analysis.js";
-import type { AnalogElement, LoadContext } from "../element.js";
-import type { ComplexSparseSolver } from "../element.js";
+import type { AnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
+import type { ComplexSparseSolverStamp as ComplexSparseSolver } from "../complex-sparse-solver.js";
 import * as ComplexSolverModule from "../complex-sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +48,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
 
   return {
     label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
@@ -77,7 +78,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
 function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): AnalogElement {
   return {
     label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
@@ -106,7 +107,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
 function makeAcInductor(nodeA: number, nodeB: number, inductance: number): AnalogElement {
   return {
     label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
@@ -196,7 +197,7 @@ function makeRlcSeriesCircuit(R: number, L: number, C: number): AcCompiledCircui
 // ---------------------------------------------------------------------------
 
 describe("AC", () => {
-  it("rc_lowpass_rolloff — -3dB point at f_c = 1/(2π·RC) ±5%", () => {
+  it("rc_lowpass_rolloff- -3dB point at f_c = 1/(2π·RC) ±5%", () => {
     const R = 1000;   // 1 kΩ
     const C = 1e-6;   // 1 µF
     const fC = 1 / (2 * Math.PI * R * C); // ≈ 159.15 Hz
@@ -232,7 +233,7 @@ describe("AC", () => {
     expect(actualF3db).toBeLessThan(fC * 1.05);
   });
 
-  it("rc_lowpass_slope — above f_c, magnitude rolls off at -20dB/decade ±2dB", () => {
+  it("rc_lowpass_slope- above f_c, magnitude rolls off at -20dB/decade ±2dB", () => {
     const R = 1000;
     const C = 1e-6;
     const fC = 1 / (2 * Math.PI * R * C); // ≈ 159.15 Hz
@@ -267,7 +268,7 @@ describe("AC", () => {
     expect(slope).toBeLessThan(-18);
   });
 
-  it("rc_lowpass_phase — at f_c, phase ≈ -45° ±5°", () => {
+  it("rc_lowpass_phase- at f_c, phase ≈ -45° ±5°", () => {
     const R = 1000;
     const C = 1e-6;
     const fC = 1 / (2 * Math.PI * R * C); // ≈ 159.15 Hz
@@ -296,7 +297,7 @@ describe("AC", () => {
     expect(phaseAtFc).toBeLessThan(-40);
   });
 
-  it("rlc_bandpass_resonance — series RLC; peak gain at f_0 = 1/(2π·√(LC))", () => {
+  it("rlc_bandpass_resonance- series RLC; peak gain at f_0 = 1/(2π·√(LC))", () => {
     const R = 100;     // 100 Ω
     const L = 1e-3;    // 1 mH
     const C = 1e-6;    // 1 µF
@@ -334,7 +335,7 @@ describe("AC", () => {
     expect(peakFreq).toBeLessThan(f0 * 1.10);
   });
 
-  it("no_source_emits_diagnostic — ac-no-source diagnostic with error severity", () => {
+  it("no_source_emits_diagnostic- ac-no-source diagnostic with error severity", () => {
     const circuit = makeRcLowpassCircuit(1000, 1e-6);
     const ac = new AcAnalysis(circuit);
 
@@ -352,7 +353,7 @@ describe("AC", () => {
     expect(diag!.severity).toBe("error");
   });
 
-  it("decade_sweep_points — type='dec', numPoints=10, 1Hz to 1MHz; 60 points (6 decades × 10)", () => {
+  it("decade_sweep_points- type='dec', numPoints=10, 1Hz to 1MHz; 60 points (6 decades × 10)", () => {
     const result = buildFrequencyArray({
       type: "dec",
       numPoints: 10,
@@ -371,7 +372,7 @@ describe("AC", () => {
     // Points should be log-spaced
   });
 
-  it("linear_sweep_points — type='lin', numPoints=100, 0 to 1kHz; 100 equally-spaced points", () => {
+  it("linear_sweep_points- type='lin', numPoints=100, 0 to 1kHz; 100 equally-spaced points", () => {
     const result = buildFrequencyArray({
       type: "lin",
       numPoints: 100,
@@ -388,7 +389,7 @@ describe("AC", () => {
     // Equally spaced
   });
 
-  it("opamp_gain_bandwidth — inverting amplifier gain × bandwidth = GBW", () => {
+  it("opamp_gain_bandwidth- inverting amplifier gain × bandwidth = GBW", () => {
     // Model an inverting amplifier using a two-RC network that approximates
     // the closed-loop gain-bandwidth tradeoff.
     //
@@ -474,7 +475,7 @@ describe("AC", () => {
 // Task 0.4.4 tests
 // ---------------------------------------------------------------------------
 
-describe("AC — Task 0.4.4", () => {
+describe("AC- Task 0.4.4", () => {
   it("ac_sweep_caller_reuses_branch_handles_across_frequencies", () => {
     // Tightened per Phase 0.4 review: exercise the actual AcAnalysis.run()
     // production path with a real RC circuit and a spy injected through the
@@ -504,7 +505,7 @@ describe("AC — Task 0.4.4", () => {
     });
 
     // The AC voltage-source branch handles (two of them) must be allocated
-    // exactly once — on fi===0 only — and reused from the cache afterwards.
+    // exactly once- on fi===0 only- and reused from the cache afterwards.
     // The RC-lowpass element stamps also allocate on fi===0 (for R and C
     // admittances), so we filter to just the branch-row allocations that the
     // handle cache is supposed to guard.
@@ -525,7 +526,7 @@ describe("AC — Task 0.4.4", () => {
 // Task 0.4.5 tests
 // ---------------------------------------------------------------------------
 
-describe("AC — Task 0.4.5", () => {
+describe("AC- Task 0.4.5", () => {
   it("ac_sweep_single_reorder_across_frequencies", () => {
     // Tightened per Phase 0.4 review: run the real AcAnalysis.run() path and
     // observe lastFactorUsedReorder on the solver that production actually
@@ -545,7 +546,7 @@ describe("AC — Task 0.4.5", () => {
     const reorderFlags: boolean[] = [];
 
     // Record lastFactorUsedReorder after every factor() call by patching the
-    // solver instance in place — zero allocations, no prototype pollution.
+    // solver instance in place- zero allocations, no prototype pollution.
     const realFactor = injectedSolver.factor.bind(injectedSolver);
     injectedSolver.factor = () => {
       const ok = realFactor();

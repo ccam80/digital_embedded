@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../../components/passives/resistor.js";

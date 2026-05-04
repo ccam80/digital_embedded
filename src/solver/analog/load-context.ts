@@ -27,7 +27,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { IntegrationMethod } from "../../core/analog-types.js";
+import type { IntegrationMethod } from "./integration.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------

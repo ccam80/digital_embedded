@@ -1,9 +1,9 @@
-/**
+﻿/**
  * PFET- P-channel MOSFET voltage-controlled switch.
  *
  * Gate input G controls source-drain connection (inverted logic vs NFET):
- *   G=0 → conducting (closed): S and D connected
- *   G=1 → non-conducting (open): S and D disconnected
+ *   G=0 â†’ conducting (closed): S and D connected
+ *   G=1 â†’ non-conducting (open): S and D disconnected
  *
  * Pins:
  *   Input:         G  (gate, 1-bit)
@@ -22,11 +22,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { FETLayout } from "./nfet.js";
@@ -155,7 +155,7 @@ export class PFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executePFET- flat simulation function
 //
-// G=0 → closed=1; G=1 → closed=0 (inverted compared to NFET)
+// G=0 â†’ closed=1; G=1 â†’ closed=0 (inverted compared to NFET)
 // ---------------------------------------------------------------------------
 
 export function executePFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -277,7 +277,7 @@ const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Ω)",
+    label: "Ron (Î©)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms",
@@ -285,7 +285,7 @@ const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Ω)",
+    label: "Roff (Î©)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms",
@@ -303,7 +303,7 @@ function pfetFactory(props: PropertyBag): PFETElement {
   return new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PFETDefinition: ComponentDefinition = {
+export const PFETDefinition: StandaloneComponentDefinition = {
   name: "PFET",
   typeId: -1,
   factory: pfetFactory,
@@ -311,7 +311,7 @@ export const PFETDefinition: ComponentDefinition = {
   propertyDefs: PFET_PROPERTY_DEFS,
   attributeMap: PFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "PFET- P-channel MOSFET. G=0 → conducting.",
+  helpText: "PFET- P-channel MOSFET. G=0 â†’ conducting.",
   models: {
     digital: {
       executeFn: executePFET,

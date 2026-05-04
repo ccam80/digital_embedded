@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RGBLED component- three-color LED with independent R, G, B channel inputs.
  *
  * Rendered as a circle divided into three arcs (red/green/blue sectors).
@@ -17,7 +17,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -181,7 +181,7 @@ function rgbLedFactory(props: PropertyBag): RgbLedElement {
   return new RgbLedElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RgbLedDefinition: ComponentDefinition = {
+export const RgbLedDefinition: StandaloneComponentDefinition = {
   name: "RGBLED",
   typeId: -1,
   factory: rgbLedFactory,

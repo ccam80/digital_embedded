@@ -23,10 +23,9 @@
  * driver- only the matrix/RHS contribution differs.
  */
 
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
@@ -81,16 +80,10 @@ const MIN_TAU  = 1e-12;
 // ComparatorPushPullDriverElement
 // ---------------------------------------------------------------------------
 
-export class ComparatorPushPullDriverElement implements PoolBackedAnalogElement {
+export class ComparatorPushPullDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly poolBacked = true as const;
   readonly stateSchema = COMPARATOR_SCHEMA;
   readonly stateSize = COMPARATOR_SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private _hysteresis: number;
   private _vos: number;
@@ -98,14 +91,13 @@ export class ComparatorPushPullDriverElement implements PoolBackedAnalogElement 
   private _tau: number;
   private _vOH: number;
   private _vOL: number;
-  private _pool!: StatePoolRef;
 
   // Single matrix handle: (out, out). Push-pull always stamps the full
   // 1/rSat conductance; the latch/weight steers the RHS injection.
   private _hOutOut = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["hysteresis"]!;
     this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vos"]!;
     this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
@@ -120,10 +112,6 @@ export class ComparatorPushPullDriverElement implements PoolBackedAnalogElement 
     if (outNode !== 0) {
       this._hOutOut = ctx.solver.allocElement(outNode, outNode);
     }
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

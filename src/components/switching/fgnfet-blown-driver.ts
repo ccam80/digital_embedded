@@ -4,7 +4,7 @@
  * regardless of CG; when false, no-op.
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -35,13 +35,8 @@ const FGNFET_BLOWN_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // FGNFETBlownDriverElement
 // ---------------------------------------------------------------------------
 
-export class FGNFETBlownDriverElement implements AnalogElement {
+export class FGNFETBlownDriverElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private _blown: boolean;
 
@@ -51,7 +46,7 @@ export class FGNFETBlownDriverElement implements AnalogElement {
   private _hNP = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._blown = props.hasModelParam("blown")
       ? props.getModelParam<number>("blown") !== 0
       : false;

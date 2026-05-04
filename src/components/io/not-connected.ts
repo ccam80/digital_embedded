@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NotConnected component- marks an intentionally unconnected pin.
  *
  * Suppresses the "unconnected pin" warning from the compiler/net resolver.
@@ -18,7 +18,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -125,7 +125,7 @@ function notConnectedFactory(props: PropertyBag): NotConnectedElement {
   return new NotConnectedElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const NotConnectedDefinition: ComponentDefinition = {
+export const NotConnectedDefinition: StandaloneComponentDefinition = {
   name: "NotConnected",
   typeId: -1,
   factory: notConnectedFactory,

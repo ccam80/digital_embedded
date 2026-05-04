@@ -21,7 +21,7 @@
 
 import { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
-import type { ComponentDefinition, ComponentRegistry } from "../core/registry.js";
+import type { StandaloneComponentDefinition, ComponentRegistry } from "../core/registry.js";
 import type { AttributeMapping } from "../core/registry.js";
 import { resolveComponentDef } from "../core/resolve-component.js";
 import type { FileResolver } from "../hgs/context.js";
@@ -368,13 +368,13 @@ class GenericResolver {
  * and reconstructs the element.
  */
 class PendingElement {
-  private readonly def: ComponentDefinition;
+  private readonly def: StandaloneComponentDefinition;
   private readonly x: number;
   private readonly y: number;
   private readonly attrMap: ElementAttributeMap;
 
   constructor(
-    def: ComponentDefinition,
+    def: StandaloneComponentDefinition,
     x: number,
     y: number,
     attrMap: ElementAttributeMap,
@@ -450,7 +450,7 @@ class ElementAttributeMap extends HGSMap {
  */
 function buildXmlAttributeMap(
   props: PropertyBag,
-  def: ComponentDefinition,
+  def: StandaloneComponentDefinition,
 ): ElementAttributeMap {
   const values = new Map<string, HGSValue>();
 
@@ -476,7 +476,7 @@ function buildXmlAttributeMap(
  */
 function applyXmlMappingsToProps(
   attrMap: ElementAttributeMap,
-  def: ComponentDefinition,
+  def: StandaloneComponentDefinition,
 ): PropertyBag {
   const bag = new PropertyBag();
   const xmlValues = attrMap.getXmlValues();

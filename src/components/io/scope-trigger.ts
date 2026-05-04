@@ -1,12 +1,12 @@
-/**
+﻿/**
  * ScopeTrigger component- trigger source for the Scope waveform display.
  *
  * A separately placeable component that signals the Scope to start or stop
  * recording based on an edge or level condition on its input.
  *
  * Trigger modes:
- *   - "rising": capture starts on rising edge (0→1)
- *   - "falling": capture starts on falling edge (1→0)
+ *   - "rising": capture starts on rising edge (0â†’1)
+ *   - "falling": capture starts on falling edge (1â†’0)
  *   - "both": capture on any edge
  *
  * internalStateCount: 1 (stores previous input value for edge detection)
@@ -26,13 +26,13 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
-// Java ScopeTriggerShape: outer rect (0.1,0.5)→(0.1,-2)→(4,-2)→(4,0.5)
+// Java ScopeTriggerShape: outer rect (0.1,0.5)â†’(0.1,-2)â†’(4,-2)â†’(4,0.5)
 // Width = 3.9, height = 2.5, origin at pin position (0,0) which is at left edge
 // ---------------------------------------------------------------------------
 
@@ -85,7 +85,7 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Java: outer rect (0.1,0.5)→(0.1,-2)→(4,-2)→(4,0.5)
+    // Java: outer rect (0.1,0.5)â†’(0.1,-2)â†’(4,-2)â†’(4,0.5)
     // Pin "T" is at (0,0). Box left edge at x=0.1, top at y=-2, right at x=4, bottom at y=0.5
     return {
       x: this.position.x + 0.1,
@@ -98,7 +98,7 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Outer rectangle: (0.1,0.5)→(0.1,-2)→(4,-2)→(4,0.5), closed, NORMAL (outline only)
+    // Outer rectangle: (0.1,0.5)â†’(0.1,-2)â†’(4,-2)â†’(4,0.5), closed, NORMAL (outline only)
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPolygon([
@@ -109,7 +109,7 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
     ], false);
 
     // Step waveform polyline: open, OTHER(2,false)- thin line width
-    // (0.45,-0.3)→(1.3,-0.3)→(1.3,-1.3)→(2.3,-1.3)→(2.3,-0.3)→(2.65,-0.3)
+    // (0.45,-0.3)â†’(1.3,-0.3)â†’(1.3,-1.3)â†’(2.3,-1.3)â†’(2.3,-0.3)â†’(2.65,-0.3)
     ctx.setLineWidth(0.5);
     ctx.drawPath({
       operations: [
@@ -123,9 +123,9 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
     }, false);
 
     // Trigger indicator rounded rectangle: Java uses QuadTo curves for corners.
-    // Path: M(0.4,-0.4) L(0.4,-1.1) Q(0.4,-1.7)→(1,-1.7) L(2.1,-1.7)
-    //        Q(2.7,-1.7)→(2.7,-1.1) L(2.7,-0.4) Q(2.7,0.2)→(2.1,0.2) L(1,0.2)
-    //        Q(0.4,0.2)→(0.4,-0.4) Z
+    // Path: M(0.4,-0.4) L(0.4,-1.1) Q(0.4,-1.7)â†’(1,-1.7) L(2.1,-1.7)
+    //        Q(2.7,-1.7)â†’(2.7,-1.1) L(2.7,-0.4) Q(2.7,0.2)â†’(2.1,0.2) L(1,0.2)
+    //        Q(0.4,0.2)â†’(0.4,-0.4) Z
     // QuadTo promoted to cubic: cp1 = P0 + 2/3*(Pq-P0), cp2 = Pend + 2/3*(Pq-Pend).
     ctx.setLineWidth(0.5);
     ctx.drawPath({
@@ -206,7 +206,7 @@ function scopeTriggerFactory(props: PropertyBag): ScopeTriggerElement {
   return new ScopeTriggerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ScopeTriggerDefinition: ComponentDefinition = {
+export const ScopeTriggerDefinition: StandaloneComponentDefinition = {
   name: "ScopeTrigger",
   typeId: -1,
   factory: scopeTriggerFactory,

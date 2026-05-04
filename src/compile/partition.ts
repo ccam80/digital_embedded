@@ -69,7 +69,7 @@ function electricalSpecForGroup(
     if (pin.domain !== "analog") continue;
     const el = elements[pin.elementIndex];
     if (!el) continue;
-    const def = registry.get(el.typeId);
+    const def = registry.getStandalone(el.typeId);
     if (!def) continue;
     const perPin = def.pinElectricalOverrides?.[pin.pinLabel];
     if (perPin) return perPin;
@@ -137,7 +137,7 @@ export function partitionByDomain(
     // assignment- they are handled by each backend individually.
     if (!ma) continue;
 
-    const def = registry.get(el.typeId);
+    const def = registry.getStandalone(el.typeId);
     if (!def) continue;
 
     // Sort resolved pins by pinIndex so compileDigitalPartition and

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * In component- interactive toggle input.
  *
  * The user clicks this component to change its output value.
@@ -19,7 +19,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -82,7 +82,7 @@ export class InElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Body rectangle: (-1.55,-0.75) → (-0.05,0.75), closed, NORMAL fill then stroke
+    // Body rectangle: (-1.55,-0.75) â†’ (-0.05,0.75), closed, NORMAL fill then stroke
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon([
       { x: -1.55, y: -0.75 },
@@ -196,7 +196,7 @@ function inFactory(props: PropertyBag): InElement {
   return new InElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const InDefinition: ComponentDefinition = {
+export const InDefinition: StandaloneComponentDefinition = {
   name: "In",
   typeId: -1,
   factory: inFactory,
@@ -206,7 +206,7 @@ export const InDefinition: ComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "In- interactive input component.\n" +
-    "Click to toggle the output value (1-bit: toggle 0↔1; multi-bit: opens value editor).\n" +
+    "Click to toggle the output value (1-bit: toggle 0â†”1; multi-bit: opens value editor).\n" +
     "The executeFn is a pass-through; the signal value is set externally by user interaction.",
   models: {
     digital: { executeFn: executeIn, inputSchema: [], outputSchema: ["out"] },

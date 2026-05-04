@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Web Worker entry point for the DigitalEngine.
  *
  * Receives EngineMessage commands via onmessage, runs the simulation, and
@@ -123,7 +123,7 @@ function handleInit(msg: Extract<EngineMessage, { type: "init" }>): void {
   const sampleFns: (ExecuteFunction | null)[] = [];
 
   for (const typeName of msg.typeNames) {
-    const def = registry.get(typeName);
+    const def = registry.getStandalone(typeName);
     if (def !== undefined) {
       executeFns.push(def.models!.digital!.executeFn);
       sampleFns.push(def.models?.digital?.sampleFn ?? null);

@@ -142,7 +142,7 @@ describe("SparseSolver", () => {
     expect(x1[1]).toBeCloseTo(1 / 11, 12);
     expect(x1[2]).toBeCloseTo(7 / 11, 12);
 
-    // Second solve: same pattern, different values — A = [[2,1],[1,4]], b = [3,5]
+    // Second solve: same pattern, different values- A = [[2,1],[1,4]], b = [3,5]
     // Analytical: det = 8-1=7; x1 = (3*4-5*1)/7 = 7/7 = 1; x2 = (2*5-3*1)/7 = 7/7 = 1
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
@@ -151,7 +151,7 @@ describe("SparseSolver", () => {
     solver.stampElement(solver.allocElement(2, 2), 4);
     const rhs2 = new Float64Array(3);
     rhs2[1] += 3; rhs2[2] += 5;
-    // topology should NOT be dirty — same nonzero pattern
+    // topology should NOT be dirty- same nonzero pattern
     const r2 = solver.factor();
     expect(r2).toBe(0);
     const x2 = new Float64Array(3);
@@ -239,7 +239,7 @@ describe("SparseSolver", () => {
 
     // V1=5, V2=2.5, Ivs = -V1/1000 = wait, let's compute:
     // V1=5, V2=2.5; current through R1 = (V1-V2)/R1 = 2.5mA into node 2
-    // Current through R2 = V2/R2 = 2.5mA out of node 2 — balanced
+    // Current through R2 = V2/R2 = 2.5mA out of node 2- balanced
     // Current through Vs source: flows from node 1 to ground through the source branch
     // Ivs = -(V1-V2)/R1 = branch current, by KCL at node 1:
     // G1*(V1-V2) + Ivs = 0 => 0.001*2.5 + Ivs = 0 => Ivs = -0.0025A
@@ -252,7 +252,7 @@ describe("SparseSolver", () => {
     const n = 50;
     const solver = new SparseSolver();
 
-    // Deterministic PRNG (mulberry32) — seeded so the matrix is the same every run.
+    // Deterministic PRNG (mulberry32)- seeded so the matrix is the same every run.
     // Seed 0xdeadbeef was verified to produce a diagonally-dominant 50x50 sparse
     // matrix whose residual converges below 1e-8 with Markowitz-primary pivot selection.
     function makePrng(seed: number): () => number {
@@ -342,26 +342,28 @@ describe("SparseSolver", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Real MNA circuit benchmark — full engine pipeline
+// Real MNA circuit benchmark- full engine pipeline
 // ---------------------------------------------------------------------------
 
 import {
-  allocateStatePool,
   makeTestSetupContext,
   setupAll,
   loadCtxFromFields,
 } from "./test-helpers.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { MNAEngine } from "../analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import type { AnalogElement } from "../element.js";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { ComparisonSession } from "./harness/comparison-session.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { ComponentRegistry } from "../../../core/registry.js";
+import type { Circuit } from "../../../core/circuit.js";
 
 // ---------------------------------------------------------------------------
-// Local benchmark element factories — §A-compliant shape (_pinNodes, label:"")
-// §A-compliant shape: _pinNodes Map, label:"", no dead flag fields.
+// Local benchmark element factories- ssA-compliant shape (_pinNodes, label:"")
+// ssA-compliant shape: _pinNodes Map, label:"", no dead flag fields.
 // setup() allocates TSTALLOC handles on the provided solver.
 // load() stamps via the pre-allocated handles.
 // ---------------------------------------------------------------------------
@@ -516,8 +518,104 @@ function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElem
   return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
 }
 
+// ---------------------------------------------------------------------------
+// 50-node benchmark circuit expressed via facade.build for M1 migration
+// ---------------------------------------------------------------------------
+
+function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {
+  const facade = new DefaultSimulatorFacade(registry);
+
+  // Component ids for chain resistors: r_{i}_{i-1} connects node i (pos) to node i-1 (neg)
+  const components: Array<{ id: string; type: string; props: Record<string, unknown> }> = [
+    { id: "gnd", type: "Ground", props: {} },
+    { id: "vs",  type: "DcVoltageSource", props: { voltage: 10.0 } },
+  ];
+
+  // Chain resistors: node 50 → 49 → ... → 1 → GND (50 resistors)
+  for (let i = 50; i >= 2; i--) {
+    components.push({ id: `r${i}_${i - 1}`, type: "Resistor", props: { resistance: 1000 + i * 10 } });
+  }
+  components.push({ id: "r1_0", type: "Resistor", props: { resistance: 1000 } });
+
+  // Shunt capacitors: every 5th node to GND
+  for (let i = 5; i <= 50; i += 5) {
+    components.push({ id: `c${i}`, type: "Capacitor", props: { capacitance: 100e-9 } });
+  }
+
+  // Shunt diodes: every 7th node to GND
+  for (let i = 7; i <= 49; i += 7) {
+    components.push({ id: `d${i}`, type: "Diode", props: {} });
+  }
+
+  // Inductor: node 25 → GND
+  components.push({ id: "l25", type: "Inductor", props: { inductance: 1e-3 } });
+
+  // Cross-link resistors
+  components.push({ id: "xr10_40", type: "Resistor", props: { resistance: 10000 } });
+  components.push({ id: "xr15_35", type: "Resistor", props: { resistance: 10000 } });
+  components.push({ id: "xr20_30", type: "Resistor", props: { resistance: 10000 } });
+  components.push({ id: "xr5_45",  type: "Resistor", props: { resistance: 10000 } });
+  components.push({ id: "xr12_38", type: "Resistor", props: { resistance: 10000 } });
+
+  // Helper: return the pin address for node N (1..50) in the chain.
+  // For node N (2..49): use the neg pin of r_{N+1}_N (the chain resistor above N).
+  // For node 50: use vs:pos.
+  // For node 1: use r2_1:neg.
+  // For GND (node 0): use gnd:out.
+  function nodePin(n: number): string {
+    if (n === 0) return "gnd:out";
+    if (n === 50) return "vs:pos";
+    return `r${n + 1}_${n}:neg`;
+  }
+
+  const connections: Array<[string, string]> = [
+    // Voltage source: pos → node 50, neg → GND
+    ["vs:pos",      "r50_49:pos"],
+    ["vs:neg",      "gnd:out"],
+    // Chain: link each resistor's neg to the next one's pos
+    ...Array.from({ length: 48 }, (_, k): [string, string] => {
+      const i = 50 - k; // i goes from 50 down to 3
+      return [`r${i}_${i - 1}:neg`, `r${i - 1}_${i - 2}:pos`];
+    }),
+    // r2_1:neg → r1_0:pos (node 1)
+    ["r2_1:neg", "r1_0:pos"],
+    // r1_0:neg → GND
+    ["r1_0:neg", "gnd:out"],
+  ];
+
+  // Shunt capacitors
+  for (let i = 5; i <= 50; i += 5) {
+    connections.push([`c${i}:pos`, nodePin(i)]);
+    connections.push([`c${i}:neg`, "gnd:out"]);
+  }
+
+  // Shunt diodes
+  for (let i = 7; i <= 49; i += 7) {
+    connections.push([`d${i}:A`, nodePin(i)]);
+    connections.push([`d${i}:K`, "gnd:out"]);
+  }
+
+  // Inductor at node 25
+  connections.push(["l25:pos", nodePin(25)]);
+  connections.push(["l25:neg", "gnd:out"]);
+
+  // Cross-link resistors
+  connections.push(["xr10_40:pos", nodePin(10)]);
+  connections.push(["xr10_40:neg", nodePin(40)]);
+  connections.push(["xr15_35:pos", nodePin(15)]);
+  connections.push(["xr15_35:neg", nodePin(35)]);
+  connections.push(["xr20_30:pos", nodePin(20)]);
+  connections.push(["xr20_30:neg", nodePin(30)]);
+  connections.push(["xr5_45:pos",  nodePin(5)]);
+  connections.push(["xr5_45:neg",  nodePin(45)]);
+  connections.push(["xr12_38:pos", nodePin(12)]);
+  connections.push(["xr12_38:neg", nodePin(38)]);
+
+  return facade.build({ components, connections });
+}
+
 describe("SparseSolver real MNA circuit", () => {
-  it("mna_50node_realistic_circuit_performance", () => {
+  it("mna_50node_realistic_circuit_performance", async () => {
     // 50-node MNA circuit with realistic topology:
     //
     //   Vs=10V source: node 50 → GND (branch row 50)
@@ -532,52 +630,12 @@ describe("SparseSolver real MNA circuit", () => {
 
     const nodeCount = 50;
     const matrixSize = nodeCount + 2;
-    const elements: AnalogElement[] = [];
 
-    // Voltage source: node 50 → GND, branch row = 50
-    const vs = makeVsrc(50, 0, 10.0);
-    vs.branchIndex = 50;
-    elements.push(vs);
-
-    // Resistor chain: node i → node i-1, with node 1 → GND
-    for (let i = 50; i >= 2; i--) {
-      elements.push(benchMakeResistor(i, i - 1, 1000 + i * 10));
-    }
-    elements.push(benchMakeResistor(1, 0, 1000)); // node 1 → GND
-
-    // Shunt capacitors: every 5th node to GND
-    for (let i = 5; i <= 50; i += 5) {
-      elements.push(benchMakeCapacitor(i, 0, 100e-9));
-    }
-
-    // Shunt diodes: every 7th node to GND
-    for (let i = 7; i <= 49; i += 7) {
-      elements.push(benchMakeDiode(i, 0, 1e-14, 1.0));
-    }
-
-    // Inductor: node 25 → GND, branch row = 51
-    elements.push(benchMakeInductor(25, 0, 51, 1e-3));
-
-    // Cross-link resistors (feedback paths across the chain)
-    elements.push(benchMakeResistor(10, 40, 10000));
-    elements.push(benchMakeResistor(15, 35, 10000));
-    elements.push(benchMakeResistor(20, 30, 10000));
-    elements.push(benchMakeResistor(5, 45, 10000));
-    elements.push(benchMakeResistor(12, 38, 10000));
-
-    const statePool = allocateStatePool(elements);
-    const compiled = new ConcreteCompiledAnalogCircuit({
-      nodeCount,
-      elements,
-      labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
-      models: new Map(),
-      elementToCircuitElement: new Map(),
-      statePool,
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: build50NodeBenchmarkCircuit,
+      analysis: "dcop",
     });
-
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    const engine = (session as any)._engine as MNAEngine;
 
     // --- DC operating point ---
     const t0 = performance.now();
@@ -699,7 +757,7 @@ describe("SparseSolver real MNA circuit", () => {
 // ---------------------------------------------------------------------------
 
 // Tests dead architecture: enablePreSolveRhsCapture / getPreSolveRhsSnapshot
-// were deleted in Phase 0 (architect §B.30). Pending harness rewrite per §4.
+// were deleted in Phase 0 (architect ssB.30). Pending harness rewrite per ss4.
 /* DEAD-ARCH-CAPTURE-TESTS
 describe("SparseSolver pre-solve RHS capture", () => {
   it("getPreSolveRhsSnapshot returns zero-length array when capture disabled", () => {
@@ -727,7 +785,7 @@ describe("SparseSolver pre-solve RHS capture", () => {
     expect(snapshot.length).toBe(2);
   });
 
-  it("pre-solve RHS is captured before factorization — distinct from solution vector", () => {
+  it("pre-solve RHS is captured before factorization- distinct from solution vector", () => {
     // RHS = [5, 0]; after solve, solution differs from RHS
     const solver = new SparseSolver();
     solver.enablePreSolveRhsCapture(true);
@@ -790,7 +848,7 @@ describe("SparseSolver preorder", () => {
     solver.solve(rhs, x);
   });
 
-  it("preorder is idempotent — second call is a no-op", () => {
+  it("preorder is idempotent- second call is a no-op", () => {
     const solver = new SparseSolver();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
@@ -915,7 +973,7 @@ describe("SparseSolver factorNumerical", () => {
     const r2 = solver.factor();
     expect(r2).not.toBe(0);
     // New API: factor() returns a plain numeric ngspice error code (spSINGULAR/spZERO_DIAG).
-    // A non-zero return signals reorder is needed — no .needsReorder property exists.
+    // A non-zero return signals reorder is needed- no .needsReorder property exists.
   });
 
   it("applies diagGmin before numerical factorization", () => {
@@ -947,7 +1005,7 @@ describe("SparseSolver factorNumerical", () => {
 // ---------------------------------------------------------------------------
 // factor() dispatch and FactorResult.usedReorder tests
 //
-// Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; the per-call
+// Stage 6.3.3- `lastFactorUsedReorder` instance field deleted; the per-call
 // "did factor() walk the reorder loop?" signal is now `FactorResult.usedReorder`.
 // ---------------------------------------------------------------------------
 
@@ -1042,7 +1100,7 @@ describe("SparseSolver Markowitz data structures", () => {
   it("allocates markowitzRow, markowitzCol, markowitzProd with correct length", () => {
     // Markowitz arrays are allocated lazily inside _allocateWorkspace() during the
     // first factor() reorder pass (ngspice spcCreateInternalVectors). They do not
-    // exist after _initStructure alone — trigger allocation via factor().
+    // exist after _initStructure alone- trigger allocation via factor().
     const solver = new SparseSolver();
     solver._initStructure();
     for (let i = 1; i <= 5; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
@@ -1099,7 +1157,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // assembly, not stale values from the prior pass.
     const solver = new SparseSolver();
 
-    // First factor — establishes off-diagonal Markowitz counts.
+    // First factor- establishes off-diagonal Markowitz counts.
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
@@ -1112,7 +1170,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // Row 1 and row 3 have 1 off-diagonal each; row 2 has 2.
     // (Values are post-elimination so are consumed, but count should be >= 0.)
 
-    // Second assembly: diagonal-only — Markowitz counts should reset to 0.
+    // Second assembly: diagonal-only- Markowitz counts should reset to 0.
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(2, 2), 3);
@@ -1244,13 +1302,13 @@ describe("SparseSolver Markowitz counts from finalize", () => {
       expect(solver.markowitzCol[i]).toBe(0);
       expect(solver.markowitzProd[i]).toBe(0);
     }
-    // All 3 rows are singletons (mProd=0) — singletons counter reflects this
+    // All 3 rows are singletons (mProd=0)- singletons counter reflects this
     // (they are consumed during pivot selection, ending at 0 post-factor).
     expect(solver.singletons).toBe(0);
   });
 
   it("counts correctly for a dense 2x2 matrix", () => {
-    // Matrix: [[4,1],[1,3]] — each row/col has 1 off-diagonal.
+    // Matrix: [[4,1],[1,3]]- each row/col has 1 off-diagonal.
     // Markowitz arrays are populated inside factor() via _countMarkowitz.
     // Post-factor they reflect end-of-elimination state (counts decremented
     // by _updateMarkowitzNumbers during pivot elimination). Verify:
@@ -1318,7 +1376,7 @@ describe("SparseSolver pivot selection", () => {
     expect(result).not.toBe(0);
   });
 
-  it("prefers singleton rows — singletons getter reflects matrix structure", () => {
+  it("prefers singleton rows- singletons getter reflects matrix structure", () => {
     // The singletons counter is initialised and consumed during the reorder loop.
     // _markowitzProducts sets it from the initial counts; each _searchForSingleton
     // call decrements it. After full factorisation it is 0 (all consumed).
@@ -1413,7 +1471,7 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
     expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(4);
     expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(4);
 
-    // Verify correct solution — proof that Markowitz-driven pivot selection worked.
+    // Verify correct solution- proof that Markowitz-driven pivot selection worked.
     const x = new Float64Array(4);
     solver.solve(rhs, x);
     // A*x = b: 2*x1 - x2 = 1, -x1 + 3*x2 - x3 = 2, -x2 + 2*x3 = 1
@@ -1528,7 +1586,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     solver.stampElement(solver.allocElement(4, 4), 5);
     { const rhs = new Float64Array(5); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 1); stampRHS(rhs, 3, 1); stampRHS(rhs, 4, 1); void rhs; }
 
-    // Factor — Markowitz arrays are allocated lazily inside factor() via
+    // Factor- Markowitz arrays are allocated lazily inside factor() via
     // _allocateWorkspace(). They do not exist before factor() is called.
     // _countMarkowitz() is called per-step and _updateMarkowitzNumbers() decrements
     // counts as pivots are applied; post-factor the arrays reflect end-of-elimination.
@@ -1581,7 +1639,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     const result = solver.factor();
     expect(result).toBe(0);
 
-    // Verify solution correctness — the key validation (1-based)
+    // Verify solution correctness- the key validation (1-based)
     const x = new Float64Array(4);
     solver.solve(rhs, x);
     const entries: [number, number, number][] = [
@@ -1624,7 +1682,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(5);
     expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(5);
 
-    // Verify correct solution — proof that Markowitz tracking worked throughout elimination.
+    // Verify correct solution- proof that Markowitz tracking worked throughout elimination.
     const x = new Float64Array(5);
     solver.solve(rhs, x);
     const entries: [number, number, number][] = [
@@ -1660,7 +1718,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     // Record initial element pool capacity
     const initialCapacity = (solver as any)._elCapacity;
 
-    // Factor — this exercises the full linked-structure pipeline including fill-in
+    // Factor- this exercises the full linked-structure pipeline including fill-in
     const result = solver.factor();
     expect(result).toBe(0);
 
@@ -1761,13 +1819,13 @@ describe("SparseSolver handle-based stamp API", () => {
     stampRHS(rhsStamp, 1, 1.0);
     stampRHS(rhsStamp, 2, 2.0);
 
-    // Verify solve correctness — factor() calls _linkRows() which builds row chains.
+    // Verify solve correctness- factor() calls _linkRows() which builds row chains.
     const result = solver.factor();
     expect(result).toBe(0);
     const x = new Float64Array(3); // size n+1
     solver.solve(rhsStamp, x);
 
-    // Check linked structure via rowHead chains — 2 elements per row.
+    // Check linked structure via rowHead chains- 2 elements per row.
     // Row chains are built by _linkRows() inside factor(); read them post-factor.
     // rowHead is indexed 1..n (1-based).
     const rowHead = (solver as any)._rowHead as Int32Array;
@@ -1821,7 +1879,7 @@ describe("SparseSolver handle-based stamp API", () => {
     expect(elVal[h10]).toBe(0);
     expect(elVal[h11]).toBe(0);
 
-    // Linked chains still intact — rowHead[1] still points to valid elements
+    // Linked chains still intact- rowHead[1] still points to valid elements
     // (_resetForAssembly preserves the linked structure built by _linkRows)
     const rowHead = (solver as any)._rowHead as Int32Array;
     const elNextInRow = (solver as any)._elNextInRow as Int32Array;
@@ -1860,11 +1918,11 @@ describe("SparseSolver handle-based stamp API", () => {
     const x1 = new Float64Array(3); // size n+1
     solver.solve(rhsA, x1);
 
-    // Invalidate topology — next beginAssembly must rebuild from scratch
+    // Invalidate topology- next beginAssembly must rebuild from scratch
     solver.invalidateTopology();
 
     solver._initStructure();
-    // After invalidation, the linked structure is empty — new allocElement calls
+    // After invalidation, the linked structure is empty- new allocElement calls
     // allocate fresh elements. Old handles h00/h11 should not be reused implicitly.
     const h00b = solver.allocElement(1, 1); solver.stampElement(h00b, 4.0);
     const h01b = solver.allocElement(1, 2); solver.stampElement(h01b, 1.0);
@@ -1898,7 +1956,7 @@ describe("SparseSolver SMPpreOrder", () => {
     //   Node 1: conductance G=1 at (1,1)
     //   VS KCL: (1,3) = 1 (current into node 1 from branch)
     //   VS KVL: (3,1) = 1 (v1 - V = 0, so v1 coeff is 1)
-    //   Diagonal (3,3) = 0 — structural zero; preorder must swap cols 1 and 3
+    //   Diagonal (3,3) = 0- structural zero; preorder must swap cols 1 and 3
     //   to expose the (3,1) twin entry on the new diagonal.
     const solver = new SparseSolver();
     solver._initStructure();
@@ -2011,7 +2069,7 @@ describe("SparseSolver SMPpreOrder", () => {
   });
 
   it("preorder_no_swap_when_diagonal_nonzero", () => {
-    // ngspice 1-based: 3x3 tridiagonal — all diagonals non-zero, preorder no-op.
+    // ngspice 1-based: 3x3 tridiagonal- all diagonals non-zero, preorder no-op.
     const solver = new SparseSolver();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2); solver.stampElement(solver.allocElement(1, 2), -1);
@@ -2025,7 +2083,7 @@ describe("SparseSolver SMPpreOrder", () => {
 
     solver.preorder();
 
-    // colHead should be unchanged — no swaps performed
+    // colHead should be unchanged- no swaps performed
     const colHeadAfter = Array.from((solver as any)._colHead as Int32Array);
     expect(colHeadAfter).toEqual(colHeadBefore);
 
@@ -2209,7 +2267,7 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
 describe("SparseSolver NISHOULDREORDER lifecycle", () => {
   it("factor_uses_numeric_path_without_forceReorder", () => {
     // After one successful factorWithReorder(), subsequent factor() calls must
-    // use the numeric-only path. Stage 6.3.3 — `lastFactorUsedReorder` instance
+    // use the numeric-only path. Stage 6.3.3- `lastFactorUsedReorder` instance
     // field deleted; verified via `FactorResult.usedReorder` returned by factor().
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
@@ -2247,7 +2305,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
 
   it("forceReorder_triggers_full_pivot_search", () => {
     // After forceReorder(), the next factor() call must use the reorder path.
-    // Stage 6.3.3 — usedReorder reported on each FactorResult.
+    // Stage 6.3.3- usedReorder reported on each FactorResult.
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
     solver._initStructure();
@@ -2259,7 +2317,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     solver.stampElement(solver.allocElement(3, 2), -1);
     solver.stampElement(solver.allocElement(3, 3), 2);
 
-    // First factor — builds pivot order
+    // First factor- builds pivot order
     solver.factor();
     expect(solver.reordered).toBe(true);
 
@@ -2273,7 +2331,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     solver.stampElement(solver.allocElement(3, 2), -1);
     solver.stampElement(solver.allocElement(3, 3), 2);
 
-    // Second factor without forceReorder — numeric path
+    // Second factor without forceReorder- numeric path
     solver.factor();
     expect(solver.lastFactorWalkedReorder).toBe(false);
 
@@ -2288,7 +2346,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     solver.stampElement(solver.allocElement(3, 3), 2);
     solver.forceReorder();
 
-    // Third factor after forceReorder — must use full pivot search
+    // Third factor after forceReorder- must use full pivot search
     const r3 = solver.factor();
     expect(r3).toBe(0);
     expect(solver.reordered).toBe(true);
@@ -2296,7 +2354,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task C5.1 acceptance gate — the value-addressed stamp(row, col, value)
+// Task C5.1 acceptance gate- the value-addressed stamp(row, col, value)
 // convenience wrapper has been deleted. Every caller uses allocElement() +
 // stampElement() (handle-based API matching ngspice spGetElement / *ElementPtr).
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for subcircuit engine flattening (Task 6.2.3).
  *
  * Tests construct SubcircuitHost implementations directly- no dependency on
@@ -12,7 +12,7 @@ import { PinDirection } from "@/core/pin";
 import type { Pin } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { flattenCircuit, isSubcircuitHost } from "@/solver/digital/flatten";
 import {
   TestLeafElement,
@@ -64,7 +64,7 @@ function makeSubcircuitElement(
 function makeRegistry(...typeIds: string[]): ComponentRegistry {
   const reg = new ComponentRegistry();
   for (const typeId of typeIds) {
-    const def: ComponentDefinition = {
+    const def: StandaloneComponentDefinition = {
       name: typeId,
       typeId: -1,
       factory: (_props) => makeLeafElement(typeId, "auto", { x: 0, y: 0 }),
@@ -119,7 +119,7 @@ describe("flattenCircuit", () => {
   });
 
   it("singleSubcircuit- subcircuit element is replaced by its internal components", () => {
-    // Internal circuit: In → And → Out
+    // Internal circuit: In â†’ And â†’ Out
     const internal = new Circuit({ name: "AndWrapper" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
@@ -202,7 +202,7 @@ describe("flattenCircuit", () => {
     const registry = makeRegistry("And", "In", "Out");
     const { circuit: flat } = flattenCircuit(parent, registry);
 
-    // Each instance contributes 3 elements → 6 total
+    // Each instance contributes 3 elements â†’ 6 total
     expect(flat.elements.length).toBe(6);
 
     // All instanceIds must be distinct
@@ -267,14 +267,14 @@ describe("flattenCircuit", () => {
   });
 
   it("pinWiring- parent net connected to subcircuit input pin is wired to the internal In component", () => {
-    // Internal circuit: In(label=A) → Out(label=Y)
+    // Internal circuit: In(label=A) â†’ Out(label=Y)
     const internal = new Circuit({ name: "Passthrough" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 5 });
     const outEl = makeOutElement("out-1", "Y", { x: 10, y: 5 });
     internal.addElement(inEl);
     internal.addElement(outEl);
 
-    // Parent circuit: subcircuit with chip-relative input pin {0,1} at element position {20,5} → world (20,6)
+    // Parent circuit: subcircuit with chip-relative input pin {0,1} at element position {20,5} â†’ world (20,6)
     const parent = new Circuit({ name: "Top" });
     const subcircuitPins: Pin[] = [
       {
@@ -371,7 +371,7 @@ describe("flattenCircuit", () => {
 
 describe("flattenCircuit- Port-based subcircuits", () => {
   it("singleLevelFlattenWithPortInterfaces- internal circuit with Port elements is inlined correctly", () => {
-    // Internal circuit: Port("A") → And gate → Port("Y")
+    // Internal circuit: Port("A") â†’ And gate â†’ Port("Y")
     const internal = new Circuit({ name: "PortWrapper" });
     const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
@@ -433,7 +433,7 @@ describe("flattenCircuit- Port-based subcircuits", () => {
   });
 
   it("nestedPortSubcircuits- recursive flattening works with Port at every level", () => {
-    // Inner circuit: Port("X") → And gate → Port("Z")
+    // Inner circuit: Port("X") â†’ And gate â†’ Port("Z")
     const inner = new Circuit({ name: "Inner" });
     const innerPortX = makePortElement("port-X", "X", { x: 0, y: 0 });
     const innerAnd = makeLeafElement("And", "and-i", { x: 5, y: 0 });
@@ -508,7 +508,7 @@ describe("flattenCircuit- Port-based subcircuits", () => {
     const registry = makeRegistry("And");
     const { circuit: flat } = flattenCircuit(parent, registry);
 
-    // Each instance contributes 3 elements (Port A, And, Port Y) → 6 total
+    // Each instance contributes 3 elements (Port A, And, Port Y) â†’ 6 total
     expect(flat.elements.length).toBe(6);
 
     // All instanceIds must be distinct
@@ -524,7 +524,7 @@ describe("flattenCircuit- Port-based subcircuits", () => {
   });
 
   it("portWithMultiBitWidth- Port('BUS', bitWidth=8) preserves bus width through the bridge", () => {
-    // Internal circuit: Port("BUS") with bitWidth 8 → And gate
+    // Internal circuit: Port("BUS") with bitWidth 8 â†’ And gate
     const internal = new Circuit({ name: "BusSub" });
     const portBus = makePortElement("port-BUS", "BUS", { x: 0, y: 0 }, 8);
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
@@ -567,7 +567,7 @@ describe("flattenCircuit- Port-based subcircuits", () => {
   });
 
   it("mixedPortAndLeafElements- multiple internal gates wired together are all preserved with correct bridge wires", () => {
-    // Internal circuit: Port("IN") → And → Or → Port("OUT")
+    // Internal circuit: Port("IN") â†’ And â†’ Or â†’ Port("OUT")
     const internal = new Circuit({ name: "TwoGates" });
     const portIn = makePortElement("port-IN", "IN", { x: 0, y: 0 });
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });

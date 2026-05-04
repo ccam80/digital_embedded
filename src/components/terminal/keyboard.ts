@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Keyboard component- keyboard input source.
  *
  * Reads key codes from a keyboard input dialog (floating panel). The circuit
@@ -38,16 +38,16 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java Keyboard uses GenericShape: 2 inputs (C, en), 2 outputs (D, av), width=3
-// Non-symmetric (2 outputs) → offs=0
+// Non-symmetric (2 outputs) â†’ offs=0
 // Input C@(0,0), en@(0,1); Output D@(3,0), av@(3,1)
-// → COMP_WIDTH=3, COMP_HEIGHT=2
+// â†’ COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -264,7 +264,7 @@ function keyboardFactory(props: PropertyBag): KeyboardElement {
   return new KeyboardElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const KeyboardDefinition: ComponentDefinition = {
+export const KeyboardDefinition: StandaloneComponentDefinition = {
   name: "Keyboard",
   typeId: -1,
   factory: keyboardFactory,

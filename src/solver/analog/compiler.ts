@@ -181,6 +181,13 @@ function resolveSubcircuitModels(
       for (const [k, v] of Object.entries(mergedRecord)) {
         mergedProps.setModelParam(k, v);
       }
+      // Also copy static (non-model-param) entries from the instance so that
+      // structural props like "bits" are accessible via getOrDefault() inside
+      // the netlist builder. These are not model params and are not included in
+      // mergedRecord above.
+      for (const [k, v] of instanceProps.entries()) {
+        mergedProps.set(k, v);
+      }
       resolvedNetlist = netlist(mergedProps);
     } else {
       resolvedNetlist = netlist;

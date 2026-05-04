@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Div component- N-bit divider with quotient and remainder.
  *
  * Ports from Digital's Div.java:
@@ -24,7 +24,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -259,7 +259,7 @@ function divFactory(props: PropertyBag): DivElement {
   return new DivElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DivDefinition: ComponentDefinition = {
+export const DivDefinition: StandaloneComponentDefinition = {
   name: "Div",
   typeId: -1,
   factory: divFactory,

@@ -15,7 +15,7 @@ import { SchottkyDiodeDefinition } from "../schottky.js";
 import { ScrDefinition } from "../scr.js";
 import { DiacDefinition } from "../diac.js";
 import { TriacDefinition } from "../triac.js";
-import type { ComponentDefinition } from "../../../core/registry.js";
+import type { StandaloneComponentDefinition } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -27,7 +27,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 
-const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
+const SEMICONDUCTOR_DEFS: StandaloneComponentDefinition[] = [
   NpnBjtDefinition,
   PnpBjtDefinition,
   DiodeDefinition,

@@ -120,7 +120,7 @@ function buildNetlistView(
     const elPins = el.getPins();
 
     // Collect properties from registry property definitions
-    const def = registry.get(el.typeId);
+    const def = registry.getStandalone(el.typeId);
     const properties: Record<string, PropertyValue> = {};
     if (def) {
       for (const propDef of def.propertyDefs) {

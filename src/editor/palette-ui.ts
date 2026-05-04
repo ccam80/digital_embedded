@@ -6,7 +6,7 @@
  * Separated from palette.ts so the logic layer is testable without DOM.
  */
 
-import { createSeededBag, type ComponentDefinition } from "@/core/registry";
+import { createSeededBag, type StandaloneComponentDefinition } from "@/core/registry";
 import type { ComponentCategory } from "@/core/registry";
 import type { ComponentPalette, PaletteNode } from "./palette.js";
 import type { ColorScheme, Point } from "@/core/renderer-interface";
@@ -16,9 +16,9 @@ import type { Viewport } from "./viewport.js";
 
 export type AllowlistChangeHandler = (typeNames: string[] | null) => void;
 
-export type PlacementHandler = (def: ComponentDefinition) => void;
+export type PlacementHandler = (def: StandaloneComponentDefinition) => void;
 
-export type TouchDropHandler = (def: ComponentDefinition, worldPt: Point) => void;
+export type TouchDropHandler = (def: StandaloneComponentDefinition, worldPt: Point) => void;
 
 // ---------------------------------------------------------------------------
 // PaletteUI
@@ -175,7 +175,7 @@ export class PaletteUI {
     return wrapper;
   }
 
-  private _buildRecentSection(recent: ComponentDefinition[]): HTMLElement {
+  private _buildRecentSection(recent: StandaloneComponentDefinition[]): HTMLElement {
     const section = document.createElement("div");
     section.className = "palette-recent";
 
@@ -263,7 +263,7 @@ export class PaletteUI {
     return categoryEl;
   }
 
-  private _buildComponentItem(def: ComponentDefinition): HTMLElement {
+  private _buildComponentItem(def: StandaloneComponentDefinition): HTMLElement {
     const item = document.createElement("li");
     item.className = "palette-component-item";
     item.title = def.helpText;
@@ -310,7 +310,7 @@ export class PaletteUI {
     return item;
   }
 
-  private _addTouchDragHandlers(item: HTMLElement, def: ComponentDefinition): void {
+  private _addTouchDragHandlers(item: HTMLElement, def: StandaloneComponentDefinition): void {
     let touchPointerId: number | null = null;
     let startX = 0;
     let startY = 0;
@@ -427,7 +427,7 @@ export class PaletteUI {
    * Render a mini component preview onto a small canvas element.
    * Falls back to a placeholder div if no color scheme is available.
    */
-  private _renderComponentIcon(def: ComponentDefinition): HTMLElement {
+  private _renderComponentIcon(def: StandaloneComponentDefinition): HTMLElement {
     if (this._colorScheme === null) {
       const placeholder = document.createElement("div");
       placeholder.className = "palette-component-icon--placeholder";
@@ -487,7 +487,7 @@ export class PaletteUI {
   private _openSettingsDialog(): void {
     const registry = this._palette.getRegistry();
     const currentAllowlist = this._palette.getAllowlist();
-    const allDefs = registry.getAll();
+    const allDefs = registry.getAllStandalone();
 
     // Build a mutable checked set- start from allowlist or all
     const checked = new Set<string>(
@@ -533,7 +533,7 @@ export class PaletteUI {
     categoriesContainer.style.display = showAllCb.checked ? "none" : "";
 
     // Group definitions by category
-    const byCategory = new Map<string, ComponentDefinition[]>();
+    const byCategory = new Map<string, StandaloneComponentDefinition[]>();
     for (const def of allDefs) {
       const cat = def.category;
       let list = byCategory.get(cat);

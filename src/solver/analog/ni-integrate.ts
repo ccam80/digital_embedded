@@ -1,4 +1,4 @@
-import type { IntegrationMethod } from "../../core/analog-types.js";
+import type { IntegrationMethod } from "./integration.js";
 
 /**
  * Exact port of ngspice niinteg.c NIintegrate() (ref/ngspice/src/maths/ni/niinteg.c:17-80).

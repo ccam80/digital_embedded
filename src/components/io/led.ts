@@ -241,21 +241,27 @@ export const LedDefinition: StandaloneComponentDefinition = {
     digital: { executeFn: executeLed, inputSchema: ["in"], outputSchema: [] },
   },
   modelRegistry: {
+    // EG (activation energy) is set to the LED's optical bandgap rather than
+    // the diode default (1.11 eV, silicon). With EG=1.11 the saturation-current
+    // temperature scaling tIS = IS*exp((T/TNOM-1)*EG/(N*vt) + ...) under-grows
+    // tIS at high T, so Vf rises with T (positive TC, opposite of real LEDs).
+    // Setting EG to the per-color optical bandgap restores the standard
+    // dVf/dT ≈ (Vf - EG)/T < 0 negative-TC behavior expected of LEDs.
     red:    { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 3.17e-19, N: 1.8, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, EG: 1.9 } },
     green:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 1e-21, N: 2.0, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, EG: 2.3 } },
     blue:   { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, EG: 2.8 } },
     yellow: { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 1e-20, N: 1.9, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, EG: 2.1 } },
     white:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, EG: 2.8 } },
   },
   defaultModel: "digital",
 };

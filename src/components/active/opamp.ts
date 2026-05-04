@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ideal Op-Amp analog component.
  *
  * Three-terminal nonlinear element: in+ (non-inverting), in- (inverting),
@@ -25,10 +25,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -40,7 +41,7 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: OPAMP_PARAM_DEFS, defaults: OPAMP_DEFAULTS } = defineModelParams({
   primary: {
     gain: { default: 1e6,  description: "Open-loop voltage gain" },
-    rOut: { default: 75,   unit: "Ω",  description: "Output resistance" },
+    rOut: { default: 75,   unit: "Î©",  description: "Output resistance" },
   },
 });
 
@@ -340,7 +341,7 @@ const OPAMP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // OpAmpDefinition
 // ---------------------------------------------------------------------------
 
-export const OpAmpDefinition: ComponentDefinition = {
+export const OpAmpDefinition: StandaloneComponentDefinition = {
   name: "OpAmp",
   typeId: -1,
   category: ComponentCategory.ACTIVE,

@@ -18,9 +18,9 @@ describe("debug_tline_signals", () => {
         ["vs:pos",   "tl:P1b"],
         ["vs:neg",   "gnd:out"],
         ["tl:P1a",   "gnd:out"],
-        ["tl:P2b",   "rload:A"],
+        ["tl:P2b",   "rload:pos"],
         ["tl:P2a",   "gnd:out"],
-        ["rload:B",  "gnd:out"],
+        ["rload:neg", "gnd:out"],
       ],
     });
     const coordinator = facade.compile(circuit) as DefaultSimulationCoordinator;

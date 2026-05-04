@@ -44,7 +44,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -52,7 +52,6 @@ import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -243,13 +242,8 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 // AnalogCrystalElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogCrystalElement implements PoolBackedAnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
+export class AnalogCrystalElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly poolBacked = true as const;
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;
 
@@ -260,9 +254,6 @@ export class AnalogCrystalElement implements PoolBackedAnalogElement {
   private L_s: number;
   private C_s: number;
   private C_0: number;
-
-  // Pool reference  set by initState(); state arrays accessed via pool.states[N] at call time.
-  private _pool!: StatePoolRef;
 
   // Internal nodes- populated in setup()
   private _n1Node: number = -1;
@@ -299,7 +290,7 @@ export class AnalogCrystalElement implements PoolBackedAnalogElement {
     Cs: number,
     C0: number,
   ) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;
     this.C_s = Cs;
@@ -363,10 +354,6 @@ export class AnalogCrystalElement implements PoolBackedAnalogElement {
 
   getInternalNodeLabels(): readonly string[] {
     return this._internalLabels;
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {

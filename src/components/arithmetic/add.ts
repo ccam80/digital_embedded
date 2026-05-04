@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Add component- N-bit adder with carry in/out.
  *
  * Ports from Digital's Add.java:
@@ -23,7 +23,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -225,7 +225,7 @@ function addFactory(props: PropertyBag): AddElement {
   return new AddElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const AddDefinition: ComponentDefinition = {
+export const AddDefinition: StandaloneComponentDefinition = {
   name: "Add",
   typeId: -1,
   factory: addFactory,

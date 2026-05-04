@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TransGate- CMOS transmission gate.
  *
  * A bidirectional switch controlled by a complementary pair of gate signals.
@@ -13,7 +13,7 @@
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
  *
- * Analog model: composite of two SW sub-elements sharing the same in↔out
+ * Analog model: composite of two SW sub-elements sharing the same inâ†”out
  * signal path. NFET SW uses ctrl pin; PFET SW uses ctrlN pin (inverted).
  * ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
  */
@@ -28,13 +28,13 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { FETLayout } from "./nfet.js";
 import { NFETSWSubElement } from "./nfet.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 
@@ -42,7 +42,7 @@ import type { SetupContext } from "../../solver/analog/setup-context.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-// Java TransGateShape: p1(SIZE,−SIZE)=(1,−1), p2(SIZE,SIZE)=(1,1), out1(0,0), out2(SIZE*2,0)=(2,0)
+// Java TransGateShape: p1(SIZE,âˆ’SIZE)=(1,âˆ’1), p2(SIZE,SIZE)=(1,1), out1(0,0), out2(SIZE*2,0)=(2,0)
 const COMP_WIDTH = 2;
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ export class TransGateElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Upper NFET bowtie polygon (closed): (0,0)→(0,-1)→(2,0)→(2,-1)→(0,0)
+    // Upper NFET bowtie polygon (closed): (0,0)â†’(0,-1)â†’(2,0)â†’(2,-1)â†’(0,0)
     ctx.drawPolygon([
       { x: 0, y: 0 },
       { x: 0, y: -1 },
@@ -129,7 +129,7 @@ export class TransGateElement extends AbstractCircuitElement {
       { x: 0, y: 0 },
     ], false);
 
-    // Lower PFET bowtie polygon (closed): (0,0)→(0,1)→(2,0)→(2,1)→(0,0)
+    // Lower PFET bowtie polygon (closed): (0,0)â†’(0,1)â†’(2,0)â†’(2,1)â†’(0,0)
     ctx.drawPolygon([
       { x: 0, y: 0 },
       { x: 0, y: 1 },
@@ -198,7 +198,7 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 // ---------------------------------------------------------------------------
 // TransGateAnalogElement- MNA composite element
 //
-// Composite: two SW sub-elements sharing the same in↔out signal path.
+// Composite: two SW sub-elements sharing the same inâ†”out signal path.
 //   _nfetSW: posNode=inNode, negNode=outNode, control=p1 (ctrl pin)
 //            ON when V(p1) > Vth_n
 //   _pfetSW: posNode=inNode, negNode=outNode, control=p2 (ctrlN pin, inverted)
@@ -211,18 +211,14 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 // ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62 (applied twice)
 // ---------------------------------------------------------------------------
 
-export class TransGateAnalogElement implements AnalogElement {
-  label: string = "";
+export class TransGateAnalogElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
 
   readonly _nfetSW: NFETSWSubElement;
   readonly _pfetSW: NFETSWSubElement;
 
   constructor(pinNodes: ReadonlyMap<string, number>) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
 
     const inNode = pinNodes.get("out1")!;
     const outNode = pinNodes.get("out2")!;
@@ -329,7 +325,7 @@ const TRANS_GATE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Ω)",
+    label: "Ron (Î©)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms",
@@ -337,7 +333,7 @@ const TRANS_GATE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Ω)",
+    label: "Roff (Î©)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms",
@@ -355,7 +351,7 @@ function transGateFactory(props: PropertyBag): TransGateElement {
   return new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TransGateDefinition: ComponentDefinition = {
+export const TransGateDefinition: StandaloneComponentDefinition = {
   name: "TransGate",
   typeId: -1,
   factory: transGateFactory,
@@ -363,7 +359,7 @@ export const TransGateDefinition: ComponentDefinition = {
   propertyDefs: TRANS_GATE_PROPERTY_DEFS,
   attributeMap: TRANS_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "TransGate- CMOS transmission gate. S=1, ~S=0 → A and B connected.",
+  helpText: "TransGate- CMOS transmission gate. S=1, ~S=0 â†’ A and B connected.",
   models: {
     digital: {
       executeFn: executeTransGate,

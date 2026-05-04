@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LedMatrix component- NxN LED grid display.
  *
  * Inputs:
@@ -31,15 +31,15 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java LedMatrix uses GenericShape: 2 inputs (r-data, c-addr), 0 outputs, width=3
-// Non-symmetric → offs=0. r-data@(0,0), c-addr@(0,1)
-// → COMP_WIDTH=3, COMP_HEIGHT=2
+// Non-symmetric â†’ offs=0. r-data@(0,0), c-addr@(0,1)
+// â†’ COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -181,7 +181,7 @@ export function executeLedMatrix(
 }
 
 // ---------------------------------------------------------------------------
-// LED_MATRIX_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
+// LED_MATRIX_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const LED_MATRIX_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -235,7 +235,7 @@ const LED_MATRIX_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// LedMatrixDefinition- ComponentDefinition for registry registration
+// LedMatrixDefinition- StandaloneComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function ledMatrixFactory(props: PropertyBag): LedMatrixElement {
@@ -248,7 +248,7 @@ function ledMatrixFactory(props: PropertyBag): LedMatrixElement {
   );
 }
 
-export const LedMatrixDefinition: ComponentDefinition = {
+export const LedMatrixDefinition: StandaloneComponentDefinition = {
   name: "LedMatrix",
   typeId: -1,
   factory: ledMatrixFactory,

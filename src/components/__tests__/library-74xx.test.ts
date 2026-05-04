@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the 74xx IC library manifest and registration.
  */
 
@@ -144,7 +144,7 @@ describe('library-74xx', () => {
     const registry = new ComponentRegistry();
     register74xxLibrary(registry);
 
-    const def = registry.get('7400');
+    const def = registry.getStandalone('7400');
     expect(def).toBeDefined();
     expect(def!.name).toBe('7400');
     expect(def!.category).toBe(ComponentCategory.SEVENTY_FOUR_XX);

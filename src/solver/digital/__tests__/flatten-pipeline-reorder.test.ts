@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the pipeline-reorder changes introduced in Wave 2.1.
  *
  * Covers flattenCircuit() unconditional inlining and resolveModelAssignments
@@ -17,7 +17,7 @@ import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
 import { resolveModelAssignments } from "@/compile/extract-connectivity";
 import {
@@ -34,7 +34,7 @@ function noopAnalogFactory() {
   return { label: "", branchIndex: -1, _stateBase: -1, _pinNodes: new Map<string, number>(), ngspiceLoadOrder: 0, load: (_ctx: unknown) => {}, setup: (_ctx: unknown) => {}, getPinCurrents: () => [] as number[], setParam: (_k: string, _v: number) => {} };
 }
 
-function makeAnalogDef(typeId: string): ComponentDefinition {
+function makeAnalogDef(typeId: string): StandaloneComponentDefinition {
   return {
     name: typeId, typeId: -1,
     factory: (props) => new TestLeafElement(typeId, "auto", { x: 0, y: 0 }, props, []),
@@ -46,7 +46,7 @@ function makeAnalogDef(typeId: string): ComponentDefinition {
   };
 }
 
-function makeMultiModelDef(typeId: string): ComponentDefinition {
+function makeMultiModelDef(typeId: string): StandaloneComponentDefinition {
   return {
     name: typeId, typeId: -1,
     factory: (props) => new TestLeafElement(typeId, "auto", { x: 0, y: 0 }, props, []),

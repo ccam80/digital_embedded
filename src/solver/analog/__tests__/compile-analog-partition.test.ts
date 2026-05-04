@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for compileAnalogPartition (P3-7).
  *
  * Verifies that the partition-based entry point handles Ground group
@@ -106,7 +106,7 @@ function makeBaseDef(name: string) {
     attributeMap: [] as import("../../../core/registry.js").AttributeMapping[],
     category: "MISC" as unknown as ComponentCategory,
     helpText: "",
-    factory: ((_props: PropertyBag) => makeElement(name, crypto.randomUUID(), [])) as unknown as import("../../../core/registry.js").ComponentDefinition["factory"],
+    factory: ((_props: PropertyBag) => makeElement(name, crypto.randomUUID(), [])) as unknown as import("../../../core/registry.js").StandaloneComponentDefinition["factory"],
   };
 }
 
@@ -184,7 +184,7 @@ interface PartitionBuilderResult {
  * Build an analog circuit with: Ground, 2-input AND gate.
  *
  * Wire layout: 4 single-point wires at (0,0), (10,0), (20,0), (30,0).
- * Ground connects at (0,0) → node 0.
+ * Ground connects at (0,0) â†’ node 0.
  * AND gate In_1 at (10,0), In_2 at (20,0), out at (30,0).
  * Expected node IDs: gnd=0, In_1=1, In_2=2, out=3.
  */
@@ -202,8 +202,8 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
     { x: 0, y: 0, label: "in", direction: PinDirection.INPUT },
   ]);
 
-  const andDef = registry.get("BehavioralAnd")!;
-  const gndDef = registry.get("Ground")!;
+  const andDef = registry.getStandalone("BehavioralAnd")!;
+  const gndDef = registry.getStandalone("Ground")!;
 
   // Build 4 wires: one per node (degenerate zero-length wires as in the test circuit)
   const wireGnd = new Wire({ x: 0,  y: 0 }, { x: 0,  y: 0 });
@@ -430,7 +430,7 @@ describe("compileAnalogPartition", () => {
       bridgeStubs: [],
       };
 
-    // Should not throw; no elements → no analog elements compiled
+    // Should not throw; no elements â†’ no analog elements compiled
     const compiled = compileAnalogPartition(emptyPartition, registry);
     expect(compiled.elements.length).toBe(0);
     expect(compiled.nodeCount).toBe(0);
@@ -446,7 +446,7 @@ describe("compileAnalogPartition", () => {
       { x: 30, y: 0, label: "out",  direction: PinDirection.OUTPUT },
     ], new Map<string, PropertyValue>([["model", "behavioral"]]));
 
-    const andDef = registry.get("BehavioralAnd")!;
+    const andDef = registry.getStandalone("BehavioralAnd")!;
     const andResolvedPins = andGate.getPins().map((pin, idx) => ({
       elementIndex: 0,
       pinIndex: idx,
@@ -505,8 +505,8 @@ describe("compileAnalogPartition", () => {
     expect(factorySpy).toHaveBeenCalledOnce();
     const [pinNodesArg] = factorySpy.mock.calls[0] as [ReadonlyMap<string, number>, ...unknown[]];
 
-    // Ground group → node 0; the 3 other groups → nodes 1, 2, 3
-    // AND pin positions: In_1=(10,0), In_2=(20,0), out=(30,0) → nodes 1, 2, 3
+    // Ground group â†’ node 0; the 3 other groups â†’ nodes 1, 2, 3
+    // AND pin positions: In_1=(10,0), In_2=(20,0), out=(30,0) â†’ nodes 1, 2, 3
     const nodeValues = [...pinNodesArg.values()];
     expect(nodeValues.every((n) => n > 0)).toBe(true);
     // All three must be distinct and non-zero
@@ -592,8 +592,8 @@ describe("compileAnalogPartition", () => {
       { x: 0, y: 0, label: "in", direction: PinDirection.INPUT },
     ]);
 
-    const compDef = registry.get("StatefulComp")!;
-    const gndDef = registry.get("Ground")!;
+    const compDef = registry.getStandalone("StatefulComp")!;
+    const gndDef = registry.getStandalone("Ground")!;
 
     const wireGnd = new Wire({ x: 0, y: 0 }, { x: 0, y: 0 });
     const wireA = new Wire({ x: 10, y: 0 }, { x: 10, y: 0 });

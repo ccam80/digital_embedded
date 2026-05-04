@@ -1,10 +1,35 @@
+/**
+ * Sub-element parameter value. CLOSED 4-arm union- no other shapes permitted.
+ *
+ * - `number`: literal scalar (resistance, capacitance, gain, flag-as-0/1).
+ * - `string`: lookup key into the enclosing subcircuit's `params` map; the
+ *   compiler resolves it to a `number` at netlist-instantiation time.
+ * - `siblingBranch` / `siblingState`: cross-leaf coupling references. The
+ *   compiler resolves these to a concrete branch index / pool slot ref so
+ *   StatePool rollback semantics are preserved across NR retries and LTE
+ *   rejections.
+ *
+ * **Flags / booleans MUST be encoded as `0`/`1` numbers**, matching ngspice's
+ * `IFvalue.iValue` convention (booleans are ints in the device-param ABI).
+ * Passing `boolean` (or any other JS primitive / object shape) is a contract
+ * violation and will fail at the type level. Builder functions that hold a
+ * boolean must coerce at the netlist boundary: `flag: f ? 1 : 0`.
+ */
+export type SubcircuitElementParam =
+  | number
+  | string
+  | { kind: "siblingBranch"; subElementName: string }
+  | { kind: "siblingState"; subElementName: string; slotName: string };
+
 export interface SubcircuitElement {
   /** Component type (NMOS, PMOS, Resistor, Diode, etc.) */
   typeId: string;
   /** Named .MODEL reference- resolved at compile time. */
   modelRef?: string;
-  /** Element-level parameter overrides. String values reference subcircuit params by name. */
-  params?: Record<string, number | string>;
+  /** Stable name used by sibling-coupling references (`siblingBranch` / `siblingState`). */
+  subElementName?: string;
+  /** Element-level parameter overrides. String values reference subcircuit params by name; object values are cross-leaf coupling refs. */
+  params?: Record<string, SubcircuitElementParam>;
   /** Number of MNA branch rows this element contributes (voltage sources, inductors = 1; MOSFETs, BJTs, resistors = 0). Defaults to 0. */
   branchCount?: number;
 }
@@ -18,6 +43,8 @@ export interface MnaSubcircuitNetlist {
   elements: SubcircuitElement[];
   /** Number of internal nets (nodes that aren't ports) */
   internalNetCount: number;
+  /** Optional debug labels for internal nets. If supplied, length MUST equal `internalNetCount`. */
+  internalNetLabels?: string[];
   /** Net connectivity: netlist[elementIndex][pinIndex] → net index.
       Net indices 0..ports.length-1 are external ports.
       Net indices ports.length.. are internal nets. */

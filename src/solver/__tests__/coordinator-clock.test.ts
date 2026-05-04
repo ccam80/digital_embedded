@@ -16,7 +16,7 @@ import { Circuit } from '../../core/circuit.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
-import type { ComponentDefinition } from '../../core/registry.js';
+import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 function makeAnalogElementObj(
@@ -35,7 +35,7 @@ function makeAnalogElementObj(
 function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
   const registry = new ComponentRegistry();
 
-  const groundDef: ComponentDefinition = {
+  const groundDef: StandaloneComponentDefinition = {
     name: 'Ground',
     typeId: -1 as unknown as number,
     factory: () => makeAnalogElementObj('Ground', crypto.randomUUID(), [{ x: 0, y: 0, label: 'gnd' }]),
@@ -62,9 +62,9 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  } as unknown as StandaloneComponentDefinition;
 
-  const resistorDef: ComponentDefinition = {
+  const resistorDef: StandaloneComponentDefinition = {
     name: 'Resistor',
     typeId: 'Resistor' as unknown as number,
     factory: () => makeAnalogElementObj('Resistor', crypto.randomUUID(), [
@@ -102,7 +102,7 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
         };
       }, paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  } as unknown as StandaloneComponentDefinition;
 
   registry.register(groundDef);
   registry.register(resistorDef);

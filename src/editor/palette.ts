@@ -6,7 +6,7 @@
  * Pure logic- no DOM dependencies.
  */
 
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { ComponentCategory, ComponentRegistry } from "@/core/registry";
 import { buildSubcircuitComponentDef } from "../components/subcircuit/subcircuit.js";
 
@@ -17,7 +17,7 @@ import { buildSubcircuitComponentDef } from "../components/subcircuit/subcircuit
 export interface PaletteNode {
   category: ComponentCategory;
   label: string;
-  children: ComponentDefinition[];
+  children: StandaloneComponentDefinition[];
   expanded: boolean;
 }
 
@@ -160,7 +160,7 @@ export class ComponentPalette {
   }
 
   /** Apply the allowlist filter to a list of component definitions. */
-  private _applyAllowlist(defs: ComponentDefinition[]): ComponentDefinition[] {
+  private _applyAllowlist(defs: StandaloneComponentDefinition[]): StandaloneComponentDefinition[] {
     if (this._allowlist === null) return defs;
     return defs.filter((d) => this._allowlist!.has(d.name));
   }
@@ -195,7 +195,7 @@ export class ComponentPalette {
           all = merged;
         }
       }
-      let children: ComponentDefinition[];
+      let children: StandaloneComponentDefinition[];
       if (this._allowlist !== null) {
         children = this._applyAllowlist(all);
       } else {
@@ -296,10 +296,10 @@ export class ComponentPalette {
    * Returns the last 10 uniquely placed component types, most recent first.
    * Types that are no longer registered are omitted.
    */
-  getRecentHistory(): ComponentDefinition[] {
-    const result: ComponentDefinition[] = [];
+  getRecentHistory(): StandaloneComponentDefinition[] {
+    const result: StandaloneComponentDefinition[] = [];
     for (const name of this._recentHistory) {
-      const def = this._registry.get(name);
+      const def = this._registry.getStandalone(name);
       if (def !== undefined) {
         result.push(def);
       }
@@ -340,11 +340,11 @@ export class ComponentPalette {
   }
 
   /**
-   * Build ComponentDefinition array for circuit-scoped subcircuits.
+   * Build StandaloneComponentDefinition array for circuit-scoped subcircuits.
    */
-  private _getCircuitScopedSubcircuits(): ComponentDefinition[] {
+  private _getCircuitScopedSubcircuits(): StandaloneComponentDefinition[] {
     if (!this._activeCircuit?.metadata.subcircuits?.size) return [];
-    const defs: ComponentDefinition[] = [];
+    const defs: StandaloneComponentDefinition[] = [];
     for (const [name, subDef] of this._activeCircuit.metadata.subcircuits) {
       defs.push(buildSubcircuitComponentDef(name, subDef));
     }

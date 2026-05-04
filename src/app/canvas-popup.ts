@@ -41,7 +41,7 @@ export function createPopupController(
   ): void {
     closePopup();
 
-    const def = ctx.registry.get(elementHit.typeId);
+    const def = ctx.registry.getStandalone(elementHit.typeId);
     if (!def || def.propertyDefs.length === 0) return;
 
     const popup = document.createElement('div');

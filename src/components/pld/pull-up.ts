@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PullUp component- pulls a floating net to logic 1.
  *
  * In Digital, PullUp is "only a placeholder. Has no connections to the model!"
@@ -24,7 +24,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -181,7 +181,7 @@ function pullUpFactory(props: PropertyBag): PullUpElement {
   return new PullUpElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PullUpDefinition: ComponentDefinition = {
+export const PullUpDefinition: StandaloneComponentDefinition = {
   name: "PullUp",
   typeId: -1,
   factory: pullUpFactory,

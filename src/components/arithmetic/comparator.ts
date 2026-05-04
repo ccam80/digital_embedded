@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Comparator component- compares two N-bit values.
  *
  * Ports from Digital's Comparator.java:
@@ -22,7 +22,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -30,7 +30,7 @@ import {
 // 2 inputs (even), symmetric: correct=1 for i>=1, offs=floor(2/2)=1
 const COMP_WIDTH = 3;
 
-// Java GenericShape: 2 inputs, 3 outputs → symmetric=false (outputs!=1)
+// Java GenericShape: 2 inputs, 3 outputs â†’ symmetric=false (outputs!=1)
 // Non-symmetric: no gap correction, offs=0
 // Inputs at y=0,1; Outputs at y=0,1,2
 function buildComparatorPinDeclarations(bitWidth: number): PinDeclaration[] {
@@ -138,7 +138,7 @@ const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];
 
-export const MagnitudeComparatorDefinition: ComponentDefinition = {
+export const MagnitudeComparatorDefinition: StandaloneComponentDefinition = {
   name: "MagnitudeComparator",
   typeId: -1,
   factory: (props) => new ComparatorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),

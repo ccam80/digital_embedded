@@ -16,7 +16,7 @@ import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation, PinDirection } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyValue } from "@/core/properties";
@@ -54,7 +54,7 @@ function makeStubElement(
   };
 }
 
-function makeDefinition(typeId: string = "StubComp"): ComponentDefinition {
+function makeDefinition(typeId: string = "StubComp"): StandaloneComponentDefinition {
   return {
     name: typeId,
     typeId: -1,
@@ -132,7 +132,7 @@ describe("EditOps", () => {
 
     circuit.addElement(el);
 
-    const resolver = (_typeId: string): ComponentDefinition | undefined => def;
+    const resolver = (_typeId: string): StandaloneComponentDefinition | undefined => def;
     const clipboard = copyToClipboard([el], [], resolver);
 
     const cmd = pasteFromClipboard(circuit, clipboard, { x: 5, y: 5 });

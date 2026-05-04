@@ -159,18 +159,18 @@ function buildAstableFacade(R1: number, R2: number, C: number, VCC: number): {
       ["t:GND",   "gnd:out"],
       ["t:RST",   "t:VCC"],
       // R1: VCC → DIS junction
-      ["t:VCC",   "r1:A"],
-      ["r1:B",    "t:DIS"],
+      ["t:VCC",   "r1:pos"],
+      ["r1:neg",  "t:DIS"],
       // R2: DIS junction → cap/THR/TRIG node
-      ["t:DIS",   "r2:A"],
-      ["r2:B",    "t:THR"],
+      ["t:DIS",   "r2:pos"],
+      ["r2:neg",  "t:THR"],
       ["t:THR",   "t:TRIG"],
       // Capacitor: THR node → GND
       ["t:THR",   "cap:pos"],
       ["cap:neg", "gnd:out"],
       // OUT probe: OUT → 1MΩ → GND (high-Z read)
-      ["t:OUT",   "rout:A"],
-      ["rout:B",  "gnd:out"],
+      ["t:OUT",   "rout:pos"],
+      ["rout:neg", "gnd:out"],
     ],
   });
   const coordinator = facade.compile(circuit);
@@ -325,8 +325,8 @@ function buildMonostableFacade(R: number, Cval: number, VCC: number): {
       ["t:GND",    "gnd:out"],
       ["t:RST",    "t:VCC"],
       // R: VCC → THR/DIS node
-      ["t:VCC",    "r:A"],
-      ["r:B",      "t:THR"],
+      ["t:VCC",    "r:pos"],
+      ["r:neg",    "t:THR"],
       ["t:THR",    "t:DIS"],
       // Capacitor: THR → GND
       ["t:THR",    "cap:pos"],
@@ -335,8 +335,8 @@ function buildMonostableFacade(R: number, Cval: number, VCC: number): {
       ["trig:pos", "t:TRIG"],
       ["trig:neg", "gnd:out"],
       // OUT probe
-      ["t:OUT",    "rout:A"],
-      ["rout:B",   "gnd:out"],
+      ["t:OUT",    "rout:pos"],
+      ["rout:neg",  "gnd:out"],
     ],
   });
   const coordinator = facade.compile(circuit);

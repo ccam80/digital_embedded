@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Port component- domain-agnostic subcircuit interface element.
  *
  * Port is neutral infrastructure (like Ground, Tunnel). It carries no
  * simulation model. The compilation pipeline infers domain from what is
  * connected to it, not from the Port itself.
  *
- * Renders as a diamond (◇) with a stub wire and label text.
+ * Renders as a diamond (â—‡) with a stub wire and label text.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -19,7 +19,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ function portFactory(props: PropertyBag): PortElement {
   return new PortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PortDefinition: ComponentDefinition = {
+export const PortDefinition: StandaloneComponentDefinition = {
   name: "Port",
   typeId: -1,
   factory: portFactory,

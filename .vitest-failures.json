@@ -2,20 +2,20 @@
   "summary": {
     "passed": 0,
     "failed": 1,
-    "skipped": 12,
+    "skipped": 20,
     "totalFiles": 1,
-    "durationSeconds": 2.8
+    "durationSeconds": 2.5
   },
   "failures": [
     {
-      "message": "expected 0 to be greater than 0.045000000000000005",
+      "message": "expected -1 to be greater than or equal to 0",
       "count": 1,
       "locations": [
         {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "cross-component current equality through real compiled lrctest.dig",
-          "line": 1066,
-          "column": 28
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "emits_stamps_when_conducting",
+          "line": 159,
+          "column": 19
         }
       ]
     }

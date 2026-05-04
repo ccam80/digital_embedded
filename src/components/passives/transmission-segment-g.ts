@@ -19,7 +19,7 @@
  * Template C exemplar.
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -49,13 +49,8 @@ const TRANSMISSION_SEGMENT_G_PIN_LAYOUT: PinDeclaration[] = [
 // TransmissionSegmentGElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentGElement implements AnalogElement {
+export class TransmissionSegmentGElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private _G: number;
 
@@ -64,8 +59,7 @@ export class TransmissionSegmentGElement implements AnalogElement {
   private _hJJ = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    // Store by reference (see transmission-segment-l.ts for full rationale).
-    this._pinNodes = pinNodes as Map<string, number>;
+    super(pinNodes);
     this._G = props.getModelParam<number>("G");
   }
 

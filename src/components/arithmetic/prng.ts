@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PRNG component- pseudo-random number generator.
  *
  * Ports from Digital's PRNG.java:
@@ -33,7 +33,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -210,7 +210,7 @@ const PRNG_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];
 
-export const PRNGDefinition: ComponentDefinition = {
+export const PRNGDefinition: StandaloneComponentDefinition = {
   name: "PRNG",
   typeId: -1,
   factory: (props) => new PRNGElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),

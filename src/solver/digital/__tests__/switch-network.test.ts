@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Tests for Task 4.2: Switch Network Integration.
  *
  * Verifies:
- * - NFET forwards drain→source when gate is high (unidirectional)
+ * - NFET forwards drainâ†’source when gate is high (unidirectional)
  * - NFET sets highZ on source when gate is low (unidirectional)
  * - TransGate closes when S!=~S and S=1
  * - TransGate burn when S==~S (non-highZ)- treated as open in current implementation
@@ -23,7 +23,7 @@ import { DigitalEngine } from "../digital-engine.js";
 import { BusResolver } from "../bus-resolution.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition, DigitalModel } from "@/core/registry";
+import type { StandaloneComponentDefinition, DigitalModel } from "@/core/registry";
 import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { } from "@/core/renderer-interface";
@@ -94,14 +94,14 @@ function nfetPins(): PinDeclaration[] {
   ];
 }
 
-type ExtraDefFields = Partial<ComponentDefinition> & Pick<DigitalModel, 'stateSlotCount' | 'switchPins' | 'defaultDelay'>;
+type ExtraDefFields = Partial<StandaloneComponentDefinition> & Pick<DigitalModel, 'stateSlotCount' | 'switchPins' | 'defaultDelay'>;
 
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],
   executeFn: ExecuteFunction = noopExecFn,
   extra?: ExtraDefFields,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   const { stateSlotCount, switchPins, defaultDelay, ...restExtra } = extra ?? {};
   return {
     name,
@@ -125,7 +125,7 @@ function makeDefinition(
   };
 }
 
-function makeRegistry(...defs: ComponentDefinition[]): ComponentRegistry {
+function makeRegistry(...defs: StandaloneComponentDefinition[]): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const def of defs) {
     registry.register(def);
@@ -393,7 +393,7 @@ describe("SwitchNetwork", () => {
     registry2.register(driverCDef);
     registry2.register(driverDDef);
     registry2.register(nfetDef);
-    registry2.register(gateDriverDef as ComponentDefinition);
+    registry2.register(gateDriverDef as StandaloneComponentDefinition);
 
     const elGate = createTestElementFromDecls("GateDriver", "g1", gatePins, undefined, { x: 8, y: 1.5 });
 

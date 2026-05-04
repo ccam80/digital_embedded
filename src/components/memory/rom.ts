@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ROM components- ROM and ROMDualPort.
  *
  * ROM: single-port read-only memory with chip-select.
@@ -38,7 +38,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import {
@@ -134,7 +134,7 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 function buildROMPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  // GenericShape: 2 inputs, 1 output → symmetric=true, even=true
+  // GenericShape: 2 inputs, 1 output â†’ symmetric=true, even=true
   // offs = 2/2 = 1; A at y=0, sel at y=2 (even gap), D at y=offs=1
   return [
     { direction: PinDirection.INPUT, label: "A", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -224,7 +224,7 @@ function romFactory(props: PropertyBag): ROMElement {
   return new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ROMDefinition: ComponentDefinition = {
+export const ROMDefinition: StandaloneComponentDefinition = {
   name: "ROM",
   typeId: -1,
   factory: romFactory,
@@ -257,7 +257,7 @@ export const ROMDefinition: ComponentDefinition = {
 // ---------------------------------------------------------------------------
 
 function buildROMDualPortPins(addrBits: number, dataBits: number): PinDeclaration[] {
-  // GenericShape: 4 inputs, 2 outputs → symmetric=false (outputs!=1)
+  // GenericShape: 4 inputs, 2 outputs â†’ symmetric=false (outputs!=1)
   // No gap, no offset: inputs y=0,1,2,3; outputs y=0,1
   return [
     { direction: PinDirection.INPUT, label: "A1", defaultBitWidth: addrBits, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -357,7 +357,7 @@ function romDualPortFactory(props: PropertyBag): ROMDualPortElement {
   return new ROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ROMDualPortDefinition: ComponentDefinition = {
+export const ROMDualPortDefinition: StandaloneComponentDefinition = {
   name: "ROMDualPort",
   typeId: -1,
   factory: romDualPortFactory,

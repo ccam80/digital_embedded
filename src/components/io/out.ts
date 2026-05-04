@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Out component- display component showing the current signal value.
  *
  * Reads its input and stores it for display. Supports configurable radix
@@ -18,7 +18,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -210,7 +210,7 @@ function outFactory(props: PropertyBag): OutElement {
   return new OutElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const OutDefinition: ComponentDefinition = {
+export const OutDefinition: StandaloneComponentDefinition = {
   name: "Out",
   typeId: -1,
   factory: outFactory,

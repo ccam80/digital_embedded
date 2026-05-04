@@ -1,4 +1,4 @@
-/**
+﻿/**
  * VDD component- always outputs all bits set to 1.
  *
  * executeFn writes a mask of all ones (based on bitWidth) to its output.
@@ -16,7 +16,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -74,7 +74,7 @@ export class VddElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Upward-pointing triangle (open path, not closed): (-0.5,0.2) → (0,-0.45) → (0.5,0.2)
+    // Upward-pointing triangle (open path, not closed): (-0.5,0.2) â†’ (0,-0.45) â†’ (0.5,0.2)
     // Java fixture: closed=false, style=NORMAL
     ctx.drawPath({
       operations: [
@@ -139,7 +139,7 @@ function vddFactory(props: PropertyBag): VddElement {
   return new VddElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const VddDefinition: ComponentDefinition = {
+export const VddDefinition: StandaloneComponentDefinition = {
   name: "VDD",
   typeId: -1,
   factory: vddFactory,

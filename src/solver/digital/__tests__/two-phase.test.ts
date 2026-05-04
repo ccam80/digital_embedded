@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Tests for two-phase sequential protocol (Tasks 2.1 and 2.2).
  *
  * Task 2.1: Verifies that the compiler populates sampleFns table from
- * ComponentDefinition.sampleFn.
+ * StandaloneComponentDefinition.sampleFn.
  *
  * Task 2.2: Verifies that _stepLevel() calls sampleFn before the
  * combinational sweep, enabling correct shift-register and cross-feedback
@@ -15,7 +15,7 @@ import { DigitalEngine } from "../digital-engine.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { BitVector } from "@/core/signal";
 import { ComponentRegistry } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { StandaloneComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
@@ -94,7 +94,7 @@ function makeDef(
   pins: PinDeclaration[],
   executeFn: ExecuteFunction,
   opts?: { sampleFn?: ExecuteFunction; stateSlotCount?: number },
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -114,7 +114,7 @@ function makeDef(
   };
 }
 
-function makeRegistry(...defs: ComponentDefinition[]): ComponentRegistry {
+function makeRegistry(...defs: StandaloneComponentDefinition[]): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const def of defs) {
     registry.register(def);
@@ -123,7 +123,7 @@ function makeRegistry(...defs: ComponentDefinition[]): ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// Task 2.1 Tests: sampleFn on ComponentDefinition
+// Task 2.1 Tests: sampleFn on StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ const executeOut: ExecuteFunction = (_index, _state, _highZs, _layout) => {
 };
 
 // ---------------------------------------------------------------------------
-// Task 2.1 Tests: sampleFn on ComponentDefinition
+// Task 2.1 Tests: sampleFn on StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 describe("SampleFn", () => {
@@ -161,7 +161,7 @@ describe("SampleFn", () => {
     const registry = makeRegistry(dffDef);
 
     const circuit = new Circuit();
-    const dff = registry.get("DFF")!.factory(new PropertyBag());
+    const dff = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dff.position = { x: 0, y: 0 };
     circuit.addElement(dff);
 
@@ -175,7 +175,7 @@ describe("SampleFn", () => {
     const registry = makeRegistry(andDef);
 
     const circuit = new Circuit();
-    const and1 = registry.get("And")!.factory(new PropertyBag());
+    const and1 = registry.getStandalone("And")!.factory(new PropertyBag());
     and1.position = { x: 0, y: 0 };
     circuit.addElement(and1);
 
@@ -199,39 +199,39 @@ describe("TwoPhaseStep", () => {
     const circuit = new Circuit();
 
     // In_data at (0,0): input pin at (0,0), output pin at (2,0)
-    const inData = registry.get("In")!.factory(new PropertyBag());
+    const inData = registry.getStandalone("In")!.factory(new PropertyBag());
     inData.position = { x: 0, y: 0 };
     circuit.addElement(inData);
 
     // In_clk at (0, 10): output pin at (2, 10)
-    const inClk = registry.get("In")!.factory(new PropertyBag());
+    const inClk = registry.getStandalone("In")!.factory(new PropertyBag());
     inClk.position = { x: 0, y: 10 };
     circuit.addElement(inClk);
 
     // DFF_A at (10, 0): D at (10,0), C at (10,1), Q at (12,0), ~Q at (12,1)
-    const dffA = registry.get("DFF")!.factory(new PropertyBag());
+    const dffA = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dffA.position = { x: 10, y: 0 };
     circuit.addElement(dffA);
 
     // DFF_B at (20, 0): D at (20,0), C at (20,1), Q at (22,0), ~Q at (22,1)
-    const dffB = registry.get("DFF")!.factory(new PropertyBag());
+    const dffB = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dffB.position = { x: 20, y: 0 };
     circuit.addElement(dffB);
 
     // Out at (30, 0): input pin at (30,0), output pin at (32,0)
-    const out = registry.get("Out")!.factory(new PropertyBag());
+    const out = registry.getStandalone("Out")!.factory(new PropertyBag());
     out.position = { x: 30, y: 0 };
     circuit.addElement(out);
 
-    // Wire In_data.out → DFF_A.D
+    // Wire In_data.out â†’ DFF_A.D
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 10, y: 0 }));
-    // Wire In_clk.out → DFF_A.C
+    // Wire In_clk.out â†’ DFF_A.C
     circuit.addWire(new Wire({ x: 2, y: 10 }, { x: 10, y: 1 }));
-    // Wire DFF_A.C → DFF_B.C (shared clock net)
+    // Wire DFF_A.C â†’ DFF_B.C (shared clock net)
     circuit.addWire(new Wire({ x: 10, y: 1 }, { x: 20, y: 1 }));
-    // Wire DFF_A.Q → DFF_B.D
+    // Wire DFF_A.Q â†’ DFF_B.D
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 20, y: 0 }));
-    // Wire DFF_B.Q → Out.in
+    // Wire DFF_B.Q â†’ Out.in
     circuit.addWire(new Wire({ x: 22, y: 0 }, { x: 30, y: 0 }));
 
     const compiled = compileUnified(circuit, registry).digital!;
@@ -254,8 +254,8 @@ describe("TwoPhaseStep", () => {
     // Toggle clock high, step.
     engine.setSignalValue(clkNetId, BitVector.fromNumber(1, 1));
     engine.step();
-    // DFF_A should have latched D=1 → Q=1
-    // DFF_B sampled DFF_A's OLD output (0) → Q=0
+    // DFF_A should have latched D=1 â†’ Q=1
+    // DFF_B sampled DFF_A's OLD output (0) â†’ Q=0
     expect(engine.getSignalRaw(qaNetId)).toBe(1);
     expect(engine.getSignalRaw(qbNetId)).toBe(0);
 
@@ -264,7 +264,7 @@ describe("TwoPhaseStep", () => {
     engine.step();
     engine.setSignalValue(clkNetId, BitVector.fromNumber(1, 1));
     engine.step();
-    // DFF_B now has DFF_A's value from previous cycle → Q=1
+    // DFF_B now has DFF_A's value from previous cycle â†’ Q=1
     expect(engine.getSignalRaw(qbNetId)).toBe(1);
   });
 
@@ -275,16 +275,16 @@ describe("TwoPhaseStep", () => {
     const circuit = new Circuit();
 
     // DFF_A at (0, 0): D at (0,0), C at (0,1), Q at (2,0), ~Q at (2,1)
-    const dffA = registry.get("DFF")!.factory(new PropertyBag());
+    const dffA = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dffA.position = { x: 0, y: 0 };
     circuit.addElement(dffA);
 
     // DFF_B at (10, 0): D at (10,0), C at (10,1), Q at (12,0), ~Q at (12,1)
-    const dffB = registry.get("DFF")!.factory(new PropertyBag());
+    const dffB = registry.getStandalone("DFF")!.factory(new PropertyBag());
     dffB.position = { x: 10, y: 0 };
     circuit.addElement(dffB);
 
-    // Cross-feedback: A.Q → B.D, B.Q → A.D
+    // Cross-feedback: A.Q â†’ B.D, B.Q â†’ A.D
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 0, y: 0 }));
     // Shared clock
@@ -336,7 +336,7 @@ describe("TwoPhaseStep", () => {
     // Rising clock edge + step: both sample simultaneously
     engine.setSignalValue(clkNetId, BitVector.fromNumber(1, 1));
     engine.step();
-    // A sampled B's OLD Q=0, B sampled A's OLD Q=1 → they swap
+    // A sampled B's OLD Q=0, B sampled A's OLD Q=1 â†’ they swap
     expect(engine.getSignalRaw(qaNetId)).toBe(0);
     expect(engine.getSignalRaw(qbNetId)).toBe(1);
   });
@@ -350,30 +350,30 @@ describe("TwoPhaseStep", () => {
     const circuit = new Circuit();
 
     // In_A at (0, 0): output at (2, 0)
-    const inA = registry.get("In")!.factory(new PropertyBag());
+    const inA = registry.getStandalone("In")!.factory(new PropertyBag());
     inA.position = { x: 0, y: 0 };
     circuit.addElement(inA);
 
     // In_B at (0, 5): output at (2, 5)
-    const inB = registry.get("In")!.factory(new PropertyBag());
+    const inB = registry.getStandalone("In")!.factory(new PropertyBag());
     inB.position = { x: 0, y: 5 };
     circuit.addElement(inB);
 
     // And at (10, 0): inputs at (10,0) and (10,1), output at (12,0)
-    const andGate = registry.get("And")!.factory(new PropertyBag());
+    const andGate = registry.getStandalone("And")!.factory(new PropertyBag());
     andGate.position = { x: 10, y: 0 };
     circuit.addElement(andGate);
 
     // Out at (20, 0): input at (20, 0)
-    const outEl = registry.get("Out")!.factory(new PropertyBag());
+    const outEl = registry.getStandalone("Out")!.factory(new PropertyBag());
     outEl.position = { x: 20, y: 0 };
     circuit.addElement(outEl);
 
-    // Wire In_A.out → And.a
+    // Wire In_A.out â†’ And.a
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 10, y: 0 }));
-    // Wire In_B.out → And.b
+    // Wire In_B.out â†’ And.b
     circuit.addWire(new Wire({ x: 2, y: 5 }, { x: 10, y: 1 }));
-    // Wire And.out → Out.in
+    // Wire And.out â†’ Out.in
     circuit.addWire(new Wire({ x: 12, y: 0 }, { x: 20, y: 0 }));
 
     const compiled = compileUnified(circuit, registry).digital!;

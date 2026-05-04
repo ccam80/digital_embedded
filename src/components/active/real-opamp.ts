@@ -47,8 +47,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -344,16 +343,11 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *   first-order backward-Euler update of V_int each timestep with slew-rate
  *   clamping. Slew "previous" voltage is read from s1[VINT] (last-accepted).
  */
-export class RealOpAmpAnalogElement implements PoolBackedAnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
+export class RealOpAmpAnalogElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly poolBacked = true as const;
   readonly stateSchema = REAL_OPAMP_SCHEMA;
   readonly stateSize = REAL_OPAMP_SCHEMA.size;
-  elementIndex?: number;
+  declare elementIndex?: number;
 
   // Cached parameter record (mutable via setParam).
   private readonly p: Record<string, number>;
@@ -370,10 +364,8 @@ export class RealOpAmpAnalogElement implements PoolBackedAnalogElement {
   private _hOutInp = -1;
   private _hOutInn = -1;
 
-  private _pool!: StatePoolRef;
-
   constructor(pinNodes: ReadonlyMap<string, number>, p: Record<string, number>) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this.p = p;
   }
 
@@ -399,10 +391,6 @@ export class RealOpAmpAnalogElement implements PoolBackedAnalogElement {
       if (nInp > 0) this._hOutInp = solver.allocElement(nOut, nInp);
       if (nInn > 0) this._hOutInn = solver.allocElement(nOut, nInn);
     }
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LookUpTable- combinational configurable truth-table component.
  *
  * N 1-bit inputs form an N-bit address into a user-editable data table.
@@ -26,7 +26,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import { getBackingStore } from "./ram.js";
@@ -43,7 +43,7 @@ const COMP_WIDTH = 3;
 // Pin layout helper
 // ---------------------------------------------------------------------------
 
-// GenericShape formula: 1 output → symmetric=true
+// GenericShape formula: 1 output â†’ symmetric=true
 // even = inputCount % 2 === 0; offs = floor(inputCount/2)
 // Input i: y = i + (symmetric && even && i >= floor(inputCount/2) ? 1 : 0)
 // Output:  y = offs = floor(inputCount/2)
@@ -207,7 +207,7 @@ function lutFactory(props: PropertyBag): LookUpTableElement {
   return new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const LookUpTableDefinition: ComponentDefinition = {
+export const LookUpTableDefinition: StandaloneComponentDefinition = {
   name: "LookUpTable",
   typeId: -1,
   factory: lutFactory,

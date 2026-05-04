@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Text annotation component- non-functional visual label on the canvas.
  *
  * Text has no simulation behavior: no pins, no executeFn state changes.
@@ -8,7 +8,7 @@
  * Properties:
  *   - text: string- the content to display
  *   - fontSize: number- font size in grid units (default 1.0)
- *   - rotation: Rotation- text rotation (0=horizontal, 1=90°CW, etc.)
+ *   - rotation: Rotation- text rotation (0=horizontal, 1=90Â°CW, etc.)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -20,7 +20,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -87,7 +87,7 @@ export function executeText(
 }
 
 // ---------------------------------------------------------------------------
-// TEXT_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
+// TEXT_ATTRIBUTE_MAPPINGS- .dig XML attribute â†’ PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const TEXT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -127,14 +127,14 @@ const TEXT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// TextDefinition- ComponentDefinition for registry registration
+// TextDefinition- StandaloneComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function textFactory(props: PropertyBag): TextElement {
   return new TextElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TextDefinition: ComponentDefinition = {
+export const TextDefinition: StandaloneComponentDefinition = {
   name: "Text",
   typeId: -1,
   factory: textFactory,

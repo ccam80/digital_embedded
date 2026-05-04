@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Monoflop- monostable multivibrator.
  *
  * On rising edge of C: Q goes high and stays high for `timerDelay` clock ticks.
@@ -30,7 +30,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -215,14 +215,14 @@ const MONOFLOP_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// MonoflopDefinition- ComponentDefinition
+// MonoflopDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function monoflopFactory(props: PropertyBag): MonoflopElement {
   return new MonoflopElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const MonoflopDefinition: ComponentDefinition = {
+export const MonoflopDefinition: StandaloneComponentDefinition = {
   name: "Monoflop",
   typeId: -1,
   factory: monoflopFactory,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Scope component- multi-channel waveform recorder.
  *
  * Records signal values over time, producing waveform data for display in a
@@ -29,7 +29,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -38,11 +38,11 @@ import {
 // ---------------------------------------------------------------------------
 
 // Java ScopeShape constants (SIZE=20px = 1 grid unit, SIZE2=10px = 0.5 grid):
-//   BORDER = SIZE/3 = 7px ≈ 0.35 grid
-//   OUTER polygon: (2,SIZE2) → (2,-SIZE*2) → (SIZE*4,-SIZE*2) → (SIZE*4,SIZE2)
-//     = (0.1, 0.5) → (0.1,-2) → (4,-2) → (4,0.5)
+//   BORDER = SIZE/3 = 7px â‰ˆ 0.35 grid
+//   OUTER polygon: (2,SIZE2) â†’ (2,-SIZE*2) â†’ (SIZE*4,-SIZE*2) â†’ (SIZE*4,SIZE2)
+//     = (0.1, 0.5) â†’ (0.1,-2) â†’ (4,-2) â†’ (4,0.5)
 //   INNER polygon (rounded): (2+BORDER, SIZE2-BORDER) = (0.45, 0.15) approx
-//     inner corners: (0.45,0.15)→(0.45,-1.65)→(2.65,-1.65)→(2.65,0.15)
+//     inner corners: (0.45,0.15)â†’(0.45,-1.65)â†’(2.65,-1.65)â†’(2.65,0.15)
 //     rounded by BORDER*2 = 14px = 0.7 grid
 //   TRACE polyline:
 //     (3+BORDER,-BORDER) = (0.5,-0.35) approx, then step up
@@ -161,7 +161,7 @@ export class ScopeElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Outer rectangle: (0.1, 0.5) → (4, -2)- NORMAL style
+    // Outer rectangle: (0.1, 0.5) â†’ (4, -2)- NORMAL style
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -175,7 +175,7 @@ export class ScopeElement extends AbstractCircuitElement {
     });
 
     // Trace waveform (THIN): matches java-shapes.json points exactly
-    // (0.45,-0.3)→(1.3,-0.3)→(1.3,-1.3)→(2.3,-1.3)→(2.3,-0.3)→(2.65,-0.3)
+    // (0.45,-0.3)â†’(1.3,-0.3)â†’(1.3,-1.3)â†’(2.3,-1.3)â†’(2.3,-0.3)â†’(2.65,-0.3)
     ctx.setLineWidth(0.5);
     ctx.drawPath({
       operations: [
@@ -188,7 +188,7 @@ export class ScopeElement extends AbstractCircuitElement {
       ],
     });
 
-    // Inner rounded rect (THIN): (0.4,0.2)→(0.4,-1.7)→(2.7,-1.7)→(2.7,0.2) closed
+    // Inner rounded rect (THIN): (0.4,0.2)â†’(0.4,-1.7)â†’(2.7,-1.7)â†’(2.7,0.2) closed
     ctx.drawPath({
       operations: [
         { op: "moveTo", x: 0.4, y:  0.2  },
@@ -292,7 +292,7 @@ function scopeFactory(props: PropertyBag): ScopeElement {
   return new ScopeElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ScopeDefinition: ComponentDefinition = {
+export const ScopeDefinition: StandaloneComponentDefinition = {
   name: "Scope",
   typeId: -1,
   factory: scopeFactory,
@@ -303,7 +303,7 @@ export const ScopeDefinition: ComponentDefinition = {
   helpText:
     "Scope- multi-channel waveform recorder.\n" +
     "Records signal values over time. Waveform displayed in a floating panel.\n" +
-    "channelCount: number of input channels (1–8).\n" +
+    "channelCount: number of input channels (1â€“8).\n" +
     "timeScale: horizontal time scale factor.",
   models: {
     // Schema for default channelCount=1; direction-filter order matches for all channelCounts.

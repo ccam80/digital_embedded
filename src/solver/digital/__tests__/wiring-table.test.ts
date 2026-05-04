@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for wiring table indirection (Task 1.2a).
  *
  * Verifies that layout.wiringTable is available, that inputOffset/outputOffset
@@ -12,7 +12,7 @@ import { DigitalEngine } from "../digital-engine.js";
 
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { StandaloneComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
@@ -99,7 +99,7 @@ function makeDef(
   pins: PinDeclaration[],
   executeFn: ExecuteFunction,
   opts?: { stateSlotCount?: number },
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,

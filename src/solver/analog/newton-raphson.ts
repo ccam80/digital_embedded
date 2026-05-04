@@ -16,7 +16,7 @@ import {
 } from "./ckt-mode.js";
 import { spOKAY, spSINGULAR } from "./sparse-solver.js";
 // ---------------------------------------------------------------------------
-// LimitingEvent — records a single voltage-limiting call per junction per NR iteration
+// LimitingEvent- records a single voltage-limiting call per junction per NR iteration
 // ---------------------------------------------------------------------------
 
 /**
@@ -35,7 +35,7 @@ export interface LimitingEvent {
   /** Junction name: "BE", "BC", "GS", "DS", "AK", etc. */
   junction: string;
   /** Limiting function applied. */
-  limitType: "pnjlim" | "fetlim" | "limvds";
+  limitType: "pnjlim" | "fetlim" | "limvds" | "railLim";
   /** Input voltage before limiting. */
   vBefore: number;
   /** Output voltage after limiting. */
@@ -82,7 +82,7 @@ const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
 /**
  * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:50-82).
  *
- * Includes the Gillespie negative-bias branch (devsup.c:67-82) — D4 in
+ * Includes the Gillespie negative-bias branch (devsup.c:67-82)- D4 in
  * spec/architectural-alignment.md. When vnew is not above the forward
  * critical-voltage threshold but is negative, the reverse clamp engages:
  *   vold > 0:  arg = -vold - 1
@@ -165,15 +165,15 @@ export function _computeVtstlo(vold: number, vto: number): number {
  *
  * Three-zone algorithm from SPICE3f5/ngspice DEVfetlim (devsup.c):
  *
- *   Zone 1 — Deep ON (vold >= vto + 3.5):
+ *   Zone 1- Deep ON (vold >= vto + 3.5):
  *     Decreasing: clamp to max(-delta, vtstlo); floor at vto + 2
  *     Increasing: clamp to +vtsthi
  *
- *   Zone 2 — Near threshold (vto <= vold < vto + 3.5):
+ *   Zone 2- Near threshold (vto <= vold < vto + 3.5):
  *     Decreasing: floor at vto - 0.5
  *     Increasing: cap at vto + 4
  *
- *   Zone 3 — OFF (vold < vto):
+ *   Zone 3- OFF (vold < vto):
  *     Decreasing: clamp to -vtsthi
  *     Increasing toward threshold: clamp to vtstlo; hard cap at vto + 0.5
  *
@@ -257,6 +257,39 @@ export function limvds(vnew: number, vold: number): number {
   return vnew;
 }
 
+export interface RailLimResult { value: number; limited: boolean; }
+
+const _railLimResult: RailLimResult = { value: 0, limited: false };
+
+/**
+ * Voltage limiter for behavioral amplifier output rails. NOT a
+ * literal port of any single ngspice device-support function- there
+ * is no rail-clamp device in the ngspice tree. Shaped using the
+ * algorithmic discipline of DEVpnjlim
+ * (ref/ngspice/src/spicelib/devices/devsup.c:49-84) and DEVlimvds
+ * (ref/ngspice/src/spicelib/devices/devsup.c:20-40): detect overshoot
+ * direction, damp by midpoint between vold and the rail, return
+ * limited so caller can ctx.noncon.value++ and push a LimitingEvent.
+ */
+export function railLim(
+  vnew: number,
+  vold: number,
+  vRailPos: number,
+  vRailNeg: number,
+): RailLimResult {
+  let limited = false;
+  if (vnew > vRailPos && vold < vRailPos) {
+    vnew = (vRailPos + vold) / 2;
+    limited = true;
+  } else if (vnew < vRailNeg && vold > vRailNeg) {
+    vnew = (vRailNeg + vold) / 2;
+    limited = true;
+  }
+  _railLimResult.value = vnew;
+  _railLimResult.limited = limited;
+  return _railLimResult;
+}
+
 // ---------------------------------------------------------------------------
 // Newton-Raphson iteration loop
 // ---------------------------------------------------------------------------
@@ -286,7 +319,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
   const diagnostics = ctx.diagnostics;
 
-  // ngspice niiter.c:622 — unconditional floor: if (maxIter < 100) maxIter = 100;
+  // ngspice niiter.c:622- unconditional floor: if (maxIter < 100) maxIter = 100;
   // Bypassed when exactMaxIterations is set (INITJCT/INITFIX need exactly 1 iteration).
   const rawMaxIter = ctx.maxIterations;
   const maxIterations = ctx.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
@@ -297,7 +330,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // pointer swap mirrors ngspice niiter.c:1087-1090, see ctx.swapRhsBuffers).
   ctx.nrResult.voltages = ctx.rhs;
 
-  // Pointer-swap model — ctx.rhs and ctx.rhsOld are the live ping-pong
+  // Pointer-swap model- ctx.rhs and ctx.rhsOld are the live ping-pong
   // pointers, mirroring ngspice's CKTrhs/CKTrhsOld pair on the CKTcircuit
   // struct. Each NR iteration:
   //   - cktLoad reads ctx.rhsOld (= iter K input) and stamps into ctx.rhs.
@@ -305,7 +338,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   //   - On non-convergence, ctx.swapRhsBuffers() rotates the pointers, so
   //     iter K's output becomes iter K+1's input.
   // On exit, ctx.rhsOld holds the converging iter's input and ctx.rhs holds
-  // its output — bit-exactly matching ngspice's NIiter exit invariant
+  // its output- bit-exactly matching ngspice's NIiter exit invariant
   // regardless of the converging-iter parity.
 
   const statePool = ctx.statePool ?? null;
@@ -316,8 +349,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // NIDIDPREORDER (cktdefs.h:143) is a CKT-state bit cleared only by
   // NIreinit (nireinit.c:42); our equivalent is solver._didPreorder, set
   // inside solver.preorder() and cleared by solver.invalidateTopology().
-  // A per-NR-call local flag would be per-invocation scope — the wrong
-  // scope — so we drop it entirely and rely on solver.preorder() being
+  // A per-NR-call local flag would be per-invocation scope- the wrong
+  // scope- so we drop it entirely and rely on solver.preorder() being
   // idempotent.
 
   // Hoist the iter-0 split hook to avoid per-iteration property lookup.
@@ -332,10 +365,10 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   }
 
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
-  // ngspice niiter.c:628-637 — pointer swap of CKTrhsOld/CKTrhs, then a single
+  // ngspice niiter.c:628-637- pointer swap of CKTrhsOld/CKTrhs, then a single
   // CKTload, then return OK. ngspice dctran.c:117-189 confirms UIC early-exit
   // exists only in DCtran, not DCop. Gate on isTranOp(cktMode) && isUic(cktMode):
-  // standalone .OP with UIC=true must NOT take this path — it must run the full
+  // standalone .OP with UIC=true must NOT take this path- it must run the full
   // CKTop ladder.
   if (isTranOp(ctx.cktMode) && isUic(ctx.cktMode)) {
     ctx.swapRhsBuffers();
@@ -353,7 +386,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       ctx.limitingCollector.length = 0;
     }
 
-    // ---- STEP B: CKTload — single-pass device evaluation ----
+    // ---- STEP B: CKTload- single-pass device evaluation ----
     // ctx.rhsOld already holds iter K's input voltages: at iter 0 it is whatever
     // the caller seeded (predictor / DC-OP carryover); at iter K>0 the previous
     // ctx.swapRhsBuffers() rotated iter K-1's solve output into ctx.rhsOld.
@@ -362,7 +395,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // ---- STEP B+: Pre-factor instrumentation hook (ngspice niiter.c:704-842) ----
     // Mirrors ngspice's `if (ni_instrument_cb)` block sitting between CKTload
     // (niiter.c:667) and SMPpreOrder (niiter.c:844). The unique window where
-    // the assembled MNA holds post-load, pre-LU values — solver.preorder() may
+    // the assembled MNA holds post-load, pre-LU values- solver.preorder() may
     // exchange columns and solver.factor() overwrites _elVal[] with LU. Harness
     // consumers register a hook that calls solver.getCSCNonZeros() here.
     // No-op when null; same optional-chain shape as the postIterationHook
@@ -401,18 +434,18 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // B3 (Phase 2.5 W2.1): ngspice SMPluFac/SMPreorder call LoadGmin
     // internally, immediately before spFactor/spOrderAndFactor (spsmp.c:173,
     // 197). The gmin stamp lives inside factor(); there is no external
-    // addDiagonalGmin API — the stamp + factor pair is atomic, matching
+    // addDiagonalGmin API- the stamp + factor pair is atomic, matching
     // ngspice's invariant that no caller observes a post-gmin, pre-factor
     // matrix.
     //
-    // H2 (Phase 2.5 W2.2) — NR owns the diagonal-Gmin decision points
+    // H2 (Phase 2.5 W2.2)- NR owns the diagonal-Gmin decision points
     // mirroring niiter.c::NIiter:
-    //   (a) forceReorder() dispatch — niiter.c:856-859 NISHOULDREORDER
+    //   (a) forceReorder() dispatch- niiter.c:856-859 NISHOULDREORDER
     //       trigger on INITJCT/INITTRAN (see lines 353-357 above).
-    //   (b) diagGmin forwarded every factor call — niiter.c:863-864 and
+    //   (b) diagGmin forwarded every factor call- niiter.c:863-864 and
     //       :883-884 pass ckt->CKTdiagGmin into SMPreorder/SMPluFac every
     //       iteration. Our factor(ctx.diagonalGmin) below mirrors that.
-    //   (c) E_SINGULAR retry loop — niiter.c:888-891 sets NISHOULDREORDER
+    //   (c) E_SINGULAR retry loop- niiter.c:888-891 sets NISHOULDREORDER
     //       and `continue`s; we mirror with forceReorder() + continue
     //       below (lines ~380-383).
     // The gmin-stepping ladder (setting ctx.diagonalGmin across multiple
@@ -422,16 +455,16 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // DC-OP ladder owns cross-solve gmin ramping. No stand-alone
     // addDiagonalGmin API exists.
     //
-    // ngspice niiter.c:863-864, 883-884 — CKTpivotAbsTol/CKTpivotRelTol are
+    // ngspice niiter.c:863-864, 883-884- CKTpivotAbsTol/CKTpivotRelTol are
     // forwarded into SMPreorder/SMPluFac every iteration. setPivotTolerances
     // is a cheap scalar store; doing it here (not just once at ctx
     // construction) matches ngspice's per-call semantic and lets hot-loaded
     // params propagate without an engine rebuild.
     solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol);
-    // ngspice niiter.c:883-884 — SMPluFac(Matrix, CKTpivotAbsTol, CKTdiagGmin).
+    // ngspice niiter.c:883-884- SMPluFac(Matrix, CKTpivotAbsTol, CKTdiagGmin).
     const errorCode = solver.factor(ctx.pivotAbsTol, ctx.diagonalGmin);
     if (errorCode !== spOKAY) {
-      // H2 (Phase 2.5 W2.2) — mirror niiter.c:881-902 in full.
+      // H2 (Phase 2.5 W2.2)- mirror niiter.c:881-902 in full.
       //
       // The else arm of `if (NISHOULDREORDER)` calls SMPluFac (the reuse
       // path) and on `error == E_SINGULAR` sets NISHOULDREORDER and
@@ -439,7 +472,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // and surfaces every error verbatim. digiTS folds the dispatch into
       // factor(); the per-call `lastFactorWalkedReorder` flag tells us
       // which arm ran. The retry gate combines both halves of ngspice's
-      // condition — error code AND structural arm — so non-singular reuse
+      // condition- error code AND structural arm- so non-singular reuse
       // failures (spZERO_DIAG, spNO_MEMORY) and any reorder failure
       // surface as a singular-matrix diagnostic instead of looping.
       if (errorCode === spSINGULAR && !solver.lastFactorWalkedReorder) {
@@ -470,14 +503,14 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     // ---- STEP F: Solve ----
     // Solver reads RHS from ctx.rhs and writes the iter K solve output
-    // back into ctx.rhs (in-place — spsolve.c:90-91 RHS and Solution may
+    // back into ctx.rhs (in-place- spsolve.c:90-91 RHS and Solution may
     // alias). ctx.rhsOld is preserved (still holds iter K's input
     // voltages). Mirrors ngspice niiter.c:927:
     //   SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare).
     solver.solve(ctx.rhs, ctx.rhs);
 
     // ---- STEP G: Check iteration limit BEFORE convergence (ngspice niiter.c:944) ----
-    // Pre-swap return mirrors niiter.c:944-955 — at exit, ctx.rhsOld = iter K's
+    // Pre-swap return mirrors niiter.c:944-955- at exit, ctx.rhsOld = iter K's
     // input, ctx.rhs = iter K's output.
     if (iteration + 1 > maxIterations) {
       ctx.nrResult.converged = false;
@@ -504,7 +537,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // read 0 or 1. Devices use `ctx.noncon.value++`, so without this collapse
     // we leak counts > 1 to the harness comparison.
     if (iteration === 0 || ctx.noncon !== 0) {
-      // niiter.c:960 — `CKTnoncon = 1` for the entire else branch
+      // niiter.c:960- `CKTnoncon = 1` for the entire else branch
       // `(CKTnoncon != 0 || iterno == 1)`. Assignment, not increment, so any
       // multi-junction limiter increments collapse to 1.
       ctx.noncon = 1;
@@ -555,7 +588,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         }
       }
 
-      // niiter.c:957-961 — write the NIconvTest result back into CKTnoncon so
+      // niiter.c:957-961- write the NIconvTest result back into CKTnoncon so
       // the INITF dispatcher (and MODEINITFLOAT return gate) sees a unified
       // convergence indicator. Without this, INITFIX→INITFLOAT transitions
       // fire after a single iteration whenever no device limited, regardless
@@ -590,10 +623,10 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         for (let i = 0; i < nodeCount; i++) {
           ctx.rhs[i] = ctx.rhsOld[i] + dampFactor * (ctx.rhs[i] - ctx.rhsOld[i]);
         }
-        // niiter.c:1040-1044 — damp CKTstate0[0..numStates) unconditionally
+        // niiter.c:1040-1044- damp CKTstate0[0..numStates) unconditionally
         // inside the maxdiff>10 block. ngspice's loop trivially runs zero
         // iterations when CKTnumStates == 0; digiTS mirrors that by gating
-        // only on statePool — when statePool is non-null, oldState0 is
+        // only on statePool- when statePool is non-null, oldState0 is
         // always populated above the solve (the prior `&& oldState0` was
         // redundant defensive over-checking).
         if (statePool) {
@@ -634,7 +667,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     const curInitf = initf(ctx.cktMode);
 
     if (curInitf === MODEINITFLOAT) {
-      // niiter.c:1051-1057 — DC + nodeset gate. ipass is only ever 0 or 1
+      // niiter.c:1051-1057- DC + nodeset gate. ipass is only ever 0 or 1
       // (sole writer is the MODEINITFIX branch below). When ipass==1 we
       // raise noncon to defer the terminating return by one iteration; the
       // unconditional `ipass = 0` matches ngspice exactly. The outer
@@ -647,7 +680,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         }
         ipass = 0;
       }
-      // niiter.c:1058-1062 — MODEINITFLOAT converged exit. NIiter returns
+      // niiter.c:1058-1062- MODEINITFLOAT converged exit. NIiter returns
       // OK without executing the trailing CKTrhsOld/CKTrhs swap. ctx.rhsOld
       // holds the converging-iter input; ctx.rhs holds the converging-iter
       // output.
@@ -692,7 +725,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     } else if (curInitf === MODEINITTRAN) {
       // B5 (Phase 2.5 W2.1): the NISHOULDREORDER trigger moved to the top of
       // the loop (before factor), matching ngspice niiter.c:856-859. Here we
-      // only mirror niiter.c:1073-1075 — clear MODEINITTRAN and set MODEINITFLOAT
+      // only mirror niiter.c:1073-1075- clear MODEINITTRAN and set MODEINITFLOAT
       // for subsequent iterations:
       //     ckt->CKTmode = (ckt->CKTmode&(~INITF))|MODEINITFLOAT;
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
@@ -711,7 +744,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // Small-signal AC bias has no transient/DC-OP attempt-grouping equivalent
       // in the harness; no ladder callback fires.
     } else {
-      // niiter.c:1077-1085 — unrecognised INITF bit returns E_INTERN. The
+      // niiter.c:1077-1085- unrecognised INITF bit returns E_INTERN. The
       // NR layer is the sole writer of INITF, so this fires only when an
       // upstream caller has corrupted cktMode. Surface it loudly rather
       // than silently falling through to the rhs/rhsOld swap.
@@ -743,7 +776,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     ctx.swapRhsBuffers();
   }
 
-  // Unreachable — the for(;;) loop returns via the iterlim, singular-matrix,
+  // Unreachable- the for(;;) loop returns via the iterlim, singular-matrix,
   // and converged exits above. Kept as a defensive fallthrough so the
   // compiler can prove the function returns void.
 }

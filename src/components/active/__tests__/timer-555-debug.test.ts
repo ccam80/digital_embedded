@@ -3,222 +3,89 @@
  * DELETE after fixing.
  */
 import { describe, it } from "vitest";
-import { EngineState } from "../../../core/engine-interface.js";
-import { Timer555Definition } from "../timer-555.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../passives/capacitor.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import type { ComponentRegistry } from "../../../core/registry.js";
 
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  return {
-    label: "",
-    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 40,
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(): number[] { return []; },
-    setup(_ctx: SetupContext): void {},
-    load(ctx: LoadContext): void {
-      const { solver } = ctx;
-      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
-      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
-      if (nodeA > 0 && nodeB > 0) {
-        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
-        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
-      }
-    },
-  } as unknown as AnalogElement;
-}
+function buildTimer555DebugCircuit(registry: ComponentRegistry) {
+  const R1 = 1000;
+  const R2 = 10000;
+  const C  = 10e-6;
+  const VCC = 5;
 
-function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
-  const capProps = new PropertyBag();
-  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
-  return new AnalogCapacitorElement(
-    new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    capProps,
-  );
-}
-
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-const TIMER555_MODEL_PARAM_KEYS = new Set(["vDrop", "rDischarge"]);
-
-function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
-  const modelParams: Record<string, number> = { vDrop: 1.5, rDischarge: 10 };
-  const staticEntries: [string, number | string][] = [["model", "bipolar"]];
-  for (const [k, v] of Object.entries(overrides)) {
-    if (TIMER555_MODEL_PARAM_KEYS.has(k)) {
-      modelParams[k] = v as number;
-    } else {
-      staticEntries.push([k, v]);
-    }
-  }
-  const bag = new PropertyBag(staticEntries);
-  bag.replaceModelParams(modelParams);
-  return bag;
-}
-
-function make555(
-  nodes: { vcc: number; gnd: number; trig: number; thr: number; ctrl: number; rst: number; dis: number; out: number },
-  overrides: Record<string, number | string> = {},
-): AnalogElement {
-  const core = getFactory(Timer555Definition.modelRegistry!["bipolar"]!)(
-    new Map([
-      ["DIS",  nodes.dis],
-      ["TRIG", nodes.trig],
-      ["THR",  nodes.thr],
-      ["VCC",  nodes.vcc],
-      ["CTRL", nodes.ctrl],
-      ["OUT",  nodes.out],
-      ["RST",  nodes.rst],
-      ["GND",  nodes.gnd],
-    ]),
-    makeProps(overrides),
-    () => 0,
-  );
-  return core;
-}
-
-function buildHandCircuit(opts: {
-  nodeCount: number;
-  elements: AnalogElement[];
-}): ConcreteCompiledAnalogCircuit {
-  return new ConcreteCompiledAnalogCircuit({
-    nodeCount: opts.nodeCount,
-    elements: opts.elements,
-    labelToNodeId: new Map(),
-    wireToNodeId: new Map() as any,
-    models: new Map(),
-    elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
+  const facade = new DefaultSimulatorFacade(registry);
+  return facade.build({
+    components: [
+      { id: "vcc",  type: "DcVoltageSource", props: { voltage: VCC, label: "vcc" } },
+      { id: "t",    type: "Timer555",        props: { label: "t", vDrop: 1.5 } },
+      { id: "r1",   type: "Resistor",        props: { resistance: R1 } },
+      { id: "r2",   type: "Resistor",        props: { resistance: R2 } },
+      { id: "cap",  type: "Capacitor",       props: { capacitance: C, label: "cap" } },
+      { id: "rout", type: "Resistor",        props: { resistance: 1e6 } },
+      { id: "gnd",  type: "Ground" },
+    ],
+    connections: [
+      ["vcc:pos", "t:VCC"],
+      ["vcc:neg", "gnd:out"],
+      ["t:GND",   "gnd:out"],
+      ["t:RST",   "t:VCC"],
+      ["t:VCC",   "r1:A"],
+      ["r1:B",    "t:DIS"],
+      ["t:DIS",   "r2:A"],
+      ["r2:B",    "t:THR"],
+      ["t:THR",   "t:TRIG"],
+      ["t:THR",   "cap:pos"],
+      ["cap:neg", "gnd:out"],
+      ["t:OUT",   "rout:A"],
+      ["rout:B",  "gnd:out"],
+    ],
   });
 }
 
-function makeVsElement(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  voltage: number,
-): AnalogElement {
-  const k = branchIdx;
-  let _hPosK = -1, _hKPos = -1, _hNegK = -1, _hKNeg = -1;
-  return {
-    label: "",
-    _pinNodes: new Map<string, number>([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: k,
-    ngspiceLoadOrder: 48,
-    setup(ctx: SetupContext): void {
-      if (nodePos !== 0) { _hPosK = ctx.solver.allocElement(nodePos, k); _hKPos = ctx.solver.allocElement(k, nodePos); }
-      if (nodeNeg !== 0) { _hNegK = ctx.solver.allocElement(nodeNeg, k); _hKNeg = ctx.solver.allocElement(k, nodeNeg); }
-      ctx.solver.allocElement(k, k);
-    },
-    load(ctx: LoadContext): void {
-      const { solver, rhs } = ctx;
-      if (nodePos !== 0) { solver.stampElement(_hPosK, 1); solver.stampElement(_hKPos, 1); }
-      if (nodeNeg !== 0) { solver.stampElement(_hNegK, -1); solver.stampElement(_hKNeg, -1); }
-      rhs[k] += voltage;
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(): number[] { return []; },
-  } as unknown as AnalogElement;
-}
-
 describe("Timer555Debug", () => {
-  it("diagnose_first_transient_step", () => {
+  it("diagnose_first_transient_step", async () => {
     const R1 = 1000;
     const R2 = 10000;
     const C  = 10e-6;
-    const VCC = 5;
-
-    const nVcc  = 1;
-    const nDis  = 2;
-    const nCap  = 3;
-    const nOut  = 4;
-    const nCtrl = 5;
-    const nodeCount  = 5;
-    const brVcc = 11;
-
-    const timer = make555(
-      { vcc: nVcc, gnd: 0, trig: nCap, thr: nCap, ctrl: nCtrl, rst: nVcc, dis: nDis, out: nOut },
-      { vDrop: 1.5 },
-    );
-
-    const vsVcc  = makeVsElement(nVcc, 0, brVcc, VCC);
-    const r1El   = makeResistor(nVcc, nDis, R1);
-    const r2El   = makeResistor(nDis, nCap, R2);
-    const capEl  = createTestCapacitor(C, nCap, 0);
-
-    const elements = [timer, vsVcc, r1El, r2El, capEl];
-    const compiled = buildHandCircuit({ nodeCount, elements });
-    const engine = new MNAEngine();
-    engine.init(compiled);
-
-    const dcResult = engine.dcOperatingPoint();
-    console.log("DC converged:", dcResult.converged, "iters:", dcResult.iterations);
-    const dcVoltages = Array.from(dcResult.nodeVoltages).map((v, i) => `[${i}]=${v.toFixed(4)}`).join(", ");
-    console.log("DC node voltages:", dcVoltages);
-
-    // Access engine's internal pool via ctx (not compiled.statePool which is the dummy)
-    const ctx = (engine as any)._ctx;
-    const pool = ctx?.statePool as StatePool | null;
-    if (!pool) {
-      console.log("No state pool found");
-    } else {
-      // Find cap _stateBase — capEl is AnalogCapacitorElement, has _stateBase
-      const capBase = (capEl as any)._stateBase as number;
-      const SLOT_Q = 3;
-      console.log(`Cap _stateBase=${capBase}, pool.totalSlots=${pool.totalSlots}`);
-      console.log(`After DC-OP: states[0][Q]=${pool.states[0][capBase+SLOT_Q]?.toExponential(4)}, states[1][Q]=${pool.states[1][capBase+SLOT_Q]?.toExponential(4)}, states[2][Q]=${pool.states[2][capBase+SLOT_Q]?.toExponential(4)}, states[3][Q]=${pool.states[3][capBase+SLOT_Q]?.toExponential(4)}`);
-    }
 
     const fExpected = 1.44 / ((R1 + 2 * R2) * C);
     const periodExpected = 1 / fExpected;
     const maxDt = periodExpected * 0.002;
-    engine.configure({ maxTimeStep: maxDt });
+    const tStop = periodExpected * 0.04; // 20 steps worth
 
-    // Enable convergence log from the start
-    engine.convergenceLog.enabled = true;
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: buildTimer555DebugCircuit,
+      analysis: "tran",
+      tStop,
+      maxStep: maxDt,
+    });
 
-    // Run a few steps and print cap state at each
-    let stepCount = 0;
-    const maxSteps = 20;
-    while (stepCount < maxSteps && engine.getState() !== EngineState.ERROR) {
-      engine.step();
-      stepCount++;
-      if (pool) {
-        const capBase = (capEl as any)._stateBase as number;
-        const SLOT_Q = 3, SLOT_CCAP = 4;
-        const q0 = pool.states[0][capBase+SLOT_Q];
-        const q1 = pool.states[1][capBase+SLOT_Q];
-        const q2 = pool.states[2][capBase+SLOT_Q];
-        const q3 = pool.states[3][capBase+SLOT_Q];
-        const ccap0 = pool.states[0][capBase+SLOT_CCAP];
-        const ccap1 = pool.states[1][capBase+SLOT_CCAP];
-        console.log(`Step ${stepCount} (t=${engine.simTime.toExponential(3)}): q0=${q0?.toExponential(4)} q1=${q1?.toExponential(4)} q2=${q2?.toExponential(4)} q3=${q3?.toExponential(4)} ccap0=${ccap0?.toExponential(4)} ccap1=${ccap1?.toExponential(4)}`);
-      }
+    const stepCount = session.sessionMap().ours.length;
+    console.log(`Total steps captured: ${stepCount}`);
+
+    // DC-OP step (stepIndex 0): log convergence and cap state.
+    const dcAttempt = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
+    const dcLastIter = dcAttempt.iterations[dcAttempt.iterations.length - 1];
+    const dcConverged = dcLastIter?.ours?.globalConverged ?? false;
+    console.log("DC converged:", dcConverged, "iters:", dcAttempt.iterations.length);
+
+    const capStatesAfterDc = dcLastIter?.ours?.elementStates["cap"];
+    const capStates1AfterDc = dcLastIter?.ours?.elementStates1Slots["cap"];
+    console.log(`After DC-OP: cap state0.Q=${capStatesAfterDc?.["Q"]}, cap state1.Q=${capStates1AfterDc?.["Q"]}`);
+
+    // Transient steps: log cap state for each of the first few steps.
+    const maxLogSteps = Math.min(20, stepCount - 1);
+    for (let s = 1; s <= maxLogSteps; s++) {
+      const attempt = session.getAttempt({ stepIndex: s, phase: "tran", phaseAttemptIndex: 0 });
+      const lastIter = attempt.iterations[attempt.iterations.length - 1];
+      const q0 = lastIter?.ours?.elementStates["cap"]?.["Q"];
+      const q1 = lastIter?.ours?.elementStates1Slots["cap"]?.["Q"];
+      const stepEnd = session.getStepEnd(s);
+      const lteRejected = stepEnd.lteRejected?.ours ?? false;
+      console.log(`Step ${s}: q0=${q0 != null ? (q0 as number).toExponential(4) : "n/a"} q1=${q1 != null ? (q1 as number).toExponential(4) : "n/a"} lteRejected=${lteRejected}`);
     }
 
-    const log = engine.convergenceLog;
-    const all = log.getAll();
-    console.log(`\nTotal log records: ${all.length}, engine state: ${engine.getState()}`);
-    for (const rec of all.slice(0, 5)) {
-      const lteInfo = rec.lteRejected ? ` LTE_REJECTED ratio=${rec.lteWorstRatio?.toFixed(3)} proposedDt=${rec.lteProposedDt?.toExponential(3)}` : "";
-      console.log(`  step#${rec.stepNumber} t=${rec.simTime.toExponential(3)} outcome=${rec.outcome}${lteInfo}`);
-      for (const att of rec.attempts) {
-        console.log(`    attempt dt=${att.dt?.toExponential(3)} converged=${att.converged} iters=${att.iterations} trigger=${att.trigger}`);
-      }
-    }
+    const shape = session.getStepShape();
+    console.log(`\nTotal log records: ${shape.steps.length}, final converged: ${session.getStepEnd(stepCount - 1).converged.ours}`);
   });
 });

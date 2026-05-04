@@ -1,5 +1,5 @@
 /**
- * NR-retry grouping tests (spec §10.2 test 4).
+ * NR-retry grouping tests (spec ss10.2 test 4).
  *
  * Verifies that when an NR attempt fails and is retried at the same stepStartTime,
  * the capture hook correctly groups both attempts under the same step:
@@ -11,7 +11,6 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { MNAEngine } from "../../analog-engine.js";
 import {
   buildElementLabelMap,
   createStepCaptureHook,
@@ -35,9 +34,7 @@ const TRAN_INTEG_COEFF: IntegrationCoefficients = {
 describe("nr-retry-grouping: failed attempt + retry grouped in same step", () => {
 
   it("two attempts with nrFailedRetry then accepted → 1 step, 2 attempts", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -90,9 +87,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("failed attempt has outcome === 'nrFailedRetry'", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -125,9 +120,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("accepted attempt has outcome === 'accepted' and converged === true", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -160,9 +153,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("both attempts share the same stepStartTime", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -190,7 +181,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     engine.postIterationHook = null;
 
     const steps = sc.getSteps();
-    // Both attempts are in step 0 — stepStartTime applies to the whole step
+    // Both attempts are in step 0- stepStartTime applies to the whole step
     expect(steps[0].stepStartTime).toBe(1e-9);
     // The accepted attempt has the smaller dt (half-step retry)
     expect(steps[0].attempts[0].dt).toBe(1e-9);
@@ -198,9 +189,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("acceptedAttemptIndex correctly points at the accepted attempt", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -233,9 +222,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("step accepted === true even though first attempt failed", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -268,9 +255,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("multiple NR retries before acceptance → all grouped in 1 step", () => {
-    const { circuit, pool } = buildHwrFixture();
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);

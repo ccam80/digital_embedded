@@ -16,8 +16,7 @@ import {
   type SlotDescriptor,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
-import type { StatePoolRef } from "../state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -109,16 +108,10 @@ function buildMuxDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 // BehavioralMuxDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralMuxDriverElement implements PoolBackedAnalogElement {
+export class BehavioralMuxDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _selectorBits: number;
   private readonly _dataCount: number;
@@ -130,10 +123,9 @@ export class BehavioralMuxDriverElement implements PoolBackedAnalogElement {
   private readonly _slotOut: number;       // OUTPUT_LOGIC_LEVEL index
   private _vIH: number;
   private _vIL: number;
-  private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._selectorBits = props.getModelParam<number>("selectorBits");
     this._dataCount = 1 << this._selectorBits;
 
@@ -158,10 +150,6 @@ export class BehavioralMuxDriverElement implements PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   /**

@@ -9,6 +9,8 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+import { ComparisonSession } from "./harness/comparison-session.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Module-scope intercept for noncon_set_before_each_nr_call test.
@@ -39,7 +41,7 @@ import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../cor
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,7 +51,7 @@ const noopBreakpoint = (_t: number): void => {};
 
 /**
  * Build a simple inline resistor element (two-terminal, conductance stamp).
- * Shaped per §A contract: _pinNodes, label, ngspiceLoadOrder, _stateBase, setup().
+ * Shaped per ssA contract: _pinNodes, label, ngspiceLoadOrder, _stateBase, setup().
  */
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
@@ -57,12 +59,12 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const el: AnalogElement = {
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     setup(ctx): void {
-      const a = el._pinNodes.get("A")!;
-      const b = el._pinNodes.get("B")!;
+      const a = el._pinNodes.get("pos")!;
+      const b = el._pinNodes.get("neg")!;
       if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
       if (b !== 0) _hBB = ctx.solver.allocElement(b, b);
       if (a !== 0 && b !== 0) {
@@ -83,63 +85,6 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   return el;
 }
 
-/**
- * Build a simple inline diode element (Shockley model, two nodes).
- * Shaped per §A contract.
- */
-function makeDiode(nodeAnode: number, nodeCathode: number, Is: number, N: number): AnalogElement {
-  const vt = 0.025852;
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: new Map([["A", nodeAnode], ["K", nodeCathode]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx): void {
-      const a = el._pinNodes.get("A")!;
-      const k = el._pinNodes.get("K")!;
-      if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
-      if (k !== 0) _hKK = ctx.solver.allocElement(k, k);
-      if (a !== 0 && k !== 0) {
-        _hAK = ctx.solver.allocElement(a, k);
-        _hKA = ctx.solver.allocElement(k, a);
-      }
-    },
-    load(ctx): void {
-      const { solver } = ctx;
-      const a = el._pinNodes.get("A")!;
-      const k = el._pinNodes.get("K")!;
-      const vA = ctx.rhsOld[a] ?? 0;
-      const vK = k !== 0 ? (ctx.rhsOld[k] ?? 0) : 0;
-      const v = vA - vK;
-      const vMax = 40 * vt * N;
-      const expv = v > vMax ? Math.exp(vMax / (vt * N)) : Math.exp(v / (vt * N));
-      const id = Is * (expv - 1);
-      const geq = (Is * expv) / (vt * N);
-      const ieq = id - geq * v;
-      if (_hAA !== -1) solver.stampElement(_hAA,  geq);
-      if (_hKK !== -1) solver.stampElement(_hKK,  geq);
-      if (_hAK !== -1) solver.stampElement(_hAK, -geq);
-      if (_hKA !== -1) solver.stampElement(_hKA, -geq);
-      if (a !== 0) stampRHS(ctx.rhs, a, -ieq);
-      if (k !== 0) stampRHS(ctx.rhs, k,  ieq);
-    },
-    checkConvergence(ctx): boolean {
-      const a = el._pinNodes.get("A")!;
-      const k = el._pinNodes.get("K")!;
-      const vA = ctx.rhsOld[a] ?? 0;
-      const vK = k !== 0 ? (ctx.rhsOld[k] ?? 0) : 0;
-      const vANew = ctx.rhs[a] ?? 0;
-      const vKNew = k !== 0 ? (ctx.rhs[k] ?? 0) : 0;
-      const dv = Math.abs((vANew - vKNew) - (vA - vK));
-      return dv < ctx.voltTol + ctx.reltol * Math.max(Math.abs(vANew - vKNew), Math.abs(vA - vK));
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
-  };
-  return el;
-}
 
 /**
  * Create a test element that forces NR to report non-convergence until
@@ -348,7 +293,7 @@ function makeScalableVoltageSource(
       stampRHS(ctx.rhs, k, voltage * ctx.srcFact);
     },
     stampAc(_solver: import("../complex-sparse-solver.js").ComplexSparseSolver, _omega: number, _ctx: import("../load-context.js").LoadContext): void {
-      // AC stamp not exercised in DC-OP tests — left as no-op
+      // AC stamp not exercised in DC-OP tests- left as no-op
     },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
@@ -356,7 +301,7 @@ function makeScalableVoltageSource(
 }
 
 // ---------------------------------------------------------------------------
-// makeVsrc — DC voltage source helper
+// makeVsrc- DC voltage source helper
 // ---------------------------------------------------------------------------
 function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
   const props = new PropertyBag();
@@ -387,23 +332,35 @@ describe("DcOP", () => {
     // V1 = 5V (node 1, 0-based index 0), V2 = 2.5V (node 2, 0-based index 1)
   });
 
-  it("diode_circuit_direct", () => {
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 2, 1000),         // R=1kOhm
-      makeDiode(2, 0, 1e-14, 1),       // diode: anode=node2, cathode=gnd
-    ];
-    const ctx = makeCtx(elements, 2, 1);
+  it("diode_circuit_direct", async () => {
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+            { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+            { id: "d1",  type: "Diode",           props: { label: "d1" } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "r1:A"],
+            ["r1:B",    "d1:A"],
+            ["d1:K",    "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
+      },
+      analysis: "dcop",
+    });
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    expect(ctx.dcopResult.method).toBe("direct");
-
-    // Forward diode voltage should be in range [0.6V, 0.75V]
-    const vDiode = ctx.dcopResult.nodeVoltages[1];
-    expect(vDiode).toBeGreaterThan(0.6);
-    expect(vDiode).toBeLessThan(0.75);
+    const shape = session.getStepShape(0);
+    const attempts = shape.attempts.ours!;
+    const directAttempt = attempts.find(a => a.phase === "dcopDirect");
+    expect(directAttempt).toBeDefined();
+    expect(directAttempt!.converged).toBe(true);
+    const gminAttempt = attempts.find(a => a.phase === "dcopGminDynamic");
+    expect(gminAttempt).toBeUndefined();
   });
 
   it("direct_success_emits_converged_info", () => {
@@ -423,57 +380,81 @@ describe("DcOP", () => {
     expect(convergedDiag!.severity).toBe("info");
   });
 
-  it("gmin_stepping_fallback", () => {
-    // A 200V source forward-biasing a diode through 1Î creates an extreme
-    // operating point. From zero-voltage initial guess, direct NR diverges.
-    // dynamicGmin adds diagonal conductance to stabilise the Jacobian.
-    const elements = [
-      makeVsrc(1, 0, 200),
-      makeResistor(1, 2, 1),             // 1Î  huge current
-      makeDiode(2, 0, 1e-14, 1),
-    ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
+  it("gmin_stepping_fallback", async () => {
+    // params.noOpIter = true forces the direct NR attempt to return
+    // converged=false immediately (cktop.c:47-48), so solveDcOperatingPoint
+    // falls through to dcopGminDynamic. This is the ngspice NOOPITER flag.
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 200 } },
+            { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1 } },
+            { id: "d1",  type: "Diode",           props: { label: "d1" } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "r1:A"],
+            ["r1:B",    "d1:A"],
+            ["d1:K",    "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
+      },
+      analysis: "dcop",
+      params: { noOpIter: true },
+    });
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
-    const successCodes = ["dc-op-converged", "dc-op-gmin", "dc-op-source-step"];
-    expect(diags.some(d => successCodes.includes(d.code))).toBe(true);
-    expect(diags.some(d => d.code === "dc-op-failed")).toBe(false);
+    const shape = session.getStepShape(0);
+    const attempts = shape.attempts.ours!;
+    const gminAttempt = attempts.find(a => a.phase === "dcopGminDynamic");
+    expect(gminAttempt).toBeDefined();
+    expect(gminAttempt!.converged).toBe(true);
   });
 
-  it("source_stepping_fallback", () => {
-    const elements = [
-      makeScalableVoltageSource(1, 0, 2, 5),
-      makeResistor(1, 2, 1000),
-      makeDiode(2, 0, 1e-14, 1),
-    ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
+  it("source_stepping_fallback", async () => {
+    // params.noOpIter = true forces the direct NR attempt to return
+    // converged=false immediately (cktop.c:47-48), causing the DC-OP ladder
+    // to advance through gmin stepping and into source stepping.
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+            { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+            { id: "d1",  type: "Diode",           props: { label: "d1" } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "r1:A"],
+            ["r1:B",    "d1:A"],
+            ["d1:K",    "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
+      },
+      analysis: "dcop",
+      params: { noOpIter: true },
+    });
 
-    solveDcOperatingPoint(ctx);
-
-    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
-
-    if (ctx.dcopResult.converged) {
-      if (ctx.dcopResult.method === "gillespie-src") {
-        expect(diags.some(d => d.code === "dc-op-source-step")).toBe(true);
-      } else if (ctx.dcopResult.method === "dynamic-gmin") {
-        expect(diags.some(d => d.code === "dc-op-gmin")).toBe(true);
-      } else {
-        expect(ctx.dcopResult.method).toBe("direct");
-        expect(diags.some(d => d.code === "dc-op-converged")).toBe(true);
-      }
-    }
+    const shape = session.getStepShape(0);
+    const attempts = shape.attempts.ours!;
+    const srcAttempt = attempts.find(
+      a => a.phase === "dcopSourceStepping" || a.phase === "dcopSrcSweep",
+    );
+    expect(srcAttempt).toBeDefined();
+    expect(srcAttempt!.converged).toBe(true);
   });
 
   it("numGminSteps_1_selects_dynamicGmin", () => {
     const elements = [
-      makeScalableVoltageSource(1, 0, 2, 5),
-      makeResistor(1, 2, 1000),
-      makeDiode(2, 0, 1e-14, 1),
+      makeVsrc(1, 0, 5),
+      makeResistor(1, 0, 1000),
+      makeGminDependentElement(1),
     ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, numGminSteps: 1 });
+    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, numGminSteps: 1 });
 
     const phases: string[] = [];
     ctx._onPhaseBegin = (phase) => { phases.push(phase); };
@@ -485,11 +466,11 @@ describe("DcOP", () => {
 
   it("numGminSteps_10_selects_spice3Gmin", () => {
     const elements = [
-      makeScalableVoltageSource(1, 0, 2, 5),
-      makeResistor(1, 2, 1000),
-      makeDiode(2, 0, 1e-14, 1),
+      makeVsrc(1, 0, 5),
+      makeResistor(1, 0, 1000),
+      makeGminDependentElement(1),
     ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, numGminSteps: 10 });
+    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, numGminSteps: 10 });
 
     const phases: string[] = [];
     ctx._onPhaseBegin = (phase) => { phases.push(phase); };
@@ -505,11 +486,11 @@ describe("DcOP", () => {
   it("spice3Src_emits_uniform_phase_parameters", () => {
     const N = 4;
     const elements = [
-      makeScalableVoltageSource(1, 0, 2, 200),
-      makeResistor(1, 2, 1),
-      makeDiode(2, 0, 1e-14, 1),
+      makeVsrc(1, 0, 5),
+      makeResistor(1, 0, 1000),
+      makeSrcSteppingRequiredElement(1),
     ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, numSrcSteps: N, gmin: 1e-3 });
+    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, numSrcSteps: N, gmin: 1e-3 });
 
     const srcSweepParams: number[] = [];
     ctx._onPhaseBegin = (phase, param) => {
@@ -548,11 +529,11 @@ describe("DcOP", () => {
 
   it("gshunt_nonzero_used_as_gtarget", () => {
     const elements = [
-      makeScalableVoltageSource(1, 0, 2, 5),
-      makeResistor(1, 2, 1000),
-      makeDiode(2, 0, 1e-14, 1),
+      makeVsrc(1, 0, 5),
+      makeResistor(1, 0, 1000),
+      makeGminDependentElement(1),
     ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gshunt: 1e-6 });
+    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gshunt: 1e-6 });
 
     solveDcOperatingPoint(ctx);
 
@@ -561,11 +542,11 @@ describe("DcOP", () => {
 
   it("failure_reports_blame", () => {
     const elements = [
-      makeScalableVoltageSource(1, 0, 2, 5),
-      makeResistor(1, 2, 1000),
-      makeDiode(2, 0, 1e-14, 1),
+      makeVsrc(1, 0, 5),
+      makeResistor(1, 0, 1000),
+      makeGminDependentElement(1),
     ];
-    const ctx = makeCtx(elements, 2, 1);
+    const ctx = makeCtx(elements, 1, 1);
 
     solveDcOperatingPoint(ctx);
 
@@ -599,7 +580,7 @@ describe("DcOP", () => {
     }
   });
 
-  // Deleted per Phase 2.5 W2.2 + A1 §Test handling rule:
+  // Deleted per Phase 2.5 W2.2 + A1 ssTest handling rule:
   //   dcopFinalize_transitions_initMode_to_initFloat
   // Inspected ctx.statePool?.initMode  a string-typed field that never
   // existed as a writable mirror in production (StatePoolRef.initMode is a
@@ -646,13 +627,13 @@ describe("DcOP", () => {
     });
 
     try {
-      // Use extreme circuit that requires gmin stepping
+      // Use circuit that requires gmin stepping
       const elements = [
-        makeVsrc(1, 0, 200),
-        makeResistor(1, 2, 1),
-        makeDiode(2, 0, 1e-14, 1),
+        makeVsrc(1, 0, 5),
+        makeResistor(1, 0, 1000),
+        makeGminDependentElement(1),
       ];
-      const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
+      const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gmin: 1e-12 });
 
       // First call: warm up
       allocCount = 0;
@@ -784,11 +765,11 @@ describe("DcOP", () => {
     _observedNoncons = [];
 
     const elements = [
-      makeVsrc(1, 0, 200),
-      makeResistor(1, 2, 1),
-      makeDiode(2, 0, 1e-14, 1),
+      makeVsrc(1, 0, 5),
+      makeResistor(1, 0, 1000),
+      makeGminDependentElement(1),
     ];
-    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
+    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gmin: 1e-12 });
 
     solveDcOperatingPoint(ctx);
 

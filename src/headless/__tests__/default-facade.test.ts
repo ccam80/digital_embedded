@@ -492,7 +492,7 @@ function createAutoModeElement(
   pos: { x: number; y: number },
   props?: Record<string, unknown>,
 ): CircuitElement {
-  const def = reg.get(typeName);
+  const def = reg.getStandalone(typeName);
   if (!def) throw new Error(`Unknown component type: ${typeName}`);
   const bag = new PropertyBag(
     Object.entries(props ?? {}) as [string, import('../../core/properties.js').PropertyValue][],

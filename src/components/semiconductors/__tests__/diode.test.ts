@@ -83,7 +83,6 @@ function withState(core: AnalogElement): { element: PoolBackedAnalogElement; poo
   runSetup(core, solver);
   const re = core as unknown as PoolBackedAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  (re as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
   re.initState(pool);
   return { element: re, pool, solver };
 }
@@ -205,7 +204,7 @@ function driveToOp(
 // ---------------------------------------------------------------------------
 
 describe("Diode", () => {
-  // forward_bias_stamp and reverse_bias_stamp deleted per A1 Â§Test handling rule:
+  // forward_bias_stamp and reverse_bias_stamp deleted per A1 ÂssTest handling rule:
   // both asserted hand-computed geq/ieq Norton pair values. After D-W3-1/D-W3-2
   // (IKF/IKR Norton-pair re-derivation) the GMIN is applied inside the IKF/IKR/else
   // branch, changing the formula for cd and gd. The correct reference is an ngspice
@@ -474,7 +473,6 @@ describe("Diode LimitingEvent instrumentation", () => {
     runSetup(core, solver);
     const re = core as unknown as PoolBackedAnalogElement;
     const pool = new StatePool(Math.max(re.stateSize, 1));
-    (re as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
     re.initState(pool);
     elementSolvers.set(core, solver);
     return core;
@@ -537,7 +535,7 @@ describe("Diode LimitingEvent instrumentation", () => {
     // Warm up to vdOld  0.6
     loadOnce(element, voltages, null);
 
-    // Tiny step — should not be limited
+    // Tiny step- should not be limited
     voltages[1] = 0.601;
     const collector: LimitingEvent[] = [];
     loadOnce(element, voltages, collector);
@@ -656,7 +654,6 @@ describe("IKF/IKR high-injection correction", () => {
     runSetup(core, solver);
     const re = core as unknown as PoolBackedAnalogElement;
     const pool = new StatePool(Math.max(re.stateSize, 1));
-    (re as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
     re.initState(pool);
     const voltages = new Float64Array(10);
     voltages[1] = vd;
@@ -707,7 +704,6 @@ describe("AREA scaling", () => {
     runSetup(core, solver);
     const re = core as unknown as PoolBackedAnalogElement;
     const pool = new StatePool(Math.max(re.stateSize, 1));
-    (re as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
     re.initState(pool);
     const voltages = new Float64Array(10);
     voltages[1] = vd;
@@ -772,7 +768,6 @@ describe("AREA scaling", () => {
     const core1 = createDiodeElement(new Map([["A", 1], ["K", 2]]), props1, () => 0) as any;
     runSetup(core1 as AnalogElement, solver1 as unknown as SparseSolver);
     const pool1 = new StatePool(Math.max(core1.stateSize, 1));
-    core1._stateBase = 0;
     core1.initState(pool1);
     stamps1.length = 0; // clear setup-phase stamps; only capture load() stamps
     core1.load(makeCtxForSolver(solver1));
@@ -781,7 +776,6 @@ describe("AREA scaling", () => {
     const core2 = createDiodeElement(new Map([["A", 1], ["K", 2]]), props2, () => 0) as any;
     runSetup(core2 as AnalogElement, solver2 as unknown as SparseSolver);
     const pool2 = new StatePool(Math.max(core2.stateSize, 1));
-    core2._stateBase = 0;
     core2.initState(pool2);
     stamps2.length = 0; // clear setup-phase stamps; only capture load() stamps
     core2.load(makeCtxForSolver(solver2));
@@ -828,13 +822,12 @@ describe("integration", () => {
     const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
     const core = createDiodeElement(new Map([["A", 1], ["K", 0]]), props, () => 0);
 
-    // Real SparseSolver — anode=node 1 mapped to row 1 (1-based), cathode=ground.
+    // Real SparseSolver- anode=node 1 mapped to row 1 (1-based), cathode=ground.
     const solver = new SparseSolver();
     solver._initStructure();
     runSetup(core, solver);
 
     const pool = new StatePool(9);
-    (core as any)._stateBase = 0;
     core.initState(pool);
 
     // Seed previous-step charge in s1 (simulates one accepted prior step)
@@ -1066,7 +1059,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
 
     // Seed state0[SLOT_VD = 0] to 0.4V
@@ -1095,7 +1087,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
 
     // Seed state1[SLOT_VD = 0] to 0.35V
@@ -1127,7 +1118,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
 
     pool.state0[0] = 0.3; // reasonable operating point in state0
@@ -1137,7 +1127,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
 
     core.load(makeLoadCtx({
       solver,
-      rhsOld: new Float64Array([0, 5.0, 0]), // large jump — would limit if not SMSIG
+      rhsOld: new Float64Array([0, 5.0, 0]), // large jump- would limit if not SMSIG
       rhs: new Float64Array([0, 5.0, 0]),
       cktMode: MODEDCOP | MODEINITSMSIG,
       dt: 0,
@@ -1156,7 +1146,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(9);
-    (core as any)._stateBase = 0;
     core.initState(pool);
     pool.state0[0] = 0.3; // seed VD
 
@@ -1192,7 +1181,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(9);
-    (core as any)._stateBase = 0;
     core.initState(pool);
     pool.state0[0] = 0.3;
 
@@ -1226,7 +1214,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(9);
-    (core as any)._stateBase = 0;
     core.initState(pool);
     pool.state0[0] = 0.3;
 
@@ -1254,7 +1241,6 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
     const el = core;
 
@@ -1271,7 +1257,6 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
     const el = core;
 
@@ -1288,7 +1273,6 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
     // Seed state0[SLOT_VD] to 0.3V so convergence check sees a small delta.
     pool.state0[0] = 0.3;
@@ -1376,7 +1360,6 @@ describe("Diode TEMP", () => {
     solver._initStructure();
     runSetup(core, solver);
     const pool = new StatePool(Math.max((core as any).stateSize, 1));
-    (core as any)._stateBase = 0;
     core.initState(pool);
 
     // Change TEMP to 400K  triggers recomputeTemp()

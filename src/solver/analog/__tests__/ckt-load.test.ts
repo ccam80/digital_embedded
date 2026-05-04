@@ -1,10 +1,10 @@
 /**
- * Tests for cktLoad — single-pass device load function.
+ * Tests for cktLoad- single-pass device load function.
  *
  * Test groups:
- *   Stamping        — end-to-end solve tests
- *   CKTload         — cktLoad-specific behaviour (single pass, nodesets, noncon)
- *   E_SINGULAR      — Phase 0 E_SINGULAR recovery via cktLoad re-run
+ *   Stamping       - end-to-end solve tests
+ *   CKTload        - cktLoad-specific behaviour (single pass, nodesets, noncon)
+ *   E_SINGULAR     - Phase 0 E_SINGULAR recovery via cktLoad re-run
  */
 
 import { describe, it, expect } from 'vitest';
@@ -17,7 +17,7 @@ import { makeDcVoltageSource } from '../../../components/sources/dc-voltage-sour
 import { makeCurrentSource as makeCurrentSourceProduction } from '../../../components/sources/current-source.js';
 import { PropertyBag } from '../../../core/properties.js';
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from '../../../components/semiconductors/diode.js';
-import { NGSPICE_LOAD_ORDER } from '../../../core/analog-types.js';
+import { NGSPICE_LOAD_ORDER } from '../ngspice-load-order.js';
 import type { AnalogElement } from '../element.js';
 import type { LoadContext } from '../load-context.js';
 import type { SetupContext } from '../setup-context.js';
@@ -38,7 +38,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const el: AnalogElement = {
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     setup(ctx: SetupContext): void {
@@ -144,7 +144,7 @@ describe('Stamping', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CKTload tests — Task 2.2.1 / 2.2.3 required tests
+// CKTload tests- Task 2.2.1 / 2.2.3 required tests
 // ---------------------------------------------------------------------------
 
 describe('CKTload', () => {
@@ -172,7 +172,7 @@ describe('CKTload', () => {
     const nodeCount = 1;
     const matrixSize = nodeCount;
     const R = makeResistor(1, 0, 1000);
-    // MODEDCOP | MODEINITJCT — nodeset must pin node 0 to 3.0V
+    // MODEDCOP | MODEINITJCT- nodeset must pin node 0 to 3.0V
     const ctxJct = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctxJct.cktMode = MODEDCOP | MODEINITJCT;
     ctxJct.nodesets.set(0, 3.0);
@@ -182,7 +182,7 @@ describe('CKTload', () => {
     const solJct = new Float64Array(matrixSize);
     ctxJct.solver.solve(ctxJct.rhs, solJct);
     const IS = makeCurrentSource(1, 0, 1e-3);
-    // MODEDCOP | MODEINITFLOAT — nodeset must NOT be applied
+    // MODEDCOP | MODEINITFLOAT- nodeset must NOT be applied
     const ctxFloat = makeSimpleCtx({ elements: [IS, R], matrixSize, nodeCount, branchCount: 0 });
     ctxFloat.cktMode = MODEDCOP | MODEINITFLOAT;
     ctxFloat.nodesets.set(0, 3.0);
@@ -214,7 +214,7 @@ describe('CKTload', () => {
 });
 
 // ---------------------------------------------------------------------------
-// nodesets — bitfield gate tests (ngspice cktload.c:104-129)
+// nodesets- bitfield gate tests (ngspice cktload.c:104-129)
 // ---------------------------------------------------------------------------
 
 describe('nodesets', () => {
@@ -266,7 +266,7 @@ describe('nodesets', () => {
 });
 
 // ---------------------------------------------------------------------------
-// ics — IC stamping gate tests (ngspice cktload.c:130-157)
+// ics- IC stamping gate tests (ngspice cktload.c:130-157)
 // Gate: (MODETRANOP) && !(MODEUIC)
 // ---------------------------------------------------------------------------
 
@@ -302,7 +302,7 @@ describe('ics', () => {
   });
 
   it('ic_NOT_stamped_in_MODEDCOP', () => {
-    // IC gate requires MODETRANOP — standalone DCOP must not apply ICs
+    // IC gate requires MODETRANOP- standalone DCOP must not apply ICs
     const nodeCount = 1;
     const matrixSize = nodeCount;
     const R = makeResistor(1, 0, 1000);
@@ -317,7 +317,7 @@ describe('ics', () => {
 });
 
 // ---------------------------------------------------------------------------
-// troubleNode — C7 zeroing on noncon rise (ngspice cktload.c:64-65)
+// troubleNode- C7 zeroing on noncon rise (ngspice cktload.c:64-65)
 // ---------------------------------------------------------------------------
 
 describe('troubleNode', () => {
@@ -359,7 +359,7 @@ describe('troubleNode', () => {
 });
 
 // ---------------------------------------------------------------------------
-// E_SINGULAR recovery test — Task 2.2.3
+// E_SINGULAR recovery test- Task 2.2.3
 // ---------------------------------------------------------------------------
 
 describe('E_SINGULAR', () => {
@@ -387,7 +387,7 @@ describe('E_SINGULAR', () => {
           return () => {
             factorCallCount++;
             if (factorCallCount === 1) {
-              // Simulate SMPluFac (reuse) failing with spSINGULAR — this
+              // Simulate SMPluFac (reuse) failing with spSINGULAR- this
               // triggers the NR-side NISHOULDREORDER retry.
               stubWalkedReorder = false;
               lastErrorCode = spSINGULAR;
@@ -423,7 +423,7 @@ describe('E_SINGULAR', () => {
     expect(ctx.nrResult.converged).toBe(true);
     expect(factorCallCount).toBeGreaterThanOrEqual(2);
     // After the retry, the next factor() call must walk the SMPreorder
-    // (spOrderAndFactor) body — mirrors niiter.c:861 NISHOULDREORDER branch.
+    // (spOrderAndFactor) body- mirrors niiter.c:861 NISHOULDREORDER branch.
     expect(stubWalkedReorder).toBe(true);
     expect(lastErrorCode).toBe(0);
     expect(ctx.nrResult.iterations).toBe(3);

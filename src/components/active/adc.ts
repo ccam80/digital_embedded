@@ -44,10 +44,18 @@ export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModel
     vOL: { default: 0.0, unit: "V", description: "Digital output LOW voltage" },
   },
   secondary: {
-    rIn:  { default: 1e7,  unit: "Î©", description: "Analog input impedance" },
+    rIn:  { default: 1e7,  unit: "Ω", description: "Analog input impedance" },
     cIn:  { default: 5e-12, unit: "F", description: "Analog input capacitance" },
-    rOut: { default: 50,   unit: "Î©", description: "Digital output impedance" },
-    rHiZ: { default: 1e7,  unit: "Î©", description: "Hi-Z output impedance" },
+    rOut: { default: 50,   unit: "Ω", description: "Digital output impedance" },
+    rHiZ: { default: 1e7,  unit: "Ω", description: "Hi-Z output impedance" },
+  },
+  instance: {
+    // Structural params: must be in paramDefs so the compiler's merger delivers
+    // them to buildAdcNetlist via getModelParam(). Defaults match structural
+    // property defaults.
+    bits:    { default: 8, description: "Number of output bits N (structural)" },
+    bipolar: { default: 0, description: "0 = unipolar, 1 = bipolar offset-binary (structural)" },
+    sar:     { default: 0, description: "0 = instant conversion, 1 = SAR multi-cycle (structural)" },
   },
 });
 
@@ -142,7 +150,7 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
  *   dPin0..N - DigitalOutputPinLoaded for D0..D(N-1)
  */
 export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
-  const N = params.getModelParam<number>("bits");
+  const N = params.getOrDefault<number>("bits", 8);
 
   // Port order: VIN, CLK, VREF, GND, EOC, D0..D(N-1)
   const ports = ["VIN", "CLK", "VREF", "GND", "EOC"];
@@ -161,10 +169,10 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
     subElementName: "drv",
     params: {
       bits: N,
-      bipolar: params.getModelParam<boolean>("bipolar") ? 1 : 0,
-      sar: params.getModelParam<boolean>("sar") ? 1 : 0,
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
+      bipolar: params.getOrDefault<number>("bipolar", 0) ? 1 : 0,
+      sar: params.getOrDefault<number>("sar", 0) ? 1 : 0,
+      vIH: params.getOrDefault<number>("vIH", 2.0),
+      vIL: params.getOrDefault<number>("vIL", 0.8),
     },
   });
   netlist.push(drvPins);

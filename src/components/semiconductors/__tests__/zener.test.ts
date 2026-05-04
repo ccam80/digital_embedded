@@ -2,8 +2,8 @@
  * Tests for the ZenerElement component.
  *
  * Covers engine-agnostic interface contracts and parameter plumbing only.
- * Hand-computed expected values deleted per A1 §Test handling rule
- * (spec/architectural-alignment.md §A1): assertions whose expected values
+ * Hand-computed expected values deleted per A1 ssTest handling rule
+ * (spec/architectural-alignment.md ssA1): assertions whose expected values
  * were computed by hand, not produced by ngspice, are subject to deletion
  * during A1 execution.
  */
@@ -56,7 +56,6 @@ function withState(core: AnalogElement): { element: PoolBackedAnalogElement; poo
   runSetup(core, solver);
   const re = core as unknown as PoolBackedAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  (re as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
   re.initState(pool);
   return { element: re, pool, solver };
 }
@@ -168,7 +167,7 @@ const KoverQ = CONSTboltz / CHARGE;
 
 describe("Zener primeJunctions", () => {
   it("method_absent", () => {
-    // primeJunctions() must NOT exist on the element — in-load MODEINITJCT priming
+    // primeJunctions() must NOT exist on the element- in-load MODEINITJCT priming
     // replaces it per dioload.c:130-138.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15 });
     const core = createZenerElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
@@ -265,7 +264,7 @@ describe("Zener TEMP", () => {
 
   it("setParam_TEMP_recomputes", () => {
     // After setParam('TEMP', 400), load() under MODEINITJCT seeds s0[SLOT_VD]
-    // with tVcrit recomputed at 400K — not at the original 300.15K.
+    // with tVcrit recomputed at 400K- not at the original 300.15K.
     const IS = 1e-14;
     const N = 1;
     const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15 });
@@ -284,7 +283,7 @@ describe("Zener TEMP", () => {
     const tVcrit300 = nVt300 * Math.log(nVt300 / (IS * Math.SQRT2));
     expect(expectedTVcrit400).not.toBeCloseTo(tVcrit300, 5);
 
-    // Set TEMP to 400K — should trigger tp recompute
+    // Set TEMP to 400K- should trigger tp recompute
     element.setParam("TEMP", 400);
 
     const voltages = new Float64Array(2);

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * EEPROM components- EEPROM and EEPROMDualPort.
  *
  * EEPROM: electrically-erasable programmable read-only memory.
@@ -39,7 +39,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import { getBackingStore } from "./ram.js";
@@ -249,7 +249,7 @@ function eepromFactory(props: PropertyBag): EEPROMElement {
   return new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const EEPROMDefinition: ComponentDefinition = {
+export const EEPROMDefinition: StandaloneComponentDefinition = {
   name: "EEPROM",
   typeId: -1,
   factory: eepromFactory,
@@ -398,7 +398,7 @@ function eepromDualPortFactory(props: PropertyBag): EEPROMDualPortElement {
   return new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const EEPROMDualPortDefinition: ComponentDefinition = {
+export const EEPROMDualPortDefinition: StandaloneComponentDefinition = {
   name: "EEPROMDualPort",
   typeId: -1,
   factory: eepromDualPortFactory,

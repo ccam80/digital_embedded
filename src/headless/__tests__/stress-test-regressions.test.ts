@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Regression suite- component execution and registry validation tests
  * found via MCP circuit stress testing.
  */
@@ -84,7 +84,7 @@ describe("Splitter executeFn respects port widths", () => {
 describe("RegisterFile pin scaling", () => {
   it("data pins scale with bitWidth, address pins scale with addrBits", () => {
     const registry = createFullRegistry();
-    const def = registry.get("RegisterFile");
+    const def = registry.getStandalone("RegisterFile");
     expect(def).toBeDefined();
 
     const props = new PropertyBag();
@@ -191,7 +191,7 @@ describe("Sequential component classification", () => {
     const registry = createFullRegistry();
 
     for (const name of syncFlipFlopNames) {
-      const def = registry.get(name);
+      const def = registry.getStandalone(name);
       expect(def, `${name} should be registered`).toBeDefined();
       expect(def!.models?.digital?.sampleFn, `${name} should have a sampleFn`).toBeDefined();
     }
@@ -202,7 +202,7 @@ describe("Sequential component classification", () => {
     const registry = createFullRegistry();
 
     for (const name of memoryNames) {
-      const def = registry.get(name);
+      const def = registry.getStandalone(name);
       expect(def, `${name} should be registered`).toBeDefined();
       expect(def!.models?.digital?.sampleFn, `${name} should have a sampleFn`).toBeDefined();
     }
@@ -271,7 +271,7 @@ describe("Builder property key validation", () => {
   it("registry component property definitions are queryable", () => {
     const registry = createFullRegistry();
 
-    const addDef = registry.get("Add");
+    const addDef = registry.getStandalone("Add");
     expect(addDef).toBeDefined();
     expect(addDef!.propertyDefs).toBeDefined();
     expect(addDef!.propertyDefs!.length).toBeGreaterThan(0);
@@ -286,7 +286,7 @@ describe("Builder property key validation", () => {
 
   it("In component uses 'bitWidth' as property key", () => {
     const registry = createFullRegistry();
-    const inDef = registry.get("In");
+    const inDef = registry.getStandalone("In");
     expect(inDef).toBeDefined();
 
     const props = new PropertyBag();
@@ -305,7 +305,7 @@ describe("Builder property key validation", () => {
 describe("ROM data property format", () => {
   it("ROM data property definition uses HEX_DATA type", () => {
     const registry = createFullRegistry();
-    const romDef = registry.get("ROM");
+    const romDef = registry.getStandalone("ROM");
     expect(romDef).toBeDefined();
 
     const dataProp = romDef!.propertyDefs!.find(d => d.key === "data");
@@ -315,7 +315,7 @@ describe("ROM data property format", () => {
 
   it("ROM data is loadable as number array", () => {
     const registry = createFullRegistry();
-    const romDef = registry.get("ROM");
+    const romDef = registry.getStandalone("ROM");
 
     const props = new PropertyBag();
     props.set("addrBits", 4);

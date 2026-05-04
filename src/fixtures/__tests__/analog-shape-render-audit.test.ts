@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Analog shape render audit- pixel comparison of TS analog component
  * rendering against CircuitJS1 (Falstad) reference shapes.
  *
@@ -14,7 +14,7 @@
  * Also includes:
  *   - Pin count comparison (TS vs Falstad reference)
  *   - Pin position comparison (local coords)
- *   - Rotation × mirror pin transform audit (all 8 combinations)
+ *   - Rotation Ã— mirror pin transform audit (all 8 combinations)
  *   - Uncovered components get sanity checks (factory, draw, bbox, pins)
  *
  * Silent-catch policy (per spec/architectural-alignment.md ssI1
@@ -97,7 +97,7 @@ function buildDefaultProps(
   registry: ComponentRegistry,
   typeName: string,
 ): PropertyBag {
-  const def = registry.get(typeName);
+  const def = registry.getStandalone(typeName);
   if (!def) return new PropertyBag();
   const entries: Array<[string, import("@/core/properties").PropertyValue]> = [];
   for (const pd of def.propertyDefs) {
@@ -215,7 +215,7 @@ function comparePins(
     if (dx > 0.01 || dy > 0.01) {
       pinPosMismatches++;
       pinPosDetails.push(
-        `${rp.label}:(${rp.x},${rp.y})→(${tp.position.x},${tp.position.y})`,
+        `${rp.label}:(${rp.x},${rp.y})â†’(${tp.position.x},${tp.position.y})`,
       );
     }
   }
@@ -236,7 +236,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
   });
 
   // -------------------------------------------------------------------------
-  // Covered types- have Falstad reference → pixel comparison
+  // Covered types- have Falstad reference â†’ pixel comparison
   // -------------------------------------------------------------------------
 
   it.each(computeCoveredTypes())(
@@ -245,7 +245,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
       if (SKIP_RENDER_TYPES.has(typeName)) return;
 
       const drawRef = FALSTAD_REFERENCES.get(typeName)!;
-      const def = registry.get(typeName)!;
+      const def = registry.getStandalone(typeName)!;
       const props = buildDefaultProps(registry, typeName);
 
       // --- Create TS element ---
@@ -308,7 +308,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
       const overlapResult = detectTextOverlaps(tsCtx.calls);
       const textOverlapDetails = overlapResult.overlaps.map(
         (o) =>
-          `"${o.a.text}"↔"${o.b.text}" (${o.overlapArea.toFixed(2)})`,
+          `"${o.a.text}"â†”"${o.b.text}" (${o.overlapArea.toFixed(2)})`,
       );
 
       // --- Pin comparison ---
@@ -388,7 +388,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
   it.each(computeUncoveredTypes())(
     "$typeName (uncovered- no Falstad reference)",
     ({ typeName }) => {
-      const def = registry.get(typeName)!;
+      const def = registry.getStandalone(typeName)!;
       const props = buildDefaultProps(registry, typeName);
 
       let element: CircuitElement;
@@ -432,7 +432,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
       const overlapResult = detectTextOverlaps(ctx.calls);
       const textOverlapDetails = overlapResult.overlaps.map(
         (o) =>
-          `"${o.a.text}"↔"${o.b.text}" (${o.overlapArea.toFixed(2)})`,
+          `"${o.a.text}"â†”"${o.b.text}" (${o.overlapArea.toFixed(2)})`,
       );
 
       const { pinCountDelta, pinPosMismatches, pinPosDetails } =
@@ -499,10 +499,10 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
     const pixelGood = covered.filter((r) => r.pixelDice >= 0.7);
     const pixelGreat = covered.filter((r) => r.pixelDice >= 0.9);
     console.log(
-      `Pixel match (Dice ≥ 0.7): ${pixelGood.length} / ${covered.length}`,
+      `Pixel match (Dice â‰¥ 0.7): ${pixelGood.length} / ${covered.length}`,
     );
     console.log(
-      `Pixel match (Dice ≥ 0.9): ${pixelGreat.length} / ${covered.length}`,
+      `Pixel match (Dice â‰¥ 0.9): ${pixelGreat.length} / ${covered.length}`,
     );
 
     // Extent
@@ -510,13 +510,13 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
       (r) => r.extent && r.extent.maxDelta < 0.5,
     );
     console.log(
-      `Extent match (maxΔ < 0.5): ${extentGood.length} / ${covered.length}`,
+      `Extent match (maxÎ” < 0.5): ${extentGood.length} / ${covered.length}`,
     );
 
     // BBox
     const bboxGood = valid.filter((r) => r.bboxOverflow <= 0.1);
     console.log(
-      `BBox covers shape (≤0.1 overflow): ${bboxGood.length} / ${valid.length}`,
+      `BBox covers shape (â‰¤0.1 overflow): ${bboxGood.length} / ${valid.length}`,
     );
 
     // Text
@@ -561,10 +561,10 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
         "\n" +
           "Component".padEnd(24) +
           "Dice".padEnd(8) +
-          "ΔW".padEnd(7) +
-          "ΔH".padEnd(7) +
-          "ΔCx".padEnd(7) +
-          "ΔCy".padEnd(7) +
+          "Î”W".padEnd(7) +
+          "Î”H".padEnd(7) +
+          "Î”Cx".padEnd(7) +
+          "Î”Cy".padEnd(7) +
           "BBox".padEnd(6) +
           "OLap".padEnd(6) +
           "Txt".padEnd(8) +
@@ -603,7 +603,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
         } else if (r.pinCountDelta !== 0) {
           pinStr = `#${r.pinCountDelta > 0 ? "+" : ""}${r.pinCountDelta}`;
         } else if (r.pinPosMismatches > 0) {
-          pinStr = `Δ${r.pinPosMismatches}`;
+          pinStr = `Î”${r.pinPosMismatches}`;
         } else {
           pinStr = "ok";
         }
@@ -622,7 +622,7 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
           r.pinCountDelta !== null &&
           r.pinCountDelta !== 0
         ) {
-          details += `pin#:Δ${r.pinCountDelta > 0 ? "+" : ""}${r.pinCountDelta} `;
+          details += `pin#:Î”${r.pinCountDelta > 0 ? "+" : ""}${r.pinCountDelta} `;
         }
         if (r.pinDetachedDetails.length > 0) {
           details += `detached:[${r.pinDetachedDetails.join(",")}] `;
@@ -656,11 +656,11 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
         (a, b) => (b.extent?.maxDelta ?? 0) - (a.extent?.maxDelta ?? 0),
       );
     if (extentBad.length > 0) {
-      console.log("\n--- Extent Outliers (maxΔ ≥ 0.5 grid) ---");
+      console.log("\n--- Extent Outliers (maxÎ” â‰¥ 0.5 grid) ---");
       for (const r of extentBad) {
         const e = r.extent!;
         console.log(
-          `  ${r.typeId}: Ref=${e.javaW.toFixed(1)}×${e.javaH.toFixed(1)} TS=${e.tsW.toFixed(1)}×${e.tsH.toFixed(1)} ΔW=${e.widthDelta.toFixed(2)} ΔH=${e.heightDelta.toFixed(2)} ΔC=(${e.centerDx.toFixed(2)},${e.centerDy.toFixed(2)})`,
+          `  ${r.typeId}: Ref=${e.javaW.toFixed(1)}Ã—${e.javaH.toFixed(1)} TS=${e.tsW.toFixed(1)}Ã—${e.tsH.toFixed(1)} Î”W=${e.widthDelta.toFixed(2)} Î”H=${e.heightDelta.toFixed(2)} Î”C=(${e.centerDx.toFixed(2)},${e.centerDy.toFixed(2)})`,
         );
       }
     }
@@ -747,11 +747,11 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
       buckets[idx]++;
     }
     console.log("\n--- Dice Distribution ---");
-    console.log(`  0.0–0.2: ${buckets[0]}`);
-    console.log(`  0.2–0.4: ${buckets[1]}`);
-    console.log(`  0.4–0.6: ${buckets[2]}`);
-    console.log(`  0.6–0.8: ${buckets[3]}`);
-    console.log(`  0.8–1.0: ${buckets[4]}`);
+    console.log(`  0.0â€“0.2: ${buckets[0]}`);
+    console.log(`  0.2â€“0.4: ${buckets[1]}`);
+    console.log(`  0.4â€“0.6: ${buckets[2]}`);
+    console.log(`  0.6â€“0.8: ${buckets[3]}`);
+    console.log(`  0.8â€“1.0: ${buckets[4]}`);
 
   });
 });
@@ -760,14 +760,14 @@ describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", ()
 // Rotation/mirror pin transform audit
 //
 // For each analog component type with a pin reference, create the element at
-// all 8 transform combinations (4 rotations × 2 mirror states) and verify
+// all 8 transform combinations (4 rotations Ã— 2 mirror states) and verify
 // that pinWorldPosition() matches the expected transform math.
 // ---------------------------------------------------------------------------
 
 const ROTATIONS: Rotation[] = [0, 1, 2, 3];
 const MIRRORS = [false, true];
 
-describe("analog pin transform audit- rotation × mirror correctness", () => {
+describe("analog pin transform audit- rotation Ã— mirror correctness", () => {
   let registry: ComponentRegistry;
 
   beforeAll(() => {
@@ -789,7 +789,7 @@ describe("analog pin transform audit- rotation × mirror correctness", () => {
       const refPins = FALSTAD_PIN_POSITIONS.get(typeName);
       if (!refPins) return; // no pin reference for this type
 
-      const def = registry.get(typeName);
+      const def = registry.getStandalone(typeName);
       if (!def) return;
 
       const props = buildDefaultProps(registry, typeName);

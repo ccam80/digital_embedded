@@ -1053,7 +1053,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-OPTO TSTALLOC sequence", () => {
-    // OptocouplerCompositeElement: 4 sub-elements in NGSPICE_LOAD_ORDER ascending.
+    // OPTOCOUPLER_NETLIST expansion: 4 sub-elements in NGSPICE_LOAD_ORDER ascending.
     //
     // Pins: anode=1, cathode=2, collector=3, emitter=4.
     // Internal nodes allocated in setup():

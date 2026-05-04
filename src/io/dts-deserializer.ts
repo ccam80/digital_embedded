@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Deserializer for the .dts (digiTS) native JSON format.
  *
  * Parses .dts JSON strings back to Circuit objects. bigint values encoded as
@@ -113,7 +113,7 @@ function rehydrateModels(
   const result: Record<string, Record<string, ModelEntry>> = {};
   for (const [compType, compModels] of Object.entries(serialized)) {
     result[compType] = {};
-    const def = registry.get(compType);
+    const def = registry.getStandalone(compType);
     for (const [modelName, entry] of Object.entries(compModels)) {
       if (entry.kind === 'inline') {
         if (def === undefined || def.modelRegistry === undefined) {

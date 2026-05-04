@@ -1,13 +1,13 @@
-/**
+﻿/**
  * SCR (Silicon Controlled Rectifier) analog component.
  *
  * Composite of two BJT sub-elements in a two-transistor latch configuration
  * per PB-SCR spec (bjtsetup.c:347-465 per sub-element).
  *
- *   Q1 — NPN (polarity = +1): B=G, C=Vint, E=K
- *   Q2 — PNP (polarity = -1): B=Vint, C=G, E=A
+ *   Q1- NPN (polarity = +1): B=G, C=Vint, E=K
+ *   Q2- PNP (polarity = -1): B=Vint, C=G, E=A
  *
- * Internal node: Vint (latch node) — created once by the composite in setup().
+ * Internal node: Vint (latch node)- created once by the composite in setup().
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -21,19 +21,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-
-import {
-  createBjtL1Element,
-  BJT_SPICE_L1_NPN_DEFAULTS,
-  BJT_SPICE_L1_PNP_DEFAULTS,
-} from "./bjt.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -46,9 +37,9 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
     IS: { default: 1e-16, unit: "A", description: "Saturation current (shared)" },
   },
   secondary: {
-    RC: { default: 0,     unit: "Ω", description: "Collector resistance (shared)" },
-    RB: { default: 0,     unit: "Ω", description: "Base resistance (shared)" },
-    RE: { default: 0,     unit: "Ω", description: "Emitter resistance (shared)" },
+    RC: { default: 0,     unit: "Î©", description: "Collector resistance (shared)" },
+    RB: { default: 0,     unit: "Î©", description: "Base resistance (shared)" },
+    RE: { default: 0,     unit: "Î©", description: "Emitter resistance (shared)" },
   },
   instance: {
     AREA: { default: 1,      description: "Device area factor" },
@@ -57,159 +48,28 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
 });
 
 // ---------------------------------------------------------------------------
-// Helpers to build PropertyBag for sub-elements
+// SCR_NETLIST  MnaSubcircuitNetlist declaration
 // ---------------------------------------------------------------------------
 
-function makeNpnProps(BF: number, IS: number, RC: number, RB: number, RE: number, AREA: number, TEMP: number): PropertyBag {
-  const bag = new PropertyBag(new Map<string, number>().entries());
-  bag.replaceModelParams({ ...BJT_SPICE_L1_NPN_DEFAULTS, BF, IS, RC, RB, RE, AREA, TEMP });
-  return bag;
-}
-
-function makePnpProps(BR: number, IS: number, RC: number, RB: number, RE: number, AREA: number, TEMP: number): PropertyBag {
-  const bag = new PropertyBag(new Map<string, number>().entries());
-  bag.replaceModelParams({ ...BJT_SPICE_L1_PNP_DEFAULTS, BR, IS, RC, RB, RE, AREA, TEMP });
-  return bag;
-}
-
-// ---------------------------------------------------------------------------
-// ScrCompositeElement — composite AnalogElementCore
-// ---------------------------------------------------------------------------
-
-class ScrCompositeElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-
-  private _aNode: number;
-  private _kNode: number;
-  private _gNode: number;
-  private _vintNode: number = -1;
-  private _internalLabels: string[] = [];
-
-  readonly _q1: AnalogElement;  // NPN: B=G, C=Vint, E=K
-  readonly _q2: AnalogElement;  // PNP: B=Vint, C=G, E=A
-
-  constructor(
-    label: string,
-    pinNodes: ReadonlyMap<string, number>,
-    q1: AnalogElement,
-    q2: AnalogElement,
-  ) {
-    this.label = label;
-    this._pinNodes = new Map(pinNodes);
-    this._aNode = pinNodes.get("A")!;
-    this._kNode = pinNodes.get("K")!;
-    this._gNode = pinNodes.get("G")!;
-    this._q1 = q1;
-    this._q2 = q2;
-  }
-
-  getInternalNodeLabels(): readonly string[] {
-    return this._internalLabels;
-  }
-
-  setup(ctx: SetupContext): void {
-    this._internalLabels = [];
-    // Create the shared internal latch node first
-    this._vintNode = ctx.makeVolt(this.label, "latch");
-    this._internalLabels.push("latch");
-
-    // Bind sub-element pin nodes using the resolved Vint.
-    // Sub-element pin rebinding uses direct pinNodeIds array assignment
-    // (consistent with PB-OPTO, PB-DAC, PB-OPAMP, PB-TIMER555). No setPinNode API is added
-    // to AnalogElementCore.
-    // Q1 NPN: BJT pin order [B, C, E] per buildBJTPinDeclarations()
-    (this._q1 as any)._pinNodes.set("B", this._gNode);    // B=G
-    (this._q1 as any)._pinNodes.set("C", this._vintNode); // C=Vint
-    (this._q1 as any)._pinNodes.set("E", this._kNode);    // E=K
-
-    // Q2 PNP: BJT pin order [B, C, E] per buildBJTPinDeclarations()
-    (this._q2 as any)._pinNodes.set("B", this._vintNode); // B=Vint
-    (this._q2 as any)._pinNodes.set("C", this._gNode);    // C=G
-    (this._q2 as any)._pinNodes.set("E", this._aNode);    // E=A
-
-    // Forward to each BJT sub-element (Q1 then Q2)
-    this._q1.setup(ctx);   // NPN: 23× TSTALLOC per bjtsetup.c:435-464
-    this._q2.setup(ctx);   // PNP: 23× TSTALLOC per bjtsetup.c:435-464
-  }
-
-  load(ctx: LoadContext): void {
-    this._q1.load(ctx);   // NPN BJT load per bjtload.c
-    this._q2.load(ctx);   // PNP BJT load per bjtload.c (polarity = -1)
-  }
-
-  setParam(key: string, value: number): void {
-    if (key === "BF") {
-      this._q1.setParam("BF", value);
-    } else if (key === "BR") {
-      this._q2.setParam("BR", value);
-    } else if (key === "IS" || key === "RC" || key === "RB" || key === "RE" || key === "AREA" || key === "TEMP") {
-      this._q1.setParam(key, value);
-      this._q2.setParam(key, value);
-    }
-  }
-
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [0, 0, 0];
-  }
-
-  /** Sub-elements in setup() order: Q1 NPN, then Q2 PNP. Each is independent
-   *  in setup; setup() rebinds their pin nodes via the shared Vint latch node. */
-  getSubElements(): readonly AnalogElement[] {
-    return [
-      this._q1 as unknown as AnalogElement,
-      this._q2 as unknown as AnalogElement,
-    ];
-  }
-}
+export const SCR_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["A", "K", "G"],
+  params: { BF: 100, BR: 100, IS: 1e-16, RC: 0, RB: 0, RE: 0, AREA: 1, TEMP: 300.15 },
+  elements: [
+    { typeId: "NpnBJT", modelRef: "spice", subElementName: "Q1",
+      params: { BF: "BF", IS: "IS", RC: "RC", RB: "RB", RE: "RE", AREA: "AREA", TEMP: "TEMP" } },
+    { typeId: "PnpBJT", modelRef: "spice", subElementName: "Q2",
+      params: { BR: "BR", IS: "IS", RC: "RC", RB: "RB", RE: "RE", AREA: "AREA", TEMP: "TEMP" } },
+  ],
+  internalNetCount: 1,
+  internalNetLabels: ["latch"],
+  netlist: [
+    [2, 3, 1],  // Q1 NPN: B=G, C=latch, E=K
+    [3, 2, 0],  // Q2 PNP: B=latch, C=G, E=A
+  ],
+};
 
 // ---------------------------------------------------------------------------
-// createScrElement — composite factory
-// ---------------------------------------------------------------------------
-
-function createScrElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): ScrCompositeElement {
-  const label = props.getOrDefault<string>("label", "") || "SCR";
-
-  const BF   = props.getModelParam<number>("BF");
-  const BR   = props.getModelParam<number>("BR");
-  const IS   = props.getModelParam<number>("IS");
-  const RC   = props.getModelParam<number>("RC");
-  const RB   = props.getModelParam<number>("RB");
-  const RE   = props.getModelParam<number>("RE");
-  const AREA = props.getModelParam<number>("AREA");
-  const TEMP = props.getModelParam<number>("TEMP");
-
-  const npnProps = makeNpnProps(BF, IS, RC, RB, RE, AREA, TEMP);
-  const pnpProps = makePnpProps(BR, IS, RC, RB, RE, AREA, TEMP);
-
-  // Q1 NPN: B=G, C=Vint, E=K — Vint not known yet; overwritten in setup()
-  const q1 = createBjtL1Element(1, false)(
-    new Map([["B", pinNodes.get("G")!], ["C", 0], ["E", pinNodes.get("K")!]]),
-    npnProps,
-    () => 0,
-  );
-  (q1 as any).label = `${label}#Q1`;
-
-  // Q2 PNP: B=Vint, C=G, E=A — Vint not known yet; overwritten in setup()
-  const q2 = createBjtL1Element(-1, false)(
-    new Map([["B", 0], ["C", pinNodes.get("G")!], ["E", pinNodes.get("A")!]]),
-    pnpProps,
-    () => 0,
-  );
-  (q2 as any).label = `${label}#Q2`;
-
-  return new ScrCompositeElement(label, pinNodes, q1, q2);
-}
-
-// ---------------------------------------------------------------------------
-// ScrElement — CircuitElement implementation
+// ScrElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ScrElement extends AbstractCircuitElement {
@@ -328,7 +188,7 @@ function scrCircuitFactory(props: PropertyBag): ScrElement {
   return new ScrElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ScrDefinition: ComponentDefinition = {
+export const ScrDefinition: StandaloneComponentDefinition = {
   name: "SCR",
   typeId: -1,
   factory: scrCircuitFactory,
@@ -337,17 +197,13 @@ export const ScrDefinition: ComponentDefinition = {
   attributeMap: SCR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "SCR — Silicon Controlled Rectifier.\n" +
+    "SCR- Silicon Controlled Rectifier.\n" +
     "Pins: A (anode), K (cathode), G (gate).\n" +
     "Two-transistor latch model: Q1 NPN (B=G, C=Vint, E=K) + Q2 PNP (B=Vint, C=G, E=A).",
   models: {},
   modelRegistry: {
-    "behavioral": {
-      kind: "inline",
-      factory: createScrElement,
-      paramDefs: SCR_PARAM_DEFS,
-      params: SCR_PARAM_DEFAULTS,
-    },
+    behavioral: { kind: "netlist", netlist: SCR_NETLIST,
+                  paramDefs: SCR_PARAM_DEFS, params: SCR_PARAM_DEFAULTS },
   },
   defaultModel: "behavioral",
 };

@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { partitionByDomain } from "../partition.js";
 import type { ModelAssignment } from "../extract-connectivity.js";
 import type { ConnectivityGroup, ResolvedGroupPin } from "../types.js";
 import { PinDirection } from "@/core/pin.js";
 import type { CircuitElement } from "@/core/element.js";
-import type { ComponentDefinition, ComponentRegistry, DigitalModel } from "@/core/registry.js";
+import type { StandaloneComponentDefinition, ComponentRegistry, DigitalModel } from "@/core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
@@ -31,7 +31,7 @@ const DIGITAL_MODEL: DigitalModel = {
 
 
 
-function makeDigitalDef(name: string): ComponentDefinition {
+function makeDigitalDef(name: string): StandaloneComponentDefinition {
   return {
     name,
     typeId: 0,
@@ -45,7 +45,7 @@ function makeDigitalDef(name: string): ComponentDefinition {
   };
 }
 
-function makeAnalogDef(name: string): ComponentDefinition {
+function makeAnalogDef(name: string): StandaloneComponentDefinition {
   return {
     name,
     typeId: 0,
@@ -62,8 +62,8 @@ function makeAnalogDef(name: string): ComponentDefinition {
 }
 
 
-function makeRegistry(defs: ComponentDefinition[]): ComponentRegistry {
-  const map = new Map<string, ComponentDefinition>();
+function makeRegistry(defs: StandaloneComponentDefinition[]): ComponentRegistry {
+  const map = new Map<string, StandaloneComponentDefinition>();
   for (const d of defs) map.set(d.name, d);
   return {
     get: (name: string) => map.get(name),
@@ -206,7 +206,7 @@ describe("partitionByDomain", () => {
 
       // Pure digital group
       const gDigital = makeGroup(0, [makePin(0, 0, "digital", PinDirection.OUTPUT)]);
-      // Boundary group: digital output → analog input
+      // Boundary group: digital output â†’ analog input
       const gBoundary = makeGroup(1, [
         makePin(0, 1, "digital", PinDirection.OUTPUT),
         makePin(1, 0, "analog", PinDirection.BIDIRECTIONAL),
@@ -422,7 +422,7 @@ describe("partitionByDomain", () => {
 
   describe("electrical spec on bridge", () => {
     it("picks electricalSpec from component definition pinElectrical", () => {
-      const analogDef: ComponentDefinition = {
+      const analogDef: StandaloneComponentDefinition = {
         name: "SpecResistor",
         typeId: 0,
         factory: () => { throw new Error(); },
@@ -500,7 +500,7 @@ describe("partitionByDomain", () => {
   });
 
   describe("neutral component routing by connected net domain (H6/H7)", () => {
-    function makeNeutralDef(name: string): ComponentDefinition {
+    function makeNeutralDef(name: string): StandaloneComponentDefinition {
       return {
         name,
         typeId: 0,

@@ -1,7 +1,7 @@
 /**
- * BJT component tests — post-W1.2 port.
+ * BJT component tests- post-W1.2 port.
  *
- * Test handling per `spec/architectural-alignment.md` §A1: only
+ * Test handling per `spec/architectural-alignment.md` ssA1: only
  * parameter-plumbing tests (setParam propagation, default values),
  * engine-agnostic interface contracts (modelRegistry wiring), and
  * LimitingEvent instrumentation remain.
@@ -9,8 +9,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  createBjtElement,
-  createPnpBjtElement,
+  createBjtL0Element,
+  createPnpBjtL0Element,
   createSpiceL1BjtElement,
   NpnBjtDefinition,
   PnpBjtDefinition,
@@ -21,7 +21,7 @@ import {
   BJT_PNP_DEFAULTS,
   BJT_SPICE_L1_PNP_DEFAULTS,
 } from "../bjt.js";
-import type { LoadContext } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -117,10 +117,10 @@ function makeDcOpCtx(rhs: Float64Array): LoadContext {
 // Engine-agnostic interface contracts
 // ---------------------------------------------------------------------------
 
-describe("BJT simple — interface contract", () => {
+describe("BJT simple- interface contract", () => {
   it("pinNodes_correct", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(new Map([["B", 3], ["C", 5], ["E", 7]]), propsObj, () => 0);
+    const element = createBjtL0Element(new Map([["B", 3], ["C", 5], ["E", 7]]), propsObj, () => 0);
     expect(element._pinNodes.get("B")).toBe(3);
     expect(element._pinNodes.get("C")).toBe(5);
     expect(element._pinNodes.get("E")).toBe(7);
@@ -128,7 +128,7 @@ describe("BJT simple — interface contract", () => {
 
   it("branchIndex_minus_one", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
+    const element = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
     expect(element.branchIndex).toBe(-1);
   });
 });
@@ -284,13 +284,13 @@ describe("ModelParams", () => {
     // Behavioural numerical correctness of setParam is validated by the
     // ngspice-comparison harness in Wave 3, not by hand-computed test values.
     const propsObj = makeBjtProps();
-    const element = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
+    const element = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
     expect(() => element.setParam("BF", 50)).not.toThrow();
     expect(() => element.setParam("IS", 1e-12)).not.toThrow();
   });
 });
 
-describe("SPICE L1 model — parameter plumbing", () => {
+describe("SPICE L1 model- parameter plumbing", () => {
   it("has full param set including terminal resistances and capacitances", () => {
     const paramKeys = BJT_SPICE_L1_PARAM_DEFS.map(pd => pd.key);
     expect(paramKeys).toContain("BF");
@@ -342,37 +342,37 @@ describe("SPICE L1 model — parameter plumbing", () => {
 });
 
 // ---------------------------------------------------------------------------
-// State schema — engine-agnostic interface contract (size/owner, seeded
+// State schema- engine-agnostic interface contract (size/owner, seeded
 // initial warm-start voltage).
 // ---------------------------------------------------------------------------
 
-describe("stateSchema — BJT simple", () => {
+describe("stateSchema- BJT simple", () => {
   it("stateSchema_declared", () => {
-    const core = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
+    const core = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
     expect(core.stateSchema).toBeDefined();
   });
 
   it("stateSchema_owner_identifies_element", () => {
-    const core = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
+    const core = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
     expect(core.stateSchema!.owner).toBe("BjtSimpleElement");
   });
 
   it("warmstart_NPN_VBE_seeded_to_0_6", () => {
-    const core = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
+    const core = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
     runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
     (core as any).initState(pool);
   });
 
   it("warmstart_PNP_VBE_seeded_to_minus_0_6", () => {
-    const core = createPnpBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
+    const core = createPnpBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps(), () => 0);
     runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
     (core as any).initState(pool);
   });
 });
 
-describe("stateSchema — BJT SPICE L1", () => {
+describe("stateSchema- BJT SPICE L1", () => {
   it("stateSchema_declared", () => {
     const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), makeSpiceL1Props());
     expect((core as any).stateSchema).toBeDefined();
@@ -399,14 +399,14 @@ describe("stateSchema — BJT SPICE L1", () => {
 });
 
 // ---------------------------------------------------------------------------
-// LimitingEvent instrumentation — interface contract, does not assert
+// LimitingEvent instrumentation- interface contract, does not assert
 // hand-computed vBefore/vAfter values.
 // ---------------------------------------------------------------------------
 
 describe("BJT simple LimitingEvent instrumentation", () => {
   function makeNpnWithState(): AnalogElement {
     const props = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), props, () => 0) as AnalogElement & { label?: string; elementIndex?: number };
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), props, () => 0) as AnalogElement & { label?: string; elementIndex?: number };
     core.label = "Q1";
     core.elementIndex = 5;
     runSetup(core, new SparseSolver());
@@ -492,19 +492,19 @@ describe("BJT L1 LimitingEvent instrumentation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.1 — MODEINITPRED full state-copy list (A1)
+// Task 5.1.1- MODEINITPRED full state-copy list (A1)
 // bjtload.c:288-303: all 9 L0 op-state slots copied from state1 to state0.
 // ---------------------------------------------------------------------------
 
 describe("BJT L0 MODEINITPRED", () => {
   it("copies_9_slots_state1_to_state0", () => {
-    // L0 slot indices (match bjt.ts createBjtElement local consts):
+    // L0 slot indices (match bjt.ts createBjtL0Element local consts):
     // 0=VBE, 1=VBC, 2=CC, 3=CB, 4=GPI, 5=GMU, 6=GM, 7=GO, 8=GX
     const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
     const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
 
     const propsObj = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     const stateSize: number = (core as any).stateSize;
     // Setup uses solverPrime so that load() priming pass uses the same solver with valid handles.
     const solverPrime = new SparseSolver();
@@ -577,14 +577,14 @@ describe("BJT L0 MODEINITPRED", () => {
     const sentGX  = s1[SLOT_GX];
 
     // Also seed s2 with the same values (so xfact extrapolation with any xfact
-    // collapses to s1 values exactly — s0 = (1+x)*s1 - x*s2 = s1 when s2=s1).
+    // collapses to s1 values exactly- s0 = (1+x)*s1 - x*s2 = s1 when s2=s1).
     s2[SLOT_VBE] = sentVBE;
     s2[SLOT_VBC] = sentVBC;
 
     // Now run MODEINITPRED: bjtload.c:288-303 must copy all 9 slots s1 → s0,
     // then extrapolate voltages (collapsed to s1 values since s2=s1), run pnjlim
     // (no-op since prior=new), run computeBjtOp at the same voltages, and write
-    // back the same op values — so s0 ends up identical to s1 sentinels.
+    // back the same op values- so s0 ends up identical to s1 sentinels.
     const solver = new SparseSolver();
     solver._initStructure();
     const rhsOld = new Float64Array(10);
@@ -633,12 +633,12 @@ describe("BJT L0 MODEINITPRED", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Shared helper for 5.1.2 / 5.1.3 / 5.1.4 tests — full LoadContext literal.
+// Shared helper for 5.1.2 / 5.1.3 / 5.1.4 tests- full LoadContext literal.
 // ---------------------------------------------------------------------------
 
 function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Record<string, number>): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool } {
   const propsObj = makeBjtProps(modelParams);
-  const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+  const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
   const solver = new SparseSolver();
   solver._initStructure();
   runSetup(core, solver);
@@ -674,7 +674,7 @@ function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Re
 }
 
 // ---------------------------------------------------------------------------
-// Task 5.1.2 — MODEINITJCT 3-branch priming verification (A3)
+// Task 5.1.2- MODEINITJCT 3-branch priming verification (A3)
 // bjtload.c:258-264, :265-269, :270-275 citation refresh + path-selection tests.
 // ---------------------------------------------------------------------------
 
@@ -683,7 +683,7 @@ describe("BJT L0 MODEINITJCT", () => {
   const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2;
 
   it("uic_path_seeds_from_icvbe_icvce", () => {
-    // cite: bjtload.c:258-264 — MODEINITJCT+MODETRANOP+MODEUIC seeds from IC* params.
+    // cite: bjtload.c:258-264- MODEINITJCT+MODETRANOP+MODEUIC seeds from IC* params.
     // pnjlim is skipped when MODEINITJCT is set; s0[VBE] = raw IC-derived voltage.
     const rhsOld = new Float64Array(10);
     const { ctx, element, s0 } = makeFullLoadCtx(
@@ -698,7 +698,7 @@ describe("BJT L0 MODEINITJCT", () => {
   });
 
   it("on_path_seeds_tVcrit", () => {
-    // cite: bjtload.c:265-269 — MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.
+    // cite: bjtload.c:265-269- MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.
     // tVcrit = vt * log(vt / (sqrt(2) * tSatCur)) with tSatCur = IS*AREA for
     // L0 (see bjt-temp.ts). For NPN defaults IS≈tSatCur scaled at T=300.15 K,
     // tVcrit lands near 0.85 V. Bound 0.6 V < vbe < 1.0 V matches the
@@ -713,7 +713,7 @@ describe("BJT L0 MODEINITJCT", () => {
   });
 
   it("off_path_zero_seeds", () => {
-    // cite: bjtload.c:270-275 — MODEINITJCT+OFF: vbe=vbc=0 → near-zero downstream op.
+    // cite: bjtload.c:270-275- MODEINITJCT+OFF: vbe=vbc=0 → near-zero downstream op.
     const rhsOld = new Float64Array(10);
     const { ctx, element, s0 } = makeFullLoadCtx(MODEINITJCT, rhsOld, { OFF: 1 });
     element.load(ctx);
@@ -723,7 +723,7 @@ describe("BJT L0 MODEINITJCT", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.3 — NOBYPASS bypass test (A4)
+// Task 5.1.3- NOBYPASS bypass test (A4)
 // bjtload.c:338-381: 4-tolerance gate skips recompute when tolerances met.
 // ---------------------------------------------------------------------------
 
@@ -750,7 +750,7 @@ describe("BJT L0 NOBYPASS", () => {
     limitingCollector: LimitingEvent[];
   } {
     const propsObj = makeBjtProps(modelParams);
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     const solver = new SparseSolver();
     solver._initStructure();
     runSetup(core, solver);
@@ -804,7 +804,7 @@ describe("BJT L0 NOBYPASS", () => {
   }
 
   it("bypass_disabled_when_ctx_bypass_false", () => {
-    // cite: bjtload.c:338 — bypass gate requires ctx.bypass=true; both calls must compute.
+    // cite: bjtload.c:338- bypass gate requires ctx.bypass=true; both calls must compute.
     // Spec (task 5.1.3): "Assert both calls emit non-zero stamp counts (stamp-count
     // probe wrapping stampG/stampRHS)." We additionally assert the compute path
     // ran on both calls (limitingCollector populated), since with bypass=false
@@ -814,11 +814,11 @@ describe("BJT L0 NOBYPASS", () => {
     rhsOld[2] = 3.0;  // nodeC=2
     rhsOld[3] = 0.0;  // nodeE=3
 
-    // First call — compute path, writes s0.
+    // First call- compute path, writes s0.
     const first = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
     first.element.load(first.ctx);
 
-    // Second call with identical rhsOld — bypass=false, so compute path again.
+    // Second call with identical rhsOld- bypass=false, so compute path again.
     // Prime s0 of the second element with the first element's s0 so that
     // tolerances WOULD be met if the gate were reachable; this proves the
     // ctx.bypass=false guard is what's blocking bypass, not the tolerances.
@@ -833,27 +833,27 @@ describe("BJT L0 NOBYPASS", () => {
     expect(first.stampCount.rhs).toBe(3);
     expect(second.stampCount.g).toBe(9);
     expect(second.stampCount.rhs).toBe(3);
-    // (b) Compute path ran on both calls — limitingCollector gets exactly
+    // (b) Compute path ran on both calls- limitingCollector gets exactly
     // 2 pushes per compute call (BE + BC junctions, bjt.ts:932-951).
     expect(first.limitingCollector.length).toBe(2);
     expect(second.limitingCollector.length).toBe(2);
   });
 
   it("bypass_triggers_when_tolerances_met", () => {
-    // cite: bjtload.c:338-381 — bypass fires when ctx.bypass=true and all 4 tolerances pass.
+    // cite: bjtload.c:338-381- bypass fires when ctx.bypass=true and all 4 tolerances pass.
     // Spec (task 5.1.3): "(a) ctx.noncon.value unchanged on second call, (b) stamps
     // still emitted on second call (bypass preserves stamps), (c) a probe on
     // computeBjtOp call-count shows it was invoked once (first call) not twice."
     //
     // computeBjtOp is a private module function, so call-count is measured
     // indirectly via ctx.limitingCollector: bjt.ts L0 load() pushes to
-    // limitingCollector only on the compute path (lines 932-951) — the
+    // limitingCollector only on the compute path (lines 932-951)- the
     // bypass path (lines 903-906) skips it entirely. The collector therefore
     // gives an exact 0/≥1 discriminator:
     //   compute ran  → limitingCollector.length === 2 (BE + BC)
     //   bypass fired → limitingCollector.length === 0
     const propsObj = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
     (core as any).initState(pool);
@@ -907,7 +907,7 @@ describe("BJT L0 NOBYPASS", () => {
       return { ctx, stampCount };
     }
 
-    // First call — bypass=false, primes s0 with self-consistent op-state.
+    // First call- bypass=false, primes s0 with self-consistent op-state.
     const rhsOld1 = new Float64Array(10);
     rhsOld1[1] = 0.65; rhsOld1[2] = 3.0; rhsOld1[3] = 0.0;
     const limits1: LimitingEvent[] = [];
@@ -931,9 +931,9 @@ describe("BJT L0 NOBYPASS", () => {
     const call2 = makeCtx(rhsOld2, true, noncon2, limits2);
     core.load(call2.ctx);
 
-    // (a) noncon unchanged — bypass skips pnjlim+icheck++ (bjt.ts:930).
+    // (a) noncon unchanged- bypass skips pnjlim+icheck++ (bjt.ts:930).
     expect(noncon2.value).toBe(0);
-    // (b) stamps still emitted on bypass path — bypass preserves the stamp
+    // (b) stamps still emitted on bypass path- bypass preserves the stamp
     // block (bjt.ts:999-1023). L0 emits exactly 9 G entries + 3 RHS entries.
     expect(call2.stampCount.g).toBe(9);
     expect(call2.stampCount.rhs).toBe(3);
@@ -944,14 +944,14 @@ describe("BJT L0 NOBYPASS", () => {
   });
 
   it("bypass_disabled_by_MODEINITPRED", () => {
-    // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate.
+    // cite: bjtload.c:347- !(MODEINITPRED) is part of the bypass gate.
     // With cktMode|=MODEINITPRED, bypass gate must not fire even when
     // ctx.bypass=true and tolerances are met.
     //
     // Probe: limitingCollector populated ⇒ compute path ran (bjt.ts:932-951).
     // If bypass had (incorrectly) fired, the collector would be empty.
     const propsObj = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
     (core as any).initState(pool);
@@ -1002,7 +1002,7 @@ describe("BJT L0 NOBYPASS", () => {
 
     // Copy s0 → s1 and s2 so xfact=0 extrapolation gives vbe/vbc == s0 values.
     // With rhsOld nulled out, the MODEINITPRED branch computes vbeRaw/vbcRaw
-    // from s1 (extrapolated), not from rhsOld — so the extrapolated values
+    // from s1 (extrapolated), not from rhsOld- so the extrapolated values
     // match s0 exactly, and delvbe/delvbc = 0. Tolerances are nominally met;
     // only the !(MODEINITPRED) guard blocks bypass.
     for (let i = 0; i < (core as any).stateSize; i++) {
@@ -1010,7 +1010,7 @@ describe("BJT L0 NOBYPASS", () => {
       s2[i] = s0[i];
     }
 
-    // Call with MODEINITPRED + bypass=true — bypass gate must NOT fire.
+    // Call with MODEINITPRED + bypass=true- bypass gate must NOT fire.
     const limits: LimitingEvent[] = [];
     core.load(makeCtx(MODETRAN | MODEINITPRED, new Float64Array(10), true, limits));
 
@@ -1021,7 +1021,7 @@ describe("BJT L0 NOBYPASS", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.4 — noncon INITFIX/off gate verification (A5)
+// Task 5.1.4- noncon INITFIX/off gate verification (A5)
 // bjtload.c:749-754: icheck++ unless MODEINITFIX && OFF.
 // ---------------------------------------------------------------------------
 
@@ -1029,11 +1029,11 @@ describe("BJT L0 noncon", () => {
   function makeNonconCtx(cktMode: number, off: number): { ctx: LoadContext; element: AnalogElement; s0: Float64Array } {
     // Use large rhsOld to trigger pnjlim (large delvbe forces limiting).
     const rhsOld = new Float64Array(10);
-    rhsOld[1] = 5.0; // vB high — ensures vbeRaw >> s0[VBE] → pnjlim fires, icheckLimited=true.
+    rhsOld[1] = 5.0; // vB high- ensures vbeRaw >> s0[VBE] → pnjlim fires, icheckLimited=true.
     rhsOld[2] = 3.0;
     rhsOld[3] = 0.0;
     const propsObj = makeBjtProps({ OFF: off });
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     const solver = new SparseSolver();
     solver._initStructure();
     runSetup(core, solver);
@@ -1069,7 +1069,7 @@ describe("BJT L0 noncon", () => {
   }
 
   it("no_bump_when_initfix_and_off", () => {
-    // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF.
+    // cite: bjtload.c:749-754- icheck++ unless MODEINITFIX && OFF.
     // OFF=1, cktMode=MODEINITFIX: the gate condition (OFF===0 || !(INITFIX)) is false → no bump.
     const { ctx, element } = makeNonconCtx(MODEINITFIX, 1);
     element.load(ctx);
@@ -1077,7 +1077,7 @@ describe("BJT L0 noncon", () => {
   });
 
   it("bumps_when_initfix_and_not_off", () => {
-    // cite: bjtload.c:749-754 — OFF=0, MODEINITFIX: OFF===0 is true → bump permitted.
+    // cite: bjtload.c:749-754- OFF=0, MODEINITFIX: OFF===0 is true → bump permitted.
     // Large vB ensures pnjlim fires → icheckLimited=true → noncon increments.
     const { ctx, element } = makeNonconCtx(MODEINITFIX, 0);
     element.load(ctx);
@@ -1085,7 +1085,7 @@ describe("BJT L0 noncon", () => {
   });
 
   it("bumps_when_not_initfix_and_off", () => {
-    // cite: bjtload.c:749-754 — OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true → bump.
+    // cite: bjtload.c:749-754- OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true → bump.
     const { ctx, element } = makeNonconCtx(MODEDCOP | MODEINITFLOAT, 1);
     element.load(ctx);
     expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
@@ -1093,7 +1093,7 @@ describe("BJT L0 noncon", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.5 — Parameterize NE / NC (A8)
+// Task 5.1.5- Parameterize NE / NC (A8)
 // NE default 1.5, NC default 2 in BJT_PARAM_DEFS.
 // ---------------------------------------------------------------------------
 
@@ -1116,14 +1116,14 @@ describe("ModelParams", () => {
 
   it("setParam_NE_NC_no_throw", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
+    const element = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
     expect(() => element.setParam("NE", 1.2)).not.toThrow();
     expect(() => element.setParam("NC", 2.5)).not.toThrow();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.6 — MODEINITSMSIG early-return + MODEINITTRAN state1 seed (A2/A9)
+// Task 5.1.6- MODEINITSMSIG early-return + MODEINITTRAN state1 seed (A2/A9)
 // ---------------------------------------------------------------------------
 
 describe("BJT L0 MODEINITSMSIG", () => {
@@ -1132,7 +1132,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
 
   function makeSmsigCtx(primePool?: { s0: Float64Array }): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; solver: SparseSolver } {
     const propsObj = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
     (core as any).initState(pool);
@@ -1183,7 +1183,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
   }
 
   it("no_stamps_emitted", () => {
-    // cite: bjtload.c:676,703 — MODEINITSMSIG stores op state, skips stamps via early return.
+    // cite: bjtload.c:676,703- MODEINITSMSIG stores op state, skips stamps via early return.
     const { ctx, element, solver } = makeSmsigCtx();
 
     // Wrap solver.addEntry to count stamp calls.
@@ -1196,19 +1196,19 @@ describe("BJT L0 MODEINITSMSIG", () => {
       };
     }
 
-    // Also count RHS via direct rhs array mutation detection — track rhs before/after.
+    // Also count RHS via direct rhs array mutation detection- track rhs before/after.
     const rhsBefore = Array.from(ctx.rhs);
     element.load(ctx);
     const rhsAfter = Array.from(ctx.rhs);
 
-    // Under MODEINITSMSIG, the early-return fires before stamp block — zero stamps.
+    // Under MODEINITSMSIG, the early-return fires before stamp block- zero stamps.
     expect(stampCallCount).toBe(0);
     // RHS must not have changed.
     expect(rhsAfter).toEqual(rhsBefore);
   });
 
   it("state0_op_slots_populated", () => {
-    // cite: bjtload.c:676,703 — MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op slots.
+    // cite: bjtload.c:676,703- MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op slots.
     // Priming bias is vbe≈0.65 V forward-active (makeSmsigCtx prime pass); the
     // MODEINITSMSIG call dispatches through the general path which reads
     // vbeRaw/vbcRaw from s0 (MODEINITSMSIG is one of the modes that skips
@@ -1237,10 +1237,10 @@ describe("BJT L0 MODEINITTRAN", () => {
   const SLOT_VBE = 0, SLOT_VBC = 1;
 
   it("state1_VBE_VBC_seeded", () => {
-    // cite: bjtload.c:236-257 — MODEINITTRAN seeds state1 from the initial voltage read
+    // cite: bjtload.c:236-257- MODEINITTRAN seeds state1 from the initial voltage read
     // so subsequent NIintegrate history has a valid t=0 prior value.
     const propsObj = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     const solver = new SparseSolver();
     solver._initStructure();
     runSetup(core, solver);
@@ -1279,7 +1279,7 @@ describe("BJT L0 MODEINITTRAN", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.2 — MODEINITSMSIG return block verification (B3)
+// Task 5.2.2- MODEINITSMSIG return block verification (B3)
 // bjtload.c:674-703: stores caps+op into state0, skips NIintegrate + stamps.
 // ---------------------------------------------------------------------------
 
@@ -1338,7 +1338,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
   }
 
   it("no_stamps_emitted", () => {
-    // cite: bjtload.c:674-703 — MODEINITSMSIG stores caps+op and returns before stamps.
+    // cite: bjtload.c:674-703- MODEINITSMSIG stores caps+op and returns before stamps.
     const { ctx, element, solver } = makeL1SmsigCtx();
 
     let stampCallCount = 0;
@@ -1359,7 +1359,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
   });
 
   it("cap_values_stored", () => {
-    // cite: bjtload.c:674-703 — MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.
+    // cite: bjtload.c:674-703- MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.
     // Defaults used: CJE=CJC=1e-12 (makeL1SmsigCtx baseline) + override
     // CJS=1e-12 (SPICE default is 0 → capsub would collapse to 0) and
     // XCJC=0.5 (SPICE default is 1 → czbx = ctot*(1-XCJC) = 0 → capbx=0).
@@ -1378,7 +1378,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
   });
 
   it("cexbc_equals_geqcb", () => {
-    // cite: bjtload.c:674-703 — s0[CEXBC] = geqcb and s0[GEQCB] = geqcb (same value).
+    // cite: bjtload.c:674-703- s0[CEXBC] = geqcb and s0[GEQCB] = geqcb (same value).
     // With TF=1e-9 and forward VBE, geqcb is non-zero; both slots receive the same value.
     const { ctx, element, s0 } = makeL1SmsigCtx({ TF: 1e-9 });
     element.load(ctx);
@@ -1388,7 +1388,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.1 — MODEINITPRED full state-copy list (B1/B2)
+// Task 5.2.1- MODEINITPRED full state-copy list (B1/B2)
 // bjtload.c:288-303: all 10 L1 op-state slots copied from state1 to state0.
 // ---------------------------------------------------------------------------
 
@@ -1483,7 +1483,7 @@ describe("BJT L1 MODEINITPRED", () => {
     // Run MODEINITPRED: bjtload.c:288-303 must copy all 10 slots s1→s0.
     // Use xfact=0 so extrapolated voltage = s1 value exactly (no prediction shift).
     // Use the same rhsOld as the prime run so vbxRaw/vsubRaw (which are always read
-    // from rhsOld directly, not from extrapolated state) match the prime values —
+    // from rhsOld directly, not from extrapolated state) match the prime values-
     // this keeps pnjlim a no-op and the op writeback identical to the prime result.
     const solver = new SparseSolver();
     solver._initStructure();
@@ -1532,7 +1532,7 @@ describe("BJT L1 MODEINITPRED", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.3 — NOBYPASS bypass test (B4)
+// Task 5.2.3- NOBYPASS bypass test (B4)
 // bjtload.c:338-381: 4-tolerance gate + 15-slot restore on L1.
 // ---------------------------------------------------------------------------
 
@@ -1597,19 +1597,19 @@ describe("BJT L1 NOBYPASS", () => {
   }
 
   it("bypass_disabled_when_ctx_bypass_false", () => {
-    // cite: bjtload.c:338 — bypass=false means gate never fires; compute always runs.
+    // cite: bjtload.c:338- bypass=false means gate never fires; compute always runs.
     // Spec (task 5.2.3, same pattern as 5.1.3): assert both calls emit
     // non-zero stamps AND compute path ran (limitingCollector populated).
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
 
-    // First call — compute path, writes s0.
+    // First call- compute path, writes s0.
     const first = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
     first.element.load(first.ctx);
     const stamps1 = first.stampCount.n;
     const limits1 = first.limitingCollector.length;
 
-    // Second call with identical rhsOld — bypass=false so compute runs again
+    // Second call with identical rhsOld- bypass=false so compute runs again
     // even though s0 was pre-aligned to rhsOld (tolerances trivially met).
     const second = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
     second.s0.set(first.s0);
@@ -1618,21 +1618,21 @@ describe("BJT L1 NOBYPASS", () => {
     const limits2 = second.limitingCollector.length;
 
     // (a) Both calls emit non-zero stamp counts. Exact counts depend on the
-    // L1 stamp block (bjt.ts:1849-1905) and aren't brittle — assert > 0.
+    // L1 stamp block (bjt.ts:1849-1905) and aren't brittle- assert > 0.
     expect(stamps1).toBeGreaterThan(0);
     expect(stamps2).toBeGreaterThan(0);
-    // (b) Compute path ran on both calls — L1 pushes exactly 3 events per
+    // (b) Compute path ran on both calls- L1 pushes exactly 3 events per
     // compute call (BE + BC + SUB, bjt.ts:1459-1485).
     expect(limits1).toBe(3);
     expect(limits2).toBe(3);
   });
 
   it("bypass_restores_and_stamps", () => {
-    // cite: bjtload.c:338-381 — bypass fires when ctx.bypass=true and tolerances met.
+    // cite: bjtload.c:338-381- bypass fires when ctx.bypass=true and tolerances met.
     // Stamp block still runs on bypass path (mirrors ngspice goto load).
     // Spec (task 5.2.3): assert (a) noncon unchanged, (b) stamps still
     // emitted, (c) computeSpiceL1BjtOp NOT called on the bypass call
-    // (limitingCollector length 0 — only compute path pushes).
+    // (limitingCollector length 0- only compute path pushes).
     const propsObj = makeSpiceL1Props();
     const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElement;
     runSetup(core, new SparseSolver());
@@ -1695,9 +1695,9 @@ describe("BJT L1 NOBYPASS", () => {
     const call2 = makeCtx(rhsOld2, true, noncon2, limits2);
     core.load(call2.ctx);
 
-    // (a) noncon unchanged — bypass skips pnjlim+icheck++ (bjt.ts:1456).
+    // (a) noncon unchanged- bypass skips pnjlim+icheck++ (bjt.ts:1456).
     expect(noncon2.value).toBe(0);
-    // (b) stamps still emitted on bypass path — bypass preserves the L1
+    // (b) stamps still emitted on bypass path- bypass preserves the L1
     // stamp block (bjt.ts:1849-1905). Count must be > 0.
     expect(call2.stampCount.n).toBeGreaterThan(0);
     // (c) computeSpiceL1BjtOp call-count probe: bypass path did NOT push to
@@ -1707,7 +1707,7 @@ describe("BJT L1 NOBYPASS", () => {
   });
 
   it("bypass_disabled_by_MODEINITPRED", () => {
-    // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
+    // cite: bjtload.c:347- !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
     // Probe: limitingCollector populated ⇒ compute path ran under MODEINITPRED.
     const propsObj = makeSpiceL1Props();
     const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElement;
@@ -1747,7 +1747,7 @@ describe("BJT L1 NOBYPASS", () => {
     // Copy s0→s1, s1→s2 so MODEINITPRED extrapolation collapses to s0 values.
     s1.set(s0); s2.set(s0);
 
-    // Call with MODEINITPRED + bypass=true — MODEINITPRED gate must prevent bypass.
+    // Call with MODEINITPRED + bypass=true- MODEINITPRED gate must prevent bypass.
     // The compute path will push 3 entries to limitingCollector.
     const limits: LimitingEvent[] = [];
     core.load(makeCtx(MODETRAN | MODEINITPRED, rhsOld1, true, limits));
@@ -1758,8 +1758,8 @@ describe("BJT L1 NOBYPASS", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.4 — noncon INITFIX/off gate verification (B5)
-// cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
+// Task 5.2.4- noncon INITFIX/off gate verification (B5)
+// cite: bjtload.c:749-754- icheck++ unless MODEINITFIX && OFF
 // ---------------------------------------------------------------------------
 
 describe("BJT L1 noncon", () => {
@@ -1791,21 +1791,21 @@ describe("BJT L1 noncon", () => {
   }
 
   it("no_bump_when_initfix_and_off", () => {
-    // cite: bjtload.c:749-754 — OFF=1 + MODEINITFIX: noncon must not increment.
+    // cite: bjtload.c:749-754- OFF=1 + MODEINITFIX: noncon must not increment.
     const { ctx, element } = makeNonconCtx(MODEINITFIX, { OFF: 1 });
     element.load(ctx);
     expect(ctx.noncon.value).toBe(0);
   });
 
   it("bumps_when_initfix_and_not_off", () => {
-    // cite: bjtload.c:749-754 — OFF=0 + MODEINITFIX: noncon increments when pnjlim fires.
+    // cite: bjtload.c:749-754- OFF=0 + MODEINITFIX: noncon increments when pnjlim fires.
     const { ctx, element } = makeNonconCtx(MODEINITFIX, { OFF: 0 });
     element.load(ctx);
     expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
   });
 
   it("bumps_when_not_initfix_and_off", () => {
-    // cite: bjtload.c:749-754 — OFF=1 + MODEDCOP (no MODEINITFIX): noncon increments.
+    // cite: bjtload.c:749-754- OFF=1 + MODEDCOP (no MODEINITFIX): noncon increments.
     const { ctx, element } = makeNonconCtx(MODEDCOP | MODEINITFLOAT, { OFF: 1 });
     element.load(ctx);
     expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
@@ -1813,15 +1813,15 @@ describe("BJT L1 noncon", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.5 — CdBE uses op.gbe verification (B8)
-// cite: bjtload.c:617, :625 — capbe = tf*gbeMod + ...; gbeMod derived from op.gbe.
+// Task 5.2.5- CdBE uses op.gbe verification (B8)
+// cite: bjtload.c:617, :625- capbe = tf*gbeMod + ...; gbeMod derived from op.gbe.
 // ---------------------------------------------------------------------------
 
 describe("BJT L1 CdBE", () => {
   const SLOT_QBE = 8;
 
   it("scales_with_gbe_not_gm", () => {
-    // cite: bjtload.c:617 — capbe uses gbeMod which derives from gbe (not gm).
+    // cite: bjtload.c:617- capbe uses gbeMod which derives from gbe (not gm).
     // Run two loads with different IS (changes gbe ~ IS*exp(vbe/vt)/vt) and compare QBE.
     // QBE = tf*cbeMod + czbe*(1-arg*sarg)/(1-xme); cbeMod scales with gbe via XTF path.
     // With TF>0 and vbeLimited>0, cbeMod = cbe*(1+argtf)/qb where argtf depends on gbe.
@@ -1888,18 +1888,18 @@ describe("BJT L1 CdBE", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.6 — External BC cap stamp destination verification (B9)
-// cite: bjtload.c:841-842 — geqbx stamps to (nodeB_ext, nodeC_int), NOT nodeC_ext.
+// Task 5.2.6- External BC cap stamp destination verification (B9)
+// cite: bjtload.c:841-842- geqbx stamps to (nodeB_ext, nodeC_int), NOT nodeC_ext.
 // ---------------------------------------------------------------------------
 
 describe("BJT L1 BC_cap_stamps", () => {
   it("target_colPrime", () => {
-    // cite: bjtload.c:841-842 — BJTbaseColPrimePtr targets nodeC_int (colPrime), not nodeC_ext.
+    // cite: bjtload.c:841-842- BJTbaseColPrimePtr targets nodeC_int (colPrime), not nodeC_ext.
     // With RC>0, nodeC_int !== nodeC_ext. Verify no stamp hits (nodeB_ext, nodeC_ext).
     // Node assignment: B=1 (ext), C=2 (ext), E=3; RC>0 creates nodeC_int via ctx.makeVolt().
     // We seed makeVolt to return 4 as the first internal node by starting nextNode at 3.
     //
-    // After the setup/load split, load() only calls stampElement(handle, value) — never
+    // After the setup/load split, load() only calls stampElement(handle, value)- never
     // allocElement. To verify which (extRow, extCol) pairs are stamped, we:
     //   1. Intercept allocElement during setup() to build handle → (extRow, extCol) map.
     //   2. Intercept stampElement during load() to record which handles are written.
@@ -2003,7 +2003,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     expect(forbidden).toHaveLength(0);
 
     // A stamp to (nodeB_ext=1, nodeC_int=4) or (nodeC_int=4, nodeB_ext=1) must
-    // be present (geqbx — bjtload.c:841-842 BJTbaseColPrimePtr / BJTcolPrimeBasePtr).
+    // be present (geqbx- bjtload.c:841-842 BJTbaseColPrimePtr / BJTcolPrimeBasePtr).
     const nodeC_int = 4;
     const toColPrime = stampedPairs.filter(
       s => (s.extRow === nodeB_ext && s.extCol === nodeC_int) ||
@@ -2014,14 +2014,14 @@ describe("BJT L1 BC_cap_stamps", () => {
 });
 
 // ---------------------------------------------------------------------------
-// BJT vertical/lateral topology — model variants, not parameters
-// cite: bjtload.c:184-187 — VERTICAL uses AREAB for c4; LATERAL uses AREAC.
+// BJT vertical/lateral topology- model variants, not parameters
+// cite: bjtload.c:184-187- VERTICAL uses AREAB for c4; LATERAL uses AREAC.
 // separate ModelEntry rows ("spice" = vertical, "spice-lateral" = lateral)
 // in NpnBJTDefinition / PnpBJTDefinition modelRegistry. The factory captures
 // `isLateral` as a closure constant via createBjtL1Element(polarity, isLateral).
 // ---------------------------------------------------------------------------
 
-describe("SpiceL1 topology — model variants", () => {
+describe("SpiceL1 topology- model variants", () => {
   it("defaultModel_is_spice_vertical_NPN", () => {
     expect(NpnBjtDefinition.defaultModel).toBe("spice");
   });
@@ -2069,7 +2069,7 @@ describe("SpiceL1 topology — model variants", () => {
 
 describe("SpiceL1 ModelParams", () => {
   // ---------------------------------------------------------------------------
-  // Task 5.2.8 — AREAB / AREAC params (B11)
+  // Task 5.2.8- AREAB / AREAC params (B11)
   // ---------------------------------------------------------------------------
 
   it("AREAB_default_1", () => {
@@ -2090,7 +2090,7 @@ describe("SpiceL1 ModelParams", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.8 — AREAB/AREAC area-scaling correctness tests
+// Task 5.2.8- AREAB/AREAC area-scaling correctness tests
 // cite: bjtload.c:184-187, 573-576, 582-585
 // ---------------------------------------------------------------------------
 
@@ -2175,7 +2175,7 @@ describe("BJT L1 AREAB_AREAC", () => {
     el1.load(makeDcInitCtx());
     el2.load(makeDcInitCtx());
     // cb contains the BC leakage contribution via cbcn which scales with c4=ISC*AREAB.
-    // el2 has AREAB=4 vs el1 AREAB=2 — el2 should have larger |CB|.
+    // el2 has AREAB=4 vs el1 AREAB=2- el2 should have larger |CB|.
     const cb1 = pool1.states[0][SLOT_CB];
     const cb2 = pool2.states[0][SLOT_CB];
     expect(Math.abs(cb2)).toBeGreaterThan(Math.abs(cb1));
@@ -2216,7 +2216,7 @@ describe("BJT L1 AREAB_AREAC", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Lateral-vs-vertical c4 stamp differential tests (Step 3b — §3.5 Test impact)
+  // Lateral-vs-vertical c4 stamp differential tests (Step 3b- ss3.5 Test impact)
   // c4 = tBCleakCur * AREAB (vertical) or AREAC (lateral). With identical
   // params except topology, c4_lateral != c4_vertical when AREAB != AREAC,
   // and the resulting cbcn contribution flows into SLOT_CB. cb is a sum of
@@ -2287,9 +2287,9 @@ describe("BJT L1 AREAB_AREAC", () => {
   }
 
   // ---------------------------------------------------------------------------
-  // Model-swap test (Step 3b — §3.5 Test impact)
+  // Model-swap test (Step 3b- ss3.5 Test impact)
   // Build via the registry's "spice" (vertical) and "spice-lateral" entries
-  // and verify the resulting cb differs — proves the closure-captured
+  // and verify the resulting cb differs- proves the closure-captured
   // isLateral reaches the c4 stamp site through the registry path.
   // ---------------------------------------------------------------------------
 
@@ -2314,14 +2314,14 @@ describe("BJT L1 AREAB_AREAC", () => {
 
     const cbVertical = buildAndLoad(verticalEntry);
     const cbLateral = buildAndLoad(lateralEntry);
-    // Lateral c4 ∝ AREAC=4, vertical c4 ∝ AREAB=1 — lateral cb must be larger.
+    // Lateral c4 ∝ AREAC=4, vertical c4 ∝ AREAB=1- lateral cb must be larger.
     expect(cbLateral).not.toBe(cbVertical);
     expect(Math.abs(cbLateral)).toBeGreaterThan(Math.abs(cbVertical));
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.9 — MODEINITTRAN charge state copy verification (B12)
+// Task 5.2.9- MODEINITTRAN charge state copy verification (B12)
 // cite: bjtload.c:715-724, 735-740, 764-769
 // ---------------------------------------------------------------------------
 
@@ -2391,7 +2391,7 @@ describe("BJT L1 MODEINITTRAN", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.10 — cexbc INITTRAN seed + dt guard removal (B15)
+// Task 5.2.10- cexbc INITTRAN seed + dt guard removal (B15)
 // cite: bjtload.c:531-535, 536-539
 // ---------------------------------------------------------------------------
 
@@ -2428,7 +2428,7 @@ describe("BJT L1 excess_phase", () => {
   }
 
   it("initTran_seeds_cexbc_state1_state2", () => {
-    // cite: bjtload.c:531-535 — INITTRAN seeds state1+state2 cexbc to cbe/qb.
+    // cite: bjtload.c:531-535- INITTRAN seeds state1+state2 cexbc to cbe/qb.
     // Pre-seed state1[VBE] with a forward vbe so cbe > 0 at the INITTRAN call.
     const { el, pool } = makeExcessPhaseEl();
     // Prime: run DC-OP pass so s0[VBE] = 0.65 (computed and stored).
@@ -2453,7 +2453,7 @@ describe("BJT L1 excess_phase", () => {
   });
 
   it("uses_deltaOld1_directly", () => {
-    // cite: bjtload.c:536-539 — IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
+    // cite: bjtload.c:536-539- IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
     // Two elements with identical state but different deltaOld[1] must produce different s0[CEXBC],
     // proving the IIR denominator consumes deltaOld[1].
     const { el: el1, pool: pool1 } = makeExcessPhaseEl();
@@ -2496,13 +2496,13 @@ describe("BJT L1 excess_phase", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 5.2.11 — cex uses raw op.cbe (B22)
+  // Task 5.2.11- cex uses raw op.cbe (B22)
   // cite: bjtload.c:522-524
   // ---------------------------------------------------------------------------
 
   it("cex_is_raw_cbe_not_cbeMod", () => {
-    // cite: bjtload.c:522-524 — cex/gex seeded from raw cbe/gbe BEFORE XTF modification.
-    // INITTRAN seeds s1[CEXBC] = cbe/qb — independent of XTF.
+    // cite: bjtload.c:522-524- cex/gex seeded from raw cbe/gbe BEFORE XTF modification.
+    // INITTRAN seeds s1[CEXBC] = cbe/qb- independent of XTF.
     // Two elements differing only in XTF must produce identical s1[CEXBC].
     const { el: el0, pool: pool0 } = makeExcessPhaseEl({ XTF: 0 });
     const { el: el10, pool: pool10 } = makeExcessPhaseEl({ XTF: 10 });
@@ -2515,7 +2515,7 @@ describe("BJT L1 excess_phase", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.12 — XTF=0 gbe adjustment verification (F-BJT-ADD-21)
+// Task 5.2.12- XTF=0 gbe adjustment verification (F-BJT-ADD-21)
 // cite: bjtload.c:591-610
 // ---------------------------------------------------------------------------
 
@@ -2550,7 +2550,7 @@ describe("BJT L1 XTF_zero", () => {
   }
 
   it("cbeMod_computed_when_tf_nonzero_xtf_zero", () => {
-    // cite: bjtload.c:591-610 — when tf>0 && vbe>0, cbeMod block runs.
+    // cite: bjtload.c:591-610- when tf>0 && vbe>0, cbeMod block runs.
     // XTF=0 collapses argtf=arg2=0, so cbeMod = cbe*(1+0)/qb = cbe/qb (still non-zero).
     const { el: elTf, pool: poolTf } = makeL1WithTfXtf(1e-9, 0);
     const { el: elNoTf, pool: poolNoTf } = makeL1WithTfXtf(0, 0);
@@ -2584,7 +2584,7 @@ describe("BJT L1 XTF_zero", () => {
   });
 
   it("cbeMod_skipped_when_tf_zero", () => {
-    // cite: bjtload.c:591-610 — when tf=0, cbeMod block is skipped entirely.
+    // cite: bjtload.c:591-610- when tf=0, cbeMod block is skipped entirely.
     // QBE = DC component only: pe*czbe*(1-arg*sarg)/(1-xme) for vbe<fcpe.
     const { el, pool } = makeL1WithTfXtf(0, 0);
 
@@ -2610,7 +2610,7 @@ describe("BJT L1 XTF_zero", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.13 — geqsub Norton aggregation verification (F-BJT-ADD-23)
+// Task 5.2.13- geqsub Norton aggregation verification (F-BJT-ADD-23)
 // cite: bjtload.c:798-800, 823
 // ---------------------------------------------------------------------------
 
@@ -2618,7 +2618,7 @@ describe("BJT L1 substrate", () => {
   const SLOT_GCSUB = 19, SLOT_GDSUB = 23;
 
   it("geqsub_aggregates_gcsub_gdsub", () => {
-    // cite: bjtload.c:798-800 — geqsub = gcsub + gdsub; all substrate stamps use geqsub.
+    // cite: bjtload.c:798-800- geqsub = gcsub + gdsub; all substrate stamps use geqsub.
     // Strategy: run with CJS>0 and ISS>0 in tran mode so both gcsub and gdsub are non-zero.
     // Read gcsub and gdsub from s0. The stamp at (substConNode, substConNode) must equal
     // m * (gcsub + gdsub). We verify by checking the sum is non-zero and finite.
@@ -2651,14 +2651,14 @@ describe("BJT L1 substrate", () => {
     const gcsub = s0[SLOT_GCSUB];
     const gdsub = s0[SLOT_GDSUB];
     const geqsub = gcsub + gdsub;
-    // geqsub must be positive and finite — confirms both components contribute.
+    // geqsub must be positive and finite- confirms both components contribute.
     expect(geqsub).toBeGreaterThan(0);
     expect(Number.isFinite(geqsub)).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.14 — Cap block gating verification (F-BJT-ADD-25)
+// Task 5.2.14- Cap block gating verification (F-BJT-ADD-25)
 // cite: bjtload.c:561-563
 // ---------------------------------------------------------------------------
 
@@ -2695,29 +2695,29 @@ describe("BJT L1 cap_block", () => {
   }
 
   it("skipped_under_pure_dcop", () => {
-    // cite: bjtload.c:561-563 — cap block gate excludes pure DCOP.
+    // cite: bjtload.c:561-563- cap block gate excludes pure DCOP.
     const { el, pool } = makeL1Cap({ CJC: 1e-12 });
     el.load(makeCtxWith(MODEDCOP | MODEINITFLOAT, 0));
-    // Cap block did not fire — QBE stays 0.
+    // Cap block did not fire- QBE stays 0.
     expect(pool.states[0][SLOT_QBE]).toBe(0);
   });
 
   it("entered_under_MODETRAN", () => {
-    // cite: bjtload.c:561-563 — MODETRAN bit opens cap block.
+    // cite: bjtload.c:561-563- MODETRAN bit opens cap block.
     const { el, pool } = makeL1Cap();
     el.load(makeCtxWith(MODEDCOP | MODETRAN | MODEINITFLOAT, 1e-9));
     expect(pool.states[0][SLOT_QBE]).toBeGreaterThan(0);
   });
 
   it("entered_under_MODETRANOP_MODEUIC", () => {
-    // cite: bjtload.c:562 — (MODETRANOP && MODEUIC) opens cap block.
+    // cite: bjtload.c:562- (MODETRANOP && MODEUIC) opens cap block.
     const { el, pool } = makeL1Cap();
     el.load(makeCtxWith(MODETRANOP | MODEUIC | MODEINITFLOAT, 0));
     expect(pool.states[0][SLOT_QBE]).toBeGreaterThan(0);
   });
 
   it("entered_under_MODEINITSMSIG", () => {
-    // cite: bjtload.c:563 — MODEINITSMSIG opens cap block; stores cap values in s0.
+    // cite: bjtload.c:563- MODEINITSMSIG opens cap block; stores cap values in s0.
     const { el, pool } = makeL1Cap();
     // Prime s0 first with a DC-OP so MODEINITSMSIG reads valid op values.
     const primeSolver = new SparseSolver(); primeSolver._initStructure();
@@ -2738,8 +2738,8 @@ describe("BJT L1 cap_block", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.15 — VSUB limiting collector entry (F-BJT-ADD-34)
-// cite: after BC push — SUB push with junction="SUB"
+// Task 5.2.15- VSUB limiting collector entry (F-BJT-ADD-34)
+// cite: after BC push- SUB push with junction="SUB"
 // ---------------------------------------------------------------------------
 
 describe("BJT L1 LimitingEvent SUB", () => {
@@ -2758,13 +2758,13 @@ describe("BJT L1 LimitingEvent SUB", () => {
 
   function makeCtxForSubLimiting(collector: LimitingEvent[] | null): LoadContext {
     // Use DC-OP mode with moderate vbe to trigger pnjlim on sub junction.
-    // vsubRaw = polarity*subs*(0 - vSubCon) — with vertical-default NPN, substConNode=nodeC_int=nodeC_ext=node2.
+    // vsubRaw = polarity*subs*(0 - vSubCon)- with vertical-default NPN, substConNode=nodeC_int=nodeC_ext=node2.
     // rhsOld[1] = 0 (collector=0) → vsubRaw = 1*1*(0-0) = 0. Use a large VBC to ensure sub junction fires.
     // Instead: start with all-zero state so pnjlim fires on BE at minimum.
     const solver = new SparseSolver();
     solver._initStructure();
     const rhsOld = new Float64Array(10);
-    rhsOld[1] = 5.0;  // VBE very large — triggers pnjlim on BE and limits.
+    rhsOld[1] = 5.0;  // VBE very large- triggers pnjlim on BE and limits.
     return loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
@@ -2800,7 +2800,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave 5.3 — BJT per-instance TEMP parameter
+// Wave 5.3- BJT per-instance TEMP parameter
 // ---------------------------------------------------------------------------
 
 describe("BJT TEMP", () => {
@@ -2821,7 +2821,7 @@ describe("BJT TEMP", () => {
   it("setParam_TEMP_no_throw", () => {
     // element.setParam("TEMP", 400) doesn't throw.
     const propsObj = makeBjtProps();
-    const element = createBjtElement(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
+    const element = createBjtL0Element(new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj, () => 0);
     expect(() => element.setParam("TEMP", 400)).not.toThrow();
   });
 
@@ -2853,8 +2853,8 @@ describe("BJT TEMP", () => {
     const expectedTVcrit300 = computeTVcrit(300.15, 1e-16);
     const expectedTVcrit400 = computeTVcrit(400, 1e-16);
 
-    const coreDefault = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), makeBjtProps({ TEMP: 300.15 }), () => 0) as any;
-    const core400 = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), makeBjtProps({ TEMP: 400 }), () => 0) as any;
+    const coreDefault = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), makeBjtProps({ TEMP: 300.15 }), () => 0) as any;
+    const core400 = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), makeBjtProps({ TEMP: 400 }), () => 0) as any;
     runSetup(coreDefault as AnalogElement, new SparseSolver());
     runSetup(core400 as AnalogElement, new SparseSolver());
     const pool300 = new StatePool(coreDefault.stateSize);
@@ -3028,11 +3028,11 @@ describe("BJT TEMP", () => {
 
     const expectedTVcrit300 = computeExpectedTVcrit(300.15, 1e-16);
     const expectedTVcrit400 = computeExpectedTVcrit(400, 1e-16);
-    // They must differ (this is what we are testing — setParam actually changes tp).
+    // They must differ (this is what we are testing- setParam actually changes tp).
     expect(Math.abs(expectedTVcrit400 - expectedTVcrit300)).toBeGreaterThan(0.05);
 
     const propsDefault = makeBjtProps();
-    const core = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), propsDefault, () => 0) as any;
+    const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsDefault, () => 0) as any;
     runSetup(core as AnalogElement, new SparseSolver());
     const pool = new StatePool(core.stateSize);
     core.initState(pool);
@@ -3054,7 +3054,7 @@ describe("BJT TEMP", () => {
       });
     }
 
-    // First load at 300.15K — tVcrit should match expectedTVcrit300.
+    // First load at 300.15K- tVcrit should match expectedTVcrit300.
     element.load(makeJctCtx());
     const vbe300 = pool.states[0][0];
     expect(Math.abs(vbe300 - expectedTVcrit300)).toBeLessThan(1e-6);
@@ -3062,7 +3062,7 @@ describe("BJT TEMP", () => {
     // setParam("TEMP", 400) must trigger makeTp() recompute.
     core.setParam("TEMP", 400);
 
-    // Load again at MODEINITJCT — tVcrit must now reflect 400K.
+    // Load again at MODEINITJCT- tVcrit must now reflect 400K.
     element.load(makeJctCtx());
     const vbe400 = pool.states[0][0];
     expect(Math.abs(vbe400 - expectedTVcrit400)).toBeLessThan(1e-6);
@@ -3123,7 +3123,7 @@ describe("BJT TEMP", () => {
     // setParam("TEMP", 400) must trigger makeTp() recompute.
     core.setParam("TEMP", 400);
 
-    // Load again — tVcrit must reflect 400K.
+    // Load again- tVcrit must reflect 400K.
     element.load(makeJctCtx());
     const vbe400 = pool.states[0][0];
     expect(Math.abs(vbe400 - expectedTVcrit400)).toBeLessThan(1e-6);

@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+﻿import { describe, it, expect, beforeEach } from "vitest";
 import {
   ComponentRegistry,
   ComponentCategory,
   type ParamDef,
 } from "../registry.js";
 import type {
-  ComponentDefinition,
+  StandaloneComponentDefinition,
   AttributeMapping,
   ComponentLayout,
   ExecuteFunction,
@@ -71,7 +71,7 @@ const noopExecuteFn: ExecuteFunction = (
 function makeDefinition(
   name: string,
   category: ComponentCategory = ComponentCategory.LOGIC,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -98,13 +98,13 @@ describe("ComponentRegistry", () => {
 
   describe("register and get", () => {
     it("returns undefined for an unregistered name", () => {
-      expect(registry.get("And")).toBeUndefined();
+      expect(registry.getStandalone("And")).toBeUndefined();
     });
 
     it("registers a definition and retrieves it by name", () => {
       const def = makeDefinition("And");
       registry.register(def);
-      const result = registry.get("And");
+      const result = registry.getStandalone("And");
       expect(result?.name).toBe("And");
     });
 
@@ -118,31 +118,31 @@ describe("ComponentRegistry", () => {
     it("registers multiple definitions with distinct names", () => {
       registry.register(makeDefinition("And"));
       registry.register(makeDefinition("Or"));
-      expect(registry.get("And")?.name).toBe("And");
-      expect(registry.get("Or")?.name).toBe("Or");
+      expect(registry.getStandalone("And")?.name).toBe("And");
+      expect(registry.getStandalone("Or")?.name).toBe("Or");
     });
   });
 
   describe("auto-assigned type IDs", () => {
     it("assigns typeId 0 to the first registered component", () => {
       registry.register(makeDefinition("And"));
-      expect(registry.get("And")!.typeId).toBe(0);
+      expect(registry.getStandalone("And")!.typeId).toBe(0);
     });
 
     it("assigns incrementing type IDs in registration order", () => {
       registry.register(makeDefinition("And"));
       registry.register(makeDefinition("Or"));
       registry.register(makeDefinition("Not"));
-      expect(registry.get("And")!.typeId).toBe(0);
-      expect(registry.get("Or")!.typeId).toBe(1);
-      expect(registry.get("Not")!.typeId).toBe(2);
+      expect(registry.getStandalone("And")!.typeId).toBe(0);
+      expect(registry.getStandalone("Or")!.typeId).toBe(1);
+      expect(registry.getStandalone("Not")!.typeId).toBe(2);
     });
 
     it("does not use the caller-supplied typeId", () => {
       const def = makeDefinition("And");
       def.typeId = 999;
       registry.register(def);
-      expect(registry.get("And")!.typeId).toBe(0);
+      expect(registry.getStandalone("And")!.typeId).toBe(0);
     });
 
     it("type IDs from separate registries are independent", () => {
@@ -220,7 +220,7 @@ describe("ComponentRegistry", () => {
   describe("factory", () => {
     it("factory produces a CircuitElement when called", () => {
       registry.register(makeDefinition("And"));
-      const def = registry.get("And")!;
+      const def = registry.getStandalone("And")!;
       const el = def.factory(new PropertyBag());
       expect(el.typeId).toBe("And");
     });
@@ -239,7 +239,7 @@ describe("ComponentRegistry", () => {
       def.attributeMap = attrMap;
       registry.register(def);
 
-      const stored = registry.get("And")!;
+      const stored = registry.getStandalone("And")!;
       // Original mapping + 3 auto-injected (label, showLabel, showValue)
       expect(stored.attributeMap.length).toBeGreaterThanOrEqual(1);
       expect(stored.attributeMap[0].xmlName).toBe("Bits");
@@ -294,7 +294,7 @@ describe("ComponentRegistry", () => {
     });
 
     it("component_with_both_models_appears_in_digital_and_analog", () => {
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("SharedComponent"),
         models: { digital: { executeFn: noopExecuteFn } },
         modelRegistry: { behavioral: { kind: 'analog' } as any },
@@ -309,7 +309,7 @@ describe("ComponentRegistry", () => {
     });
 
     it("pure_analog_excluded_from_digital", () => {
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("PureAnalog"),
         models: {},
         modelRegistry: { behavioral: { kind: 'analog' } as any },
@@ -328,7 +328,7 @@ describe("ComponentRegistry", () => {
     it("models field is preserved through register()", () => {
       const def = makeDefinition("AutoPop");
       registry.register(def);
-      const stored = registry.get("AutoPop")!;
+      const stored = registry.getStandalone("AutoPop")!;
       expect(stored.models).toBeDefined();
       expect(stored.models.digital).toBeDefined();
       expect(stored.models.digital!.executeFn).toBe(noopExecuteFn);
@@ -336,43 +336,43 @@ describe("ComponentRegistry", () => {
 
     it("models.digital.sampleFn is preserved through register()", () => {
       const sampleFn: ExecuteFunction = () => {};
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("WithSample"),
         models: { digital: { executeFn: noopExecuteFn, sampleFn } },
       };
       registry.register(def);
-      const stored = registry.get("WithSample")!;
+      const stored = registry.getStandalone("WithSample")!;
       expect(stored.models.digital!.sampleFn).toBe(sampleFn);
     });
 
     it("models.digital.stateSlotCount is preserved through register()", () => {
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("WithState"),
         models: { digital: { executeFn: noopExecuteFn, stateSlotCount: 3 } },
       };
       registry.register(def);
-      const stored = registry.get("WithState")!;
+      const stored = registry.getStandalone("WithState")!;
       expect(stored.models.digital!.stateSlotCount).toBe(3);
     });
 
     it("models.digital.switchPins is preserved through register()", () => {
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("Switch"),
         models: { digital: { executeFn: noopExecuteFn, switchPins: [0, 1] } },
       };
       registry.register(def);
-      const stored = registry.get("Switch")!;
+      const stored = registry.getStandalone("Switch")!;
       expect(stored.models.digital!.switchPins).toEqual([0, 1]);
     });
 
     it("modelRegistry is preserved through register()", () => {
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("VSource"),
         models: {},
         modelRegistry: { behavioral: { kind: 'analog' } as any },
       };
       registry.register(def);
-      const stored = registry.get("VSource")!;
+      const stored = registry.getStandalone("VSource")!;
       expect(stored.modelRegistry?.behavioral).toBeDefined();
     });
 
@@ -380,27 +380,27 @@ describe("ComponentRegistry", () => {
       const customModels: ComponentModels = {
         digital: { executeFn: noopExecuteFn },
       };
-      const def: ComponentDefinition = { ...makeDefinition("ExplicitModels"), models: customModels };
+      const def: StandaloneComponentDefinition = { ...makeDefinition("ExplicitModels"), models: customModels };
       registry.register(def);
-      const stored = registry.get("ExplicitModels")!;
+      const stored = registry.getStandalone("ExplicitModels")!;
       expect(stored.models).toBe(customModels);
     });
 
     it("defaultModel is preserved through register()", () => {
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("WithDefault"),
         models: { digital: { executeFn: noopExecuteFn } },
         defaultModel: "digital",
       };
       registry.register(def);
-      const stored = registry.get("WithDefault")!;
+      const stored = registry.getStandalone("WithDefault")!;
       expect(stored.defaultModel).toBe("digital");
     });
 
     it("getWithModel digital returns components with digital model", () => {
       registry.register(makeDefinition("Gate1"));
       registry.register(makeDefinition("Gate2"));
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("PureAnalogOnly"),
         models: {},
         modelRegistry: { behavioral: { kind: 'analog' } as any },
@@ -414,7 +414,7 @@ describe("ComponentRegistry", () => {
 
     it("getWithModel analog returns components with analog model", () => {
       registry.register(makeDefinition("DigOnlyGate"));
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("AnalogPassive"),
         models: {},
         modelRegistry: { behavioral: { kind: 'analog' } as any },
@@ -433,67 +433,67 @@ describe("ComponentRegistry", () => {
 
       const diode = makeDefinition("Diode");
       registry.register(diode);
-      const result = registry.get("Diode");
+      const result = registry.getStandalone("Diode");
       expect(result!.name).toBe("PldDiode"); // alias takes precedence
     });
 
     it("without the alias, get(Diode) returns the semiconductor Diode", () => {
       registry.register(makeDefinition("PldDiode"));
-      // No alias "Diode" → "PldDiode"
+      // No alias "Diode" â†’ "PldDiode"
       const diode = makeDefinition("Diode");
       registry.register(diode);
 
-      const result = registry.get("Diode");
+      const result = registry.getStandalone("Diode");
       expect(result).toBeDefined();
       expect(result!.name).toBe("Diode");
-      expect(registry.get("PldDiode")!.name).toBe("PldDiode");
+      expect(registry.getStandalone("PldDiode")!.name).toBe("PldDiode");
     });
   });
 
-  describe("pinElectrical on ComponentDefinition", () => {
-    it("pinElectrical stored on ComponentDefinition is preserved through register()", () => {
+  describe("pinElectrical on StandaloneComponentDefinition", () => {
+    it("pinElectrical stored on StandaloneComponentDefinition is preserved through register()", () => {
       const spec: PinElectricalSpec = { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 };
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("BridgeGate"),
         pinElectrical: spec,
       };
       registry.register(def);
-      const stored = registry.get("BridgeGate")!;
+      const stored = registry.getStandalone("BridgeGate")!;
       expect(stored.pinElectrical).toEqual(spec);
     });
 
-    it("pinElectricalOverrides stored on ComponentDefinition is preserved through register()", () => {
+    it("pinElectricalOverrides stored on StandaloneComponentDefinition is preserved through register()", () => {
       const overrides: Record<string, PinElectricalSpec> = {
         out: { vOH: 5.0, vOL: 0.1, rOut: 25 },
         in: { vIH: 2.5, vIL: 0.5 },
       };
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("HighDriveGate"),
         pinElectricalOverrides: overrides,
       };
       registry.register(def);
-      const stored = registry.get("HighDriveGate")!;
+      const stored = registry.getStandalone("HighDriveGate")!;
       expect(stored.pinElectricalOverrides).toEqual(overrides);
     });
 
     it("pinElectrical and pinElectricalOverrides are independent of modelRegistry", () => {
       const spec: PinElectricalSpec = { vOH: 3.3, vOL: 0 };
-      const def: ComponentDefinition = {
+      const def: StandaloneComponentDefinition = {
         ...makeDefinition("MixedGate"),
         pinElectrical: spec,
         models: { digital: { executeFn: noopExecuteFn } },
         modelRegistry: { behavioral: { kind: 'analog' } as any },
       };
       registry.register(def);
-      const stored = registry.get("MixedGate")!;
+      const stored = registry.getStandalone("MixedGate")!;
       expect(stored.pinElectrical).toEqual(spec);
       expect(stored.modelRegistry?.behavioral).toBeDefined();
     });
 
-    it("ComponentDefinition without pinElectrical has undefined pinElectrical", () => {
+    it("StandaloneComponentDefinition without pinElectrical has undefined pinElectrical", () => {
       const def = makeDefinition("PlainGate");
       registry.register(def);
-      const stored = registry.get("PlainGate")!;
+      const stored = registry.getStandalone("PlainGate")!;
       expect(stored.pinElectrical).toBeUndefined();
       expect(stored.pinElectricalOverrides).toBeUndefined();
     });

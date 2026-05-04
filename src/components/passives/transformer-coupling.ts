@@ -60,7 +60,7 @@
  * (contracts_group_05.md). ngspice anchors: mutsetup.c:66-67, mutload.c.
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -71,13 +71,8 @@ import type { ComponentDefinition } from "../../core/registry.js";
 // TransformerCouplingElement
 // ---------------------------------------------------------------------------
 
-export class TransformerCouplingElement implements AnalogElement {
+export class TransformerCouplingElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   /** Global label of sibling 1 (e.g. `parentLabel:L1`). Compiler-stamped. */
   private readonly _label1: string;
@@ -93,7 +88,7 @@ export class TransformerCouplingElement implements AnalogElement {
   private _hBr2Br1 = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
 
     // siblingBranch resolution: compiler stamps "${parentLabel}:${subName}"
     // into the regular prop partition (compiler.ts:391-394). Empty string

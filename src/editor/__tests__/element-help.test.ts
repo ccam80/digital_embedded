@@ -11,7 +11,7 @@ import { PropertyBag, PropertyType } from "@/core/properties";
 import type { Pin, Rotation } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
-import type { ComponentDefinition, ComponentLayout } from "@/core/registry";
+import type { StandaloneComponentDefinition, ComponentLayout } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import type { PropertyDefinition } from "@/core/properties";
 
@@ -71,12 +71,12 @@ function makeDefinition(
   name: string,
   helpText: string,
   propertyDefs: PropertyDefinition[] = [],
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
     factory: (_props) =>
-      makeElementWithPins(helpText, []) as unknown as ReturnType<ComponentDefinition["factory"]>,
+      makeElementWithPins(helpText, []) as unknown as ReturnType<StandaloneComponentDefinition["factory"]>,
     pinLayout: [],
     propertyDefs,
     attributeMap: [],

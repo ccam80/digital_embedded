@@ -8,7 +8,7 @@
  */
 
 import type { CircuitElement } from "@/core/element";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { PropertyDefinition } from "@/core/properties";
@@ -126,7 +126,7 @@ function propDefToPropInfo(def: PropertyDefinition): PropInfo {
  */
 export function buildHelpContent(
   element: CircuitElement,
-  definition: ComponentDefinition,
+  definition: StandaloneComponentDefinition,
 ): HelpContent {
   const pins = element.getPins();
   const pinTable: PinInfo[] = pins.map(pinToPinInfo);

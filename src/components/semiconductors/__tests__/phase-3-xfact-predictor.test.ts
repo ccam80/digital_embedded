@@ -1,5 +1,5 @@
 /**
- * Phase 3 — xfact predictor tests.
+ * Phase 3- xfact predictor tests.
  *
  * Task 3.2.1: Diode MODEINITPRED xfact extrapolation.
  * Task 3.2.2–3.2.4: BJT tests appended by the BJT implementer task_group.
@@ -8,9 +8,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import {
-  createBjtElement,
   createSpiceL1BjtElement,
-  BJT_NPN_DEFAULTS,
   BJT_SPICE_L1_NPN_DEFAULTS,
 } from "../bjt.js";
 import { PropertyBag } from "../../../core/properties.js";
@@ -47,7 +45,7 @@ function makeParamBag(overrides: Record<string, number> = {}): PropertyBag {
 
 /**
  * Instantiate a diode element with anode=node1, cathode=node2 (1-based node IDs).
- * RS=0 so no internal node — nodeJunction === nodeAnode.
+ * RS=0 so no internal node- nodeJunction === nodeAnode.
  */
 function makeDiode(paramOverrides: Record<string, number> = {}) {
   const pinNodes = new Map<string, number>([["A", 1], ["K", 2]]);
@@ -108,10 +106,10 @@ function buildCtx(
 }
 
 // ---------------------------------------------------------------------------
-// Task 3.2.1 — Diode MODEINITPRED xfact extrapolation
+// Task 3.2.1- Diode MODEINITPRED xfact extrapolation
 // ---------------------------------------------------------------------------
 
-describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
+describe("Task 3.2.1- Diode MODEINITPRED xfact", () => {
   it("extrapolates vdRaw as (1+xfact)*s1 - xfact*s2", () => {
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeDiode();
@@ -137,7 +135,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     // load() overwrites s0[SLOT_ID] and s0[SLOT_GEQ] at the end with newly computed
     // values, so we cannot inspect them on s0 after load() returns.
     // Instead we spy on pnjlim to capture a snapshot of s0 immediately before the
-    // first call — at that moment the state-copy has already run but the end-of-load
+    // first call- at that moment the state-copy has already run but the end-of-load
     // write-back has not yet occurred.
     let capturedS0ID: number | undefined;
     let capturedS0GEQ: number | undefined;
@@ -253,7 +251,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     const rhsOld = new Float64Array([0.0, 0.72, 0.0]);
 
     // MODETRAN without MODEINITPRED → MODEINITFLOAT path → rhsOld read.
-    // pnjlim's first argument is the rhsOld-derived vdRaw — confirms the else branch.
+    // pnjlim's first argument is the rhsOld-derived vdRaw- confirms the else branch.
     const ctx = buildCtx(MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
@@ -309,8 +307,8 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
 function makeBjtL0(paramOverrides: Record<string, number> = {}) {
   const pinNodes = new Map<string, number>([["B", 1], ["C", 2], ["E", 3]]);
   const bag = new PropertyBag();
-  bag.replaceModelParams({ ...BJT_NPN_DEFAULTS, ...paramOverrides });
-  return createBjtElement(pinNodes, bag, () => 0);
+  bag.replaceModelParams({ ...BJT_SPICE_L1_NPN_DEFAULTS, ...paramOverrides });
+  return createSpiceL1BjtElement(1, false, pinNodes, bag);
 }
 
 /**
@@ -371,17 +369,17 @@ function buildBjtCtx(
   } as LoadContext;
 }
 
-// Slot indices — mirror internal constants in bjt.ts (L0 and L1 share VBE=0, VBC=1).
+// Slot indices- mirror internal constants in bjt.ts (L0 and L1 share VBE=0, VBC=1).
 const BJT_SLOT_VBE  = 0;
 const BJT_SLOT_VBC  = 1;
 // L1-only slots
 const BJT_SLOT_VSUB = 21;
 
 // ---------------------------------------------------------------------------
-// Task 3.2.2 — BJT L0 MODEINITPRED xfact
+// Task 3.2.2- BJT L0 MODEINITPRED xfact
 // ---------------------------------------------------------------------------
 
-describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
+describe("Task 3.2.2- BJT L0 MODEINITPRED xfact", () => {
   it("extrapolates vbeRaw and vbcRaw as (1+xfact)*s1 - xfact*s2", () => {
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL0();
@@ -400,7 +398,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
     // (1+0.25)*(-0.3) - 0.25*(-0.28) = -0.305 exactly
     const expectedVbc = (1 + 0.25) * (-0.3) - 0.25 * (-0.28);
-    // pnjlim call sequence under L0 MODEINITPRED: [BE, BC] — first arg is the
+    // pnjlim call sequence under L0 MODEINITPRED: [BE, BC]- first arg is the
     // extrapolated raw voltage for each junction.
     expect(pnjlimSpy.mock.calls.length).toBe(2);
     expect(pnjlimSpy.mock.calls[0][0]).toBe(expectedVbe);
@@ -436,7 +434,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
 
   it("runs pnjlim under MODEINITPRED", () => {
     // xfact=2: vbeRaw = (1+2)*0.9 - 2*0.85 = 1.0 (above tVcrit ~0.65)
-    // The pnjlim skip mask is (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN) — MODEINITPRED
+    // The pnjlim skip mask is (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)- MODEINITPRED
     // is absent, so pnjlim runs for both BE and BC junctions.
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
 
@@ -451,7 +449,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 2.0);
     element.load(ctx);
 
-    // Exactly 2 calls: once for BE, once for BC — this is the key ngspice-alignment assertion.
+    // Exactly 2 calls: once for BE, once for BC- this is the key ngspice-alignment assertion.
     expect(pnjlimSpy.mock.calls.length).toBe(2);
 
     pnjlimSpy.mockRestore();
@@ -501,7 +499,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
-    // pnjlim's first call (BE junction) receives vbeRaw — must equal the rhsOld-derived value.
+    // pnjlim's first call (BE junction) receives vbeRaw- must equal the rhsOld-derived value.
     // L0 rhsOld path calls pnjlim exactly twice (BE + BC).
     expect(pnjlimSpy.mock.calls.length).toBe(2);
     expect(pnjlimSpy.mock.calls[0][0]).toBe(0.7);
@@ -512,10 +510,10 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.2.3 — BJT L1 MODEINITPRED xfact
+// Task 3.2.3- BJT L1 MODEINITPRED xfact
 // ---------------------------------------------------------------------------
 
-describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
+describe("Task 3.2.3- BJT L1 MODEINITPRED xfact", () => {
   it("extrapolates vbeRaw and vbcRaw via xfact", () => {
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL1();
@@ -532,7 +530,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
 
     const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
     const expectedVbc = (1 + 0.25) * (-0.3) - 0.25 * (-0.28);
-    // pnjlim call sequence under L1 MODEINITPRED: [BE, BC, substrate] — the first two
+    // pnjlim call sequence under L1 MODEINITPRED: [BE, BC, substrate]- the first two
     // receive the extrapolated raw voltages; substrate is observed separately.
     expect(pnjlimSpy.mock.calls.length).toBe(3);
     expect(pnjlimSpy.mock.calls[0][0]).toBe(expectedVbe);
@@ -639,7 +637,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
-    // Exactly 3 calls: BE, BC, substrate — this is the key ngspice-alignment assertion.
+    // Exactly 3 calls: BE, BC, substrate- this is the key ngspice-alignment assertion.
     expect(pnjlimSpy.mock.calls.length).toBe(3);
 
     pnjlimSpy.mockRestore();
@@ -689,7 +687,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
-    // pnjlim's first call (BE junction) receives vbeRaw — must equal the rhsOld-derived value.
+    // pnjlim's first call (BE junction) receives vbeRaw- must equal the rhsOld-derived value.
     // L1 rhsOld path calls pnjlim three times (BE + BC + substrate).
     expect(pnjlimSpy.mock.calls.length).toBe(3);
     expect(pnjlimSpy.mock.calls[0][0]).toBe(0.7);
@@ -699,10 +697,10 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.2.4 — BJT L1 VSUB state-copy
+// Task 3.2.4- BJT L1 VSUB state-copy
 // ---------------------------------------------------------------------------
 
-describe("Task 3.2.4 — BJT L1 VSUB state-copy", () => {
+describe("Task 3.2.4- BJT L1 VSUB state-copy", () => {
   it("copies s1[VSUB] into s0[VSUB] inside the MODEINITPRED branch", () => {
     // s0[SLOT_VSUB] is overwritten at the end of load() with vsubLimited,
     // so we verify the copy via the pnjlim call: pnjlim(vsubRaw, s0[VSUB], vt, tSubVcrit)
@@ -713,7 +711,7 @@ describe("Task 3.2.4 — BJT L1 VSUB state-copy", () => {
     const pool = initBjtPool(element);
 
     // Place sentinel in s0[VSUB], target in s1[VSUB]
-    pool.states[0][BJT_SLOT_VSUB] = 0.0;  // sentinel — must be overwritten by copy
+    pool.states[0][BJT_SLOT_VSUB] = 0.0;  // sentinel- must be overwritten by copy
     pool.states[1][BJT_SLOT_VSUB] = 0.42; // the value that must be copied to s0
     pool.states[2][BJT_SLOT_VSUB] = 0.35; // s2 for extrapolation
 

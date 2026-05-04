@@ -7,23 +7,27 @@
  */
 
 import type { Circuit } from "./circuit.js";
-import type { ComponentDefinition, ComponentRegistry } from "./registry.js";
+import type { ComponentRegistry, StandaloneComponentDefinition } from "./registry.js";
 import { buildSubcircuitComponentDef } from "../components/subcircuit/subcircuit.js";
 
 /**
- * Resolve a component type name to its ComponentDefinition.
+ * Resolve a component type name to its StandaloneComponentDefinition.
  *
  * Resolution order:
  *  1. Circuit-scoped subcircuit definitions (circuit.metadata.subcircuits)
- *  2. Global registry (built-in component types)
+ *  2. Global registry user-facing definitions (built-in component types)
  *
  * Handles both bare names ("HalfAdder") and prefixed names ("Subcircuit:HalfAdder").
+ *
+ * Internal-only sub-elements (behavioural drivers, transmission-line segments,
+ * etc.) are excluded- they exist only inside parent composite netlists and are
+ * never resolved as top-level circuit elements.
  */
 export function resolveComponentDef(
   typeName: string,
   circuit: Circuit | null,
   registry: ComponentRegistry,
-): ComponentDefinition | undefined {
+): StandaloneComponentDefinition | undefined {
   if (circuit?.metadata.subcircuits) {
     const lookupName = typeName.startsWith("Subcircuit:")
       ? typeName.slice(11)
@@ -33,5 +37,5 @@ export function resolveComponentDef(
       return buildSubcircuitComponentDef(lookupName, subDef);
     }
   }
-  return registry.get(typeName);
+  return registry.getStandalone(typeName);
 }

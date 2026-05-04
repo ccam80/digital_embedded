@@ -36,8 +36,7 @@ import {
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
@@ -122,17 +121,11 @@ const ADC_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // ADCDriverElement
 // ---------------------------------------------------------------------------
 
-export class ADCDriverElement implements PoolBackedAnalogElement {
+export class ADCDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly poolBacked = true as const;
   // Per-instance schema- one per distinct bits value (memoised module-scope).
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _bits: number;
   private readonly _maxCode: number;
@@ -152,11 +145,10 @@ export class ADCDriverElement implements PoolBackedAnalogElement {
   private readonly _gndNode:  number;
   private _vIH: number;
   private _vIL: number;
-  private _pool!: StatePoolRef;
   private _firstSample: boolean = true;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._bits    = props.getModelParam<number>("bits");
     this._maxCode = this._bits >= 32 ? 0xFFFFFFFF : ((1 << this._bits) - 1);
     this._bipolar = props.getModelParam<number>("bipolar") !== 0;
@@ -183,10 +175,6 @@ export class ADCDriverElement implements PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   /**

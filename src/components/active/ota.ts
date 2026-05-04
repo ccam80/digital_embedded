@@ -68,10 +68,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -372,7 +373,7 @@ const OTA_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // OTADefinition
 // ---------------------------------------------------------------------------
 
-export const OTADefinition: ComponentDefinition = {
+export const OTADefinition: StandaloneComponentDefinition = {
   name: "OTA",
   typeId: -1,
   category: ComponentCategory.ACTIVE,

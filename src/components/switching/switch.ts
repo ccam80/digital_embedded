@@ -24,7 +24,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -32,7 +32,6 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 
 // ---------------------------------------------------------------------------
 // State-pool schema
@@ -317,21 +316,15 @@ export interface SpstAnalogElement extends AnalogElement {
   setSwState(on: boolean): void;
 }
 
-export class SwitchAnalogElement implements SpstAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
+export class SwitchAnalogElement extends AbstractPoolBackedAnalogElement implements SpstAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
 
-  readonly poolBacked = true as const;
   readonly stateSchema = SWITCH_SCHEMA;
   readonly stateSize = 1;
 
   private readonly _ron: number;
   private readonly _roff: number;
   private readonly _normallyClosed: boolean;
-  private _pool!: StatePoolRef;
 
   // Voltage-controlled state. _pendingCtrlVoltage stores the latest value passed
   // to setCtrlVoltage(); _useCtrlVoltage gates load() consumption (true while
@@ -347,6 +340,14 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   private _forcedState: boolean | null = null;
   private _pendingClosed: boolean | null = null;
 
+  // §4d-faithful instance state: the current effective closed state.
+  // Seeded from the `closed` (and `normallyClosed`) props at construction so
+  // the very first load() picks the correct Ron/Roff before any pool history
+  // is seeded. Mirrors `analog-fuse._intact`. Updated by setClosed /
+  // setSwState / setCtrlVoltage and re-read from s1 on subsequent iters
+  // (after _seedFromDcop's state1.set(state0) at dctran.c:349-350).
+  private _currentClosed: boolean;
+
   // Matrix handles allocated in setup()- port of swsetup.c:59-62 TSTALLOC sequence
   private _hPP: number = -1;
   private _hPN: number = -1;
@@ -354,14 +355,14 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   private _hNN: number = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
     this._roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
     this._normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
+    // Seed effective closed state from props. NC inverts the user-visible
+    // `closed` prop (NC + closed=false ⇒ effectively closed at rest).
+    const userClosed = props.getOrDefault<boolean>("closed", false);
+    this._currentClosed = this._normallyClosed ? !userClosed : userClosed;
   }
 
   setup(ctx: SetupContext): void {
@@ -379,13 +380,13 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    const s1 = ctx.state1;
     const s0 = ctx.state0;
     const base = this._stateBase;
 
-    // Apply pending state writes before reading s1.
+    // Apply pending state writes before stamping. _pendingClosed flows in via
+    // setClosed() and supersedes any prior driver.
     if (this._pendingClosed !== null) {
-      s0[base + SLOT_CLOSED] = this._pendingClosed ? 1 : 0;
+      this._currentClosed = this._pendingClosed;
       this._pendingClosed = null;
     }
 
@@ -397,16 +398,19 @@ export class SwitchAnalogElement implements SpstAnalogElement {
     // when normallyClosed).
     if (this._useCtrlVoltage) {
       const v = this._pendingCtrlVoltage;
-      const closeFromVoltage = this._normallyClosed ? v <= 0 : v > 0;
-      s0[base + SLOT_CLOSED] = closeFromVoltage ? 1 : 0;
+      this._currentClosed = this._normallyClosed ? v <= 0 : v > 0;
     }
 
-    // Read s1[CLOSED] to pick Ron vs Roff. The switch's stamp is stable across
-    // the NR loop because s1 doesn't change within a step.
-    const on = this._forcedState !== null ? this._forcedState : s1[base + SLOT_CLOSED] >= 0.5;
-    this._forcedState = null;
+    // _forcedState is a one-shot override (setSwState).
+    if (this._forcedState !== null) {
+      this._currentClosed = this._forcedState;
+      this._forcedState = null;
+    }
 
-    // Bottom-of-load history write.
+    const on = this._currentClosed;
+
+    // Bottom-of-load history write — keep CKTstate0 in sync for inspection /
+    // pool-slot rollback (mirrors ngspice CKTstate0 idiom for SW devices).
     s0[base + SLOT_CLOSED] = on ? 1 : 0;
 
     const G = on ? 1 / this._ron : 1 / this._roff;
@@ -439,9 +443,9 @@ export class SwitchAnalogElement implements SpstAnalogElement {
     const negNode = this._pinNodes.get("B1")!;
     const vA = rhs[posNode];
     const vB = rhs[negNode];
-    const s1 = this._pool.states[1];
-    const on = s1[this._stateBase + SLOT_CLOSED] >= 0.5;
-    const G = on ? 1 / this._ron : 1 / this._roff;
+    // Use the same effective state load() last stamped. After warm-start,
+    // _currentClosed and s0/s1[CLOSED] agree.
+    const G = this._currentClosed ? 1 / this._ron : 1 / this._roff;
     const I = G * (vA - vB);
     return [I, -I];
   }

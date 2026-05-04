@@ -40,6 +40,13 @@ export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModel
     rIn: { default: 1e7, unit: "Î©", description: "Digital input impedance" },
     cIn: { default: 5e-12, unit: "F", description: "Digital input capacitance" },
   },
+  instance: {
+    // Structural params: must be in paramDefs so the builder promotes them from
+    // _map → _mparams, and the compiler's merger delivers them to buildDacNetlist
+    // via getModelParam(). Defaults match structural property defaults.
+    bits:    { default: 8, description: "Number of digital input bits (structural)" },
+    bipolar: { default: 0, description: "0 = unipolar, 1 = bipolar (structural)" },
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -198,7 +205,7 @@ export class DACElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
-  const N = params.getModelParam<number>("bits");
+  const N = params.getOrDefault<number>("bits", 8);
   const ports = ["VREF", "OUT", "GND"];
   for (let i = 0; i < N; i++) ports.push(`D${i}`);
 

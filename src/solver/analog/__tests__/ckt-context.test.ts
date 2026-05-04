@@ -1,5 +1,5 @@
 /**
- * Tests for CKTCircuitContext — Phase 1 Task 1.1.1
+ * Tests for CKTCircuitContext- Phase 1 Task 1.1.1
  *
  * Verifies:
  *   1. All Float64Array fields have correct lengths after construction.
@@ -12,7 +12,7 @@ import { CKTCircuitContext, NRResult, DcOpResult } from "../ckt-context.js";
 import { allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { SparseSolver } from "../sparse-solver.js";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
@@ -23,7 +23,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   const el: AnalogElement = {
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     setup(ctx: SetupContext): void {
@@ -153,62 +153,58 @@ const defaultParams = DEFAULT_SIMULATION_PARAMS;
 const noopBreakpoint = (_t: number): void => {};
 
 // ---------------------------------------------------------------------------
-// Test: allocates_all_buffers_at_init
+// Test: allocates_all_buffers_after_setup
 // ---------------------------------------------------------------------------
 
 describe("CKTCircuitContext", () => {
-  it("allocates_all_buffers_at_init", () => {
+  it("allocates_all_buffers_after_setup", () => {
     const circuit = makeTestCircuit(9, 1);
     const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
 
     const sz = circuit.matrixSize; // 10
     const stateSlots = circuit.statePool!.totalSlots;
 
-    // Node voltage buffers — length = matrixSize
+    // Pre-sizer state- Decision #14: constructor leaves zero-length placeholders.
     expect(ctx.rhsOld).toBeInstanceOf(Float64Array);
-    expect(ctx.rhsOld.length).toBe(sz);
-    expect(ctx.rhs).toBeInstanceOf(Float64Array);
-    expect(ctx.rhs.length).toBe(sz);
-    expect(ctx.rhsSpare).toBeInstanceOf(Float64Array);
-    expect(ctx.rhsSpare.length).toBe(sz);
+    expect(ctx.rhsOld.length).toBe(0);
+    expect(ctx.rhs.length).toBe(0);
+    expect(ctx.rhsSpare.length).toBe(0);
+    expect(ctx.acceptedVoltages.length).toBe(0);
+    expect(ctx.prevAcceptedVoltages.length).toBe(0);
+    expect(ctx.dcopVoltages.length).toBe(0);
+    expect(ctx.dcopSavedVoltages.length).toBe(0);
+    expect(ctx.dcopSavedState0.length).toBe(0);
+    expect(ctx.dcopOldState0.length).toBe(0);
 
-    // Accepted solution buffers — length = matrixSize
-    expect(ctx.acceptedVoltages).toBeInstanceOf(Float64Array);
-    expect(ctx.acceptedVoltages.length).toBe(sz);
-    expect(ctx.prevAcceptedVoltages).toBeInstanceOf(Float64Array);
-    expect(ctx.prevAcceptedVoltages.length).toBe(sz);
+    // Drive the deferred sizers in the same order MNAEngine._setup() drives them.
+    ctx.allocateStateBuffers(stateSlots, circuit.statePool);
+    ctx.allocateRowBuffers(sz);
 
-    // DC-OP scratch — voltage buffers = matrixSize
-    expect(ctx.dcopVoltages).toBeInstanceOf(Float64Array);
-    expect(ctx.dcopVoltages.length).toBe(sz);
-    expect(ctx.dcopSavedVoltages).toBeInstanceOf(Float64Array);
-    expect(ctx.dcopSavedVoltages.length).toBe(sz);
+    const sizePlusOne = sz + 1;
+    expect(ctx.rhsOld.length).toBe(sizePlusOne);
+    expect(ctx.rhs.length).toBe(sizePlusOne);
+    expect(ctx.rhsSpare.length).toBe(sizePlusOne);
+    expect(ctx.acceptedVoltages.length).toBe(sizePlusOne);
+    expect(ctx.prevAcceptedVoltages.length).toBe(sizePlusOne);
+    expect(ctx.dcopVoltages.length).toBe(sizePlusOne);
+    expect(ctx.dcopSavedVoltages.length).toBe(sizePlusOne);
 
-    // DC-OP scratch — state0 snapshots = statePool.totalSlots
     expect(ctx.dcopSavedState0).toBeInstanceOf(Float64Array);
     expect(ctx.dcopSavedState0.length).toBe(stateSlots);
     expect(ctx.dcopOldState0).toBeInstanceOf(Float64Array);
     expect(ctx.dcopOldState0.length).toBe(stateSlots);
 
-    // Integration — length 7
     expect(ctx.ag).toBeInstanceOf(Float64Array);
     expect(ctx.ag.length).toBe(7);
     expect(ctx.agp).toBeInstanceOf(Float64Array);
     expect(ctx.agp.length).toBe(7);
-
-    // deltaOld — pre-allocated length 7 array
     expect(Array.isArray(ctx.deltaOld)).toBe(true);
     expect(ctx.deltaOld.length).toBe(7);
-
-    // Gear scratch — 7×7 flat = 49
     expect(ctx.gearMatScratch).toBeInstanceOf(Float64Array);
     expect(ctx.gearMatScratch.length).toBe(49);
-
-    // LTE scratch — at least matrixSize elements
     expect(ctx.lteScratch).toBeInstanceOf(Float64Array);
     expect(ctx.lteScratch.length).toBeGreaterThanOrEqual(sz);
 
-    // nrResult exists with default values
     expect(ctx.nrResult).toBeInstanceOf(NRResult);
     expect(ctx.nrResult.converged).toBe(false);
     expect(ctx.nrResult.iterations).toBe(0);
@@ -216,15 +212,12 @@ describe("CKTCircuitContext", () => {
     expect(ctx.nrResult.largestChangeNode).toBe(-1);
     expect(ctx.nrResult.voltages).toBeInstanceOf(Float64Array);
 
-    // dcopResult exists with default values
     expect(ctx.dcopResult).toBeInstanceOf(DcOpResult);
     expect(ctx.dcopResult.converged).toBe(false);
     expect(ctx.dcopResult.iterations).toBe(0);
     expect(ctx.dcopResult.nodeVoltages).toBeInstanceOf(Float64Array);
 
     expect(ctx.nodeCount).toBe(circuit.nodeCount);
-
-    // statePool is set
     expect(ctx.statePool).toBe(circuit.statePool);
   });
 
@@ -249,7 +242,7 @@ describe("CKTCircuitContext", () => {
     }) as unknown as typeof Float64Array;
 
     try {
-      // Reset counter after initial setup — only count allocations during reuse
+      // Reset counter after initial setup- only count allocations during reuse
       allocCount = 0;
 
       // Simulate NR reuse: read and write through existing ctx buffers
@@ -259,7 +252,7 @@ describe("CKTCircuitContext", () => {
       ctx.noncon = 0;
       ctx.nrResult.reset();
 
-      // Second invocation — still zero allocations
+      // Second invocation- still zero allocations
       ctx.rhsOld.fill(1);
       ctx.rhs.fill(1);
       ctx.noncon = 0;
@@ -282,70 +275,70 @@ describe("CKTCircuitContext", () => {
 
     const lc = ctx.loadCtx;
 
-    // solver field — must be the SparseSolver instance on ctx
+    // solver field- must be the SparseSolver instance on ctx
     expect(lc.solver).toBe(ctx.solver);
 
-    // voltages — points into rhsOld
+    // voltages- points into rhsOld
     expect(lc.rhsOld).toBeInstanceOf(Float64Array);
     expect(lc.rhsOld).toBe(ctx.rhsOld);
 
-    // Deleted per Phase 2.5 W2.2 (C3 + D1) + A1 §Test handling rule:
-    //   lc.iteration — removed by C3 (cktLoad no longer takes an iteration param;
+    // Deleted per Phase 2.5 W2.2 (C3 + D1) + A1 ssTest handling rule:
+    //   lc.iteration- removed by C3 (cktLoad no longer takes an iteration param;
     //   iteration-sensitive behavior keys on cktMode INITF bits).
-    //   lc.initMode — removed by D1; INITF state lives in cktMode bitfield only.
+    //   lc.initMode- removed by D1; INITF state lives in cktMode bitfield only.
     //   These assertions inspected non-existent LoadContext fields.
     //
-    // cktMode check — bitfield is the sole source of truth for analysis + INITF.
+    // cktMode check- bitfield is the sole source of truth for analysis + INITF.
     expect(typeof lc.cktMode).toBe("number");
 
-    // dt — 0 at construction (DC mode)
+    // dt- 0 at construction (DC mode)
     expect(typeof lc.dt).toBe("number");
     expect(lc.dt).toBe(0);
 
-    // method — valid integration method string
+    // method- valid integration method string
     const validMethods = ["trapezoidal", "gear"];
     expect(validMethods).toContain(lc.method);
 
-    // order — default is 1 at construction
+    // order- default is 1 at construction
     expect(lc.order).toBe(1);
 
-    // deltaOld — length-7 array
+    // deltaOld- length-7 array
     expect(Array.isArray(lc.deltaOld)).toBe(true);
     expect(lc.deltaOld.length).toBe(7);
 
-    // ag — Float64Array length 7, same instance as ctx.ag
+    // ag- Float64Array length 7, same instance as ctx.ag
     expect(lc.ag).toBeInstanceOf(Float64Array);
     expect(lc.ag.length).toBe(7);
     expect(lc.ag).toBe(ctx.ag);
 
-    // srcFact — starts at 1 (full source magnitude)
+    // srcFact- starts at 1 (full source magnitude)
     expect(typeof lc.srcFact).toBe("number");
     expect(lc.srcFact).toBe(1);
 
-    // noncon — mutable ref object, value starts at 0
+    // noncon- mutable ref object, value starts at 0
     expect(lc.noncon).not.toBeNull();
     expect(lc.noncon.value).toBe(0);
 
-    // limitingCollector — null at construction
+    // limitingCollector- null at construction
     expect(lc.limitingCollector).toBeNull();
 
-    // Deleted per Phase 2.5 W2.2 (A2+A3 already landed) + A1 §Test handling:
-    //   lc.isDcOp / lc.isTransient / lc.uic — all removed in A2/A3/C2. The
+    // Deleted per Phase 2.5 W2.2 (A2+A3 already landed) + A1 ssTest handling:
+    //   lc.isDcOp / lc.isTransient / lc.uic- all removed in A2/A3/C2. The
     //   canonical readers test against cktMode bitfield bits (MODEDCOP,
     //   MODETRAN, MODEUIC) per ckt-mode.ts helpers.
 
-    // xfact — 0 until first step computes deltaOld[0]/deltaOld[1]
+    // xfact- 0 until first step computes deltaOld[0]/deltaOld[1]
     expect(lc.xfact).toBe(0);
 
-    // gmin — positive number
+    // gmin- positive number
     expect(typeof lc.gmin).toBe("number");
     expect(lc.gmin).toBeGreaterThan(0);
 
-    // reltol — matches params
+    // reltol- matches params
     expect(typeof lc.reltol).toBe("number");
     expect(lc.reltol).toBe(defaultParams.reltol);
 
-    // iabstol — matches params abstol
+    // iabstol- matches params abstol
     expect(typeof lc.iabstol).toBe("number");
     expect(lc.iabstol).toBe(defaultParams.abstol);
   });
@@ -374,14 +367,14 @@ describe("CKTCircuitContext", () => {
 
   describe("LoadContext defaults", () => {
     it("bypass_defaults_to_false", () => {
-      // cite: cktinit.c:53-55 — CKTbypass defaults to false
+      // cite: cktinit.c:53-55- CKTbypass defaults to false
       const circuit = makeTestCircuit(9, 1);
       const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
       expect(ctx.loadCtx.bypass).toBe(false);
     });
 
     it("voltTol_defaults_to_1e_minus_6", () => {
-      // cite: cktinit.c:53-55 — CKTvoltTol defaults to 1e-6
+      // cite: cktinit.c:53-55- CKTvoltTol defaults to 1e-6
       const circuit = makeTestCircuit(9, 1);
       const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
       expect(ctx.loadCtx.voltTol).toBe(1e-6);
@@ -390,7 +383,7 @@ describe("CKTCircuitContext", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task C6.2 — DcOpResult.reset() must not reallocate diagnostics
+// Task C6.2- DcOpResult.reset() must not reallocate diagnostics
 // ---------------------------------------------------------------------------
 
 describe("DcOpResult", () => {
@@ -417,7 +410,7 @@ describe("DcOpResult", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task C6.4 — solver must be passed in and not re-allocated
+// Task C6.4- solver must be passed in and not re-allocated
 // ---------------------------------------------------------------------------
 
 describe("solver", () => {

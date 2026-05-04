@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RAM components- all variants in one file sharing common logic.
  *
  * Variants implemented:
@@ -42,7 +42,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -329,7 +329,7 @@ function ramSinglePortFactory(props: PropertyBag): RAMSinglePortElement {
   return new RAMSinglePortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RAMSinglePortDefinition: ComponentDefinition = {
+export const RAMSinglePortDefinition: StandaloneComponentDefinition = {
   name: "RAMSinglePort",
   typeId: -1,
   factory: ramSinglePortFactory,
@@ -358,7 +358,7 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
 // Outputs: D (dataBits, bidirectional)
 //
 // CS=1 selects chip. WE=1 writes D (from the bidirectional net) to memory[A].
-// OE=1 && CS=1 && !WE → D = memory[A]; else D = 0.
+// OE=1 && CS=1 && !WE â†’ D = memory[A]; else D = 0.
 // Fully combinational- no clock.
 //
 // internalStateCount: 0
@@ -448,7 +448,7 @@ function ramSinglePortSelFactory(props: PropertyBag): RAMSinglePortSelElement {
   return new RAMSinglePortSelElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RAMSinglePortSelDefinition: ComponentDefinition = {
+export const RAMSinglePortSelDefinition: StandaloneComponentDefinition = {
   name: "RAMSinglePortSel",
   typeId: -1,
   factory: ramSinglePortSelFactory,
@@ -578,7 +578,7 @@ function ramDualPortFactory(props: PropertyBag): RAMDualPortElement {
   return new RAMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RAMDualPortDefinition: ComponentDefinition = {
+export const RAMDualPortDefinition: StandaloneComponentDefinition = {
   name: "RAMDualPort",
   typeId: -1,
   factory: ramDualPortFactory,
@@ -710,7 +710,7 @@ function ramDualAccessFactory(props: PropertyBag): RAMDualAccessElement {
   return new RAMDualAccessElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RAMDualAccessDefinition: ComponentDefinition = {
+export const RAMDualAccessDefinition: StandaloneComponentDefinition = {
   name: "RAMDualAccess",
   typeId: -1,
   factory: ramDualAccessFactory,
@@ -814,7 +814,7 @@ function ramAsyncFactory(props: PropertyBag): RAMAsyncElement {
   return new RAMAsyncElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RAMAsyncDefinition: ComponentDefinition = {
+export const RAMAsyncDefinition: StandaloneComponentDefinition = {
   name: "RAMAsync",
   typeId: -1,
   factory: ramAsyncFactory,
@@ -937,7 +937,7 @@ function blockRAMDualPortFactory(props: PropertyBag): BlockRAMDualPortElement {
   return new BlockRAMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const BlockRAMDualPortDefinition: ComponentDefinition = {
+export const BlockRAMDualPortDefinition: StandaloneComponentDefinition = {
   name: "BlockRAMDualPort",
   typeId: -1,
   factory: blockRAMDualPortFactory,

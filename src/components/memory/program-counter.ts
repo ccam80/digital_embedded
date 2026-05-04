@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ProgramCounter- edge-triggered counter with jump (load) support.
  *
  * Used as the instruction pointer in CPU circuits. On each rising clock edge:
@@ -30,7 +30,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -276,7 +276,7 @@ function programCounterFactory(props: PropertyBag): ProgramCounterElement {
   return new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ProgramCounterDefinition: ComponentDefinition = {
+export const ProgramCounterDefinition: StandaloneComponentDefinition = {
   name: "ProgramCounter",
   typeId: -1,
   factory: programCounterFactory,

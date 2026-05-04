@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Neg component- two's complement negation.
  *
  * Ports from Digital's Neg.java:
@@ -22,7 +22,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -83,7 +83,7 @@ const NEG_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 1, min: 1, max: 32, structural: true },
 ];
 
-export const NegDefinition: ComponentDefinition = {
+export const NegDefinition: StandaloneComponentDefinition = {
   name: "Neg",
   typeId: -1,
   factory: (props) => new NegElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),

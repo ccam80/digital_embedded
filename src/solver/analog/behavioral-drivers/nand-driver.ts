@@ -19,8 +19,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
-import type { StatePoolRef } from "../state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -71,26 +70,19 @@ function buildNandDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 // BehavioralNandDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralNandDriverElement implements PoolBackedAnalogElement {
+export class BehavioralNandDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _inputCount: number;
   private readonly _inputNodes: number[];
   private readonly _gndNode: number;
   private _vIH: number;
   private _vIL: number;
-  private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._inputCount = props.getModelParam<number>("inputCount");
     this._inputNodes = new Array(this._inputCount);
     for (let i = 0; i < this._inputCount; i++) {
@@ -103,10 +95,6 @@ export class BehavioralNandDriverElement implements PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {

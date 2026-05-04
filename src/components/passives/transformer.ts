@@ -30,7 +30,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -40,7 +40,6 @@ import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { MODEDC, MODEINITPRED, MODEINITTRAN, MODEUIC } from "../../solver/analog/ckt-mode.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -224,13 +223,8 @@ export class TransformerElement extends AbstractCircuitElement {
  *   [0] = P1 (primary+)   [1] = P2 (primaryâˆ’)
  *   [2] = S1 (secondary+) [3] = S2 (secondaryâˆ’)
  */
-export class AnalogTransformerElement implements PoolBackedAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+export class AnalogTransformerElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
-  readonly poolBacked = true as const;
   readonly stateSchema = TRANSFORMER_SCHEMA;
   readonly stateSize = TRANSFORMER_SCHEMA.size;
 
@@ -243,7 +237,6 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
   private _IC1: number;
   private _IC2: number;
   private _M: number;
-  private _pool!: StatePoolRef;
 
   // Cached handles for winding resistance stamps (allocated in setup, used in load)
   private _hRP1P1: number = -1;
@@ -277,7 +270,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
     IC2: number = NaN,
     multiplicity: number = 1,
   ) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     const lSecondary = lPrimary / (turnsRatio * turnsRatio);
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
@@ -296,6 +289,15 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
+    // Allocate this element's own state slots BEFORE sub-elements claim
+    // their own. The 13-slot composite schema (G11/G22/G12/HIST1/HIST2/I1/I2/
+    // PHI1/PHI2/CCAP1/CCAP2/VOLT1/VOLT2) is consumed via `s0[base + SLOT_X]`
+    // in load(); without this allocation `_stateBase` stays at -1 and every
+    // such read returns NaN, propagating to the secondary node solution.
+    if (this._stateBase === -1) {
+      this._stateBase = ctx.allocStates(this.stateSize);
+    }
+
     // Composite setup: call sub-elements in order L1, L2, MUT.
     // Ordering invariant: _l1.setup() and _l2.setup() MUST complete before
     // _mut.setup() is called, because _mut reads _l1.branchIndex and
@@ -342,10 +344,6 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
     if (p2 !== 0) this._hB1P2 = solver.allocElement(b1, p2);
     if (sec1 !== 0) this._hB2S1 = solver.allocElement(b2, sec1);
     if (sec2 !== 0) this._hB2S2 = solver.allocElement(b2, sec2);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

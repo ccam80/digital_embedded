@@ -1,9 +1,9 @@
-/**
+﻿/**
  * MIDI component- note on/off, channel, velocity via Web MIDI API.
  *
  * Inputs (rising-edge clock triggered, when en=1):
- *   N    - MIDI note number (7-bit, 0–127)
- *   V    - velocity / volume (7-bit, 0–127)
+ *   N    - MIDI note number (7-bit, 0â€“127)
+ *   V    - velocity / volume (7-bit, 0â€“127)
  *   OnOff- 1=note on, 0=note off (1-bit)
  *   en   - enable (1-bit); clock edge is ignored when en=0
  *   C    - clock (1-bit, rising-edge triggered)
@@ -22,7 +22,7 @@
  *
  * Properties:
  *   label          - optional label
- *   midiChannel    - MIDI channel number 1–16 (default 1)
+ *   midiChannel    - MIDI channel number 1â€“16 (default 1)
  *   midiInstrument - instrument name or GM patch number string (default "")
  *   progChangeEnable- when true, adds a PC input pin (default false)
  */
@@ -44,7 +44,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -327,7 +327,7 @@ const MIDI_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: 1,
     min: 1,
     max: 16,
-    description: "MIDI channel number (1–16)",
+    description: "MIDI channel number (1â€“16)",
   },
   {
     key: "midiInstrument",
@@ -353,7 +353,7 @@ function midiFactory(props: PropertyBag): MidiElement {
   return new MidiElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const MidiDefinition: ComponentDefinition = {
+export const MidiDefinition: StandaloneComponentDefinition = {
   name: "MIDI",
   typeId: -1,
   factory: midiFactory,

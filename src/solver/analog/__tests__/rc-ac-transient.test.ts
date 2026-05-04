@@ -1,5 +1,5 @@
 /**
- * RC lowpass driven by AC voltage source — analytical verification.
+ * RC lowpass driven by AC voltage source- analytical verification.
  *
  * Circuit: AC Source (Vs) → R → C → GND
  *   node 1: source pos / resistor A  (voltages[0])
@@ -21,19 +21,20 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
 import { allocateStatePool } from "./test-helpers.js";
+import { DefaultSimulationCoordinator } from "../../coordinator.js";
+import { MNAEngine } from "../analog-engine.js";
 import { makeAcVoltageSourceElement } from "../../../components/sources/ac-voltage-source.js";
 import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../../components/passives/capacitor.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
 
 // ---------------------------------------------------------------------------
-// Inline §A-compliant element factories for this test file
+// Inline ssA-compliant element factories for this test file
 // ---------------------------------------------------------------------------
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
@@ -148,6 +149,23 @@ function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCirc
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Acquire a MNAEngine from a pre-compiled analog circuit without constructing
+ *  MNAEngine directly- routes through DefaultSimulationCoordinator per UC-1. */
+function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
+  const coordinator = new DefaultSimulationCoordinator({
+    digital: null,
+    analog: compiled,
+    bridges: [],
+    wireSignalMap: new Map(),
+    labelSignalMap: new Map(),
+    labelToCircuitElement: new Map(),
+    pinSignalMap: new Map(),
+    diagnostics: [],
+    allCircuitElements: [],
+  });
+  return coordinator.getAnalogEngine() as MNAEngine;
+}
+
 /** Advance engine until simTime >= targetTime. Returns step count. */
 function stepUntil(engine: MNAEngine, targetTime: number, maxSteps = 50_000): number {
   let steps = 0;
@@ -191,13 +209,12 @@ function sampleOnePeriod(
 // Tests
 // ===========================================================================
 
-describe("RC lowpass AC transient — hand-built", () => {
+describe("RC lowpass AC transient- hand-built", () => {
   it("steady-state amplitude matches analytical |H(f)|", () => {
     const timeRef = { value: 0 };
     const circuit = makeAcRcCircuit(timeRef);
 
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const engine = engineFrom(circuit);
 
     const dcResult = engine.dcOperatingPoint();
     expect(dcResult.converged).toBe(true);
@@ -219,8 +236,7 @@ describe("RC lowpass AC transient — hand-built", () => {
     const timeRef = { value: 0 };
     const circuit = makeAcRcCircuit(timeRef);
 
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const engine = engineFrom(circuit);
     engine.dcOperatingPoint();
 
     // Wait for steady state
@@ -250,8 +266,7 @@ describe("RC lowpass AC transient — hand-built", () => {
     const timeRef = { value: 0 };
     const circuit = makeAcRcCircuit(timeRef);
 
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const engine = engineFrom(circuit);
     engine.dcOperatingPoint();
 
     // Let transient die out
@@ -303,8 +318,7 @@ describe("RC lowpass AC transient — hand-built", () => {
     const timeRef = { value: 0 };
     const circuit = makeAcRcCircuit(timeRef);
 
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const engine = engineFrom(circuit);
     const dcResult = engine.dcOperatingPoint();
 
     expect(dcResult.converged).toBe(true);
@@ -335,8 +349,7 @@ describe("RC lowpass AC transient — hand-built", () => {
       timeRef,
     } as unknown as ConcreteCompiledAnalogCircuit & { timeRef: { value: number } };
 
-    const engine = new MNAEngine();
-    engine.init(circuit);
+    const engine = engineFrom(circuit);
     engine.dcOperatingPoint();
 
     // Wait for steady state (5τ = 5ms, period = 1ms so ~5 periods)
@@ -365,7 +378,7 @@ describe("RC lowpass AC transient — hand-built", () => {
 });
 
 // ===========================================================================
-// Integration test — full compiler pipeline
+// Integration test- full compiler pipeline
 // ===========================================================================
 
 import { Circuit, Wire } from "../../../core/circuit.js";
@@ -451,7 +464,7 @@ function buildAnalogRegistry(): ComponentRegistry {
   return registry;
 }
 
-describe("RC lowpass AC transient — compiler pipeline", () => {
+describe("RC lowpass AC transient- compiler pipeline", () => {
   it("compilation produces correct topology", () => {
     const circuit = new Circuit();
     const registry = buildAnalogRegistry();
@@ -544,8 +557,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     addWire(circuit, 30, 0, 30, 0);
 
     const compiled = compileUnified(circuit, registry).analog!;
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
     engine.dcOperatingPoint();
 
     // Step a few times and collect node voltages
@@ -639,8 +651,7 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     expect(errors).toHaveLength(0);
 
     // Engine init + DC OP
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
     const dcResult = engine.dcOperatingPoint();
     expect(dcResult.converged).toBe(true);
 

@@ -190,7 +190,7 @@ function serializeElement(
   element: CircuitElement,
   registry: ComponentRegistry,
 ): string {
-  const def = registry.get(element.typeId);
+  const def = registry.getStandalone(element.typeId);
 
   // Build reverse map: propertyKey → xmlName
   const reverseMap = new Map<string, string>();

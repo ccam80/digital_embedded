@@ -29,7 +29,7 @@ function createElement(
   pos: { x: number; y: number },
   props?: Record<string, PropertyValue>,
 ) {
-  const def = registry.get(typeName);
+  const def = registry.getStandalone(typeName);
   if (!def) throw new Error(`Unknown component type: ${typeName}`);
   const bag = new PropertyBag(
     Object.entries(props ?? {}) as [string, PropertyValue][],

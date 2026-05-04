@@ -19,8 +19,7 @@ import {
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
@@ -67,24 +66,17 @@ const TIMER_555_LATCH_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // Timer555LatchDriverElement
 // ---------------------------------------------------------------------------
 
-export class Timer555LatchDriverElement implements PoolBackedAnalogElement {
+export class Timer555LatchDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = SCHEMA.size;
 
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
-
   private _vDrop: number;
-  private _pool!: StatePoolRef;
   // TSTALLOC handle for the (disBase, disBase) conductance stamp.
   private _hDisDis = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._vDrop = props.hasModelParam("vDrop")
       ? props.getModelParam<number>("vDrop")
       : 1.5;
@@ -95,10 +87,6 @@ export class Timer555LatchDriverElement implements PoolBackedAnalogElement {
     const disBase = this._pinNodes.get("disBase")!;
     // TSTALLOC: (disBase, disBase) — conductance stamp for discharge-BJT base clamping.
     this._hDisDis = ctx.solver.allocElement(disBase, disBase);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Terminal component- serial text terminal.
  *
  * Receives character data on its input pins and appends characters to an
@@ -41,14 +41,14 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java Terminal uses GenericShape: 3 inputs, 0 outputs, width=3
-// → COMP_WIDTH=3, COMP_HEIGHT=3
+// â†’ COMP_WIDTH=3, COMP_HEIGHT=3
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -279,7 +279,7 @@ function terminalFactory(props: PropertyBag): TerminalElement {
   return new TerminalElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TerminalDefinition: ComponentDefinition = {
+export const TerminalDefinition: StandaloneComponentDefinition = {
   name: "Terminal",
   typeId: -1,
   factory: terminalFactory,

@@ -10,7 +10,7 @@ import type { PropertyDefinition, PropertyValue } from "@/core/properties";
 import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
-import type { ComponentDefinition, ModelEntry, ParamDef } from "@/core/registry";
+import type { StandaloneComponentDefinition, ModelEntry, ParamDef } from "@/core/registry";
 import { paramDefDefaults } from "@/core/model-params";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
@@ -289,7 +289,7 @@ export class PropertyPanel {
    */
   showModelSelector(
     element: CircuitElement,
-    def: ComponentDefinition,
+    def: StandaloneComponentDefinition,
     runtimeModels?: Record<string, ModelEntry>,
   ): void {
     const registry = def.modelRegistry;
@@ -376,7 +376,7 @@ export class PropertyPanel {
    */
   private _renderModelParams(
     element: CircuitElement,
-    def: ComponentDefinition,
+    def: StandaloneComponentDefinition,
     modelKey: string,
     registry: Record<string, ModelEntry>,
     runtimeModels: Record<string, ModelEntry> | undefined,
@@ -454,7 +454,7 @@ export class PropertyPanel {
    */
   private _buildModelParamRow(
     _element: CircuitElement,
-    _def: ComponentDefinition,
+    _def: StandaloneComponentDefinition,
     pd: ParamDef,
     entry: ModelEntry,
     bag: ReturnType<CircuitElement["getProperties"]>,
@@ -566,7 +566,7 @@ export class PropertyPanel {
    */
   showPinElectricalOverrides(
     element: CircuitElement,
-    def: ComponentDefinition,
+    def: StandaloneComponentDefinition,
     family: LogicFamilyConfig,
   ): void {
     const pins = def.pinLayout;

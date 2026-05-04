@@ -41,8 +41,7 @@ import {
   type StateSchema,
 } from "./state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "./ngspice-load-order.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
-import type { StatePoolRef } from "./state-pool.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "./element.js";
 import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
 import { stampRHS } from "./stamp-helpers.js";
@@ -108,16 +107,10 @@ const BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS: Record<string, number> = {
 // BehavioralOutputDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralOutputDriverElement implements PoolBackedAnalogElement {
+export class BehavioralOutputDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly poolBacked = true as const;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _vOH: number;
   private readonly _vOL: number;
@@ -125,7 +118,6 @@ export class BehavioralOutputDriverElement implements PoolBackedAnalogElement {
   private readonly _bitIndex: number;
   private readonly _inputLogicRef: PoolSlotRef;
   private readonly _enableLogicRef: PoolSlotRef | null;
-  private _pool!: StatePoolRef;
 
   // Norton conductance stamp handles- 2x2 conductance matrix at (pos, neg).
   // Same incidence pattern as a 2-terminal resistor (relay-resistor.ts shape).
@@ -135,7 +127,7 @@ export class BehavioralOutputDriverElement implements PoolBackedAnalogElement {
   private _hNP = -1; // (neg, pos)
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._vOH      = props.hasModelParam("vOH")      ? props.getModelParam<number>("vOH")      : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["vOH"]!;
     this._vOL      = props.hasModelParam("vOL")      ? props.getModelParam<number>("vOL")      : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["vOL"]!;
     this._rOut     = props.hasModelParam("rOut")     ? props.getModelParam<number>("rOut")     : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["rOut"]!;
@@ -162,10 +154,6 @@ export class BehavioralOutputDriverElement implements PoolBackedAnalogElement {
     this._hNN = solver.allocElement(negNode, negNode);
     this._hPN = solver.allocElement(posNode, negNode);
     this._hNP = solver.allocElement(negNode, posNode);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(_key: string, _value: number): void {

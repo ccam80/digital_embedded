@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Button component- momentary push button.
  *
  * Output is high while held, low when released (or inverted if activeLow=true).
@@ -18,7 +18,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -86,7 +86,7 @@ export class ButtonElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Outer 3D button polygon (body to left of pin at x=0):
-    // (-1.9,-1.1) → (-0.4,-1.1) → (-0.05,-0.75) → (-0.05,0.75) → (-1.55,0.75) → (-1.9,0.4)
+    // (-1.9,-1.1) â†’ (-0.4,-1.1) â†’ (-0.05,-0.75) â†’ (-0.05,0.75) â†’ (-1.55,0.75) â†’ (-1.9,0.4)
     ctx.drawPolygon(
       [
         { x: -1.9, y: -1.1 },
@@ -99,7 +99,7 @@ export class ButtonElement extends AbstractCircuitElement {
       true,
     );
 
-    // Inner button face open path: (-0.4,-1.05) → (-0.4,0.4) → (-1.85,0.4)
+    // Inner button face open path: (-0.4,-1.05) â†’ (-0.4,0.4) â†’ (-1.85,0.4)
     ctx.drawLine(-0.4, -1.05, -0.4, 0.4);
     ctx.drawLine(-0.4, 0.4, -1.85, 0.4);
 
@@ -178,7 +178,7 @@ function buttonFactory(props: PropertyBag): ButtonElement {
   return new ButtonElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ButtonDefinition: ComponentDefinition = {
+export const ButtonDefinition: StandaloneComponentDefinition = {
   name: "Button",
   typeId: -1,
   factory: buttonFactory,

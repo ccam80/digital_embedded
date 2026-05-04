@@ -10,7 +10,7 @@
 
 import type { ComponentRegistry } from '../core/registry.js';
 import { ComponentCategory } from '../core/registry.js';
-import type { ComponentDefinition } from '../core/registry.js';
+import type { StandaloneComponentDefinition } from '../core/registry.js';
 import { executeSubcircuit } from './subcircuit/subcircuit.js';
 import { PropertyType } from '../core/properties.js';
 import type { PropertyBag } from '../core/properties.js';
@@ -299,13 +299,13 @@ export function register74xxSubcircuit(
  * @param registry  The component registry (must already contain the stub).
  * @param name      The IC name matching a manifest entry (e.g. "7400").
  * @param basePath  Base URL path to the 74xx library files (default "lib/74xx/").
- * @returns         The updated ComponentDefinition with real factory and pins.
+ * @returns         The updated StandaloneComponentDefinition with real factory and pins.
  */
 export async function load74xxComponent(
   registry: ComponentRegistry,
   name: string,
   basePath: string = "lib/74xx/",
-): Promise<ComponentDefinition> {
+): Promise<StandaloneComponentDefinition> {
   const entry = LIBRARY_74XX.find((e) => e.name === name);
   if (!entry) {
     throw new Error(`74xx component "${name}" not found in manifest.`);
@@ -332,7 +332,7 @@ export async function load74xxComponent(
 
   register74xxSubcircuit(registry, name, definition);
 
-  const updated = registry.get(name);
+  const updated = registry.getStandalone(name);
   if (!updated) {
     throw new Error(`Failed to register 74xx component "${name}".`);
   }

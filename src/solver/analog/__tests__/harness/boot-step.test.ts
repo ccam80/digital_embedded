@@ -1,5 +1,5 @@
 /**
- * Unit tests for boot-step capture (spec §10.2 test 2).
+ * Unit tests for boot-step capture (spec ss10.2 test 2).
  *
  * runDcOp() must produce exactly 1 step:
  *   - stepStartTime === 0
@@ -8,11 +8,10 @@
  *   - attempts reflect DCOP path (phase = "dcopDirect" or variant)
  *   - accepted === true
  *
- * No DLL required — uses our engine only via the low-level hook API.
+ * No DLL required- uses our engine only via the low-level hook API.
  */
 
 import { describe, it, expect } from "vitest";
-import { MNAEngine } from "../../analog-engine.js";
 import {
   buildElementLabelMap,
   createStepCaptureHook,
@@ -31,9 +30,7 @@ const ZERO_INTEG_COEFF: IntegrationCoefficients = {
 
 /** Run DCOP with phase/iteration hooks and return the captured steps. */
 function runDcopCapture() {
-  const { circuit, pool } = buildHwrFixture();
-  const engine = new MNAEngine();
-  engine.init(circuit);
+  const { circuit, pool, engine } = buildHwrFixture();
 
   const elementLabels = buildElementLabelMap(circuit);
   const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
@@ -52,7 +49,7 @@ function runDcopCapture() {
     analysisPhase: "dcop",
     acceptedAttemptIndex: -1,
     order: engine.integrationOrder,
-    delta: 0,                  // DC-OP has no timestep — analog-engine.ts:855-862
+    delta: 0,                  // DC-OP has no timestep- analog-engine.ts:855-862
   });
 
   engine.stepPhaseHook = null;

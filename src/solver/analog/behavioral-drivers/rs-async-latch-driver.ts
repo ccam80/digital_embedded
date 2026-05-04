@@ -18,8 +18,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
-import type { StatePoolRef } from "../state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -44,20 +43,13 @@ const RS_AS_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
-export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElement {
+export class BehavioralRSAsyncLatchDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _vIH: number;
   private readonly _vIL: number;
-  private _pool!: StatePoolRef;
 
   // SLOT_OUT_NQ is the rollback-bearing source of truth for ~Q (it carries
   // the forbidden S=R=1 collision state where Q=NQ=0). The boot reset
@@ -67,17 +59,13 @@ export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElem
   private _firstSample: boolean = true;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
     this._vIL = props.hasModelParam("vIL") ? props.getModelParam<number>("vIL") : 0.8;
   }
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {

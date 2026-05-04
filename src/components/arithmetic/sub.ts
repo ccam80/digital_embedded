@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Sub component- N-bit subtractor with borrow in/out.
  *
  * Ports from Digital's Sub.java:
@@ -27,7 +27,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -225,7 +225,7 @@ function subFactory(props: PropertyBag): SubElement {
   return new SubElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const SubDefinition: ComponentDefinition = {
+export const SubDefinition: StandaloneComponentDefinition = {
   name: "Sub",
   typeId: -1,
   factory: subFactory,

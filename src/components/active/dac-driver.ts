@@ -30,8 +30,7 @@ import {
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -98,23 +97,16 @@ const DAC_DRIVER_DEFAULTS: Record<string, number> = {
 // DACDriverElement
 // ---------------------------------------------------------------------------
 
-export class DACDriverElement implements PoolBackedAnalogElement {
+export class DACDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _bits: number;
   private readonly _bipolar: boolean;
   private readonly _maxCode: number;
   // Slot index for OUTPUT_TARGET_V (LATCHED_BIT_i are at indices 0..bits-1).
   private readonly _slotTarget: number;
-  private _pool!: StatePoolRef;
 
   // VSRC TSTALLOC handles (vsrcsetup.c four-entry sequence).
   private _hOutBr  = -1;  // (OUT, br)
@@ -123,7 +115,7 @@ export class DACDriverElement implements PoolBackedAnalogElement {
   private _hBrGnd  = -1;  // (br,  GND)
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._bits    = props.getModelParam<number>("bits");
     this._bipolar = props.getModelParam<number>("bipolar") !== 0;
     this._maxCode = this._bits >= 32 ? 0xFFFFFFFF : ((1 << this._bits) - 1);
@@ -150,10 +142,6 @@ export class DACDriverElement implements PoolBackedAnalogElement {
     this._hGndBr = solver.allocElement(gndNode, br);
     this._hBrOut = solver.allocElement(br,      outNode);
     this._hBrGnd = solver.allocElement(br,      gndNode);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(_key: string, _value: number): void {

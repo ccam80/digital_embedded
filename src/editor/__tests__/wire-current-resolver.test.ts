@@ -1,5 +1,5 @@
 /**
- * Tests for WireCurrentResolver — KCL-correct tree-traced wire current attribution.
+ * Tests for WireCurrentResolver- KCL-correct tree-traced wire current attribution.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -12,8 +12,9 @@ import type { Pin, Rotation } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { Rect, RenderContext } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
-import { MNAEngine } from "@/solver/analog/analog-engine";
+import type { MNAEngine } from "@/solver/analog/analog-engine";
 import type { ConcreteCompiledAnalogCircuit } from "@/solver/analog/compiled-analog-circuit";
+import { DefaultSimulationCoordinator } from "@/solver/coordinator";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "@/components/sources/dc-voltage-source";
 import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "@/components/passives/capacitor";
 import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "@/components/passives/inductor";
@@ -23,14 +24,14 @@ import type { SetupContext } from "@/solver/analog/setup-context";
 import type { LoadContext } from "@/solver/analog/load-context";
 
 // ---------------------------------------------------------------------------
-// Local element factory helpers — use production constructors / factories
+// Local element factory helpers- use production constructors / factories
 // ---------------------------------------------------------------------------
 
 /** Inline resistor factory: 2-terminal, stamps conductance G=1/R. */
 function makeResistor(posNode: number, negNode: number, resistance: number): AnalogElement {
   const G = 1 / Math.max(resistance, 1e-9);
   let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const pinNodes = new Map([["A", posNode], ["B", negNode]]);
+  const pinNodes = new Map([["pos", posNode], ["neg", negNode]]);
   const res: AnalogElement = {
     label: "",
     ngspiceLoadOrder: 40,
@@ -38,8 +39,8 @@ function makeResistor(posNode: number, negNode: number, resistance: number): Ana
     _stateBase: -1,
     branchIndex: -1,
     setup(ctx) {
-      const p = res._pinNodes.get("A")!;
-      const n = res._pinNodes.get("B")!;
+      const p = res._pinNodes.get("pos")!;
+      const n = res._pinNodes.get("neg")!;
       _hPP = ctx.solver.allocElement(p, p);
       _hNN = ctx.solver.allocElement(n, n);
       _hPN = ctx.solver.allocElement(p, n);
@@ -52,8 +53,8 @@ function makeResistor(posNode: number, negNode: number, resistance: number): Ana
       ctx.solver.stampElement(_hNP, -G);
     },
     getPinCurrents(rhs) {
-      const vA = rhs[res._pinNodes.get("A")!];
-      const vB = rhs[res._pinNodes.get("B")!];
+      const vA = rhs[res._pinNodes.get("pos")!];
+      const vB = rhs[res._pinNodes.get("neg")!];
       const I = G * (vA - vB);
       return [I, -I];
     },
@@ -108,7 +109,7 @@ function makeInductor(posNode: number, negNode: number, branchNode: number, indu
   const props = new PropertyBag();
   props.replaceModelParams({ ...INDUCTOR_DEFAULTS, inductance });
   return new AnalogInductorElement(
-    new Map([["A", posNode], ["B", negNode]]),
+    new Map([["pos", posNode], ["neg", negNode]]),
     props,
   );
 }
@@ -256,6 +257,23 @@ function makeCompiledWithEngine(params: {
   } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
+/** Acquire a MNAEngine from a pre-compiled analog circuit without constructing
+ *  MNAEngine directly- routes through DefaultSimulationCoordinator per UC-1. */
+function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
+  const coordinator = new DefaultSimulationCoordinator({
+    digital: null,
+    analog: compiled,
+    bridges: [],
+    wireSignalMap: new Map(),
+    labelSignalMap: new Map(),
+    labelToCircuitElement: new Map(),
+    pinSignalMap: new Map(),
+    diagnostics: [],
+    allCircuitElements: [],
+  });
+  return coordinator.getAnalogEngine() as MNAEngine;
+}
+
 /**
  * Build a CurrentResolverContext from a real MNAEngine + compiled circuit.
  * The engine provides live pin currents; the compiled circuit provides topology.
@@ -278,7 +296,7 @@ function makeContextFromEngine(
 }
 
 // ===========================================================================
-// Unit tests — mock elements with known currents
+// Unit tests- mock elements with known currents
 // ===========================================================================
 
 describe("WireCurrentResolver", () => {
@@ -358,7 +376,7 @@ describe("WireCurrentResolver", () => {
     ]);
 
     // source (0→1, 10 mA), R1 (1→2, 3 mA), R2 (1→3, 7 mA)
-    // gndR1 (2→0, 3 mA), gndR2 (3→0, 7 mA) — close the loop
+    // gndR1 (2→0, 3 mA), gndR2 (3→0, 7 mA)- close the loop
     const elements = [
       makeMockElement([0, 1]),  // source
       makeMockElement([1, 2]),  // R1
@@ -485,10 +503,10 @@ describe("WireCurrentResolver", () => {
 });
 
 // ===========================================================================
-// KCL conservation tests — real MNA engine, tree-traced attribution
+// KCL conservation tests- real MNA engine, tree-traced attribution
 // ===========================================================================
 
-describe("WireCurrentResolver — KCL conservation", () => {
+describe("WireCurrentResolver- KCL conservation", () => {
   let resolver: WireCurrentResolver;
 
   beforeEach(() => {
@@ -500,8 +518,8 @@ describe("WireCurrentResolver — KCL conservation", () => {
   //
   // Vs(5V) → R1(1kΩ) → node2 → R2(2kΩ)||R3(3kΩ) → ground
   //
-  // Node 1: Vs.pos(0,0), R1.A(4,0)  — single wire
-  // Node 2: R1.B(8,0), R2.A(8,6), R3.A(14,3) — JUNCTION at (8,3)
+  // Node 1: Vs.pos(0,0), R1.A(4,0) - single wire
+  // Node 2: R1.B(8,0), R2.A(8,6), R3.A(14,3)- JUNCTION at (8,3)
   //   Wire: (8,0)→(8,3), (8,3)→(8,6), (8,3)→(14,3)
   // Ground: Vs.neg(0,6), R2.B(8,10), R3.B(14,10)
   // -------------------------------------------------------------------------
@@ -549,8 +567,7 @@ describe("WireCurrentResolver — KCL conservation", () => {
       wireToNodeId,
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled as unknown as ConcreteCompiledAnalogCircuit);
+    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
     const dc = engine.dcOperatingPoint();
     expect(dc.converged).toBe(true);
 
@@ -643,8 +660,7 @@ describe("WireCurrentResolver — KCL conservation", () => {
       wireToNodeId,
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled as unknown as ConcreteCompiledAnalogCircuit);
+    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
     const dc = engine.dcOperatingPoint();
     expect(dc.converged).toBe(true);
 
@@ -673,10 +689,10 @@ describe("WireCurrentResolver — KCL conservation", () => {
 });
 
 // ===========================================================================
-// AC transient KCL — RLC circuit with time-varying currents
+// AC transient KCL- RLC circuit with time-varying currents
 // ===========================================================================
 
-describe("WireCurrentResolver — AC transient RLC", () => {
+describe("WireCurrentResolver- AC transient RLC", () => {
   // -------------------------------------------------------------------------
   // AC source → Resistor → junction → (Capacitor || Inductor) → ground
   //
@@ -753,8 +769,7 @@ describe("WireCurrentResolver — AC transient RLC", () => {
     });
 
     // Run MNA engine
-    const engine = new MNAEngine();
-    engine.init(compiled as unknown as ConcreteCompiledAnalogCircuit);
+    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
     const dc = engine.dcOperatingPoint();
     expect(dc.converged).toBe(true);
 
@@ -831,7 +846,7 @@ describe("WireCurrentResolver — AC transient RLC", () => {
     // Must have taken meaningful steps
     expect(sampleCount).toBeGreaterThan(10);
 
-    // MNA guarantees KCL — residual should be near machine epsilon
+    // MNA guarantees KCL- residual should be near machine epsilon
     expect(maxKclError).toBeLessThan(1e-6);
 
     // Wire currents should match element currents within 1%
@@ -841,10 +856,10 @@ describe("WireCurrentResolver — AC transient RLC", () => {
 });
 
 // ===========================================================================
-// Cross-component KCL — wire current at each pin must match component body
+// Cross-component KCL- wire current at each pin must match component body
 // ===========================================================================
 
-describe("WireCurrentResolver — cross-component pin-wire matching", () => {
+describe("WireCurrentResolver- cross-component pin-wire matching", () => {
   // -------------------------------------------------------------------------
   // For every 2-terminal component, the wire adjacent to each pin must carry
   // at least that component's current. When the pin connects to a
@@ -884,7 +899,7 @@ describe("WireCurrentResolver — cross-component pin-wire matching", () => {
     const cap = makeCapacitor(2, 0, C_val);
     const ind = makeInductor(2, 0, 3, L_val);
 
-    // Pin positions — must match wire endpoints
+    // Pin positions- must match wire endpoints
     const ceVs = makeCE([{ x: 0, y: 0 }, { x: 0, y: 10 }]);
     const ceR  = makeCE([{ x: 4, y: 0 }, { x: 8, y: 0 }]);
     const ceC  = makeCE([{ x: 8, y: 6 }, { x: 8, y: 10 }]);
@@ -915,8 +930,7 @@ describe("WireCurrentResolver — cross-component pin-wire matching", () => {
       wireToNodeId,
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled as unknown as ConcreteCompiledAnalogCircuit);
+    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
     engine.dcOperatingPoint();
 
     // Settle to steady state
@@ -1004,10 +1018,10 @@ describe("WireCurrentResolver — cross-component pin-wire matching", () => {
 });
 
 // ===========================================================================
-// Real lrctest.dig fixture — full pipeline (load → compile → MNA → resolve)
+// Real lrctest.dig fixture- full pipeline (load → compile → MNA → resolve)
 // ===========================================================================
 
-describe("WireCurrentResolver — lrctest.dig real fixture", () => {
+describe("WireCurrentResolver- lrctest.dig real fixture", () => {
   // -------------------------------------------------------------------------
   // Loads the actual lrctest.dig fixture through the full pipeline:
   //   XML parse → analog compile → MNA engine → DC OP → transient → resolve
@@ -1030,7 +1044,6 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
     const { createDefaultRegistry } = await import("@/components/register-all");
     const { compileUnified } = await import("@/compile/compile");
-    const { MNAEngine } = await import("@/solver/analog/analog-engine");
     const { pinWorldPosition } = await import("@/core/pin");
 
     // Load the real lrctest.dig fixture through the full pipeline:
@@ -1048,10 +1061,9 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const compiled = compileUnified(circuit, registry).analog!;
     expect(compiled.elements.length).toBeGreaterThan(0);
 
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
 
-    // DC OP — may or may not converge depending on topology (inductor at DC).
+    // DC OP- may or may not converge depending on topology (inductor at DC).
     // Either way, transient stepping will settle the circuit.
     const dc = engine.dcOperatingPoint();
 
@@ -1213,7 +1225,6 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
     const { createDefaultRegistry } = await import("@/components/register-all");
     const { compileUnified } = await import("@/compile/compile");
-    const { MNAEngine } = await import("@/solver/analog/analog-engine");
 
     const xml = readFileSync(
       resolve(__dirname, "../../../fixtures/lrctest.dig"),
@@ -1225,12 +1236,11 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     circuit.metadata = { ...circuit.metadata };
 
     const compiled = compileUnified(circuit, registry).analog!;
-    const engine = new MNAEngine();
-    engine.init(compiled);
+    const engine = engineFrom(compiled);
     engine.dcOperatingPoint();
 
     // Settle past transients
-    const settleTime = 0.01; // 10ms — 10×RC for R=1k, C=1µF
+    const settleTime = 0.01; // 10ms- 10×RC for R=1k, C=1µF
     let steps = 0;
     while (engine.simTime < settleTime && steps < 100_000) {
       engine.step();
@@ -1328,7 +1338,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 
         // CHECK 1: For non-junction pins, wire current must match body current.
         // At a junction vertex the component's current splits across multiple
-        // wires, so no single wire carries the full amount — skip those pins.
+        // wires, so no single wire carries the full amount- skip those pins.
         if (!isJunctionA) {
           const errA = Math.abs(cA - bodyCurrent) / I_elem;
           if (errA > maxWireVsBodyError) maxWireVsBodyError = errA;
@@ -1341,7 +1351,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         }
 
         // CHECK 2: When BOTH pins are non-junction, wire currents must match
-        // each other (component-as-node KCL — current in = current out).
+        // each other (component-as-node KCL- current in = current out).
         if (!isJunctionA && !isJunctionB) {
           const pinAPinBErr = Math.abs(cA - cB) / I_elem;
           if (pinAPinBErr > maxPinAPinBError) maxPinAPinBError = pinAPinBErr;
@@ -1365,10 +1375,10 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 });
 
 // ===========================================================================
-// Rotated-component pin snap — simplified mock (misaligned pin on wire segment)
+// Rotated-component pin snap- simplified mock (misaligned pin on wire segment)
 // ===========================================================================
 
-describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
+describe("WireCurrentResolver- misaligned pin snap (mock)", () => {
   it("current into resistor equals current out despite misaligned pins", () => {
     // Simple DC series circuit: Vs(5V) → R1(1kΩ) → R2(1kΩ) → ground
     // R2 has a MISALIGNED pin: pin B at (10, 3) lies ON the wire from
@@ -1382,9 +1392,9 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     const r2 = makeResistor(2, 0, R2v);
 
     // Simpler: just 3 nodes in a line
-    // node 1: Vs.pos(0,0) ——wire——> R1.A(2,0)
+    // node 1: Vs.pos(0,0)-—wire——> R1.A(2,0)
     const wa = makeWire(0, 0, 2, 0);
-    // node 2: R1.B(6,0) ——wire——> R2.A(8,0)  (single wire, both pins on endpoints)
+    // node 2: R1.B(6,0)-—wire——> R2.A(8,0)  (single wire, both pins on endpoints)
     const wb = makeWire(6, 0, 8, 0);
     // ground: R2.B(10,3) is ON wire (10,0)→(10,6) but not at an endpoint
     const wg1 = makeWire(10, 0, 10, 6);  // R2 ground-side wire
@@ -1414,8 +1424,7 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
       wireToNodeId,
     });
 
-    const engine = new MNAEngine();
-    engine.init(compiled as unknown as ConcreteCompiledAnalogCircuit);
+    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
     const dc = engine.dcOperatingPoint();
     expect(dc.converged).toBe(true);
 
@@ -1425,7 +1434,7 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     const I_R2 = Math.abs(engine.getElementCurrent(2));
 
     // THE KEY CHECKS:
-    // wb (node 2): R1.B(6,0) → R2.A(8,0) — both endpoints match pins, single wire at node 2.
+    // wb (node 2): R1.B(6,0) → R2.A(8,0)- both endpoints match pins, single wire at node 2.
     // Wire wb must carry R2's current (= R1's current = series current).
     const cWb = resolver.getWireCurrent(wb)!.current;
     expect(cWb).toBeGreaterThan(0);
@@ -1437,7 +1446,7 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     expect(cWg1).toBeGreaterThan(0);
     expect(Math.abs(cWg1 - I_R2) / I_R2).toBeLessThan(0.01);
 
-    // Component body paths — one per element (vs, r1, r2)
+    // Component body paths- one per element (vs, r1, r2)
     const paths = resolver.getComponentPaths();
     expect(paths).toHaveLength(3);
   });

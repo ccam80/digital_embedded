@@ -16,14 +16,12 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 import {
-  allocateStatePool,
   makeTestSetupContext,
   setupAll,
   loadCtxFromFields,
 } from "../../../solver/analog/__tests__/test-helpers.js";
-import { CapacitorDefinition } from "../../passives/capacitor.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -93,7 +91,7 @@ function makeMinimalCtx(
 }
 
 // ---------------------------------------------------------------------------
-// Helper — create AC source AnalogElement from props
+// Helper- create AC source AnalogElement from props
 // ---------------------------------------------------------------------------
 
 function makeAcElement(
@@ -134,7 +132,7 @@ function makeAcElement(
 }
 
 // ---------------------------------------------------------------------------
-// Helper — setup an AC element and assign its branch index
+// Helper- setup an AC element and assign its branch index
 // ---------------------------------------------------------------------------
 
 function setupAcElement(
@@ -150,7 +148,7 @@ function setupAcElement(
 }
 
 // ---------------------------------------------------------------------------
-// Unit tests — waveform computation (pure function)
+// Unit tests- waveform computation (pure function)
 // ---------------------------------------------------------------------------
 
 describe("computeWaveformValue", () => {
@@ -188,7 +186,7 @@ describe("squareWaveBreakpoints", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AcSource — stamp tests via MNA mock
+// AcSource- stamp tests via MNA mock
 // ---------------------------------------------------------------------------
 
 describe("AcSource", () => {
@@ -259,7 +257,7 @@ describe("AcSource", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration test — RC low-pass filter
+// Integration test- RC low-pass filter
 //
 // 1kHz sine (5V) → 1kΩ → 1µF → ground
 // Expected capacitor voltage amplitude:
@@ -270,89 +268,44 @@ describe("AcSource", () => {
 // ---------------------------------------------------------------------------
 
 describe("Integration", () => {
-  it("rc_lowpass", () => {
-    // Build circuit using test-elements: AC source + R + C
-    // Nodes: node1=Vs+ (1), node2=mid RC (2), gnd=0
-    // Elements: AcSource(1,0,branch=3), R=1kΩ(1,2), C=1µF(2,0)
-
-    const props = new PropertyBag();
-    props.setModelParam("amplitude", 5);
-    props.setModelParam("frequency", 1000);
-    props.setModelParam("phase", 0);
-    props.setModelParam("dcOffset", 0);
-    props.set("waveform", "sine");
-
-    let simTime = 0;
-    const getTime = () => simTime;
-
-    // 1-based: nodeCount=2, branchCount=1, matrixSize=3. Branch row = nodeCount+1 = 3.
-    const acSrc = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 0]]),
-      props,
-      getTime,
-    ) as AcVoltageSourceAnalogElement;
-
-    // Build resistor as an inline element (1kΩ, node1→node2)
-    const G = 1 / 1000;
-    const r: import("../../../solver/analog/element.js").AnalogElement = {
-      label: "",
-      branchIndex: -1,
-      _stateBase: -1,
-      ngspiceLoadOrder: 10,
-      _pinNodes: new Map([["A", 1], ["B", 2]]),
-      setup(_ctx) {},
-      setParam(_k, _v) {},
-      getPinCurrents(_v) { return []; },
-      load(ctx) {
-        ctx.solver.stampElement(ctx.solver.allocElement(1, 1), G);
-        ctx.solver.stampElement(ctx.solver.allocElement(2, 2), G);
-        ctx.solver.stampElement(ctx.solver.allocElement(1, 2), -G);
-        ctx.solver.stampElement(ctx.solver.allocElement(2, 1), -G);
-      },
-    };
-
-    // Build capacitor using the production factory (1µF, node2→gnd)
-    const capProps = new PropertyBag();
-    capProps.replaceModelParams({ capacitance: 1e-6 });
-    const cap = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 2], ["neg", 0]]),
-      capProps,
-      () => 0,
-    );
-
-    const acElements = [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap];
-    const acStatePool = allocateStatePool(acElements);
-
-    const circuit = {
-      netCount: 2,
-      componentCount: 3,
-      nodeCount: 2,
-      branchCount: 1,
-      matrixSize: 3,
-      elements: acElements,
-      labelToNodeId: new Map(),
-      statePool: acStatePool,
-    } as unknown as ConcreteCompiledAnalogCircuit;
-
-    const engine = new MNAEngine();
-    engine.init(circuit);
-
-    // Run transient for 10 periods at 1kHz (10ms), dt=5µs per step
+  it("rc_lowpass", async () => {
+    // 1kHz sine (5V) → 1kΩ → 1µF → ground
+    // Expected capacitor voltage amplitude ≈ 0.786V, allow ±10%.
     const period = 1e-3;
-    const dt = 5e-6;
-    const totalTime = 10 * period;
-    const steps = Math.round(totalTime / dt);
-
-    // Track peak capacitor voltage in the last 5 periods (after settling)
-    let peakVcap = 0;
+    const tStop = 10 * period;
     const settleTime = 5 * period;
+    const maxStep = 5e-6;
 
-    for (let i = 0; i < steps; i++) {
-      simTime = (i + 1) * dt;
-      engine.step();
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "acsrc", type: "AcVoltageSource", props: { label: "acsrc", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0, waveform: "sine" } },
+            { id: "r1",    type: "Resistor",        props: { label: "r1",    resistance: 1000 } },
+            { id: "c1",    type: "Capacitor",       props: { label: "c1",    capacitance: 1e-6 } },
+            { id: "gnd",   type: "Ground" },
+          ],
+          connections: [
+            ["acsrc:pos", "r1:A"],
+            ["r1:B",      "c1:pos"],
+            ["c1:neg",    "gnd:out"],
+            ["acsrc:neg", "gnd:out"],
+          ],
+        });
+      },
+      analysis: "tran",
+      tStop,
+      maxStep,
+    });
 
-      if (simTime > settleTime) {
-        const vcap = Math.abs(engine.getNodeVoltage(2)); // node2 = MNA node ID 2
+    // Find peak capacitor voltage in the settled portion (after settleTime).
+    const stepCount = (session as any)._ourSession!.steps.length;
+    let peakVcap = 0;
+    for (let i = 0; i < stepCount; i++) {
+      const stepEnd = session.getStepEnd(i);
+      if ((stepEnd.stepEndTime.ours ?? 0) > settleTime) {
+        const vcap = Math.abs(stepEnd.nodes["c1:pos"]?.ours ?? 0);
         if (vcap > peakVcap) peakVcap = vcap;
       }
     }
@@ -415,7 +368,7 @@ describe("ExprWaveform", () => {
   });
 
   it("invalid_expression_emits_diagnostic", () => {
-    // "sin(" is malformed — should record parse error, not throw
+    // "sin(" is malformed- should record parse error, not throw
     const el = makeExprElement("sin(");
     expect(el._parsedExpr).toBeNull();
     expect(el._parseError).not.toBeNull();
@@ -447,7 +400,7 @@ describe("ExprWaveform", () => {
 });
 
 // ===========================================================================
-// Task C4.4 — AC voltage source srcFact + breakpoint parity
+// Task C4.4- AC voltage source srcFact + breakpoint parity
 //
 // ngspice reference: cktload.c:96-136 + VSRCload. The AC voltage source
 // multiplies its computed waveform value by CKTsrcFact before stamping.
@@ -562,7 +515,7 @@ describe("ac_vsource_breakpoints_parity", () => {
 });
 
 // ===========================================================================
-// AC-source-fixes — PULSE-aligned triangle + sawtooth waveform parity
+// AC-source-fixes- PULSE-aligned triangle + sawtooth waveform parity
 //
 // After Fix 1 (triangle) and Fix 2 (sawtooth) in ac-voltage-source.ts, the
 // engine produces piecewise-linear output bit-exactly matching a SPICE
@@ -599,11 +552,11 @@ function pulseReference(
 }
 
 // ===========================================================================
-// PULSE wrap parity — vsrcload.c:112-117 bit-exact
+// PULSE wrap parity- vsrcload.c:112-117 bit-exact
 //
 // Two regressions guarded here:
 //   (1) Precision: ((x % P) + P) % P destroys ~2e7 ULPs for tiny positive x
-//       (caught by rc-transient at t=1e-11, period=2ms — drift to 9.99e-12).
+//       (caught by rc-transient at t=1e-11, period=2ms- drift to 9.99e-12).
 //   (2) Negative-time semantics: positive phase makes tShifted < 0, where
 //       ngspice returns V1 via the `time <= 0 || time >= TR+PW+TF` branch.
 //       The harness encodes phase as TD = ((-phaseShift % P) + P) % P, so
@@ -631,7 +584,7 @@ describe("ac_vsource_pulse_wrap_parity", () => {
     // And explicitly the rising-edge linear formula at t=1e-11 with TR=1ps:
     //   V1 + (V2 - V1) * 1e-11 / 1e-12 = -5 + 10*10 = 95V (not V1; we are
     //   well past TR). With TR=1ps and t=10ps, t > TR + PW + TF (period - TR)
-    //   actually no — let's just keep it as bit-exact-vs-ngspice without
+    //   actually no- let's just keep it as bit-exact-vs-ngspice without
     //   asserting the analytical value.
   });
 
@@ -825,7 +778,7 @@ describe("ac_vsource_sawtooth_pulse_parity", () => {
       period * 0.75,
       period - fallTime * 2,  // still on the rise
       period - fallTime / 2,  // midway through the fall
-      period,                 // cycle boundary — next rise
+      period,                 // cycle boundary- next rise
       period * 1.25,
       period * 1.5,
       period * 2 - fallTime * 2,
@@ -875,7 +828,7 @@ describe("ac_vsource_sawtooth_pulse_parity", () => {
 });
 
 // ===========================================================================
-// AC-source-fixes — nextBreakpoint support for triangle and sawtooth
+// AC-source-fixes- nextBreakpoint support for triangle and sawtooth
 // ===========================================================================
 
 describe("ac_vsource_triangle_breakpoints_parity", () => {

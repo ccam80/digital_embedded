@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mul component- N-bit multiplier producing a 2N-bit product.
  *
  * Ports from Digital's Mul.java:
@@ -31,7 +31,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -42,7 +42,7 @@ import {
 const COMP_WIDTH = 3;
 // Java Mul uses GenericShape: 2 inputs (a, b), 1 output (mul), width=3
 // Inputs a@(0,0), b@(0,2) [even gap], output mul@(3,1) [offs=1]
-// Java rect: (0.05,-0.5)→(2.95,2.5) = height 3
+// Java rect: (0.05,-0.5)â†’(2.95,2.5) = height 3
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -242,7 +242,7 @@ function mulFactory(props: PropertyBag): MulElement {
   return new MulElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const MulDefinition: ComponentDefinition = {
+export const MulDefinition: StandaloneComponentDefinition = {
   name: "Mul",
   typeId: -1,
   factory: mulFactory,

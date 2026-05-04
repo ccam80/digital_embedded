@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for bridge MNA element integration in compileAnalogPartition.
  *
  * Task 1.6: Verifies that bridge stubs produce BridgeOutputAdapter /
@@ -18,12 +18,11 @@ import type {
 } from '../../../compile/types.js';
 import type { BridgeOutputAdapter, BridgeInputAdapter } from '../bridge-adapter.js';
 import { ComponentRegistry, ComponentCategory } from '../../../core/registry.js';
-import type { ComponentDefinition } from '../../../core/registry.js';
+import type { StandaloneComponentDefinition } from '../../../core/registry.js';
 import { CompositeElement } from '../composite-element.js';
 import { loadCtxFromFields, makeTestSetupContext, setupAll } from './test-helpers.js';
 import type { MnaSubcircuitNetlist } from '../../../core/mna-subcircuit-netlist.js';
 import { PropertyBag } from '../../../core/properties.js';
-import { StatePool } from '../state-pool.js';
 import { SparseSolver } from '../sparse-solver.js';
 import { ResistorDefinition } from '../../../components/passives/resistor.js';
 
@@ -212,7 +211,7 @@ describe('bridge-compilation: bridge output in hi-z mode stamps I=0', () => {
   });
 });
 
-describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeElement subclass (§A.21 item 3)', () => {
+describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeElement subclass (ssA.21 item 3)', () => {
   it('factory returns instanceof CompositeElement and setup propagates _stateBase to sub-elements', () => {
     // Build a minimal subcircuit netlist: one resistor between port A and port B.
     // Ports: ["A", "B"] (indices 0, 1). No internal nets.
@@ -223,7 +222,7 @@ describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeEleme
         { typeId: "Resistor", params: { resistance: 1000 } },
       ],
       netlist: [
-        [0, 1], // resistor A→B maps to net 0 (port A) and net 1 (port B)
+        [0, 1], // resistor Aâ†’B maps to net 0 (port A) and net 1 (port B)
       ],
     };
 
@@ -231,8 +230,8 @@ describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeEleme
     const registry = new ComponentRegistry();
     registry.register(ResistorDefinition);
 
-    // Build a stub ComponentDefinition with the subcircuit netlist as a model entry.
-    const stubDef: ComponentDefinition = {
+    // Build a stub StandaloneComponentDefinition with the subcircuit netlist as a model entry.
+    const stubDef: StandaloneComponentDefinition = {
       name: "SubcktResistor",
       typeId: -99,
       factory: (_props: unknown) => { throw new Error("unused"); },
@@ -253,7 +252,7 @@ describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeEleme
           params: { resistance: 1000 },
         },
       },
-    } as unknown as ComponentDefinition;
+    } as unknown as StandaloneComponentDefinition;
 
     registry.register(stubDef);
 
@@ -342,10 +341,10 @@ describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeEleme
     expect(compiled.elements.length).toBeGreaterThanOrEqual(1);
     const composite = compiled.elements[0];
 
-    // §A.21 item 3: the factory result must be instanceof CompositeElement.
+    // ssA.21 item 3: the factory result must be instanceof CompositeElement.
     expect(composite).toBeInstanceOf(CompositeElement);
 
-    // setup → _stateBase is propagated: after setup, all pool-backed sub-elements
+    // setup â†’ _stateBase is propagated: after setup, all pool-backed sub-elements
     // within the composite must have _stateBase !== -1.
     // The composite itself gets _stateBase assigned by setupAll.
     const matrixSize = 2;
@@ -355,13 +354,10 @@ describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeEleme
     setupAll([composite], ctx);
 
     // After setup, _stateBase on the composite is set by the engine's setupAll.
-    // The spec requirement (§A.21 item 3): getSubElements() forwarding propagates
-    // to all sub-elements — verify no sub-element has _stateBase === -1 after
+    // The spec requirement (ssA.21 item 3): getSubElements() forwarding propagates
+    // to all sub-elements- verify no sub-element has _stateBase === -1 after
     // super.setup (i.e., the CompositeElement.initState forwarding works).
-    // We verify by running initState manually with a zero-based StatePool.
-    (composite as any)._stateBase = 0;
-    const pool = new StatePool((composite as any).stateSize);
-    (composite as any).initState(pool);
+    // setupAll already assigned _stateBase and called initState via ctx.allocStates.
 
     const subElements = (composite as any).getSubElements() as any[];
     for (const sub of subElements) {

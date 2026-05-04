@@ -19,8 +19,8 @@ import type { LimitingEvent } from "./newton-raphson.js";
 import { NodeVoltageHistory } from "./integration.js";
 export type { LoadContext } from "./load-context.js";
 import type { LoadContext, ConvergenceEvent } from "./load-context.js";
-import type { IntegrationMethod } from "../../core/analog-types.js";
-import { MODEDCOP, MODEINITFLOAT } from "./ckt-mode.js";
+import type { IntegrationMethod } from "./integration.js";
+import { MODEDCOP, MODEINITFLOAT, MODEUIC } from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // LoadCtxImpl- concrete LoadContext with live state-ring access
@@ -333,7 +333,10 @@ export class CKTCircuitContext {
    * it to devices via `loadCtx.cktMode`.
    *
    * Defaults to MODEDCOP | MODEINITFLOAT- ngspice's post-reset analysis-
-   * idle state.
+   * idle state. The MODEUIC bit is OR'd in by the constructor when
+   * `params.uic` is true (cktdefs.h:185), and is preserved across the
+   * `& MODEUIC` mask used by every analysis-mode reset thereafter
+   * (dcop.c:82, dctran.c:346, acan.c:285).
    */
   cktMode: number = MODEDCOP | MODEINITFLOAT;
 
@@ -656,8 +659,16 @@ export class CKTCircuitContext {
     // rotation reads always see the live ring (cktdefs.h:82-85 macro
     // semantics). cite: cktinit.c:53-55- CKTbypass default false;
     // CKTvoltTol default 1e-6.
+    // ngspice cktdefs.h:185 — MODEUIC is an orthogonal bit that's preserved
+    // across every analysis-mode reset (dcop.c:82 `(CKTmode & MODEUIC) | …`,
+    // dctran.c:346 likewise, acan.c:285 likewise). The user enables it via
+    // `SimulationParams.uic` (.tran's UIC argument) and it gates the
+    // skip-DCOP-and-use-ICs-as-initial path in transientDcOp() and the
+    // device-side IC seeding branches (e.g. bjtload.c:258-264).
+    const initialCktMode = (MODEDCOP | MODEINITFLOAT) | (params.uic ? MODEUIC : 0);
+    this.cktMode = initialCktMode;
     this.loadCtx = new LoadCtxImpl(new StatePool(0), {
-      cktMode: MODEDCOP | MODEINITFLOAT,
+      cktMode: initialCktMode,
       solver: this._solver,
       matrix: this._solver,
       rhs: this.rhs,

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PriorityEncoder component- outputs the index of the highest-priority
  * (most significant) active input.
  *
@@ -32,7 +32,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -233,7 +233,7 @@ function priorityEncoderFactory(props: PropertyBag): PriorityEncoderElement {
   );
 }
 
-export const PriorityEncoderDefinition: ComponentDefinition = {
+export const PriorityEncoderDefinition: StandaloneComponentDefinition = {
   name: "PriorityEncoder",
   typeId: -1,
   factory: priorityEncoderFactory,

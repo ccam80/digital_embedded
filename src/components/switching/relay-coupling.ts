@@ -14,8 +14,7 @@
 
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
@@ -31,26 +30,19 @@ const SCHEMA = defineStateSchema("RelayCoupling", []); // no internal state
 // RelayCouplingElement
 // ---------------------------------------------------------------------------
 
-export class RelayCouplingElement implements PoolBackedAnalogElement {
+export class RelayCouplingElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
-  readonly poolBacked = true as const;
   readonly stateSize = 0;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private readonly _coilBranchLabel: string;
   private readonly _switchClosedRef: PoolSlotRef;
   private _pullInI: number;
   private _dropOutI: number;
   private _coilBranchIndex = -1;
-  private _pool!: StatePoolRef;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
 
     // siblingBranch resolution: compiler stamps "${parentLabel}:${subName}"
     // into the regular prop partition (compiler.ts:391-394).
@@ -77,11 +69,6 @@ export class RelayCouplingElement implements PoolBackedAnalogElement {
           `the coil inductor sub-element must declare branchCount: 1.`,
       );
     }
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
-    // stateSize is 0 - no own slots to initialise.
   }
 
   load(ctx: LoadContext): void {

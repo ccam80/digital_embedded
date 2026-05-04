@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shape render audit- pixel comparison + structural text comparison
  * of TS component rendering against Java Digital's reference shapes.
  *
@@ -83,7 +83,7 @@ const SKIP_TYPES = new Set([
   "PJFET",        // D and S pins are offset from the body leads
 ]);
 
-/** Java type name → TS registry name overrides. */
+/** Java type name â†’ TS registry name overrides. */
 const JAVA_TO_TS_NAME: Record<string, string> = {
   "Seven-Seg": "SevenSeg",
   "Seven-Seg-Hex": "SevenSegHex",
@@ -98,7 +98,7 @@ function buildDefaultProps(
   registry: ComponentRegistry,
   typeName: string,
 ): PropertyBag {
-  const def = registry.get(typeName);
+  const def = registry.getStandalone(typeName);
   if (!def) return new PropertyBag();
   const entries: Array<[string, import("@/core/properties").PropertyValue]> = [];
   for (const pd of def.propertyDefs) {
@@ -179,7 +179,7 @@ function computeUncoveredTypes(): Array<{ tsName: string }> {
   }
 
   const types: Array<{ tsName: string }> = [];
-  for (const def of reg.getAll()) {
+  for (const def of reg.getAllStandalone()) {
     if (SKIP_TYPES.has(def.name)) continue;
     if (coveredTsNames.has(def.name)) continue;
     // 74xx ICs are subcircuit stubs- factory intentionally throws
@@ -217,7 +217,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
 
       // Create TS element and draw
       const props = buildDefaultProps(registry, tsName);
-      const def = registry.get(tsName)!;
+      const def = registry.getStandalone(tsName)!;
       let element: CircuitElement;
       try {
         element = def.factory(props);
@@ -271,7 +271,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
       // Convert TS draw calls to segments
       const tsSegs = tsCallsToSegments(ctx.calls);
 
-      // Compute union bounding box → shared viewport
+      // Compute union bounding box â†’ shared viewport
       const javaBounds = segmentBounds(javaSegs);
       const tsBounds = segmentBounds(tsSegs);
       const bounds = unionBounds(javaBounds, tsBounds);
@@ -320,7 +320,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
       // --- Text overlap detection ---
       const overlapResult = detectTextOverlaps(ctx.calls);
       const textOverlapDetails = overlapResult.overlaps.map(
-        (o) => `"${o.a.text}"↔"${o.b.text}" (${o.overlapArea.toFixed(2)})`
+        (o) => `"${o.a.text}"â†”"${o.b.text}" (${o.overlapArea.toFixed(2)})`
       );
 
       // --- Pin position comparison ---
@@ -348,7 +348,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
             if (dx > 0.01 || dy > 0.01) {
               pinPosMismatches++;
               pinPosDetails.push(
-                `${jp.label}:(${jp.x},${jp.y})→(${tp.position.x},${tp.position.y})`
+                `${jp.label}:(${jp.x},${jp.y})â†’(${tp.position.x},${tp.position.y})`
               );
             }
           }
@@ -393,7 +393,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
   it.each(computeUncoveredTypes())(
     "$tsName (uncovered- no Java pixel reference)",
     ({ tsName }) => {
-      const def = registry.get(tsName)!;
+      const def = registry.getStandalone(tsName)!;
       const props = buildDefaultProps(registry, tsName);
 
       let element: CircuitElement;
@@ -474,7 +474,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
       // --- Text overlap detection ---
       const overlapResult = detectTextOverlaps(ctx.calls);
       const textOverlapDetails = overlapResult.overlaps.map(
-        (o) => `"${o.a.text}"↔"${o.b.text}" (${o.overlapArea.toFixed(2)})`
+        (o) => `"${o.a.text}"â†”"${o.b.text}" (${o.overlapArea.toFixed(2)})`
       );
 
       // --- Pin position comparison ---
@@ -500,7 +500,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
             if (dx > 0.01 || dy > 0.01) {
               pinPosMismatches++;
               pinPosDetails.push(
-                `${jp.label}:(${jp.x},${jp.y})→(${tp.position.x},${tp.position.y})`
+                `${jp.label}:(${jp.x},${jp.y})â†’(${tp.position.x},${tp.position.y})`
               );
             }
           }
@@ -555,7 +555,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
     console.log(`Total components: ${total} (${covered.length} covered + ${uncoveredResults.length} uncovered)`);
     console.log(`Errors (factory/draw): ${errors.length}`);
     console.log(
-      `Pixel match (Dice ≥ 0.7): ${pixelGood.length} / ${covered.length}`,
+      `Pixel match (Dice â‰¥ 0.7): ${pixelGood.length} / ${covered.length}`,
     );
     const extentGood = covered.filter((r) => r.extent.maxDelta < 0.5);
     const bboxGood = valid.filter((r) => r.bboxOverflow <= 0.1);
@@ -563,10 +563,10 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
       `Text match (no missing/extra): ${textPerfect.length} / ${covered.length}`,
     );
     console.log(
-      `Extent match (maxΔ < 0.5): ${extentGood.length} / ${covered.length}`,
+      `Extent match (maxÎ” < 0.5): ${extentGood.length} / ${covered.length}`,
     );
     console.log(
-      `BBox covers shape (≤0.1 overflow): ${bboxGood.length} / ${valid.length}`,
+      `BBox covers shape (â‰¤0.1 overflow): ${bboxGood.length} / ${valid.length}`,
     );
     const overlapFree = valid.filter((r) => r.textOverlaps === 0);
     console.log(
@@ -596,10 +596,10 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
         "\n" +
           "Component".padEnd(22) +
           "Dice".padEnd(8) +
-          "ΔW".padEnd(7) +
-          "ΔH".padEnd(7) +
-          "ΔCx".padEnd(7) +
-          "ΔCy".padEnd(7) +
+          "Î”W".padEnd(7) +
+          "Î”H".padEnd(7) +
+          "Î”Cx".padEnd(7) +
+          "Î”Cy".padEnd(7) +
           "BBox".padEnd(6) +
           "OLap".padEnd(6) +
           "Txt".padEnd(8) +
@@ -630,7 +630,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
         } else if (r.pinCountDelta !== 0) {
           pinStr = `#${r.pinCountDelta > 0 ? "+" : ""}${r.pinCountDelta}`;
         } else if (r.pinPosMismatches > 0) {
-          pinStr = `Δ${r.pinPosMismatches}`;
+          pinStr = `Î”${r.pinPosMismatches}`;
         } else {
           pinStr = "ok";
         }
@@ -645,7 +645,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
         // Show position diffs > 0.5 grid units
         for (const m of r.textResult.matched) {
           if (m.posDiff > 0.5) {
-            details += `"${m.java.text}" Δ${m.posDiff.toFixed(1)} `;
+            details += `"${m.java.text}" Î”${m.posDiff.toFixed(1)} `;
           }
         }
         // Show pin mismatches
@@ -654,7 +654,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
         }
         if (r.pinCountDelta !== null && r.pinCountDelta !== 0) {
           const tsCnt = (r.pinCountDelta > 0 ? r.pinCountDelta : 0);
-          details += `pin#:${tsCnt + (r.pinCountDelta < 0 ? r.pinCountDelta : 0)}→${tsCnt + (r.pinCountDelta > 0 ? r.pinCountDelta : 0)} `;
+          details += `pin#:${tsCnt + (r.pinCountDelta < 0 ? r.pinCountDelta : 0)}â†’${tsCnt + (r.pinCountDelta > 0 ? r.pinCountDelta : 0)} `;
         }
         if (r.pinDetachedDetails.length > 0) {
           details += `detached:[${r.pinDetachedDetails.join(",")}] `;
@@ -681,11 +681,11 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
       .filter((r) => r.extent.maxDelta >= 0.5)
       .sort((a, b) => b.extent.maxDelta - a.extent.maxDelta);
     if (extentBad.length > 0) {
-      console.log("\n--- Extent Outliers (maxΔ ≥ 0.5 grid) ---");
+      console.log("\n--- Extent Outliers (maxÎ” â‰¥ 0.5 grid) ---");
       for (const r of extentBad) {
         const e = r.extent;
         console.log(
-          `  ${r.typeId}: Java=${e.javaW.toFixed(1)}×${e.javaH.toFixed(1)} TS=${e.tsW.toFixed(1)}×${e.tsH.toFixed(1)} ΔW=${e.widthDelta.toFixed(2)} ΔH=${e.heightDelta.toFixed(2)} ΔC=(${e.centerDx.toFixed(2)},${e.centerDy.toFixed(2)})`,
+          `  ${r.typeId}: Java=${e.javaW.toFixed(1)}Ã—${e.javaH.toFixed(1)} TS=${e.tsW.toFixed(1)}Ã—${e.tsH.toFixed(1)} Î”W=${e.widthDelta.toFixed(2)} Î”H=${e.heightDelta.toFixed(2)} Î”C=(${e.centerDx.toFixed(2)},${e.centerDy.toFixed(2)})`,
         );
       }
     }
@@ -759,11 +759,11 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
       buckets[idx]++;
     }
     console.log("\n--- Dice Distribution ---");
-    console.log(`  0.0–0.2: ${buckets[0]}`);
-    console.log(`  0.2–0.4: ${buckets[1]}`);
-    console.log(`  0.4–0.6: ${buckets[2]}`);
-    console.log(`  0.6–0.8: ${buckets[3]}`);
-    console.log(`  0.8–1.0: ${buckets[4]}`);
+    console.log(`  0.0â€“0.2: ${buckets[0]}`);
+    console.log(`  0.2â€“0.4: ${buckets[1]}`);
+    console.log(`  0.4â€“0.6: ${buckets[2]}`);
+    console.log(`  0.6â€“0.8: ${buckets[3]}`);
+    console.log(`  0.8â€“1.0: ${buckets[4]}`);
 
     // -----------------------------------------------------------------------
     // Assertions- strict thresholds, no escape hatches
@@ -774,7 +774,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
     // independently, giving a complete failure inventory in one pass.
     // -----------------------------------------------------------------------
 
-    // Dice ≥ 0.99: every covered component must near-perfectly match Java reference
+    // Dice â‰¥ 0.99: every covered component must near-perfectly match Java reference
     const diceFails = covered.filter((r) => r.pixelDice < 0.99);
     expect.soft(
       diceFails.length,
@@ -786,8 +786,8 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
     const extentFails = covered.filter((r) => r.extent.maxDelta > 0);
     expect.soft(
       extentFails.length,
-      `Extent Δ > 0 (${extentFails.length}):\n` +
-        extentFails.map((r) => `  ${r.typeId} (Δ${r.extent.maxDelta.toFixed(2)})`).join("\n"),
+      `Extent Î” > 0 (${extentFails.length}):\n` +
+        extentFails.map((r) => `  ${r.typeId} (Î”${r.extent.maxDelta.toFixed(2)})`).join("\n"),
     ).toBe(0);
 
     // BBox: no component should draw outside its bounding box at all
@@ -810,7 +810,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
     expect.soft(
       pinCountBad.length,
       `Pin count mismatch (${pinCountBad.length}):\n` +
-        pinCountBad.map((r) => `  ${r.typeId} (Δ${r.pinCountDelta! > 0 ? "+" : ""}${r.pinCountDelta})`).join("\n"),
+        pinCountBad.map((r) => `  ${r.typeId} (Î”${r.pinCountDelta! > 0 ? "+" : ""}${r.pinCountDelta})`).join("\n"),
     ).toBe(0);
 
     // Pin positions: every covered component's pins must be at the right local coordinates
@@ -821,7 +821,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
         pinPosBad.map((r) => `  ${r.typeId}: ${r.pinPosDetails.join(", ")}`).join("\n"),
     ).toBe(0);
 
-    // Pin proximity: every pin must touch the drawn body (distance ≤ 0.1 grid)
+    // Pin proximity: every pin must touch the drawn body (distance â‰¤ 0.1 grid)
     const totalDetached = valid.reduce((sum, r) => sum + r.pinDetachedCount, 0);
     expect.soft(
       totalDetached,
@@ -835,7 +835,7 @@ describe("shape render audit- pixel + text comparison vs Java Digital", () => {
 // Rotation/mirror pin transform audit
 //
 // For each component type with a Java pin reference, create the element at
-// all 8 transform combinations (4 rotations × 2 mirror states) and verify
+// all 8 transform combinations (4 rotations Ã— 2 mirror states) and verify
 // that pinWorldPosition() matches the Java transform math.
 // ---------------------------------------------------------------------------
 
@@ -846,7 +846,7 @@ import { javaWorldPosition } from "@/test-utils/java-pin-reference";
 const ROTATIONS: Rotation[] = [0, 1, 2, 3];
 const MIRRORS = [false, true];
 
-describe("pin transform audit- rotation × mirror correctness", () => {
+describe("pin transform audit- rotation Ã— mirror correctness", () => {
   let registry: ComponentRegistry;
 
   beforeAll(() => {
@@ -873,7 +873,7 @@ describe("pin transform audit- rotation × mirror correctness", () => {
   it.each(allAuditTypes)(
     "$tsName pin transforms",
     ({ tsName }) => {
-      const def = registry.get(tsName);
+      const def = registry.getStandalone(tsName);
       if (!def) return;
 
       const props = buildDefaultProps(registry, tsName);
@@ -970,7 +970,7 @@ describe("pin transform audit- rotation × mirror correctness", () => {
       lines.push(`  ${typeId}- ${ms.length} mismatch(es):`);
       for (const [pattern, { count, example }] of patterns) {
         lines.push(
-          `    ${pattern} (×${count})- expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
+          `    ${pattern} (Ã—${count})- expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
         );
       }
     }

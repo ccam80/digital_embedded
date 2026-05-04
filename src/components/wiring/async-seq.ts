@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AsyncSeq component- marks circuit as asynchronous sequential.
  * Propagation is triggered by input changes only (no explicit clock).
  *
@@ -23,7 +23,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -80,7 +80,7 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Filled rectangle: (0.5,0.5) → (4.5,2.5)- 4x2 box
+    // Filled rectangle: (0.5,0.5) â†’ (4.5,2.5)- 4x2 box
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
@@ -186,7 +186,7 @@ function asyncSeqFactory(props: PropertyBag): AsyncSeqElement {
   return new AsyncSeqElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const AsyncSeqDefinition: ComponentDefinition = {
+export const AsyncSeqDefinition: StandaloneComponentDefinition = {
   name: "AsyncSeq",
   typeId: -1,
   factory: asyncSeqFactory,

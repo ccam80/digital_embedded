@@ -42,12 +42,12 @@ function buildHwrCircuit(registry: ComponentRegistry) {
       { id: "gnd", type: "Ground" },
     ],
     connections: [
-      ["vs:pos", "r1:A"],
-      ["r1:B",   "d1:A"],
+      ["vs:pos", "r1:pos"],
+      ["r1:neg", "d1:A"],
       ["d1:K",   "gnd:out"],
-      ["c1:pos", "r1:B"],
+      ["c1:pos", "r1:neg"],
       ["c1:neg", "gnd:out"],
-      ["vs:neg",  "gnd:out"],
+      ["vs:neg", "gnd:out"],
     ],
   });
 }

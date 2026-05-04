@@ -9,7 +9,8 @@ import { PropertyBag } from "../../../../core/properties.js";
 import { AbstractCircuitElement } from "../../../../core/element.js";
 import type { RenderContext } from "../../../../core/renderer-interface.js";
 import type { Pin } from "../../../../core/pin.js";
-import type { AnalogElement, LoadContext } from "../../element.js";
+import type { AnalogElement } from "../../element.js";
+import type { LoadContext } from "../../load-context.js";
 import type { StatePool } from "../../state-pool.js";
 import { createDefaultRegistry } from "../../../../components/register-all.js";
 
@@ -68,9 +69,9 @@ class TestCircuitElement extends AbstractCircuitElement {
   getBoundingBox() { return { x: 0, y: 0, width: 0, height: 0 }; }
 }
 
-function makeAnalogEl(pinNodeIds: number[]): AnalogElement {
+function makeAnalogEl(nodeIds: number[]): AnalogElement {
   return {
-    _pinNodes: new Map(pinNodeIds.map((id, i) => [String(i), id])),
+    _pinNodes: new Map(nodeIds.map((id, i) => [String(i), id])),
     _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
@@ -423,7 +424,7 @@ describe("generateSpiceNetlist", () => {
     props.setModelParam("AREA", 2);
     props.setModelParam("OFF", 1);
     props.setModelParam("TEMP", 325);
-    // IC left at default NaN — should not appear
+    // IC left at default NaN- should not appear
     const compiled = makeCompiled(
       [makeAnalogEl([1, 2])],
       new Map([[0, new TestCircuitElement("Diode", props)]]),
@@ -462,7 +463,7 @@ describe("generateSpiceNetlist", () => {
   });
 
   it("MOSFET NMOS: non-default instance params emit on element line in paramDefs order", () => {
-    // Use NON-default values so every token is visibly present — needed
+    // Use NON-default values so every token is visibly present- needed
     // because TEMP carries a Kelvin→Celsius spiceConverter (TEMP=300.15 K
     // emits as TEMP=27, ngspice's default). At TEMP=350 K → TEMP=76.85,
     // which both side-steps that collapse and asserts the converter ran.
@@ -567,7 +568,7 @@ describe("generateSpiceNetlist", () => {
     // TEMP carries the Kelvin→Celsius spiceConverter (350 K → 76.85 °C, with
     // a trailing FP artifact from the subtraction).
     expect(elementLine).toContain("TEMP=76.85");
-    // SUBS has no ngspice counterpart — must never reach the netlist.
+    // SUBS has no ngspice counterpart- must never reach the netlist.
     expect(elementLine).not.toContain("SUBS");
     // Model card must not contain instance keys
     const modelLine = netlist.split("\n").find(l => l.startsWith(".model Q1_NPN NPN"))!;
@@ -639,9 +640,9 @@ describe("generateSpiceNetlist", () => {
   });
 
   // -------------------------------------------------------------------------
-  // spiceConverter — Kelvin→Celsius for TEMP/TNOM
+  // spiceConverter- Kelvin→Celsius for TEMP/TNOM
   //
-  // ngspice parses TEMP/TNOM as Celsius and adds CONSTCtoK (273.15) — see
+  // ngspice parses TEMP/TNOM as Celsius and adds CONSTCtoK (273.15)- see
   // bjtparam.c:47, bjtmpar.c:42, etc. digiTS stores these in Kelvin (REFTEMP
   // = 300.15 K = 27 °C), so emission must subtract 273.15 to round-trip
   // correctly. Without the converter, TEMP=300.15 K is read back by ngspice

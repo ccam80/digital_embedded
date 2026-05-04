@@ -56,7 +56,7 @@ export function synthesizeCircuit(
   // Step 1: Create In components for each input
   // -------------------------------------------------------------------------
 
-  const inDef = registry.get('In');
+  const inDef = registry.getStandalone('In');
   if (inDef === undefined) {
     throw new Error('synthesizeCircuit: "In" component not registered');
   }
@@ -103,7 +103,7 @@ export function synthesizeCircuit(
   // Step 3: Create Out components for each output
   // -------------------------------------------------------------------------
 
-  const outDef = registry.get('Out');
+  const outDef = registry.getStandalone('Out');
   if (outDef === undefined) {
     throw new Error('synthesizeCircuit: "Out" component not registered');
   }
@@ -159,7 +159,7 @@ function buildExprTree(
     case 'constant': {
       // Represent a constant as a Const component (or just an In with a label)
       const nodeId = freshId();
-      const def = registry.get('Const') ?? registry.get('In');
+      const def = registry.getStandalone('Const') ?? registry.getStandalone('In');
       if (def === undefined) {
         throw new Error('synthesizeCircuit: no Const or In component registered for constants');
       }
@@ -181,7 +181,7 @@ function buildExprTree(
           return baseId;
         }
         // Variable not in map- create a late In element
-        const inDef = registry.get('In');
+        const inDef = registry.getStandalone('In');
         if (inDef === undefined) throw new Error('synthesizeCircuit: "In" not registered');
         const props = new PropertyBag([['label', baseId], ['bitWidth', 1]]);
         const el = inDef.factory(props);
@@ -280,7 +280,7 @@ function buildPosVariable(
   _minColumn: number,
 ): string {
   if (signalElements.has(name)) return name;
-  const inDef = registry.get('In');
+  const inDef = registry.getStandalone('In');
   if (inDef === undefined) throw new Error('synthesizeCircuit: "In" not registered');
   const props = new PropertyBag([['label', name], ['bitWidth', 1]]);
   const el = inDef.factory(props);
@@ -301,7 +301,7 @@ function buildNotGate(
   freshId: () => string,
   column: number,
 ): string {
-  const def = registry.get('Not');
+  const def = registry.getStandalone('Not');
   if (def === undefined) {
     throw new Error('synthesizeCircuit: "Not" component not registered');
   }
@@ -334,7 +334,7 @@ function buildNaryGate(
   freshId: () => string,
   column: number,
 ): string {
-  const def = registry.get(gateType);
+  const def = registry.getStandalone(gateType);
   if (def === undefined) {
     throw new Error(`synthesizeCircuit: "${gateType}" component not registered`);
   }

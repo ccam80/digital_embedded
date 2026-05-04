@@ -16,7 +16,7 @@
  */
 
 import type { DigCircuit, DigVisualElement, DigWire, DigValue } from "./dig-schema.js";
-import type { AttributeMapping, ComponentDefinition } from "../core/registry.js";
+import type { AttributeMapping, StandaloneComponentDefinition } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import { resolveComponentDef } from "../core/resolve-component.js";
 import type { CircuitElement } from "../core/element.js";
@@ -194,7 +194,7 @@ export function createElementFromDig(
  * `_mparams` via setModelParam. This ensures the compiler reads model params
  * from the correct partition.
  */
-function migrateModelParams(bag: PropertyBag, def: ComponentDefinition): void {
+function migrateModelParams(bag: PropertyBag, def: StandaloneComponentDefinition): void {
   const registry = def.modelRegistry;
   if (!registry) return;
 

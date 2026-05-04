@@ -14,7 +14,7 @@
 import type { Point } from "@/core/renderer-interface";
 import type { CircuitElement } from "@/core/element";
 import type { Rotation } from "@/core/pin";
-import { createSeededBag, type ComponentDefinition } from "@/core/registry";
+import { createSeededBag, type StandaloneComponentDefinition } from "@/core/registry";
 import type { Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
 import type { ClipboardData } from "@/editor/edit-operations";
@@ -49,7 +49,7 @@ interface GhostState {
  */
 export class PlacementMode {
   private _active: boolean = false;
-  private _definition: ComponentDefinition | undefined = undefined;
+  private _definition: StandaloneComponentDefinition | undefined = undefined;
   private _position: Point = { x: 0, y: 0 };
   private _rotation: Rotation = 0;
   private _mirror: boolean = false;
@@ -69,7 +69,7 @@ export class PlacementMode {
    * Enter placement mode for the given component type.
    * Creates an initial ghost element at the origin.
    */
-  start(definition: ComponentDefinition): void {
+  start(definition: StandaloneComponentDefinition): void {
     this._definition = definition;
     this._position = { x: 0, y: 0 };
     this._rotation = 0;

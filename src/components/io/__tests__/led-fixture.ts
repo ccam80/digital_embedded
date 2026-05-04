@@ -31,6 +31,14 @@ export function buildLedDcCircuit(opts: {
         type: "LED",
         props: {
           color: opts.color,
+          // LedDefinition.defaultModel === "digital" so the LED lands in the
+          // digital partition unless `model` is set explicitly. The LED's
+          // analog presets live in modelRegistry keyed by color, so we route
+          // the analog tests by setting `model` to the color name- this
+          // mirrors what the editor does when a user sets the analog model
+          // via the property panel (and matches LED_ATTRIBUTE_MAPPINGS where
+          // the XML "Color" attribute is mapped to both "color" and "model").
+          model: opts.color,
           label: "led",
           ...(opts.TEMP !== undefined ? { TEMP: opts.TEMP } : {}),
         },
@@ -38,8 +46,8 @@ export function buildLedDcCircuit(opts: {
       { id: "gnd", type: "Ground" },
     ],
     connections: [
-      ["vs:pos",  "r1:A"],
-      ["r1:B",    "led:in"],
+      ["vs:pos",  "r1:pos"],
+      ["r1:neg",  "led:in"],
       ["vs:neg",  "gnd:out"],
     ],
   });

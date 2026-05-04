@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Circuit compiler- transforms a visual Circuit into an executable
  * CompiledCircuit.
  *
@@ -67,7 +67,7 @@ export interface CompilationWarning {
  *
  * Unlike compileCircuit(), this function receives pre-computed connectivity
  * groups and partitioned components from the unified netlist pipeline.
- * It receives pre-computed connectivity groups- wire→netId mapping is
+ * It receives pre-computed connectivity groups- wireâ†’netId mapping is
  * already encoded in the partition's groups and their wires arrays.
  *
  * All digital-specific logic (multi-driver detection, SCC decomposition,
@@ -92,7 +92,7 @@ export function compileDigitalPartition(
   const componentCount = elements.length;
 
   // -----------------------------------------------------------------------
-  // Step 2: Map groupId → sequential net ID
+  // Step 2: Map groupId â†’ sequential net ID
   // -----------------------------------------------------------------------
 
   // Groups are the pre-computed connectivity groups for the digital domain.
@@ -136,7 +136,7 @@ export function compileDigitalPartition(
   }
 
   // -----------------------------------------------------------------------
-  // Step 3b: Build flat-circuit elementIndex → partition-local index map
+  // Step 3b: Build flat-circuit elementIndex â†’ partition-local index map
   //
   // ResolvedGroupPin.elementIndex is an index into the original flat circuit's
   // elements array. The partition's components array is a subset, so we need
@@ -160,7 +160,7 @@ export function compileDigitalPartition(
   //
   // Each ResolvedGroupPin carries an elementIndex (flat circuit) and pinIndex
   // that identify which slot belongs to which group.
-  // We build a lookup: (partitionLocalIndex, pinIndex) → netId
+  // We build a lookup: (partitionLocalIndex, pinIndex) â†’ netId
   // -----------------------------------------------------------------------
 
   // pinNetLookup[partitionLocalIndex][pinIndex] = netId
@@ -168,7 +168,7 @@ export function compileDigitalPartition(
   // Keys are positions in pc.resolvedPins (matching allPinRefs[i][j].pinIndex = j).
   const pinNetLookup: number[][] = new Array(componentCount).fill(null).map(() => []);
 
-  // For each component, build a map from originalPinIndex → resolvedPins position.
+  // For each component, build a map from originalPinIndex â†’ resolvedPins position.
   // This translates group pin references (which use originalPinIndex = rp.pinIndex)
   // to the iteration-position keys used by allPinRefs and slotToNetId.
   const originalPinIdxToResolvedPos: Map<number, number>[] = [];
@@ -266,7 +266,7 @@ export function compileDigitalPartition(
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const propMap = new Map<string, import("@/core/properties").PropertyValue>();
-    const def = registry.get(el.typeId)!;
+    const def = registry.getStandalone(el.typeId)!;
     for (const propDef of def.propertyDefs) {
       const val = el.getAttribute(propDef.key);
       if (val !== undefined) {
@@ -286,7 +286,7 @@ export function compileDigitalPartition(
   for (let i = 0; i < componentCount; i++) {
     const refs = allPinRefs[i]!;
     const el = elements[i]!;
-    const def = registry.get(el.typeId);
+    const def = registry.getStandalone(el.typeId);
     if (def === undefined) {
       throw new Error(
         `Compiler: unknown component type "${el.typeId}" at index ${i}. ` +
@@ -418,7 +418,7 @@ export function compileDigitalPartition(
 
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
-    const def = registry.get(el.typeId)!;
+    const def = registry.getStandalone(el.typeId)!;
     const slotSpec = INFRASTRUCTURE_TYPES.has(el.typeId) ? undefined : def.models!.digital!.stateSlotCount;
     let resolvedSlots = 0;
     if (typeof slotSpec === "function") {
@@ -553,7 +553,7 @@ export function compileDigitalPartition(
   const switchNetPairs: Array<{ compIdx: number; netA: number; netB: number }> = [];
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
-    const def = registry.get(el.typeId)!;
+    const def = registry.getStandalone(el.typeId)!;
     if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
     const sp = def.models!.digital!.switchPins;
     if (sp === undefined) continue;
@@ -686,7 +686,7 @@ export function compileDigitalPartition(
 
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
-    const def = registry.get(el.typeId)!;
+    const def = registry.getStandalone(el.typeId)!;
     typeIds[i] = def.typeId;
     if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
       if (!executeFnsMap.has(def.typeId)) {
@@ -720,7 +720,7 @@ export function compileDigitalPartition(
   const delays = new Uint32Array(componentCount);
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
-    const def = registry.get(el.typeId)!;
+    const def = registry.getStandalone(el.typeId)!;
     const instanceDelay = el.getAttribute("delay");
     if (typeof instanceDelay === "number") {
       delays[i] = instanceDelay;

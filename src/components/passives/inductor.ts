@@ -21,7 +21,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -33,7 +33,6 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 
@@ -178,13 +177,8 @@ const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
 const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 
-export class AnalogInductorElement implements PoolBackedAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
+export class AnalogInductorElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly poolBacked = true as const;
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;
 
@@ -196,7 +190,6 @@ export class AnalogInductorElement implements PoolBackedAnalogElement {
   private _TNOM: number;
   private _SCALE: number;
   private _M: number;
-  private _pool!: StatePoolRef;
   protected _hPIbr:   number = -1;
   protected _hNIbr:   number = -1;
   protected _hIbrN:   number = -1;
@@ -204,7 +197,7 @@ export class AnalogInductorElement implements PoolBackedAnalogElement {
   protected _hIbrIbr: number = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._nominalL = props.getModelParam<number>("inductance");
     this._IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
     this._TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : INDUCTOR_DEFAULTS["TC1"]!;
@@ -251,10 +244,6 @@ export class AnalogInductorElement implements PoolBackedAnalogElement {
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     return this.branchIndex;
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

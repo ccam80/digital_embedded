@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BarrelShifter component- configurable shift/rotate.
  *
  * Ports from Digital's BarrelShifter.java:
@@ -27,7 +27,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -217,7 +217,7 @@ const BARREL_SHIFTER_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];
 
-export const BarrelShifterDefinition: ComponentDefinition = {
+export const BarrelShifterDefinition: StandaloneComponentDefinition = {
   name: "BarrelShifter",
   typeId: -1,
   factory: (props) => new BarrelShifterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),

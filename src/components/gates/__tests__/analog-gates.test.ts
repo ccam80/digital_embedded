@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for analog gate registration on ComponentDefinitions.
  *
  * Verifies:
@@ -44,12 +44,12 @@ const GATE_NAMES = ["And", "NAnd", "Or", "NOr", "XOr", "XNOr", "Not"];
 describe("Registration", () => {
   it("and_has_analog_factory", () => {
     const registry = makeGateRegistry();
-    expect(registry.get("And")!.modelRegistry?.cmos).toBeDefined();
+    expect(registry.getStandalone("And")!.modelRegistry?.cmos).toBeDefined();
   });
 
   it("and_has_both_digital_and_analog_models", () => {
     const registry = makeGateRegistry();
-    const def = registry.get("And")!;
+    const def = registry.getStandalone("And")!;
     expect(def.models?.digital).toBeDefined();
     expect(def.modelRegistry?.cmos).toBeDefined();
   });
@@ -57,7 +57,7 @@ describe("Registration", () => {
   it("all_gates_have_analog_factory", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
-      const def = registry.get(name);
+      const def = registry.getStandalone(name);
       expect(def, `Expected ${name} to be registered`).toBeDefined();
       expect(
         def!.modelRegistry?.cmos,
@@ -69,7 +69,7 @@ describe("Registration", () => {
   it("all_gates_have_both_digital_and_analog_models", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
-      const def = registry.get(name)!;
+      const def = registry.getStandalone(name)!;
       expect(def.models?.digital, `${name} should have digital model`).toBeDefined();
       expect(def.modelRegistry?.cmos, `${name} should have analog model`).toBeDefined();
     }
@@ -117,7 +117,7 @@ describe("Palette", () => {
 describe("SimulationModes", () => {
   it("and_supports_digital_and_cmos", () => {
     const registry = makeGateRegistry();
-    const def = registry.get("And")!;
+    const def = registry.getStandalone("And")!;
     expect(def.models?.digital).toBeDefined();
     expect(def.modelRegistry?.cmos).toBeDefined();
   });
@@ -125,7 +125,7 @@ describe("SimulationModes", () => {
   it("all_gates_support_digital_and_cmos", () => {
     const registry = makeGateRegistry();
     for (const name of GATE_NAMES) {
-      const def = registry.get(name)!;
+      const def = registry.getStandalone(name)!;
       expect(def.models?.digital, `${name} should have digital model`).toBeDefined();
       expect(def.modelRegistry?.cmos, `${name} should have analog model`).toBeDefined();
     }

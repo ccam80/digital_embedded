@@ -11,9 +11,9 @@ import { PropertyBag } from "../../../../core/properties.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../element.js";
 import type { SetupContext } from "../../setup-context.js";
 import type { LoadContext } from "../../load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../ngspice-load-order.js";
 import type { StateSchema } from "../../state-schema.js";
-import type { StatePoolRef } from "../../../../core/analog-types.js";
+import type { StatePoolRef } from "../../state-pool.js";
 import { captureTopology, captureElementStates, createIterationCaptureHook, createStepCaptureHook } from "./capture.js";
 import { convergenceSummary, nodeVoltageTrajectory, findLargestDelta, querySteps } from "./query.js";
 import { compareSnapshots, formatComparison, findFirstDivergence } from "./compare.js";
@@ -27,7 +27,7 @@ const ZERO_INTEG_COEFF: IntegrationCoefficients = {
 };
 
 // ---------------------------------------------------------------------------
-// Minimal inline element factories — implement the new AnalogElement contract.
+// Minimal inline element factories- implement the new AnalogElement contract.
 // These exist only to give the engine a functioning circuit; they are NOT
 // testing element correctness.
 // ---------------------------------------------------------------------------
@@ -109,8 +109,8 @@ function makeDiodeEl(nodeA: number, nodeK: number, IS: number, N: number): Analo
 const CAP_SCHEMA: StateSchema = {
   owner: "TestCapacitor",
   slots: [
-    { name: "QCAP", doc: "Capacitor charge", init: { kind: "zero" } },
-    { name: "VCAP", doc: "Capacitor voltage", init: { kind: "zero" } },
+    { name: "QCAP", doc: "Capacitor charge" },
+    { name: "VCAP", doc: "Capacitor voltage" },
   ],
   size: 2,
   indexOf: new Map([["QCAP", 0], ["VCAP", 1]]),
@@ -217,8 +217,6 @@ function makeRC() {
 }
 
 describe("harness integration", () => {
-  let engine: MNAEngine;
-  beforeEach(() => { engine = new MNAEngine(); });
 
   it("captureTopology returns correct circuit structure", () => {
     const { circuit } = buildHwrFixture();
@@ -231,16 +229,14 @@ describe("harness integration", () => {
   });
 
   it("captureElementStates snapshots pool-backed elements", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     engine.dcOperatingPoint();
     const states = captureElementStates(circuit.elements, pool);
     expect(states.length).toBeGreaterThan(0);
   });
 
   it("iteration capture hook records NR iterations during DC OP", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const { hook, preFactorHook, getSnapshots, clear } = createIterationCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = hook;
     engine.preFactorHook = preFactorHook;
@@ -263,8 +259,7 @@ describe("harness integration", () => {
   });
 
   it("postIterationHook fires during DC OP (nonlinear circuit)", () => {
-    const { circuit } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, engine } = buildHwrFixture();
     let hookCallCount = 0;
     engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, _g: boolean, _e: boolean, _le: unknown[], _cf: string[]) => { hookCallCount++; };
     const result = engine.dcOperatingPoint();
@@ -288,8 +283,7 @@ describe("harness integration", () => {
   });
 
   it("step capture hook packages iterations into step snapshots", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -318,8 +312,7 @@ describe("harness integration", () => {
   });
 
   it("convergenceSummary reports correct statistics", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -350,8 +343,7 @@ describe("harness integration", () => {
   });
 
   it("nodeVoltageTrajectory returns voltage history", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -379,8 +371,7 @@ describe("harness integration", () => {
   });
 
   it("querySteps filters by convergence", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -398,8 +389,7 @@ describe("harness integration", () => {
   });
 
   it("compareSnapshots returns all-pass for self-comparison", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -421,8 +411,7 @@ describe("harness integration", () => {
   });
 
   it("formatComparison produces readable output", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -441,8 +430,7 @@ describe("harness integration", () => {
   });
 
   it("findFirstDivergence returns null for identical sessions", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -459,8 +447,7 @@ describe("harness integration", () => {
   });
 
   it("step capture hook supports retry tracking via beginAttempt/endAttempt", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
 
@@ -486,8 +473,7 @@ describe("harness integration", () => {
   });
 
   it("step capture hook emits single attempt when no retries", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -504,25 +490,17 @@ describe("harness integration", () => {
     expect(steps[0].attempts.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("MNAEngine exposes accessors after init", () => {
-    const { circuit } = buildHwrFixture();
-    engine.init(circuit);
+  it("MNAEngine exposes accessors after first dcop", () => {
+    const { engine } = buildHwrFixture();
+    engine.dcOperatingPoint();
     expect(engine.solver).not.toBeNull();
     expect(engine.statePool).not.toBeNull();
     expect(engine.elements.length).toBe(3);
     expect(engine.compiled).not.toBeNull();
   });
 
-  it("MNAEngine accessors return null/empty before init", () => {
-    expect(engine.solver).toBeNull();
-    expect(engine.statePool).toBeNull();
-    expect(engine.elements).toHaveLength(0);
-    expect(engine.compiled).toBeNull();
-  });
-
   it("SparseSolver exposes dimension, getCSCNonZeros", () => {
-    const { circuit } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, engine } = buildHwrFixture();
     const solver = engine.solver!;
     engine.dcOperatingPoint();
     expect(solver.dimension).toBe(3);
@@ -534,8 +512,7 @@ describe("harness integration", () => {
   });
 
   it("findLargestDelta identifies worst convergence point", () => {
-    const { circuit, pool } = buildHwrFixture();
-    engine.init(circuit);
+    const { circuit, pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -548,10 +525,10 @@ describe("harness integration", () => {
     engine.stepPhaseHook = null;
     engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit, 3), steps: capture.getSteps() };
-    // Node 2 is the diode anode — it changes between NR iterations as the nonlinear diode converges.
+    // Node 2 is the diode anode- it changes between NR iterations as the nonlinear diode converges.
     const result = findLargestDelta(session, 2);
     expect(result).not.toBeNull();
-    // stepIndex must be 0 (only one step — DCOP)
+    // stepIndex must be 0 (only one step- DCOP)
     expect(result!.stepIndex).toBe(0);
     // iterationIndex must be 0 (largest delta is always on the first NR iteration from zero initial conditions)
     expect(result!.iterationIndex).toBe(0);

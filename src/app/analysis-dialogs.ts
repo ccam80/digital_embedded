@@ -723,7 +723,7 @@ export function initAnalysisDialogs(ctx: AppContext): void {
         testEl.getProperties().set('testData', storeValue);
         testEl.getProperties().set('testDataCompiled', testData);
       } else {
-        const testDef = registry.get('Testcase');
+        const testDef = registry.getStandalone('Testcase');
         if (testDef) {
           const props = new PropertyBag();
           props.set('testData', storeValue);

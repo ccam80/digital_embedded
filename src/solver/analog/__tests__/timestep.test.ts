@@ -11,7 +11,8 @@
 import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
-import type { AnalogElement, IntegrationMethod } from "../element.js";
+import type { AnalogElement } from "../element.js";
+import type { IntegrationMethod } from "../integration.js";
 import type { ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";

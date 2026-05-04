@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# digiTS Wave-1 remediation pre-commit hook.
+# See spec/REMEDIATION_PLAN.md Stage 0.
+
+# Skip the lint-bans pass entirely when STRICT_BANS=0 (escape hatch for emergency
+# commits during the remediation rollout). Default = enforced.
+if [ "${STRICT_BANS:-1}" = "0" ]; then
+  echo "[pre-commit] STRICT_BANS=0 — skipping lint-bans (use sparingly)"
+  exit 0
+fi
+
+node scripts/lint-bans.mjs

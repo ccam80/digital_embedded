@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Testcase component- placeable test case element.
  *
  * Contains embedded truth table test data. Displayed as a labeled box on
@@ -34,7 +34,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import { testDataConverter } from "../../io/attribute-map.js";
@@ -245,7 +245,7 @@ function testcaseFactory(props: PropertyBag): TestcaseElement {
   return new TestcaseElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TestcaseDefinition: ComponentDefinition = {
+export const TestcaseDefinition: StandaloneComponentDefinition = {
   name: "Testcase",
   typeId: -1,
   factory: testcaseFactory,

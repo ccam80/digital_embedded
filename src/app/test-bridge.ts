@@ -343,7 +343,7 @@ export function createTestBridge(
     },
 
     describeComponent(typeName: string) {
-      const def = registry.get(typeName);
+      const def = registry.getStandalone(typeName);
       if (!def) return null;
       return {
         pinLayout: def.pinLayout.map(p => ({

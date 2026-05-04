@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for Port-based subcircuit flattening (SE-2).
  *
  * Verifies that findInterfaceElement() recognizes Port elements and that
@@ -11,7 +11,7 @@ import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition } from "@/core/registry";
+import type { StandaloneComponentDefinition } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
 import {
   TestLeafElement,
@@ -53,7 +53,7 @@ function makePortElement(
 function makeRegistry(...typeIds: string[]): ComponentRegistry {
   const reg = new ComponentRegistry();
   for (const typeId of typeIds) {
-    const def: ComponentDefinition = {
+    const def: StandaloneComponentDefinition = {
       name: typeId,
       typeId: -1,
       factory: (_props) => makeLeafElement(typeId, "auto", { x: 0, y: 0 }),
@@ -77,7 +77,7 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
 
 describe("flattenCircuit- Port interface elements", () => {
   it("Port matched by label creates bridge wire for BIDIRECTIONAL subcircuit pin", () => {
-    // Internal circuit: Port("A") → And gate
+    // Internal circuit: Port("A") â†’ And gate
     const internal = new Circuit({ name: "PortSub" });
     const portEl = makePortElement("port-A", "A", { x: 0, y: 0 });
     const gate = makeLeafElement("And", "and1", { x: 5, y: 0 });
@@ -111,12 +111,12 @@ describe("flattenCircuit- Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // 1 internal wire (Port pin → And pin) + 1 bridge wire (subcircuit pin → Port pin) = 2
+    // 1 internal wire (Port pin â†’ And pin) + 1 bridge wire (subcircuit pin â†’ Port pin) = 2
     expect(flat.circuit.wires.length).toBe(2);
   });
 
   it("matches In/Out elements for INPUT/OUTPUT direction", () => {
-    // Internal circuit: In("X") → And gate → Out("Y")
+    // Internal circuit: In("X") â†’ And gate â†’ Out("Y")
     const internal = new Circuit({ name: "InOutSub" });
     const inEl = makeInElement("in1", "X", { x: 0, y: 0 });
     const outEl = makeOutElement("out1", "Y", { x: 10, y: 0 });
@@ -161,7 +161,7 @@ describe("flattenCircuit- Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // 1 internal wire (In pin → And pin) + 2 bridge wires (one per subcircuit pin: X and Y) = 3
+    // 1 internal wire (In pin â†’ And pin) + 2 bridge wires (one per subcircuit pin: X and Y) = 3
     expect(flat.circuit.wires.length).toBe(3);
   });
 
@@ -240,7 +240,7 @@ describe("flattenCircuit- Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // 1 internal wire (Port pin → And pin) + 1 bridge wire (subcircuit pin → Port pin) = 2
+    // 1 internal wire (Port pin â†’ And pin) + 1 bridge wire (subcircuit pin â†’ Port pin) = 2
     expect(flat.circuit.wires.length).toBe(2);
 
     // Port IS retained in the flattened circuit- assert count unconditionally
@@ -252,11 +252,11 @@ describe("flattenCircuit- Port interface elements", () => {
 
   it("bridge wire connects subcircuit pin position to internal Port pin position", () => {
     const portPos = { x: 2, y: 3 };
-    // subcircuitPinChip is chip-relative; subEl is at {12,3} → world pin = {12+3, 3+2} = {15,5}
+    // subcircuitPinChip is chip-relative; subEl is at {12,3} â†’ world pin = {12+3, 3+2} = {15,5}
     const subcircuitPinChip = { x: 3, y: 2 };
     const subElPos = { x: 12, y: 3 };
     const expectedSubPinWorld = { x: subElPos.x + subcircuitPinChip.x, y: subElPos.y + subcircuitPinChip.y }; // {15,5}
-    // portEl at {2,3} with chip-relative pin {0,1} → world pin = {2+0, 3+1} = {2,4}
+    // portEl at {2,3} with chip-relative pin {0,1} â†’ world pin = {2+0, 3+1} = {2,4}
     const expectedPortPinWorld = { x: portPos.x + 0, y: portPos.y + 1 }; // {2,4}
 
     // Internal circuit with Port at known position

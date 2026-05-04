@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Probe component- measurement point.
  *
  * Reads its input signal and adds it to the measurement/signal list.
@@ -21,11 +21,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // ProbeMode
@@ -239,7 +240,7 @@ class AnalogProbeElement implements AnalogElement {
   setParam(_key: string, _value: number): void {}
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    // Probe stamps nothing� it is a pure voltage measurement with no loading.
+    // Probe stamps nothingï¿½ it is a pure voltage measurement with no loading.
     // Return zero current for the single input pin.
     return [0];
   }
@@ -263,7 +264,7 @@ function probeFactory(props: PropertyBag): ProbeElement {
   return new ProbeElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const ProbeDefinition: ComponentDefinition = {
+export const ProbeDefinition: StandaloneComponentDefinition = {
   name: "Probe",
   typeId: -1,
   factory: probeFactory,

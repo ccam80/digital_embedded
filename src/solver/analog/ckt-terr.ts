@@ -24,7 +24,7 @@
  *   method                    -> method
  */
 
-import type { IntegrationMethod } from "./element.js";
+import type { IntegrationMethod } from "./integration.js";
 
 // ---------------------------------------------------------------------------
 // Method-specific LTE coefficients (ngspice trdefs.h / geardefs.h)

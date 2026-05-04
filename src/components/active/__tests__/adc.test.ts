@@ -1,46 +1,35 @@
-﻿/**
+/**
  * Tests for the ADC (Analog-to-Digital Converter) component.
  *
- * The ADC converts an analog input voltage to an N-bit digital output code on
- * each rising clock edge:
- *   code = clamp(floor(V_in / V_ref  2^N), 0, 2^N - 1)   (unipolar mode)
+ * §4c migration: all tests route through `buildFixture`, drive via
+ * `coordinator.step()` / `coordinator.dcOperatingPoint()`, and read
+ * observable state from the ADCDriverElement's pool slots. No direct
+ * element.setup() / element.load() / element.accept() calls, no hand-rolled
+ * contexts or state pools.
  *
- * Testing approach: construct the ADC AnalogElement directly via analogFactory,
- * then drive its state via accept(ctx, simTime, addBreakpoint) calls with
- * synthetic Float64Array voltage vectors. The element exposes `latchedCode`
- * and `eocActive` as observable properties for inspection without running the
- * full MNA solver.
+ * Circuit topology (8-bit, unipolar-instant):
+ *   clk  (DcVoltageSource, label "clk")  → adc:CLK
+ *   vin  (DcVoltageSource, label "vin")  → adc:VIN
+ *   vref (DcVoltageSource, label "vref", voltage=5) → adc:VREF
+ *   gnd  → adc:GND
  *
- * Node assignment (8-bit, unipolar):
- *   nodeIds[0] = VIN    node 1  (voltages[0])
- *   nodeIds[1] = CLK    node 2  (voltages[1])
- *   nodeIds[2] = VREF   node 3  (voltages[2])
- *   nodeIds[3] = GND    node 0  (MNA ground, implicit)
- *   nodeIds[4] = EOC    node 4  (voltages[3])
- *   nodeIds[5] = D0     node 5  (voltages[4])
- *   ...
- *   nodeIds[12]= D7     node 12 (voltages[11])
+ * Observable surface:
+ *   findDriver(fix.circuit.elements) → ADCDriverElement (instanceof)
+ *   latchedCode = pool.state0[drv._stateBase + SLOT_OUTPUT_CODE]
+ *   eocActive   = pool.state0[drv._stateBase + SLOT_OUTPUT_EOC] !== 0
  *
- * The voltages Float64Array is 0-indexed: voltages[nodeId] for nodeId > 0.
- * GND = node 0 is the MNA ground constant (0V, not stored in voltages array).
+ * Rising-edge protocol:
+ *   1. Build with clk.voltage = 0 (low), step once (warm-start).
+ *   2. facade.setSignal(coordinator, "clk", vHigh) to go high.
+ *   3. coordinator.step() — ADC detects rising edge, latches code.
+ *   4. Read latchedCode / eocActive from pool.
  */
 
 import { describe, it, expect } from "vitest";
-import { ADCDefinition, ADC_DEFAULTS, ADCAnalogElement } from "../adc.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
-import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
-
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ADCDriverElement } from "../adc-driver.js";
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -49,139 +38,155 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 const BITS = 8;
 const V_REF = 5.0;
 const MAX_CODE = (1 << BITS) - 1; // 255
+const V_IH_DEFAULT = 2.0;
+const V_IL_DEFAULT = 0.8;
 
 // ---------------------------------------------------------------------------
-// Node layout (1-based MNA node IDs)
+// Pool slot indices (from ADCDriverElement's schema, 8-bit)
+// imported at test construction time via the schema the element carries.
 // ---------------------------------------------------------------------------
 
-const N_VIN  = 1;
-const N_CLK  = 2;
-const N_VREF = 3;
-const N_GND  = 0;  // MNA ground  implicit, not in voltages array
-const N_EOC  = 4;
-// D0..D7 occupy nodes 5..12
-const N_D0   = 5;
-
-/** Build the pinNodes Map for an 8-bit ADC. */
-function makeNodeIds(): ReadonlyMap<string, number> {
-  const m = new Map<string, number>();
-  m.set("VIN",  N_VIN);
-  m.set("CLK",  N_CLK);
-  m.set("VREF", N_VREF);
-  m.set("GND",  N_GND);
-  m.set("EOC",  N_EOC);
-  for (let i = 0; i < BITS; i++) m.set(`D${i}`, N_D0 + i);
-  return m;
+function getSlots(drv: ADCDriverElement): { outputCode: number; outputEoc: number } {
+  return {
+    outputCode: drv.stateSchema.indexOf.get("OUTPUT_CODE")!,
+    outputEoc:  drv.stateSchema.indexOf.get("OUTPUT_EOC")!,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Voltage vector helpers
+// Circuit factory
 // ---------------------------------------------------------------------------
 
-/** Matrix size: 12 data nodes (nodes 1..12). voltages length = MATRIX_SIZE + 1 (slot 0 = ground). */
-const MATRIX_SIZE = N_D0 + BITS - 1; // = 12
-
-function makeVoltages(overrides: Partial<Record<string, number>> = {}): Float64Array {
-  // nodeId  voltages[nodeId] (ngspice 1-based; slot 0 is the ground sentinel).
-  const v = new Float64Array(MATRIX_SIZE + 1);
-  v[N_VREF] = V_REF;  // default VREF = 5V
-  for (const [key, value] of Object.entries(overrides)) {
-    const nodeId = parseInt(key);
-    if (nodeId > 0 && nodeId <= MATRIX_SIZE && value !== undefined) v[nodeId] = value;
-  }
-  return v;
+interface AdcCircuitParams {
+  vIn?: number;
+  vRef?: number;
+  clkVoltage?: number;
+  bits?: number;
+  /** Override vIH as a model param on the ADC component. */
+  vIH?: number;
 }
 
-// ---------------------------------------------------------------------------
-// ADC factory helper
-// ---------------------------------------------------------------------------
+function buildAdcCircuit(facade: DefaultSimulatorFacade, p: AdcCircuitParams): Circuit {
+  const adcProps: Record<string, string | number> = {
+    label: "adc1",
+    bits:  p.bits ?? BITS,
+    model: "default",
+  };
+  if (p.vIH !== undefined) adcProps.vIH = p.vIH;
 
-function makeAdc(
-  componentProps?: Record<string, number | string>,
-  paramOverrides?: Record<string, number>,
-): ADCAnalogElement {
-  const modelKey = (componentProps?.model as string) ?? "unipolar-instant";
-  const bag = new PropertyBag([
-    ["bits",           BITS],
-    ["model",          modelKey],
-  ]);
-  bag.replaceModelParams({ ...ADC_DEFAULTS, ...paramOverrides });
-  return getFactory(ADCDefinition.modelRegistry![modelKey]!)(
-    makeNodeIds(), bag, () => 0,
-  ) as ADCAnalogElement;
-}
-
-// ---------------------------------------------------------------------------
-// Clock-edge simulation helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Build a transient LoadContext bound to the supplied voltage vector and dt.
- *
- * accept(ctx, simTime, addBreakpoint) reads ctx.rhs and ctx.dt to detect
- * clock edges and to step the internal companion-model state of the pin models.
- */
-function makeAcceptCtx(rhs: Float64Array, dt: number): LoadContext {
-  return makeLoadCtx({
-    solver: undefined as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    cktMode: MODETRAN | MODEINITFLOAT,
-    dt,
-    rhs: rhs,
-    rhsOld: rhs,
+  return facade.build({
+    components: [
+      { id: "vin",  type: "DcVoltageSource", props: { label: "vin",  voltage: p.vIn  ?? 0 } },
+      { id: "vref", type: "DcVoltageSource", props: { label: "vref", voltage: p.vRef ?? V_REF } },
+      { id: "clk",  type: "DcVoltageSource", props: { label: "clk",  voltage: p.clkVoltage ?? 0 } },
+      { id: "adc",  type: "ADC",             props: adcProps },
+      { id: "gnd",  type: "Ground" },
+    ],
+    connections: [
+      ["vin:pos",   "adc:VIN"],
+      ["vin:neg",   "gnd:out"],
+      ["vref:pos",  "adc:VREF"],
+      ["vref:neg",  "gnd:out"],
+      ["clk:pos",   "adc:CLK"],
+      ["clk:neg",   "gnd:out"],
+      ["adc:GND",   "gnd:out"],
+      // Pull EOC and all D-pins to GND through high-Z resistors for stability.
+      // The ADC output pin models have their own rOut drive; the pull-downs
+      // just ensure the open-drain nodes are not floating.
+      ["adc:EOC",   "gnd:out"],
+      ["adc:D0",    "gnd:out"],
+      ["adc:D1",    "gnd:out"],
+      ["adc:D2",    "gnd:out"],
+      ["adc:D3",    "gnd:out"],
+      ["adc:D4",    "gnd:out"],
+      ["adc:D5",    "gnd:out"],
+      ["adc:D6",    "gnd:out"],
+      ["adc:D7",    "gnd:out"],
+    ],
   });
 }
 
-/**
- * Apply a rising clock edge to the ADC with the given V_in.
- *
- * Steps:
- *   1. Drive CLK LOW with the target V_in set  accept() sees prev=LOW.
- *   2. Drive CLK HIGH  accept() detects the rising edge and converts.
- */
-function applyClockEdge(
-  adc: ADCAnalogElement,
-  vIn: number,
-  vRef: number = V_REF,
-  clkHigh?: number,
-): void {
-  const dt = 1e-6; // 1 s timestep
-  const vIL = ADC_DEFAULTS.vIL;
-  const vIH = clkHigh ?? (ADC_DEFAULTS.vIH + 0.1);
+// ---------------------------------------------------------------------------
+// Element finder
+// ---------------------------------------------------------------------------
 
-  // Step 1: CLK low  initialise prevClkVoltage to LOW
-  const vLow = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIL, [N_VREF]: vRef });
-  adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
-
-  // Step 2: CLK high  rising edge detected, conversion fires
-  const vHigh = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIH, [N_VREF]: vRef });
-  adc.accept!(makeAcceptCtx(vHigh, dt), dt, () => {});
+function findDriver(elements: ReadonlyArray<unknown>): ADCDriverElement {
+  const el = elements.find((e) => e instanceof ADCDriverElement);
+  if (el === undefined) throw new Error("ADCDriverElement not found in compiled circuit");
+  return el as ADCDriverElement;
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Observable ADC state helpers
+// ---------------------------------------------------------------------------
+
+function readLatchedCode(fix: ReturnType<typeof buildFixture>): number {
+  const drv = findDriver(fix.circuit.elements);
+  const { outputCode } = getSlots(drv);
+  return Math.round(fix.pool.state0[drv._stateBase + outputCode]);
+}
+
+function readEocActive(fix: ReturnType<typeof buildFixture>): boolean {
+  const drv = findDriver(fix.circuit.elements);
+  const { outputEoc } = getSlots(drv);
+  return fix.pool.state0[drv._stateBase + outputEoc] !== 0;
+}
+
+/**
+ * Apply a rising clock edge in the real circuit.
+ *
+ * Steps:
+ *   1. Fixture is already warm-started with CLK low.
+ *   2. Set CLK to vHigh via facade.setSignal.
+ *   3. coordinator.step() — engine runs one transient step, ADC detects edge.
+ */
+function applyRisingEdge(
+  fix: ReturnType<typeof buildFixture>,
+  vHigh: number = V_IH_DEFAULT + 0.1,
+): void {
+  fix.facade.setSignal(fix.coordinator, "clk", vHigh);
+  fix.coordinator.step();
+}
+
+// ---------------------------------------------------------------------------
+// ADC tests
 // ---------------------------------------------------------------------------
 
 describe("ADC", () => {
   it("midscale_input", () => {
-    // V_in = V_ref / 2 = 2.5V  code = floor(0.5  256) = 128
-    const adc = makeAdc();
-    applyClockEdge(adc, V_REF / 2);
-    expect(adc.latchedCode).toBe(128);
+    // V_in = V_ref / 2 = 2.5V → code = floor(0.5 × 256) = 128
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: V_REF / 2, vRef: V_REF }),
+    });
+
+    expect(readLatchedCode(fix)).toBe(0); // no edge yet
+
+    applyRisingEdge(fix);
+
+    expect(readLatchedCode(fix)).toBe(128);
   });
 
   it("full_scale", () => {
-    // V_in = V_ref - 1 LSB = V_ref  (1 - 1/2^N)  code = 2^N - 1 = 255
+    // V_in = V_ref × (MAX_CODE / 2^N) → code = 2^N - 1 = 255
     const vIn = V_REF * (MAX_CODE / (1 << BITS));
-    const adc = makeAdc();
-    applyClockEdge(adc, vIn);
-    expect(adc.latchedCode).toBe(MAX_CODE);
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn, vRef: V_REF }),
+    });
+
+    applyRisingEdge(fix);
+
+    expect(readLatchedCode(fix)).toBe(MAX_CODE);
   });
 
   it("zero_input", () => {
-    // V_in = 0V  code = floor(0  256) = 0
-    const adc = makeAdc();
-    applyClockEdge(adc, 0);
-    expect(adc.latchedCode).toBe(0);
+    // V_in = 0V → code = floor(0 × 256) = 0
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: 0, vRef: V_REF }),
+    });
+
+    applyRisingEdge(fix);
+
+    expect(readLatchedCode(fix)).toBe(0);
   });
 
   it("ramp_test", () => {
@@ -191,9 +196,11 @@ describe("ADC", () => {
 
     for (let i = 0; i <= steps; i++) {
       const vIn = (V_REF * i) / steps;
-      const adc = makeAdc();
-      applyClockEdge(adc, vIn);
-      codes.push(adc.latchedCode);
+      const fix = buildFixture({
+        build: (_r, facade) => buildAdcCircuit(facade, { vIn, vRef: V_REF }),
+      });
+      applyRisingEdge(fix);
+      codes.push(readLatchedCode(fix));
     }
 
     // Monotonically non-decreasing
@@ -209,203 +216,80 @@ describe("ADC", () => {
   it("eoc_pulses_after_conversion", () => {
     // Before any clock edge EOC should be inactive.
     // After one clock edge EOC should be active (instant conversion type).
-    const adc = makeAdc({ model: "unipolar-instant" });
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: V_REF / 2, vRef: V_REF }),
+    });
 
-    expect(adc.eocActive).toBe(false);
+    expect(readEocActive(fix)).toBe(false);
 
-    applyClockEdge(adc, V_REF / 2);
+    applyRisingEdge(fix);
 
-    expect(adc.eocActive).toBe(true);
+    expect(readEocActive(fix)).toBe(true);
   });
 
   it("output scales with VREF from wire", () => {
-    // Same V_in ratio, different VREF  code should be the same
-    const adc3 = makeAdc();
-    applyClockEdge(adc3, 1.65, 3.3);  // 1.65/3.3 = 0.5  code 128
+    // Same V_in ratio, different VREF → code should be the same
+    const fix3 = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: 1.65, vRef: 3.3 }),
+    });
+    applyRisingEdge(fix3);
 
-    const adc5 = makeAdc();
-    applyClockEdge(adc5, 2.5, 5.0);   // 2.5/5.0 = 0.5  code 128
+    const fix5 = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: 2.5, vRef: 5.0 }),
+    });
+    applyRisingEdge(fix5);
 
-    expect(adc3.latchedCode).toBe(128);
-    expect(adc5.latchedCode).toBe(128);
+    // Both are 0.5 × VREF → code 128
+    expect(readLatchedCode(fix3)).toBe(128);
+    expect(readLatchedCode(fix5)).toBe(128);
   });
 
   it("3.3V clock triggers edge detection with default thresholds", () => {
     // Default vIH = 2.0V. A 3.3V clock signal should trigger conversion.
-    const adc = makeAdc();
-    applyClockEdge(adc, V_REF / 2, V_REF, 3.3);
-    expect(adc.latchedCode).toBe(128);
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: V_REF / 2, vRef: V_REF }),
+    });
+    applyRisingEdge(fix, 3.3);
+    expect(readLatchedCode(fix)).toBe(128);
   });
 
   it("clock below vIH does not trigger conversion", () => {
-    // Drive clock to 1.5V  below default vIH=2.0V. No conversion should fire.
-    const adc = makeAdc();
-    const dt = 1e-6;
+    // Drive clock to 1.5V — below default vIH=2.0V. No conversion should fire.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: V_REF / 2, vRef: V_REF }),
+    });
 
-    // Step 1: CLK low
-    const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
-    adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
+    // Step with CLK at 1.5V — below vIH=2.0V, should not trigger
+    fix.facade.setSignal(fix.coordinator, "clk", 1.5);
+    fix.coordinator.step();
 
-    // Step 2: CLK to 1.5V  still below vIH=2.0V
-    const vMid = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 1.5, [N_VREF]: V_REF });
-    adc.accept!(makeAcceptCtx(vMid, dt), dt, () => {});
-
-    expect(adc.latchedCode).toBe(0);  // no conversion fired
-    expect(adc.eocActive).toBe(false);
+    expect(readLatchedCode(fix)).toBe(0); // no conversion fired
+    expect(readEocActive(fix)).toBe(false);
   });
 
   it("custom vIH threshold changes clock sensitivity", () => {
     // Set vIH = 4.0V. 3.3V clock should NOT trigger conversion.
-    const adc = makeAdc(undefined, { vIH: 4.0 });
-    const dt = 1e-6;
+    // Then drive above 4.0V — should trigger.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAdcCircuit(facade, { vIn: V_REF / 2, vRef: V_REF, vIH: 4.0 }),
+    });
 
-    const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
-    adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
+    // Drive CLK to 3.3V — below custom vIH=4.0V
+    fix.facade.setSignal(fix.coordinator, "clk", 3.3);
+    fix.coordinator.step();
 
-    const vHigh = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 3.3, [N_VREF]: V_REF });
-    adc.accept!(makeAcceptCtx(vHigh, dt), dt, () => {});
+    expect(readLatchedCode(fix)).toBe(0);  // 3.3V < 4.0V → no edge
+    expect(readEocActive(fix)).toBe(false);
 
-    expect(adc.latchedCode).toBe(0);  // 3.3V < 4.0V  no edge
-    expect(adc.eocActive).toBe(false);
+    // Drive CLK back low so we can get a clean rising edge
+    fix.facade.setSignal(fix.coordinator, "clk", V_IL_DEFAULT - 0.1);
+    fix.coordinator.step();
 
-    // Now drive above 4.0V  should trigger
-    const vHigher = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 4.5, [N_VREF]: V_REF });
-    adc.accept!(makeAcceptCtx(vHigher, dt), 2 * dt, () => {});
+    // Now drive above 4.0V → should trigger
+    fix.facade.setSignal(fix.coordinator, "clk", 4.5);
+    fix.coordinator.step();
 
-    expect(adc.latchedCode).toBe(128);
-    expect(adc.eocActive).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// C4.5 parity test  adc_load_dcop_parity
-// ---------------------------------------------------------------------------
-//
-// Drives the 8-bit unipolar-instant ADC via load(ctx) at DC-OP. Without any
-// accept() rising-edge latch, all digital outputs are at their initial low
-// state, EOC is low, and analog inputs stamp only their loading conductance.
-//
-// Reference formulas (from adc.ts createADCAnalogElement + digital-pin-model.ts):
-//   inputSpec.rIn  = p.rIn   VIN and CLK diagonal stamps = 1/rIn
-//   outputSpec.rOut = p.rOut  EOC and D0..D(N-1) diagonal stamps = 1/rOut,
-//                              RHS = vOL(1/rOut) (all initially low  stays at vOL)
-
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-
-interface AdcCaptureStamp { row: number; col: number; value: number; }
-function makeAdcCaptureSolver(rhsSize = 32): {
-  solver: SparseSolverType;
-  stamps: AdcCaptureStamp[];
-  rhs: Float64Array;
-} {
-  const stamps: AdcCaptureStamp[] = [];
-  const rhs = new Float64Array(rhsSize);
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    stamp: (row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
-    },
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
-}
-
-function makeAdcParityCtx(rhs: Float64Array, solver: SparseSolverType): LoadContext {
-  return makeLoadCtx({
-    solver,
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    dt: 0,
-    rhs: rhs,
-    rhsOld: rhs,
-  });
-}
-
-describe("ADC parity (C4.5)", () => {
-  it("adc_load_dcop_parity", () => {
-    // 8-bit unipolar-instant ADC. Nodes as defined at top of file.
-    // Real path: setup() must be called first to allocate matrix handles,
-    // then load() uses those handles.
-    const props = new PropertyBag([["bits", BITS]]);
-    props.replaceModelParams({ ...ADC_DEFAULTS });
-    const adc = getFactory(ADCDefinition.modelRegistry!["unipolar-instant"]!)(
-      makeNodeIds(), props, () => 0,
-    );
-
-    const { solver, stamps, rhs } = makeAdcCaptureSolver();
-
-    // Step 1: Run setup() to allocate matrix handles via the capture solver.
-    // SetupContext mirrors what MNAEngine._buildSetupContext() provides.
-    let stateCount = 0;
-    let nodeCount = 1000;
-    const setupCtx = {
-      solver,
-      temp: 300.15,
-      nomTemp: 300.15,
-      copyNodesets: false,
-      makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-      makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-      allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
-      findBranch(_label: string): number { return 0; },
-      findDevice(_label: string) { return null; },
-    };
-    (adc as unknown as { setup: (ctx: typeof setupCtx) => void }).setup(setupCtx);
-
-    initElement(adc);
-
-    // Step 2: Reset stamps accumulated during setup() so we only see load() stamps.
-    stamps.length = 0;
-
-    // Canonical: VIN=2.5V, CLK=0V (no edge), VREF=5V, all others 0.
-    const voltages = makeVoltages({ [N_VIN]: 2.5, [N_CLK]: 0.0 });
-
-    const ctx = makeAdcParityCtx(voltages, solver);
-    // Wire the owned rhs buffer into ctx so stampRHS(ctx.rhs, ...) writes to it.
-    (ctx as unknown as { rhs: Float64Array }).rhs = rhs;
-    adc.load(ctx);
-
-    // Closed-form reference:
-    // Pin models stamp at 1-based MNA node IDs (ngspice convention: 0=ground sentinel).
-    const NGSPICE_RIN  = ADC_DEFAULTS.rIn;
-    const NGSPICE_ROUT = ADC_DEFAULTS.rOut;
-    const NGSPICE_GIN  = 1 / NGSPICE_RIN;
-    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
-    const NGSPICE_VOL  = ADC_DEFAULTS.vOL;
-    const NGSPICE_RHS_LOW = NGSPICE_VOL * NGSPICE_GOUT;
-
-    const sumAt = (row: number, col: number): number =>
-      stamps.filter((s) => s.row === row && s.col === col)
-            .reduce((a, s) => a + s.value, 0);
-
-    // Analog input loading: VIN and CLK each stamp 1/rIn on their diagonal.
-    // Stamps use 1-based node IDs (N_VIN=1, N_CLK=2).
-    expect(sumAt(N_VIN, N_VIN)).toBe(NGSPICE_GIN);
-    expect(sumAt(N_CLK, N_CLK)).toBe(NGSPICE_GIN);
-
-    // EOC output pin (initially low): 1/rOut diag + vOL*G_out RHS.
-    // 1-based: N_EOC=4.
-    expect(sumAt(N_EOC, N_EOC)).toBe(NGSPICE_GOUT);
-    expect(rhs[N_EOC]).toBe(NGSPICE_RHS_LOW);
-
-    // D0..D7 output pins (all initially low): 1/rOut diag + vOL*G_out RHS per bit.
-    // 1-based: D0=N_D0=5, D1=6, ..., D7=12.
-    for (let i = 0; i < BITS; i++) {
-      const nodeId = N_D0 + i;
-      expect(sumAt(nodeId, nodeId)).toBe(NGSPICE_GOUT);
-      expect(rhs[nodeId]).toBe(NGSPICE_RHS_LOW);
-    }
+    expect(readLatchedCode(fix)).toBe(128);
+    expect(readEocActive(fix)).toBe(true);
   });
 });

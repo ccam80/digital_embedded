@@ -4,19 +4,15 @@
  * ngspice anchor: ressetup.c:46-49 (TSTALLOC) + resload.c (4-stamp conductance).
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
-export class RelayResSubElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
+export class RelayResSubElement extends AbstractAnalogElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
 
   // Handle fields- port of ressetup.c:46-49 TSTALLOC sequence
   _hPP: number = -1; // (RESposNode, RESposNode)
@@ -28,7 +24,7 @@ export class RelayResSubElement implements AnalogElement {
   private _G: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._resistance = Math.max(props.getModelParam<number>("R"), 1e-9);
     this._G = 1 / this._resistance;
   }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared registry builder functions for use in tests.
  *
  * Eliminates ~40 repeated inline buildRegistry/makeRegistry functions
@@ -6,7 +6,7 @@
  */
 
 import { ComponentRegistry, ComponentCategory } from "../core/registry.js";
-import type { ComponentDefinition, ExecuteFunction } from "../core/registry.js";
+import type { StandaloneComponentDefinition, ExecuteFunction } from "../core/registry.js";
 import { PropertyBag } from "../core/properties.js";
 import { TestElement } from "./test-element.js";
 import { noopExecFn } from "./execute-stubs.js";
@@ -71,7 +71,7 @@ function makeNoopAnalogFactory(pinNodes: ReadonlyMap<string, number>) {
   };
 }
 
-function makeDigitalDef(config: DigitalComponentConfig): Omit<ComponentDefinition, "typeId"> & { typeId: -1 } {
+function makeDigitalDef(config: DigitalComponentConfig): Omit<StandaloneComponentDefinition, "typeId"> & { typeId: -1 } {
   return {
     name: config.name,
     typeId: -1,
@@ -88,7 +88,7 @@ function makeDigitalDef(config: DigitalComponentConfig): Omit<ComponentDefinitio
   };
 }
 
-function makeAnalogDef(config: AnalogComponentConfig): Omit<ComponentDefinition, "typeId"> & { typeId: -1 } {
+function makeAnalogDef(config: AnalogComponentConfig): Omit<StandaloneComponentDefinition, "typeId"> & { typeId: -1 } {
   const modelKey = config.defaultModel ?? "behavioral";
   return {
     name: config.name,
@@ -113,7 +113,7 @@ function makeAnalogDef(config: AnalogComponentConfig): Omit<ComponentDefinition,
   };
 }
 
-function makeMixedDef(config: MixedComponentConfig): Omit<ComponentDefinition, "typeId"> & { typeId: -1 } {
+function makeMixedDef(config: MixedComponentConfig): Omit<StandaloneComponentDefinition, "typeId"> & { typeId: -1 } {
   const modelKey = config.defaultModel ?? "behavioral";
   return {
     name: config.name,
@@ -154,7 +154,7 @@ export function buildDigitalRegistry(
 ): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const config of components) {
-    registry.register(makeDigitalDef(config) as ComponentDefinition);
+    registry.register(makeDigitalDef(config) as StandaloneComponentDefinition);
   }
   return registry;
 }
@@ -169,7 +169,7 @@ export function buildAnalogRegistry(
 ): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const config of components) {
-    registry.register(makeAnalogDef(config) as ComponentDefinition);
+    registry.register(makeAnalogDef(config) as StandaloneComponentDefinition);
   }
   return registry;
 }
@@ -184,7 +184,7 @@ export function buildMixedRegistry(
 ): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const config of components) {
-    registry.register(makeMixedDef(config) as ComponentDefinition);
+    registry.register(makeMixedDef(config) as StandaloneComponentDefinition);
   }
   return registry;
 }

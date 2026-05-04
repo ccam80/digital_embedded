@@ -62,7 +62,7 @@ export function resolveModelAssignments(
       continue;
     }
 
-    const def = registry.get(el.typeId);
+    const def = registry.getStandalone(el.typeId);
     if (def === undefined) {
       result.push({ elementIndex: i, modelKey: 'neutral', model: null });
       continue;

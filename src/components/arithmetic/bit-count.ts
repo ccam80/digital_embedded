@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BitCount component- count number of set bits (popcount).
  *
  * Ports from Digital's BitCount.java:
@@ -21,7 +21,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
@@ -105,7 +105,7 @@ const BIT_COUNT_PROPERTY_DEFS: PropertyDefinition[] = [
   { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32, structural: true },
 ];
 
-export const BitCountDefinition: ComponentDefinition = {
+export const BitCountDefinition: StandaloneComponentDefinition = {
   name: "BitCount",
   typeId: -1,
   factory: (props) => new BitCountElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),

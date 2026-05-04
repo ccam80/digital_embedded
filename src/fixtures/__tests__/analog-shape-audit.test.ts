@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Analog fixture pin audit- per-(type, rotation, mirror) individual tests.
  *
  * For every analog component type that has a Falstad pin reference, tests all
- * 8 transform combinations (4 rotations × 2 mirrors) at a non-origin position
+ * 8 transform combinations (4 rotations Ã— 2 mirrors) at a non-origin position
  * to verify that pinWorldPosition() matches the expected Falstad transform.
  *
- * 46 types with pin references × 8 transforms = ~368 individual test instances.
+ * 46 types with pin references Ã— 8 transforms = ~368 individual test instances.
  * Each test asserts unconditionally- no skip lists, no gating, no KNOWN_FAILURES.
  *
  * CI output reads: "Resistor rot=1 mir=true", "NpnBJT rot=2 mir=false", etc.
@@ -33,7 +33,7 @@ function buildDefaultProps(
   registry: ComponentRegistry,
   typeName: string,
 ): PropertyBag {
-  const def = registry.get(typeName);
+  const def = registry.getStandalone(typeName);
   if (!def) return new PropertyBag();
   const entries: Array<[string, PropertyValue]> = [];
   for (const pd of def.propertyDefs) {
@@ -78,12 +78,12 @@ function buildCases(): TransformCase[] {
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe("analog fixture pin audit- all rotations × mirrors", () => {
+describe("analog fixture pin audit- all rotations Ã— mirrors", () => {
   const registry = createDefaultRegistry();
   const cases = buildCases();
 
   it.each(cases)("$label", ({ typeName, rotation, mirror }) => {
-    const def = registry.get(typeName);
+    const def = registry.getStandalone(typeName);
     if (!def) return;
 
     const props = buildDefaultProps(registry, typeName);

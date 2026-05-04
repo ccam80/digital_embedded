@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ground component- unified digital + analog.
  *
  * Digital mode: OUTPUT pin "out" always writes 0 to the simulation state.
@@ -22,11 +22,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ function groundFactory(props: PropertyBag): GroundElement {
   return new GroundElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const GroundDefinition: ComponentDefinition = {
+export const GroundDefinition: StandaloneComponentDefinition = {
   name: "Ground",
   typeId: -1,
   factory: groundFactory,

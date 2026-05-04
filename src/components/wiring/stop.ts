@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Stop component- like Break but terminates simulation entirely.
  * When input goes high, the engine closes (terminates) the simulation model.
  *
@@ -23,15 +23,15 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
 // Java Stop uses GenericShape: 1 input (stop), 0 outputs, width=3
-// Non-symmetric → offs=0. stop@(0,0)
-// → COMP_WIDTH=3, COMP_HEIGHT=1
+// Non-symmetric â†’ offs=0. stop@(0,0)
+// â†’ COMP_WIDTH=3, COMP_HEIGHT=1
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
@@ -152,7 +152,7 @@ function stopFactory(props: PropertyBag): StopElement {
   return new StopElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const StopDefinition: ComponentDefinition = {
+export const StopDefinition: StandaloneComponentDefinition = {
   name: "Stop",
   typeId: -1,
   factory: stopFactory,

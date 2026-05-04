@@ -10,7 +10,7 @@
  * calls, no property lookups, and no allocations.
  */
 
-import type { IntegrationMethod } from "../../core/analog-types.js";
+import type { IntegrationMethod } from "./integration.js";
 
 // ---------------------------------------------------------------------------
 // Data structures

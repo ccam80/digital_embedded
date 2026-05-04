@@ -37,10 +37,9 @@
  *   5. Bottom-of-load history write: OUTPUT_LATCH written to s0 exactly once.
  */
 
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
@@ -104,23 +103,16 @@ const G_NORTON = 1 / 1e-3;
 // SchmittTriggerDriverElement
 // ---------------------------------------------------------------------------
 
-export class SchmittTriggerDriverElement implements PoolBackedAnalogElement {
+export class SchmittTriggerDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  readonly poolBacked = true as const;
   readonly stateSchema = SCHMITT_TRIGGER_SCHEMA;
   readonly stateSize = SCHMITT_TRIGGER_SCHEMA.size;
-
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
 
   private _vTH: number;
   private _vTL: number;
   private _vOH: number;
   private _vOL: number;
   private _inverting: number;
-  private _pool!: StatePoolRef;
 
   // Four matrix handles for the two-node Norton stamp: (out,out), (out,gnd),
   // (gnd,out), (gnd,gnd). Any handle whose node is ground (node 0) stays -1.
@@ -130,7 +122,7 @@ export class SchmittTriggerDriverElement implements PoolBackedAnalogElement {
   private _hGndGnd  = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes  = new Map(pinNodes);
+    super(pinNodes);
     this._vTH       = props.hasModelParam("vTH")       ? props.getModelParam<number>("vTH")       : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vTH"]!;
     this._vTL       = props.hasModelParam("vTL")       ? props.getModelParam<number>("vTL")        : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vTL"]!;
     this._vOH       = props.hasModelParam("vOH")       ? props.getModelParam<number>("vOH")       : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vOH"]!;
@@ -146,10 +138,6 @@ export class SchmittTriggerDriverElement implements PoolBackedAnalogElement {
     if (outNode !== 0 && gndNode !== 0)        this._hOutGnd = ctx.solver.allocElement(outNode, gndNode);
     if (gndNode !== 0 && outNode !== 0)        this._hGndOut = ctx.solver.allocElement(gndNode, outNode);
     if (gndNode !== 0)                         this._hGndGnd = ctx.solver.allocElement(gndNode, gndNode);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

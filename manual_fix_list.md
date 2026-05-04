@@ -393,13 +393,13 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 > Pattern decision (locked): a single exemplar (`src/components/passives/__tests__/analog-fuse.test.ts`, since it already prompted this work) is migrated first to lock the `buildFixture` shape; the remaining 32 are agent-spawnable in parallel against the exemplar.
 
 - [x] **Exemplar:** `src/components/passives/__tests__/analog-fuse.test.ts` (8 callsites) — landed 2026-05-03 as part of §4d. Pattern locked: full rewrite to `buildFixture` + `coordinator.step()` + `coordinator.getRuntimeDiagnostics()` for diag emission. State-pool reads via `fix.pool.state0/state1[fuse._stateBase + SLOT]`. Element lookup via `findFuse(fix.circuit.elements)` (instanceof). Round-trip props writeback via `fix.circuit.elementToCircuitElement.get(idx)!.getProperties()`. 13/13 green.
-- [ ] `src/components/active/__tests__/adc.test.ts` (2)
+- [x] `src/components/active/__tests__/adc.test.ts` (2) — landed 2026-05-04. Full rewrite onto `buildFixture` + real circuit (vin/vref/clk DcVoltageSources + ADC + Ground). Deleted `makeAdc`/`applyClockEdge`/`makeAcceptCtx` poison helpers (all called `adc.accept!()` directly against hand-rolled `Float64Array` voltage vectors + `makeLoadCtx`). Deleted the entire `ADC parity (C4.5) > adc_load_dcop_parity` describe block (hand-rolled `makeAdcCaptureSolver`/`makeAdcParityCtx`, inline `setup()`+`load()` drives with fake SparseSolver — pure engine impersonation). Rising-edge protocol: warm-start with CLK=0, call `facade.setSignal(coordinator, "clk", vHigh)`, then `coordinator.step()`. Read `latchedCode`/`eocActive` from `fix.pool.state0[drv._stateBase + SLOT_OUTPUT_CODE/EOC]` via `findDriver(fix.circuit.elements)` (instanceof `ADCDriverElement`). **Latent production bugs surfaced and fixed:** (1) `buildAdcNetlist` called `params.getModelParam<number>("bits")` but `bits` is a structural static prop never put in `_mparams` — changed to `params.getOrDefault<number>("bits", 8)`; (2) same pattern for `bipolar`/`sar`/`vIH`/`vIL` — all changed to `getOrDefault`; (3) `bits`/`bipolar`/`sar` added to `ADC_PARAM_DEFS` instance section so compiler merger delivers them to the netlist builder; (4) same latent bug in `buildDacNetlist` — fixed identically (`getOrDefault` + `instance` section in `DAC_PARAM_DEFS`); (5) `resolveSubcircuitModels` in `compiler.ts` now copies static entries from `instanceProps` into `mergedProps` so structural props reach netlist builders. 9/9 green.
 - [ ] `src/components/active/__tests__/dac.test.ts` (2)
 - [ ] `src/components/active/__tests__/opamp.test.ts` (5)
 - [ ] `src/components/active/__tests__/ota.test.ts` (8)
 - [ ] `src/components/active/__tests__/real-opamp.test.ts` (3)
 - [ ] `src/components/active/__tests__/real-opamp-raillim.test.ts` (1)
-- [ ] `src/components/active/__tests__/timer-555.test.ts` (1)
+- [x] `src/components/active/__tests__/timer-555.test.ts` (1) — landed 2026-05-04. File was already migrated to `DefaultSimulatorFacade` (no `test-helpers.js` import). The (1) callsite referred to wrong Resistor pin names (`r1:A`/`r1:B`/`r2:A`/`r2:B`/`rout:A`/`rout:B`) in `buildAstableFacade` and `buildMonostableFacade` — all renamed to `pos`/`neg`. **Pre-existing Timer555 convergence failures exposed:** fixing the pin names uncovered 5 pre-existing failures (`converged: false` on DC-OP, `stagnation: simTime stuck at 0s` on transient) that were masked by the circuit-build errors. These are Timer555 engine convergence issues under active investigation (see `timer-555-debug.test.ts`); they are not caused by this migration. Escalation: Timer555 DCOP non-convergence and transient stagnation must be resolved as a separate item before these 5 tests can be marked green.
 - [x] `src/components/io/__tests__/led.test.ts` (2) — landed 2026-05-03. Wave-2A-1 cleanup: deleted `integration > junction_cap_transient_matches_ngspice` and the `LED limitingCollector >` describe block (both tests- the symmetric `pushes wasLimited=false` companion was deleted with its `pushes AK pnjlim event` partner per the wave-2A-1 spec) — all three were category-1 engine-impersonator-via-comparison-harness deletes (`ComparisonSession.getAttempt({ phase: "tranNR"|"dcopDirect" }).iterations[N].ours.matrix[...]` / `.limitingEvents[]` peeks). Bit-exact junction-cap stamping and pnjlim limiting are covered by the ngspice harness parity tests (`harness_run` + `harness_get_attempt` against the instrumented ngspice DLL), not by in-process iteration peeks. Pruned now-unused `ComparisonSession`, `DefaultSimulatorFacade`, `computeJunctionCapacitance`, `computeJunctionCharge`, `DIODE_CAP_SCHEMA`, `LED_VT` imports. Folded in **two genuine bugs** that surfaced once the LED actually entered the analog partition: (1) `led-fixture.ts` was missing `model: opts.color`- without it `resolveModelAssignments` honors `LedDefinition.defaultModel === "digital"` and the LED never reaches the analog compiler, so `red_led_forward_drop` / `blue_led_forward_drop` / `vt_reflects_TEMP` all read `Vf=0` from the trivially-converged sub-circuit; (2) `setParam_TEMP_recomputes` looked up the LED via `e.instanceId === "led"`, but `facade.build({ id: "led" })` assigns a fresh UUID as `instanceId` and only stores `"led"` as the `label` property — fixed to look up by `label`. Also folded in the LED color-preset `EG` engine bug (see §5 below). 86/86 tests pass after deletions.
 - [x] `src/components/passives/__tests__/crystal.test.ts` (3) — landed 2026-05-03 (§3 poison-pattern). Migrated to `buildFixture` + registered `QuartzCrystal`/`DcVoltageSource`/`Resistor`/`Ground`. Deleted 2 engine-impersonator-via-capture-solver tests (`factory creates element with 2 external pins and correct branchIndex after setup` + `factory creates element that stamps R_s conductance at A-node diagonal after setup`) — both drove element.setup()/load() against hand-rolled SparseSolver + ag[] vector and asserted bit-exact `(1,1)` matrix peeks. BVD R_s + C_0 stamping is covered by ngspice harness parity tests. Replaced `dc_blocks` runDcOp+matrixSize=8 hand-rolled poke with observable `engine.getNodeVoltage("xtal:pos")=1V` / `getNodeVoltage("xtal:neg")≈0V` contract via `coordinator.dcOperatingPoint()`. Kept `_stateBase=-1` UC-7 retention (J-048) as pure factory check. Folded in `branchIndex>0 after compile` smoke. 13/13 green.
 - [ ] `src/components/passives/__tests__/memristor.test.ts` (4)
@@ -510,84 +510,84 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 >
 > **Exemplar (landed 2026-05-04):** `src/components/passives/transmission-segment-{r,l,c}.ts`. r is Pattern B (plain), l + c are Pattern A (pool-backed). transmission-line.test.ts: 14/14 green in 77ms. Diff shape locked.
 
-#### 4f Wave 1 — close the surgical-fix transmission-segment trio (2 remaining files)
+#### 4f Wave 1 — close the surgical-fix transmission-segment trio (2 remaining files) (LANDED, verified 2026-05-04)
 
 > Pattern A pool-backed and Pattern B plain. Already carry the `as Map<string, number>` surgical-fix cast that the migration deletes.
 
-- [ ] `src/components/passives/transmission-segment-rl.ts` — Pattern A (pool-backed, branch-row + state schema same as segment-l).
-- [ ] `src/components/passives/transmission-segment-g.ts` — Pattern B (plain, 1-pin shunt conductance).
+- [x] `src/components/passives/transmission-segment-rl.ts` — Pattern A (pool-backed, branch-row + state schema same as segment-l).
+- [x] `src/components/passives/transmission-segment-g.ts` — Pattern B (plain, 1-pin shunt conductance).
 
-#### 4f Wave 2 — pool-backed standalone passives (4 files)
+#### 4f Wave 2 — pool-backed standalone passives (4 files) (LANDED, verified 2026-05-04)
 
-- [ ] `src/components/passives/capacitor.ts` — Pattern A. Standard `(pinNodes, props)` ctor.
-- [ ] `src/components/passives/inductor.ts` — Pattern A. Standard ctor.
-- [ ] `src/components/passives/memristor.ts` — Pattern A. Standard ctor.
-- [ ] `src/components/passives/crystal.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rs, ls, cs, c0)`. Just route the first arg into `super(pinNodes);` first thing.
+- [x] `src/components/passives/capacitor.ts` — Pattern A. Standard `(pinNodes, props)` ctor.
+- [x] `src/components/passives/inductor.ts` — Pattern A. Standard ctor.
+- [x] `src/components/passives/memristor.ts` — Pattern A. Standard ctor.
+- [x] `src/components/passives/crystal.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rs, ls, cs, c0)`. Just route the first arg into `super(pinNodes);` first thing.
 
-#### 4f Wave 3 — pool-backed gate / mux / decoder behavioral drivers (16 files)
+#### 4f Wave 3 — pool-backed gate / mux / decoder behavioral drivers (16 files) (LANDED, verified 2026-05-04)
 
 > Mechanical sweep. All Pattern A with standard `(pinNodes, props: PropertyBag)` ctors.
 
-- [ ] `src/solver/analog/behavioral-drivers/and-driver.ts` — exemplar within the wave (canonical Template A-variable).
-- [ ] `src/solver/analog/behavioral-drivers/or-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/nand-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/nor-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/xor-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/xnor-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/not-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/buf-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/mux-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/demux-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/decoder-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/seven-seg-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/splitter-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/driver-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/driver-inv-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/button-led-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/and-driver.ts` — exemplar within the wave (canonical Template A-variable).
+- [x] `src/solver/analog/behavioral-drivers/or-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/nand-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/nor-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/xor-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/xnor-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/not-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/buf-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/mux-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/demux-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/decoder-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/seven-seg-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/splitter-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/driver-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/driver-inv-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/button-led-driver.ts`
 
-#### 4f Wave 4 — pool-backed flipflop / counter / register / latch behavioral drivers (10 files)
+#### 4f Wave 4 — pool-backed flipflop / counter / register / latch behavioral drivers (10 files) (LANDED, verified 2026-05-04)
 
-- [ ] `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/d-async-flipflop-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/jk-flipflop-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/jk-async-flipflop-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/rs-flipflop-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/rs-async-latch-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/t-flipflop-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/counter-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/counter-preset-driver.ts`
-- [ ] `src/solver/analog/behavioral-drivers/register-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/d-async-flipflop-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/jk-flipflop-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/jk-async-flipflop-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/rs-flipflop-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/rs-async-latch-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/t-flipflop-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/counter-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/counter-preset-driver.ts`
+- [x] `src/solver/analog/behavioral-drivers/register-driver.ts`
 
-#### 4f Wave 5 — pool-backed analog drivers (comparator / opamp / schmitt / timer / adc / dac, 6 files)
+#### 4f Wave 5 — pool-backed analog drivers (comparator / opamp / schmitt / timer / adc / dac, 6 files) (LANDED, verified 2026-05-04)
 
-- [ ] `src/components/active/comparator-driver.ts`
-- [ ] `src/components/active/comparator-pushpull-driver.ts`
-- [ ] `src/components/active/dac-driver.ts`
-- [ ] `src/components/active/adc-driver.ts`
-- [ ] `src/components/active/schmitt-trigger-driver.ts`
-- [ ] `src/components/active/timer-555-latch-driver.ts`
-- [ ] `src/components/active/real-opamp.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, p: Record<string, number>)` — keep the second arg shape, route first into `super(pinNodes);`.
-- [ ] `src/solver/analog/behavioral-output-driver.ts` — Pattern A. Standard ctor.
+- [x] `src/components/active/comparator-driver.ts`
+- [x] `src/components/active/comparator-pushpull-driver.ts`
+- [x] `src/components/active/dac-driver.ts`
+- [x] `src/components/active/adc-driver.ts`
+- [x] `src/components/active/schmitt-trigger-driver.ts`
+- [x] `src/components/active/timer-555-latch-driver.ts`
+- [x] `src/components/active/real-opamp.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, p: Record<string, number>)` — keep the second arg shape, route first into `super(pinNodes);`.
+- [x] `src/solver/analog/behavioral-output-driver.ts` — Pattern A. Standard ctor.
 
-#### 4f Wave 6 — switch family + relay + bridge drivers (mixed pool-backed / plain, 7 files)
+#### 4f Wave 6 — switch family + relay + bridge drivers (mixed pool-backed / plain, 7 files) (LANDED, verified 2026-05-04)
 
-- [ ] `src/components/switching/switch.ts` — Pattern A.
-- [ ] `src/components/switching/switch-dt.ts` — Pattern B (no `poolBacked`).
-- [ ] `src/components/switching/trans-gate.ts` — Pattern B. **Non-standard ctor:** `(pinNodes)` only, no props.
-- [ ] `src/components/switching/relay-coupling.ts` — Pattern A.
-- [ ] `src/components/switching/relay-resistor.ts` — Pattern B.
-- [ ] `src/components/switching/fgnfet-blown-driver.ts` — Pattern B.
-- [ ] `src/components/switching/fgpfet-blown-driver.ts` — Pattern B.
+- [x] `src/components/switching/switch.ts` — Pattern A. (Carries `implements SpstAnalogElement` domain-marker interface — keep, not a §4g Phase C target.)
+- [x] `src/components/switching/switch-dt.ts` — Pattern B (no `poolBacked`). (Carries `implements SpdtAnalogElement` domain-marker interface — keep.)
+- [x] `src/components/switching/trans-gate.ts` — Pattern B. **Non-standard ctor:** `(pinNodes)` only, no props. **Wave 0a redundant-implements sweep target:** strip `implements AnalogElement`.
+- [x] `src/components/switching/relay-coupling.ts` — Pattern A.
+- [x] `src/components/switching/relay-resistor.ts` — Pattern B. **Wave 0a sweep target.**
+- [x] `src/components/switching/fgnfet-blown-driver.ts` — Pattern B. **Wave 0a sweep target.**
+- [x] `src/components/switching/fgpfet-blown-driver.ts` — Pattern B. **Wave 0a sweep target.**
 
-#### 4f Wave 7 — non-driver internals + remaining passives + transformer + analog-fuse (8 files)
+#### 4f Wave 7 — non-driver internals + remaining passives + transformer + analog-fuse (8 files) (LANDED, verified 2026-05-04)
 
-- [ ] `src/components/active/internal-cccs.ts` — Pattern B.
-- [ ] `src/components/active/internal-zero-volt-sense.ts` — Pattern B.
-- [ ] `src/components/passives/transformer.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, ..., multiplicity = 1)`.
-- [ ] `src/components/passives/transformer-coupling.ts` — Pattern B.
-- [ ] `src/components/passives/potentiometer.ts` — Pattern B. **Non-standard ctor:** `(pinNodes, resistance, position)`.
-- [ ] `src/components/semiconductors/triode.ts` — Pattern B.
-- [ ] `src/components/passives/analog-fuse.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rCold, rBlown, i2tRating, onStateChange?)`. Has the diagnostic-emitter setter coupling — keep `setDiagnosticEmitter` body untouched. Land last in case the diagnostic-wiring contract changes mid-migration.
+- [x] `src/components/active/internal-cccs.ts` — Pattern B. **Wave 0a sweep target.**
+- [x] `src/components/active/internal-zero-volt-sense.ts` — Pattern B. **Wave 0a sweep target.**
+- [x] `src/components/passives/transformer.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, ..., multiplicity = 1)`. *(Note: Wave 11a converts the parent to `kind: "netlist"` form, so the class itself disappears; this entry stays ticked for the §4f load-bearing property.)*
+- [x] `src/components/passives/transformer-coupling.ts` — Pattern B. **Wave 0a sweep target.**
+- [x] `src/components/passives/potentiometer.ts` — Pattern B. **Non-standard ctor:** `(pinNodes, resistance, position)`. **Wave 0a sweep target.**
+- [x] `src/components/semiconductors/triode.ts` — Pattern B. **Wave 0a sweep target.** *(Note: Wave 11a converts the parent to `kind: "netlist"` form.)*
+- [x] `src/components/passives/analog-fuse.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rCold, rBlown, i2tRating, onStateChange?)`. Has the diagnostic-emitter setter coupling — keep `setDiagnosticEmitter` body untouched. Land last in case the diagnostic-wiring contract changes mid-migration.
 
 #### 4f Wave 8 — test-mock migration to abstract base classes (~30 files)
 
@@ -650,6 +650,275 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 #### 4f follow-ons
 
 - [ ] **Tick fix-list line 410.** `transmission-line.test.ts` was hanging; with the surgical `pinNodes`-by-reference fix landed (pre-migration) plus the §4f exemplar, all 14 tests pass in ~80ms. Tick `[ ]` → `[x]` on §4c row.
+
+### 4g. Single-class collapse + `#pinNodes` privacy + completeness sweep
+
+> **Surfaced 2026-05-04 by §4e triage of three confirmed bugs sharing one architectural smell** (compiler.ts:392 labelRef snapshot, capture.ts:122 buildTopology heuristic, polarized-cap MODEUIC NaN). All three are instances of *"a value owned by site A is hand-replicated at site B via a formula or snapshot that approximates A's output."* The §4f migration closes this for `_pinNodes` defensive copies but leaves three escape hatches open:
+>
+> 1. The loose `interface AnalogElement` and `interface PoolBackedAnalogElement` (`element.ts:37`, `element.ts:336`) — anyone can write `class X implements AnalogElement { this._pinNodes = new Map(pinNodes); }` and the bug returns. The dual `interface` + `abstract class` structure has no TypeScript or architectural justification beyond legacy convenience for inline object literals (which are themselves the smell sites).
+> 2. The `_pinNodes` field is `public` on `AbstractAnalogElement`. Subclasses can shadow-redeclare it; consumers can mutate it through `el._pinNodes.set(...)`. The "by-reference, no defensive copy" contract is documented but not enforced.
+> 3. §4f's enumeration is bounded by *"currently used as a sub-leaf in a netlist composite."* That criterion is wrong for the same reason transmission-line was latently broken: any future composite can wire any analog element through internal nets. 13 production files (resistor, polarized-cap, sensors, FETs, bridge drivers, probe, controlled-source-base, subcircuit-wrapper) are unmigrated solely because no current netlist uses them.
+>
+> **Architectural decision:** Collapse `interface AnalogElement` + `abstract class AbstractAnalogElement` into a single `abstract class AnalogElement` with (a) a private `__brand` field (TS treats classes with `private` members nominally, closing structural conformance) and (b) `#pinNodes` as a true ECMAScript private field exposed through a `ReadonlyMap` getter. Same treatment for the pool-backed pair. Migrate every class-based implementer regardless of current netlist usage. Migrate compiler internal `AnalogElement` literals (patcher leaf, internal-net allocator) to real classes. The patcher's writes go through closure-captured `Map` references in `patchWork`, never through `el.pinNodes` — the `ReadonlyMap` getter is therefore safe and protective.
+>
+> **Scale:** 543 `_pinNodes` references across 143 files (count drops materially after Wave 11a deletes the nfet/pfet/triode/transformer parent classes; re-measure before launching Phase A); 10 unmigrated standalone production files (Wave 9, post-rebaseline; nfet/pfet/mutual-inductor moved to Wave 11a scope where their parent classes disappear, so the implements→extends migration on those three would be wasted motion); 2 interfaces to delete; 1 base class rename; 1 field privacy transformation; 3 compiler-internal literals to convert.
+
+#### 4g Wave 0a — Rebaseline + redundant-implements sweep (mechanical, one commit)
+
+> **Surfaced 2026-05-04 by audit-before-launch.** §4f Waves 1–7 are functionally complete (no `_pinNodes = new Map(pinNodes)` defensive copies in any of the 53 named files; every one extends the abstract base; `super(pinNodes)` first; transmission-line.test.ts smoke gate 14/14 green). What remains is mechanical cleanup that the §4f recipe step "Replace `implements X` → `extends Abstract`" partially executed: 9 files added `extends Abstract...` *alongside* the original `implements (Pool)?AnalogElement` clause rather than replacing it. The double-declaration is a no-op at compile time but trips Phase C (which deletes the loose interface) and the original Wave 0 acceptance grep.
+
+- [ ] **Strip redundant `implements AnalogElement` / `implements PoolBackedAnalogElement` clauses on 9 files where the class already `extends Abstract(PoolBacked)?AnalogElement`:**
+  - `src/components/active/internal-cccs.ts`
+  - `src/components/active/internal-zero-volt-sense.ts`
+  - `src/components/switching/trans-gate.ts`
+  - `src/components/switching/relay-resistor.ts`
+  - `src/components/switching/fgnfet-blown-driver.ts`
+  - `src/components/switching/fgpfet-blown-driver.ts`
+  - `src/components/passives/transformer-coupling.ts`
+  - `src/components/passives/potentiometer.ts`
+  - `src/components/semiconductors/triode.ts`
+
+  **Do NOT touch:** `switch.ts implements SpstAnalogElement` and `switch-dt.ts implements SpdtAnalogElement` — these are domain marker interfaces, not the loose `AnalogElement`/`PoolBackedAnalogElement` interfaces Phase C deletes. They remain.
+
+- [ ] **Acceptance:** `Grep` for `extends\s+Abstract\w*\s+implements\s+(AnalogElement|PoolBackedAnalogElement)\b` across `src/` returns zero hits. `tsc --noEmit -p .` clean. No targeted-test runs needed (the sweep is purely lexical; behavior is unchanged).
+
+#### 4g Wave 0 — Hard prerequisites (must land before Phase A)
+
+- [x] All §4f Waves 1–7 production-file migrations complete (load-bearing property: zero `_pinNodes = new Map(pinNodes)` defensive copies in any §4f-named file; every class extends the abstract base; `super(pinNodes)` first). Verified by audit 2026-05-04.
+- [ ] Wave 0a redundant-implements sweep landed (above).
+- [ ] §4f Wave 8 test-mock migration complete. Every inline `const el: AnalogElement = { ... }` in `src/**/__tests__/*.test.ts` and `src/test-fixtures/*.ts` rewritten as a local `class TestEl extends AbstractAnalogElement` declaration. **Acceptance:** `Grep` for `:\s*AnalogElement\s*=\s*\{` returns zero hits across `src/`.
+
+> **Rationale:** Phase C deletes the loose interface. Any unmigrated literal or `implements` site becomes a `tsc` error after Phase C. Landing all Wave 8 work first means Phase C is a single atomic rename, not a multi-day red build. The original "no `implements` clauses outside element.ts" gate is replaced by the architectural-smell gate (`_pinNodes\s*=\s*new Map\(`) at Wave 11; the residual `implements` clauses on Wave-9-target files are part of those files' migration scope, not Wave 0's.
+
+#### 4g Wave 9 — §4f completeness sweep (10 standalone production files)
+
+Migrate every class-based analog element regardless of current netlist usage. **Scope-narrowed 2026-05-04:** `nfet.ts`, `pfet.ts`, and `mutual-inductor.ts` removed from this wave because Wave 11a converts their parents to `kind: "netlist"` form (the parent classes disappear; the new top-level sub-elements are authored as `extends Abstract...` from the start). Doing implements→extends on a class about to be deleted is wasted motion.
+
+##### 9a — Standalone passives §4f missed (2 files)
+
+- [ ] `src/components/passives/resistor.ts` — Pattern B (plain `AnalogElement`, confirmed not pool-backed). Standard `(pinNodes, props)` ctor. The most-used analog primitive; will be a child of every analog netlist composite ever written.
+- [ ] `src/components/passives/polarized-cap.ts` — Pattern A (pool-backed). Standard `(pinNodes, props)` ctor. **Land alongside §4e PolarizedCap MODEUIC fix** so the new `initVoltages` (or `icLoad` if the typed `IcLoadable` interface lands first) can be added cleanly to the migrated class body.
+
+##### 9b — Sensor passives (3 files)
+
+- [ ] `src/components/sensors/ldr.ts` — pattern per current schema.
+- [ ] `src/components/sensors/ntc-thermistor.ts` — same.
+- [ ] `src/components/sensors/spark-gap.ts` — same.
+
+##### 9d — Behavioral bridge drivers §4f missed (2 files)
+
+- [ ] `src/solver/analog/behavioral-drivers/bridge-input-driver.ts` — same shape as Wave 3 gate drivers.
+- [ ] `src/solver/analog/behavioral-drivers/bridge-output-driver.ts` — same.
+
+##### 9e — IO + special-case (3 files)
+
+- [ ] `src/components/io/probe.ts` — Pattern B likely (no state).
+- [ ] `src/solver/analog/controlled-source-base.ts` — **Decision: option 9e.i (extend the base).** Make `ControlledSourceBase extends AbstractAnalogElement`. Subclasses (`cccs.ts`, `ccvs.ts`, `vccs.ts`, `vcvs.ts`) inherit transitively; the four subclasses pick up the new contract automatically. Land the base-class change first; verify the four subclasses compile without modification.
+- [ ] `src/solver/analog/subcircuit-wrapper-element.ts` — Pattern B. The wrapper is intentionally a no-op pass-through; outer `pinNodes` are pre-resolved by `groupToNodeId`. Migration is type-system completeness only — runtime behavior is unchanged.
+
+> **Wave 9c (switching FETs) — DELETED.** `nfet.ts` / `pfet.ts` were originally listed here for implements→extends migration. Wave 11a converts both to `kind: "netlist"` composites (NFETSWSubElement + behavioral driver leaf as siblings); the parent class is deleted, so Wave 9c migration would be thrown away. The new top-level sub-elements emerging from Wave 11a are authored as `extends Abstract...` from the start.
+>
+> **9a `mutual-inductor.ts` removal — same logic.** Wave 11a's transformer/mutual-inductor paired migration emits `InductorSubElement(L1)` + `InductorSubElement(L2)` + `MutualInductorElement(K)` as three top-level netlist sub-elements. Both `InductorSubElement` and `MutualInductorElement` get authored as `extends Abstract...` from the start, so a separate Wave 9 migration step is redundant.
+
+**Acceptance for Wave 9:** `Grep` for `^(export\s+)?class\s+\w+\s+(implements\s+(AnalogElement|PoolBackedAnalogElement))` across `src/` returns zero hits outside `element.ts` itself, the Wave 11a scope files (`nfet.ts`, `pfet.ts`, `mutual-inductor.ts`), and the harness/test-fixture files Wave 8 covers.
+
+#### 4g Wave 10 — Compiler internal literals → real classes + §4e Bug 2 labelPatchWork channel (bundled)
+
+The compiler's ad-hoc `AnalogElement` object literals are exactly the allocator-publish smell sites. They cannot be left as literals after Phase C (deleted interface) or Phase B (private brand). **Bundled with this wave:** the §4e Bug 2 fix (compiler.ts:392 siblingBranch labelRef snapshot), because both touch the same `compiler.ts` patcher infrastructure and the new `PatcherLeaf` class is the natural home for the `labelPatchWork` channel.
+
+- [ ] `src/solver/analog/compiler.ts` — `makeInternalNetAllocator` literal → `class InternalNetAllocator extends AbstractAnalogElement` (or `AbstractPoolBackedAnalogElement` if pool-backed). Constructor receives `(pinNodes, labelRef)`; `setup()` body unchanged.
+- [ ] `src/solver/analog/compiler.ts` — Patcher leaf literal → `class PatcherLeaf extends AbstractAnalogElement`. Constructor receives `(pinNodes, patchWork, labelPatchWork)`; `setup()` body walks `patchWork` (existing) and `labelPatchWork` (new). **Critical:** the patcher writes through `patchWork[i].map` (a closure-captured `Map` reference), NOT through `el.pinNodes` — this is the property that makes the `ReadonlyMap` getter safe in Phase B.
+- [ ] **§4e Bug 2 — `labelPatchWork` channel.** In `compiler.ts:390–393`, replace the eager string interpolation `subProps.set(paramKey, \`${labelRef.value}:${ref.subElementName}\`)` with a deferred push:
+  ```ts
+  labelPatchWork.push({
+    target: subProps,
+    paramKey,
+    template: (label: string) => `${label}:${ref.subElementName}`,
+  });
+  ```
+  The `PatcherLeaf.setup()` drains `labelPatchWork` after `setLabel` has run (the patcher is sorted ahead of sub-elements by `NGSPICE_LOAD_ORDER.INTERNAL_NET_PATCH`, but `setLabel` runs at compiler.ts:1155 *before* engine init begins setup, so `labelRef.value` is correct by the time the patcher's `setup()` fires). **Per-leaf change:** `RelayCoupling`, `InternalCccs`, `TransformerCoupling` must move their `props.getOrDefault("coilBranch")` / `props.getOrDefault("sense")` / `props.getOrDefault("L1_branch")` reads from constructor body to `setup()` body, so they read the patched value rather than the constructor-time empty string. Validation that previously fired in the constructor (e.g. `RelayCoupling:58` empty-label throw) moves to `setup()` as well.
+- [ ] **Tests to un-skip / verify post-fix.** `tapped-transformer.test.ts:19–37` is currently skipped with a comment citing this exact bug; un-skip and verify mutual-inductance coupling rows are correctly wired. Add a regression test for the Optocoupler photocurrent CCCS path and the Relay actuation path — both currently appear to "work" only because no test exercises the broken sibling-branch resolution.
+- [ ] Sweep for any other inline `AnalogElement` literals in `src/solver/analog/*.ts` (`Grep` for `:\s*AnalogElement\s*=\s*\{`); convert each.
+
+**Acceptance for Wave 10:**
+- `Grep` for `:\s*AnalogElement\s*=\s*\{` across `src/` returns zero hits.
+- `Grep` for `\$\{labelRef\.value\}` in `src/solver/analog/compiler.ts` returns zero hits in factory body context (only appears inside `labelPatchWork.push(... template ...)` triples).
+- `tapped-transformer.test.ts` un-skipped and green; new optocoupler / relay regression tests green.
+
+#### 4g Wave 11 — Inline-form parent composites + factory-literal leaves (closes the rest of `_pinNodes = new Map(...)` in production)
+
+> **Why this exists.** Wave 9 closes class-form leaves. Wave 10 closes compiler-internal literals. What remains in production are two distinct shapes both still emitting `_pinNodes = new Map(pinNodes)` (or assigning into a child sub-element's `_pinNodes` from constructor-time pin reads):
+>
+> 1. **Parent classes that wrap one or more child sub-elements as fields**, building each child's `_pinNodes` from the parent's `pinNodes.get("…")` snapshots taken at the parent's construction time. If the parent is ever placed as a child of a higher composite that wires one of its pins through an internal-only net, the patcher writes the resolved ID into the parent's `_pinNodes` after construction — but the child sub-element's `_pinNodes` Map was frozen at construction with `-1`, exactly the §4f exemplar hang. Today these parents only avoid the hang because no test happens to put them in that compositional position; the bug is latent until any user circuit triggers it.
+>
+> 2. **Component factories returning inline `AnalogElement` object literals** (`return { _pinNodes: new Map(pinNodes), setup, load, ... }`). Same factory-defensive-copy smell as Wave 9b/c, just expressed as a literal rather than via `el._pinNodes = new Map(...)`. The Wave 10 transform applies (literal → class extending the abstract base), the only difference being that the file is a component definition rather than the compiler.
+>
+> Both halves are landed under one wave so the acceptance Grep (`_pinNodes\s*=\s*new Map\(` and `_pinNodes:\s*new Map\(` outside `element.ts`) reaches zero in a single pass; otherwise one half passing and the other failing leaves a misleading green build.
+
+##### 11a — Parent composites: convert `kind: "inline"` → `kind: "netlist"` (5 files, exemplar = `transmission-line.ts`)
+
+> **Universal recipe.** The parent's job becomes a `buildXNetlist(props): CircuitSpec` function that emits each former child sub-element as a top-level analog element with its own connectivity row. The parent class either disappears (preferred) or becomes a thin orchestrator with no `_pinNodes`-derived child wiring. Children's `pinNodes` Maps are constructed by the composite compiler with patch-aware references — exactly the path `transmission-segment-l.ts` already lives on. **No special handling for shared-state coupling** because each former child sub-element already has its own state schema; cross-coupling (e.g. transformer's mutual inductance) becomes a normal sibling-state read via the established sibling-state ref pattern (cf. `behavioral-output-driver.ts`).
+
+- [ ] `src/components/switching/trans-gate.ts` — composite of two `NFETSWSubElement` children sharing D/S nodes. Emit two top-level SW elements with `(D=out1, S=out2)` and inverted control voltage handling for the PFET sub-element. The current parent-class signal-path control-voltage indirection (`_nfetSW.setCtrlVoltage(vCtrlN)`) becomes a sibling-state push from a small behavioral driver if needed, or a direct connectivity edge if the SW element can read its control directly from `_pinNodes`. Preserve PB-TRANSGATE TSTALLOC ordering: NFET sub-element emitted first.
+
+- [ ] `src/components/switching/nfet.ts` — composite of one `NFETSWSubElement` (analog) + one behavioral driver leaf for the digital body model. Emit SW + driver as siblings; the driver's `OUTPUT_LOGIC_LEVEL` slot is consumed by the SW via siblingState. The factory-closure `el._pinNodes = new Map(pinNodes)` defensive copy and `el._sw._pinNodes = new Map([...])` constructor-time read both disappear.
+
+- [ ] `src/components/switching/pfet.ts` — same shape as `nfet`, mirror polarities.
+
+- [ ] `src/components/semiconductors/triode.ts` — composite of one `VCCS` child. Emit VCCS as a top-level sub-element with the triode's gain parameter mapped to the VCCS gain. Pin-label translation (P/G/K → ctrl+/ctrl-/out+/out-) becomes a connectivity row in the netlist.
+
+- [ ] `src/components/passives/transformer.ts` + `src/components/passives/mutual-inductor.ts` — paired migration. Emit `InductorSubElement(L1)` + `InductorSubElement(L2)` + `MutualInductorElement(K)` as three top-level sub-elements. **Exemplar already exists**: `tapped-transformer.ts` is `kind: "netlist"` and emits the equivalent shape; copy the structure. The L1/L2 windings each get their own `_pinNodes` Map via the compiler patcher; the K coupling element reads L1/L2 branch indices via the sibling-branch ref pattern (cf. `optocoupler.ts` photocurrent CCCS / `relay-resistor.ts` coil branch — note these sibling-branch reads are themselves the subject of §4e Bug 2 / Wave 10 `labelPatchWork`, so order Wave 10 before this row).
+
+##### 11b — Object-literal factory leaves: literal → class extending `AbstractAnalogElement` (5 files, exemplar = the Wave 10 compiler-leaf transform)
+
+> **Universal recipe.** Replace `return { _pinNodes: new Map(pinNodes), label: "", _stateBase: -1, branchIndex: -1, ngspiceLoadOrder: …, setup, load, getPinCurrents, setParam }` with a local class extending `AbstractAnalogElement` (or `AbstractPoolBackedAnalogElement` if pool-backed), then `return new XElement(pinNodes, props)`. Method bodies move onto the class verbatim. The defensive copy disappears because `super(pinNodes)` stores by reference. **Exactly the Wave 8 mock-migration recipe applied to production object literals.**
+
+- [ ] `src/components/active/opamp.ts:208` — single literal in `createOpAmpElement`. Pattern B (no state pool). Standard `(pinNodes, props)` ctor.
+- [ ] `src/components/active/ota.ts:186` — single literal. Pattern B. Standard ctor.
+- [ ] `src/components/semiconductors/mosfet.ts:277, 384` — TWO literals in different model factories (likely L1/L2 model variants; check each model's state usage to determine A vs B per-literal).
+- [ ] `src/components/active/analog-switch.ts:859` — single literal in factory. Audit: confirm whether it's a defensive-copy or a constructor-time wiring; classify accordingly. (Line 859 is high; may indicate a multi-factory file like mosfet.)
+
+##### 11 dependency notes
+
+- Wave 9 must land first (reduces `implements (AnalogElement|PoolBackedAnalogElement)` hits to zero outside `element.ts`).
+- Wave 10 must land before 11a's `transformer.ts` row because the K-coupling element relies on the `labelPatchWork` channel for sibling-branch label resolution.
+- Wave 11b can land in parallel with 11a; the two halves are independent.
+
+**Acceptance for Wave 11 (the umbrella zero-smell gate):**
+- `Grep` for `_pinNodes\s*=\s*new Map\(` across `src/` returns zero hits outside `src/solver/analog/element.ts` (the abstract base's docstring example).
+- `Grep` for `_pinNodes:\s*new Map\(` across `src/` returns zero hits outside `src/solver/analog/element.ts`.
+- `Grep` for `kind:\s*"inline"` across `src/components/{switching,semiconductors,passives}/` returns hits **only** in files outside the 11a list (registry-driven generic factories that don't wrap children).
+- All Wave 11a parents have a `buildXNetlist` function and a `kind: "netlist"` model entry in their `ComponentDefinition`.
+- All targeted vitest passes for the migrated parents (trans-gate, nfet, pfet, triode, transformer) — green.
+- Headless transmission-line, op-amp inverter, and CMOS-inverter regression circuits compile and run without NaN/hang in any composite NR path.
+
+#### 4g Phase A — Add public getter, migrate all read sites
+
+Mechanical, low-risk, prepares the field-privacy step.
+
+- [ ] **A.1** — In `element.ts`, add to `AbstractAnalogElement`:
+  ```ts
+  get pinNodes(): Map<string, number> { return this._pinNodes; }
+  ```
+  Returns the live `Map` (not `Readonly` yet). Field stays as `_pinNodes` for the duration of this phase.
+- [ ] **A.2** — Migrate all `_pinNodes` read/iteration sites to `pinNodes`. 543 occurrences across 143 files. Categories:
+  - Internal class reads: `this._pinNodes.get("pos")` → `this.pinNodes.get("pos")`
+  - External access from harness/engine: `el._pinNodes.values()` → `el.pinNodes.values()`
+  - Documentation comments: `_pinNodes` → `pinNodes`
+- [ ] **A.3** — Within the abstract base class itself, the constructor still assigns `this._pinNodes = pinNodes as Map<string, number>` — leave this sole write-site for Phase B to convert.
+- [ ] **A.4** — `tsc --noEmit` clean; full test suite green.
+
+**Acceptance:** `Grep` for `\b_pinNodes\b` returns hits ONLY in `element.ts` (the field declaration and the constructor write).
+
+#### 4g Phase B — `#pinNodes` true privacy
+
+The hard requirement. ECMAScript private field; not just `private` keyword (which TS strips at runtime); not protected (subclasses must not access it directly).
+
+- [ ] **B.1** — In `AbstractAnalogElement`, change:
+  ```ts
+  _pinNodes: Map<string, number>;
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    this._pinNodes = pinNodes as Map<string, number>;
+  }
+  get pinNodes(): Map<string, number> { return this._pinNodes; }
+  ```
+  to:
+  ```ts
+  readonly #pinNodes: Map<string, number>;
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    this.#pinNodes = pinNodes as Map<string, number>;
+  }
+  get pinNodes(): ReadonlyMap<string, number> { return this.#pinNodes; }
+  ```
+  Three things change at once: (a) field renamed to `#pinNodes` (true ES private), (b) field is `readonly` (the *reference* cannot be reassigned; the Map is still mutable for the patcher's closure), (c) getter narrows return type to `ReadonlyMap`.
+- [ ] **B.2** — `tsc --noEmit`. Errors will surface at exactly two kinds of sites:
+  - Any consumer that calls `el.pinNodes.set(...)` or `el.pinNodes.delete(...)`. **These are the smell.** Each such site must be audited: either it's the patcher (which should be writing through its closure-captured `patchWork[i].map` reference, not `el.pinNodes` — fix the patcher), or it's a leaf incorrectly trying to mutate its own pin map (which violates the contract — fix the leaf).
+  - Any subclass that declared `_pinNodes` independently and read it as `this._pinNodes` (Phase A.2 should have migrated all reads, but the field declaration check catches stragglers).
+- [ ] **B.3** — All errors resolved; full test suite green. **Critical:** the test suite is the verifier for the patcher's "writes through captured reference, not through getter" property. If transmission-line tests still pass, the patcher is correct.
+
+**Acceptance:** `Grep` for `\b_pinNodes\b` returns hits ONLY in JSDoc comments (sweep those too if any remain). `Grep` for `\.pinNodes\.set\(` and `\.pinNodes\.delete\(` returns zero hits across `src/`.
+
+#### 4g Phase C — Collapse interfaces into single abstract classes
+
+- [ ] **C.1** — In `element.ts`, delete `export interface AnalogElement { ... }` (lines 37–255).
+- [ ] **C.2** — Rename `export abstract class AbstractAnalogElement` → `export abstract class AnalogElement`. Drop `implements AnalogElement` from its declaration (no longer meaningful).
+- [ ] **C.3** — Add nominal brand to prevent structural conformance:
+  ```ts
+  export abstract class AnalogElement {
+    private readonly __analogElementBrand!: never;
+    // ... existing fields, constructor, abstract methods
+  }
+  ```
+  TypeScript treats classes with `private` members nominally for assignability. After this, `{ pinNodes: ..., label: "" } as AnalogElement` becomes a compile error — the only path to an `AnalogElement` is `new SomeSubclass(...)`.
+- [ ] **C.4** — Same treatment for the pool-backed pair: delete `export interface PoolBackedAnalogElement`, rename `AbstractPoolBackedAnalogElement` → `PoolBackedAnalogElement`, drop the redundant `implements`. The brand inherits from the parent.
+- [ ] **C.5** — Update all `implements AnalogElement` → `extends AnalogElement` (mechanical sed); same for `implements PoolBackedAnalogElement` → `extends PoolBackedAnalogElement`. After Wave 9, this should be a no-op (everything already extends).
+- [ ] **C.6** — Update `isPoolBacked` type guard signature if needed (still works — the guard predicate is unchanged).
+- [ ] **C.7** — `tsc --noEmit` clean; full test suite green.
+
+**Acceptance:**
+- `Grep` for `^export\s+interface\s+(AnalogElement|PoolBackedAnalogElement)` returns zero hits.
+- `Grep` for `\bAbstractAnalogElement\b` and `\bAbstractPoolBackedAnalogElement\b` return zero hits (renames complete).
+- `Grep` for `implements\s+(AnalogElement|PoolBackedAnalogElement)\b` returns zero hits.
+- `Grep` for `:\s*AnalogElement\s*=\s*\{` returns zero hits.
+
+#### 4g Cross-cutting design notes
+
+> **Why `#pinNodes` (ECMAScript private), not `private _pinNodes` (TS private)?**
+> TS `private` is erased at runtime — subclasses, harness code, and `as any` casts can still reach the field. ES `#name` is genuinely inaccessible outside the declaring class, even via reflection. Since the contract we're encoding is "the only writer is the patcher's closure-captured Map reference," any runtime escape hatch reopens the bug class. ES private is the only construct that closes it.
+>
+> **Why `ReadonlyMap` on the getter, but mutable Map internally?**
+> The Map *must* remain mutable for the patcher to back-fill internal-net IDs after construction. The patcher captures the Map reference at compile time (in `patchWork`) and writes through that closure capture. The getter exposes `ReadonlyMap` so that *consumers other than the patcher* cannot mutate. Effectively: the engine compiler is the only writer; everyone else is a reader.
+>
+> **Risk: subclasses that override `pinNodes` getter.**
+> TS lets a subclass override a getter with its own. If a subclass returned a different Map (or a copy), the patcher's writes still hit the original `#pinNodes` (correct) but the subclass's own `setup()` reads the override (incorrect). Mitigation: document the contract; add a custom ESLint rule forbidding `get pinNodes()` declarations outside `element.ts`. Lower priority — no current subclass overrides; flag as a §4g follow-on if needed.
+>
+> **Interaction with §4e bugs:**
+> - **§4e Bug 1 (PolarizedCap MODEUIC NaN):** Migrating `polarized-cap.ts` in Wave 9a is a prerequisite for cleanly adding the `initVoltages` / `icLoad` method to the class body. The IC-publish typed interface (`IcLoadable`) is a separate spec.
+> - **§4e Bug 2 (compiler.ts:392 labelRef snapshot):** Bundled into Wave 10 above (`labelPatchWork` channel on the new `PatcherLeaf` class).
+> - **§4e Bug 3 (capture.ts buildTopology):** Independent of §4g. The `onNodeAllocated` channel on `SetupContext` is a separate spec; it eliminates the harness's positional `pinCount + p` heuristic and the typeId allowlist for branch-row labelling in one mechanism change.
+
+#### 4g Migration order summary
+
+```
+Wave 0a (rebaseline)         → §4f Waves 1-7 ticked (LANDED, audited
+                               2026-05-04); strip 9 redundant
+                               `implements (Pool)?AnalogElement` clauses
+                               from already-migrated classes (one
+                               mechanical commit, no behavior change).
+Wave 0  (prereqs)            → Wave 0a + Wave 8 (test mocks) land first.
+Wave 8  (test mocks)         → inline `const el: AnalogElement = {...}`
+                               literals → local class declarations;
+                               grep `:\s*AnalogElement\s*=\s*\{` → 0.
+Wave 9  (completeness, slim) → 10 production files: resistor,
+                               polarized-cap (+ §4e Bug 1 bundled),
+                               sensors x3, bridge drivers x2, probe,
+                               controlled-source-base, subcircuit-wrapper.
+                               nfet/pfet/mutual-inductor moved to 11a.
+Wave 10 (compiler internals  → patcher leaf, allocator literal → classes;
+         + §4e Bug 2 bundled)  labelPatchWork channel; per-leaf prop-read
+                               relocation to setup(); tapped-transformer
+                               test un-skip.
+Wave 11a (parents → netlist) → trans-gate / nfet / pfet / triode /
+                               transformer + mutual-inductor →
+                               `kind: "netlist"`. Parent classes
+                               disappear. New sub-elements authored
+                               as `extends Abstract...` from start.
+Wave 11b (literal factories) → opamp / ota / mosfet / analog-switch
+                               object literals → classes (independent
+                               of 11a; can run in parallel).
+                               After 11a + 11b: grep `_pinNodes\s*=\s*
+                               new Map\(` and `_pinNodes:\s*new Map\(`
+                               outside element.ts → 0 hits.
+Phase A (read-site sweep)    → add `pinNodes` getter; migrate reads.
+                               (Re-count after 11a; original 543 figure
+                               is inflated because 11a deletes large
+                               parent classes.)
+Phase B (#pinNodes)          → make truly private; ReadonlyMap getter;
+                               audit any surviving `pinNodes.set(...)` sites.
+Phase C (interface delete)   → collapse to single abstract class with brand.
+```
+
+Each phase should land as its own commit with the acceptance grep run as the gate. Phase B is the high-risk phase — that's where smell sites surface as compile errors, and each one is an audit moment.
 
 ## Unclassified (needs user triage)
 

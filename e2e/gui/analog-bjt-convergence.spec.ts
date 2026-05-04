@@ -8,9 +8,9 @@
  *   LC filter (0.3H + 10µF) → 50Ω load, powered from 10V DC.
  *
  * Named nets (via Tunnel components) connect distant sections:
- *   10V — DC supply rail
- *   DRV — AC drive signal to both BJT base resistors
- *   NDRV — NPN collector output to NMOS gate
+ *   10V- DC supply rail
+ *   DRV- AC drive signal to both BJT base resistors
+ *   NDRV- NPN collector output to NMOS gate
  *
  * Tests verify:
  *   1. Nonlinear NR convergence (multiple BJTs, NMOS, diode)
@@ -73,7 +73,7 @@ function expectClose(actual: number, expected: number, rtol = 1e-6, atol = 1e-9)
  */
 async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   // =======================================================================
-  // COMPONENT PLACEMENT — positions & rotations match fixtures/buckbjt.dts
+  // COMPONENT PLACEMENT- positions & rotations match fixtures/buckbjt.dts
   // =======================================================================
 
   // --- Power supplies ---
@@ -96,7 +96,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.setComponentProperty('T_10V', 'Net Name', '10V');
 
   // --- NPN driver section ---
-  // Tunnel "DRV" at (12,12) rot=180 — pin overlaps Rb1.A for auto-connect
+  // Tunnel "DRV" at (12,12) rot=180- pin overlaps Rb1.A for auto-connect
   await builder.placeLabeled('Tunnel', 12, 12, 'T_DRV_N', 180);
   await builder.setComponentProperty('T_DRV_N', 'Net Name', 'DRV');
 
@@ -111,12 +111,12 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.placeLabeled('Resistor', 20, 10, 'R1', 90);
   await builder.setComponentProperty('R1', 'resistance', 10000);
 
-  // Tunnel "NDRV" at (21,11) rot=0 — NPN collector output
+  // Tunnel "NDRV" at (21,11) rot=0- NPN collector output
   await builder.placeLabeled('Tunnel', 21, 11, 'T_NDRV_N');
   await builder.setComponentProperty('T_NDRV_N', 'Net Name', 'NDRV');
 
   // --- PNP driver section ---
-  // Tunnel "DRV" at (25,9) rot=180 — pin overlaps Rb2.A for auto-connect
+  // Tunnel "DRV" at (25,9) rot=180- pin overlaps Rb2.A for auto-connect
   await builder.placeLabeled('Tunnel', 25, 9, 'T_DRV_P', 180);
   await builder.setComponentProperty('T_DRV_P', 'Net Name', 'DRV');
 
@@ -127,11 +127,11 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   // PnpBJT Q2 at (29,9) rot=0: B@(29,9), C@(33,10), E@(33,8)
   await builder.placeLabeled('PnpBJT', 29, 9, 'Q2');
 
-  // R2 (10kΩ) at (33,11) rot=270: A@(33,11), B@(33,15) — B on ground bus
+  // R2 (10kΩ) at (33,11) rot=270: A@(33,11), B@(33,15)- B on ground bus
   await builder.placeLabeled('Resistor', 33, 11, 'R2', 270);
   await builder.setComponentProperty('R2', 'resistance', 10000);
 
-  // Tunnel "PDRV" at (34,10) rot=0 — PNP collector label
+  // Tunnel "PDRV" at (34,10) rot=0- PNP collector label
   await builder.placeLabeled('Tunnel', 34, 10, 'T_PDRV');
   await builder.setComponentProperty('T_PDRV', 'Net Name', 'PDRV');
 
@@ -140,7 +140,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.placeLabeled('NMOS', 39, 9, 'M1', 90);
   await builder.selectNamedModel('M1', '2N7000');
 
-  // Tunnel "NDRV" at (39,10) rot=0 — NMOS gate drive
+  // Tunnel "NDRV" at (39,10) rot=0- NMOS gate drive
   await builder.placeLabeled('Tunnel', 39, 10, 'T_NDRV_M');
   await builder.setComponentProperty('T_NDRV_M', 'Net Name', 'NDRV');
 
@@ -153,6 +153,9 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.placeLabeled('Capacitor', 52, 11, 'C1', 90);
   await builder.setComponentProperty('C1', 'capacitance', 0.00001);
 
+  // Diode TD at (43,12) rot=90: A@(43,12), K@(43,8)- freewheel/snubber across switch node.
+  await builder.placeLabeled('Diode', 43, 12, 'TD', 90);
+
   // Zoom to fit so far-right Rload position is on-screen
   await builder.page.evaluate(() => (document.activeElement as HTMLElement)?.blur?.());
   await builder.page.keyboard.press('Control+Shift+F');
@@ -164,13 +167,13 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.setComponentProperty('Rload', 'resistance', 50);
 
   // =======================================================================
-  // WIRING — routes derived from fixtures/buckbjt.dts wire paths
+  // WIRING- routes derived from fixtures/buckbjt.dts wire paths
   // =======================================================================
 
   // --- Supply rail (y=5 horizontal bus) ---
   // Vdc.pos@(9,11) → (9,5) → (20,5) → T_10V@(20,4)
   await builder.drawWireExplicit('Vdc', 'pos', 'T_10V', 'in', [[9, 5], [20, 5]]);
-  // M1.D@(38,5) → supply rail junction at (20,5) — creates horizontal bus
+  // M1.D@(38,5) → supply rail junction at (20,5)- creates horizontal bus
   await builder.drawWireFromPinExplicit('M1', 'D', 20, 5);
   // R1.B@(20,6) → supply rail at (20,5)
   await builder.drawWireFromPinExplicit('R1', 'B', 20, 5);
@@ -182,7 +185,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.drawWireExplicit('Vac', 'neg', 'Vdc', 'neg');
   // Vdc.neg@(9,15) → R2.B@(33,15)
   await builder.drawWireExplicit('Vdc', 'neg', 'R2', 'B');
-  // R2.B@(33,15) → (57,15) → Rload.A@(57,11) — extends bus and connects load
+  // R2.B@(33,15) → (57,15) → Rload.A@(57,11)- extends bus and connects load
   await builder.drawWireExplicit('R2', 'B', 'Rload', 'A', [[57, 15]]);
   // Ground@(20,16) → ground bus at (20,15)
   await builder.drawWireByPath([[20, 16], [20, 15]]);
@@ -200,7 +203,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   // --- NPN section ---
   // R1.A@(20,10) → Q1.C@(20,11)
   await builder.drawWireExplicit('R1', 'A', 'Q1', 'C');
-  // T_NDRV_N@(21,11) → Q1.C@(20,11) — junction at collector
+  // T_NDRV_N@(21,11) → Q1.C@(20,11)- junction at collector
   await builder.drawWireExplicit('T_NDRV_N', 'in', 'Q1', 'C');
 
   // --- PNP section ---
@@ -241,10 +244,10 @@ test.describe('BJT buck converter convergence', () => {
   });
 
   // =========================================================================
-  // Test 1: Compile + step — no convergence error, supply rail is 10V
+  // Test 1: Compile + step- no convergence error, supply rail is 10V
   // =========================================================================
 
-  test('compile and step — no convergence error, supply rail is 10V', async () => {
+  test('compile and step- no convergence error, supply rail is 10V', async () => {
     // Circuit built from fixtures/buckbjt.dts reference.
     //
     // WHAT TO CHECK:
@@ -285,7 +288,7 @@ test.describe('BJT buck converter convergence', () => {
     //
     //   9. NO floating wires, no diagonal segments, no disconnected components.
     //
-    // Compile and step — must not throw convergence error
+    // Compile and step- must not throw convergence error
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
@@ -295,7 +298,7 @@ test.describe('BJT buck converter convergence', () => {
     await builder.addCurrentTraceViaContextMenu('Q1');
     await builder.addCurrentTraceViaContextMenu('Q2');
 
-    // Measure at 1.025ms — 1/4 through cycle, drive HIGH, NPN on
+    // Measure at 1.025ms- 1/4 through cycle, drive HIGH, NPN on
     await builder.stepToTimeViaUI('1.025m');
     const vals = await builder.getTraceValues();
     expect(vals).not.toBeNull();
@@ -312,7 +315,7 @@ test.describe('BJT buck converter convergence', () => {
     expectClose(iQ1, 9.979153e-04);       // NPN Ic ≈ 998µA
     expectClose(iQ2, -9.979174e-04);      // PNP Ic ≈ -998µA
 
-    // --- Phase 2: Steady state — last 2 switching cycles (499.8ms–500ms) ---
+    // --- Phase 2: Steady state- last 2 switching cycles (499.8ms–500ms) ---
     await builder.addTraceViaContextMenu('M1', 'S');    // switch node
     await builder.addTraceViaContextMenu('Rload', 'B'); // output node
     await builder.addCurrentTraceViaContextMenu('TD');   // diode current
@@ -345,10 +348,10 @@ test.describe('BJT buck converter convergence', () => {
   });
 
   // =========================================================================
-  // Test 2: Run briefly — no divergence, all voltages bounded
+  // Test 2: Run briefly- no divergence, all voltages bounded
   // =========================================================================
 
-  test('run continuously — voltages remain bounded', async () => {
+  test('run continuously- voltages remain bounded', async () => {
     // Compile
     await builder.stepViaUI();
     await builder.verifyNoErrors();
@@ -377,10 +380,10 @@ test.describe('BJT buck converter convergence', () => {
   });
 
   // =========================================================================
-  // Test 3: Step to 5ms — output voltage evolves via trace capture
+  // Test 3: Step to 5ms- output voltage evolves via trace capture
   // =========================================================================
 
-  test('step to 5ms — output voltage evolves and trace captures transient', async () => {
+  test('step to 5ms- output voltage evolves and trace captures transient', async () => {
     // Compile
     await builder.stepViaUI();
     await builder.verifyNoErrors();
@@ -389,14 +392,14 @@ test.describe('BJT buck converter convergence', () => {
     await builder.addTraceViaContextMenu('Rload', 'B');  // output
     await builder.addTraceViaContextMenu('M1', 'S');     // switch node
 
-    // Step to 1ms — early snapshot
+    // Step to 1ms- early snapshot
     await builder.stepToTimeViaUI('1m');
     const early = await builder.getTraceValues();
     expect(early).not.toBeNull();
     const vOutEarly = early![0].value;
     console.log(`[buckbjt-t3] 1ms: V(out)=${vOutEarly}`);
 
-    // Step to 5ms — late snapshot
+    // Step to 5ms- late snapshot
     await builder.stepToTimeViaUI('5m');
     const late = await builder.getTraceValues();
     expect(late).not.toBeNull();
@@ -411,7 +414,7 @@ test.describe('BJT buck converter convergence', () => {
     expectClose(vOutLate, 4.259786e+00);
     expectClose(vSwLate, 6.430716e+00);
 
-    // Trace stats over 4.9ms–5ms (last cycle) — switch node should swing
+    // Trace stats over 4.9ms–5ms (last cycle)- switch node should swing
     const stats = await builder.getTraceStatsInRange(0.0049, 0.005);
     expect(stats).not.toBeNull();
     const swStats = stats![1];

@@ -68,7 +68,7 @@ export function computeStatistics(circuit: Circuit, registry: ComponentRegistry)
     } else if (el.typeId === 'Out') {
       outputCount++;
     } else {
-      const def = registry.get(el.typeId);
+      const def = registry.getStandalone(el.typeId);
       if (def?.category === ComponentCategory.SUBCIRCUIT) {
         subcircuitCount++;
       } else {
@@ -227,7 +227,7 @@ function computeCircuitDepth(circuit: Circuit, registry: ComponentRegistry): num
   // Gate cost: 0 for In/Out, 1 for all other types
   function isGate(typeId: string): boolean {
     if (typeId === 'In' || typeId === 'Out') return false;
-    const def = registry.get(typeId);
+    const def = registry.getStandalone(typeId);
     return def?.category !== ComponentCategory.IO;
   }
 

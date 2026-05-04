@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SwitchDT component -- SPDT switch with mechanical symbol rendering.
  *
  * Double-throw switch: three terminals per pole (A=common, B=upper, C=lower).
@@ -22,11 +22,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { SwitchAnalogElement } from "./switch.js";
 
@@ -273,7 +274,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Î)",
+    label: "Ron (ÃŽ)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -281,7 +282,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Î)",
+    label: "Roff (ÃŽ)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -314,18 +315,14 @@ export interface SpdtAnalogElement extends AnalogElement {
   setClosed(closed: boolean): void;
 }
 
-export class SwitchDTAnalogElement implements SpdtAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
+export class SwitchDTAnalogElement extends AbstractAnalogElement implements SpdtAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
 
   readonly swAB: SwitchAnalogElement;
   readonly swAC: SwitchAnalogElement;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
 
     const a1 = pinNodes.get("A1")!;
     const b1 = pinNodes.get("B1")!;
@@ -333,7 +330,7 @@ export class SwitchDTAnalogElement implements SpdtAnalogElement {
 
     const closed = props.getOrDefault<boolean>("closed", false);
 
-    // SW_AB: A1 (pos) ↔ B1 (neg)
+    // SW_AB: A1 (pos) â†” B1 (neg)
     const propAB = new PropertyBag();
     propAB.set("Ron", props.getOrDefault<number>("Ron", 1));
     propAB.set("Roff", props.getOrDefault<number>("Roff", 1e9));
@@ -344,7 +341,7 @@ export class SwitchDTAnalogElement implements SpdtAnalogElement {
       propAB,
     );
 
-    // SW_AC: A1 (pos) ↔ C1 (neg)
+    // SW_AC: A1 (pos) â†” C1 (neg)
     // When closed=true: AB is on (Ron), AC is off (Roff).
     // When closed=false: AB is off (Roff), AC is on (Ron).
     // So SW_AC is the complement: it starts as !closed.
@@ -361,7 +358,7 @@ export class SwitchDTAnalogElement implements SpdtAnalogElement {
 
   setup(ctx: SetupContext): void {
     // Composite forwards to sub-elements in subElements[] order.
-    // swAB runs first (A1↔B1), swAC runs second (A1↔C1).
+    // swAB runs first (A1â†”B1), swAC runs second (A1â†”C1).
     this.swAB.setup(ctx);  // allocates SW_AB's 2 state slots + 4 matrix handles
     this.swAC.setup(ctx);  // allocates SW_AC's 2 state slots + 4 matrix handles
   }
@@ -412,7 +409,7 @@ function switchDTFactory(props: PropertyBag): SwitchDTElement {
   );
 }
 
-export const SwitchDTDefinition: ComponentDefinition = {
+export const SwitchDTDefinition: StandaloneComponentDefinition = {
   name: "SwitchDT",
   typeId: -1,
   factory: switchDTFactory,
