@@ -17,7 +17,7 @@ import type { MNAEngine } from "../analog-engine.js";
 function diodeAnodeVoltage(engine: MNAEngine): number {
   const diode = engine.compiled!.elements.find((el) => el.label === "d1");
   if (!diode) throw new Error("diode 'd1' not found in compiled circuit");
-  const anodeNode = diode._pinNodes.get("A");
+  const anodeNode = diode.pinNodes.get("A");
   if (anodeNode === undefined) throw new Error("diode 'd1' has no 'A' pin");
   return engine.getNodeVoltage(anodeNode);
 }
@@ -59,7 +59,7 @@ describe("convergence regression", () => {
 
     expect(result.converged).toBe(true);
 
-    // Diode anode voltage should show forward drop ~0.6–0.75V
+    // Diode anode voltage should show forward drop ~0.6â€“0.75V
     const vAnode = diodeAnodeVoltage(engine);
     expect(vAnode).toBeGreaterThan(0.55);
     expect(vAnode).toBeLessThan(0.80);

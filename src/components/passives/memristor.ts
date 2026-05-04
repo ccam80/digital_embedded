@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Memristor analog component — Joglekar window function model.
  *
  * The memristor's resistance depends on an internal state variable w
@@ -21,8 +21,8 @@
  * s1, writing s0.
  *
  * MNA topology:
- *   _pinNodes.get("pos") = node_pos  (positive terminal)
- *   _pinNodes.get("neg") = node_neg  (negative terminal)
+ *   pinNodes.get("pos") = node_pos  (positive terminal)
+ *   pinNodes.get("neg") = node_neg  (negative terminal)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -147,8 +147,8 @@ export class MemristorElement extends AbstractPoolBackedAnalogElement {
     }
 
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;  // pos pin - RESposNode
-    const negNode = this._pinNodes.get("neg")!;  // neg pin - RESnegNode
+    const posNode = this.pinNodes.get("pos")!;  // pos pin - RESposNode
+    const negNode = this.pinNodes.get("neg")!;  // neg pin - RESnegNode
 
     // ressetup.c:46-49 TSTALLOC sequence, line-for-line.
     if (posNode !== 0) this._hPP = solver.allocElement(posNode, posNode);
@@ -229,8 +229,8 @@ export class MemristorElement extends AbstractPoolBackedAnalogElement {
     }
 
     // ngspice CKTstate0 idiom - bjtload.c:744-746, dioload.c:325-326
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
     const voltages = ctx.rhsOld;
     const vPos = voltages[posNode];
     const vNeg = voltages[negNode];
@@ -248,8 +248,8 @@ export class MemristorElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
     const vPos = rhs[posNode];
     const vNeg = rhs[negNode];
     const s1 = this._pool.states[1];

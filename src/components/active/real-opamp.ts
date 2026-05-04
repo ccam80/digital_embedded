@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Real Op-Amp composite model.
  *
  * Extends the ideal op-amp with physically realistic effects:
@@ -308,11 +308,11 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  * MNA implementation of the real op-amp.
  *
  * Node assignment (1-based, 0 = ground):
- *   _pinNodes.get("in+")  = non-inverting input
- *   _pinNodes.get("in-")  = inverting input
- *   _pinNodes.get("out")  = output
- *   _pinNodes.get("Vcc+") = positive supply
- *   _pinNodes.get("Vcc-") = negative supply
+ *   pinNodes.get("in+")  = non-inverting input
+ *   pinNodes.get("in-")  = inverting input
+ *   pinNodes.get("out")  = output
+ *   pinNodes.get("Vcc+") = positive supply
+ *   pinNodes.get("Vcc-") = negative supply
  *
  * MNA formulation- Norton/VCVS hybrid with proper Jacobian:
  *
@@ -374,9 +374,9 @@ export class RealOpAmpAnalogElement extends AbstractPoolBackedAnalogElement {
       this._stateBase = ctx.allocStates(this.stateSize);
     }
     const solver = ctx.solver;
-    const nInp = this._pinNodes.get("in+")!;
-    const nInn = this._pinNodes.get("in-")!;
-    const nOut = this._pinNodes.get("out")!;
+    const nInp = this.pinNodes.get("in+")!;
+    const nInn = this.pinNodes.get("in-")!;
+    const nOut = this.pinNodes.get("out")!;
 
     // Input resistance stamp: conductance between nInp and nInn.
     if (nInp > 0) this._hInpInp = solver.allocElement(nInp, nInp);
@@ -404,11 +404,11 @@ export class RealOpAmpAnalogElement extends AbstractPoolBackedAnalogElement {
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
 
-    const nInp = this._pinNodes.get("in+")!;
-    const nInn = this._pinNodes.get("in-")!;
-    const nOut = this._pinNodes.get("out")!;
-    const nVccP = this._pinNodes.get("Vcc+")!;
-    const nVccN = this._pinNodes.get("Vcc-")!;
+    const nInp = this.pinNodes.get("in+")!;
+    const nInn = this.pinNodes.get("in-")!;
+    const nOut = this.pinNodes.get("out")!;
+    const nVccP = this.pinNodes.get("Vcc+")!;
+    const nVccN = this.pinNodes.get("Vcc-")!;
 
     const G_in   = 1 / Math.max(p.rIn,  1e-9);
     const G_out  = 1 / Math.max(p.rOut, 1e-9);
@@ -591,11 +591,11 @@ export class RealOpAmpAnalogElement extends AbstractPoolBackedAnalogElement {
     // Vcc- sinks current when output sinks.
 
     const p = this.p;
-    const nInp = this._pinNodes.get("in+")!;
-    const nInn = this._pinNodes.get("in-")!;
-    const nOut = this._pinNodes.get("out")!;
-    const nVccP = this._pinNodes.get("Vcc+")!;
-    const nVccN = this._pinNodes.get("Vcc-")!;
+    const nInp = this.pinNodes.get("in+")!;
+    const nInn = this.pinNodes.get("in-")!;
+    const nOut = this.pinNodes.get("out")!;
+    const nVccP = this.pinNodes.get("Vcc+")!;
+    const nVccN = this.pinNodes.get("Vcc-")!;
 
     const vInp = nInp > 0 ? rhs[nInp] : 0;
     const vInn = nInn > 0 ? rhs[nInn] : 0;

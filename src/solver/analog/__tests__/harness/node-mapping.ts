@@ -12,7 +12,7 @@
  *
  * Our node labels follow patterns like:
  *   "Q1:C", "Q1:B", "Q1:E"
- *   "R1:A", "R1:B"
+ *   "R1:pos", "R1:neg"
  *   "V1:branch"
  *   "D1:A", "D1:K"
  *   "M1:D", "M1:G", "M1:S"
@@ -49,11 +49,11 @@ const PIN_ALIASES: Record<string, Record<string, string>> = {
   // JFET
   jfet: { d: "D", g: "G", s: "S" },
   // Resistor
-  resistor: { "1": "A", "2": "B" },
+  resistor: { "1": "pos", "2": "neg" },
   // Capacitor
-  capacitor: { "1": "A", "2": "B" },
+  capacitor: { "1": "pos", "2": "neg" },
   // Inductor
-  inductor: { "1": "A", "2": "B" },
+  inductor: { "1": "pos", "2": "neg" },
   // Voltage source
   vsource: { "1": "pos", "2": "neg" },
   // Current source

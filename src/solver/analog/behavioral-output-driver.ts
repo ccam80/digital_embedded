@@ -6,11 +6,11 @@
  * and stamps a Norton-equivalent (current source in parallel with the
  * output conductance) at its (pos, neg) pins. The Norton form absorbs the
  * output resistance into this leaf so the conductance value can be switched
- * between active (1/rOut) and high-Z isolated (1e-9 S = 1 GΩ) without
+ * between active (1/rOut) and high-Z isolated (1e-9 S = 1 GÎ©) without
  * touching a separate Resistor sub-element.
  *
  * Tri-state plumbing: the optional `enableLogic` siblingState ref points
- * at a sibling slot containing the enable bit (>= 0.5 → enabled, < 0.5 →
+ * at a sibling slot containing the enable bit (>= 0.5 â†’ enabled, < 0.5 â†’
  * high-Z). When the ref is absent the driver is permanently enabled (the
  * case for every non-tri-state-capable consumer- gates, flipflops, mux,
  * etc.). When present and the slot reads disabled, the conductance stamp
@@ -29,9 +29,9 @@
  * Uint32).
  *
  * Per Composite I7 (phase-composite-architecture.md), J-171
- * (contracts_group_11.md). Replaces the prior Thévenin VSRC + separate
+ * (contracts_group_11.md). Replaces the prior ThÃ©venin VSRC + separate
  * Resistor child with a single Norton stamp; mathematically equivalent at
- * the external port (Thévenin/Norton equivalence preserves I/V at every
+ * the external port (ThÃ©venin/Norton equivalence preserves I/V at every
  * operating point) but eliminates the internal driveNode and branch row,
  * and lets the driver own the conductance value for tri-state switching.
  */
@@ -50,9 +50,9 @@ import { PropertyBag, type PoolSlotRef } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Tri-state isolated conductance- 1 GΩ per the architectural decision.
+// Tri-state isolated conductance- 1 GÎ© per the architectural decision.
 // Picked to be small enough that it never measurably perturbs a real driver
-// elsewhere on the shared net (real driver rOut is 100 Ω → ratio 1e7) but
+// elsewhere on the shared net (real driver rOut is 100 Î© â†’ ratio 1e7) but
 // large enough to keep the MNA matrix non-singular when every driver on a
 // net is disabled (a true float would leave the node unconstrained).
 // ---------------------------------------------------------------------------
@@ -144,8 +144,8 @@ export class BehavioralOutputDriverElement extends AbstractPoolBackedAnalogEleme
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
     this._stateBase = ctx.allocStates(this.stateSize);
 
@@ -165,8 +165,8 @@ export class BehavioralOutputDriverElement extends AbstractPoolBackedAnalogEleme
   load(ctx: LoadContext): void {
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
     // Read sibling driver's input slot (prior step- s1 per StatePool migration shape).
     const inBase = this._inputLogicRef.element._stateBase;
@@ -180,7 +180,7 @@ export class BehavioralOutputDriverElement extends AbstractPoolBackedAnalogEleme
     const target = bit ? this._vOH : this._vOL;
 
     // Tri-state evaluation. When `enableLogic` is wired and the sibling slot
-    // reads disabled, the Norton stamp collapses to a 1 GΩ shunt with zero
+    // reads disabled, the Norton stamp collapses to a 1 GÎ© shunt with zero
     // current injection- the pin effectively disconnects from the external
     // net so other drivers on the shared net take over. When `enableLogic`
     // is absent (the common case), driver is permanently enabled.
@@ -215,8 +215,8 @@ export class BehavioralOutputDriverElement extends AbstractPoolBackedAnalogEleme
     // Norton-equivalent current at the external port: I_pos = G * (vTarget - (vPos - vNeg)).
     // This is the actual current flowing OUT of the pos pin into the external net,
     // computed from the post-solve node voltages.
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
     const s1 = this._pool.states[1];
     const target = s1[this._stateBase + SLOT_DRIVE_V];
     let G = 1 / this._rOut;

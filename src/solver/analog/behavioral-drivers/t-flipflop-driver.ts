@@ -78,9 +78,9 @@ export class BehavioralTFlipflopDriverElement extends AbstractPoolBackedAnalogEl
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this._pinNodes.get("gnd")!];
-    const vClock = rhsOld[this._pinNodes.get("C")!] - gnd;
-    const vT     = rhsOld[this._pinNodes.get("T")!] - gnd;
+    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
+    const vClock = rhsOld[this.pinNodes.get("C")!] - gnd;
+    const vT     = rhsOld[this.pinNodes.get("T")!] - gnd;
 
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
@@ -90,7 +90,7 @@ export class BehavioralTFlipflopDriverElement extends AbstractPoolBackedAnalogEl
         // withEnable=false: unconditionally toggle on every rising edge.
         q = 1 - q;
       } else if (vT >= this._vIH) {
-        // withEnable=true: T high → toggle. T low (vT < vIL) and T
+        // withEnable=true: T high â†’ toggle. T low (vT < vIL) and T
         // indeterminate (vIL <= vT < vIH) both hold q (no else branch).
         q = 1 - q;
       }
@@ -104,7 +104,7 @@ export class BehavioralTFlipflopDriverElement extends AbstractPoolBackedAnalogEl
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

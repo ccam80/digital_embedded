@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
 import type { IntegrationMethod } from "../integration.js";
 import type { ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
@@ -52,14 +53,12 @@ const DEFAULT_PARAMS: ResolvedSimulationParams = {
  * reason about in tests.
  */
 function makeReactiveElement(truncationError: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["A", 1], ["B", 0]]),
-    branchIndex: -1,
-    _stateBase: -1,
-    ngspiceLoadOrder: 0,
-    load(_ctx: LoadContext): void {},
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
+  const pinNodes = new Map([["A", 1], ["B", 0]]);
+  class ReactiveElement extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
     getLteTimestep(
       dt: number,
       _deltaOld: readonly number[],
@@ -71,11 +70,11 @@ function makeReactiveElement(truncationError: number): AnalogElement {
       const ratio = truncationError / localTol;
       if (ratio <= 0) return Infinity;
       return 0.9 * dt * Math.pow(1 / ratio, 1 / 3);
-    },
-    setup(_ctx: unknown): void {},
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-  };
+    }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  }
+  return new ReactiveElement(pinNodes);
 }
 
 // ---------------------------------------------------------------------------

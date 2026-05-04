@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Polarized electrolytic capacitor analog component.
  *
  * Extends the standard capacitor companion model with three additional effects:
@@ -329,8 +329,8 @@ export class AnalogPolarizedCapElement extends AbstractPoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;  // pos pin
-    const negNode = this._pinNodes.get("neg")!;  // neg pin
+    const posNode = this.pinNodes.get("pos")!;  // pos pin
+    const negNode = this.pinNodes.get("neg")!;  // neg pin
 
     // Allocate internal node n_cap (junction between ESR and cap body).
     // No ngspice primitive equivalent- digiTS-internal topology extension.
@@ -402,8 +402,8 @@ export class AnalogPolarizedCapElement extends AbstractPoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag } = ctx;
     const mode = ctx.cktMode;
-    const nPos = this._pinNodes.get("pos")!;
-    const nNeg = this._pinNodes.get("neg")!;
+    const nPos = this.pinNodes.get("pos")!;
+    const nNeg = this.pinNodes.get("neg")!;
     const nCap = this._nCap;
     const base = this._stateBase;
     const m = this._M; // PC-W3-6: capload.c:44 CAPm
@@ -540,7 +540,7 @@ export class AnalogPolarizedCapElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this._pinNodes.get("pos")!;
+    const nPos = this.pinNodes.get("pos")!;
     const nCap = this._nCap;
     const vPos = rhs[nPos];
     const vCap = rhs[nCap];

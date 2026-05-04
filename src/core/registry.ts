@@ -73,7 +73,7 @@ export interface ParamDef {
    * Combined-emission group. When set, the generator collects every ParamDef
    * with the same `emitGroup.name` and emits them as a single comma-joined
    * token: `<NAME>=v1,v2,v3` (in ascending `index` order). Currently used for
-   * the MOS initial-condition triplet (ICVDS/ICVGS/ICVBS → `IC=vds,vgs,vbs`).
+   * the MOS initial-condition triplet (ICVDS/ICVGS/ICVBS â†’ `IC=vds,vgs,vbs`).
    * The group is emitted only when at least one member has a non-default value.
    */
   emitGroup?: { name: string; index: number };
@@ -168,7 +168,7 @@ export const enum ComponentCategory {
 }
 
 // ---------------------------------------------------------------------------
-// AttributeMapping- .dig XML attribute → PropertyBag entry
+// AttributeMapping- .dig XML attribute â†’ PropertyBag entry
 // ---------------------------------------------------------------------------
 
 /**
@@ -350,7 +350,7 @@ export interface ComponentDefinition {
    *  user-facing components (narrowed in StandaloneComponentDefinition).
    *  Optional for internal-only sub-elements- some drivers (e.g.
    *  BehavioralDFlipflopDriver) need explicit pin labels to map netlist
-   *  connectivity rows to `_pinNodes` entries during expansion; others
+   *  connectivity rows to `pinNodes` entries during expansion; others
    *  (pure stamp leaves) omit it.
    *
    *  For drivers whose pin set varies per instance (gates with N inputs,
@@ -398,7 +398,7 @@ export interface StandaloneComponentDefinition extends ComponentDefinition {
   pinLayout: PinDeclaration[];
   /** Property definitions for the property panel. */
   propertyDefs: PropertyDefinition[];
-  /** .dig XML attribute → PropertyBag converters. */
+  /** .dig XML attribute â†’ PropertyBag converters. */
   attributeMap: AttributeMapping[];
   /** Palette grouping. */
   category: ComponentCategory;
@@ -489,8 +489,8 @@ export class ComponentRegistry {
     this._byName.set(updated.name, updated);
 
     // Category index: only user-facing definitions appear in the palette.
-    // Maintain it across the four transitions (standalone↔standalone,
-    // standalone↔internal, internal↔internal).
+    // Maintain it across the four transitions (standaloneâ†”standalone,
+    // standaloneâ†”internal, internalâ†”internal).
     if (isStandalone(existing)) {
       const oldList = this._byCategory.get(existing.category);
       if (oldList) {
@@ -534,7 +534,7 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: cannot register alias "${alias}"- a canonical type with that name already exists`);
     }
     if (!this._byName.has(canonicalName)) {
-      throw new Error(`ComponentRegistry: cannot register alias "${alias}" → "${canonicalName}"- canonical type is not registered`);
+      throw new Error(`ComponentRegistry: cannot register alias "${alias}" â†’ "${canonicalName}"- canonical type is not registered`);
     }
     this._aliases.set(alias, canonicalName);
   }

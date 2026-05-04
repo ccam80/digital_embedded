@@ -11,10 +11,10 @@
  *
  * Hold-on-indeterminate is *whole-vector*: if ANY selector bit lands in
  * the indeterminate band (vIL <= v < vIH), every output slot copies its
- * prior value (s1 → s0). Per-bit hold is incoherent for one-hot decoding-
+ * prior value (s1 â†’ s0). Per-bit hold is incoherent for one-hot decoding-
  * the active output bit depends on the entire sel value, so a single
  * unknown bit makes the whole pattern unknown. Mirrors the and-driver
- * "sawIndeterminate ⇒ result = prev" pattern, generalised to a vector of
+ * "sawIndeterminate â‡’ result = prev" pattern, generalised to a vector of
  * outputs.
  *
  * Variable-arity schema via module-scope memoised factory- one frozen
@@ -79,7 +79,7 @@ function getDecoderSchema(selectorBits: number): StateSchema {
 //
 // Order MUST match the buildDecoderNetlist drv connectivity row:
 // `[sel_0..sel_{K-1}, gnd]`. The compiler reads pinLayout[i].label and
-// stores it in _pinNodes against the resolved node from connectivity[i]
+// stores it in pinNodes against the resolved node from connectivity[i]
 // (compiler.ts:447-462).
 
 function buildDecoderDriverPinLayout(props: PropertyBag): PinDeclaration[] {
@@ -144,7 +144,7 @@ export class BehavioralDecoderDriverElement extends AbstractPoolBackedAnalogElem
    * Threshold-classify each selector bit; assemble `sel`; one-hot write.
    *
    * If any selector bit is indeterminate, hold the entire output vector
-   * (s1 → s0 copy on the output slots). The active bit depends on the
+   * (s1 â†’ s0 copy on the output slots). The active bit depends on the
    * whole sel value, so per-bit hold is incoherent.
    */
   load(_ctx: LoadContext): void {
@@ -177,7 +177,7 @@ export class BehavioralDecoderDriverElement extends AbstractPoolBackedAnalogElem
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

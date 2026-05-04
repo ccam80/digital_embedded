@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Current-Controlled Voltage Source (CCVS) analog component.
  *
  * Four-terminal element: sense+ and sense- form the current sense port;
@@ -137,8 +137,8 @@ export class CCVSAnalogElement extends ControlledSourceElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("out+")!;  // CCVSposNode  (pinNodeIds[2])
-    const negNode = this._pinNodes.get("out-")!;  // CCVSnegNode  (pinNodeIds[3])
+    const posNode = this.pinNodes.get("out+")!;  // CCVSposNode  (pinNodeIds[2])
+    const negNode = this.pinNodes.get("out-")!;  // CCVSnegNode  (pinNodeIds[3])
 
     // Own branch row: ccvsset.c:40-43 (idempotent guard)
     if (this.branchIndex === -1) {

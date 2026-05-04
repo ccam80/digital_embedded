@@ -1,12 +1,12 @@
 /**
- * DACDriver — internal-only hybrid pin+stamp+state driver leaf for the N-bit
+ * DACDriver â€” internal-only hybrid pin+stamp+state driver leaf for the N-bit
  * DAC composite.
  *
  * Per Composite M25 (phase-composite-architecture.md), J-022
  * (contracts_group_02.md). Emitted by the `DAC` parent's `buildDacNetlist`
  * (`dac.ts`) as the single sub-element `drv`.
  *
- * Canonical Template D exemplar — combines Template C's matrix-stamping body
+ * Canonical Template D exemplar â€” combines Template C's matrix-stamping body
  * with Template A's state-bearing latch machinery. Reads N digital input
  * voltages from `rhsOld[D_i] - rhsOld[GND]`; latches each at threshold 0.5;
  * reads `rhsOld[VREF] - rhsOld[GND]` for the reference; computes output
@@ -19,8 +19,8 @@
  *   [0] VREF, [1] OUT, [2] GND, [3..N+2] D0..D(N-1)
  *
  * Branch stamp: VSRC TSTALLOC shape (vsrcsetup.c):
- *   +1 at (OUT, br), -1 at (GND, br)   — KCL rows
- *   +1 at (br, OUT), -1 at (br, GND)   — KVL row (V_OUT - V_GND = target)
+ *   +1 at (OUT, br), -1 at (GND, br)   â€” KCL rows
+ *   +1 at (br, OUT), -1 at (br, GND)   â€” KVL row (V_OUT - V_GND = target)
  * load() writes rhs[br] += target.
  */
 
@@ -42,8 +42,8 @@ import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 // ---------------------------------------------------------------------------
 //
 // Slot layout for N bits:
-//   [0 .. N-1]   LATCHED_BIT_0 .. LATCHED_BIT_(N-1)   — per-bit latch state
-//   [N]          OUTPUT_TARGET_V                        — stamped target voltage
+//   [0 .. N-1]   LATCHED_BIT_0 .. LATCHED_BIT_(N-1)   â€” per-bit latch state
+//   [N]          OUTPUT_TARGET_V                        â€” stamped target voltage
 
 const DAC_SCHEMAS = new Map<number, StateSchema>();
 
@@ -69,7 +69,7 @@ function getDacSchema(bits: number): StateSchema {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — fixed, mirrors parent buildDacNetlist drvPins [0,1,2,3..N+2]
+// Pin layout â€” fixed, mirrors parent buildDacNetlist drvPins [0,1,2,3..N+2]
 // Positions are placeholders; the driver is internal-only (no canvas render).
 // ---------------------------------------------------------------------------
 
@@ -129,8 +129,8 @@ export class DACDriverElement extends AbstractPoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
 
     const solver  = ctx.solver;
-    const outNode = this._pinNodes.get("OUT")!;
-    const gndNode = this._pinNodes.get("GND")!;
+    const outNode = this.pinNodes.get("OUT")!;
+    const gndNode = this.pinNodes.get("GND")!;
 
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label ?? "dac", "branch");
@@ -154,15 +154,15 @@ export class DACDriverElement extends AbstractPoolBackedAnalogElement {
     const s0   = this._pool.states[0];
     const base = this._stateBase;
 
-    const gndNode  = this._pinNodes.get("GND")!;
-    const vrefNode = this._pinNodes.get("VREF")!;
+    const gndNode  = this.pinNodes.get("GND")!;
+    const vrefNode = this.pinNodes.get("VREF")!;
     const gnd  = rhsOld[gndNode];
     const vref = rhsOld[vrefNode] - gnd;
 
     // Read and threshold-latch each digital input bit.
     const inputs: boolean[] = [];
     for (let i = 0; i < this._bits; i++) {
-      const diNode = this._pinNodes.get(`D${i}`)!;
+      const diNode = this.pinNodes.get(`D${i}`)!;
       const v = rhsOld[diNode] - gnd;
       inputs.push(v >= 0.5);
     }
@@ -186,7 +186,7 @@ export class DACDriverElement extends AbstractPoolBackedAnalogElement {
     solver.stampElement(this._hBrGnd, -1);
     ctx.rhs[this.branchIndex] += target;
 
-    // Bottom-of-load writes — every slot mutated this step writes to s0 exactly once.
+    // Bottom-of-load writes â€” every slot mutated this step writes to s0 exactly once.
     for (let i = 0; i < this._bits; i++) {
       s0[base + i] = inputs[i] ? 1 : 0;
     }

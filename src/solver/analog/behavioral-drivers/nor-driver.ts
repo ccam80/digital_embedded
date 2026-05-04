@@ -111,12 +111,12 @@ export class BehavioralNorDriverElement extends AbstractPoolBackedAnalogElement 
   /**
    * Per-input threshold-classify with hold-on-indeterminate semantic:
    *
-   *   - If any input rises above vIH (a "1" for OR) → output 0 immediately
-   *     (NOR inverts: OR absorber "1" → NOR output 0); further inputs do not
+   *   - If any input rises above vIH (a "1" for OR) â†’ output 0 immediately
+   *     (NOR inverts: OR absorber "1" â†’ NOR output 0); further inputs do not
    *     matter.
-   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) →
+   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) â†’
    *     hold prior output (CMOS metastability proxy).
-   *   - Else (all inputs < vIL, all classified "0") → OR gives 0, NOR inverts
+   *   - Else (all inputs < vIL, all classified "0") â†’ OR gives 0, NOR inverts
    *     to 1: `inputs.some((b) => b === 1) ? 0 : 1` = 1.
    */
   load(ctx: LoadContext): void {
@@ -145,7 +145,7 @@ export class BehavioralNorDriverElement extends AbstractPoolBackedAnalogElement 
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

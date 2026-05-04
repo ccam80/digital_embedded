@@ -3,10 +3,10 @@
  * level-sensitive RS latch (no clock).
  *
  * Every load() pass:
- *   S=0, R=0 → hold
- *   S=1, R=0 → q=1, ~q=0
- *   S=0, R=1 → q=0, ~q=1
- *   S=1, R=1 → forbidden state Q=~Q=0 (matches parent's digital `executeRSAsync`
+ *   S=0, R=0 â†’ hold
+ *   S=1, R=0 â†’ q=1, ~q=0
+ *   S=0, R=1 â†’ q=0, ~q=1
+ *   S=1, R=1 â†’ forbidden state Q=~Q=0 (matches parent's digital `executeRSAsync`
  *              behavior; both outputs forced low when both inputs are high).
  *
  * Per Composite M17 (phase-composite-architecture.md), J-155
@@ -74,9 +74,9 @@ export class BehavioralRSAsyncLatchDriverElement extends AbstractPoolBackedAnalo
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd = rhsOld[this._pinNodes.get("gnd")!];
-    const vS  = rhsOld[this._pinNodes.get("S")!] - gnd;
-    const vR  = rhsOld[this._pinNodes.get("R")!] - gnd;
+    const gnd = rhsOld[this.pinNodes.get("gnd")!];
+    const vS  = rhsOld[this.pinNodes.get("S")!] - gnd;
+    const vR  = rhsOld[this.pinNodes.get("R")!] - gnd;
 
     let q: number;
     let nq: number;
@@ -109,7 +109,7 @@ export class BehavioralRSAsyncLatchDriverElement extends AbstractPoolBackedAnalo
         q  = 0;
         nq = 1;
       }
-      // both low → hold (q and nq retain prior s1 values)
+      // both low â†’ hold (q and nq retain prior s1 values)
     }
 
     s0[base + SLOT_Q]      = q;
@@ -118,7 +118,7 @@ export class BehavioralRSAsyncLatchDriverElement extends AbstractPoolBackedAnalo
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(_key: string, _value: number): void {}

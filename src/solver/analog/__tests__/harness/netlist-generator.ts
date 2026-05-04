@@ -89,7 +89,7 @@ export function generateSpiceNetlist(
     if (!spec) continue;
 
     const props = circuitEl.getProperties();
-    const nodes = [...el._pinNodes.values()];
+    const nodes = [...el.pinNodes.values()];
 
     let paramDefs: ParamDef[] = [];
     let emission: ModelEmissionSpec | undefined;
@@ -307,10 +307,10 @@ function modelCardSuffix(
  * .tran analysis. The SPICE transient spec syntax is identical for V and I sources.
  *
  * Supported waveforms (all exact- no approximations):
- *   sine     → SIN(VO VA FREQ TD THETA PHASE_DEG)
- *   square   → PULSE(V1 V2 TD TR TF PW PER)
- *   triangle → PULSE(V1 V2 TD halfPeriod halfPeriod 0 PER)
- *   sawtooth → PULSE(V1 V2 TD (period-fallTime) fallTime 0 PER)
+ *   sine     â†’ SIN(VO VA FREQ TD THETA PHASE_DEG)
+ *   square   â†’ PULSE(V1 V2 TD TR TF PW PER)
+ *   triangle â†’ PULSE(V1 V2 TD halfPeriod halfPeriod 0 PER)
+ *   sawtooth â†’ PULSE(V1 V2 TD (period-fallTime) fallTime 0 PER)
  *
  * Rejected waveforms (throw): sweep, am, fm, noise, expression- none of these
  * are representable as a SPICE transient primitive. A .tran parity comparison
@@ -324,7 +324,7 @@ function modelCardSuffix(
  *   emission is therefore exact- no approximation or sub-riseTime discrepancy.
  *
  * Triangle-wave note:
- *   After the -π/2 phase alignment in computeWaveformValue, at t=0 (phase=0) our
+ *   After the -Ï€/2 phase alignment in computeWaveformValue, at t=0 (phase=0) our
  *   triangle sits at V1 = dc - amp and rises linearly to V2 over the first half
  *   period, then falls linearly back to V1 over the second half. SPICE PULSE with
  *   TR=TF=halfPeriod and PW=0 reproduces this exactly (the rising edge is the
@@ -348,7 +348,7 @@ function buildAcSourceSpec(
 
   switch (waveform) {
     case "sine": {
-      // Our engine: dc + amp * sin(2π * freq * t + phase)  [phase in radians]
+      // Our engine: dc + amp * sin(2Ï€ * freq * t + phase)  [phase in radians]
       // SPICE SIN:  SIN(VO VA FREQ TD THETA PHASE_DEG)
       //   PHASE_DEG is phase in degrees (ngspice manual ss4.1.2).
       const phaseDeg = phase * (180 / Math.PI);
@@ -368,7 +368,7 @@ function buildAcSourceSpec(
       //   V2  = dc + amp
       //   TD  = delay to first rising edge start in real time
       //         = ((-phaseShift) % period + period) % period
-      //         (positive phase → waveform shifted left → rising edge earlier → larger TD wrap)
+      //         (positive phase â†’ waveform shifted left â†’ rising edge earlier â†’ larger TD wrap)
       //   TR  = riseTime
       //   TF  = fallTime
       //   PW  = period/2 - TR  (HIGH plateau, same as engine)
@@ -388,9 +388,9 @@ function buildAcSourceSpec(
 
     case "triangle": {
       // PULSE-aligned triangle (see ac-voltage-source.ts computeWaveformValue):
-      // rises V1 → V2 over halfPeriod, then falls V2 → V1 over halfPeriod.
+      // rises V1 â†’ V2 over halfPeriod, then falls V2 â†’ V1 over halfPeriod.
       // At t=0 (phase=0) the wave sits at V1 rising. Non-zero phase shifts the
-      // waveform left in time by phase/(2π*freq); encode that as a positive TD
+      // waveform left in time by phase/(2Ï€*freq); encode that as a positive TD
       // wrapped into [0, period) just like the square case.
       const halfP = period / 2;
       const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
@@ -402,7 +402,7 @@ function buildAcSourceSpec(
 
     case "sawtooth": {
       // PULSE-aligned sawtooth (see ac-voltage-source.ts computeWaveformValue):
-      // rises V1 → V2 over (period - fallTime), then falls V2 → V1 over fallTime.
+      // rises V1 â†’ V2 over (period - fallTime), then falls V2 â†’ V1 over fallTime.
       // At t=0 (phase=0) the wave sits at V1 rising. Default fallTime = 1 ps so
       // the sharp fall is below typical transient timesteps while remaining
       // losslessly encodable in PULSE.

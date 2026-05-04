@@ -94,9 +94,9 @@ export class BehavioralNotDriverElement extends AbstractPoolBackedAnalogElement 
    * Threshold-classify the single input with hold-on-indeterminate semantic,
    * then invert: output = 1 - level.
    *
-   *   - v >= vIH (logic "1") → output 0 (NOT of 1).
-   *   - v <  vIL (logic "0") → output 1 (NOT of 0).
-   *   - vIL <= v < vIH (indeterminate) → hold prior output.
+   *   - v >= vIH (logic "1") â†’ output 0 (NOT of 1).
+   *   - v <  vIL (logic "0") â†’ output 1 (NOT of 0).
+   *   - vIL <= v < vIH (indeterminate) â†’ hold prior output.
    */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
@@ -107,15 +107,15 @@ export class BehavioralNotDriverElement extends AbstractPoolBackedAnalogElement 
     const prev: 0 | 1 = s1[base + SLOT_OUT] >= 0.5 ? 1 : 0;
 
     let result: 0 | 1;
-    if      (v >= this._vIH)  result = 0;    // input is "1" → NOT outputs 0
-    else if (v <  this._vIL)  result = 1;    // input is "0" → NOT outputs 1
-    else                       result = prev; // indeterminate → hold prior
+    if      (v >= this._vIH)  result = 0;    // input is "1" â†’ NOT outputs 0
+    else if (v <  this._vIL)  result = 1;    // input is "0" â†’ NOT outputs 1
+    else                       result = prev; // indeterminate â†’ hold prior
 
     s0[base + SLOT_OUT] = result;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

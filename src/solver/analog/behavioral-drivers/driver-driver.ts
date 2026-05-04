@@ -5,13 +5,13 @@
  * Reads `in` and `sel` voltages from rhsOld (relative to gnd), threshold-
  * classifies each against per-instance vIH / vIL with hold-on-indeterminate,
  * and writes:
- *   - OUTPUT_LOGIC_LEVEL        ← pass-through of `in` (0/1)
- *   - OUTPUT_LOGIC_LEVEL_ENABLE ← `sel` (0/1, active-high enable)
+ *   - OUTPUT_LOGIC_LEVEL        â† pass-through of `in` (0/1)
+ *   - OUTPUT_LOGIC_LEVEL_ENABLE â† `sel` (0/1, active-high enable)
  *
  * The two slots are consumed via siblingState by the parent composite's
  * outPin DigitalOutputPinLoaded sub-element- `inputLogic` selects which
  * voltage to drive, `enableLogic` switches the Norton conductance between
- * 1/rOut (active) and 1 GΩ (high-Z) so the pin disconnects from the shared
+ * 1/rOut (active) and 1 GÎ© (high-Z) so the pin disconnects from the shared
  * net when sel is low.
  *
  * Per Composite M13 (phase-composite-architecture.md), J-145
@@ -101,9 +101,9 @@ export class BehavioralDriverDriverElement extends AbstractPoolBackedAnalogEleme
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd = rhsOld[this._pinNodes.get("gnd")!];
-    const vIn  = rhsOld[this._pinNodes.get("in")!]  - gnd;
-    const vSel = rhsOld[this._pinNodes.get("sel")!] - gnd;
+    const gnd = rhsOld[this.pinNodes.get("gnd")!];
+    const vIn  = rhsOld[this.pinNodes.get("in")!]  - gnd;
+    const vSel = rhsOld[this.pinNodes.get("sel")!] - gnd;
 
     const prevOut    = (s1[base + SLOT_OUT]    >= 0.5 ? 1 : 0) as 0 | 1;
     const prevEnable = (s1[base + SLOT_ENABLE] >= 0.5 ? 1 : 0) as 0 | 1;
@@ -116,7 +116,7 @@ export class BehavioralDriverDriverElement extends AbstractPoolBackedAnalogEleme
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

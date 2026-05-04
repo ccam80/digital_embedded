@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Potentiometer analog component.
  *
  * A three-terminal linear element modelled as two series resistors sharing a
@@ -193,9 +193,9 @@ class AnalogPotentiometerElement extends AbstractAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const aNode = this._pinNodes.get("pos")!;  // pos pin- R_AW posNode
-    const wNode = this._pinNodes.get("W")!;    // W pin- shared wiper node
-    const bNode = this._pinNodes.get("neg")!;  // neg pin- R_WB negNode
+    const aNode = this.pinNodes.get("pos")!;  // pos pin- R_AW posNode
+    const wNode = this.pinNodes.get("W")!;    // W pin- shared wiper node
+    const bNode = this.pinNodes.get("neg")!;  // neg pin- R_WB negNode
 
     // R_AW- ressetup.c:46-49 (A as posNode, W as negNode)
     this._hAW_PP = solver.allocElement(aNode, aNode);  // (RESposNode, RESposNode)
@@ -237,9 +237,9 @@ class AnalogPotentiometerElement extends AbstractAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const aNode = this._pinNodes.get("pos")!;  // pos pin
-    const wNode = this._pinNodes.get("W")!;    // W (wiper) pin
-    const bNode = this._pinNodes.get("neg")!;  // neg pin
+    const aNode = this.pinNodes.get("pos")!;  // pos pin
+    const wNode = this.pinNodes.get("W")!;    // W (wiper) pin
+    const bNode = this.pinNodes.get("neg")!;  // neg pin
 
     const vA = rhs[aNode];
     const vW = rhs[wNode];

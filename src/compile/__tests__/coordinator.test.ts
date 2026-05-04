@@ -230,7 +230,7 @@ function makeGroundDef(): StandaloneComponentDefinition {
     helpText: '',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => new CoordinatorTestGroundStubEl(new Map<string, number>()), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (_pn: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => new CoordinatorTestGroundStubEl(new Map<string, number>()), paramDefs: [], params: {} },
     },
   };
 }

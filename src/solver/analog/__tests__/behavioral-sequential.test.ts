@@ -49,11 +49,11 @@ describe("Counter", () => {
   /**
    * counts_on_clock_edges:
    *
-   * Circuit: Clock(1Hz, vdd=3.3) → counter:C
-   *          DcVoltageSource(0V) → counter:clr
-   *          DcVoltageSource(3.3V) → counter:en
-   *          counter:q0..q3 → Resistor(10kΩ) → Ground (4 bits)
-   *          counter:ovf → Resistor(10kΩ) → Ground
+   * Circuit: Clock(1Hz, vdd=3.3) Ã¢â€ â€™ counter:C
+   *          DcVoltageSource(0V) Ã¢â€ â€™ counter:clr
+   *          DcVoltageSource(3.3V) Ã¢â€ â€™ counter:en
+   *          counter:q0..q3 Ã¢â€ â€™ Resistor(10kÃŽÂ©) Ã¢â€ â€™ Ground (4 bits)
+   *          counter:ovf Ã¢â€ â€™ Resistor(10kÃŽÂ©) Ã¢â€ â€™ Ground
    *
    * Run 5.5 periods (tStop = 5.5s at 1Hz). After 5 rising edges count = 5 = 0b0101.
    * Reconstruct count from q0..q3 bit voltages at the last step.
@@ -79,16 +79,16 @@ describe("Counter", () => {
             ["clk:out",    "ctr:C"],
             ["vsCLR:pos",  "ctr:clr"],
             ["vsEN:pos",   "ctr:en"],
-            ["ctr:q0",     "rQ0:A"],
-            ["ctr:q1",     "rQ1:A"],
-            ["ctr:q2",     "rQ2:A"],
-            ["ctr:q3",     "rQ3:A"],
-            ["ctr:ovf",    "rOvf:A"],
-            ["rQ0:B",      "gnd:out"],
-            ["rQ1:B",      "gnd:out"],
-            ["rQ2:B",      "gnd:out"],
-            ["rQ3:B",      "gnd:out"],
-            ["rOvf:B",     "gnd:out"],
+            ["ctr:q0",     "rQ0:pos"],
+            ["ctr:q1",     "rQ1:pos"],
+            ["ctr:q2",     "rQ2:pos"],
+            ["ctr:q3",     "rQ3:pos"],
+            ["ctr:ovf",    "rOvf:pos"],
+            ["rQ0:neg",      "gnd:out"],
+            ["rQ1:neg",      "gnd:out"],
+            ["rQ2:neg",      "gnd:out"],
+            ["rQ3:neg",      "gnd:out"],
+            ["rOvf:neg",     "gnd:out"],
             ["vsCLR:neg",  "gnd:out"],
             ["vsEN:neg",   "gnd:out"],
           ],
@@ -138,16 +138,16 @@ describe("Counter", () => {
             ["clk:out",    "ctr:C"],
             ["vsCLR:pos",  "ctr:clr"],
             ["vsEN:pos",   "ctr:en"],
-            ["ctr:q0",     "rQ0:A"],
-            ["ctr:q1",     "rQ1:A"],
-            ["ctr:q2",     "rQ2:A"],
-            ["ctr:q3",     "rQ3:A"],
-            ["ctr:ovf",    "rOvf:A"],
-            ["rQ0:B",      "gnd:out"],
-            ["rQ1:B",      "gnd:out"],
-            ["rQ2:B",      "gnd:out"],
-            ["rQ3:B",      "gnd:out"],
-            ["rOvf:B",     "gnd:out"],
+            ["ctr:q0",     "rQ0:pos"],
+            ["ctr:q1",     "rQ1:pos"],
+            ["ctr:q2",     "rQ2:pos"],
+            ["ctr:q3",     "rQ3:pos"],
+            ["ctr:ovf",    "rOvf:pos"],
+            ["rQ0:neg",      "gnd:out"],
+            ["rQ1:neg",      "gnd:out"],
+            ["rQ2:neg",      "gnd:out"],
+            ["rQ3:neg",      "gnd:out"],
+            ["rOvf:neg",     "gnd:out"],
             ["vsCLR:neg",  "gnd:out"],
             ["vsEN:neg",   "gnd:out"],
           ],
@@ -197,16 +197,16 @@ describe("Counter", () => {
             ["clk:out",    "ctr:C"],
             ["vsCLR:pos",  "ctr:clr"],
             ["vsEN:pos",   "ctr:en"],
-            ["ctr:q0",     "rQ0:A"],
-            ["ctr:q1",     "rQ1:A"],
-            ["ctr:q2",     "rQ2:A"],
-            ["ctr:q3",     "rQ3:A"],
-            ["ctr:ovf",    "rOvf:A"],
-            ["rQ0:B",      "gnd:out"],
-            ["rQ1:B",      "gnd:out"],
-            ["rQ2:B",      "gnd:out"],
-            ["rQ3:B",      "gnd:out"],
-            ["rOvf:B",     "gnd:out"],
+            ["ctr:q0",     "rQ0:pos"],
+            ["ctr:q1",     "rQ1:pos"],
+            ["ctr:q2",     "rQ2:pos"],
+            ["ctr:q3",     "rQ3:pos"],
+            ["ctr:ovf",    "rOvf:pos"],
+            ["rQ0:neg",      "gnd:out"],
+            ["rQ1:neg",      "gnd:out"],
+            ["rQ2:neg",      "gnd:out"],
+            ["rQ3:neg",      "gnd:out"],
+            ["rOvf:neg",     "gnd:out"],
             ["vsCLR:neg",  "gnd:out"],
             ["vsEN:neg",   "gnd:out"],
           ],
@@ -248,9 +248,9 @@ describe("Register", () => {
    * latches_all_bits:
    *
    * Circuit: 8 DcVoltageSources driving D bits 0..7 (data=0xA5=0b10100101)
-   *          DcVoltageSource(3.3V) → reg:en
-   *          Clock(1Hz) → reg:C
-   *          reg:Q0..Q7 → Resistor(10kΩ) → Ground
+   *          DcVoltageSource(3.3V) Ã¢â€ â€™ reg:en
+   *          Clock(1Hz) Ã¢â€ â€™ reg:C
+   *          reg:Q0..Q7 Ã¢â€ â€™ Resistor(10kÃŽÂ©) Ã¢â€ â€™ Ground
    *
    * Run 1.5 periods. After 1 rising edge with en=1 and data=0xA5, storedValue=0xA5.
    * Reconstruct storedValue from Q0..Q7 bit voltages at the last step.
@@ -356,7 +356,7 @@ describe("Register", () => {
     const stepEnd = session.getStepEnd(stepCount - 1);
     const bits = Array.from({ length: 8 }, (_, i) => stepEnd.nodes[`reg:Q${i}`]?.ours ?? 0);
     const storedValue = bitsToInt(bits);
-    // en=0 → register does not latch → storedValue=0
+    // en=0 Ã¢â€ â€™ register does not latch Ã¢â€ â€™ storedValue=0
     expect(storedValue).toBe(0);
   }, 60_000);
 
@@ -468,7 +468,7 @@ describe("Registration", () => {
       props, () => 0,
     );
     expect(element.branchIndex).toBe(-1);
-    expect(element._pinNodes.size).toBe(5);
+    expect(element.pinNodes.size).toBe(5);
   });
 
   it("register_analog_factory_returns_analog_element", () => {
@@ -480,7 +480,7 @@ describe("Registration", () => {
       props, () => 0,
     );
     expect(element.branchIndex).toBe(-1);
-    expect(element._pinNodes.size).toBe(4);
+    expect(element.pinNodes.size).toBe(4);
   });
 });
 
@@ -494,7 +494,7 @@ describe("Task 6.4.3- sequential pin loading propagates", () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // 4-bit counter: en=loaded, C and clr=unloaded.
-    // Drive through rsrc=10kΩ series with 5V ideal source for loaded pin.
+    // Drive through rsrc=10kÃŽÂ© series with 5V ideal source for loaded pin.
     // Loaded pin: vNet ~= 5 * 100k/(10k + 100k) = 4.5454...V
     // Unloaded: vNet = 5.0V (ideal source, no sag)
     const circuit = facade.build({
@@ -512,20 +512,20 @@ describe("Task 6.4.3- sequential pin loading propagates", () => {
         { id: "gnd",   type: "Ground" },
       ],
       connections: [
-        ["vsEN:pos",  "rEN:A"],
-        ["rEN:B",     "ctr:en"],
+        ["vsEN:pos",  "rEN:pos"],
+        ["rEN:neg",     "ctr:en"],
         ["vsCLK:pos", "ctr:C"],
         ["vsCLR:pos", "ctr:clr"],
-        ["ctr:q0",    "rQ0:A"],
-        ["ctr:q1",    "rQ1:A"],
-        ["ctr:q2",    "rQ2:A"],
-        ["ctr:q3",    "rQ3:A"],
-        ["ctr:ovf",   "rOvf:A"],
-        ["rQ0:B",     "gnd:out"],
-        ["rQ1:B",     "gnd:out"],
-        ["rQ2:B",     "gnd:out"],
-        ["rQ3:B",     "gnd:out"],
-        ["rOvf:B",    "gnd:out"],
+        ["ctr:q0",    "rQ0:pos"],
+        ["ctr:q1",    "rQ1:pos"],
+        ["ctr:q2",    "rQ2:pos"],
+        ["ctr:q3",    "rQ3:pos"],
+        ["ctr:ovf",   "rOvf:pos"],
+        ["rQ0:neg",     "gnd:out"],
+        ["rQ1:neg",     "gnd:out"],
+        ["rQ2:neg",     "gnd:out"],
+        ["rQ3:neg",     "gnd:out"],
+        ["rOvf:neg",    "gnd:out"],
         ["vsEN:neg",  "gnd:out"],
         ["vsCLK:neg", "gnd:out"],
         ["vsCLR:neg", "gnd:out"],
@@ -543,12 +543,12 @@ describe("Task 6.4.3- sequential pin loading propagates", () => {
     facade.getDcOpResult();
     const signals = facade.readAllSignals(coordinator);
 
-    // Loaded pin (en): voltage sag through rEN=10kΩ with rIn=100kΩ → 4.5454V
+    // Loaded pin (en): voltage sag through rEN=10kÃŽÂ© with rIn=100kÃŽÂ© Ã¢â€ â€™ 4.5454V
     const vEN = signals["ctr:en"];
     expect(vEN).toBeGreaterThan(4.4);
     expect(vEN).toBeLessThan(4.6);
 
-    // Unloaded pins (C, clr): no sag → 5.0V
+    // Unloaded pins (C, clr): no sag Ã¢â€ â€™ 5.0V
     const vCLK = signals["ctr:C"];
     expect(vCLK).toBeCloseTo(5.0, 3);
     const vCLR = signals["ctr:clr"];

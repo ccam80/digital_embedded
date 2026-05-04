@@ -100,9 +100,9 @@ export class BehavioralButtonLEDDriverElement extends AbstractPoolBackedAnalogEl
   /**
    * Threshold-classify the LED input voltage with hold-on-indeterminate
    * hysteresis (mirrors buf-driver / not-driver Template A pattern):
-   *   v >= vIH  → output 1
-   *   v <  vIL  → output 0
-   *   otherwise → hold prior output
+   *   v >= vIH  â†’ output 1
+   *   v <  vIL  â†’ output 0
+   *   otherwise â†’ hold prior output
    */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
@@ -119,7 +119,7 @@ export class BehavioralButtonLEDDriverElement extends AbstractPoolBackedAnalogEl
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

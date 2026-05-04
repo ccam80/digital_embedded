@@ -108,6 +108,6 @@ describe("Ground", () => {
       () => 0,
     );
 
-    expect(element._pinNodes.get("out")).toBe(5);
+    expect(element.pinNodes.get("out")).toBe(5);
   });
 });

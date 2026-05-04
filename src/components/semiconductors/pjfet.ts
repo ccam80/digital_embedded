@@ -120,6 +120,7 @@ export interface PjfetParams {
   TNOM: number;
   TEMP: number;
   OFF: number;
+  [key: string]: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -807,7 +808,7 @@ class PJfetAnalogElement extends AbstractPoolBackedAnalogElement {
 
   setParam(key: string, value: number): void {
     if (key in this._params) {
-      Reflect.set(this._params, key, value);
+      this._params[key] = value;
       this._tp = computePjfetTempParams(this._params);
     }
   }

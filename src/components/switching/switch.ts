@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Switch component -- SPST switch with mechanical symbol rendering.
  *
  * Like PlainSwitch but with the standard mechanical switch symbol:
@@ -366,8 +366,8 @@ export class SwitchAnalogElement extends AbstractPoolBackedAnalogElement impleme
   }
 
   setup(ctx: SetupContext): void {
-    const posNode = this._pinNodes.get("A1")!;
-    const negNode = this._pinNodes.get("B1")!;
+    const posNode = this.pinNodes.get("A1")!;
+    const negNode = this.pinNodes.get("B1")!;
 
     // Port of swsetup.c:47-48- state slot allocation
     this._stateBase = ctx.allocStates(1);  // SWITCH_SCHEMA: 1 slot (CLOSED)
@@ -439,8 +439,8 @@ export class SwitchAnalogElement extends AbstractPoolBackedAnalogElement impleme
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const posNode = this._pinNodes.get("A1")!;
-    const negNode = this._pinNodes.get("B1")!;
+    const posNode = this.pinNodes.get("A1")!;
+    const negNode = this.pinNodes.get("B1")!;
     const vA = rhs[posNode];
     const vB = rhs[negNode];
     // Use the same effective state load() last stamped. After warm-start,

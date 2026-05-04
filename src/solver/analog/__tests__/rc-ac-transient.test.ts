@@ -1,23 +1,23 @@
 /**
  * RC lowpass driven by AC voltage source- analytical verification.
  *
- * Circuit: AC Source (Vs) → R → C → GND
+ * Circuit: AC Source (Vs) â†’ R â†’ C â†’ GND
  *   node 1: source pos / resistor A  (voltages[0])
- *   node 2: resistor B / cap top     (voltages[1])  ← output
+ *   node 2: resistor B / cap top     (voltages[1])  â† output
  *   ground: source neg / cap bottom
  *   branch 0: voltage source current (voltages[2])
  *
  * Analytical transfer function for RC lowpass:
- *   H(f) = 1 / (1 + j·2πf·R·C)
- *   |H(f)| = 1 / √(1 + (2πfRC)²)
- *   φ(f) = -arctan(2πfRC)
+ *   H(f) = 1 / (1 + jÂ·2Ï€fÂ·RÂ·C)
+ *   |H(f)| = 1 / âˆš(1 + (2Ï€fRC)Â²)
+ *   Ï†(f) = -arctan(2Ï€fRC)
  *
- * Test parameters: R = 1 kΩ, C = 1 µF, f = 100 Hz, A = 5 V
- *   τ = RC = 1 ms
- *   ωRC = 2π·100·1e-3 ≈ 0.6283
- *   |H| ≈ 0.8467
- *   Expected output amplitude ≈ 4.234 V
- *   Expected phase ≈ -32.14°
+ * Test parameters: R = 1 kÎ©, C = 1 ÂµF, f = 100 Hz, A = 5 V
+ *   Ï„ = RC = 1 ms
+ *   Ï‰RC = 2Ï€Â·100Â·1e-3 â‰ˆ 0.6283
+ *   |H| â‰ˆ 0.8467
+ *   Expected output amplitude â‰ˆ 4.234 V
+ *   Expected phase â‰ˆ -32.14Â°
  */
 
 import { describe, it, expect } from "vitest";
@@ -104,15 +104,15 @@ function makeAcVoltageSource(
 // Constants
 // ---------------------------------------------------------------------------
 
-const R = 1000;          // 1 kΩ
-const C = 1e-6;          // 1 µF
+const R = 1000;          // 1 kÎ©
+const C = 1e-6;          // 1 ÂµF
 const F = 100;           // 100 Hz
 const A = 5;             // 5 V peak
 const TAU = R * C;       // 1 ms
-const OMEGA_RC = 2 * Math.PI * F * TAU;  // ≈ 0.6283
-const H_MAG = 1 / Math.sqrt(1 + OMEGA_RC * OMEGA_RC);  // ≈ 0.8467
-const EXPECTED_AMP = A * H_MAG;  // ≈ 4.234 V
-const EXPECTED_PHASE = -Math.atan(OMEGA_RC);  // ≈ -0.5614 rad
+const OMEGA_RC = 2 * Math.PI * F * TAU;  // â‰ˆ 0.6283
+const H_MAG = 1 / Math.sqrt(1 + OMEGA_RC * OMEGA_RC);  // â‰ˆ 0.8467
+const EXPECTED_AMP = A * H_MAG;  // â‰ˆ 4.234 V
+const EXPECTED_PHASE = -Math.atan(OMEGA_RC);  // â‰ˆ -0.5614 rad
 
 // ---------------------------------------------------------------------------
 // Circuit builders
@@ -219,7 +219,7 @@ describe("RC lowpass AC transient- hand-built", () => {
     const dcResult = engine.dcOperatingPoint();
     expect(dcResult.converged).toBe(true);
 
-    // Let transient die out: simulate for 5τ = 5 ms
+    // Let transient die out: simulate for 5Ï„ = 5 ms
     stepUntil(engine, 5 * TAU);
 
     // Sample one full period in steady state (10 ms period at 100 Hz)
@@ -326,7 +326,7 @@ describe("RC lowpass AC transient- hand-built", () => {
   });
 
   it("higher frequency produces greater attenuation", () => {
-    // f = 1000 Hz: ωRC = 6.283, |H| ≈ 0.157
+    // f = 1000 Hz: Ï‰RC = 6.283, |H| â‰ˆ 0.157
     const highF = 1000;
     const timeRef = { value: 0 };
     const getTime = () => timeRef.value;
@@ -352,7 +352,7 @@ describe("RC lowpass AC transient- hand-built", () => {
     const engine = engineFrom(circuit);
     engine.dcOperatingPoint();
 
-    // Wait for steady state (5τ = 5ms, period = 1ms so ~5 periods)
+    // Wait for steady state (5Ï„ = 5ms, period = 1ms so ~5 periods)
     stepUntil(engine, 5 * TAU);
 
     // Sample one period
@@ -516,7 +516,7 @@ describe("RC lowpass AC transient- compiler pipeline", () => {
     const capEl = compiled.elements.find(
       e => typeof (e as { getLteTimestep?: unknown }).getLteTimestep === "function",
     )!;
-    const capNodes = [...capEl._pinNodes.values()];
+    const capNodes = [...capEl.pinNodes.values()];
     expect(capNodes).toHaveLength(2);
     // One node should be ground (0), the other should be non-zero
     const hasGround = capNodes[0] === 0 || capNodes[1] === 0;
@@ -595,8 +595,8 @@ describe("RC lowpass AC transient- compiler pipeline", () => {
     expect(ampRatio).toBeLessThan(0.99);
   });
 
-  it("full pipeline: compile → DC OP → transient → analytical match", () => {
-    // Layout: AC Source → R → C → GND
+  it("full pipeline: compile â†’ DC OP â†’ transient â†’ analytical match", () => {
+    // Layout: AC Source â†’ R â†’ C â†’ GND
     //
     // Pin positions (grid coords, matched at wire junctions):
     //   node_src (x=10): AcVoltageSource.pos, Resistor.A
@@ -659,7 +659,7 @@ describe("RC lowpass AC transient- compiler pipeline", () => {
     stepUntil(engine, 5 * TAU);
 
     // Find the output node (should be the capacitor node, not the source node).
-    // The source node has amplitude ≈ A, the output node has amplitude < A.
+    // The source node has amplitude â‰ˆ A, the output node has amplitude < A.
     const periodEnd = engine.simTime + 1 / F;
     const peaks = new Array(compiled.nodeCount).fill(-Infinity);
     const troughs = new Array(compiled.nodeCount).fill(Infinity);
@@ -677,9 +677,9 @@ describe("RC lowpass AC transient- compiler pipeline", () => {
 
     const sorted = [...amplitudes].sort((a, b) => b - a);
 
-    // Largest amplitude ≈ A (source node)
+    // Largest amplitude â‰ˆ A (source node)
     expect(sorted[0]).toBeGreaterThan(A * 0.9);
-    // Smaller amplitude ≈ expected RC filtered amplitude
+    // Smaller amplitude â‰ˆ expected RC filtered amplitude
     const outputAmp = sorted[1];
     expect(outputAmp).toBeGreaterThan(EXPECTED_AMP * 0.90);
     expect(outputAmp).toBeLessThan(EXPECTED_AMP * 1.10);

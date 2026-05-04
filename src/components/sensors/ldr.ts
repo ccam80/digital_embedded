@@ -1,4 +1,4 @@
-﻿/**
+/**
  * LDR (Light Dependent Resistor)  illumination-dependent resistor.
  *
  * Resistance model:
@@ -19,8 +19,8 @@
  * calibrated, i.e. when rLight == rDark).
  *
  * MNA topology:
- *   _pinNodes["pos"] = n_pos
- *   _pinNodes["neg"] = n_neg
+ *   pinNodes["pos"] = n_pos
+ *   pinNodes["neg"] = n_neg
  *   branchIndex    = -1
  *
  * Unified load() pipeline (matches ngspice DEVload):
@@ -125,8 +125,8 @@ export class LDRElement extends AbstractAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!; // RESposNode
-    const negNode = this._pinNodes.get("neg")!; // RESnegNode
+    const posNode = this.pinNodes.get("pos")!; // RESposNode
+    const negNode = this.pinNodes.get("neg")!; // RESnegNode
 
     // TSTALLOC sequence: ressetup.c:46-49, line-for-line
     this._hPP = solver.allocElement(posNode, posNode); // :46 (RESposNode, RESposNode)
@@ -148,8 +148,8 @@ export class LDRElement extends AbstractAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this._pinNodes.get("pos")!;
-    const nNeg = this._pinNodes.get("neg")!;
+    const nPos = this.pinNodes.get("pos")!;
+    const nNeg = this.pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const G = 1 / this.resistance();

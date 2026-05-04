@@ -103,9 +103,9 @@ export class BehavioralBufDriverElement extends AbstractPoolBackedAnalogElement 
    *
    * Threshold-classify with hold-on-indeterminate semantic (mirrors and-driver
    * pattern with N=1):
-   *   - v < vIL  → output 0
-   *   - vIL <= v < vIH → hold prior output (CMOS metastability proxy)
-   *   - v >= vIH → output 1
+   *   - v < vIL  â†’ output 0
+   *   - vIL <= v < vIH â†’ hold prior output (CMOS metastability proxy)
+   *   - v >= vIH â†’ output 1
    */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
@@ -126,7 +126,7 @@ export class BehavioralBufDriverElement extends AbstractPoolBackedAnalogElement 
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

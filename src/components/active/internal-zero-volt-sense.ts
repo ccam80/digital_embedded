@@ -1,5 +1,5 @@
 /**
- * InternalZeroVoltSense — internal-only 0V voltage-source sense element.
+ * InternalZeroVoltSense â€” internal-only 0V voltage-source sense element.
  *
  * Per Composite M4 (phase-composite-architecture.md), J-025
  * (contracts_group_02.md). Promoted from VsenseSubElement in optocoupler.ts.
@@ -9,12 +9,12 @@
  * by the sibling InternalCccs via siblingBranch resolution.
  *
  * Template C variant: branch-bearing, stateless, 2 pins. Subset of the
- * canonical Template C exemplar (transmission-segment-l.ts) — delete state
+ * canonical Template C exemplar (transmission-segment-l.ts) â€” delete state
  * schema, delete pool plumbing, keep branch alloc and 4-handle VSRC stamp.
  *
  * Stamp math: 0V VSRC (vsrcload.c). Four matrix entries + zero RHS:
- *   +1 at (pos, b), -1 at (neg, b)   — KCL rows
- *   +1 at (b, pos), -1 at (b, neg)   — KVL row (V_pos - V_neg = 0)
+ *   +1 at (pos, b), -1 at (neg, b)   â€” KCL rows
+ *   +1 at (b, pos), -1 at (b, neg)   â€” KVL row (V_pos - V_neg = 0)
  */
 
 import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
@@ -41,7 +41,7 @@ const INTERNAL_ZERO_VOLT_SENSE_PIN_LAYOUT: PinDeclaration[] = [
 export class InternalZeroVoltSenseElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
 
-  // Cached matrix-entry handles — mirror vsrcsetup.c TSTALLOC sequence for
+  // Cached matrix-entry handles â€” mirror vsrcsetup.c TSTALLOC sequence for
   // a standard two-node voltage source with one branch row.
   private _hPB = -1;
   private _hNB = -1;
@@ -54,16 +54,16 @@ export class InternalZeroVoltSenseElement extends AbstractAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
-    // vsrcsetup.c — CKTmkCur (idempotent guard).
+    // vsrcsetup.c â€” CKTmkCur (idempotent guard).
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
-    // vsrcsetup.c — TSTALLOC sequence for 0V VSRC.
+    // vsrcsetup.c â€” TSTALLOC sequence for 0V VSRC.
     this._hPB = solver.allocElement(posNode, b);
     this._hNB = solver.allocElement(negNode, b);
     this._hBP = solver.allocElement(b, posNode);
@@ -72,7 +72,7 @@ export class InternalZeroVoltSenseElement extends AbstractAnalogElement {
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    // vsrcload.c — stamp +1/-1 entries; RHS is zero (enforced voltage = 0).
+    // vsrcload.c â€” stamp +1/-1 entries; RHS is zero (enforced voltage = 0).
     solver.stampElement(this._hPB, +1);
     solver.stampElement(this._hNB, -1);
     solver.stampElement(this._hBP, +1);

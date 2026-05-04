@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Resistor analog component.
  *
  * Stamps a conductance matrix: G = 1/R at four positions in the MNA matrix.
@@ -173,8 +173,8 @@ class ResistorAnalogElement extends AbstractAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;  // RESposNode
-    const negNode = this._pinNodes.get("neg")!;  // RESnegNode
+    const posNode = this.pinNodes.get("pos")!;  // RESposNode
+    const negNode = this.pinNodes.get("neg")!;  // RESnegNode
 
     // ressetup.c:46-49- TSTALLOC sequence, line-for-line.
     this._hPP = solver.allocElement(posNode, posNode);  // (RESposNode, RESposNode)
@@ -200,8 +200,8 @@ class ResistorAnalogElement extends AbstractAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this._pinNodes.get("pos")!;
-    const n1 = this._pinNodes.get("neg")!;
+    const n0 = this.pinNodes.get("pos")!;
+    const n1 = this.pinNodes.get("neg")!;
     const vA = rhs[n0];
     const vB = rhs[n1];
     const I = this._G * (vA - vB);

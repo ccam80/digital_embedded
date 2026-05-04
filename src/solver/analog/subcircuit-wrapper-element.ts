@@ -33,7 +33,7 @@ export interface SubcircuitWrapperBindings {
 }
 
 export interface SubcircuitWrapperOptions {
-  /** Pin label -> MNA node ID, copied as the wrapper's `_pinNodes`. */
+  /** Pin label -> MNA node ID, copied as the wrapper's `pinNodes`. */
   pinNodes: ReadonlyMap<string, number>;
   /**
    * Position in the global ngspice load order. Architecturally arbitrary

@@ -44,7 +44,7 @@ const TYPE_TO_PREFIX: Record<string, string> = {
 };
 
 /**
- * Build a map from element index → human-readable component label.
+ * Build a map from element index â†’ human-readable component label.
  */
 export function buildElementLabelMap(
   compiled: ConcreteCompiledAnalogCircuit,
@@ -97,7 +97,7 @@ export function captureTopology(
     const el = compiled.elements[i];
     const elLabel = elementLabels?.get(i) ?? `element_${i}`;
     const resolvedPins = compiled.elementResolvedPins?.get(i);
-    const pinNodeValues = [...el._pinNodes.values()];
+    const pinNodeValues = [...el.pinNodes.values()];
     for (let p = 0; p < pinNodeValues.length; p++) {
       const nodeId = pinNodeValues[p];
       if (nodeId === 0) continue;
@@ -112,8 +112,8 @@ export function captureTopology(
     }
 
     // Internal (prime) nodes- labels from getInternalNodeLabels(); IDs are
-    // allocated in order starting at _pinNodes.size (allocation offset per ssA.23).
-    const pinCount = el._pinNodes.size;
+    // allocated in order starting at pinNodes.size (allocation offset per ssA.23).
+    const pinCount = el.pinNodes.size;
     const internalLabels = (el as any).getInternalNodeLabels?.() ?? [];
     for (let p = 0; p < internalLabels.length; p++) {
       // Internal node IDs follow pin nodes in allocation order: offset = pinCount + p.
@@ -173,7 +173,7 @@ export function captureTopology(
         index: i,
         label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
         type: normalizeDeviceType(typeId),
-        pinNodeIds: [...el._pinNodes.values()],
+        pinNodeIds: [...el.pinNodes.values()],
       };
     }),
     nodeLabels,

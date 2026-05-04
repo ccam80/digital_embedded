@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for compileAnalogPartition (P3-7).
  *
  * Verifies that the partition-based entry point handles Ground group
@@ -570,7 +570,7 @@ describe("compileAnalogPartition", () => {
 
     const elementWithState = new PartitionStatefulEl(new Map<string, number>());
 
-    const factoryReturningStateElement = vi.fn((_pinNodes: ReadonlyMap<string, number>) => {
+    const factoryReturningStateElement = vi.fn((_pn: ReadonlyMap<string, number>) => {
       return elementWithState;
     });
 

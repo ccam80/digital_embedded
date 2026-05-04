@@ -1,7 +1,7 @@
 /**
  * Tests for the Transformer component.
  *
- * §4c gap-fill (2026-05-03): all engine-impersonator tests that hand-rolled
+ * Â§4c gap-fill (2026-05-03): all engine-impersonator tests that hand-rolled
  * `new StatePool(...)`, drove `element.load(ctx)` directly through fabricated
  * `LoadContext` objects, or impersonated `SetupContext` to allocate branches /
  * solver handles by hand have been deleted. Bit-exact per-NR-iteration parity
@@ -11,10 +11,10 @@
  * Remaining coverage in this file:
  *   - Component definition / pinLayout / attributeMapping smoke tests
  *   - Property-bag factory checks (`_stateBase = -1` before compile)
- *   - Voltage ratio (V_sec ≈ V_pri / N) — observed through public engine
- *   - Power conservation (P_sec ≈ P_ideal) — observed through public engine
- *   - DC steady-state (inductor short ⇒ V_sec ≈ 0) — observed through public engine
- *   - Leakage (k=0.8 < k=0.99 secondary peak) — observed through public engine
+ *   - Voltage ratio (V_sec â‰ˆ V_pri / N) â€” observed through public engine
+ *   - Power conservation (P_sec â‰ˆ P_ideal) â€” observed through public engine
+ *   - DC steady-state (inductor short â‡’ V_sec â‰ˆ 0) â€” observed through public engine
+ *   - Leakage (k=0.8 < k=0.99 secondary peak) â€” observed through public engine
  */
 
 import { describe, it, expect } from "vitest";
@@ -48,7 +48,7 @@ function findTransformer(elements: ReadonlyArray<unknown>): AnalogTransformerEle
 }
 
 // ---------------------------------------------------------------------------
-// AC transformer fixture: AcVoltageSource → primary → secondary → R_load → GND
+// AC transformer fixture: AcVoltageSource â†’ primary â†’ secondary â†’ R_load â†’ GND
 // ---------------------------------------------------------------------------
 
 interface AcXfmrParams {
@@ -86,7 +86,7 @@ function buildAcXfmrCircuit(facade: DefaultSimulatorFacade, p: AcXfmrParams): Ci
 // ---------------------------------------------------------------------------
 
 describe("Transformer", () => {
-  it("voltage_ratio - N=10:1 secondary ≈ primary/10 for k=0.99 in AC steady state", async () => {
+  it("voltage_ratio - N=10:1 secondary â‰ˆ primary/10 for k=0.99 in AC steady state", async () => {
     const N = 10;
     const Vpeak = 1.2;
     const freq = 1000;
@@ -105,7 +105,7 @@ describe("Transformer", () => {
       params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
     });
     const xfmr = findTransformer(fix.circuit.elements);
-    const s1Node = xfmr._pinNodes.get("S1")!;
+    const s1Node = xfmr.pinNodes.get("S1")!;
 
     const times = Array.from({ length: totalSamples }, (_, i) =>
       (i + 1) * (tStop / totalSamples),
@@ -128,7 +128,7 @@ describe("Transformer", () => {
     expect(maxSecondary).toBeLessThan(idealPeak * 1.10);
   });
 
-  it("power_conservation - P_secondary ≈ P_ideal for k=0.99 within 5%", async () => {
+  it("power_conservation - P_secondary â‰ˆ P_ideal for k=0.99 within 5%", async () => {
     const N = 1;
     const Vpeak = 2.0;
     const freq = 50;
@@ -146,7 +146,7 @@ describe("Transformer", () => {
       params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
     });
     const xfmr = findTransformer(fix.circuit.elements);
-    const s1Node = xfmr._pinNodes.get("S1")!;
+    const s1Node = xfmr.pinNodes.get("S1")!;
 
     const times = Array.from({ length: totalSamples }, (_, i) =>
       (i + 1) * (tStop / totalSamples),
@@ -156,7 +156,7 @@ describe("Transformer", () => {
       () => fix.engine.getNodeVoltage(s1Node),
     );
 
-    // Average V² over the last cycle to get V_rms² for secondary power.
+    // Average VÂ² over the last cycle to get V_rmsÂ² for secondary power.
     const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
     let sumV2sq = 0;
     let sampleCount = 0;
@@ -176,7 +176,7 @@ describe("Transformer", () => {
 
   it("leakage_with_low_k - k=0.8 secondary peak < k=0.99 secondary peak", async () => {
     /**
-     * Lower coupling → more leakage inductance → less energy transferred to
+     * Lower coupling â†’ more leakage inductance â†’ less energy transferred to
      * secondary. Observed through `coordinator.sampleAtTimes` reading
      * `xfmr:S1`; no engine-internal stamping inspection.
      */
@@ -197,7 +197,7 @@ describe("Transformer", () => {
         params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
       });
       const xfmr = findTransformer(fix.circuit.elements);
-      const s1Node = xfmr._pinNodes.get("S1")!;
+      const s1Node = xfmr.pinNodes.get("S1")!;
 
       const times = Array.from({ length: totalSamples }, (_, i) =>
         (i + 1) * (tStop / totalSamples),
@@ -221,17 +221,17 @@ describe("Transformer", () => {
     expect(lowK).toBeLessThan(highK);
   });
 
-  it("dc_blocks - DC steady state shorts secondary to ground (V_sec ≈ 0)", () => {
+  it("dc_blocks - DC steady state shorts secondary to ground (V_sec â‰ˆ 0)", () => {
     /**
      * In DC steady state, inductors are short circuits (dI/dt = 0).
      * The transformer load() skips inductive companion stamps in MODEDC, so
      * each winding becomes a pure KVL short: V_winding = 0.
      *
-     * Topology: Vdc → R_series → primary; secondary → R_load → GND. The
+     * Topology: Vdc â†’ R_series â†’ primary; secondary â†’ R_load â†’ GND. The
      * external R_series breaks the voltage-source/short conflict that would
      * otherwise occur if Vdc fed the primary directly.
      *
-     * Expected: V(xfmr:S1) ≈ 0 (secondary shorted in DC).
+     * Expected: V(xfmr:S1) â‰ˆ 0 (secondary shorted in DC).
      */
     const Vdc = 5.0;
     const Lp = 1.0;
@@ -264,7 +264,7 @@ describe("Transformer", () => {
     expect(dcop.converged).toBe(true);
 
     const xfmr = findTransformer(fix.circuit.elements);
-    const s1Node = xfmr._pinNodes.get("S1")!;
+    const s1Node = xfmr.pinNodes.get("S1")!;
     const vSec = Math.abs(fix.engine.getNodeVoltage(s1Node));
     expect(vSec).toBeLessThan(Vdc * 0.05);
   });

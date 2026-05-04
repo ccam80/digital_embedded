@@ -84,11 +84,18 @@ export interface AnalogElement {
    * Pin-label-to-MNA-node map. The single source of truth for pin topology.
    * Populated by the factory at construction; treated as frozen thereafter.
    * `setup()` and `load()` bodies access pin nodes by label:
-   *   `this._pinNodes.get("pos")!`
+   *   `this.pinNodes.get("pos")!`
    * Insertion order matches the component's pinLayout order; iterate
-   * `_pinNodes.values()` to get pinLayout-ordered node IDs.
+   * `pinNodes.values()` to get pinLayout-ordered node IDs.
+   *
+   * Phase A of the §4g hardening: this is the public read accessor.
+   * Subclasses extending `AbstractAnalogElement` get this via the class
+   * getter (backed by the internal `_pinNodes` field, queued for Phase B
+   * conversion to ECMAScript private `#pinNodes`). Object-literal
+   * `AnalogElement` implementers provide it as a plain `Map` property
+   * (`pinNodes: new Map(...)`).
    */
-  _pinNodes: Map<string, number>;
+  readonly pinNodes: Map<string, number>;
 
   /**
    * Assigned branch-current row index for elements that introduce extra MNA
@@ -316,6 +323,19 @@ export abstract class AbstractAnalogElement implements AnalogElement {
     // the `ReadonlyMap` parameter type is the structural-typing convention
     // shared with object-literal AnalogElement implementers.
     this._pinNodes = pinNodes as Map<string, number>;
+  }
+
+  /**
+   * Public read-side accessor for the pin-label-to-MNA-node map.
+   *
+   * Phase A of the §4g hardening: external readers migrate to this getter
+   * while the field remains a mutable `Map<string, number>` (the compiler's
+   * patcher leaf still needs to write internal-net resolutions back in).
+   * Phase B narrows the return type to `ReadonlyMap` and converts the
+   * backing field to ECMAScript private `#pinNodes`.
+   */
+  get pinNodes(): Map<string, number> {
+    return this._pinNodes;
   }
 
   abstract setup(ctx: SetupContext): void;

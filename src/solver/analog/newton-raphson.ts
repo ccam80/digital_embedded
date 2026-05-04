@@ -89,13 +89,13 @@ const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
  *   vold <= 0: arg = 2*vold - 1
  *   if vnew < arg, clamp vnew = arg and flag limited
  *
- * Variable mapping (ngspice → ours):
- *   vnew   → vnew   (proposed new junction voltage)
- *   vold   → vold   (previous junction voltage)
- *   vt     → vt     (thermal voltage, kT/q ≈ 0.02585 V at 300 K)
- *   vcrit  → vcrit  (critical voltage, ≈0.6 V for silicon)
- *   *icheck → limited (true when ngspice sets *icheck = 1)
- *   log    → Math.log (natural logarithm)
+ * Variable mapping (ngspice â†’ ours):
+ *   vnew   â†’ vnew   (proposed new junction voltage)
+ *   vold   â†’ vold   (previous junction voltage)
+ *   vt     â†’ vt     (thermal voltage, kT/q â‰ˆ 0.02585 V at 300 K)
+ *   vcrit  â†’ vcrit  (critical voltage, â‰ˆ0.6 V for silicon)
+ *   *icheck â†’ limited (true when ngspice sets *icheck = 1)
+ *   log    â†’ Math.log (natural logarithm)
  */
 export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): PnjlimResult {
   let limited: boolean;
@@ -590,7 +590,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
       // niiter.c:957-961- write the NIconvTest result back into CKTnoncon so
       // the INITF dispatcher (and MODEINITFLOAT return gate) sees a unified
-      // convergence indicator. Without this, INITFIX→INITFLOAT transitions
+      // convergence indicator. Without this, INITFIXâ†’INITFLOAT transitions
       // fire after a single iteration whenever no device limited, regardless
       // of whether the global convergence test actually passed.
       if (!globalConverged || !elemConverged) {
@@ -645,7 +645,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       for (let ei = 0; ei < elements.length; ei++) {
         const el = elements[ei];
         let elDelta = 0;
-        for (const ni of el._pinNodes.values()) {
+        for (const ni of el.pinNodes.values()) {
           if (ni > 0 && ni <= solver.matrixSize) {
             const d = Math.abs(ctx.rhs[ni] - ctx.rhsOld[ni]);
             if (d > elDelta) elDelta = d;

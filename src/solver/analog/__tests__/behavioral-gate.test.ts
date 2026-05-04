@@ -61,8 +61,8 @@ function build2InputGate(gateType: string, vA: number, vB: number) {
       connections: [
         ["vsA:pos",  "gate:In_1"],
         ["vsB:pos",  "gate:In_2"],
-        ["gate:out", "rLoad:A"],
-        ["rLoad:B",  "gnd:out"],
+        ["gate:out", "rLoad:pos"],
+        ["rLoad:neg",  "gnd:out"],
         ["vsA:neg",  "gnd:out"],
         ["vsB:neg",  "gnd:out"],
       ],
@@ -86,8 +86,8 @@ function build1InputGate(gateType: string, vIn: number) {
       ],
       connections: [
         ["vsIn:pos", "gate:In_1"],
-        ["gate:out", "rLoad:A"],
-        ["rLoad:B",  "gnd:out"],
+        ["gate:out", "rLoad:pos"],
+        ["rLoad:neg",  "gnd:out"],
         ["vsIn:neg", "gnd:out"],
       ],
     });
@@ -227,7 +227,7 @@ describe("Factory", () => {
     expect(element).toBeDefined();
     expect(typeof element.load).toBe("function");
     expect(element.branchIndex).toBe(-1);
-    expect(element._pinNodes.size).toBe(3);
+    expect(element.pinNodes.size).toBe(3);
   });
 
   it("not_factory_returns_1_input_element", () => {
@@ -235,7 +235,7 @@ describe("Factory", () => {
     const props = new PropertyBag();
     const element = factory(new Map([["In_1", 1], ["out", 2]]), props, () => 0);
     expect(element).toBeDefined();
-    expect(element._pinNodes.size).toBe(2);
+    expect(element.pinNodes.size).toBe(2);
   });
 
   it("nand_factory_correct_truth_table", async () => {
@@ -347,11 +347,11 @@ describe("Pin loading", () => {
           { id: "gnd",  type: "Ground" },
         ],
         connections: [
-          ["vsIn:pos",  "rsrc:A"],
-          ["rsrc:B",    "gate:In_1"],
+          ["vsIn:pos",  "rsrc:pos"],
+          ["rsrc:neg",    "gate:In_1"],
           ["vsB:pos",   "gate:In_2"],
-          ["gate:out",  "rLoad:A"],
-          ["rLoad:B",   "gnd:out"],
+          ["gate:out",  "rLoad:pos"],
+          ["rLoad:neg",   "gnd:out"],
           ["vsIn:neg",  "gnd:out"],
           ["vsB:neg",   "gnd:out"],
         ],

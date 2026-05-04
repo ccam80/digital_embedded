@@ -101,7 +101,7 @@ describe("Inductor temperature coefficients", () => {
   });
 
   it("TC1_non_zero_TNOM_offset_scales_inductance", () => {
-    // With TNOM=250K, at T=300.15 → dT=50.15, TC1=0.001 → factor=1.05015
+    // With TNOM=250K, at T=300.15 â†’ dT=50.15, TC1=0.001 â†’ factor=1.05015
     const props = new PropertyBag();
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("TC1", 0.001);
@@ -141,18 +141,18 @@ describe("Inductor M multiplicity", () => {
   });
 });
 
-// Circuit: VS=1V → R=1kΩ → L=1mH → GND.
-// Time constant τ = L/R = 1µs.
+// Circuit: VS=1V â†’ R=1kÎ© â†’ L=1mH â†’ GND.
+// Time constant Ï„ = L/R = 1Âµs.
 //
 // Closed-form step response of an RL circuit driven by a DC source:
-//   i(t)         = (Vsrc / R) * (1 - exp(-t/τ))
-//   V_inductor(t)= Vsrc * exp(-t/τ)              (voltage across L)
-//   V_R(t)       = Vsrc * (1 - exp(-t/τ))        (voltage across R)
+//   i(t)         = (Vsrc / R) * (1 - exp(-t/Ï„))
+//   V_inductor(t)= Vsrc * exp(-t/Ï„)              (voltage across L)
+//   V_R(t)       = Vsrc * (1 - exp(-t/Ï„))        (voltage across R)
 //
 // The node between R and L (call it node M) sits at:
-//   V(M) = Vsrc - V_R(t) = Vsrc * exp(-t/τ)
+//   V(M) = Vsrc - V_R(t) = Vsrc * exp(-t/Ï„)
 //
-// At t = τ, V(M) ≈ Vsrc * exp(-1) ≈ 0.36788 V.
+// At t = Ï„, V(M) â‰ˆ Vsrc * exp(-1) â‰ˆ 0.36788 V.
 
 interface RlCircuitParams {
   vSource: number;
@@ -184,13 +184,13 @@ function findInductor(elements: ReadonlyArray<unknown>): AnalogInductorElement {
 }
 
 describe("Inductor RL transient response", () => {
-  it("V(L_pos) matches closed-form Vsrc * exp(-t/τ) at t≈τ (UIC start)", () => {
+  it("V(L_pos) matches closed-form Vsrc * exp(-t/Ï„) at tâ‰ˆÏ„ (UIC start)", () => {
     const Vsrc = 1.0;
     const R    = 1000;
     const L    = 1e-3;
-    const tau  = L / R;            // 1 µs
-    const tStop = 5 * tau;         // run ~5τ to keep the engine engaged
-    const maxDt = tau / 100;       // 100 steps per τ keeps trap error well below 1e-3
+    const tau  = L / R;            // 1 Âµs
+    const tStop = 5 * tau;         // run ~5Ï„ to keep the engine engaged
+    const maxDt = tau / 100;       // 100 steps per Ï„ keeps trap error well below 1e-3
 
     // Use UIC (Use Initial Conditions, ngspice MODEUIC) to skip DCOP. Without
     // explicit IC parameters the inductor starts at I_L(0)=0. With I_L=0,
@@ -201,10 +201,10 @@ describe("Inductor RL transient response", () => {
     });
 
     const ind = findInductor(fix.circuit.elements);
-    // V(L_pos) is the mid-node between R and L. Closed-form: Vsrc * exp(-t/τ).
-    const lPosNode = ind._pinNodes.get("pos")!;
+    // V(L_pos) is the mid-node between R and L. Closed-form: Vsrc * exp(-t/Ï„).
+    const lPosNode = ind.pinNodes.get("pos")!;
 
-    // Step until simTime crosses τ.
+    // Step until simTime crosses Ï„.
     while (fix.engine.simTime < tau) fix.coordinator.step();
 
     const vMeasured = fix.engine.getNodeVoltage(lPosNode);
@@ -215,7 +215,7 @@ describe("Inductor RL transient response", () => {
 
   it("V(L_pos) reaches 0 (inductor short) at DC steady state", () => {
     // Complementary DCOP-driven check: at DC steady state inductor is a
-    // short ⇒ V(L_pos) = V(L_neg) = 0 (gnd), regardless of how the engine
+    // short â‡’ V(L_pos) = V(L_neg) = 0 (gnd), regardless of how the engine
     // got there.
     const Vsrc = 1.0;
     const R    = 1000;
@@ -226,7 +226,7 @@ describe("Inductor RL transient response", () => {
       params: { tStop: 10 * tau, maxTimeStep: tau / 10 },
     });
     const ind = findInductor(fix.circuit.elements);
-    const lPosNode = ind._pinNodes.get("pos")!;
+    const lPosNode = ind.pinNodes.get("pos")!;
     while (fix.engine.simTime < 5 * tau) fix.coordinator.step();
     expect(fix.engine.getNodeVoltage(lPosNode)).toBeCloseTo(0, 6);
   });

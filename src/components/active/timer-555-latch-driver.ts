@@ -1,5 +1,5 @@
 /**
- * Timer555LatchDriver — RS flip-flop + discharge-BJT base driver leaf.
+ * Timer555LatchDriver â€” RS flip-flop + discharge-BJT base driver leaf.
  *
  * Consumed by `buildTimer555Netlist` in `timer-555.ts` as the `latchDrv`
  * sub-element of the 555-timer composite. Reads comparator outputs, drives
@@ -84,8 +84,8 @@ export class Timer555LatchDriverElement extends AbstractPoolBackedAnalogElement 
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-    const disBase = this._pinNodes.get("disBase")!;
-    // TSTALLOC: (disBase, disBase) — conductance stamp for discharge-BJT base clamping.
+    const disBase = this.pinNodes.get("disBase")!;
+    // TSTALLOC: (disBase, disBase) â€” conductance stamp for discharge-BJT base clamping.
     this._hDisDis = ctx.solver.allocElement(disBase, disBase);
   }
 
@@ -95,11 +95,11 @@ export class Timer555LatchDriverElement extends AbstractPoolBackedAnalogElement 
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const vComp1 = rhsOld[this._pinNodes.get("comp1Out")!];
-    const vComp2 = rhsOld[this._pinNodes.get("comp2Out")!];
-    const vRst   = rhsOld[this._pinNodes.get("rst")!];
-    const vVcc   = rhsOld[this._pinNodes.get("vcc")!];
-    const vGnd   = rhsOld[this._pinNodes.get("gnd")!];
+    const vComp1 = rhsOld[this.pinNodes.get("comp1Out")!];
+    const vComp2 = rhsOld[this.pinNodes.get("comp2Out")!];
+    const vRst   = rhsOld[this.pinNodes.get("rst")!];
+    const vVcc   = rhsOld[this.pinNodes.get("vcc")!];
+    const vGnd   = rhsOld[this.pinNodes.get("gnd")!];
 
     const lastQ = s1[base + SLOT_LATCH_Q];
     let q = lastQ;
@@ -116,14 +116,14 @@ export class Timer555LatchDriverElement extends AbstractPoolBackedAnalogElement 
     const G_base  = 1;
     const targetV = q ? this._vDrop : 0;
     ctx.solver.stampElement(this._hDisDis, G_base);
-    ctx.rhs[this._pinNodes.get("disBase")!] += targetV * G_base;
+    ctx.rhs[this.pinNodes.get("disBase")!] += targetV * G_base;
 
     s0[base + SLOT_LATCH_Q]      = q;
     s0[base + SLOT_OUTPUT_LEVEL] = q;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

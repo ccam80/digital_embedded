@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Inductor analog component.
  *
  * Reactive two-terminal element that requires a branch variable (extra MNA row)
@@ -217,7 +217,7 @@ export class AnalogInductorElement extends AbstractPoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const pinNodes = this._pinNodes;
+    const pinNodes = this.pinNodes;
     const posNode = pinNodes.get("pos")!;  // INDposNode
     const negNode = pinNodes.get("neg")!;  // INDnegNode
 

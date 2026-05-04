@@ -3,7 +3,7 @@
  *
  * Covers:
  *   - Pin declarations: correct count, labels, directions
- *   - executeTransGate: closed flag write (S=1,~S=0 → closed), open cases
+ *   - executeTransGate: closed flag write (S=1,~S=0 Ã¢â€ â€™ closed), open cases
  *   - ComponentDefinition completeness
  *   - Attribute mappings
  *   - Analog composite: setup() allocates 8 handles (4 per SW sub-element)
@@ -111,8 +111,8 @@ function buildTransGateCircuit(
       ["vp1:pos",   "tg:p1"],
       ["vp1:neg",   "gnd:out"],
       ["tg:p2",     "gnd:out"],
-      ["tg:out2",   "rload:A"],
-      ["rload:B",   "gnd:out"],
+      ["tg:out2",   "rload:pos"],
+      ["rload:neg",   "gnd:out"],
     ],
   });
 }
@@ -247,7 +247,7 @@ describe("TransGateElement", () => {
 // ===========================================================================
 
 describe("executeTransGate", () => {
-  it("S=1, ~S=0 → closed=1 (normal on state)", () => {
+  it("S=1, ~S=0 Ã¢â€ â€™ closed=1 (normal on state)", () => {
     // Input layout: [S=0, ~S=1]; outputs: [A=2, B=3]; state at offset 4
     const layout = makeLayout(2, 2);
     const state = makeState(8);
@@ -258,7 +258,7 @@ describe("executeTransGate", () => {
     expect(state[4]).toBe(1);
   });
 
-  it("S=0, ~S=1 → closed=0 (inverted state is open)", () => {
+  it("S=0, ~S=1 Ã¢â€ â€™ closed=0 (inverted state is open)", () => {
     const layout = makeLayout(2, 2);
     const state = makeState(8);
     const highZs = new Uint32Array(8);
@@ -268,7 +268,7 @@ describe("executeTransGate", () => {
     expect(state[4]).toBe(0);
   });
 
-  it("S=0, ~S=0 → closed=0 (invalid/both low → open)", () => {
+  it("S=0, ~S=0 Ã¢â€ â€™ closed=0 (invalid/both low Ã¢â€ â€™ open)", () => {
     const layout = makeLayout(2, 2);
     const state = makeState(8);
     const highZs = new Uint32Array(8);
@@ -278,7 +278,7 @@ describe("executeTransGate", () => {
     expect(state[4]).toBe(0);
   });
 
-  it("S=1, ~S=1 → closed=0 (invalid/both high → open)", () => {
+  it("S=1, ~S=1 Ã¢â€ â€™ closed=0 (invalid/both high Ã¢â€ â€™ open)", () => {
     const layout = makeLayout(2, 2);
     const state = makeState(8);
     const highZs = new Uint32Array(8);
@@ -288,7 +288,7 @@ describe("executeTransGate", () => {
     expect(state[4]).toBe(0);
   });
 
-  it("S high-Z → closed=0 (high-impedance input → open)", () => {
+  it("S high-Z Ã¢â€ â€™ closed=0 (high-impedance input Ã¢â€ â€™ open)", () => {
     const layout = makeLayout(2, 2);
     const state = makeState(8);
     const highZs = new Uint32Array(8);
@@ -411,16 +411,16 @@ describe("TransGateAnalogElement", () => {
       // Migration shape M1: ComparisonSession.createSelfCompare({ buildCircuit, analysis }).
       // Per PB-TRANSGATE TSTALLOC table: NFET SW 4 stamps (swsetup.c:59-62 first pass),
       // then PFET SW 4 stamps (swsetup.c:59-62 second pass). Verified via session convergence
-      // and node voltages (p1=1V > Vth=0.5V → gate on → tg:out2 near 1V).
+      // and node voltages (p1=1V > Vth=0.5V Ã¢â€ â€™ gate on Ã¢â€ â€™ tg:out2 near 1V).
       const session = await ComparisonSession.createSelfCompare({
         buildCircuit: (registry) => buildTransGateCircuit(registry),
         analysis: "dcop",
       });
       const stepEnd = session.getStepEnd(0);
       expect(stepEnd.converged.ours).toBe(true);
-      // With p1=1V (> Vth=0.5V), NFET SW is on; PFET SW uses inverted p2=0V → on too.
-      // tg:out2 drives rload=1kΩ to ground; vs:pos=1V → tg:out2 ≈ 1000/1001 ≈ 0.999V.
-      const vOut2 = stepEnd.nodes["tg:out2"]?.ours ?? stepEnd.nodes["rload:A"]?.ours;
+      // With p1=1V (> Vth=0.5V), NFET SW is on; PFET SW uses inverted p2=0V Ã¢â€ â€™ on too.
+      // tg:out2 drives rload=1kÃŽÂ© to ground; vs:pos=1V Ã¢â€ â€™ tg:out2 Ã¢â€°Ë† 1000/1001 Ã¢â€°Ë† 0.999V.
+      const vOut2 = stepEnd.nodes["tg:out2"]?.ours ?? stepEnd.nodes["rload:pos"]?.ours;
       expect(vOut2).toBeDefined();
       expect(vOut2!).toBeGreaterThan(0.99);
     });
@@ -467,29 +467,29 @@ describe("TransGateAnalogElement", () => {
   describe("sub-element node assignments", () => {
     it("_nfetSW D maps to inNode (out1)", () => {
       const el = makeTransGateAnalogElement(1, 2, 3, 4);
-      expect(el._nfetSW._pinNodes.get("D")).toBe(1);
+      expect(el._nfetSW.pinNodes.get("D")).toBe(1);
     });
 
     it("_nfetSW S maps to outNode (out2)", () => {
       const el = makeTransGateAnalogElement(1, 2, 3, 4);
-      expect(el._nfetSW._pinNodes.get("S")).toBe(2);
+      expect(el._nfetSW.pinNodes.get("S")).toBe(2);
     });
 
     it("_pfetSW D maps to inNode (out1)", () => {
       const el = makeTransGateAnalogElement(1, 2, 3, 4);
-      expect(el._pfetSW._pinNodes.get("D")).toBe(1);
+      expect(el._pfetSW.pinNodes.get("D")).toBe(1);
     });
 
     it("_pfetSW S maps to outNode (out2)", () => {
       const el = makeTransGateAnalogElement(1, 2, 3, 4);
-      expect(el._pfetSW._pinNodes.get("S")).toBe(2);
+      expect(el._pfetSW.pinNodes.get("S")).toBe(2);
     });
   });
 
   describe("setParam propagates to both sub-elements", () => {
     it("setParam Ron propagates to both SW sub-elements", async () => {
-      // Migration shape M1. Ron=100Ω → verify session converges; Ron update is
-      // observable via node voltage (tg:out2 ≈ 1000/(100+1000) ≈ 0.909V).
+      // Migration shape M1. Ron=100ÃŽÂ© Ã¢â€ â€™ verify session converges; Ron update is
+      // observable via node voltage (tg:out2 Ã¢â€°Ë† 1000/(100+1000) Ã¢â€°Ë† 0.909V).
       const session = await ComparisonSession.createSelfCompare({
         buildCircuit: (registry) => {
           const facade = new DefaultSimulatorFacade(registry);
@@ -507,8 +507,8 @@ describe("TransGateAnalogElement", () => {
               ["vp1:pos",   "tg:p1"],
               ["vp1:neg",   "gnd:out"],
               ["tg:p2",     "gnd:out"],
-              ["tg:out2",   "rload:A"],
-              ["rload:B",   "gnd:out"],
+              ["tg:out2",   "rload:pos"],
+              ["rload:neg",   "gnd:out"],
             ],
           });
         },

@@ -79,8 +79,8 @@ describe("Mux", () => {
           ["vsIn1:pos",  "mux:in_1"],
           ["vsIn2:pos",  "mux:in_2"],
           ["vsIn3:pos",  "mux:in_3"],
-          ["mux:out",    "rLoad:A"],
-          ["rLoad:B",    "gnd:out"],
+          ["mux:out",    "rLoad:pos"],
+          ["rLoad:neg",    "gnd:out"],
           ["vsSel0:neg", "gnd:out"],
           ["vsSel1:neg", "gnd:out"],
           ["vsIn0:neg",  "gnd:out"],
@@ -162,14 +162,14 @@ describe("Demux", () => {
           ["vsSel0:pos", "demux:sel"],
           ["vsSel1:pos", "demux:sel_1"],
           ["vsIn:pos",   "demux:in"],
-          ["demux:out_0", "r0:A"],
-          ["demux:out_1", "r1:A"],
-          ["demux:out_2", "r2:A"],
-          ["demux:out_3", "r3:A"],
-          ["r0:B", "gnd:out"],
-          ["r1:B", "gnd:out"],
-          ["r2:B", "gnd:out"],
-          ["r3:B", "gnd:out"],
+          ["demux:out_0", "r0:pos"],
+          ["demux:out_1", "r1:pos"],
+          ["demux:out_2", "r2:pos"],
+          ["demux:out_3", "r3:pos"],
+          ["r0:neg", "gnd:out"],
+          ["r1:neg", "gnd:out"],
+          ["r2:neg", "gnd:out"],
+          ["r3:neg", "gnd:out"],
           ["vsSel0:neg", "gnd:out"],
           ["vsSel1:neg", "gnd:out"],
           ["vsIn:neg",   "gnd:out"],
@@ -249,14 +249,14 @@ describe("Decoder", () => {
         connections: [
           ["vsSel0:pos", "decoder:sel"],
           ["vsSel1:pos", "decoder:sel_1"],
-          ["decoder:out_0", "r0:A"],
-          ["decoder:out_1", "r1:A"],
-          ["decoder:out_2", "r2:A"],
-          ["decoder:out_3", "r3:A"],
-          ["r0:B", "gnd:out"],
-          ["r1:B", "gnd:out"],
-          ["r2:B", "gnd:out"],
-          ["r3:B", "gnd:out"],
+          ["decoder:out_0", "r0:pos"],
+          ["decoder:out_1", "r1:pos"],
+          ["decoder:out_2", "r2:pos"],
+          ["decoder:out_3", "r3:pos"],
+          ["r0:neg", "gnd:out"],
+          ["r1:neg", "gnd:out"],
+          ["r2:neg", "gnd:out"],
+          ["r3:neg", "gnd:out"],
           ["vsSel0:neg", "gnd:out"],
           ["vsSel1:neg", "gnd:out"],
         ],
@@ -321,7 +321,7 @@ describe("Registration", () => {
     // 2:1 mux (selectorBits=1): pins "sel", "in_0", "in_1", "out".
     const factory = makeBehavioralMuxAnalogFactory(1);
     const element = factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), props, () => 0);
-    expect(element._pinNodes.size).toBe(4);
+    expect(element.pinNodes.size).toBe(4);
   });
 
   it("demux_factory_produces_element_with_pin_nodes", () => {
@@ -329,7 +329,7 @@ describe("Registration", () => {
     // 1:2 demux (selectorBits=1): pins "sel", "out_0", "out_1", "in".
     const factory = makeBehavioralDemuxAnalogFactory(1);
     const element = factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]), props, () => 0);
-    expect(element._pinNodes.size).toBe(4);
+    expect(element.pinNodes.size).toBe(4);
   });
 
   it("decoder_factory_produces_element_with_pin_nodes", () => {
@@ -337,7 +337,7 @@ describe("Registration", () => {
     // 1-bit decoder (selectorBits=1): pins "sel", "out_0", "out_1".
     const factory = makeBehavioralDecoderAnalogFactory(1);
     const element = factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]), props, () => 0);
-    expect(element._pinNodes.size).toBe(3);
+    expect(element.pinNodes.size).toBe(3);
   });
 });
 
@@ -375,13 +375,13 @@ describe("Task 6.4.3- combinational pin loading propagates", () => {
           { id: "gnd",    type: "Ground" },
         ],
         connections: [
-          ["vsSel:pos",   "rsrcSel:A"],
-          ["rsrcSel:B",   "mux:sel"],
-          ["vsIn0:pos",   "rsrcIn0:A"],
-          ["rsrcIn0:B",   "mux:in_0"],
+          ["vsSel:pos",   "rsrcSel:pos"],
+          ["rsrcSel:neg",   "mux:sel"],
+          ["vsIn0:pos",   "rsrcIn0:pos"],
+          ["rsrcIn0:neg",   "mux:in_0"],
           ["vsIn1:pos",   "mux:in_1"],
-          ["mux:out",     "rLoad:A"],
-          ["rLoad:B",     "gnd:out"],
+          ["mux:out",     "rLoad:pos"],
+          ["rLoad:neg",     "gnd:out"],
           ["vsSel:neg",   "gnd:out"],
           ["vsIn0:neg",   "gnd:out"],
           ["vsIn1:neg",   "gnd:out"],

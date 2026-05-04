@@ -121,9 +121,9 @@ describe("BJT simple- interface contract", () => {
   it("pinNodes_correct", () => {
     const propsObj = makeBjtProps();
     const element = createBjtL0Element(new Map([["B", 3], ["C", 5], ["E", 7]]), propsObj, () => 0);
-    expect(element._pinNodes.get("B")).toBe(3);
-    expect(element._pinNodes.get("C")).toBe(5);
-    expect(element._pinNodes.get("E")).toBe(7);
+    expect(element.pinNodes.get("B")).toBe(3);
+    expect(element.pinNodes.get("C")).toBe(5);
+    expect(element.pinNodes.get("E")).toBe(7);
   });
 
   it("branchIndex_minus_one", () => {
@@ -199,9 +199,9 @@ describe("Definitions", () => {
     const entry = NpnBjtDefinition.modelRegistry!["simple"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0);
-    expect(el._pinNodes.get("B")).toBe(1);
-    expect(el._pinNodes.get("C")).toBe(2);
-    expect(el._pinNodes.get("E")).toBe(3);
+    expect(el.pinNodes.get("B")).toBe(1);
+    expect(el.pinNodes.get("C")).toBe(2);
+    expect(el.pinNodes.get("E")).toBe(3);
   });
 
   it("pnp_simple_modelRegistry_factory_creates_element", () => {
@@ -209,9 +209,9 @@ describe("Definitions", () => {
     const entry = PnpBjtDefinition.modelRegistry!["simple"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0);
-    expect(el._pinNodes.get("B")).toBe(1);
-    expect(el._pinNodes.get("C")).toBe(2);
-    expect(el._pinNodes.get("E")).toBe(3);
+    expect(el.pinNodes.get("B")).toBe(1);
+    expect(el.pinNodes.get("C")).toBe(2);
+    expect(el.pinNodes.get("E")).toBe(3);
   });
 
   it("npn_spice_l1_modelRegistry_factory_creates_element", () => {
@@ -219,9 +219,9 @@ describe("Definitions", () => {
     const entry = NpnBjtDefinition.modelRegistry!["spice"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0);
-    expect(el._pinNodes.get("B")).toBe(1);
-    expect(el._pinNodes.get("C")).toBe(2);
-    expect(el._pinNodes.get("E")).toBe(3);
+    expect(el.pinNodes.get("B")).toBe(1);
+    expect(el.pinNodes.get("C")).toBe(2);
+    expect(el.pinNodes.get("E")).toBe(3);
   });
 
   it("pnp_spice_l1_modelRegistry_factory_creates_element", () => {
@@ -229,9 +229,9 @@ describe("Definitions", () => {
     const entry = PnpBjtDefinition.modelRegistry!["spice"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0);
-    expect(el._pinNodes.get("B")).toBe(1);
-    expect(el._pinNodes.get("C")).toBe(2);
-    expect(el._pinNodes.get("E")).toBe(3);
+    expect(el.pinNodes.get("B")).toBe(1);
+    expect(el.pinNodes.get("C")).toBe(2);
+    expect(el.pinNodes.get("E")).toBe(3);
   });
 });
 
@@ -327,17 +327,17 @@ describe("SPICE L1 model- parameter plumbing", () => {
   it("factory_produces_valid_element_with_zero_resistances", () => {
     const propsObj = makeSpiceL1Props();
     const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
-    expect(el._pinNodes.get("B")).toBe(2);
-    expect(el._pinNodes.get("C")).toBe(1);
-    expect(el._pinNodes.get("E")).toBe(3);
+    expect(el.pinNodes.get("B")).toBe(2);
+    expect(el.pinNodes.get("C")).toBe(1);
+    expect(el.pinNodes.get("E")).toBe(3);
   });
 
   it("factory_produces_element_with_internal_nodes_when_resistances_nonzero", () => {
     const propsObj = makeSpiceL1Props({ RB: 10, RC: 1, RE: 0.5 });
     const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
-    expect(el._pinNodes.get("B")).toBe(2);
-    expect(el._pinNodes.get("C")).toBe(1);
-    expect(el._pinNodes.get("E")).toBe(3);
+    expect(el.pinNodes.get("B")).toBe(2);
+    expect(el.pinNodes.get("C")).toBe(1);
+    expect(el.pinNodes.get("E")).toBe(3);
   });
 });
 
@@ -520,11 +520,11 @@ describe("BJT L0 MODEINITPRED", () => {
     // Prime state1 with physically consistent op-state values by running a
     // normal NR load() pass at vbe=0.65 V, vbc=-1.0 V (forward-active bias).
     // This gives s0 values that are self-consistent at those voltages; we then
-    // copy s0 → s1 to simulate what the previous time-step would have left.
+    // copy s0 â†’ s1 to simulate what the previous time-step would have left.
     const rhsOldPrime = new Float64Array(10);
-    rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
-    rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
-    rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
+    rhsOldPrime[1] = 0.65; // nodeB=1 â†’ rhsOld[0]
+    rhsOldPrime[2] = -1.0; // nodeC=2 â†’ rhsOld[1]
+    rhsOldPrime[3] = 0.0;  // nodeE=3 â†’ rhsOld[2]
     const rhs = new Float64Array(10);
     const ctxPrime = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -554,7 +554,7 @@ describe("BJT L0 MODEINITPRED", () => {
     });
     core.load(ctxPrime);
 
-    // Copy s0 → s1 so that s1 holds physically consistent sentinels.
+    // Copy s0 â†’ s1 so that s1 holds physically consistent sentinels.
     s1[SLOT_VBE] = s0[SLOT_VBE];
     s1[SLOT_VBC] = s0[SLOT_VBC];
     s1[SLOT_CC]  = s0[SLOT_CC];
@@ -581,7 +581,7 @@ describe("BJT L0 MODEINITPRED", () => {
     s2[SLOT_VBE] = sentVBE;
     s2[SLOT_VBC] = sentVBC;
 
-    // Now run MODEINITPRED: bjtload.c:288-303 must copy all 9 slots s1 → s0,
+    // Now run MODEINITPRED: bjtload.c:288-303 must copy all 9 slots s1 â†’ s0,
     // then extrapolate voltages (collapsed to s1 values since s2=s1), run pnjlim
     // (no-op since prior=new), run computeBjtOp at the same voltages, and write
     // back the same op values- so s0 ends up identical to s1 sentinels.
@@ -700,10 +700,10 @@ describe("BJT L0 MODEINITJCT", () => {
   it("on_path_seeds_tVcrit", () => {
     // cite: bjtload.c:265-269- MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.
     // tVcrit = vt * log(vt / (sqrt(2) * tSatCur)) with tSatCur = IS*AREA for
-    // L0 (see bjt-temp.ts). For NPN defaults IS≈tSatCur scaled at T=300.15 K,
+    // L0 (see bjt-temp.ts). For NPN defaults ISâ‰ˆtSatCur scaled at T=300.15 K,
     // tVcrit lands near 0.85 V. Bound 0.6 V < vbe < 1.0 V matches the
     // thermal-voltage-derived critical voltage and rules out any trivially-
-    // positive seed (e.g. vt itself ≈ 0.026 V or a bare pnjlim default).
+    // positive seed (e.g. vt itself â‰ˆ 0.026 V or a bare pnjlim default).
     const rhsOld = new Float64Array(10);
     const { ctx, element, s0 } = makeFullLoadCtx(MODEINITJCT, rhsOld, { OFF: 0 });
     element.load(ctx);
@@ -713,11 +713,11 @@ describe("BJT L0 MODEINITJCT", () => {
   });
 
   it("off_path_zero_seeds", () => {
-    // cite: bjtload.c:270-275- MODEINITJCT+OFF: vbe=vbc=0 → near-zero downstream op.
+    // cite: bjtload.c:270-275- MODEINITJCT+OFF: vbe=vbc=0 â†’ near-zero downstream op.
     const rhsOld = new Float64Array(10);
     const { ctx, element, s0 } = makeFullLoadCtx(MODEINITJCT, rhsOld, { OFF: 1 });
     element.load(ctx);
-    // vbeRaw=0, vbcRaw=0 → computeBjtOp produces near-zero cc (IS * (exp(0)-1) ~ 0).
+    // vbeRaw=0, vbcRaw=0 â†’ computeBjtOp produces near-zero cc (IS * (exp(0)-1) ~ 0).
     expect(Math.abs(s0[SLOT_CC])).toBeLessThan(1e-6);
   });
 });
@@ -734,7 +734,7 @@ describe("BJT L0 NOBYPASS", () => {
   // ctx.limitingCollector.push() on the compute path (bjt.ts:932-951,
   // inside the `else` branch of the bypass gate). On the bypass path
   // (bjt.ts:903-906), push() is never called. Providing a non-null
-  // limitingCollector array therefore gives an exact 0/≥1 discriminator
+  // limitingCollector array therefore gives an exact 0/â‰¥1 discriminator
   // between "bypass fired" and "compute ran".
   function makeBypassCtx(
     cktMode: number,
@@ -849,9 +849,9 @@ describe("BJT L0 NOBYPASS", () => {
     // indirectly via ctx.limitingCollector: bjt.ts L0 load() pushes to
     // limitingCollector only on the compute path (lines 932-951)- the
     // bypass path (lines 903-906) skips it entirely. The collector therefore
-    // gives an exact 0/≥1 discriminator:
-    //   compute ran  → limitingCollector.length === 2 (BE + BC)
-    //   bypass fired → limitingCollector.length === 0
+    // gives an exact 0/â‰¥1 discriminator:
+    //   compute ran  â†’ limitingCollector.length === 2 (BE + BC)
+    //   bypass fired â†’ limitingCollector.length === 0
     const propsObj = makeBjtProps();
     const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
     runSetup(core, new SparseSolver());
@@ -914,7 +914,7 @@ describe("BJT L0 NOBYPASS", () => {
     const call1 = makeCtx(rhsOld1, false, { value: 0 }, limits1);
     core.load(call1.ctx);
 
-    // First-call path probe: compute ran → exactly 2 pushes (BE + BC).
+    // First-call path probe: compute ran â†’ exactly 2 pushes (BE + BC).
     expect(limits1.length).toBe(2);
 
     // Build rhsOld2 aligned to s0[VBE]/s0[VBC] so delvbe=delvbc=0 exactly.
@@ -922,8 +922,8 @@ describe("BJT L0 NOBYPASS", () => {
     const vbeTarget = s0[SLOT_VBE];
     const vbcTarget = s0[SLOT_VBC];
     const rhsOld2 = new Float64Array(10);
-    rhsOld2[1] = vbeTarget;             // nodeB=1 → vB = vbeTarget (vE=0)
-    rhsOld2[2] = vbeTarget - vbcTarget; // nodeC=2 → vC = vB - vbcTarget
+    rhsOld2[1] = vbeTarget;             // nodeB=1 â†’ vB = vbeTarget (vE=0)
+    rhsOld2[2] = vbeTarget - vbcTarget; // nodeC=2 â†’ vC = vB - vbcTarget
     rhsOld2[3] = 0.0;                   // nodeE=3
 
     const noncon2 = { value: 0 };
@@ -948,7 +948,7 @@ describe("BJT L0 NOBYPASS", () => {
     // With cktMode|=MODEINITPRED, bypass gate must not fire even when
     // ctx.bypass=true and tolerances are met.
     //
-    // Probe: limitingCollector populated ⇒ compute path ran (bjt.ts:932-951).
+    // Probe: limitingCollector populated â‡’ compute path ran (bjt.ts:932-951).
     // If bypass had (incorrectly) fired, the collector would be empty.
     const propsObj = makeBjtProps();
     const core = createBjtL0Element(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElement;
@@ -1000,7 +1000,7 @@ describe("BJT L0 NOBYPASS", () => {
     rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
     core.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false, []));
 
-    // Copy s0 → s1 and s2 so xfact=0 extrapolation gives vbe/vbc == s0 values.
+    // Copy s0 â†’ s1 and s2 so xfact=0 extrapolation gives vbe/vbc == s0 values.
     // With rhsOld nulled out, the MODEINITPRED branch computes vbeRaw/vbcRaw
     // from s1 (extrapolated), not from rhsOld- so the extrapolated values
     // match s0 exactly, and delvbe/delvbc = 0. Tolerances are nominally met;
@@ -1014,7 +1014,7 @@ describe("BJT L0 NOBYPASS", () => {
     const limits: LimitingEvent[] = [];
     core.load(makeCtx(MODETRAN | MODEINITPRED, new Float64Array(10), true, limits));
 
-    // Path probe: compute ran (limitingCollector populated) ⇒ bypass did not
+    // Path probe: compute ran (limitingCollector populated) â‡’ bypass did not
     // fire under MODEINITPRED. Exactly 2 pushes (BE + BC junctions).
     expect(limits.length).toBe(2);
   });
@@ -1029,7 +1029,7 @@ describe("BJT L0 noncon", () => {
   function makeNonconCtx(cktMode: number, off: number): { ctx: LoadContext; element: AnalogElement; s0: Float64Array } {
     // Use large rhsOld to trigger pnjlim (large delvbe forces limiting).
     const rhsOld = new Float64Array(10);
-    rhsOld[1] = 5.0; // vB high- ensures vbeRaw >> s0[VBE] → pnjlim fires, icheckLimited=true.
+    rhsOld[1] = 5.0; // vB high- ensures vbeRaw >> s0[VBE] â†’ pnjlim fires, icheckLimited=true.
     rhsOld[2] = 3.0;
     rhsOld[3] = 0.0;
     const propsObj = makeBjtProps({ OFF: off });
@@ -1070,22 +1070,22 @@ describe("BJT L0 noncon", () => {
 
   it("no_bump_when_initfix_and_off", () => {
     // cite: bjtload.c:749-754- icheck++ unless MODEINITFIX && OFF.
-    // OFF=1, cktMode=MODEINITFIX: the gate condition (OFF===0 || !(INITFIX)) is false → no bump.
+    // OFF=1, cktMode=MODEINITFIX: the gate condition (OFF===0 || !(INITFIX)) is false â†’ no bump.
     const { ctx, element } = makeNonconCtx(MODEINITFIX, 1);
     element.load(ctx);
     expect(ctx.noncon.value).toBe(0);
   });
 
   it("bumps_when_initfix_and_not_off", () => {
-    // cite: bjtload.c:749-754- OFF=0, MODEINITFIX: OFF===0 is true → bump permitted.
-    // Large vB ensures pnjlim fires → icheckLimited=true → noncon increments.
+    // cite: bjtload.c:749-754- OFF=0, MODEINITFIX: OFF===0 is true â†’ bump permitted.
+    // Large vB ensures pnjlim fires â†’ icheckLimited=true â†’ noncon increments.
     const { ctx, element } = makeNonconCtx(MODEINITFIX, 0);
     element.load(ctx);
     expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
   });
 
   it("bumps_when_not_initfix_and_off", () => {
-    // cite: bjtload.c:749-754- OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true → bump.
+    // cite: bjtload.c:749-754- OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true â†’ bump.
     const { ctx, element } = makeNonconCtx(MODEDCOP | MODEINITFLOAT, 1);
     element.load(ctx);
     expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
@@ -1209,7 +1209,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
 
   it("state0_op_slots_populated", () => {
     // cite: bjtload.c:676,703- MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op slots.
-    // Priming bias is vbe≈0.65 V forward-active (makeSmsigCtx prime pass); the
+    // Priming bias is vbeâ‰ˆ0.65 V forward-active (makeSmsigCtx prime pass); the
     // MODEINITSMSIG call dispatches through the general path which reads
     // vbeRaw/vbcRaw from s0 (MODEINITSMSIG is one of the modes that skips
     // pnjlim at bjt.ts:915), so s0[VBE]/s0[VBC] are written back unchanged.
@@ -1220,15 +1220,15 @@ describe("BJT L0 MODEINITSMSIG", () => {
     // (a) VBE / VBC write-back is bit-exact under MODEINITSMSIG.
     expect(s0[SLOT_VBE]).toBe(vbeBefore);
     expect(s0[SLOT_VBC]).toBe(vbcBefore);
-    // (b) Forward-active Gummel-Poon at vbe≈0.65 V produces clearly positive
-    // cc, cb, gpi, gmu, gm, go for NPN defaults (IS=1e-16, BF=100, VAF=∞).
+    // (b) Forward-active Gummel-Poon at vbeâ‰ˆ0.65 V produces clearly positive
+    // cc, cb, gpi, gmu, gm, go for NPN defaults (IS=1e-16, BF=100, VAF=âˆž).
     expect(s0[SLOT_CC]).toBeGreaterThan(0);
     expect(s0[SLOT_CB]).toBeGreaterThan(0);
     expect(s0[SLOT_GPI]).toBeGreaterThan(0);
     expect(s0[SLOT_GMU]).toBeGreaterThan(0);
     expect(s0[SLOT_GM]).toBeGreaterThan(0);
     expect(s0[SLOT_GO]).toBeGreaterThan(0);
-    // L0 has no base resistance → gx=0 (bjt.ts:972).
+    // L0 has no base resistance â†’ gx=0 (bjt.ts:972).
     expect(s0[SLOT_GX]).toBe(0);
   });
 });
@@ -1250,7 +1250,7 @@ describe("BJT L0 MODEINITTRAN", () => {
     const s1 = pool.states[1];
 
     // Seed state1 with known vbeRaw / vbcRaw values:
-    // nodeB=1 → rhsOld[0], nodeC=2 → rhsOld[1], nodeE=3 → rhsOld[2].
+    // nodeB=1 â†’ rhsOld[0], nodeC=2 â†’ rhsOld[1], nodeE=3 â†’ rhsOld[2].
     // NPN polarity=1: vbeRaw = vB - vE = 0.5, vbcRaw = vB - vC = 0.5 - (-0.3) = 0.8
     // State1 is pre-seeded by ngspice with the DC-OP values; for MODEINITTRAN,
     // load() reads from s1[VBE]/s1[VBC] and then writes them back.
@@ -1361,9 +1361,9 @@ describe("BJT L1 MODEINITSMSIG", () => {
   it("cap_values_stored", () => {
     // cite: bjtload.c:674-703- MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.
     // Defaults used: CJE=CJC=1e-12 (makeL1SmsigCtx baseline) + override
-    // CJS=1e-12 (SPICE default is 0 → capsub would collapse to 0) and
-    // XCJC=0.5 (SPICE default is 1 → czbx = ctot*(1-XCJC) = 0 → capbx=0).
-    // With forward-active bias (vbe≈0.65 V, vbc≈-2.35 V), all four
+    // CJS=1e-12 (SPICE default is 0 â†’ capsub would collapse to 0) and
+    // XCJC=0.5 (SPICE default is 1 â†’ czbx = ctot*(1-XCJC) = 0 â†’ capbx=0).
+    // With forward-active bias (vbeâ‰ˆ0.65 V, vbcâ‰ˆ-2.35 V), all four
     // depletion+diffusion caps are strictly positive:
     //   capbe = tf*gbeMod + czbe*sarg   (czbe=CJE*AREA > 0, sarg > 0)
     //   capbc = tr*gbc + czbc*sarg      (czbc = CJC*AREA*XCJC > 0)
@@ -1419,9 +1419,9 @@ describe("BJT L1 MODEINITPRED", () => {
     // Prime state1 with physically consistent op-state values by running a
     // normal NR load() pass at vbe=0.65 V forward-active bias.
     const rhsOldPrime = new Float64Array(10);
-    rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
-    rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
-    rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
+    rhsOldPrime[1] = 0.65; // nodeB=1 â†’ rhsOld[0]
+    rhsOldPrime[2] = -1.0; // nodeC=2 â†’ rhsOld[1]
+    rhsOldPrime[3] = 0.0;  // nodeE=3 â†’ rhsOld[2]
     const ctxPrime = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: solverPrime,
@@ -1450,7 +1450,7 @@ describe("BJT L1 MODEINITPRED", () => {
     });
     core.load(ctxPrime);
 
-    // Copy s0 → s1 to simulate what the previous time-step would have left.
+    // Copy s0 â†’ s1 to simulate what the previous time-step would have left.
     s1[SLOT_VBE]  = s0[SLOT_VBE];
     s1[SLOT_VBC]  = s0[SLOT_VBC];
     s1[SLOT_CC]   = s0[SLOT_CC];
@@ -1480,7 +1480,7 @@ describe("BJT L1 MODEINITPRED", () => {
     s2[SLOT_VBC]  = sentVBC;
     s2[SLOT_VSUB] = sentVSUB;
 
-    // Run MODEINITPRED: bjtload.c:288-303 must copy all 10 slots s1→s0.
+    // Run MODEINITPRED: bjtload.c:288-303 must copy all 10 slots s1â†’s0.
     // Use xfact=0 so extrapolated voltage = s1 value exactly (no prediction shift).
     // Use the same rhsOld as the prime run so vbxRaw/vsubRaw (which are always read
     // from rhsOld directly, not from extrapolated state) match the prime values-
@@ -1517,7 +1517,7 @@ describe("BJT L1 MODEINITPRED", () => {
 
     // All 10 slots in s0 must equal the corresponding s1 sentinels.
     // With xfact=0: extrapolated VBE/VBC/VSUB = s1 value. Same rhsOld as prime means
-    // pnjlim sees prior=new → no limiting → writeback identical to prime values.
+    // pnjlim sees prior=new â†’ no limiting â†’ writeback identical to prime values.
     expect(s0[SLOT_VBE]).toBe(sentVBE);
     expect(s0[SLOT_VBC]).toBe(sentVBC);
     expect(s0[SLOT_CC]).toBe(sentCC);
@@ -1673,7 +1673,7 @@ describe("BJT L1 NOBYPASS", () => {
       return { ctx, stampCount };
     }
 
-    // First load: prime s0. bypass=false → compute path → 3 pushes expected.
+    // First load: prime s0. bypass=false â†’ compute path â†’ 3 pushes expected.
     const rhsOld1 = new Float64Array(10);
     rhsOld1[1] = 0.65; rhsOld1[2] = 3.0; rhsOld1[3] = 0.0;
     const limits1: LimitingEvent[] = [];
@@ -1691,7 +1691,7 @@ describe("BJT L1 NOBYPASS", () => {
 
     const noncon2 = { value: 0 };
     const limits2: LimitingEvent[] = [];
-    // Second load: bypass=true, same voltages → tolerances met.
+    // Second load: bypass=true, same voltages â†’ tolerances met.
     const call2 = makeCtx(rhsOld2, true, noncon2, limits2);
     core.load(call2.ctx);
 
@@ -1708,7 +1708,7 @@ describe("BJT L1 NOBYPASS", () => {
 
   it("bypass_disabled_by_MODEINITPRED", () => {
     // cite: bjtload.c:347- !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
-    // Probe: limitingCollector populated ⇒ compute path ran under MODEINITPRED.
+    // Probe: limitingCollector populated â‡’ compute path ran under MODEINITPRED.
     const propsObj = makeSpiceL1Props();
     const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElement;
     runSetup(core, new SparseSolver());
@@ -1744,7 +1744,7 @@ describe("BJT L1 NOBYPASS", () => {
     rhsOld1[1] = 0.65; rhsOld1[2] = 3.0; rhsOld1[3] = 0.0;
     core.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld1, false, []));
 
-    // Copy s0→s1, s1→s2 so MODEINITPRED extrapolation collapses to s0 values.
+    // Copy s0â†’s1, s1â†’s2 so MODEINITPRED extrapolation collapses to s0 values.
     s1.set(s0); s2.set(s0);
 
     // Call with MODEINITPRED + bypass=true- MODEINITPRED gate must prevent bypass.
@@ -1752,7 +1752,7 @@ describe("BJT L1 NOBYPASS", () => {
     const limits: LimitingEvent[] = [];
     core.load(makeCtx(MODETRAN | MODEINITPRED, rhsOld1, true, limits));
 
-    // Path probe: compute ran ⇒ exactly 3 pushes (BE + BC + SUB).
+    // Path probe: compute ran â‡’ exactly 3 pushes (BE + BC + SUB).
     expect(limits.length).toBe(3);
   });
 });
@@ -1880,7 +1880,7 @@ describe("BJT L1 CdBE", () => {
     const qbe1 = pool1.states[0][SLOT_QBE];
     const qbe2 = pool2.states[0][SLOT_QBE];
 
-    // IS×10 → gbe×10 → larger QBE (monotonic response).
+    // ISÃ—10 â†’ gbeÃ—10 â†’ larger QBE (monotonic response).
     expect(Number.isFinite(qbe1)).toBe(true);
     expect(Number.isFinite(qbe2)).toBe(true);
     expect(qbe2).toBeGreaterThan(qbe1);
@@ -1901,7 +1901,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     //
     // After the setup/load split, load() only calls stampElement(handle, value)- never
     // allocElement. To verify which (extRow, extCol) pairs are stamped, we:
-    //   1. Intercept allocElement during setup() to build handle → (extRow, extCol) map.
+    //   1. Intercept allocElement during setup() to build handle â†’ (extRow, extCol) map.
     //   2. Intercept stampElement during load() to record which handles are written.
     //   3. Cross-reference map + stamped handles to find the stamped node pairs.
     const propsObj = makeSpiceL1Props({ RC: 1, CJC: 1e-11 });
@@ -1912,7 +1912,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     const solver = new SparseSolver();
     solver._initStructure();
 
-    // Step 1: spy on allocElement during setup() to capture handle → (extRow, extCol).
+    // Step 1: spy on allocElement during setup() to capture handle â†’ (extRow, extCol).
     const handleToNodes = new Map<number, { extRow: number; extCol: number }>();
     const origAllocElement = (solver as any).allocElement.bind(solver);
     (solver as any).allocElement = (row: number, col: number): number => {
@@ -1944,7 +1944,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     (core as any).initState(pool);
 
     // Nodes: B_ext=1, C_ext=2, E=3, C_int=4.
-    const nodeCount = 5; // 1-based nodes up to 4 → need size 5
+    const nodeCount = 5; // 1-based nodes up to 4 â†’ need size 5
 
     // Step 2: spy on stampElement during load() to record which handles are written.
     const stampedHandles: number[] = [];
@@ -2123,14 +2123,14 @@ describe("BJT L1 AREAB_AREAC", () => {
 
   function makeDcInitCtx(): LoadContext {
     // Use MODEINITFLOAT with VBC forward-biased so cbcn = c4*(exp(vbc/(nc*vt))-1) != 0.
-    // c4 = tBCleakCur * AREAB (VERTICAL) or AREAC (LATERAL). Differences in c4 → differences in cb.
+    // c4 = tBCleakCur * AREAB (VERTICAL) or AREAC (LATERAL). Differences in c4 â†’ differences in cb.
     // NPN node order: B=node[0], C=node[1], E=node[2]. vbc = voltages[0] - voltages[1].
-    // Set VB=0.65, VC=0 → vbc = 0.65 (forward-biased), making cbcn nonzero and proportional to c4.
+    // Set VB=0.65, VC=0 â†’ vbc = 0.65 (forward-biased), making cbcn nonzero and proportional to c4.
     const solver = new SparseSolver();
     solver._initStructure();
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 0.65;  // VB: VBE forward
-    rhsOld[2] = 0.0;   // VC=0 → vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
+    rhsOld[2] = 0.0;   // VC=0 â†’ vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
     return loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
@@ -2198,7 +2198,7 @@ describe("BJT L1 AREAB_AREAC", () => {
     const { el: el2, pool: pool2 } = makeL1El({ AREAB: 2, AREAC: 4, CJS: 1e-12 }, false);
     el1.load(makeTranCtx());
     el2.load(makeTranCtx());
-    // MODEINITTRAN seeds s1[CQSUB] = s0[CQSUB]. s0[CQSUB] reflects capsub ∝ czsub ∝ AREAC.
+    // MODEINITTRAN seeds s1[CQSUB] = s0[CQSUB]. s0[CQSUB] reflects capsub âˆ czsub âˆ AREAC.
     const cqsub1 = pool1.states[1][SLOT_CQSUB]; // state1 after MODEINITTRAN copy
     const cqsub2 = pool2.states[1][SLOT_CQSUB];
     expect(cqsub2).toBeGreaterThan(cqsub1);
@@ -2225,15 +2225,15 @@ describe("BJT L1 AREAB_AREAC", () => {
   // ---------------------------------------------------------------------------
 
   it("c4_path_differs_between_lateral_and_vertical_NPN", () => {
-    // AREAC > AREAB: lateral path scales c4 by larger factor → larger |cb| contribution from cbcn.
+    // AREAC > AREAB: lateral path scales c4 by larger factor â†’ larger |cb| contribution from cbcn.
     const params = { AREAB: 1, AREAC: 4, ISC: 1e-12 };
-    const { el: elV, pool: poolV } = makeL1El(params, false); // vertical: c4 ∝ AREAB=1
-    const { el: elL, pool: poolL } = makeL1El(params, true);  // lateral:  c4 ∝ AREAC=4
+    const { el: elV, pool: poolV } = makeL1El(params, false); // vertical: c4 âˆ AREAB=1
+    const { el: elL, pool: poolL } = makeL1El(params, true);  // lateral:  c4 âˆ AREAC=4
     elV.load(makeDcInitCtx());
     elL.load(makeDcInitCtx());
     const cbV = poolV.states[0][SLOT_CB];
     const cbL = poolL.states[0][SLOT_CB];
-    // cbcn is forward-biased positive; lateral has 4x more c4 → cb_lateral > cb_vertical.
+    // cbcn is forward-biased positive; lateral has 4x more c4 â†’ cb_lateral > cb_vertical.
     expect(cbL).not.toBe(cbV);
     expect(Math.abs(cbL)).toBeGreaterThan(Math.abs(cbV));
   });
@@ -2314,7 +2314,7 @@ describe("BJT L1 AREAB_AREAC", () => {
 
     const cbVertical = buildAndLoad(verticalEntry);
     const cbLateral = buildAndLoad(lateralEntry);
-    // Lateral c4 ∝ AREAC=4, vertical c4 ∝ AREAB=1- lateral cb must be larger.
+    // Lateral c4 âˆ AREAC=4, vertical c4 âˆ AREAB=1- lateral cb must be larger.
     expect(cbLateral).not.toBe(cbVertical);
     expect(Math.abs(cbLateral)).toBeGreaterThan(Math.abs(cbVertical));
   });
@@ -2443,7 +2443,7 @@ describe("BJT L1 excess_phase", () => {
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
     }));
-    // Copy s0[VBE] → s1[VBE] so MODEINITTRAN branch reads a non-zero vbe.
+    // Copy s0[VBE] â†’ s1[VBE] so MODEINITTRAN branch reads a non-zero vbe.
     pool.states[1][0] = pool.states[0][0]; // SLOT_VBE = 0
     el.load(makeInittranCtx());
     const s1val = pool.states[1][SLOT_CEXBC];
@@ -2460,7 +2460,7 @@ describe("BJT L1 excess_phase", () => {
     const { el: el2, pool: pool2 } = makeExcessPhaseEl();
 
     // Manually seed state1+state2 with distinct cexbc values so the dt/d1 terms in the IIR
-    // formula do not cancel algebraically (s1 != s2 → cc depends on deltaOld1).
+    // formula do not cancel algebraically (s1 != s2 â†’ cc depends on deltaOld1).
     const s1 = 1e-12;
     const s2 = 2e-12;
     pool1.states[1][SLOT_CEXBC] = s1;
@@ -2491,7 +2491,7 @@ describe("BJT L1 excess_phase", () => {
     el1.load(makeTranCtxWith(1e-6));
     el2.load(makeTranCtxWith(1e-5));
 
-    // Different deltaOld[1] → different dt/deltaOld1 term → different IIR cc → different s0[CEXBC].
+    // Different deltaOld[1] â†’ different dt/deltaOld1 term â†’ different IIR cc â†’ different s0[CEXBC].
     expect(pool1.states[0][SLOT_CEXBC]).not.toBe(pool2.states[0][SLOT_CEXBC]);
   });
 
@@ -2579,7 +2579,7 @@ describe("BJT L1 XTF_zero", () => {
     // With TF>0, QBE includes transit-time contribution: TF*cbeMod term.
     expect(qbeTf).toBeGreaterThan(0);
     expect(qbeNoTf).toBeGreaterThan(0);
-    // TF=1e-9 adds transit-time contribution → larger QBE.
+    // TF=1e-9 adds transit-time contribution â†’ larger QBE.
     expect(qbeTf).toBeGreaterThan(qbeNoTf);
   });
 
@@ -2604,7 +2604,7 @@ describe("BJT L1 XTF_zero", () => {
     el.load(makeSmsigCtx());
 
     const qbe = pool.states[0][SLOT_QBE];
-    // TF=0 → no transit-time contribution → QBE == DC charge (CJE>0, so QBE>0).
+    // TF=0 â†’ no transit-time contribution â†’ QBE == DC charge (CJE>0, so QBE>0).
     expect(qbe).toBeGreaterThan(0);
   });
 });
@@ -2759,7 +2759,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
   function makeCtxForSubLimiting(collector: LimitingEvent[] | null): LoadContext {
     // Use DC-OP mode with moderate vbe to trigger pnjlim on sub junction.
     // vsubRaw = polarity*subs*(0 - vSubCon)- with vertical-default NPN, substConNode=nodeC_int=nodeC_ext=node2.
-    // rhsOld[1] = 0 (collector=0) → vsubRaw = 1*1*(0-0) = 0. Use a large VBC to ensure sub junction fires.
+    // rhsOld[1] = 0 (collector=0) â†’ vsubRaw = 1*1*(0-0) = 0. Use a large VBC to ensure sub junction fires.
     // Instead: start with all-zero state so pnjlim fires on BE at minimum.
     const solver = new SparseSolver();
     solver._initStructure();
@@ -2895,10 +2895,10 @@ describe("BJT TEMP", () => {
     // Construct L1 NPN with IS=1e-16, XTI=3, EG=1.11, TNOM=300.15.
     // Build at TEMP=300.15 and TEMP=400. Assert tSatCur(400) > tSatCur(300.15).
     // We probe tSatCur via MODEINITJCT s0[VBE] = tVcrit = vt*log(vt/(sqrt2*tSatCur*AREA)).
-    // Higher tSatCur → smaller tVcrit. Higher T also raises vt. Net effect: tVcrit(400) > tVcrit(300.15)
+    // Higher tSatCur â†’ smaller tVcrit. Higher T also raises vt. Net effect: tVcrit(400) > tVcrit(300.15)
     // because at 400K the exp(factlog) factor dominates IS scaling.
     // We verify by checking that the CB (base current) after a DC forward-active load is
-    // larger for TEMP=400 (higher tSatCur → larger cbe at same vbe).
+    // larger for TEMP=400 (higher tSatCur â†’ larger cbe at same vbe).
     function makeL1AtTemp(TEMP: number): { el: any; pool: StatePool } {
       const propsObj = makeSpiceL1Props({ IS: 1e-16, XTI: 3, EG: 1.11, TNOM: 300.15, TEMP });
       const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as any;
@@ -2936,7 +2936,7 @@ describe("BJT TEMP", () => {
     const SLOT_CB = 3;
     const cb300 = pool300.states[0][SLOT_CB];
     const cb400 = pool400.states[0][SLOT_CB];
-    // Higher temperature → higher tSatCur → larger base current at same vbe.
+    // Higher temperature â†’ higher tSatCur â†’ larger base current at same vbe.
     expect(Math.abs(cb400)).toBeGreaterThan(Math.abs(cb300));
   });
 
@@ -2950,7 +2950,7 @@ describe("BJT TEMP", () => {
     const propsXtb05 = makeSpiceL1Props({ TEMP: 400, TNOM: 300.15, BF: 100, XTB: 0.5 });
 
     // We probe tBetaF by checking the forward gain: in the Gummel-Poon model,
-    // cb ≈ cbe / tBetaF + ...; so tBetaF changes the base current.
+    // cb â‰ˆ cbe / tBetaF + ...; so tBetaF changes the base current.
     const coreXtb0 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsXtb0) as any;
     const coreXtb05 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsXtb05) as any;
     runSetup(coreXtb0 as AnalogElement, new SparseSolver());
@@ -2985,8 +2985,8 @@ describe("BJT TEMP", () => {
     const cbXtb0 = poolXtb0.states[0][SLOT_CB];
     const cbXtb05 = poolXtb05.states[0][SLOT_CB];
 
-    // XTB=0.5 at TEMP=400 > TNOM=300.15 → bfactor > 1 → tBetaF > BF → smaller cb (less base current).
-    // XTB=0 → bfactor=1 → tBetaF == BF.
+    // XTB=0.5 at TEMP=400 > TNOM=300.15 â†’ bfactor > 1 â†’ tBetaF > BF â†’ smaller cb (less base current).
+    // XTB=0 â†’ bfactor=1 â†’ tBetaF == BF.
     // So |cb(XTB=0.5)| < |cb(XTB=0)| when TEMP>TNOM and XTB>0.
     expect(Math.abs(cbXtb05)).toBeLessThan(Math.abs(cbXtb0));
   });

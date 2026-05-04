@@ -64,7 +64,7 @@ export class TransmissionSegmentGElement extends AbstractAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    const juncNode = this._pinNodes.get("junc")!;
+    const juncNode = this.pinNodes.get("junc")!;
     if (juncNode !== 0) {
       this._hJJ = ctx.solver.allocElement(juncNode, juncNode);
     }
@@ -83,7 +83,7 @@ export class TransmissionSegmentGElement extends AbstractAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const v = rhs[this._pinNodes.get("junc")!];
+    const v = rhs[this.pinNodes.get("junc")!];
     return [this._G * v];
   }
 }

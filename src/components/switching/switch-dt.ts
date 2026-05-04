@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SwitchDT component -- SPDT switch with mechanical symbol rendering.
  *
  * Double-throw switch: three terminals per pole (A=common, B=upper, C=lower).
@@ -375,9 +375,9 @@ export class SwitchDTAnalogElement extends AbstractAnalogElement implements Spdt
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const a1 = this._pinNodes.get("A1")!;
-    const b1 = this._pinNodes.get("B1")!;
-    const c1 = this._pinNodes.get("C1")!;
+    const a1 = this.pinNodes.get("A1")!;
+    const b1 = this.pinNodes.get("B1")!;
+    const c1 = this.pinNodes.get("C1")!;
     const [iAB_a, iAB_b] = this.swAB.getPinCurrents(rhs);
     const [iAC_a, iAC_c] = this.swAC.getPinCurrents(rhs);
     void a1; void b1; void c1;

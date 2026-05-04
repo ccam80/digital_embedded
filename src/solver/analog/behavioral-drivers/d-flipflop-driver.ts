@@ -71,7 +71,7 @@ const SLOT_OUT_NQ     = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_NQ")!;
 //
 // Order MUST match the buildDFlipflopNetlist drv connectivity row
 // `[0, 1, 2, 3, 4]` mapping to ports `[D, C, Q, ~Q, gnd]`. The compiler reads
-// pinLayout[i].label and stores it in _pinNodes against the resolved node
+// pinLayout[i].label and stores it in pinNodes against the resolved node
 // from connectivity[i] (compiler.ts:443-446).
 //
 // Q and ~Q pins are connected to the parent composite's Q / ~Q nets so the
@@ -117,9 +117,9 @@ export class BehavioralDFlipflopDriverElement extends AbstractPoolBackedAnalogEl
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this._pinNodes.get("gnd")!];
-    const vClock = rhsOld[this._pinNodes.get("C")!]   - gnd;
-    const vD     = rhsOld[this._pinNodes.get("D")!]   - gnd;
+    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
+    const vClock = rhsOld[this.pinNodes.get("C")!]   - gnd;
+    const vD     = rhsOld[this.pinNodes.get("D")!]   - gnd;
 
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q: 0 | 1 = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
@@ -141,7 +141,7 @@ export class BehavioralDFlipflopDriverElement extends AbstractPoolBackedAnalogEl
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

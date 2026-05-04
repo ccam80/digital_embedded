@@ -72,8 +72,8 @@ export class TransmissionSegmentRElement extends AbstractAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
     // ressetup.c:46-49- TSTALLOC sequence, line-for-line.
     this._hPP = solver.allocElement(posNode, posNode);
@@ -99,8 +99,8 @@ export class TransmissionSegmentRElement extends AbstractAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const vP = rhs[this._pinNodes.get("pos")!];
-    const vN = rhs[this._pinNodes.get("neg")!];
+    const vP = rhs[this.pinNodes.get("pos")!];
+    const vN = rhs[this.pinNodes.get("neg")!];
     const I = this._G * (vP - vN);
     return [I, -I];
   }

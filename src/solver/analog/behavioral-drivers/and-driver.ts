@@ -118,12 +118,12 @@ export class BehavioralAndDriverElement extends AbstractPoolBackedAnalogElement 
   /**
    * Per-input threshold-classify with hold-on-indeterminate semantic:
    *
-   *   - If any input falls below vIL (a "0" for AND) → output 0 immediately;
+   *   - If any input falls below vIL (a "0" for AND) â†’ output 0 immediately;
    *     0 is the absorbing element for AND so further inputs do not matter.
-   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) →
+   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) â†’
    *     hold prior output (CMOS metastability proxy: indeterminate inputs
    *     produce indeterminate output, modelled as steady-state retention).
-   *   - Else (all inputs >= vIH) → output 1.
+   *   - Else (all inputs >= vIH) â†’ output 1.
    *
    * Per-gate variation surface for OR / NAND / NOR / XOR / XNOR:
    *   - OR:   absorber is "1" (v >= vIH), pass-through is "0", default 0.
@@ -162,7 +162,7 @@ export class BehavioralAndDriverElement extends AbstractPoolBackedAnalogElement 
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

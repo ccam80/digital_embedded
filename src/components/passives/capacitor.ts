@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Capacitor analog component.
  *
  * Reactive two-terminal element modelled using companion model (equivalent
@@ -205,8 +205,8 @@ export class AnalogCapacitorElement extends AbstractPoolBackedAnalogElement {
   }
 
   setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-    const posNode = this._pinNodes.get("pos")!;  // CAPposNode
-    const negNode = this._pinNodes.get("neg")!;  // CAPnegNode
+    const posNode = this.pinNodes.get("pos")!;  // CAPposNode
+    const negNode = this.pinNodes.get("neg")!;  // CAPnegNode
 
     // capsetup.c:102-103  *states += 2 (CAPqcap slot).
     // digiTS uses stateSize slots (GEQ, IEQ, V, Q, CCAP) to cover all
@@ -262,8 +262,8 @@ export class AnalogCapacitorElement extends AbstractPoolBackedAnalogElement {
    */
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag, cktMode: mode } = ctx;
-    const n0 = this._pinNodes.get("pos")!;
-    const n1 = this._pinNodes.get("neg")!;
+    const n0 = this.pinNodes.get("pos")!;
+    const n1 = this.pinNodes.get("neg")!;
     const C = this.C;
     // capload.c:44  m = CAPm; applied at every stamp site, not folded into C.
     const m = this._M;
@@ -352,8 +352,8 @@ export class AnalogCapacitorElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this._pinNodes.get("pos")!;
-    const n1 = this._pinNodes.get("neg")!;
+    const n0 = this.pinNodes.get("pos")!;
+    const n1 = this.pinNodes.get("neg")!;
     const v0 = rhs[n0];
     const v1 = rhs[n1];
     const s0 = this._pool.states[0];

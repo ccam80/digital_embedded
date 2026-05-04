@@ -124,6 +124,7 @@ export interface ResolvedMosfetParams {
   _tKP?: number;
   _tPhi?: number;
   _tVto?: number;
+  [key: string]: number | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1730,7 +1731,7 @@ function _createMosfetElementWithPolarity(
 
     setParam(key: string, value: number): void {
       if (key in params) {
-        Reflect.set(params, key, value);
+        params[key] = value;
         tp = computeTempParams(params, polarity);
         params._tKP = tp.tTransconductance;
         params._tPhi = tp.tPhi;

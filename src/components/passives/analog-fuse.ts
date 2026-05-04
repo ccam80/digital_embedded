@@ -1,38 +1,38 @@
 /**
- * Analog fuse MNA element- switching resistance with thermal I²t energy model.
+ * Analog fuse MNA element- switching resistance with thermal IÂ²t energy model.
  *
  * Models a fuse as a resistance that switches abruptly from R_cold (intact) to
- * R_blown (open circuit) when the accumulated I²t energy reaches the rating.
+ * R_blown (open circuit) when the accumulated IÂ²t energy reaches the rating.
  *
  * Thermal model:
- *   SLOT_I2T_ACCUM accumulates I²·dt each accepted timestep via the bottom-of-load
+ *   SLOT_I2T_ACCUM accumulates IÂ²Â·dt each accepted timestep via the bottom-of-load
  *   history write. When SLOT_I2T_ACCUM >= i2tRating the fuse is permanently blown-
  *   SLOT_CONDUCT switches in one step from 1 to 0.
  *
  * Trip-time breakpoint scheduling:
  *   acceptStep() predicts the time-to-blow from the current operating
- *   point (t_blow = (rating - accum) / i²) and registers it via addBreakpoint.
+ *   point (t_blow = (rating - accum) / iÂ²) and registers it via addBreakpoint.
  *   The transient controller then lands the next step exactly on the predicted
- *   blow instant, so the rCold→rBlown jump never happens mid-step. This avoids
+ *   blow instant, so the rColdâ†’rBlown jump never happens mid-step. This avoids
  *   LTE rejection / dt collapse from a discontinuity inside an integration interval.
  *   Mirrors ngspice vsrcacct.c:24-310 (DEVaccept breakpoint-scheduling hook).
  *
  * Cross-engine state propagation:
  *   The factory captures the CircuitElement's PropertyBag and writes
- *   `_thermalRatio` (0→1) and `blown` (boolean) into it each timestep.
+ *   `_thermalRatio` (0â†’1) and `blown` (boolean) into it each timestep.
  *   The visual FuseElement.draw() reads these for heat glow and blown rendering.
  *   The digital executeFuse reads `blown` for the bus resolver closed flag.
  *
  * MNA topology:
- *   _pinNodes.get("out1") = n_pos  (positive terminal)
- *   _pinNodes.get("out2") = n_neg  (negative terminal)
+ *   pinNodes.get("out1") = n_pos  (positive terminal)
+ *   pinNodes.get("out2") = n_neg  (negative terminal)
  *   branchIndex            = -1    (no branch current row- RES topology)
  *
  * Setup/load split (ngspice anchor: res/ressetup.c, res/resload.c):
  *   setup(ctx)      allocates 4 matrix handles (_hPP, _hNN, _hPN, _hNP) via
  *                   ressetup.c:46-49 TSTALLOC sequence.
  *   load(ctx)       stamps conductance through cached handles only (no allocElement).
- *                   Bottom-of-load integrates I²t and updates CONDUCT slot.
+ *                   Bottom-of-load integrates IÂ²t and updates CONDUCT slot.
  *   acceptStep()    schedules breakpoint at predicted blow instant.
  *                   Mirrors vsrcacct.c:24-310.
  */
@@ -54,7 +54,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export const ANALOG_FUSE_SCHEMA = defineStateSchema("AnalogFuseElement", [
-  { name: "I2T_ACCUM", doc: "Accumulated I²t thermal energy in A²·s" },
+  { name: "I2T_ACCUM", doc: "Accumulated IÂ²t thermal energy in AÂ²Â·s" },
   { name: "CONDUCT",   doc: "Conductance state: 1 = intact, 0 = blown" },
 ]) satisfies StateSchema;
 
@@ -67,9 +67,9 @@ const SLOT_CONDUCT   = 1;
 
 export const { paramDefs: ANALOG_FUSE_PARAM_DEFS, defaults: ANALOG_FUSE_DEFAULTS } = defineModelParams({
   primary: {
-    rCold:     { default: 0.01,  unit: "Ω", description: "Cold (intact) resistance in ohms", min: 1e-12 },
-    rBlown:    { default: 1e9,   unit: "Ω", description: "Blown (open) resistance in ohms", min: 1e-6 },
-    i2tRating: { default: 1e-4,  unit: "A²s", description: "I²t energy rating in A²·s", min: 1e-30 },
+    rCold:     { default: 0.01,  unit: "Î©", description: "Cold (intact) resistance in ohms", min: 1e-12 },
+    rBlown:    { default: 1e9,   unit: "Î©", description: "Blown (open) resistance in ohms", min: 1e-6 },
+    i2tRating: { default: 1e-4,  unit: "AÂ²s", description: "IÂ²t energy rating in AÂ²Â·s", min: 1e-30 },
   },
 });
 
@@ -109,7 +109,7 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
    * @param pinNodes       - Pin map with "out1" (positive) and "out2" (negative) terminals
    * @param rCold          - Cold (intact) resistance in ohms
    * @param rBlown         - Blown (open) resistance in ohms
-   * @param i2tRating      - I²t energy rating in A²·s
+   * @param i2tRating      - IÂ²t energy rating in AÂ²Â·s
    * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
    *
    * The runtime diagnostic channel is installed by the engine via
@@ -141,8 +141,8 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
     }
 
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("out1")!;  // RESposNode
-    const negNode = this._pinNodes.get("out2")!;  // RESnegNode
+    const posNode = this.pinNodes.get("out1")!;  // RESposNode
+    const negNode = this.pinNodes.get("out2")!;  // RESnegNode
 
     // Port of ressetup.c:46-49- TSTALLOC sequence (line-for-line)
     this._hPP = solver.allocElement(posNode, posNode);  // (RESposNode, RESposNode)
@@ -168,8 +168,8 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
     ctx.solver.stampElement(this._hNP, -g);
 
     // ngspice CKTstate0 idiom - bjtload.c:744-746, dioload.c:325-326
-    const posNode = this._pinNodes.get("out1")!;
-    const negNode = this._pinNodes.get("out2")!;
+    const posNode = this.pinNodes.get("out1")!;
+    const negNode = this.pinNodes.get("out2")!;
     const voltages = ctx.rhsOld;
     const v = voltages[posNode] - voltages[negNode];
     const iIter = g * v;
@@ -188,7 +188,7 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
   }
 
   /**
-   * Flip _intact on the first accepted step where I²t crosses the rating,
+   * Flip _intact on the first accepted step where IÂ²t crosses the rating,
    * emit the fuse-blown diagnostic exactly once, and schedule a breakpoint
    * at the predicted blow instant. acceptStep is the canonical mutation
    * site for _intact / _diagEmitted (post-LTE-acceptance).
@@ -213,9 +213,9 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
       this._emitDiagnostic({
         code: "fuse-blown",
         severity: "info",
-        message: "Fuse blown: accumulated I²t energy exceeded rating.",
+        message: "Fuse blown: accumulated IÂ²t energy exceeded rating.",
         explanation:
-          "The fuse thermal energy (I²·t integral) exceeded the specified i2tRating. " +
+          "The fuse thermal energy (IÂ²Â·t integral) exceeded the specified i2tRating. " +
           "The fuse is now permanently open (high resistance). " +
           "Replace the fuse or reduce the current to prevent recurrence.",
         suggestions: [
@@ -231,8 +231,8 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
     if (!this._intact) return;
 
     if (accumNow >= this._i2tRating * 0.95) {
-      const posNode = this._pinNodes.get("out1")!;
-      const negNode = this._pinNodes.get("out2")!;
+      const posNode = this.pinNodes.get("out1")!;
+      const negNode = this.pinNodes.get("out2")!;
       const rhs = this._pool.state0;
       const v = rhs[posNode] - rhs[negNode];
       const g = 1 / Math.max(this._rCold, MIN_RESISTANCE);
@@ -251,7 +251,7 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
     this._i2tRating = Math.max(i2tRating, 1e-30);
   }
 
-  /** Accumulated I²t energy- exposed for testing. */
+  /** Accumulated IÂ²t energy- exposed for testing. */
   get thermalEnergy(): number {
     if (this._stateBase === -1 || !this._pool) return 0;
     return this._pool.states[1][this._stateBase + SLOT_I2T_ACCUM];
@@ -262,7 +262,7 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
     return !this._intact;
   }
 
-  /** Ratio of accumulated I²t energy to i2tRating (0→1). */
+  /** Ratio of accumulated IÂ²t energy to i2tRating (0â†’1). */
   get thermalRatio(): number {
     if (this._stateBase === -1 || !this._pool) return 0;
     const accum = this._pool.states[1][this._stateBase + SLOT_I2T_ACCUM];
@@ -275,8 +275,8 @@ export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this._pinNodes.get("out1")!;
-    const nNeg = this._pinNodes.get("out2")!;
+    const nPos = this.pinNodes.get("out1")!;
+    const nNeg = this.pinNodes.get("out2")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const R = this._intact ? this._rCold : this._rBlown;

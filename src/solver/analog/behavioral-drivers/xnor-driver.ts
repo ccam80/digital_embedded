@@ -135,7 +135,7 @@ export class BehavioralXnorDriverElement extends AbstractPoolBackedAnalogElement
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

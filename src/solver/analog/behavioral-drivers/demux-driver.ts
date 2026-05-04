@@ -12,7 +12,7 @@
  *
  * Hold-on-indeterminate is *whole-vector*: if ANY selector bit OR the data
  * input is indeterminate, every output slot copies its prior value
- * (s1 → s0). Per-bit hold is incoherent for routed output- the active
+ * (s1 â†’ s0). Per-bit hold is incoherent for routed output- the active
  * bit's value comes from `data`, and which output is active depends on
  * the whole sel value, so any unknown input makes the whole pattern
  * unknown.
@@ -142,9 +142,9 @@ export class BehavioralDemuxDriverElement extends AbstractPoolBackedAnalogElemen
   }
 
   /**
-   * Threshold-classify K selector bits + 1 data bit; route data → output `sel`.
+   * Threshold-classify K selector bits + 1 data bit; route data â†’ output `sel`.
    *
-   * Whole-vector hold-on-indeterminate: any indeterminate input → all
+   * Whole-vector hold-on-indeterminate: any indeterminate input â†’ all
    * output slots copy prior. The routed output's value comes from `data`
    * and the route comes from `sel`; either being unknown makes the whole
    * pattern unknown.
@@ -189,7 +189,7 @@ export class BehavioralDemuxDriverElement extends AbstractPoolBackedAnalogElemen
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

@@ -1,5 +1,5 @@
 /**
- * InternalCccs — internal-only current-controlled current source.
+ * InternalCccs â€” internal-only current-controlled current source.
  *
  * Per Composite M4 (phase-composite-architecture.md), J-024
  * (contracts_group_02.md). Promoted from CccsSubElement in optocoupler.ts.
@@ -60,7 +60,7 @@ export class InternalCccsElement extends AbstractAnalogElement {
   private _senseBranch = -1;
   private readonly _props: PropertyBag;
 
-  // Cached matrix-entry handles — ccssetup.c TSTALLOC at (pos, b_sense)
+  // Cached matrix-entry handles â€” ccssetup.c TSTALLOC at (pos, b_sense)
   // and (neg, b_sense).
   private _hPosSense = -1;
   private _hNegSense = -1;
@@ -80,8 +80,8 @@ export class InternalCccsElement extends AbstractAnalogElement {
     }
 
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
     // findBranch returns the 1-based MNA branch row for the named sibling,
     // lazy-allocating if the sibling's setup() has not yet run (VSRCfindBr
@@ -97,14 +97,14 @@ export class InternalCccsElement extends AbstractAnalogElement {
     }
     const b = this._senseBranch;
 
-    // ccssetup.c — TSTALLOC at (pos, b_sense) and (neg, b_sense).
+    // ccssetup.c â€” TSTALLOC at (pos, b_sense) and (neg, b_sense).
     this._hPosSense = solver.allocElement(posNode, b);
     this._hNegSense = solver.allocElement(negNode, b);
   }
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    // ccsload.c — stamp gain and -gain on the sense-branch column.
+    // ccsload.c â€” stamp gain and -gain on the sense-branch column.
     solver.stampElement(this._hPosSense, this._gain);
     solver.stampElement(this._hNegSense, -this._gain);
   }

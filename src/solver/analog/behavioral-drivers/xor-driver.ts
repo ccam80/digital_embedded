@@ -110,9 +110,9 @@ export class BehavioralXorDriverElement extends AbstractPoolBackedAnalogElement 
   /**
    * Per-input threshold-classify with hold-on-indeterminate semantic:
    *
-   *   - Classify each input: v >= vIH → 1, v < vIL → 0, else indeterminate.
-   *   - If ANY input is indeterminate → hold prior output (metastability proxy).
-   *   - Else → XOR-reduce all classified bits: inputs.reduce((a, b) => a ^ b, 0).
+   *   - Classify each input: v >= vIH â†’ 1, v < vIL â†’ 0, else indeterminate.
+   *   - If ANY input is indeterminate â†’ hold prior output (metastability proxy).
+   *   - Else â†’ XOR-reduce all classified bits: inputs.reduce((a, b) => a ^ b, 0).
    */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
@@ -142,7 +142,7 @@ export class BehavioralXorDriverElement extends AbstractPoolBackedAnalogElement 
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Probe component- measurement point.
  *
  * Reads its input signal and adds it to the measurement/signal list.
@@ -234,7 +234,7 @@ class AnalogProbeElement extends AbstractAnalogElement {
   }
 
   getVoltage(rhs: Float64Array): number {
-    const posNode = this._pinNodes.get("in");
+    const posNode = this.pinNodes.get("in");
     return posNode !== undefined ? rhs[posNode] : 0;
   }
 

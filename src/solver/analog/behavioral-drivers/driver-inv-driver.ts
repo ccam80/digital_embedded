@@ -5,8 +5,8 @@
  * Reads `in` and `sel` voltages from rhsOld (relative to gnd), threshold-
  * classifies each against per-instance vIH / vIL with hold-on-indeterminate,
  * and writes:
- *   - OUTPUT_LOGIC_LEVEL        ← pass-through of `in` (0/1)
- *   - OUTPUT_LOGIC_LEVEL_ENABLE ← INVERTED `sel` (sel=0 → enable=1; sel=1 → enable=0)
+ *   - OUTPUT_LOGIC_LEVEL        â† pass-through of `in` (0/1)
+ *   - OUTPUT_LOGIC_LEVEL_ENABLE â† INVERTED `sel` (sel=0 â†’ enable=1; sel=1 â†’ enable=0)
  *
  * Mirror of driver-driver.ts; the only behavioural difference is the final
  * invert on the enable line so the parent's outPin sees enable=1 when sel
@@ -89,9 +89,9 @@ export class BehavioralDriverInvDriverElement extends AbstractPoolBackedAnalogEl
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd = rhsOld[this._pinNodes.get("gnd")!];
-    const vIn  = rhsOld[this._pinNodes.get("in")!]  - gnd;
-    const vSel = rhsOld[this._pinNodes.get("sel")!] - gnd;
+    const gnd = rhsOld[this.pinNodes.get("gnd")!];
+    const vIn  = rhsOld[this.pinNodes.get("in")!]  - gnd;
+    const vSel = rhsOld[this.pinNodes.get("sel")!] - gnd;
 
     const prevOut    = (s1[base + SLOT_OUT]    >= 0.5 ? 1 : 0) as 0 | 1;
     // prevEnable hold value for indeterminate sel: store the pre-invert sel
@@ -108,7 +108,7 @@ export class BehavioralDriverInvDriverElement extends AbstractPoolBackedAnalogEl
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

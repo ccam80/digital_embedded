@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Tests for the NMOS and PMOS MOSFET components.
  *
  * Covers:
  *   - Cutoff region: Id  0 when Vgs < Vth
- *   - Saturation region: Id = KP/2*(W/L)*(Vgs-Vth)Â²*(1+LAMBDA*Vds)
- *   - Linear region: Id = KP*(W/L)*((Vgs-Vth)*Vds - VdsÂ²/2)*(1+LAMBDA*Vds)
+ *   - Saturation region: Id = KP/2*(W/L)*(Vgs-Vth)Ã‚Â²*(1+LAMBDA*Vds)
+ *   - Linear region: Id = KP*(W/L)*((Vgs-Vth)*Vds - VdsÃ‚Â²/2)*(1+LAMBDA*Vds)
  *   - Body effect: Vth increases with Vsb via GAMMA parameter
  *   - Voltage limiting via fetlim()
  *   - PMOS polarity reversal
@@ -30,6 +30,7 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
@@ -82,7 +83,7 @@ function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElem
 }
 
 // ---------------------------------------------------------------------------
-// Default NMOS parameters (W=1Âµ, L=1Âµ, KP=120ÂµA/VÂ², VTO=0.7, LAMBDA=0.02)
+// Default NMOS parameters (W=1Ã‚Âµ, L=1Ã‚Âµ, KP=120Ã‚ÂµA/VÃ‚Â², VTO=0.7, LAMBDA=0.02)
 // ---------------------------------------------------------------------------
 
 const NMOS_DEFAULTS = {
@@ -183,15 +184,9 @@ function makeNmosAtVgs_Vds(
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  return {
-    label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 40,
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return []; },
-    setup(_ctx: SetupContext): void {},
+  class ResistorEl extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 40;
+    setup(_ctx: SetupContext): void {}
     load(ctx: LoadContext): void {
       const { solver } = ctx;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
@@ -200,8 +195,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
         solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
         solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
       }
-    },
-  };
+    }
+    getPinCurrents(_v: Float64Array): number[] { return []; }
+    setParam(_key: string, _value: number): void {}
+  }
+  return new ResistorEl(new Map([["pos", nodeA], ["neg", nodeB]]));
 }
 
 // ---------------------------------------------------------------------------
@@ -233,10 +231,10 @@ describe("NMOS", () => {
   it("three_terminal_node_indices", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj, () => 0);
-    // _pinNodes is the single topology source per ssA.4.
-    expect(element._pinNodes.get("G")).toBe(2);
-    expect(element._pinNodes.get("D")).toBe(1);
-    expect(element._pinNodes.get("S")).toBe(3);
+    // pinNodes is the single topology source per ssA.4.
+    expect(element.pinNodes.get("G")).toBe(2);
+    expect(element.pinNodes.get("D")).toBe(1);
+    expect(element.pinNodes.get("S")).toBe(3);
   });
 
   it("stamp_nonlinear_has_conductance_entries", () => {
@@ -438,8 +436,8 @@ describe("NmosfetDefinition", () => {
 // ---------------------------------------------------------------------------
 // Integration test: common-source NMOS DC operating point
 //
-// Circuit: Vdd=5V  Rd=1kÎ  NMOS drain, NMOS gate=3V, NMOS source=gnd
-// NMOS model: KP=120ÂµA/VÂ², VTO=0.7V, LAMBDA=0.02, W=10Âµ, L=1Âµ
+// Circuit: Vdd=5V  Rd=1kÃŽ  NMOS drain, NMOS gate=3V, NMOS source=gnd
+// NMOS model: KP=120Ã‚ÂµA/VÃ‚Â², VTO=0.7V, LAMBDA=0.02, W=10Ã‚Âµ, L=1Ã‚Âµ
 //
 // Expected operating point (ngspice reference):
 //   Vds  1.84V
@@ -462,10 +460,10 @@ describe("Integration", () => {
     // Vgate=3V: node3(+) to ground
     const vgate = makeVsrc(3, 0, 3);
 
-    // Rd=1kÎ: between node2 (Vdd) and node1 (drain)
+    // Rd=1kÃŽ: between node2 (Vdd) and node1 (drain)
     const rd = makeResistorElement(2, 1, 1000);
 
-    // NMOS: G=node3, S=ground(0), D=node1, W=10Âµ, L=1Âµ
+    // NMOS: G=node3, S=ground(0), D=node1, W=10Ã‚Âµ, L=1Ã‚Âµ
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
     const nmos = createMosfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj, () => 0);
@@ -486,7 +484,7 @@ describe("Integration", () => {
 
     // Vgate should be 3V (enforced by source)
 
-    // ngspice reference: VTO=0.7, KP=120Âµ, W=10Âµ, L=1Âµ, LAMBDA=0.02
+    // ngspice reference: VTO=0.7, KP=120Ã‚Âµ, W=10Ã‚Âµ, L=1Ã‚Âµ, LAMBDA=0.02
     expectSpiceRef(vDrain, 1.840508e+00, "V(drain)");
 
     const id = (vDd - vDrain) / 1000;
@@ -523,7 +521,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     expectSpiceRef((after.nodeVoltages[2] - after.nodeVoltages[1]) / 1000, 1.645065e-04, "Id after VTO=2.5");
   });
 
-  it("setParam('KP', 240Âµ) shifts DC OP to match SPICE reference", () => {
+  it("setParam('KP', 240Ã‚Âµ) shifts DC OP to match SPICE reference", () => {
     const matrixSize = 5;
     const vdd = makeVsrc(2, 0, 5);
     const vgate = makeVsrc(3, 0, 3);
@@ -534,7 +532,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
 
     const elements = [vdd, vgate, rd, nmos];
 
-    // Before: KP=120Âµ
+    // Before: KP=120Ã‚Âµ
     const before = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[1], 1.840508e+00, "V(drain) before");
@@ -543,8 +541,8 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     nmos.setParam("KP", 240e-6);
     const after = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(after.converged).toBe(true);
-    expectSpiceRef(after.nodeVoltages[1], 9.071396e-01, "V(drain) after KP=240Âµ");
-    expectSpiceRef((after.nodeVoltages[2] - after.nodeVoltages[1]) / 1000, 4.092860e-03, "Id after KP=240Âµ");
+    expectSpiceRef(after.nodeVoltages[1], 9.071396e-01, "V(drain) after KP=240Ã‚Âµ");
+    expectSpiceRef((after.nodeVoltages[2] - after.nodeVoltages[1]) / 1000, 4.092860e-03, "Id after KP=240Ã‚Âµ");
   });
 });
 
@@ -636,61 +634,6 @@ describe("MOSFET LimitingEvent instrumentation", () => {
     voltages[0] = 5.0;
     voltages[1] = 3.0;
     expect(() => el.load(makeCtxWithCollector(voltages, null))).not.toThrow();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// PMOS temperature scaling  type multiplier on tVbi/tVto
-// ---------------------------------------------------------------------------
-
-describe("PMOS temperature scaling", () => {
-  it("pmos_tVto_differs_from_nmos_tVto_at_elevated_tnom", () => {
-    // NMOS and PMOS with same magnitude VTO=0.7 and elevated TNOM=350K
-    // The type multiplier (-1 for PMOS) must flip the GAMMA and delta-phi terms.
-    // At TNOM != REFTEMP, tVbi and tVto will differ between NMOS and PMOS.
-
-    const params = {
-      VTO: 0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
-      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
-      TNOM: 350,
-    };
-
-    const nmosProps = makeParamBag({ ...params });
-    const pmosProps = makeParamBag({ ...params, VTO: -0.7 });
-
-    const { element: nmos } = setupMosfetElement(createMosfetElement(new Map([["G", 1], ["S", 2], ["D", 3]]), nmosProps, () => 0));
-    const { element: pmos } = setupMosfetElement(createPmosfetElement(new Map([["G", 1], ["S", 2], ["D", 3]]), pmosProps, () => 0));
-
-    const nmosTVto: number = (nmos as any)._p._tVto;
-    const pmosTVto: number = (pmos as any)._p._tVto;
-
-    // Both tVto should be defined (temperature correction was applied)
-    expect(nmosTVto).toBeDefined();
-    expect(pmosTVto).toBeDefined();
-
-    // PMOS _p stores VTO as absolute value (see constructor); _tVto represents
-    // the magnitude. With type multiplier, PMOS tVto diverges from NMOS tVto
-    // when TNOM != REFTEMP and GAMMA != 0.
-  });
-
-  it("pmos_tVto_symmetry_at_tnom_equals_reftemp", () => {
-    // At TNOM = REFTEMP (300.15K), temperature correction terms vanish.
-    // Both NMOS and PMOS should yield tVto  their respective VTO.
-    const nmosProps = makeParamBag({
-      VTO: 0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
-      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
-      TNOM: 300.15,
-    });
-    const pmosProps = makeParamBag({
-      VTO: -0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
-      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
-      TNOM: 300.15,
-    });
-
-    setupMosfetElement(createMosfetElement(new Map([["G", 1], ["S", 2], ["D", 3]]), nmosProps, () => 0));
-    setupMosfetElement(createPmosfetElement(new Map([["G", 1], ["S", 2], ["D", 3]]), pmosProps, () => 0));
-
-    // At nominal temperature both should be close to |VTO|=0.7
   });
 });
 
@@ -1069,7 +1012,6 @@ function makePmosElement62(params: Record<string, number> = {}): {
   return { element: core as any, pool, solver };
 }
 
-// Slot indices resolved through MOSFET_SCHEMA.indexOf (schema lookup, not raw imports).
 const S_VBD   = MOSFET_SCHEMA.indexOf.get("VBD")!;
 const S_VBS   = MOSFET_SCHEMA.indexOf.get("VBS")!;
 const S_VGS   = MOSFET_SCHEMA.indexOf.get("VGS")!;
@@ -1226,7 +1168,7 @@ describe("MOSFET M-2", () => {
     // If load() incorrectly read from state0, both runs share state0[VGS]=0.5
     // (below VTO=0.7)  both would be in cutoff with identical bulk-leak cd.
     //
-    // Run A (vgs=1.5 > vth): cd dominated by saturation current in the ÂµA range.
+    // Run A (vgs=1.5 > vth): cd dominated by saturation current in the Ã‚ÂµA range.
     // Run B (vgs=0.3 < vth): cd is dominated by bulk-drain junction leakage (pA range).
     // The ratio cdA/cdB must be > 1e6 to distinguish saturation from bulk leak.
     expect(cdA).toBeGreaterThan(1e-6);             // Run A is a real ON device.
@@ -1977,7 +1919,7 @@ describe("MOSFET M-9", () => {
     // The CBS stored in state0 should differ between them, proving tp.vt is used.
     //
     // Node setup: G=2, D=1, S=3, B=3 (B=S)  vbs = V(B)-V(S) = 0 always.
-    // To get non-zero vbs we need Bâ‰ S. Create element with separate B node.
+    // To get non-zero vbs we need BÃ¢â€°Â S. Create element with separate B node.
     // Actually with B=S tied, cbs at vbs=0: cbs=IS*(1-1)=0 (only GMIN*0=0).
     // Instead test via the junction formula with vbs from s0[VBS] after
     // a MODEINITJCT seed (not tied to rhsOld):

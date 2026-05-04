@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Quartz crystal analog component  Butterworth-Van Dyke (BVD) equivalent circuit.
  *
  * The BVD model represents the mechanical resonance of a quartz crystal as a
@@ -12,8 +12,8 @@
  *   Parallel resonance: f_p  f_s Â· âˆš(1 + C_s / C_0)   (slightly above f_s)
  *
  * MNA topology (1-based node indices, 0 = ground):
- *   _pinNodes.get("pos")  = n_A      external terminal pos
- *   _pinNodes.get("neg")  = n_B      external terminal neg
+ *   pinNodes.get("pos")  = n_A      external terminal pos
+ *   pinNodes.get("neg")  = n_B      external terminal neg
  *   n1                             junction between R_s and L_s (internal)
  *   n2                             junction between L_s and C_s (internal)
  *   branchIndex                    branch current row for L_s
@@ -299,8 +299,8 @@ export class AnalogCrystalElement extends AbstractPoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const aNode = this._pinNodes.get("pos")!;  // external terminal pos
-    const bNode = this._pinNodes.get("neg")!;  // external terminal neg
+    const aNode = this.pinNodes.get("pos")!;  // external terminal pos
+    const bNode = this.pinNodes.get("neg")!;  // external terminal neg
 
     // Allocate 15 state slots as a monolithic block (CRYSTAL_SCHEMA).
     this._stateBase = ctx.allocStates(15);
@@ -376,8 +376,8 @@ export class AnalogCrystalElement extends AbstractPoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag } = ctx;
     const mode = ctx.cktMode;
-    const nA = this._pinNodes.get("pos")!;
-    const nB = this._pinNodes.get("neg")!;
+    const nA = this.pinNodes.get("pos")!;
+    const nB = this.pinNodes.get("neg")!;
     const n1 = this._n1Node;
     const n2 = this._n2Node;
     const b = this.branchIndex;
@@ -534,8 +534,8 @@ export class AnalogCrystalElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nA = this._pinNodes.get("pos")!;
-    const nB = this._pinNodes.get("neg")!;
+    const nA = this.pinNodes.get("pos")!;
+    const nB = this.pinNodes.get("neg")!;
     const n1 = this._n1Node;
 
     // Current through the series R_s (from pos pin into the motional arm):

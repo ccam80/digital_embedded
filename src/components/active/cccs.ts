@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Current-Controlled Current Source (CCCS) analog component.
  *
  * Four-terminal element: sense+ and sense- form the current sense port;
@@ -134,8 +134,8 @@ export class CCCSAnalogElement extends ControlledSourceElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("out+")!;  // CCCSposNode  (pinNodeIds[2])
-    const negNode = this._pinNodes.get("out-")!;  // CCCSnegNode  (pinNodeIds[3])
+    const posNode = this.pinNodes.get("out+")!;  // CCCSposNode  (pinNodeIds[2])
+    const negNode = this.pinNodes.get("out-")!;  // CCCSnegNode  (pinNodeIds[3])
 
     // Resolve controlling branch: cccsset.c:36
     // ctx.findBranch dispatches to the controlling source's findBranchFor
@@ -200,8 +200,8 @@ export class CCCSAnalogElement extends ControlledSourceElement {
     solver.stampElement(this._hPCtBr, -gm); // G[posNode, contBranch]
     solver.stampElement(this._hNCtBr,  gm); // G[negNode, contBranch]
 
-    const posNode = this._pinNodes.get("out+")!;
-    const negNode = this._pinNodes.get("out-")!;
+    const posNode = this.pinNodes.get("out+")!;
+    const negNode = this.pinNodes.get("out-")!;
     if (posNode !== 0) rhs[posNode] += iNR;
     if (negNode !== 0) rhs[negNode] -= iNR;
   }

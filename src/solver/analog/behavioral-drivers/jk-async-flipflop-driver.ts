@@ -8,8 +8,8 @@
  * After the clocked update, async Set / Clr override the latched state every
  * load() pass. Collision policy- preserved from
  * `.recovery/behavioral-flipflop-jk-async.ts.orig`'s
- * `BehavioralJKAsyncFlipflopElement.accept()`- Set runs first (Set high → q=1),
- * Clr runs second (Clr high → q=0). When both are high, **Clr wins**.
+ * `BehavioralJKAsyncFlipflopElement.accept()`- Set runs first (Set high â†’ q=1),
+ * Clr runs second (Clr high â†’ q=0). When both are high, **Clr wins**.
  *
  * Per Composite M19 (phase-composite-architecture.md), J-147
  * (contracts_group_10.md).
@@ -77,12 +77,12 @@ export class BehavioralJKAsyncFlipflopDriverElement extends AbstractPoolBackedAn
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this._pinNodes.get("gnd")!];
-    const vClock = rhsOld[this._pinNodes.get("C")!]   - gnd;
-    const vJ     = rhsOld[this._pinNodes.get("J")!]   - gnd;
-    const vK     = rhsOld[this._pinNodes.get("K")!]   - gnd;
-    const vSet   = rhsOld[this._pinNodes.get("Set")!] - gnd;
-    const vClr   = rhsOld[this._pinNodes.get("Clr")!] - gnd;
+    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
+    const vClock = rhsOld[this.pinNodes.get("C")!]   - gnd;
+    const vJ     = rhsOld[this.pinNodes.get("J")!]   - gnd;
+    const vK     = rhsOld[this.pinNodes.get("K")!]   - gnd;
+    const vSet   = rhsOld[this.pinNodes.get("Set")!] - gnd;
+    const vClr   = rhsOld[this.pinNodes.get("Clr")!] - gnd;
 
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
@@ -118,7 +118,7 @@ export class BehavioralJKAsyncFlipflopDriverElement extends AbstractPoolBackedAn
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

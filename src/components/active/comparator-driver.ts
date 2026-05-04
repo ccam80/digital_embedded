@@ -109,7 +109,7 @@ export class ComparatorDriverElement extends AbstractPoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-    const outNode = this._pinNodes.get("out")!;
+    const outNode = this.pinNodes.get("out")!;
     if (outNode !== 0) {
       this._hOutOut = ctx.solver.allocElement(outNode, outNode);
     }
@@ -138,8 +138,8 @@ export class ComparatorDriverElement extends AbstractPoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const vPlus  = rhsOld[this._pinNodes.get("in+")!];
-    const vMinus = rhsOld[this._pinNodes.get("in-")!];
+    const vPlus  = rhsOld[this.pinNodes.get("in+")!];
+    const vMinus = rhsOld[this.pinNodes.get("in-")!];
 
     // Hysteresis thresholds.
     const half = this._hysteresis * 0.5;
@@ -174,7 +174,7 @@ export class ComparatorDriverElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const outNode = this._pinNodes.get("out")!;
+    const outNode = this.pinNodes.get("out")!;
     const s1 = this._pool.states[1];
     const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
     const gEff = wOld / this._rSat;

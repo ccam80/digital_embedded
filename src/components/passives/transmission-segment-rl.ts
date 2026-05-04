@@ -101,8 +101,8 @@ export class TransmissionSegmentRLElement extends AbstractPoolBackedAnalogElemen
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
     this._stateBase = ctx.allocStates(this.stateSize);
 

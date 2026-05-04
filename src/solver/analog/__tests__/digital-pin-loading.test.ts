@@ -117,7 +117,7 @@ function buildRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => new PinLoadingTestGroundEl(_pinNodes), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes) => new PinLoadingTestGroundEl(pinNodes), paramDefs: [], params: {} },
     },
   });
 
@@ -278,9 +278,9 @@ function buildCircuit(
   xorEl.position = { x: 10, y: 0 };
   circuit.addElement(xorEl);
 
-  // Wire Ground to Resistor A: (0,0)→(20,0)
+  // Wire Ground to Resistor A: (0,0)â†’(20,0)
   circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 20, y: 0 }));
-  // Resistor B to a floating endpoint: (22,0)→(23,0)
+  // Resistor B to a floating endpoint: (22,0)â†’(23,0)
   circuit.addWire(new Wire({ x: 22, y: 0 }, { x: 23, y: 0 }));
   // Wire each XOR pin to a distinct endpoint
   circuit.addWire(new Wire({ x: 10, y: 1 }, { x: 11, y: 1 }));
@@ -351,7 +351,7 @@ describe("digitalPinLoading: all", () => {
     const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
 
     expect(analogDomain).not.toBeNull();
-    // One boundary group per digital net- DigitalXor has 3 pins → 3 nets.
+    // One boundary group per digital net- DigitalXor has 3 pins â†’ 3 nets.
     expect(analogDomain!.bridgeAdaptersByGroupId.size).toBeGreaterThan(0);
   });
 

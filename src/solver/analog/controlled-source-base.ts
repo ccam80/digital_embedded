@@ -75,7 +75,7 @@ export class MutableExpressionContext implements ExpressionContext {
  * Abstract base for expression-driven controlled sources.
  *
  * Concrete subclasses supply:
- *   - `_pinNodes` initialization in the constructor
+ *   - `pinNodes` initialization in the constructor
  *   - `abstract readonly branchIndex` (or mutable field)
  *   - `_bindContext(voltages)` to populate ctx with the relevant control values
  *     and set `_ctrlValue`.

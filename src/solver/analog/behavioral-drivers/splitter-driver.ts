@@ -39,7 +39,7 @@ import { logicLevel } from "./edge-detect.js";
 //
 // Key: `${inputCount}:${outputCount}`.
 // Slot layout for N inputs, M outputs:
-//   [0 .. M-1]   OUTPUT_LOGIC_LEVEL_0 .. OUTPUT_LOGIC_LEVEL_{M-1}   ← consumed-by-pin
+//   [0 .. M-1]   OUTPUT_LOGIC_LEVEL_0 .. OUTPUT_LOGIC_LEVEL_{M-1}   â† consumed-by-pin
 
 const SPLITTER_SCHEMAS = new Map<string, StateSchema>();
 
@@ -164,7 +164,7 @@ export class BehavioralSplitterDriverElement extends AbstractPoolBackedAnalogEle
    *
    * Passthrough (inputCount === outputCount, neither mode above applies):
    *   Classify in_i directly to slot i. Mirrors the implicit no-op in
-   *   executeSplitter for the non-split non-merge case — but here we must
+   *   executeSplitter for the non-split non-merge case â€” but here we must
    *   still drive outputs, so we classify 1:1.
    *
    * vIL for hysteresis is read from props (default 0.8, hot-loadable via setParam).
@@ -182,7 +182,7 @@ export class BehavioralSplitterDriverElement extends AbstractPoolBackedAnalogEle
     if (this._inputCount === 1 && this._outputCount >= 1) {
       // Split mode: unpack bit i from the wide bus voltage at in_0.
       const vIn = rhsOld[this._inNodes[0]] - gnd;
-      const packed = vIn >>> 0;  // ToUint32 truncation — matches bus-pin convention
+      const packed = vIn >>> 0;  // ToUint32 truncation â€” matches bus-pin convention
       for (let i = 0; i < this._outputCount; i++) {
         const bitVoltage = (packed >>> i) & 1;
         const prev = s1[base + i] >= 0.5 ? 1 : 0;
@@ -199,7 +199,7 @@ export class BehavioralSplitterDriverElement extends AbstractPoolBackedAnalogEle
       }
       s0[base] = packed >>> 0;
     } else {
-      // Passthrough mode: classify in_i → slot i directly.
+      // Passthrough mode: classify in_i â†’ slot i directly.
       const n = Math.min(this._inputCount, this._outputCount);
       for (let i = 0; i < n; i++) {
         const vIn = rhsOld[this._inNodes[i]] - gnd;
@@ -210,7 +210,7 @@ export class BehavioralSplitterDriverElement extends AbstractPoolBackedAnalogEle
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

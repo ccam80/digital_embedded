@@ -9,6 +9,7 @@ import { allocateStatePool, makeSimpleCtx } from "../test-helpers.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../../core/properties.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../element.js";
+import { AbstractAnalogElement, AbstractPoolBackedAnalogElement } from "../../element.js";
 import type { SetupContext } from "../../setup-context.js";
 import type { LoadContext } from "../../load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../ngspice-load-order.js";
@@ -32,78 +33,96 @@ const ZERO_INTEG_COEFF: IntegrationCoefficients = {
 // testing element correctness.
 // ---------------------------------------------------------------------------
 
+class HarnessResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  private _hPP = -1;
+  private _hNN = -1;
+  private _hPN = -1;
+  private _hNP = -1;
+  private readonly _G: number;
+  constructor(pinNodes: ReadonlyMap<string, number>, resistance: number) {
+    super(pinNodes);
+    this._G = 1 / resistance;
+  }
+  setup(ctx: SetupContext): void {
+    const s = ctx.solver;
+    const p = this.pinNodes.get("pos")!;
+    const n = this.pinNodes.get("neg")!;
+    this._hPP = s.allocElement(p, p);
+    this._hNN = s.allocElement(n, n);
+    this._hPN = s.allocElement(p, n);
+    this._hNP = s.allocElement(n, p);
+  }
+  load(ctx: LoadContext): void {
+    ctx.solver.stampElement(this._hPP, this._G);
+    ctx.solver.stampElement(this._hNN, this._G);
+    ctx.solver.stampElement(this._hPN, -this._G);
+    ctx.solver.stampElement(this._hNP, -this._G);
+  }
+  getPinCurrents(_rhs: Float64Array): number[] { return []; }
+  setParam(_key: string, _value: number): void {}
+}
+
 function makeResistorEl(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const G = 1 / resistance;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext) {
-      const s = ctx.solver;
-      const p = el._pinNodes.get("A")!;
-      const n = el._pinNodes.get("B")!;
-      _hPP = s.allocElement(p, p);
-      _hNN = s.allocElement(n, n);
-      _hPN = s.allocElement(p, n);
-      _hNP = s.allocElement(n, p);
-    },
-    load(ctx: LoadContext) {
-      ctx.solver.stampElement(_hPP, G);
-      ctx.solver.stampElement(_hNN, G);
-      ctx.solver.stampElement(_hPN, -G);
-      ctx.solver.stampElement(_hNP, -G);
-    },
-    getPinCurrents(_rhs: Float64Array): number[] { return []; },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+  return new HarnessResistorEl(new Map([["pos", nodeA], ["neg", nodeB]]), resistance);
+}
+
+class HarnessDiodeEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+  private _hAA = -1;
+  private _hKK = -1;
+  private _hAK = -1;
+  private _hKA = -1;
+  private readonly _nodeA: number;
+  private readonly _nodeK: number;
+  private readonly _IS: number;
+  private readonly _N: number;
+  private readonly _VT = 0.025852;
+  private _vd = 0;
+  constructor(pinNodes: ReadonlyMap<string, number>, IS: number, N: number) {
+    super(pinNodes);
+    this._nodeA = pinNodes.get("A")!;
+    this._nodeK = pinNodes.get("K")!;
+    this._IS = IS;
+    this._N = N;
+  }
+  setup(ctx: SetupContext): void {
+    const s = ctx.solver;
+    this._hAA = s.allocElement(this._nodeA, this._nodeA);
+    this._hKK = s.allocElement(this._nodeK, this._nodeK);
+    this._hAK = s.allocElement(this._nodeA, this._nodeK);
+    this._hKA = s.allocElement(this._nodeK, this._nodeA);
+  }
+  load(ctx: LoadContext): void {
+    const vA = ctx.rhsOld[this._nodeA] ?? 0;
+    const vK = ctx.rhsOld[this._nodeK] ?? 0;
+    this._vd = vA - vK;
+    const expArg = Math.min(this._vd / (this._N * this._VT), 40);
+    const Id = this._IS * (Math.exp(expArg) - 1);
+    const Gd = this._IS * Math.exp(expArg) / (this._N * this._VT);
+    const Ieq = Id - Gd * this._vd;
+    ctx.solver.stampElement(this._hAA, Gd);
+    ctx.solver.stampElement(this._hKK, Gd);
+    ctx.solver.stampElement(this._hAK, -Gd);
+    ctx.solver.stampElement(this._hKA, -Gd);
+    ctx.rhs[this._nodeA] -= Ieq;
+    ctx.rhs[this._nodeK] += Ieq;
+  }
+  checkConvergence(ctx: LoadContext): boolean {
+    const vA = ctx.rhsOld[this._nodeA] ?? 0;
+    const vK = ctx.rhsOld[this._nodeK] ?? 0;
+    const vdNew = vA - vK;
+    return Math.abs(vdNew - this._vd) < ctx.voltTol + ctx.reltol * Math.abs(vdNew);
+  }
+  getPinCurrents(_rhs: Float64Array): number[] { return []; }
+  setParam(_key: string, _value: number): void {}
 }
 
 function makeDiodeEl(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const VT = 0.025852;
-  let _vd = 0;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: new Map([["A", nodeA], ["K", nodeK]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext) {
-      const s = ctx.solver;
-      _hAA = s.allocElement(nodeA, nodeA);
-      _hKK = s.allocElement(nodeK, nodeK);
-      _hAK = s.allocElement(nodeA, nodeK);
-      _hKA = s.allocElement(nodeK, nodeA);
-    },
-    load(ctx: LoadContext) {
-      const vA = ctx.rhsOld[nodeA] ?? 0;
-      const vK = ctx.rhsOld[nodeK] ?? 0;
-      _vd = vA - vK;
-      const expArg = Math.min(_vd / (N * VT), 40);
-      const Id = IS * (Math.exp(expArg) - 1);
-      const Gd = IS * Math.exp(expArg) / (N * VT);
-      const Ieq = Id - Gd * _vd;
-      ctx.solver.stampElement(_hAA, Gd);
-      ctx.solver.stampElement(_hKK, Gd);
-      ctx.solver.stampElement(_hAK, -Gd);
-      ctx.solver.stampElement(_hKA, -Gd);
-      ctx.rhs[nodeA] -= Ieq;
-      ctx.rhs[nodeK] += Ieq;
-    },
-    checkConvergence(ctx: LoadContext): boolean {
-      const vA = ctx.rhsOld[nodeA] ?? 0;
-      const vK = ctx.rhsOld[nodeK] ?? 0;
-      const vdNew = vA - vK;
-      return Math.abs(vdNew - _vd) < ctx.voltTol + ctx.reltol * Math.abs(vdNew);
-    },
-    getPinCurrents(_rhs: Float64Array): number[] { return []; },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+  const diodePins = new Map<string, number>();
+  diodePins.set("A", nodeA);
+  diodePins.set("K", nodeK);
+  return new HarnessDiodeEl(diodePins, IS, N);
 }
 
 const CAP_SCHEMA: StateSchema = {
@@ -116,69 +135,62 @@ const CAP_SCHEMA: StateSchema = {
   indexOf: new Map([["QCAP", 0], ["VCAP", 1]]),
 };
 
+class HarnessCapacitorEl extends AbstractPoolBackedAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
+  readonly stateSchema = CAP_SCHEMA;
+  readonly stateSize = CAP_SCHEMA.size;
+  private _hPP = -1;
+  private _hNN = -1;
+  private _hPN = -1;
+  private _hNP = -1;
+  private readonly _nodePos: number;
+  private readonly _nodeNeg: number;
+  private readonly _capacitance: number;
+  private static readonly SLOT_Q = 0;
+  private static readonly SLOT_V = 1;
+  constructor(pinNodes: ReadonlyMap<string, number>, capacitance: number) {
+    super(pinNodes);
+    this._nodePos = pinNodes.get("pos")!;
+    this._nodeNeg = pinNodes.get("neg")!;
+    this._capacitance = capacitance;
+  }
+  setup(ctx: SetupContext): void {
+    const base = ctx.allocStates(CAP_SCHEMA.size);
+    this._stateBase = base;
+    const s = ctx.solver;
+    this._hPP = s.allocElement(this._nodePos, this._nodePos);
+    this._hNN = s.allocElement(this._nodeNeg, this._nodeNeg);
+    this._hPN = s.allocElement(this._nodePos, this._nodeNeg);
+    this._hNP = s.allocElement(this._nodeNeg, this._nodePos);
+  }
+  override initState(pool: StatePoolRef): void {
+    super.initState(pool);
+    const base = this._stateBase;
+    pool.state0[base + HarnessCapacitorEl.SLOT_Q] = 0;
+    pool.state0[base + HarnessCapacitorEl.SLOT_V] = 0;
+  }
+  load(ctx: LoadContext): void {
+    if (!this._pool) return;
+    const { ag, dt } = ctx;
+    const Geq = ag[0] * this._capacitance;
+    const vOld = this._pool.state1[this._stateBase + HarnessCapacitorEl.SLOT_V] ?? 0;
+    const Ieq = ag[1] * this._capacitance * vOld;
+    ctx.solver.stampElement(this._hPP, Geq);
+    ctx.solver.stampElement(this._hNN, Geq);
+    ctx.solver.stampElement(this._hPN, -Geq);
+    ctx.solver.stampElement(this._hNP, -Geq);
+    const vPos = ctx.rhsOld[this._nodePos] ?? 0;
+    const vNeg = ctx.rhsOld[this._nodeNeg] ?? 0;
+    void vPos; void vNeg; void dt; void Ieq;
+    ctx.rhs[this._nodePos] -= Ieq;
+    ctx.rhs[this._nodeNeg] += Ieq;
+  }
+  getPinCurrents(_rhs: Float64Array): number[] { return []; }
+  setParam(_key: string, _value: number): void {}
+}
+
 function makeCapacitorEl(nodePos: number, nodeNeg: number, capacitance: number): PoolBackedAnalogElement {
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  let _pool: StatePoolRef | null = null;
-  let _base = -1;
-  const SLOT_Q = 0, SLOT_V = 1;
-
-  const el: PoolBackedAnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
-    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    poolBacked: true as const,
-    stateSchema: CAP_SCHEMA,
-    stateSize: CAP_SCHEMA.size,
-
-    setup(ctx: SetupContext) {
-      _base = ctx.allocStates(CAP_SCHEMA.size);
-      el._stateBase = _base;
-      const s = ctx.solver;
-      _hPP = s.allocElement(nodePos, nodePos);
-      _hNN = s.allocElement(nodeNeg, nodeNeg);
-      _hPN = s.allocElement(nodePos, nodeNeg);
-      _hNP = s.allocElement(nodeNeg, nodePos);
-    },
-
-    initState(pool: StatePoolRef) {
-      _pool = pool;
-      _base = el._stateBase;
-      pool.state0[_base + SLOT_Q] = 0;
-      pool.state0[_base + SLOT_V] = 0;
-    },
-
-    load(ctx: LoadContext) {
-      if (!_pool) return;
-      const { ag, dt } = ctx;
-      const Geq = ag[0] * capacitance;
-      const vOld = _pool.state1[_base + SLOT_V] ?? 0;
-      const Ieq = ag[1] * capacitance * vOld;
-      ctx.solver.stampElement(_hPP, Geq);
-      ctx.solver.stampElement(_hNN, Geq);
-      ctx.solver.stampElement(_hPN, -Geq);
-      ctx.solver.stampElement(_hNP, -Geq);
-      const vPos = ctx.rhsOld[nodePos] ?? 0;
-      const vNeg = ctx.rhsOld[nodeNeg] ?? 0;
-      void vPos; void vNeg; void dt; void Ieq;
-      ctx.rhs[nodePos] -= Ieq;
-      ctx.rhs[nodeNeg] += Ieq;
-    },
-
-    accept(ctx: LoadContext, _simTime: number, _addBp: (t: number) => void) {
-      if (!_pool) return;
-      const vPos = ctx.rhs[nodePos] ?? 0;
-      const vNeg = ctx.rhs[nodeNeg] ?? 0;
-      const v = vPos - vNeg;
-      _pool.state0[_base + SLOT_V] = v;
-      _pool.state0[_base + SLOT_Q] = capacitance * v;
-    },
-
-    getPinCurrents(_rhs: Float64Array): number[] { return []; },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+  return new HarnessCapacitorEl(new Map([["pos", nodePos], ["neg", nodeNeg]]), capacitance);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +222,7 @@ function makeRC() {
   return {
     circuit: {
       netCount: 2, componentCount: 3, nodeCount: 2,
-      elements, labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]), statePool: pool,
+      elements, labelToNodeId: new Map([["Vs", 1], ["C1:pos", 2]]), statePool: pool,
     } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
@@ -532,7 +544,7 @@ describe("harness integration", () => {
     expect(result!.stepIndex).toBe(0);
     // iterationIndex must be 0 (largest delta is always on the first NR iteration from zero initial conditions)
     expect(result!.iterationIndex).toBe(0);
-    // Node 2 (diode anode) starts at 0V; first iteration drives it toward the diode drop (~0.6–0.7V),
+    // Node 2 (diode anode) starts at 0V; first iteration drives it toward the diode drop (~0.6â€“0.7V),
     // so the largest delta is in the range (0, 5].
     expect(result!.delta).toBeGreaterThan(0);
     expect(result!.delta).toBeLessThanOrEqual(5.0);
@@ -686,8 +698,8 @@ describe("node mapping", () => {
   });
 
   it("canonicalizeNgspiceName handles resistor terminal patterns", () => {
-    expect(canonicalizeNgspiceName("r1_1", "resistor")).toBe("R1:A");
-    expect(canonicalizeNgspiceName("r1_2", "resistor")).toBe("R1:B");
+    expect(canonicalizeNgspiceName("r1_1", "resistor")).toBe("R1:pos");
+    expect(canonicalizeNgspiceName("r1_2", "resistor")).toBe("R1:neg");
   });
 
   it("canonicalizeNgspiceName handles branch currents", () => {
@@ -702,7 +714,7 @@ describe("node mapping", () => {
 
   it("canonicalizeOurLabel uppercases", () => {
     expect(canonicalizeOurLabel("Q1:C")).toBe("Q1:C");
-    expect(canonicalizeOurLabel("r1:a")).toBe("R1:A");
+    expect(canonicalizeOurLabel("r1:pos")).toBe("R1:POS");
   });
 
 });

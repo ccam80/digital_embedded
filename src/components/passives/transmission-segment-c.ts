@@ -102,7 +102,7 @@ export class TransmissionSegmentCElement extends AbstractPoolBackedAnalogElement
   }
 
   setup(ctx: SetupContext): void {
-    const juncNode = this._pinNodes.get("junc")!;
+    const juncNode = this.pinNodes.get("junc")!;
 
     // capsetup.c:102-103- *states += stateSize.
     this._stateBase = ctx.allocStates(this.stateSize);
@@ -125,7 +125,7 @@ export class TransmissionSegmentCElement extends AbstractPoolBackedAnalogElement
    */
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag, cktMode: mode } = ctx;
-    const n = this._pinNodes.get("junc")!;
+    const n = this.pinNodes.get("junc")!;
     const C = this._C;
     const base = this._stateBase;
     const s0 = this._pool.states[0];
@@ -194,7 +194,7 @@ export class TransmissionSegmentCElement extends AbstractPoolBackedAnalogElement
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const v = rhs[this._pinNodes.get("junc")!];
+    const v = rhs[this.pinNodes.get("junc")!];
     const s0 = this._pool.states[0];
     const base = this._stateBase;
     const geq = s0[base + SLOT_GEQ];

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Spark Gap - voltage-triggered variable resistance with hysteresis.
  *
  * Behaviour:
@@ -22,8 +22,8 @@
  *   State variable CONDUCTING switches based on thresholds to avoid chattering.
  *
  * MNA topology:
- *   _pinNodes["pos"] = n_pos
- *   _pinNodes["neg"] = n_neg
+ *   pinNodes["pos"] = n_pos
+ *   pinNodes["neg"] = n_neg
  *   branchIndex    = -1
  *
  * Unified load() pipeline:
@@ -168,8 +168,8 @@ export class SparkGapElement extends AbstractPoolBackedAnalogElement {
     }
 
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!; // SWposNode
-    const negNode = this._pinNodes.get("neg")!; // SWnegNode
+    const posNode = this.pinNodes.get("pos")!; // SWposNode
+    const negNode = this.pinNodes.get("neg")!; // SWnegNode
 
     // TSTALLOC sequence: swsetup.c:59-62, line-for-line
     this._hPP = solver.allocElement(posNode, posNode); // :59 (SWposNode, SWposNode)
@@ -202,8 +202,8 @@ export class SparkGapElement extends AbstractPoolBackedAnalogElement {
     const s0 = this._pool.states[0];
 
     const conductingOld = s1[base + SLOT_CONDUCTING];
-    const nPos = this._pinNodes.get("pos")!;
-    const nNeg = this._pinNodes.get("neg")!;
+    const nPos = this.pinNodes.get("pos")!;
+    const nNeg = this.pinNodes.get("neg")!;
     // ngspice DEVload idiom - read CKTrhsOld (prior NR iterate), not CKTrhs.
     // bjtload.c:208-209, dioload.c:139-140 read rhsOld so Jacobian-linearised
     // stamps use the last committed iter's voltages, stable across NR.
@@ -225,8 +225,8 @@ export class SparkGapElement extends AbstractPoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this._pinNodes.get("pos")!;
-    const nNeg = this._pinNodes.get("neg")!;
+    const nPos = this.pinNodes.get("pos")!;
+    const nNeg = this.pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const s1 = this._pool.states[1];

@@ -2896,4 +2896,40 @@ export class SparseSolver {
     return { row: 0, col: 0 };
   }
 
+  /**
+   * Whitebox debug view for tests. Exposes internal sparse-matrix structural
+   * state as a readonly snapshot for assertions in `sparse-solver.test.ts`.
+   * Production code MUST NOT use this — it is gated by name only; do not
+   * widen access here.
+   */
+  get debugView(): {
+    readonly rowHead: Int32Array;
+    readonly colHead: Int32Array;
+    readonly elNextInRow: Int32Array;
+    readonly elNextInCol: Int32Array;
+    readonly elRow: Int32Array;
+    readonly elCol: Int32Array;
+    readonly elVal: Float64Array;
+    readonly elCount: number;
+    readonly elCapacity: number;
+    readonly intToExtCol: Int32Array;
+    readonly perm: undefined;
+    readonly permInv: undefined;
+  } {
+    return {
+      rowHead: this._rowHead,
+      colHead: this._colHead,
+      elNextInRow: this._elNextInRow,
+      elNextInCol: this._elNextInCol,
+      elRow: this._elRow,
+      elCol: this._elCol,
+      elVal: this._elVal,
+      elCount: this._elCount,
+      elCapacity: this._elCapacity,
+      intToExtCol: this._intToExtCol,
+      perm: undefined,
+      permInv: undefined,
+    };
+  }
+
 }

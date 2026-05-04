@@ -30,9 +30,9 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // Each distinct selectorBits value maps to exactly one frozen StateSchema.
 //
 // Slot layout for selectorBits K (N = 2^K data inputs):
-//   [0 .. K-1]       SEL_LATCH_0 .. SEL_LATCH_{K-1}       ← latched sel inputs
-//   [K .. K+N-1]     DATA_LATCH_0 .. DATA_LATCH_{N-1}      ← latched data inputs
-//   [K+N]            OUTPUT_LOGIC_LEVEL                    ← consumed-by-pin
+//   [0 .. K-1]       SEL_LATCH_0 .. SEL_LATCH_{K-1}       â† latched sel inputs
+//   [K .. K+N-1]     DATA_LATCH_0 .. DATA_LATCH_{N-1}      â† latched data inputs
+//   [K+N]            OUTPUT_LOGIC_LEVEL                    â† consumed-by-pin
 
 const MUX_SCHEMAS = new Map<number, StateSchema>();
 
@@ -156,10 +156,10 @@ export class BehavioralMuxDriverElement extends AbstractPoolBackedAnalogElement 
    * Selector-indexed pick with hold-on-indeterminate semantic:
    *
    *   - Classify each sel_i: if ANY sel falls in the indeterminate band
-   *     (vIL <= v < vIH) → hold previous OUTPUT_LOGIC_LEVEL (cannot form a
+   *     (vIL <= v < vIH) â†’ hold previous OUTPUT_LOGIC_LEVEL (cannot form a
    *     valid selector index).
    *   - Build selIdx = sum(sel_i_bit << i for i in 0..K-1).
-   *   - Classify data_${selIdx}: if indeterminate → hold previous
+   *   - Classify data_${selIdx}: if indeterminate â†’ hold previous
    *     OUTPUT_LOGIC_LEVEL.
    *   - Otherwise write classified data bit to OUTPUT_LOGIC_LEVEL.
    *
@@ -213,7 +213,7 @@ export class BehavioralMuxDriverElement extends AbstractPoolBackedAnalogElement 
     for (let i = 0; i < this._selectorBits; i++) {
       s0[base + this._slotSelBase + i] = selBits[i];
     }
-    // Latch all data input levels to s0 (classification; indeterminate → hold s1).
+    // Latch all data input levels to s0 (classification; indeterminate â†’ hold s1).
     for (let i = 0; i < this._dataCount; i++) {
       const dv = rhsOld[this._dataNodes[i]] - gnd;
       let dataLatch: 0 | 1;
@@ -226,7 +226,7 @@ export class BehavioralMuxDriverElement extends AbstractPoolBackedAnalogElement 
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

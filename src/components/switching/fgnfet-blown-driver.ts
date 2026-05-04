@@ -54,8 +54,8 @@ export class FGNFETBlownDriverElement extends AbstractAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const pos = this._pinNodes.get("pos")!;
-    const neg = this._pinNodes.get("neg")!;
+    const pos = this.pinNodes.get("pos")!;
+    const neg = this.pinNodes.get("neg")!;
 
     this._hPP = solver.allocElement(pos, pos);
     this._hNN = solver.allocElement(neg, neg);
@@ -73,7 +73,7 @@ export class FGNFETBlownDriverElement extends AbstractAnalogElement {
 
   getPinCurrents(rhs: Float64Array): number[] {
     if (!this._blown) return [0, 0];
-    const v = rhs[this._pinNodes.get("pos")!] - rhs[this._pinNodes.get("neg")!];
+    const v = rhs[this.pinNodes.get("pos")!] - rhs[this.pinNodes.get("neg")!];
     return [+v, -v];
   }
 }

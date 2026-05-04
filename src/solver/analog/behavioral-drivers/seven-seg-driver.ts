@@ -6,7 +6,7 @@
  * relative to gnd, threshold-classifies each against vIH/vIL hysteresis, and
  * writes the resulting logic level to the corresponding SEG_* observation slot.
  * Those slots are consumed by the parent composite's draw() function to
- * determine which segments to illuminate — they are NOT consumed via
+ * determine which segments to illuminate â€” they are NOT consumed via
  * siblingState by any DigitalOutputPinLoaded sub-element (no electrical output
  * pins exist on this component; the display itself is the consumer).
  *
@@ -91,7 +91,7 @@ const SLOT_SEG_DP = SCHEMA.indexOf.get("SEG_DP")!;
 // Order MUST match the buildSevenSegNetlist drv connectivity row
 // `[0, 1, 2, 3, 4, 5, 6, 7, netGnd(8)]` mapping to ports
 // `[a, b, c, d, e, f, g, dp, gnd]`. The compiler reads pinLayout[i].label
-// and stores it in _pinNodes against the resolved node from connectivity[i].
+// and stores it in pinNodes against the resolved node from connectivity[i].
 //
 // All 9 pins are INPUT direction. There are no OUTPUT pins on this driver;
 // the display rendering is the sole consumer of the SEG_* observation slots.
@@ -136,15 +136,15 @@ export class BehavioralSevenSegDriverElement extends AbstractPoolBackedAnalogEle
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd = rhsOld[this._pinNodes.get("gnd")!];
-    const vA  = rhsOld[this._pinNodes.get("a")!]  - gnd;
-    const vB  = rhsOld[this._pinNodes.get("b")!]  - gnd;
-    const vC  = rhsOld[this._pinNodes.get("c")!]  - gnd;
-    const vD  = rhsOld[this._pinNodes.get("d")!]  - gnd;
-    const vE  = rhsOld[this._pinNodes.get("e")!]  - gnd;
-    const vF  = rhsOld[this._pinNodes.get("f")!]  - gnd;
-    const vG  = rhsOld[this._pinNodes.get("g")!]  - gnd;
-    const vDP = rhsOld[this._pinNodes.get("dp")!] - gnd;
+    const gnd = rhsOld[this.pinNodes.get("gnd")!];
+    const vA  = rhsOld[this.pinNodes.get("a")!]  - gnd;
+    const vB  = rhsOld[this.pinNodes.get("b")!]  - gnd;
+    const vC  = rhsOld[this.pinNodes.get("c")!]  - gnd;
+    const vD  = rhsOld[this.pinNodes.get("d")!]  - gnd;
+    const vE  = rhsOld[this.pinNodes.get("e")!]  - gnd;
+    const vF  = rhsOld[this.pinNodes.get("f")!]  - gnd;
+    const vG  = rhsOld[this.pinNodes.get("g")!]  - gnd;
+    const vDP = rhsOld[this.pinNodes.get("dp")!] - gnd;
 
     // Threshold-classify each segment voltage with vIH/vIL hysteresis.
     // logicLevel holds the previous value when the input sits in the
@@ -171,7 +171,7 @@ export class BehavioralSevenSegDriverElement extends AbstractPoolBackedAnalogEle
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

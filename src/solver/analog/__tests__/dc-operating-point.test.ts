@@ -41,6 +41,7 @@ import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../cor
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { AbstractAnalogElement } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
@@ -51,38 +52,37 @@ const noopBreakpoint = (_t: number): void => {};
 
 /**
  * Build a simple inline resistor element (two-terminal, conductance stamp).
- * Shaped per ssA contract: _pinNodes, label, ngspiceLoadOrder, _stateBase, setup().
+ * Shaped per ssA contract: pinNodes, label, ngspiceLoadOrder, _stateBase, setup().
  */
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx): void {
-      const a = el._pinNodes.get("pos")!;
-      const b = el._pinNodes.get("neg")!;
-      if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
-      if (b !== 0) _hBB = ctx.solver.allocElement(b, b);
+  class TestResistor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+    private _hAA = -1;
+    private _hBB = -1;
+    private _hAB = -1;
+    private _hBA = -1;
+    setup(ctx: import("../setup-context.js").SetupContext): void {
+      const a = this.pinNodes.get("pos")!;
+      const b = this.pinNodes.get("neg")!;
+      if (a !== 0) this._hAA = ctx.solver.allocElement(a, a);
+      if (b !== 0) this._hBB = ctx.solver.allocElement(b, b);
       if (a !== 0 && b !== 0) {
-        _hAB = ctx.solver.allocElement(a, b);
-        _hBA = ctx.solver.allocElement(b, a);
+        this._hAB = ctx.solver.allocElement(a, b);
+        this._hBA = ctx.solver.allocElement(b, a);
       }
-    },
-    load(ctx): void {
+    }
+    load(ctx: import("../load-context.js").LoadContext): void {
       const solver = ctx.solver;
-      if (_hAA !== -1) solver.stampElement(_hAA,  G);
-      if (_hBB !== -1) solver.stampElement(_hBB,  G);
-      if (_hAB !== -1) solver.stampElement(_hAB, -G);
-      if (_hBA !== -1) solver.stampElement(_hBA, -G);
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
-  };
-  return el;
+      if (this._hAA !== -1) solver.stampElement(this._hAA,  G);
+      if (this._hBB !== -1) solver.stampElement(this._hBB,  G);
+      if (this._hAB !== -1) solver.stampElement(this._hAB, -G);
+      if (this._hBA !== -1) solver.stampElement(this._hBA, -G);
+    }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
+  }
+  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
 }
 
 
@@ -111,7 +111,7 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
   return {
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: nodeB === 0 ? new Map([["A", nodeA]]) : new Map([["A", nodeA], ["B", nodeB]]),
+    pinNodes: nodeB === 0 ? new Map([["pos", nodeA]]) : new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     setup(_ctx): void {},
@@ -178,7 +178,7 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
   return {
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: nodeB === 0 ? new Map([["A", nodeA]]) : new Map([["A", nodeA], ["B", nodeB]]),
+    pinNodes: nodeB === 0 ? new Map([["pos", nodeA]]) : new Map([["pos", nodeA], ["neg", nodeB]]),
     _stateBase: -1,
     branchIndex: -1,
     setup(_ctx): void {},
@@ -276,13 +276,14 @@ function makeScalableVoltageSource(
   branchIdx: number,
   voltage: number,
 ): AnalogElement {
-  return {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: branchIdx,
-    setup(_ctx): void {},
+  const pinNodes = new Map([["pos", nodePos], ["neg", nodeNeg]]);
+  class ScalableVoltageSource extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+    constructor(pins: ReadonlyMap<string, number>) {
+      super(pins);
+      this.branchIndex = branchIdx;
+    }
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(ctx: import("../load-context.js").LoadContext): void {
       const solver = ctx.solver;
       const k = branchIdx + 1; // 1-based solver row for branch
@@ -291,13 +292,14 @@ function makeScalableVoltageSource(
       if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
       if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
       stampRHS(ctx.rhs, k, voltage * ctx.srcFact);
-    },
+    }
     stampAc(_solver: import("../complex-sparse-solver.js").ComplexSparseSolver, _omega: number, _ctx: import("../load-context.js").LoadContext): void {
       // AC stamp not exercised in DC-OP tests- left as no-op
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-  };
+    }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  }
+  return new ScalableVoltageSource(pinNodes);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,8 +346,8 @@ describe("DcOP", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -395,8 +397,8 @@ describe("DcOP", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -428,8 +430,8 @@ describe("DcOP", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -760,7 +762,7 @@ describe("DcOP", () => {
     // ctx.noncon on each call then delegates to the real implementation.
     // _observedNoncons is a module-scope array reset here before each run.
     //
-    // The extreme circuit (200V, 1Î, diode) forces the dynamicGmin path,
+    // The extreme circuit (200V, 1ÃƒÅ½, diode) forces the dynamicGmin path,
     // guaranteeing multiple runNR calls.
     _observedNoncons = [];
 

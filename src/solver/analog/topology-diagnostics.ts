@@ -12,7 +12,7 @@ export interface TopologyEntry {
 export function buildTopologyInfo(elements: readonly AnalogElement[]): TopologyEntry[] {
   const result: TopologyEntry[] = [];
   for (const el of elements) {
-    const nodeIds = [...el._pinNodes.values()];
+    const nodeIds = [...el.pinNodes.values()];
     const isBranch = el.branchIndex !== -1;
     let typeHint: "inductor" | "voltage" | "other";
     if (isBranch && typeof el.getLteTimestep === "function") {
@@ -180,7 +180,7 @@ function detectVoltageSourceLoops(
   const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
   if (vSources.length < 2) return false;
 
-  // Build adjacency list: node → set of reachable nodes through voltage sources
+  // Build adjacency list: node â†’ set of reachable nodes through voltage sources
   const adj = new Map<number, Set<number>>();
   for (const vs of vSources) {
     const [a, b] = vs.nodeIds;
@@ -271,7 +271,7 @@ function detectCompetingVoltageConstraints(
   const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
   if (vSources.length < 2) return [];
 
-  // Map from node ID → list of component labels that drive that node via a branch equation
+  // Map from node ID â†’ list of component labels that drive that node via a branch equation
   const nodeDrivers = new Map<number, string[]>();
   for (const vs of vSources) {
     for (const nodeId of vs.nodeIds) {

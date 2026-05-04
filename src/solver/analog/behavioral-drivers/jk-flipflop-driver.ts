@@ -3,10 +3,10 @@
  * edge-triggered JK flip-flop.
  *
  * On rising clock edge:
- *   J=0, K=0 → hold
- *   J=1, K=0 → q=1
- *   J=0, K=1 → q=0
- *   J=1, K=1 → toggle (q = 1-q)
+ *   J=0, K=0 â†’ hold
+ *   J=1, K=0 â†’ q=1
+ *   J=0, K=1 â†’ q=0
+ *   J=1, K=1 â†’ toggle (q = 1-q)
  *
  * Per Composite M18 (phase-composite-architecture.md), J-148
  * (contracts_group_10.md). Behavior migrated from
@@ -73,10 +73,10 @@ export class BehavioralJKFlipflopDriverElement extends AbstractPoolBackedAnalogE
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this._pinNodes.get("gnd")!];
-    const vClock = rhsOld[this._pinNodes.get("C")!] - gnd;
-    const vJ     = rhsOld[this._pinNodes.get("J")!] - gnd;
-    const vK     = rhsOld[this._pinNodes.get("K")!] - gnd;
+    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
+    const vClock = rhsOld[this.pinNodes.get("C")!] - gnd;
+    const vJ     = rhsOld[this.pinNodes.get("J")!] - gnd;
+    const vK     = rhsOld[this.pinNodes.get("K")!] - gnd;
 
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
@@ -101,7 +101,7 @@ export class BehavioralJKFlipflopDriverElement extends AbstractPoolBackedAnalogE
         } else if (kHigh) {
           q = 0;
         }
-        // both low → hold
+        // both low â†’ hold
       }
     }
 
@@ -112,7 +112,7 @@ export class BehavioralJKFlipflopDriverElement extends AbstractPoolBackedAnalogE
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

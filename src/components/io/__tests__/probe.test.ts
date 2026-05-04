@@ -97,7 +97,7 @@ function makeProbe(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// Analog circuit factory: VS=v → Probe:in. Probe is single-pin and a pure
+// Analog circuit factory: VS=v â†’ Probe:in. Probe is single-pin and a pure
 // voltage-measurement sink, so VS:pos drives probe:in directly and the
 // expected V(probe:in) = v.
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ describe("Probe", () => {
 
   describe("AnalogProbe", () => {
     it("reads_node_voltage returns voltage at the wired-up node (V_source = V_probe_in)", () => {
-      // Circuit: VS(4.72V):pos → Probe:in ; VS:neg → GND.
+      // Circuit: VS(4.72V):pos â†’ Probe:in ; VS:neg â†’ GND.
       // Probe is a single-pin pure-measurement sink that contributes no MNA
       // stamp (load() is empty). The voltage at the probe's "in" pin is
       // therefore exactly the source's pos-side voltage = 4.72V at DC.
@@ -422,7 +422,7 @@ describe("Probe", () => {
         () => 0,
       );
 
-      expect(analogElement._pinNodes.get("in")).toBe(5);
+      expect(analogElement.pinNodes.get("in")).toBe(5);
       expect(analogElement.branchIndex).toBe(-1);
     });
   });

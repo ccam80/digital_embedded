@@ -30,8 +30,8 @@ export class RelayResSubElement extends AbstractAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
     // ressetup.c:46-49: TSTALLOC sequence (4 entries, line-for-line)
     this._hPP = ctx.solver.allocElement(posNode, posNode); // (RESposNode, RESposNode)
@@ -49,8 +49,8 @@ export class RelayResSubElement extends AbstractAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
     const I = this._G * (rhs[posNode] - rhs[negNode]);
     return [I, -I];
   }

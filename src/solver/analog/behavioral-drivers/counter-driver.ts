@@ -75,9 +75,9 @@ import { detectRisingEdge } from "./edge-detect.js";
 //
 // Slot layout for bitWidth N:
 //   [0]              LAST_CLOCK
-//   [1 .. N]         COUNT_BIT0 ..  COUNT_BIT(N-1)              ← internal latch
-//   [N+1 .. 2N]      OUTPUT_LOGIC_LEVEL_BIT0 .. _BIT(N-1)       ← consumed-by-pin
-//   [2N+1]           OUTPUT_LOGIC_LEVEL_OVF                     ← consumed-by-pin
+//   [1 .. N]         COUNT_BIT0 ..  COUNT_BIT(N-1)              â† internal latch
+//   [N+1 .. 2N]      OUTPUT_LOGIC_LEVEL_BIT0 .. _BIT(N-1)       â† consumed-by-pin
+//   [2N+1]           OUTPUT_LOGIC_LEVEL_OVF                     â† consumed-by-pin
 
 const COUNTER_SCHEMAS = new Map<number, StateSchema>();
 
@@ -182,7 +182,7 @@ export class BehavioralCounterDriverElement extends AbstractPoolBackedAnalogElem
   /**
    * Edge-detect on C; on rising edge, clr (priority) or increment (when en).
    *
-   * Control-input classification is simple-threshold (v >= vIH → 1, else 0)
+   * Control-input classification is simple-threshold (v >= vIH â†’ 1, else 0)
    * rather than the held-indeterminate hysteresis used for edge-sampled data
    * in d-flipflop. Reason: en / clr are slow-changing control signals where
    * the metastability proxy is not load-bearing; the increment / clear
@@ -239,7 +239,7 @@ export class BehavioralCounterDriverElement extends AbstractPoolBackedAnalogElem
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

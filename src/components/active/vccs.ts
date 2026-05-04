@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Voltage-Controlled Current Source (VCCS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -130,10 +130,10 @@ export class VCCSAnalogElement extends ControlledSourceElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode     = this._pinNodes.get("out+")!;   // VCCSposNode
-    const negNode     = this._pinNodes.get("out-")!;   // VCCSnegNode
-    const ctrlPosNode = this._pinNodes.get("ctrl+")!;  // VCCScontPosNode
-    const ctrlNegNode = this._pinNodes.get("ctrl-")!;  // VCCScontNegNode
+    const posNode     = this.pinNodes.get("out+")!;   // VCCSposNode
+    const negNode     = this.pinNodes.get("out-")!;   // VCCSnegNode
+    const ctrlPosNode = this.pinNodes.get("ctrl+")!;  // VCCScontPosNode
+    const ctrlNegNode = this.pinNodes.get("ctrl-")!;  // VCCScontNegNode
 
     // TSTALLOC sequence: vccsset.c:43-46, line-for-line
     this._hPCtP = solver.allocElement(posNode, ctrlPosNode); // :43
@@ -159,8 +159,8 @@ export class VCCSAnalogElement extends ControlledSourceElement {
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
-    const ctrlPosNode = this._pinNodes.get("ctrl+")!;
-    const ctrlNegNode = this._pinNodes.get("ctrl-")!;
+    const ctrlPosNode = this.pinNodes.get("ctrl+")!;
+    const ctrlNegNode = this.pinNodes.get("ctrl-")!;
     const vCtrlP = ctrlPosNode > 0 ? rhsOld[ctrlPosNode] : 0;
     const vCtrlN = ctrlNegNode > 0 ? rhsOld[ctrlNegNode] : 0;
     const vCtrl = vCtrlP - vCtrlN;
@@ -192,8 +192,8 @@ export class VCCSAnalogElement extends ControlledSourceElement {
     solver.stampElement(this._hNCtP,  gm); // G[negNode, ctrlPosNode]
     solver.stampElement(this._hNCtN, -gm); // G[negNode, ctrlNegNode]
 
-    const posNode = this._pinNodes.get("out+")!;
-    const negNode = this._pinNodes.get("out-")!;
+    const posNode = this.pinNodes.get("out+")!;
+    const negNode = this.pinNodes.get("out-")!;
     if (posNode !== 0) rhs[posNode] += iNR;
     if (negNode !== 0) rhs[negNode] -= iNR;
   }

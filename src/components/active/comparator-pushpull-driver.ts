@@ -13,8 +13,8 @@
  *   The output is driven to a smoothed target between vOL and vOH, with
  *   the smoothing tracked by the existing `OUTPUT_WEIGHT` slot:
  *     vTarget = (1 - w) * vOH + w * vOL
- *   When latch=0 (v+ above threshold), w trends 0 and vTarget → vOH.
- *   When latch=1 (v+ below threshold, asserted), w trends 1 and vTarget → vOL.
+ *   When latch=0 (v+ above threshold), w trends 0 and vTarget â†’ vOH.
+ *   When latch=1 (v+ below threshold, asserted), w trends 1 and vTarget â†’ vOL.
  *   Latch semantic preserved from the open-collector path: latch=1 means
  *   "asserted/sinking" per the schema doc; in push-pull that maps to "drive
  *   the output low".
@@ -108,7 +108,7 @@ export class ComparatorPushPullDriverElement extends AbstractPoolBackedAnalogEle
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-    const outNode = this._pinNodes.get("out")!;
+    const outNode = this.pinNodes.get("out")!;
     if (outNode !== 0) {
       this._hOutOut = ctx.solver.allocElement(outNode, outNode);
     }
@@ -131,9 +131,9 @@ export class ComparatorPushPullDriverElement extends AbstractPoolBackedAnalogEle
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const vPlus  = rhsOld[this._pinNodes.get("in+")!];
-    const vMinus = rhsOld[this._pinNodes.get("in-")!];
-    const outNode = this._pinNodes.get("out")!;
+    const vPlus  = rhsOld[this.pinNodes.get("in+")!];
+    const vMinus = rhsOld[this.pinNodes.get("in-")!];
+    const outNode = this.pinNodes.get("out")!;
 
     // Hysteresis thresholds.
     const half = this._hysteresis * 0.5;
@@ -169,7 +169,7 @@ export class ComparatorPushPullDriverElement extends AbstractPoolBackedAnalogEle
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const outNode = this._pinNodes.get("out")!;
+    const outNode = this.pinNodes.get("out")!;
     const s1 = this._pool.states[1];
     const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
     const G = 1 / this._rSat;

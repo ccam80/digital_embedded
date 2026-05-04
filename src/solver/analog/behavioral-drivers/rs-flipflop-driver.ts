@@ -3,10 +3,10 @@
  * edge-triggered RS flip-flop.
  *
  * On rising clock edge:
- *   S=0, R=0 → hold previous Q
- *   S=1, R=0 → q=1
- *   S=0, R=1 → q=0
- *   S=1, R=1 → forbidden- hold previous Q (the recovered original additionally
+ *   S=0, R=0 â†’ hold previous Q
+ *   S=1, R=0 â†’ q=1
+ *   S=0, R=1 â†’ q=0
+ *   S=1, R=1 â†’ forbidden- hold previous Q (the recovered original additionally
  *              emitted an "rs-flipflop-both-set" warning via instance-field
  *              `_diagnostics`; that path is not preserved- per the pool-backed
  *              architecture all state lives in slots, and the spec migration
@@ -76,10 +76,10 @@ export class BehavioralRSFlipflopDriverElement extends AbstractPoolBackedAnalogE
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this._pinNodes.get("gnd")!];
-    const vClock = rhsOld[this._pinNodes.get("C")!] - gnd;
-    const vS     = rhsOld[this._pinNodes.get("S")!] - gnd;
-    const vR     = rhsOld[this._pinNodes.get("R")!] - gnd;
+    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
+    const vClock = rhsOld[this.pinNodes.get("C")!] - gnd;
+    const vS     = rhsOld[this.pinNodes.get("S")!] - gnd;
+    const vR     = rhsOld[this.pinNodes.get("R")!] - gnd;
 
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
@@ -107,7 +107,7 @@ export class BehavioralRSFlipflopDriverElement extends AbstractPoolBackedAnalogE
         } else if (rHigh) {
           q = 0;
         }
-        // both low → hold
+        // both low â†’ hold
       }
     }
 
@@ -118,7 +118,7 @@ export class BehavioralRSFlipflopDriverElement extends AbstractPoolBackedAnalogE
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    return new Array(this._pinNodes.size).fill(0);
+    return new Array(this.pinNodes.size).fill(0);
   }
 
   setParam(key: string, value: number): void {

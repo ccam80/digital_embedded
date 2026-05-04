@@ -5,9 +5,9 @@
  * `ConcreteCompiledAnalogCircuit` that the MNA engine can simulate.
  *
  * Steps:
- *  1. Build node map (wire groups → MNA node IDs, ground = 0)
+ *  1. Build node map (wire groups â†’ MNA node IDs, ground = 0)
  *  2. Resolve subcircuit-backed models into MnaModel factories
- *  3. Resolve pin→node bindings for each element
+ *  3. Resolve pinâ†’node bindings for each element
  *  4. Call factory for each element
  *  5. Topology validation (floating nodes, voltage-source loops, inductor loops)
  *  6. Return ConcreteCompiledAnalogCircuit
@@ -90,7 +90,7 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
  *
  * @param nodeId          - MNA node ID for the pin (from groupToNodeId).
  * @param mode            - Circuit-level digitalPinLoading setting.
- * @param nodeIdToOverride - Per-net loading overrides (nodeId → "loaded"|"ideal").
+ * @param nodeIdToOverride - Per-net loading overrides (nodeId â†’ "loaded"|"ideal").
  * @param isCrossDomain   - True when the pin is at a cross-domain boundary
  *                          (bridge adapter); false for purely behavioural pins.
  */
@@ -232,7 +232,7 @@ class InternalNetAllocator extends AbstractAnalogElement {
 
   setup(ctx: import("./setup-context.js").SetupContext): void {
     this._slot.nodeId = ctx.makeVolt(this._labelRef.value, this._suffix);
-    this._pinNodes.set(this._suffix, this._slot.nodeId);
+    this.pinNodes.set(this._suffix, this._slot.nodeId);
   }
 
   load(_ctx: import("./load-context.js").LoadContext): void {
@@ -346,9 +346,9 @@ function compileSubcircuitToMnaModel(
         internalNetSlots.push({ nodeId: -1 });
       }
 
-      // Binding map: subcircuit param name → [{element, elementParamKey}]
+      // Binding map: subcircuit param name â†’ [{element, elementParamKey}]
       // Used by setParam to route subcircuit-level changes to the correct
-      // sub-element param (e.g. "WP" → PMOS elements' "W" param).
+      // sub-element param (e.g. "WP" â†’ PMOS elements' "W" param).
       const bindings = new Map<string, Array<{ el: AnalogElement; key: string }>>();
 
       // Per-instance label resolved at expansion time via setLabel.
@@ -370,7 +370,7 @@ function compileSubcircuitToMnaModel(
         elementsByName.set(subName, subEl);
       }
 
-      // Map sub-element name → constructed AnalogElement, populated as we build
+      // Map sub-element name â†’ constructed AnalogElement, populated as we build
       // each leaf below. Used for siblingState resolution to acquire the
       // resolved sibling element reference (not just the netlist record).
       const constructedByName = new Map<string, AnalogElement>();
@@ -390,21 +390,21 @@ function compileSubcircuitToMnaModel(
         return internalNetSlots[slotIdx]?.nodeId ?? -1;
       }
 
-      // Helpers for creating proxy _pinNodes maps that read slot values lazily.
+      // Helpers for creating proxy pinNodes maps that read slot values lazily.
       // Each sub-element receives a Map whose values for internal nets are
       // resolved at setup() time (after allocators run), not at construction.
       // We accomplish this by giving sub-elements Maps pre-populated with -1
       // for internal nets, then the allocator elements write the resolved IDs
-      // back into the shared slot object. Since the sub-element's _pinNodes Map
+      // back into the shared slot object. Since the sub-element's pinNodes Map
       // holds the node ID directly (it is not a live reference to the slot),
       // we must patch the Map entries before the sub-element's setup() runs.
       //
       // The patching is done by a dedicated patcher element inserted between
       // the allocators and the real sub-elements. The patcher's setup() reads
       // all slot values (now populated) and writes the final node IDs into
-      // each sub-element's _pinNodes.
+      // each sub-element's pinNodes.
 
-      // Record which sub-element _pinNodes entries need patching and which slot.
+      // Record which sub-element pinNodes entries need patching and which slot.
       const patchWork: Array<{
         target: Map<string, number>;
         pinLabel: string;
@@ -582,7 +582,7 @@ function compileSubcircuitToMnaModel(
       }
 
       // Patcher leaf element: runs after allocators, before real sub-elements,
-      // to write resolved internal-node IDs into each sub-element's _pinNodes.
+      // to write resolved internal-node IDs into each sub-element's pinNodes.
       const patcher = new PatcherLeaf(patchWork, labelPatchWork, labelRef);
 
       if (patchWork.length > 0 || labelPatchWork.length > 0) {
@@ -746,7 +746,7 @@ function runPassA_partition(
  *
  * Identifies the Ground group by checking whether any PartitionedComponent in
  * the partition is a Ground element whose pin appears in that group.
- * Ground group → node 0; all other groups → sequential from 1.
+ * Ground group â†’ node 0; all other groups â†’ sequential from 1.
  */
 function buildAnalogNodeMapFromPartition(
   partition: SolverPartition,
@@ -825,7 +825,7 @@ function buildAnalogNodeMapFromPartition(
     // Boundary groups will be assigned node IDs starting at 1 below.
   }
 
-  // Assign node IDs: ground groups → 0; remaining groups → 1, 2, 3, … in
+  // Assign node IDs: ground groups â†’ 0; remaining groups â†’ 1, 2, 3, â€¦ in
   // ngspice deck-line first-encounter order.
   //
   // ngspice numbers MNA nodes during deck PARSE (not during CKTsetup). Each
@@ -839,7 +839,7 @@ function buildAnalogNodeMapFromPartition(
   // `partition.components` in the same order here and assign node IDs as we
   // encounter each component's pins.
   //
-  // We use the typeId→loadOrder lookup `getNgspiceLoadOrderByTypeId`
+  // We use the typeIdâ†’loadOrder lookup `getNgspiceLoadOrderByTypeId`
   // (`core/analog-types.ts`)- load order is a per-DEVICE-TYPE concept in
   // ngspice (its position in `DEVices[]`), not per-model or per-instance, so
   // the typeId is the right key. This avoids the chicken-and-egg of needing
@@ -850,7 +850,7 @@ function buildAnalogNodeMapFromPartition(
       groupToNodeId.set(g.groupId, 0);
     }
   }
-  // Build a position → groupId index for O(1) lookup as we walk pins.
+  // Build a position â†’ groupId index for O(1) lookup as we walk pins.
   const positionToGroupId = new Map<string, number>();
   for (const g of groups) {
     for (const gp of g.pins) {
@@ -885,7 +885,7 @@ function buildAnalogNodeMapFromPartition(
       groupToNodeId.set(gid, nextNodeId++);
     };
     if (deckLabels !== undefined) {
-      // Build a label → ResolvedPin index lookup for this component.
+      // Build a label â†’ ResolvedPin index lookup for this component.
       const labelToPinIdx = new Map<string, number>();
       for (let pi = 0; pi < pc.resolvedPins.length; pi++) {
         labelToPinIdx.set(pc.resolvedPins[pi]!.pinLabel, pi);
@@ -1005,7 +1005,7 @@ export function compileAnalogPartition(
     positionToNodeId,
   } = buildAnalogNodeMapFromPartition(partition, diagnostics);
 
-  // Build a reverse map from MNA node ID → per-net loading override so that
+  // Build a reverse map from MNA node ID â†’ per-net loading override so that
   // bridge synthesis sites can consult per-net overrides instead of relying
   // solely on the circuit-level digitalPinLoading setting.
   const nodeIdToLoadingOverride = new Map<number, "loaded" | "ideal">();
@@ -1070,7 +1070,7 @@ export function compileAnalogPartition(
     const props = el.getProperties();
     const activeModel = route.model;
 
-    // Resolve pin → node ID bindings
+    // Resolve pin â†’ node ID bindings
     const livePins = el.getPins();
     const pinVertices: Array<{ x: number; y: number } | null> = new Array(
       livePins.length,
@@ -1123,7 +1123,7 @@ export function compileAnalogPartition(
       const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
         ? props.get<Record<string, number>>("_pinElectricalOverrides")
         : {};
-      // Build per-pin overrides from flat composite keys (e.g. "A.rOut" → { A: { rOut: ... } })
+      // Build per-pin overrides from flat composite keys (e.g. "A.rOut" â†’ { A: { rOut: ... } })
       const userOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
       for (const [compositeKey, val] of Object.entries(flatOverrides)) {
         const dotIdx = compositeKey.indexOf('.');
@@ -1169,7 +1169,7 @@ export function compileAnalogPartition(
     }
 
     // Populate model params.
-    // Merge order (lowest wins): model entry defaults → element _mparams.
+    // Merge order (lowest wins): model entry defaults â†’ element _mparams.
     const modelEntry = route.entry;
     if (modelEntry) {
       const schemaKeys = new Set(modelEntry.paramDefs.map(d => d.key));
@@ -1265,7 +1265,7 @@ export function compileAnalogPartition(
       const branchIdx = totalNodeCount + 1 + branchCount;
       branchCount++;
       const adapter = makeBridgeOutputAdapter(spec, nodeId, branchIdx, loaded);
-      // Label for coordinator pin-param dispatch (e.g. "out.rOut" → endsWith(":out"))
+      // Label for coordinator pin-param dispatch (e.g. "out.rOut" â†’ endsWith(":out"))
       const driverPin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
       if (driverPin) adapter.label = `bridge-${boundaryGroupId}:${driverPin.pinLabel}`;
       analogElements.push(adapter);
@@ -1287,7 +1287,7 @@ export function compileAnalogPartition(
   // ngspice does (every R, every C, ..., every V, ...). Within each bucket,
   // walk in REVERSE deck order: ngspice's `cktcrte.c:63-65` prepends every
   // parsed instance to the model's GENinstances linked list, so when CKTsetup
-  // walks that list head→tail it visits instances in reverse-deck order. To
+  // walks that list headâ†’tail it visits instances in reverse-deck order. To
   // mirror that, we sort by (ngspiceLoadOrder ASC, originalIndex DESC). The
   // netlist generator emits the deck back in forward-within-bucket order
   // (see netlist-generator.ts) so that ngspice's prepend re-reverses to

@@ -73,7 +73,7 @@ describe("Capacitor", () => {
 
 describe("Capacitor temperature coefficients", () => {
   it("TC1_zero_TNOM_room_temp_gives_nominal_capacitance", () => {
-    // dT=0 → factor=1, C_eff = C_nom * SCALE * M = C_nom
+    // dT=0 â†’ factor=1, C_eff = C_nom * SCALE * M = C_nom
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("TNOM", 300.15);
@@ -83,7 +83,7 @@ describe("Capacitor temperature coefficients", () => {
   });
 
   it("TC1_non_zero_TNOM_offset_scales_capacitance", () => {
-    // TNOM=250K → dT = 300.15-250 = 50.15, TC1=0.001 → factor=1.05015
+    // TNOM=250K â†’ dT = 300.15-250 = 50.15, TC1=0.001 â†’ factor=1.05015
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("TC1", 0.001);
@@ -123,13 +123,13 @@ describe("Capacitor M multiplicity", () => {
   });
 });
 
-// Circuit: VS=1V → R=1kΩ → C=1µF → GND.
-// Time constant τ = R*C = 1 ms.
+// Circuit: VS=1V â†’ R=1kÎ© â†’ C=1ÂµF â†’ GND.
+// Time constant Ï„ = R*C = 1 ms.
 //
 // Closed-form step response of an RC circuit driven by a DC source:
-//   V_C(t) = Vsrc * (1 - exp(-t/τ))
+//   V_C(t) = Vsrc * (1 - exp(-t/Ï„))
 //
-// At t = τ, V_C ≈ Vsrc * (1 - exp(-1)) ≈ 0.63212 V.
+// At t = Ï„, V_C â‰ˆ Vsrc * (1 - exp(-1)) â‰ˆ 0.63212 V.
 
 interface RcCircuitParams {
   vSource: number;
@@ -161,13 +161,13 @@ function findCapacitor(elements: ReadonlyArray<unknown>): AnalogCapacitorElement
 }
 
 describe("Capacitor RC transient response", () => {
-  it("V(C_pos) matches closed-form Vsrc * (1 - exp(-t/τ)) at t≈τ (UIC start)", () => {
+  it("V(C_pos) matches closed-form Vsrc * (1 - exp(-t/Ï„)) at tâ‰ˆÏ„ (UIC start)", () => {
     const Vsrc = 1.0;
     const R    = 1000;
     const C    = 1e-6;
     const tau  = R * C;            // 1 ms
-    const tStop = 5 * tau;         // run ~5τ
-    const maxDt = tau / 100;       // 100 steps per τ keeps trap error well below 1e-3
+    const tStop = 5 * tau;         // run ~5Ï„
+    const maxDt = tau / 100;       // 100 steps per Ï„ keeps trap error well below 1e-3
 
     // Use UIC (Use Initial Conditions, ngspice MODEUIC) to skip DCOP. Without
     // explicit IC parameters the cap starts at V_C(0)=0, so we observe the
@@ -178,9 +178,9 @@ describe("Capacitor RC transient response", () => {
     });
 
     const cap = findCapacitor(fix.circuit.elements);
-    const cPosNode = cap._pinNodes.get("pos")!;
+    const cPosNode = cap.pinNodes.get("pos")!;
 
-    // Step until simTime crosses τ.
+    // Step until simTime crosses Ï„.
     while (fix.engine.simTime < tau) fix.coordinator.step();
 
     const vMeasured = fix.engine.getNodeVoltage(cPosNode);
@@ -189,7 +189,7 @@ describe("Capacitor RC transient response", () => {
     expect(relErr).toBeLessThan(1e-3);
   });
 
-  it("V(C_pos) reaches Vsrc steady state at t ≫ τ", () => {
+  it("V(C_pos) reaches Vsrc steady state at t â‰« Ï„", () => {
     // Complementary check that doesn't depend on UIC: under DCOP the cap is
     // open at DC, so V_C must equal Vsrc both immediately (DCOP) and after
     // any transient run.
@@ -202,7 +202,7 @@ describe("Capacitor RC transient response", () => {
       params: { tStop: 10 * tau, maxTimeStep: tau / 10 },
     });
     const cap = findCapacitor(fix.circuit.elements);
-    const cPosNode = cap._pinNodes.get("pos")!;
+    const cPosNode = cap.pinNodes.get("pos")!;
     while (fix.engine.simTime < 5 * tau) fix.coordinator.step();
     expect(fix.engine.getNodeVoltage(cPosNode)).toBeCloseTo(Vsrc, 6);
   });

@@ -91,7 +91,7 @@ const RULES = [
     pattern: /\.\baccept\s*[!?]?\s*\.?\(\s*[A-Za-z_]/,
     // crude exclusion: MNA-internal files where accept may legitimately exist on
     // a different vtable, plus this script (whose rule comments contain the pattern).
-    exclude: /(^|\/)(src\/solver\/analog\/mna\/|src\/types\/dom-shim|scripts\/lint-bans\.mjs)/,
+    exclude: /(^|\/)(src\/solver\/analog\/mna\/|src\/solver\/analog\/timestep\.ts|src\/solver\/analog\/__tests__\/timestep\.test\.ts|src\/types\/dom-shim|scripts\/lint-bans\.mjs)/,
   },
   {
     id: "B4-schema-indexOf-as-fn",

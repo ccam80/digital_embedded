@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Voltage-Controlled Voltage Source (VCVS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -148,10 +148,10 @@ export class VCVSAnalogElement extends ControlledSourceElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode     = this._pinNodes.get("out+")!;   // VCVSposNode
-    const negNode     = this._pinNodes.get("out-")!;   // VCVSnegNode
-    const ctrlPosNode = this._pinNodes.get("ctrl+")!;  // VCVScontPosNode
-    const ctrlNegNode = this._pinNodes.get("ctrl-")!;  // VCVScontNegNode
+    const posNode     = this.pinNodes.get("out+")!;   // VCVSposNode
+    const negNode     = this.pinNodes.get("out-")!;   // VCVSnegNode
+    const ctrlPosNode = this.pinNodes.get("ctrl+")!;  // VCVScontPosNode
+    const ctrlNegNode = this.pinNodes.get("ctrl-")!;  // VCVScontNegNode
 
     // Branch row allocation: vcvsset.c:41-44 (idempotent guard)
     if (this.branchIndex === -1) {
@@ -180,8 +180,8 @@ export class VCVSAnalogElement extends ControlledSourceElement {
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
-    const ctrlPosNode = this._pinNodes.get("ctrl+")!;
-    const ctrlNegNode = this._pinNodes.get("ctrl-")!;
+    const ctrlPosNode = this.pinNodes.get("ctrl+")!;
+    const ctrlNegNode = this.pinNodes.get("ctrl-")!;
     const vCtrlP = ctrlPosNode > 0 ? rhsOld[ctrlPosNode] : 0;
     const vCtrlN = ctrlNegNode > 0 ? rhsOld[ctrlNegNode] : 0;
     const vCtrl = vCtrlP - vCtrlN;

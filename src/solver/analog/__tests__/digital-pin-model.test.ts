@@ -203,7 +203,7 @@ describe("DigitalOutputPinModel", () => {
     expect(solver.sumAt(branchRow, branchRow)).toBe(1);
     // A[branchRow][NODE] = 0
     expect(solver.sumAt(branchRow, NODE)).toBe(0);
-    // ideal (not loaded) → NO 1/rHiZ diagonal
+    // ideal (not loaded) â†’ NO 1/rHiZ diagonal
     expect(solver.sumAt(NODE, NODE)).toBe(0);
     // RHS at branchRow = 0
     expect(ctx.rhs[branchRow]).toBe(0);
@@ -267,10 +267,10 @@ describe("DigitalOutputPinModel", () => {
 
     const children = pin.getChildElements();
     expect(children.length).toBe(1);
-    // The child is an AnalogCapacitorElement with _pinNodes set
+    // The child is an AnalogCapacitorElement with pinNodes set
     const child = children[0];
     expect(child).toBeDefined();
-    expect([...child._pinNodes.values()]).toEqual([NODE, 0]);
+    expect([...child.pinNodes.values()]).toEqual([NODE, 0]);
   });
 
   it("loaded_getter_reads_private_field", () => {
@@ -361,11 +361,11 @@ describe("DigitalInputPinModel", () => {
     const pin = new DigitalInputPinModel(CMOS_3V3, false);
     pin.init(NODE, 0);
 
-    // voltage > vIH → true
+    // voltage > vIH â†’ true
     expect(pin.readLogicLevel(CMOS_3V3.vIH + 0.1)).toBe(true);
-    // voltage < vIL → false
+    // voltage < vIL â†’ false
     expect(pin.readLogicLevel(CMOS_3V3.vIL - 0.1)).toBe(false);
-    // voltage between vIL and vIH → undefined
+    // voltage between vIL and vIH â†’ undefined
     expect(pin.readLogicLevel((CMOS_3V3.vIL + CMOS_3V3.vIH) / 2)).toBeUndefined();
   });
 
@@ -436,24 +436,24 @@ describe("Task 0.2.3- DigitalPinModel capacitor child refactor", () => {
   });
 
   it("getChildElements_returns_capacitor_when_loaded_and_cout_positive", () => {
-    // Loaded output pin with cOut > 0 → one AnalogCapacitorElement child.
+    // Loaded output pin with cOut > 0 â†’ one AnalogCapacitorElement child.
     const pin = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
     pin.init(1, -1);
     const children = pin.getChildElements();
     expect(children.length).toBe(1);
-    // Child has _pinNodes set to pos=1, neg=0
-    expect([...children[0]._pinNodes.values()]).toEqual([1, 0]);
+    // Child has pinNodes set to pos=1, neg=0
+    expect([...children[0].pinNodes.values()]).toEqual([1, 0]);
   });
 
   it("getChildElements_empty_for_unloaded_output", () => {
-    // Unloaded output pin → no capacitor child (loading disabled).
+    // Unloaded output pin â†’ no capacitor child (loading disabled).
     const pin = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
     pin.init(1, -1);
     expect(pin.getChildElements().length).toBe(0);
   });
 
   it("getChildElements_empty_for_output_with_zero_cout", () => {
-    // Output pin spec with cOut = 0 → no capacitor child even when loaded.
+    // Output pin spec with cOut = 0 â†’ no capacitor child even when loaded.
     // Covers the second negative branch of Task 0.2.3's acceptance criterion
     // (length 0 when either `loaded` or `cOut > 0` fails) for the output model.
     const specNoCap: ResolvedPinElectrical = { ...CMOS_3V3, cOut: 0 };
@@ -463,16 +463,16 @@ describe("Task 0.2.3- DigitalPinModel capacitor child refactor", () => {
   });
 
   it("getChildElements_returns_capacitor_when_loaded_and_cin_positive", () => {
-    // Loaded input pin with cIn > 0 → one AnalogCapacitorElement child.
+    // Loaded input pin with cIn > 0 â†’ one AnalogCapacitorElement child.
     const pin = new DigitalInputPinModel(CMOS_3V3, true);
     pin.init(2, 0);
     const children = pin.getChildElements();
     expect(children.length).toBe(1);
-    expect([...children[0]._pinNodes.values()]).toEqual([2, 0]);
+    expect([...children[0].pinNodes.values()]).toEqual([2, 0]);
   });
 
   it("getChildElements_empty_for_input_with_zero_cin", () => {
-    // Input pin spec with cIn = 0 → no capacitor child.
+    // Input pin spec with cIn = 0 â†’ no capacitor child.
     const specNoCap: ResolvedPinElectrical = { ...CMOS_3V3, cIn: 0 };
     const pin = new DigitalInputPinModel(specNoCap, true);
     pin.init(2, 0);

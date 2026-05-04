@@ -21,7 +21,7 @@
  * engine's _setup and _load walks handle before any real ngspice device:
  *   INTERNAL_NET_ALLOC (-2): makeInternalNetAllocator- calls ctx.makeVolt for
  *     each internal net declared in the subcircuit netlist.
- *   INTERNAL_NET_PATCH (-1): patcher- writes resolved node IDs into _pinNodes
+ *   INTERNAL_NET_PATCH (-1): patcher- writes resolved node IDs into pinNodes
  *     of every leaf element after internal net allocation completes.
  * Sort target: ALLOC -> PATCH -> URC -> ... -> VSRC -> BEHAVIORAL.
  */
@@ -29,7 +29,7 @@ export const NGSPICE_LOAD_ORDER = {
   // Compiler pseudo-leaves (negative- precede every real device,
   // including URC). Sort target: ALLOC -> PATCH -> URC -> ... -> VSRC -> BEHAVIORAL.
   INTERNAL_NET_ALLOC: -2, // makeInternalNetAllocator: ctx.makeVolt per internal net
-  INTERNAL_NET_PATCH: -1, // patcher: writes resolved node IDs into _pinNodes
+  INTERNAL_NET_PATCH: -1, // patcher: writes resolved node IDs into pinNodes
 
   URC:  0,   // dev.c:141- MUST precede both resistors and capacitors
   BJT:  2,
