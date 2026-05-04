@@ -30,7 +30,7 @@ import type { Diagnostic } from "../../compile/types.js";
  * Reactivity is method-presence: an element is "reactive" iff
  * `typeof el.getLteTimestep === "function"`. There are no boolean
  * device-class flags, no Core / non-Core split, no post-compile type
- * promotion. Pin topology is carried entirely by `_pinNodes`; allocation of
+ * promotion. Pin topology is carried entirely by `pinNodes`; allocation of
  * internal nodes / branch rows / state slots / TSTALLOC handles all happens
  * inside `setup(ctx)`, never at construction time.
  */
@@ -82,20 +82,9 @@ export interface AnalogElement {
 
   /**
    * Pin-label-to-MNA-node map. The single source of truth for pin topology.
-   * Populated by the factory at construction; treated as frozen thereafter.
-   * `setup()` and `load()` bodies access pin nodes by label:
-   *   `this.pinNodes.get("pos")!`
-   * Insertion order matches the component's pinLayout order; iterate
-   * `pinNodes.values()` to get pinLayout-ordered node IDs.
-   *
-   * Phase A of the §4g hardening: this is the public read accessor.
-   * Subclasses extending `AbstractAnalogElement` get this via the class
-   * getter (backed by the internal `_pinNodes` field, queued for Phase B
-   * conversion to ECMAScript private `#pinNodes`). Object-literal
-   * `AnalogElement` implementers provide it as a plain `Map` property
-   * (`pinNodes: new Map(...)`).
+   * Exposed as `ReadonlyMap` via getter backed by ES private `#pinNodes`.
    */
-  readonly pinNodes: Map<string, number>;
+  readonly pinNodes: ReadonlyMap<string, number>;
 
   /**
    * Assigned branch-current row index for elements that introduce extra MNA
@@ -239,7 +228,7 @@ export interface AnalogElement {
    * Compute per-pin currents for this element.
    *
    * Returns an array of currents in pinLayout order (same as
-   * `_pinNodes.values()` insertion order), one per visible pin. Positive
+   * `pinNodes.values()` insertion order), one per visible pin. Positive
    * means current flowing into the element. The array must satisfy KCL:
    * the sum of all entries is zero.
    */
@@ -269,9 +258,9 @@ export interface AnalogElement {
  * Optional abstract base class that centralises the boilerplate every
  * class-based AnalogElement needs:
  *
- *   - the four identity / topology fields (`label`, `_pinNodes`,
+ *   - the four identity / topology fields (`label`, `#pinNodes`,
  *     `_stateBase`, `branchIndex`) with their canonical defaults,
- *   - a single, audited assignment of `_pinNodes` from the constructor
+ *   - a single, audited assignment of `#pinNodes` from the constructor
  *     argument that does NOT defensive-copy.
  *
  * The "do not defensive-copy" rule is load-bearing. The composite
@@ -281,7 +270,7 @@ export interface AnalogElement {
  * `ctx.makeVolt(...)` to allocate internal-net node IDs) and this
  * element's `setup()`, the patcher leaf walks `patchWork` and writes the
  * resolved IDs back into the Map. If a leaf constructor freezes a copy
- * via `this._pinNodes = new Map(pinNodes)`, the patcher's writes never
+ * via `this.#pinNodes = new Map(pinNodes)`, the patcher's writes never
  * reach the leaf — the leaf's `setup()` reads `pos`/`neg` as `-1`,
  * `solver.allocElement(-1, b)` returns garbage handles, `rhsOld[b]` is
  * `undefined` past the matrix bound, `L * undefined === NaN` lands in
@@ -303,7 +292,7 @@ export interface AnalogElement {
  *   - declare `readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.<DEV>;`
  *   - call `super(pinNodes)` first thing in the constructor,
  *   - implement `setup`, `load`, `getPinCurrents`, `setParam`,
- *   - do NOT redeclare `label`, `_pinNodes`, `_stateBase`, `branchIndex`
+ *   - do NOT redeclare `label`, `#pinNodes`, `_stateBase`, `branchIndex`
  *     (the base owns them; redeclaration shadows the base field and
  *     re-introduces the defensive-copy footgun this class exists to
  *     prevent).
@@ -312,7 +301,7 @@ export abstract class AbstractAnalogElement implements AnalogElement {
   abstract readonly ngspiceLoadOrder: number;
 
   label = "";
-  _pinNodes: Map<string, number>;
+  readonly #pinNodes: Map<string, number>;
   _stateBase = -1;
   branchIndex = -1;
   elementIndex?: number;
@@ -322,20 +311,12 @@ export abstract class AbstractAnalogElement implements AnalogElement {
     // rationale. The compiler always passes a mutable `Map<string, number>`;
     // the `ReadonlyMap` parameter type is the structural-typing convention
     // shared with object-literal AnalogElement implementers.
-    this._pinNodes = pinNodes as Map<string, number>;
+    this.#pinNodes = pinNodes as Map<string, number>;
   }
 
-  /**
-   * Public read-side accessor for the pin-label-to-MNA-node map.
-   *
-   * Phase A of the §4g hardening: external readers migrate to this getter
-   * while the field remains a mutable `Map<string, number>` (the compiler's
-   * patcher leaf still needs to write internal-net resolutions back in).
-   * Phase B narrows the return type to `ReadonlyMap` and converts the
-   * backing field to ECMAScript private `#pinNodes`.
-   */
-  get pinNodes(): Map<string, number> {
-    return this._pinNodes;
+  /** `ReadonlyMap` view of the pin-label-to-MNA-node map; backed by ES private `#pinNodes`. */
+  get pinNodes(): ReadonlyMap<string, number> {
+    return this.#pinNodes;
   }
 
   abstract setup(ctx: SetupContext): void;

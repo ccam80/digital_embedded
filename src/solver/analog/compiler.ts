@@ -232,7 +232,6 @@ class InternalNetAllocator extends AbstractAnalogElement {
 
   setup(ctx: import("./setup-context.js").SetupContext): void {
     this._slot.nodeId = ctx.makeVolt(this._labelRef.value, this._suffix);
-    this.pinNodes.set(this._suffix, this._slot.nodeId);
   }
 
   load(_ctx: import("./load-context.js").LoadContext): void {
