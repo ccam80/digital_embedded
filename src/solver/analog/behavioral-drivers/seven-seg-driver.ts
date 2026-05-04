@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralSevenSegDriverElement- observation-only driver leaf for the
  * seven-segment display.
  *
@@ -28,7 +28,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -112,7 +112,7 @@ const SEVEN_SEG_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralSevenSegDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralSevenSegDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

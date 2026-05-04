@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for MNAEngine- the concrete AnalogEngine implementation.
  *
  * All circuit fixtures live in `./fixtures/analog-fixtures.ts`. Tests use
@@ -32,8 +32,7 @@ import { createDefaultRegistry } from "../../../components/register-all.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
 import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
@@ -57,7 +56,7 @@ function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class TestResistor extends AbstractAnalogElement {
+  class TestResistor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
     private _hPP = -1;
     private _hNN = -1;
@@ -322,7 +321,7 @@ describe("MNAEngine", () => {
     const edgePeriod = 100e-6;
     const scheduledEdges: number[] = [];
 
-    class PulseElement extends AbstractAnalogElement {
+    class PulseElement extends AnalogElement {
       readonly ngspiceLoadOrder = 0;
       setup(_ctx: SetupContext): void {}
       load(_ctx: LoadContext): void {}

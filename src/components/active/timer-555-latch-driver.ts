@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Timer555LatchDriver â€” RS flip-flop + discharge-BJT base driver leaf.
  *
  * Consumed by `buildTimer555Netlist` in `timer-555.ts` as the `latchDrv`
@@ -19,7 +19,7 @@ import {
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
@@ -66,7 +66,7 @@ const TIMER_555_LATCH_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // Timer555LatchDriverElement
 // ---------------------------------------------------------------------------
 
-export class Timer555LatchDriverElement extends AbstractPoolBackedAnalogElement {
+export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

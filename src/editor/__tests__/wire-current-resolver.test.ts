@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for WireCurrentResolver- KCL-correct tree-traced wire current attribution.
  */
 
@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { WireCurrentResolver } from "../wire-current-resolver";
 import { Wire, Circuit } from "@/core/circuit";
 import type { CurrentResolverContext } from "@/solver/coordinator-types";
-import type { AnalogElement } from "@/solver/analog/element";
+import { AnalogElement } from "@/solver/analog/element";
 import type { CircuitElement } from "@/core/element";
 import type { Pin, Rotation } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
@@ -22,14 +22,13 @@ import { PropertyBag } from "@/core/properties";
 import { makeAcVoltageSourceElement } from "@/components/sources/ac-voltage-source";
 import type { SetupContext } from "@/solver/analog/setup-context";
 import type { LoadContext } from "@/solver/analog/load-context";
-import { AbstractAnalogElement } from "@/solver/analog/element";
 
 // ---------------------------------------------------------------------------
 // Local element factory helpers- use production constructors / factories
 // ---------------------------------------------------------------------------
 
 /** Inline resistor factory: 2-terminal, stamps conductance G=1/R. */
-class WireTestResistorEl extends AbstractAnalogElement {
+class WireTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 40;
   private _hPP = -1;
   private _hNN = -1;
@@ -128,7 +127,7 @@ function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
 }
 
 /** Minimal AnalogElement stub with stamp no-op. */
-class WireTestMockEl extends AbstractAnalogElement {
+class WireTestMockEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   private readonly _pinCount: number;
   constructor(pinNodes: ReadonlyMap<string, number>, branchIndex: number) {

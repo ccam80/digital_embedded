@@ -40,7 +40,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -241,7 +241,7 @@ function swLoadHandles(
 // Direct port of ngspice SW (VSWITCH) primitive. swload.c, swdefs.h.
 // ---------------------------------------------------------------------------
 
-class AnalogSwitchSPSTElement extends AbstractPoolBackedAnalogElement {
+class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
   readonly stateSchema = SW_SCHEMA;
   readonly stateSize = SW_SCHEMA.size;  // 2 (SW_NUM_STATES, swdefs.h:56)
@@ -341,7 +341,7 @@ function createSwitchSPSTElement(
 //   [base+2]: NC_CURRENT_STATE, [base+3]: NC_V_CTRL   COM-NC path
 // ---------------------------------------------------------------------------
 
-class AnalogSwitchSPDTElement extends AbstractPoolBackedAnalogElement {
+class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
   readonly stateSchema = SPDT_SCHEMA;
   readonly stateSize = SPDT_SCHEMA.size;  // 4 (two SW paths × 2 slots each)

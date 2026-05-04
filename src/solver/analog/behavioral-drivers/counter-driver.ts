@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralCounterDriverElement- multi-bit driver leaf for the edge-triggered
  * up-counter with enable, clear, and overflow outputs.
  *
@@ -53,7 +53,7 @@ import {
   type SlotDescriptor,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -133,7 +133,7 @@ const COUNTER_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralCounterDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralCounterDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   // Per-instance schema- the only Template-A shape diff. The schema is still
   // a frozen module-scope object (just one per bitWidth instead of one for

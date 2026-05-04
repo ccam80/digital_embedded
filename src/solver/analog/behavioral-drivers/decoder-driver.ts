@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralDecoderDriverElement- combinational driver leaf for the K-bit
  * decoder.
  *
@@ -37,7 +37,7 @@ import {
   type SlotDescriptor,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -104,7 +104,7 @@ function buildDecoderDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 // BehavioralDecoderDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralDecoderDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;

@@ -25,7 +25,7 @@ import {
   TestSubcircuitElement,
 } from "@/test-fixtures/subcircuit-elements";
 import { noopExecFn } from "@/test-fixtures/execute-stubs";
-import { AbstractAnalogElement } from "@/solver/analog/element";
+import { AnalogElement } from "@/solver/analog/element";
 import type { LoadContext } from "@/solver/analog/load-context";
 import type { SetupContext } from "@/solver/analog/setup-context";
 
@@ -33,7 +33,7 @@ import type { SetupContext } from "@/solver/analog/setup-context";
 // Local class-based analog element stub
 // ---------------------------------------------------------------------------
 
-class FlattenNoopEl extends AbstractAnalogElement {
+class FlattenNoopEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RC lowpass driven by AC voltage source- analytical verification.
  *
  * Circuit: AC Source (Vs) â†’ R â†’ C â†’ GND
@@ -29,8 +29,7 @@ import { makeAcVoltageSourceElement } from "../../../components/sources/ac-volta
 import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../../components/passives/capacitor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
 
@@ -40,7 +39,7 @@ import type { SetupContext } from "../setup-context.js";
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class TestResistor extends AbstractAnalogElement {
+  class TestResistor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
     private _hPP = -1;
     private _hNN = -1;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Potentiometer analog component.
  *
  * A three-terminal linear element modelled as two series resistors sharing a
@@ -21,7 +21,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -167,7 +167,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 // AnalogPotentiometerElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-class AnalogPotentiometerElement extends AbstractAnalogElement {
+class AnalogPotentiometerElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private R: number;

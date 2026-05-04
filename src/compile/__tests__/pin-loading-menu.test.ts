@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Headless tests for the digitalPinLoading circuit metadata field.
  *
  * Verifies that setting digitalPinLoading to "cross-domain", "all", or "none"
@@ -25,8 +25,7 @@ import type { ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
-import type { AnalogElement } from '../../solver/analog/element.js';
-import { AbstractAnalogElement } from '../../solver/analog/element.js';
+import { AnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SetupContext } from '../../solver/analog/setup-context.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
@@ -36,7 +35,7 @@ import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 // Local class-based analog element stub
 // ---------------------------------------------------------------------------
 
-class PinLoadingMenuTestEl extends AbstractAnalogElement {
+class PinLoadingMenuTestEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void { /* no-op for static test fixture */ }

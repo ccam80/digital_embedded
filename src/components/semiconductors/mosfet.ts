@@ -34,7 +34,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -841,7 +841,7 @@ function _createMosfetElementWithPolarity(
     || params.CGDO > 0 || params.CGSO > 0 || params.CGBO > 0
     || oxideCapProbe > 0);
 
-  class MosfetAnalogElement extends AbstractPoolBackedAnalogElement {
+  class MosfetAnalogElement extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MOS;
     readonly stateSchema: StateSchema = MOSFET_SCHEMA;
     readonly stateSize: number = MOSFET_SCHEMA.size;

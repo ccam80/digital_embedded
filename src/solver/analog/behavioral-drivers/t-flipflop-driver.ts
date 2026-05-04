@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralTFlipflopDriverElement- pure-truth-function driver leaf for the
  * edge-triggered T flip-flop.
  *
@@ -22,7 +22,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -50,7 +50,7 @@ const T_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
-export class BehavioralTFlipflopDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

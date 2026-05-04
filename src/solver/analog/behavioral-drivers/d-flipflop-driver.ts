@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralDFlipflopDriverElement- pure-truth-function driver leaf for the
  * edge-triggered D flip-flop.
  *
@@ -29,7 +29,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -91,7 +91,7 @@ const D_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralDFlipflopDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralDFlipflopDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

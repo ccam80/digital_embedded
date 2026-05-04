@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BJT analog components  NPN and PNP bipolar junction transistors.
  *
  * Simple L0 and SPICE L1 (Gummel-Poon) models ported mechanically from
@@ -37,8 +37,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/model-params.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   defineStateSchema,
@@ -564,7 +563,7 @@ function _createBjtElementWithPolarity(
   // Substrate (entries 19-21) and excess-phase (entries 22-23) are also absent
   // from the L0 model, so those allocations are skipped too. The 9 surviving
   // entries match the L0 load() stamp list line for line.
-  class BjtL0Element extends AbstractPoolBackedAnalogElement {
+  class BjtL0Element extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
     readonly stateSchema = BJT_SIMPLE_SCHEMA;
     readonly stateSize = BJT_SIMPLE_SCHEMA.size;
@@ -1173,7 +1172,7 @@ export function createSpiceL1BjtElement(
   // 23 TSTALLOC entries per bjtsetup.c:435-464.
   const internalLabels: string[] = [];
 
-  class BjtL1Element extends AbstractPoolBackedAnalogElement {
+  class BjtL1Element extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
     readonly stateSchema = BJT_L1_SCHEMA;
     readonly stateSize = BJT_L1_SCHEMA.size;

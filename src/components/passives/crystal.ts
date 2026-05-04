@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Quartz crystal analog component  Butterworth-Van Dyke (BVD) equivalent circuit.
  *
  * The BVD model represents the mechanical resonance of a quartz crystal as a
@@ -44,7 +44,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -242,7 +242,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 // AnalogCrystalElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogCrystalElement extends AbstractPoolBackedAnalogElement {
+export class AnalogCrystalElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;

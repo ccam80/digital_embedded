@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Resistor analog component.
  *
  * Stamps a conductance matrix: G = 1/R at four positions in the MNA matrix.
@@ -20,8 +20,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -151,7 +150,7 @@ export class ResistorElement extends AbstractCircuitElement {
 // ResistorAnalogElement- AnalogElement class implementation
 // ---------------------------------------------------------------------------
 
-class ResistorAnalogElement extends AbstractAnalogElement {
+class ResistorAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _resistance: number;

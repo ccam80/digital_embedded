@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AC Analysis Engine tests.
  *
  * Tests use inline AnalogElement implementations with stampAc methods.
@@ -19,8 +19,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
 import type { AcCompiledCircuit } from "../ac-analysis.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComplexSparseSolverStamp as ComplexSparseSolver } from "../complex-sparse-solver.js";
 import * as ComplexSolverModule from "../complex-sparse-solver.js";
@@ -48,7 +47,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
   }
 
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class AcResistor extends AbstractAnalogElement {
+  class AcResistor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}
@@ -76,7 +75,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
  */
 function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): AnalogElement {
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class AcCapacitor extends AbstractAnalogElement {
+  class AcCapacitor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}
@@ -103,7 +102,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
  */
 function makeAcInductor(nodeA: number, nodeB: number, inductance: number): AnalogElement {
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class AcInductor extends AbstractAnalogElement {
+  class AcInductor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}

@@ -18,7 +18,7 @@ import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
-import { AbstractAnalogElement } from '../analog/element.js';
+import { AnalogElement } from '../analog/element.js';
 import type { SetupContext } from '../analog/setup-context.js';
 import type { LoadContext } from '../analog/load-context.js';
 
@@ -26,7 +26,7 @@ import type { LoadContext } from '../analog/load-context.js';
 // Local class-based analog element mocks for coordinator-clock tests
 // ---------------------------------------------------------------------------
 
-class ClockTestGroundEl extends AbstractAnalogElement {
+class ClockTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
@@ -34,7 +34,7 @@ class ClockTestGroundEl extends AbstractAnalogElement {
   setParam(_key: string, _value: number): void {}
 }
 
-class ClockTestResistorEl extends AbstractAnalogElement {
+class ClockTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   private readonly _nodeA: number;
   private readonly _nodeB: number;

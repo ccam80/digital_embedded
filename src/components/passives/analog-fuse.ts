@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Analog fuse MNA element- switching resistance with thermal IÂ²t energy model.
  *
  * Models a fuse as a resistance that switches abruptly from R_cold (intact) to
@@ -37,7 +37,7 @@
  *                   Mirrors vsrcacct.c:24-310.
  */
 
-import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -83,7 +83,7 @@ const MIN_RESISTANCE = 1e-12;
 // AnalogFuseElement- MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogFuseElement extends AbstractPoolBackedAnalogElement {
+export class AnalogFuseElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly stateSchema = ANALOG_FUSE_SCHEMA;
   readonly stateSize = ANALOG_FUSE_SCHEMA.size;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for cktLoad- single-pass device load function.
  *
  * Test groups:
@@ -18,8 +18,7 @@ import { makeCurrentSource as makeCurrentSourceProduction } from '../../../compo
 import { PropertyBag } from '../../../core/properties.js';
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from '../../../components/semiconductors/diode.js';
 import { NGSPICE_LOAD_ORDER } from '../ngspice-load-order.js';
-import { AbstractAnalogElement } from '../element.js';
-import type { AnalogElement } from '../element.js';
+import { AnalogElement } from '../element.js';
 import type { LoadContext } from '../load-context.js';
 import type { SetupContext } from '../setup-context.js';
 import { newtonRaphson } from '../newton-raphson.js';
@@ -35,7 +34,7 @@ import {
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class TestResistor extends AbstractAnalogElement {
+  class TestResistor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
     private _hPP = -1;
     private _hNN = -1;

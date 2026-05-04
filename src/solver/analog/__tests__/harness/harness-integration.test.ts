@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration test for the comparison harness infrastructure.
  */
 import { describe, it, expect, beforeEach } from "vitest";
@@ -8,8 +8,7 @@ import { EngineState } from "../../../../core/engine-interface.js";
 import { allocateStatePool, makeSimpleCtx } from "../test-helpers.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../../core/properties.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../../element.js";
-import { AbstractAnalogElement, AbstractPoolBackedAnalogElement } from "../../element.js";
+import { AnalogElement, PoolBackedAnalogElement } from "../../element.js";
 import type { SetupContext } from "../../setup-context.js";
 import type { LoadContext } from "../../load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../ngspice-load-order.js";
@@ -33,7 +32,7 @@ const ZERO_INTEG_COEFF: IntegrationCoefficients = {
 // testing element correctness.
 // ---------------------------------------------------------------------------
 
-class HarnessResistorEl extends AbstractAnalogElement {
+class HarnessResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   private _hPP = -1;
   private _hNN = -1;
@@ -67,7 +66,7 @@ function makeResistorEl(nodeA: number, nodeB: number, resistance: number): Analo
   return new HarnessResistorEl(new Map([["pos", nodeA], ["neg", nodeB]]), resistance);
 }
 
-class HarnessDiodeEl extends AbstractAnalogElement {
+class HarnessDiodeEl extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
   private _hAA = -1;
   private _hKK = -1;
@@ -135,7 +134,7 @@ const CAP_SCHEMA: StateSchema = {
   indexOf: new Map([["QCAP", 0], ["VCAP", 1]]),
 };
 
-class HarnessCapacitorEl extends AbstractPoolBackedAnalogElement {
+class HarnessCapacitorEl extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly stateSchema = CAP_SCHEMA;
   readonly stateSize = CAP_SCHEMA.size;

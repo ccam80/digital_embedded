@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TransmissionSegmentG- internal-only shunt-conductance segment for the
  * lossy transmission-line composite.
  *
@@ -19,7 +19,7 @@
  * Template C exemplar.
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -49,7 +49,7 @@ const TRANSMISSION_SEGMENT_G_PIN_LAYOUT: PinDeclaration[] = [
 // TransmissionSegmentGElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentGElement extends AbstractAnalogElement {
+export class TransmissionSegmentGElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _G: number;

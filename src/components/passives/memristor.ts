@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Memristor analog component — Joglekar window function model.
  *
  * The memristor's resistance depends on an internal state variable w
@@ -37,7 +37,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -92,7 +92,7 @@ const MIN_WINDOW_P   = 1;
 // MemristorElement  PoolBackedAnalogElement implementation
 // ---------------------------------------------------------------------------
 
-export class MemristorElement extends AbstractPoolBackedAnalogElement {
+export class MemristorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly stateSchema = MEMRISTOR_SCHEMA;
   readonly stateSize = MEMRISTOR_SCHEMA.size;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ADCDriverElement- internal-only behavioral driver leaf for the N-bit ADC
  * composite. Reads one analog input (VIN), a clock (CLK), and a reference
  * voltage (VREF) relative to GND; runs an SAR or instant-conversion FSM
@@ -36,7 +36,7 @@ import {
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
@@ -121,7 +121,7 @@ const ADC_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // ADCDriverElement
 // ---------------------------------------------------------------------------
 
-export class ADCDriverElement extends AbstractPoolBackedAnalogElement {
+export class ADCDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   // Per-instance schema- one per distinct bits value (memoised module-scope).
   readonly stateSchema: StateSchema;

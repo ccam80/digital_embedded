@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralRegisterDriverElement- bus-wide edge-triggered register driver leaf.
  *
  * Reads D (packed bus integer), C, and en from rhsOld (relative to gnd).
@@ -26,7 +26,7 @@ import {
   type SlotDescriptor,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -88,7 +88,7 @@ const REGISTER_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralRegisterDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralRegisterDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;

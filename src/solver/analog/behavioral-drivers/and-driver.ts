@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralAndDriverElement- pure-truth-function driver leaf for the N-input
  * AND gate.
  *
@@ -28,7 +28,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -88,7 +88,7 @@ function buildAndDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 // BehavioralAndDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralAndDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

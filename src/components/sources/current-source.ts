@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Current Source  ideal independent current source for MNA simulation.
  *
  * Stamps only into the RHS vector  no G-matrix entries required.
@@ -24,7 +24,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -163,7 +163,7 @@ const CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // analogFactory helper (exported for tests)
 // ---------------------------------------------------------------------------
 
-class CurrentSourceAnalogImpl extends AbstractAnalogElement {
+class CurrentSourceAnalogImpl extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.ISRC;
 
   private readonly _p: Record<string, number>;

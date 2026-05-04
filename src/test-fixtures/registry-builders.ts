@@ -10,7 +10,7 @@ import type { StandaloneComponentDefinition, ExecuteFunction } from "../core/reg
 import { PropertyBag } from "../core/properties.js";
 import { TestElement } from "./test-element.js";
 import { noopExecFn } from "./execute-stubs.js";
-import { AbstractAnalogElement } from "../solver/analog/element.js";
+import { AnalogElement } from "../solver/analog/element.js";
 import type { SetupContext } from "../solver/analog/setup-context.js";
 import type { LoadContext } from "../solver/analog/load-context.js";
 
@@ -60,7 +60,7 @@ export interface MixedComponentConfig {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-class NoopAnalogElement extends AbstractAnalogElement {
+class NoopAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

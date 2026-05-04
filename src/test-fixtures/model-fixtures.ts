@@ -1,11 +1,11 @@
-import { PropertyBag } from "../core/properties.js";
+﻿import { PropertyBag } from "../core/properties.js";
 import { defineModelParams } from "../core/model-params.js";
 import type { AnalogFactory, ModelEntry } from "../core/registry.js";
-import { AbstractAnalogElement } from "../solver/analog/element.js";
+import { AnalogElement } from "../solver/analog/element.js";
 import type { SetupContext } from "../solver/analog/setup-context.js";
 import type { LoadContext } from "../solver/analog/load-context.js";
 
-class StubAnalogElement extends AbstractAnalogElement {
+class StubAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

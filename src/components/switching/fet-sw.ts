@@ -1,4 +1,4 @@
-/**
+﻿/**
  * FetSW- analog SW leaf for the NFET / PFET / TransGate composites.
  *
  * Reads its sibling driver's `OUTPUT_LOGIC_LEVEL` slot via siblingState,
@@ -20,7 +20,7 @@ import {
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -73,7 +73,7 @@ const FET_SW_PIN_LAYOUT: PinDeclaration[] = [
 // FetSWElement
 // ---------------------------------------------------------------------------
 
-export class FetSWElement extends AbstractPoolBackedAnalogElement {
+export class FetSWElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
   readonly stateSchema = SCHEMA;
   readonly stateSize = 0;

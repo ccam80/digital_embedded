@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralButtonLEDDriverElement- pure threshold-classification driver leaf
  * for the ButtonLED component.
  *
@@ -23,7 +23,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -75,7 +75,7 @@ const BUTTON_LED_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralButtonLEDDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralButtonLEDDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralButtonLEDDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

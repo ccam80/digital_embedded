@@ -22,8 +22,7 @@ import { DcVoltageSourceDefinition } from '../../components/sources/dc-voltage-s
 import { GroundDefinition } from '../../components/io/ground.js';
 import type { Pin } from '../../core/pin.js';
 import type { StandaloneComponentDefinition } from '../../core/registry.js';
-import type { AnalogElement } from '../analog/element.js';
-import { AbstractAnalogElement } from '../analog/element.js';
+import { AnalogElement } from '../analog/element.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { SetupContext } from '../analog/setup-context.js';
 import type { ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
@@ -37,7 +36,7 @@ import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 // Local class-based analog element mocks for coordinator-capability tests
 // ---------------------------------------------------------------------------
 
-class CapabilityTestGroundEl extends AbstractAnalogElement {
+class CapabilityTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
@@ -50,7 +49,7 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pinDescs: { x:
   return new TestElement(typeId, instanceId, { x: 0, y: 0 }, pins);
 }
 
-class CapabilityTestResistorEl extends AbstractAnalogElement {
+class CapabilityTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   private readonly _nodeA: number;
   private readonly _nodeB: number;

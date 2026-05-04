@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Inductor analog component.
  *
  * Reactive two-terminal element that requires a branch variable (extra MNA row)
@@ -21,7 +21,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -177,7 +177,7 @@ const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
 const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 
-export class AnalogInductorElement extends AbstractPoolBackedAnalogElement {
+export class AnalogInductorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;

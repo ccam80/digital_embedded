@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TransmissionSegmentC- internal-only shunt-capacitance segment for the
  * lossy transmission-line composite.
  *
@@ -20,7 +20,7 @@
  * of TC1/TC2/TNOM/SCALE/M and IC handling that the segment never receives.
  */
 
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -85,7 +85,7 @@ const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 // TransmissionSegmentCElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentCElement extends AbstractPoolBackedAnalogElement {
+export class TransmissionSegmentCElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

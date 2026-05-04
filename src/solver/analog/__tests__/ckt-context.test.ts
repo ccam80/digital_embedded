@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for CKTCircuitContext- Phase 1 Task 1.1.1
  *
  * Verifies:
@@ -13,14 +13,13 @@ import { allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class TestResistor extends AbstractAnalogElement {
+  class TestResistor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
     private _hPP = -1;
     private _hNN = -1;
@@ -54,7 +53,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 
 function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number): AnalogElement {
   const VT = 0.025852;
-  class TestDiode extends AbstractAnalogElement {
+  class TestDiode extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
     private _hAA = -1;
     private _hKK = -1;
@@ -91,7 +90,7 @@ function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number
 }
 
 function makeCapacitor(nodePos: number, nodeNeg: number, _capacitance: number): AnalogElement {
-  class TestCapacitor extends AbstractAnalogElement {
+  class TestCapacitor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
     private _hPP = -1;
     private _hNN = -1;

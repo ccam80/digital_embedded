@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Base class for expression-driven controlled analog sources.
  *
  * All four controlled source types (VCVS, VCCS, CCVS, CCCS) share a common
@@ -23,7 +23,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import { AbstractAnalogElement } from "./element.js";
+import { AnalogElement } from "./element.js";
 import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
 import type { ExprNode } from "./expression.js";
@@ -91,7 +91,7 @@ export class MutableExpressionContext implements ExpressionContext {
  * Sources that own a branch row (VCVS, CCVS) inherit the shared
  * `findBranchFor` implementation from this base class (per ssA.6).
  */
-export abstract class ControlledSourceElement extends AbstractAnalogElement {
+export abstract class ControlledSourceElement extends AnalogElement {
   abstract readonly ngspiceLoadOrder: number;
   abstract getPinCurrents(rhs: Float64Array): number[];
 

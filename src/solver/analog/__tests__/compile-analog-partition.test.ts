@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for compileAnalogPartition (P3-7).
  *
  * Verifies that the partition-based entry point handles Ground group
@@ -16,8 +16,7 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentCategory } from "../../../core/registry.js";
-import { AbstractAnalogElement, AbstractPoolBackedAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement, PoolBackedAnalogElement } from "../element.js";
 import { defineStateSchema } from "../state-schema.js";
 import type { SetupContext } from "../setup-context.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
@@ -43,7 +42,7 @@ const PARTITION_STATEFUL_SCHEMA = defineStateSchema("PartitionStatefulEl", [
   { name: "S6", doc: "slot 6" },
 ]);
 
-class PartitionStatefulEl extends AbstractPoolBackedAnalogElement {
+class PartitionStatefulEl extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = 0;
   readonly stateSchema = PARTITION_STATEFUL_SCHEMA;
   readonly stateSize = this.stateSchema.size;
@@ -117,7 +116,7 @@ function makeElement(
 function makeStubElement(nodeIds: number[]): AnalogElement {
   const pinEntries: [string, number][] = nodeIds.map((id, i) => [`p${i}`, id]);
   const pinNodes = new Map(pinEntries);
-  class StubElement extends AbstractAnalogElement {
+  class StubElement extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: import("../setup-context.js").SetupContext): void { /* no-op */ }
     load(_ctx: LoadContext): void { /* no-op */ }

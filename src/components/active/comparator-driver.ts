@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ComparatorDriver- open-collector driver leaf for the analog comparator
  * composite. The push-pull variant lives in
  * `comparator-pushpull-driver.ts`.
@@ -30,7 +30,7 @@
  * J-020 spec text "OUTPUT_LOGIC_LEVEL" predates the schema split.
  */
 
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -84,7 +84,7 @@ const MIN_TAU  = 1e-12;
 // ComparatorDriverElement
 // ---------------------------------------------------------------------------
 
-export class ComparatorDriverElement extends AbstractPoolBackedAnalogElement {
+export class ComparatorDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = COMPARATOR_SCHEMA;
   readonly stateSize = COMPARATOR_SCHEMA.size;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for OTA (Operational Transconductance Amplifier) analog element.
  *
  * Circuit conventions:
@@ -21,8 +21,7 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { makeLoadCtx, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { AbstractAnalogElement } from "../../../solver/analog/element.js";
+import { AnalogElement } from "../../../solver/analog/element.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -77,7 +76,7 @@ function makeOTAElement(
 
 function makeInlineResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class InlineResistorEl extends AbstractAnalogElement {
+  class InlineResistorEl extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: SetupContext): void {}
     load(ctx: LoadContext): void {

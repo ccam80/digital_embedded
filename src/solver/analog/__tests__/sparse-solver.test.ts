@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { stampRHS } from "../stamp-helpers.js";
 import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
@@ -353,8 +353,7 @@ import {
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 import { ComparisonSession } from "./harness/comparison-session.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -370,7 +369,7 @@ import type { Circuit } from "../../../core/circuit.js";
 
 function benchMakeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class BenchResistor extends AbstractAnalogElement {
+  class BenchResistor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
     private _hPP = -1;
     private _hNN = -1;
@@ -409,7 +408,7 @@ function benchMakeResistor(nodeA: number, nodeB: number, resistance: number): An
 }
 
 function benchMakeCapacitor(nodeA: number, nodeB: number, _C: number): AnalogElement {
-  class BenchCapacitor extends AbstractAnalogElement {
+  class BenchCapacitor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
     private _hPP = -1;
     private _hNN = -1;
@@ -443,7 +442,7 @@ function benchMakeDiode(nodeA: number, nodeK: number, IS: number, N: number): An
   const pinNodes = new Map<string, number>();
   pinNodes.set("A", nodeA);
   pinNodes.set("K", nodeK);
-  class BenchDiode extends AbstractAnalogElement {
+  class BenchDiode extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
     setup(ctx: import("../setup-context.js").SetupContext) {
       const s = ctx.solver;
@@ -478,7 +477,7 @@ function benchMakeDiode(nodeA: number, nodeK: number, IS: number, N: number): An
 function benchMakeInductor(nodeA: number, nodeB: number, branchRow: number, _L: number): AnalogElement {
   let _hPIbr = -1, _hNIbr = -1, _hIbrP = -1, _hIbrN = -1, _hIbrIbr = -1;
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class BenchInductor extends AbstractAnalogElement {
+  class BenchInductor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
     constructor(pins: ReadonlyMap<string, number>) {
       super(pins);

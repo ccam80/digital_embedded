@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NTC Thermistor - negative temperature coefficient temperature-dependent resistor.
  *
  * Resistance model:
@@ -22,7 +22,7 @@
  *               bottom-of-load integrates thermal ODE reading s1, writing s0.
  */
 
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -124,7 +124,7 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 // NTCThermistorElement - MNA implementation
 // ---------------------------------------------------------------------------
 
-export class NTCThermistorElement extends AbstractPoolBackedAnalogElement {
+export class NTCThermistorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly stateSchema = NTC_SCHEMA;
   readonly stateSize = NTC_SCHEMA.size;

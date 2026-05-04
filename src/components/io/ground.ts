@@ -25,8 +25,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 
@@ -105,7 +104,7 @@ export function executeGround(index: number, state: Uint32Array, _highZs: Uint32
 // createGroundAnalogElement- AnalogElement factory (no-op stamp)
 // ---------------------------------------------------------------------------
 
-class GroundAnalogElement extends AbstractAnalogElement {
+class GroundAnalogElement extends AnalogElement {
   // Ground is a no-op stamper (the compiler maps its pin to node 0 directly,
   // load() does nothing). Ordinal is therefore irrelevant for parity, but
   // every AnalogElement must declare one. RES is the lowest-ordinal

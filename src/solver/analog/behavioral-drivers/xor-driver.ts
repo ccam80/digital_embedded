@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralXorDriverElement- pure-truth-function driver leaf for the N-input
  * XOR gate.
  *
@@ -20,7 +20,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -80,7 +80,7 @@ function buildXorDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 // BehavioralXorDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralXorDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralXorDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

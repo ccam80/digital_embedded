@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TransmissionSegmentL- internal-only inductor segment for the lossy
  * transmission-line composite.
  *
@@ -20,7 +20,7 @@
  * segment and never uses UIC/temperature scaling.
  */
 
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -78,7 +78,7 @@ const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 // TransmissionSegmentLElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentLElement extends AbstractPoolBackedAnalogElement {
+export class TransmissionSegmentLElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

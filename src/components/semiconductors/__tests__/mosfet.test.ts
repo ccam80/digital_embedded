@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the NMOS and PMOS MOSFET components.
  *
  * Covers:
@@ -29,8 +29,7 @@ import { makeTestSetupContext, setupAll, initElement, runDcOp, loadCtxFromFields
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { AbstractAnalogElement } from "../../../solver/analog/element.js";
+import { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
@@ -184,7 +183,7 @@ function makeNmosAtVgs_Vds(
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class ResistorEl extends AbstractAnalogElement {
+  class ResistorEl extends AnalogElement {
     readonly ngspiceLoadOrder = 40;
     setup(_ctx: SetupContext): void {}
     load(ctx: LoadContext): void {

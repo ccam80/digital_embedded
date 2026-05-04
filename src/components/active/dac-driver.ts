@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DACDriver â€” internal-only hybrid pin+stamp+state driver leaf for the N-bit
  * DAC composite.
  *
@@ -30,7 +30,7 @@ import {
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -97,7 +97,7 @@ const DAC_DRIVER_DEFAULTS: Record<string, number> = {
 // DACDriverElement
 // ---------------------------------------------------------------------------
 
-export class DACDriverElement extends AbstractPoolBackedAnalogElement {
+export class DACDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;

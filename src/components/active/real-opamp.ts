@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Real Op-Amp composite model.
  *
  * Extends the ideal op-amp with physically realistic effects:
@@ -47,7 +47,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -343,7 +343,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *   first-order backward-Euler update of V_int each timestep with slew-rate
  *   clamping. Slew "previous" voltage is read from s1[VINT] (last-accepted).
  */
-export class RealOpAmpAnalogElement extends AbstractPoolBackedAnalogElement {
+export class RealOpAmpAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly stateSchema = REAL_OPAMP_SCHEMA;
   readonly stateSize = REAL_OPAMP_SCHEMA.size;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Headless tests for the .MODEL import flow (W11.1).
  *
  * Verifies:
@@ -23,7 +23,7 @@ import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
-import { AbstractAnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
@@ -38,7 +38,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Local class-based analog element mock for spice-import-dialog tests
 // ---------------------------------------------------------------------------
 
-class SpiceImportTestStubEl extends AbstractAnalogElement {
+class SpiceImportTestStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

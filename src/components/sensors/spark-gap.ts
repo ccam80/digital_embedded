@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Spark Gap - voltage-triggered variable resistance with hysteresis.
  *
  * Behaviour:
@@ -32,7 +32,7 @@
  *                     CONDUCTING state read from s1; bottom-of-load updates s0.
  */
 
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -126,7 +126,7 @@ function applyHysteresis(conductingOld: number, absV: number, vBreakdown: number
 // SparkGapElement - MNA implementation
 // ---------------------------------------------------------------------------
 
-export class SparkGapElement extends AbstractPoolBackedAnalogElement {
+export class SparkGapElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly stateSchema = SPARK_GAP_SCHEMA;
   readonly stateSize = SPARK_GAP_SCHEMA.size;

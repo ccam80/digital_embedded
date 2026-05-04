@@ -17,8 +17,7 @@ import type { PropertyValue } from '../../core/properties.js';
 import type { MeasurementObserver } from '../../core/engine-interface.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { AnalogElement } from '../../solver/analog/element.js';
-import { AbstractAnalogElement } from '../../solver/analog/element.js';
+import { AnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SetupContext } from '../../solver/analog/setup-context.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
@@ -31,7 +30,7 @@ import { buildFixture } from '../../solver/analog/__tests__/fixtures/build-fixtu
 // Local class-based analog element stubs
 // ---------------------------------------------------------------------------
 
-class CoordinatorTestResistorEl extends AbstractAnalogElement {
+class CoordinatorTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   private readonly _resistance: number;
   private readonly _n1: number;
@@ -81,7 +80,7 @@ class CoordinatorTestResistorEl extends AbstractAnalogElement {
   setParam(_key: string, _value: number): void {}
 }
 
-class CoordinatorTestGroundStubEl extends AbstractAnalogElement {
+class CoordinatorTestGroundStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

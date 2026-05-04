@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SubcircuitWrapperElement- presentation-only AnalogElement representing a
  * compiled subcircuit composite from the perspective of the per-instance
  * caller (slider/property-panel hot-patching, per-pin current introspection,
@@ -16,8 +16,7 @@
  * can name internal nodes `${parentLabel}:intN`, and (c) every sub-element so
  * each leaf carries `${parentLabel}:${subElementName}` (Composite I5).
  */
-import { AbstractAnalogElement } from "./element.js";
-import type { AnalogElement } from "./element.js";
+import { AnalogElement } from "./element.js";
 import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
 
@@ -60,7 +59,7 @@ export interface SubcircuitWrapperOptions {
   labelRef: { value: string };
 }
 
-export class SubcircuitWrapperElement extends AbstractAnalogElement {
+export class SubcircuitWrapperElement extends AnalogElement {
   readonly ngspiceLoadOrder: number;
   readonly _subcircuitLeaves: readonly AnalogElement[];
 

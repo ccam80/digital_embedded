@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralDriverInvDriverElement- pure-truth-function driver leaf for the
  * DriverInvSel tri-state buffer (active-LOW enable).
  *
@@ -21,7 +21,7 @@ import {
 } from "../state-schema.js";
 import { logicLevel } from "./edge-detect.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -65,7 +65,7 @@ const DRIVER_INV_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralDriverInvDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralDriverInvDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralDriverInvDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

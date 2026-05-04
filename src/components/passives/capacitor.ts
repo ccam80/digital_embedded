@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Capacitor analog component.
  *
  * Reactive two-terminal element modelled using companion model (equivalent
@@ -21,7 +21,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import { AbstractPoolBackedAnalogElement, type PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -168,7 +168,7 @@ const SLOT_CCAP = 4;
  * stamp; do not introduce a parallel non-registered capacitor
  * class.
  */
-export class AnalogCapacitorElement extends AbstractPoolBackedAnalogElement {
+export class AnalogCapacitorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;

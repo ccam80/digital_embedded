@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AC Voltage Source  time-varying independent voltage source.
  *
  * Supports four waveforms: sine, square, triangle, sawtooth.
@@ -29,7 +29,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -552,7 +552,7 @@ export interface AcVoltageSourceAnalogElement extends AnalogElement {
   setParam(key: string, value: number): void;
 }
 
-class AcVoltageSourceAnalogImpl extends AbstractAnalogElement implements AcVoltageSourceAnalogElement {
+class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSourceAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
 
   // Cached matrix-entry handles — vsrcset.c TSTALLOC sequence

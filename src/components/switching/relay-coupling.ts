@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RelayCoupling - coil-current -> switch-state behavioural leaf.
  *
  * No MNA pins. Reads the coil's branch current (resolved siblingBranch),
@@ -14,7 +14,7 @@
 
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
@@ -30,7 +30,7 @@ const SCHEMA = defineStateSchema("RelayCoupling", []); // no internal state
 // RelayCouplingElement
 // ---------------------------------------------------------------------------
 
-export class RelayCouplingElement extends AbstractPoolBackedAnalogElement {
+export class RelayCouplingElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = 0;

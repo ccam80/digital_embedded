@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Variable Rail  user-adjustable DC voltage source.
  *
  * Designed for live parameter slider integration: changing the rail voltage
@@ -27,8 +27,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -157,7 +156,7 @@ export interface VariableRailAnalogElement extends AnalogElement {
   setParam(key: string, value: number): void;
 }
 
-class VariableRailAnalogImpl extends AbstractAnalogElement implements VariableRailAnalogElement {
+class VariableRailAnalogImpl extends AnalogElement implements VariableRailAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
 
   private _voltage: number;

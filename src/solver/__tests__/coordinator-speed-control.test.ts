@@ -16,8 +16,7 @@ import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
-import type { AnalogElement } from '../analog/element.js';
-import { AbstractAnalogElement } from '../analog/element.js';
+import { AnalogElement } from '../analog/element.js';
 import type { ComplexSparseSolverStamp as ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { SetupContext } from '../analog/setup-context.js';
@@ -28,7 +27,7 @@ import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stub
 // Local class-based analog element mocks for coordinator-speed-control tests
 // ---------------------------------------------------------------------------
 
-class SpeedTestGroundEl extends AbstractAnalogElement {
+class SpeedTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
@@ -36,7 +35,7 @@ class SpeedTestGroundEl extends AbstractAnalogElement {
   setParam(_key: string, _value: number): void {}
 }
 
-class SpeedTestResistorEl extends AbstractAnalogElement {
+class SpeedTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   private readonly _n1: number;
   private readonly _n2: number;

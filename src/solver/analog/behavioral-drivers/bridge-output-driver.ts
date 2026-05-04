@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BridgeOutputDriverElement- analog MNA element at a digital-engine output
  * pin's analog-side boundary.
  *
@@ -42,7 +42,7 @@
 
 import { defineStateSchema, type StateSchema } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { StatePoolRef } from "../state-pool.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -55,7 +55,7 @@ import { stampRHS } from "../stamp-helpers.js";
 // the bridge's stateSize includes the child's stateSize.
 const BRIDGE_OUTPUT_SCHEMA: StateSchema = defineStateSchema("BridgeOutputDriver", []);
 
-export class BridgeOutputDriverElement extends AbstractPoolBackedAnalogElement {
+export class BridgeOutputDriverElement extends PoolBackedAnalogElement {
   // ---------- AnalogElement contract ----------
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
 

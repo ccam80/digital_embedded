@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the digitalPinLoading circuit metadata field.
  *
  * Verifies that the three loading modes produce the correct bridge adapter
@@ -32,8 +32,7 @@ import type { PropertyValue } from "../../../core/properties.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
 import type { ExecuteFunction } from "../../../core/registry.js";
-import type { AnalogElement } from "../element.js";
-import { AbstractAnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
@@ -45,7 +44,7 @@ import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.j
 // Local class-based analog element mocks for digital-pin-loading tests
 // ---------------------------------------------------------------------------
 
-class PinLoadingTestGroundEl extends AbstractAnalogElement {
+class PinLoadingTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
@@ -54,7 +53,7 @@ class PinLoadingTestGroundEl extends AbstractAnalogElement {
 }
 
 
-class PinLoadingTestStubEl extends AbstractAnalogElement {
+class PinLoadingTestStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

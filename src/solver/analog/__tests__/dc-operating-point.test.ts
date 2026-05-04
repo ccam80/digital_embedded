@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the DC operating point solver (Tasks 1.1.3 and 1.3.2).
  *
  * Tests cover all four outcomes:
@@ -36,12 +36,11 @@ import { CKTCircuitContext } from "../ckt-context.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { stampRHS } from "../stamp-helpers.js";
 import { allocateStatePool, makeTestSetupContext, setupAll } from "./test-helpers.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../core/analog-engine-interface.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { AbstractAnalogElement } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
@@ -56,7 +55,7 @@ const noopBreakpoint = (_t: number): void => {};
  */
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  class TestResistor extends AbstractAnalogElement {
+  class TestResistor extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
     private _hAA = -1;
     private _hBB = -1;
@@ -100,57 +99,42 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
  * the matrix non-singular.
  */
 function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogElement {
-  const Is = 1e-14;
-  const vt = 0.025852;
-  // Once gmin stepping has started (diagonalGmin > 0 observed at least once),
-  // stop blocking so the final clean solve can converge normally.
-  let seenPositiveDiagGmin = false;
-  function stampG(solver: import("../sparse-solver.js").SparseSolver, row: number, col: number, val: number): void {
-    if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
-  }
-  return {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    pinNodes: nodeB === 0 ? new Map([["pos", nodeA]]) : new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(_ctx): void {},
-    setParam(_key: string, _value: number): void {},
-
+  class GminDependentElement extends AnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+    private _seenPositiveDiagGmin = false;
+    constructor(private readonly _nodeA: number, private readonly _nodeB: number) {
+      super(_nodeB === 0
+        ? new Map([["pos", _nodeA]])
+        : new Map([["pos", _nodeA], ["neg", _nodeB]]));
+    }
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    setParam(_key: string, _value: number): void {}
     load(ctx: import("../load-context.js").LoadContext): void {
+      const Is = 1e-14;
+      const vt = 0.025852;
       const { solver } = ctx;
-      const vA = ctx.rhsOld[nodeA];
-      const vB = ctx.rhsOld[nodeB];
+      const vA = ctx.rhsOld[this._nodeA];
+      const vB = ctx.rhsOld[this._nodeB];
       const v = vA - vB;
-      // Shockley diode residual  ill-conditioned at diagonalGmin=0, solvable
-      // once ctx.diagonalGmin > 0 (stamped atomically inside SparseSolver.factor).
-      // Mirrors ngspice dioload.c:298,310 but intentionally omits the internal
-      // CKTgmin addition  only the outer diagonalGmin stepping stabilizes it.
       const expv = v > 40 * vt ? Math.exp(40) : Math.exp(v / vt);
       const id = Is * (expv - 1);
       const geq = Is * expv / vt;
       const ieq = id - geq * v;
-      // Conductance stamps
-      stampG(solver, nodeA, nodeA, geq);
-      stampG(solver, nodeB, nodeB, geq);
-      stampG(solver, nodeA, nodeB, -geq);
-      stampG(solver, nodeB, nodeA, -geq);
-      // RHS stamps
-      if (nodeA !== 0) stampRHS(ctx.rhs, nodeA, -ieq);
-      if (nodeB !== 0) stampRHS(ctx.rhs, nodeB, ieq);
-      // Track whether gmin stepping has started. ctx.gmin (LoadContext.gmin)
-      // equals CKTdiagGmin  set by ckt-load.ts from ctx.diagonalGmin before
-      // each NR iteration. Once a positive gmin is seen, the operating point
-      // has been warmed up and the final clean solve (gmin=0) can converge.
-      if (ctx.gmin > 0) seenPositiveDiagGmin = true;
-      // Force non-convergence when gmin=0 so direct NR fails and the
-      // gmin stepping path is reliably entered. Stop blocking once gmin
-      // stepping has warmed up the solution.
-      if (ctx.gmin === 0 && !seenPositiveDiagGmin) ctx.noncon.value++;
-    },
-
-    getPinCurrents(_v: Float64Array): number[] { return nodeB === 0 ? [0] : [0, 0]; },
-  };
+      const stampG = (row: number, col: number, val: number): void => {
+        if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
+      };
+      stampG(this._nodeA, this._nodeA, geq);
+      stampG(this._nodeB, this._nodeB, geq);
+      stampG(this._nodeA, this._nodeB, -geq);
+      stampG(this._nodeB, this._nodeA, -geq);
+      if (this._nodeA !== 0) stampRHS(ctx.rhs, this._nodeA, -ieq);
+      if (this._nodeB !== 0) stampRHS(ctx.rhs, this._nodeB, ieq);
+      if (ctx.gmin > 0) this._seenPositiveDiagGmin = true;
+      if (ctx.gmin === 0 && !this._seenPositiveDiagGmin) ctx.noncon.value++;
+    }
+    getPinCurrents(_v: Float64Array): number[] { return this._nodeB === 0 ? [0] : [0, 0]; }
+  }
+  return new GminDependentElement(nodeA, nodeB);
 }
 
 /**
@@ -168,55 +152,42 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
  * Used to force gillespieSrc / spice3Src paths reliably.
  */
 function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): AnalogElement {
-  const vt = 0.025852;
-  // Once source stepping has started (srcFact < 1 observed at least once),
-  // stop blocking so the final full-scale step can converge.
-  let seenPartialSrcFact = false;
-  function stampG(solver: import("../sparse-solver.js").SparseSolver, row: number, col: number, val: number): void {
-    if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
-  }
-  return {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    pinNodes: nodeB === 0 ? new Map([["pos", nodeA]]) : new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(_ctx): void {},
-    setParam(_key: string, _value: number): void {},
-
+  class SrcSteppingRequiredElement extends AnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+    private _seenPartialSrcFact = false;
+    constructor(private readonly _nodeA: number, private readonly _nodeB: number) {
+      super(_nodeB === 0
+        ? new Map([["pos", _nodeA]])
+        : new Map([["pos", _nodeA], ["neg", _nodeB]]));
+    }
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    setParam(_key: string, _value: number): void {}
     load(ctx: import("../load-context.js").LoadContext): void {
+      const vt = 0.025852;
       const { solver } = ctx;
-      const vA = ctx.rhsOld[nodeA];
-      const vB = ctx.rhsOld[nodeB];
+      const vA = ctx.rhsOld[this._nodeA];
+      const vB = ctx.rhsOld[this._nodeB];
       const v = vA - vB;
-      // Pathological Shockley residual scaled by source-stepping factor
-      // (ctx.srcFact == ngspice CKTsrcFact). Large Is_scaled at full scale
-      // creates an ill-conditioned residual that direct NR / gmin can't
-      // solve; shrinking Is via srcFact at intermediate source-stepping
-      // values makes the residual tractable.
       const IsScaled = 1e-6 * ctx.srcFact;
       const expv = Math.exp(Math.min(v / vt, 40));
       const id = IsScaled * (expv - 1);
       const geq = IsScaled * expv / vt;
       const ieq = id - geq * v;
-      stampG(solver, nodeA, nodeA, geq);
-      stampG(solver, nodeB, nodeB, geq);
-      stampG(solver, nodeA, nodeB, -geq);
-      stampG(solver, nodeB, nodeA, -geq);
-      if (nodeA !== 0) stampRHS(ctx.rhs, nodeA, -ieq);
-      if (nodeB !== 0) stampRHS(ctx.rhs, nodeB, ieq);
-      // Track whether source stepping has started (srcFact < 1 means we're
-      // inside the stepping ramp). Once seen, allow the final full-scale step
-      // to converge normally so spice3Src/gillespieSrc can complete.
-      if (ctx.srcFact < 1) seenPartialSrcFact = true;
-      // Force non-convergence at full scale until source stepping has warmed
-      // up the operating point. Direct NR and gmin stepping both run at
-      // srcFact=1 and fail here, triggering source stepping.
-      if (ctx.srcFact >= 1 && !seenPartialSrcFact) ctx.noncon.value++;
-    },
-
-    getPinCurrents(_v: Float64Array): number[] { return nodeB === 0 ? [0] : [0, 0]; },
-  };
+      const stampG = (row: number, col: number, val: number): void => {
+        if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
+      };
+      stampG(this._nodeA, this._nodeA, geq);
+      stampG(this._nodeB, this._nodeB, geq);
+      stampG(this._nodeA, this._nodeB, -geq);
+      stampG(this._nodeB, this._nodeA, -geq);
+      if (this._nodeA !== 0) stampRHS(ctx.rhs, this._nodeA, -ieq);
+      if (this._nodeB !== 0) stampRHS(ctx.rhs, this._nodeB, ieq);
+      if (ctx.srcFact < 1) this._seenPartialSrcFact = true;
+      if (ctx.srcFact >= 1 && !this._seenPartialSrcFact) ctx.noncon.value++;
+    }
+    getPinCurrents(_v: Float64Array): number[] { return this._nodeB === 0 ? [0] : [0, 0]; }
+  }
+  return new SrcSteppingRequiredElement(nodeA, nodeB);
 }
 
 const DEFAULT_PARAMS = resolveSimulationParams(DEFAULT_SIMULATION_PARAMS);
@@ -277,7 +248,7 @@ function makeScalableVoltageSource(
   voltage: number,
 ): AnalogElement {
   const pinNodes = new Map([["pos", nodePos], ["neg", nodeNeg]]);
-  class ScalableVoltageSource extends AbstractAnalogElement {
+  class ScalableVoltageSource extends AnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
     constructor(pins: ReadonlyMap<string, number>) {
       super(pins);

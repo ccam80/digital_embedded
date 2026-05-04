@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SwitchDT component -- SPDT switch with mechanical symbol rendering.
  *
  * Double-throw switch: three terminals per pole (A=common, B=upper, C=lower).
@@ -25,7 +25,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -315,7 +315,7 @@ export interface SpdtAnalogElement extends AnalogElement {
   setClosed(closed: boolean): void;
 }
 
-export class SwitchDTAnalogElement extends AbstractAnalogElement implements SpdtAnalogElement {
+export class SwitchDTAnalogElement extends AnalogElement implements SpdtAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
 
   readonly swAB: SwitchAnalogElement;

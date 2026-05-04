@@ -70,7 +70,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -146,7 +146,7 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
 // OtaAnalogElement
 // ---------------------------------------------------------------------------
 
-class OtaAnalogElement extends AbstractAnalogElement {
+class OtaAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
 
   private readonly p: Record<string, number>;

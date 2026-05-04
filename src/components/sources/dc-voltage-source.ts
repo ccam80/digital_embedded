@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DC Voltage Source  ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
@@ -26,8 +26,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -159,7 +158,7 @@ const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // DcVoltageSourceAnalogElement  AnalogElement class implementation
 // ---------------------------------------------------------------------------
 
-class DcVoltageSourceAnalogElement extends AbstractAnalogElement {
+class DcVoltageSourceAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
 
   private _voltage: number;

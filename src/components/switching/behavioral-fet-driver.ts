@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralFETDriver- behavioral driver leaf for the NFET / PFET / TransGate
  * composites. Reads V(G) - V(S), thresholds against Vth, and writes the
  * classified logic level (0 or 1) into its own OUTPUT_LOGIC_LEVEL pool slot.
@@ -25,7 +25,7 @@ import {
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -85,7 +85,7 @@ const BEHAVIORAL_FET_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralFETDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralFETDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

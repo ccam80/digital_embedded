@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralDAsyncFlipflopDriverElement- pure-truth-function driver leaf for
  * the D flip-flop with asynchronous Set / Clr.
  *
@@ -19,7 +19,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -49,7 +49,7 @@ const D_AS_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
-export class BehavioralDAsyncFlipflopDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralDAsyncFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

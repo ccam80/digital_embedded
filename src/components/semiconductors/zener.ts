@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Zener diode analog component  Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
@@ -24,7 +24,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import {
@@ -177,7 +177,7 @@ interface ZenerTp {
   tBV: number;
 }
 
-class ZenerAnalogElement extends AbstractPoolBackedAnalogElement {
+class ZenerAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
   readonly stateSchema = ZENER_STATE_SCHEMA;
   readonly stateSize = 4;

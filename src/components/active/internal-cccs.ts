@@ -1,4 +1,4 @@
-/**
+﻿/**
  * InternalCccs â€” internal-only current-controlled current source.
  *
  * Per Composite M4 (phase-composite-architecture.md), J-024
@@ -18,7 +18,7 @@
  *   G[neg, b_sense] -= gain
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -49,7 +49,7 @@ const INTERNAL_CCCS_PIN_LAYOUT: PinDeclaration[] = [
 // InternalCccsElement
 // ---------------------------------------------------------------------------
 
-export class InternalCccsElement extends AbstractAnalogElement {
+export class InternalCccsElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
 
   /** Gain (CTR). Hot-loadable via setParam("gain", v). */

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the analog circuit compiler.
  *
  * Uses a lightweight test registry with minimal analog ComponentDefinitions
@@ -16,8 +16,7 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentCategory } from "../../../core/registry.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import { compileUnified } from "@/compile/compile.js";
@@ -95,7 +94,7 @@ function makeElement(
 
 function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class TestResistor extends AbstractAnalogElement {
+  class TestResistor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}
@@ -108,7 +107,7 @@ function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
 
 function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
   const pinNodes = new Map([["pos", nodePos], ["neg", nodeNeg]]);
-  class TestVs extends AbstractAnalogElement {
+  class TestVs extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     constructor(pins: ReadonlyMap<string, number>) {
       super(pins);
@@ -125,7 +124,7 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
 
 function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class TestInductor extends AbstractAnalogElement {
+  class TestInductor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     constructor(pins: ReadonlyMap<string, number>) {
       super(pins);

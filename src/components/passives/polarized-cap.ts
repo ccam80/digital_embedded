@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Polarized electrolytic capacitor analog component.
  *
  * Extends the standard capacitor companion model with three additional effects:
@@ -38,8 +38,8 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -259,7 +259,7 @@ function makeClampDiodeProps(): PropertyBag {
 // AnalogPolarizedCapElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogPolarizedCapElement extends AbstractPoolBackedAnalogElement {
+export class AnalogPolarizedCapElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;

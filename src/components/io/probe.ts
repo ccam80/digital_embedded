@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Probe component- measurement point.
  *
  * Reads its input signal and adds it to the measurement/signal list.
@@ -24,8 +24,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 
@@ -216,7 +215,7 @@ const PROBE_PROPERTY_DEFS: PropertyDefinition[] = [
 // Analog probe factory and element
 // ---------------------------------------------------------------------------
 
-class AnalogProbeElement extends AbstractAnalogElement {
+class AnalogProbeElement extends AnalogElement {
   // Probe is a pure voltage measurement- no MNA contribution. Ordinal is
   // therefore irrelevant for parity, but every AnalogElement must declare one.
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;

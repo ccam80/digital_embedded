@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralOutputDriver- Norton-equivalent behaviourally-driven source.
  *
  * Reads a logic level from a sibling leaf's pool slot (resolved at expansion
@@ -41,7 +41,7 @@ import {
   type StateSchema,
 } from "./state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "./ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "./element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "./element.js";
 import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
 import { stampRHS } from "./stamp-helpers.js";
@@ -107,7 +107,7 @@ const BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS: Record<string, number> = {
 // BehavioralOutputDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralOutputDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralOutputDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * InternalZeroVoltSense â€” internal-only 0V voltage-source sense element.
  *
  * Per Composite M4 (phase-composite-architecture.md), J-025
@@ -17,7 +17,7 @@
  *   +1 at (b, pos), -1 at (b, neg)   â€” KVL row (V_pos - V_neg = 0)
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -38,7 +38,7 @@ const INTERNAL_ZERO_VOLT_SENSE_PIN_LAYOUT: PinDeclaration[] = [
 // InternalZeroVoltSenseElement
 // ---------------------------------------------------------------------------
 
-export class InternalZeroVoltSenseElement extends AbstractAnalogElement {
+export class InternalZeroVoltSenseElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
 
   // Cached matrix-entry handles â€” mirror vsrcsetup.c TSTALLOC sequence for

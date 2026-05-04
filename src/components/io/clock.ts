@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Clock component  periodic signal source or manual toggle.
  *
  * When autoRun is true (default), the ClockManager toggles the output
@@ -21,8 +21,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -249,7 +248,7 @@ export interface AnalogClockElement extends AnalogElement {
  * internally, preserving the call-site signature of makeAnalogClockElement.
  */
 class AnalogClockElementImpl
-  extends AbstractAnalogElement
+  extends AnalogElement
   implements AnalogClockElement
 {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;

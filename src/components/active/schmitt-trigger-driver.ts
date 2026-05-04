@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SchmittTriggerDriver â€” internal-only hybrid pin+stamp+state driver leaf for
  * the Schmitt Trigger composite (both inverting and non-inverting variants).
  *
@@ -37,7 +37,7 @@
  *   5. Bottom-of-load history write: OUTPUT_LATCH written to s0 exactly once.
  */
 
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -103,7 +103,7 @@ const G_NORTON = 1 / 1e-3;
 // SchmittTriggerDriverElement
 // ---------------------------------------------------------------------------
 
-export class SchmittTriggerDriverElement extends AbstractPoolBackedAnalogElement {
+export class SchmittTriggerDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHMITT_TRIGGER_SCHEMA;
   readonly stateSize = SCHMITT_TRIGGER_SCHEMA.size;

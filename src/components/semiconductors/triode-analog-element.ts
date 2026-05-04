@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TriodeAnalogElement — Koren plate-current analog leaf.
  *
  * Internal-only sub-element emitted by the user-facing `Triode` parent
@@ -17,13 +17,13 @@
  * VCCS sub-element + 2 own gds entries:
  *   (P,G) +gm   (P,K) -gm   (K,G) -gm   (K,K) +gm   (P,P) +gds   (K,P) -gds
  *
- * Pool-backed (`AbstractPoolBackedAnalogElement`): per-NR state lives in
+ * Pool-backed (`PoolBackedAnalogElement`): per-NR state lives in
  * the shared StatePool so NR rollback recovers `_vgk` and the cached
  * Koren operating-point (`ip`, `gm`, `gds`, `vgk`, `vpk`) on retries.
  */
 
 import {
-  AbstractPoolBackedAnalogElement,
+  PoolBackedAnalogElement,
   type AnalogElement,
 } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -161,7 +161,7 @@ const TRIODE_ANALOG_PIN_LAYOUT: PinDeclaration[] = [
 // TriodeAnalogElement
 // ---------------------------------------------------------------------------
 
-export class TriodeAnalogElement extends AbstractPoolBackedAnalogElement {
+export class TriodeAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
   readonly stateSchema: StateSchema = TRIODE_ANALOG_SCHEMA;
   readonly stateSize: number = TRIODE_ANALOG_SCHEMA.size;

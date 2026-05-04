@@ -1,10 +1,10 @@
-/**
+﻿/**
  * FGNFETBlownDriver- OTP fuse clamp. When params.blown===true, stamps
  * a strong conductance G_blown=1 between FG and S, forcing V_GS_eff~=0
  * regardless of CG; when false, no-op.
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -35,7 +35,7 @@ const FGNFET_BLOWN_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // FGNFETBlownDriverElement
 // ---------------------------------------------------------------------------
 
-export class FGNFETBlownDriverElement extends AbstractAnalogElement {
+export class FGNFETBlownDriverElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _blown: boolean;

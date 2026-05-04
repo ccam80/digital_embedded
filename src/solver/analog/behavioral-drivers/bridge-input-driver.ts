@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BridgeInputDriverElement- analog MNA element at a digital-engine input
  * pin's analog-side boundary.
  *
@@ -31,7 +31,7 @@
 
 import { defineStateSchema, type StateSchema } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { StatePoolRef } from "../state-pool.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -41,7 +41,7 @@ import { PropertyBag } from "../../../core/properties.js";
 
 const BRIDGE_INPUT_SCHEMA: StateSchema = defineStateSchema("BridgeInputDriver", []);
 
-export class BridgeInputDriverElement extends AbstractPoolBackedAnalogElement {
+export class BridgeInputDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = BRIDGE_INPUT_SCHEMA;
   readonly stateSize: number;

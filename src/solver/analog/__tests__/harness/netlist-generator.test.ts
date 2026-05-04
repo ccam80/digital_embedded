@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for Item 5 (BJT companion current mapping) and Item 12 (netlist generator).
  */
 import { describe, it, expect } from "vitest";
@@ -9,8 +9,7 @@ import { PropertyBag } from "../../../../core/properties.js";
 import { AbstractCircuitElement } from "../../../../core/element.js";
 import type { RenderContext } from "../../../../core/renderer-interface.js";
 import type { Pin } from "../../../../core/pin.js";
-import type { AnalogElement } from "../../element.js";
-import { AbstractAnalogElement } from "../../element.js";
+import { AnalogElement } from "../../element.js";
 import type { LoadContext } from "../../load-context.js";
 import type { SetupContext } from "../../setup-context.js";
 import type { StatePool } from "../../state-pool.js";
@@ -20,7 +19,7 @@ import { createDefaultRegistry } from "../../../../components/register-all.js";
 // Local class-based analog element stub
 // ---------------------------------------------------------------------------
 
-class NetlistGenTestEl extends AbstractAnalogElement {
+class NetlistGenTestEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

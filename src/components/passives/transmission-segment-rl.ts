@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TransmissionSegmentRL- internal-only combined R+L segment for the lossy
  * transmission-line composite's final segment.
  *
@@ -23,7 +23,7 @@
  * the extra series-resistance contribution to the branch diagonal.
  */
 
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -79,7 +79,7 @@ const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 // TransmissionSegmentRLElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentRLElement extends AbstractPoolBackedAnalogElement {
+export class TransmissionSegmentRLElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LDR (Light Dependent Resistor)  illumination-dependent resistor.
  *
  * Resistance model:
@@ -27,8 +27,7 @@
  *   load(ctx)  stamps conductance 1/R(lux) between terminals every NR iteration
  */
 
-import type { AnalogElement } from "../../solver/analog/element.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -71,7 +70,7 @@ export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModel
 // LDRElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class LDRElement extends AbstractAnalogElement {
+export class LDRElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _hPP: number = -1; // (posNode, posNode)- ressetup.c:46

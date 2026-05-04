@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MutualInductorElement and InductorSubElement â€” class-based leaves used by
  * Transformer composites.
  *
@@ -16,7 +16,7 @@
  *   mutload.c         - MUT load (off-diagonal coupling stamps)
  */
 
-import { AbstractAnalogElement, AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -56,7 +56,7 @@ const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
  * factories (e.g. `transformer.ts` ctor body, prior to the netlist-form
  * migration).
  */
-export class InductorSubElement extends AbstractPoolBackedAnalogElement {
+export class InductorSubElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly stateSchema: StateSchema = INDUCTOR_SUB_SCHEMA;
   readonly stateSize: number = INDUCTOR_SUB_SCHEMA.size;
@@ -247,7 +247,7 @@ export class InductorSubElement extends AbstractPoolBackedAnalogElement {
  * NOT pool-backed â€” MUT allocates no state slots (mutsetup.c:28
  * `NG_IGNORE(states)`).
  */
-export class MutualInductorElement extends AbstractAnalogElement {
+export class MutualInductorElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
 
   private _coupling: number;

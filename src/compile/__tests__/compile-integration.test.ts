@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests for the unified compilation pipeline (P3-9).
  *
  * Verifies the unified compilation pipeline produces correct output for
@@ -22,8 +22,7 @@ import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
-import type { AnalogElement } from '../../solver/analog/element.js';
-import { AbstractAnalogElement } from '../../solver/analog/element.js';
+import { AnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SetupContext } from '../../solver/analog/setup-context.js';
 import type { IntegrationMethod } from '../../solver/analog/integration.js';
@@ -35,7 +34,7 @@ import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 // Local class-based analog element stubs
 // ---------------------------------------------------------------------------
 
-class IntegrationResistorEl extends AbstractAnalogElement {
+class IntegrationResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
@@ -44,7 +43,7 @@ class IntegrationResistorEl extends AbstractAnalogElement {
   setParam(_key: string, _value: number): void {}
 }
 
-class IntegrationVsEl extends AbstractAnalogElement {
+class IntegrationVsEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
@@ -53,7 +52,7 @@ class IntegrationVsEl extends AbstractAnalogElement {
   setParam(_key: string, _value: number): void {}
 }
 
-class IntegrationCapacitorEl extends AbstractAnalogElement {
+class IntegrationCapacitorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void { /* no-op for static test fixture */ }

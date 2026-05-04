@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralMuxDriverElement- selector-indexed pick driver leaf for the
  * N-input MUX (where N = 2^selectorBits).
  *
@@ -16,7 +16,7 @@ import {
   type SlotDescriptor,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -108,7 +108,7 @@ function buildMuxDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 // BehavioralMuxDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralMuxDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema: StateSchema;
   readonly stateSize: number;

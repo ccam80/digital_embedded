@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit tests for TimestepController.
  *
  * Tests cover:
@@ -11,8 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
-import { AbstractAnalogElement } from "../element.js";
-import type { AnalogElement } from "../element.js";
+import { AnalogElement } from "../element.js";
 import type { IntegrationMethod } from "../integration.js";
 import type { ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
@@ -54,7 +53,7 @@ const DEFAULT_PARAMS: ResolvedSimulationParams = {
  */
 function makeReactiveElement(truncationError: number): AnalogElement {
   const pinNodes = new Map([["A", 1], ["B", 0]]);
-  class ReactiveElement extends AbstractAnalogElement {
+  class ReactiveElement extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}

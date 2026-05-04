@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BehavioralNotDriverElement- pure-truth-function driver leaf for the 1-input
  * NOT gate.
  *
@@ -16,7 +16,7 @@ import {
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AbstractPoolBackedAnalogElement } from "../element.js";
+import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
@@ -68,7 +68,7 @@ const NOT_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // BehavioralNotDriverElement
 // ---------------------------------------------------------------------------
 
-export class BehavioralNotDriverElement extends AbstractPoolBackedAnalogElement {
+export class BehavioralNotDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;

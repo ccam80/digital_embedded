@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit tests for compileUnified()- the Phase 3 unified compilation entry point.
  *
  * Tests verify:
@@ -20,8 +20,7 @@ import { PinDirection } from "../../core/pin.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { PropertyBag as PropertyBagType, PropertyValue } from "../../core/properties.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
-import { AbstractAnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { ComplexSparseSolver } from "../../solver/analog/complex-sparse-solver.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -33,7 +32,7 @@ import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 // Local class-based analog element stubs
 // ---------------------------------------------------------------------------
 
-class CompileTestResistorEl extends AbstractAnalogElement {
+class CompileTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   private readonly _resistance: number;
   private readonly _n1: number;
@@ -69,7 +68,7 @@ class CompileTestResistorEl extends AbstractAnalogElement {
   setParam(_key: string, _value: number): void {}
 }
 
-class CompileTestGroundStubEl extends AbstractAnalogElement {
+class CompileTestGroundStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}

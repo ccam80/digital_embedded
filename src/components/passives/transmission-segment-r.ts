@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TransmissionSegmentR- internal-only resistor segment for the lossy
  * transmission-line composite.
  *
@@ -18,7 +18,7 @@
  * tolerance / ACtemp scaling that segments never receive.
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -51,7 +51,7 @@ const TRANSMISSION_SEGMENT_R_PIN_LAYOUT: PinDeclaration[] = [
 // TransmissionSegmentRElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentRElement extends AbstractAnalogElement {
+export class TransmissionSegmentRElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _R: number;

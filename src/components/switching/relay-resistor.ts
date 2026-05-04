@@ -1,17 +1,17 @@
-/**
+﻿/**
  * RelayResSubElement- RES sub-element for relay coil resistance.
  *
  * ngspice anchor: ressetup.c:46-49 (TSTALLOC) + resload.c (4-stamp conductance).
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
-export class RelayResSubElement extends AbstractAnalogElement {
+export class RelayResSubElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   // Handle fields- port of ressetup.c:46-49 TSTALLOC sequence

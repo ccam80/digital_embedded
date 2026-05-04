@@ -1,4 +1,4 @@
-/**
+﻿/**
  * P-channel JFET analog component.
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/jfet/jfetload.c::JFETload`.
@@ -28,7 +28,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
-import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -249,7 +249,7 @@ export function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
 // PJfetAnalogElement  pool-backed class for P-channel JFET load.
 // ---------------------------------------------------------------------------
 
-class PJfetAnalogElement extends AbstractPoolBackedAnalogElement {
+class PJfetAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.JFET;
   readonly stateSchema = PJFET_SCHEMA;
   readonly stateSize = PJFET_SCHEMA.size;

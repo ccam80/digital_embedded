@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Switch component -- SPST switch with mechanical symbol rendering.
  *
  * Like PlainSwitch but with the standard mechanical switch symbol:
@@ -24,7 +24,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -316,7 +316,7 @@ export interface SpstAnalogElement extends AnalogElement {
   setSwState(on: boolean): void;
 }
 
-export class SwitchAnalogElement extends AbstractPoolBackedAnalogElement implements SpstAnalogElement {
+export class SwitchAnalogElement extends PoolBackedAnalogElement implements SpstAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
 
   readonly stateSchema = SWITCH_SCHEMA;

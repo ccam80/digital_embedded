@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Analog circuit compiler.
  *
  * Transforms a visual `Circuit` containing analog components into a
@@ -38,7 +38,7 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
-import { isPoolBacked, AbstractAnalogElement, type AnalogElement } from "./element.js";
+import { isPoolBacked, AnalogElement } from "./element.js";
 import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
@@ -212,7 +212,7 @@ function resolveSubcircuitModels(
  * element's label before `super.setup(ctx)` is called, so that diagnostic node
  * names are attributed to the correct parent instance.
  */
-class InternalNetAllocator extends AbstractAnalogElement {
+class InternalNetAllocator extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.INTERNAL_NET_ALLOC;
 
   private readonly _labelRef: { value: string };
@@ -259,7 +259,7 @@ type LabelPatchWorkItem = {
   template: (label: string) => string;
 };
 
-class PatcherLeaf extends AbstractAnalogElement {
+class PatcherLeaf extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.INTERNAL_NET_PATCH;
 
   private readonly _patchWork: ReadonlyArray<PatchWorkItem>;
