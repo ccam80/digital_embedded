@@ -352,7 +352,6 @@ import {
 } from "./test-helpers.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { MNAEngine } from "../analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { AbstractAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
