@@ -75,9 +75,9 @@ export class TransformerCouplingElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
 
   /** Global label of sibling 1 (e.g. `parentLabel:L1`). Compiler-stamped. */
-  private readonly _label1: string;
+  private _label1 = "";
   /** Global label of sibling 2 (e.g. `parentLabel:L2`). Compiler-stamped. */
-  private readonly _label2: string;
+  private _label2 = "";
   /** Mutual inductance. Hot-loadable via setParam("M", v). */
   private _M: number;
   /** Resolved sibling branch indices (1-based MNA branch numbers). */
@@ -86,20 +86,12 @@ export class TransformerCouplingElement extends AbstractAnalogElement {
   /** Cached solver handles for the two off-diagonal stamps. */
   private _hBr1Br2 = -1;
   private _hBr2Br1 = -1;
+  private readonly _props: PropertyBag;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
 
-    // siblingBranch resolution: compiler stamps "${parentLabel}:${subName}"
-    // into the regular prop partition (compiler.ts:391-394). Empty string
-    // sentinel means the parent didn't supply the ref.
-    this._label1 = props.getOrDefault<string>("L1_branch", "");
-    this._label2 = props.getOrDefault<string>("L2_branch", "");
-    if (!this._label1 || !this._label2) {
-      throw new Error(
-        "TransformerCoupling: requires L1_branch and L2_branch siblingBranch params.",
-      );
-    }
+    this._props = props;
 
     // Numeric element params route through the mparams partition
     // (compiler.ts:372-374). Default 0 means uncoupled — handles still get
@@ -108,6 +100,14 @@ export class TransformerCouplingElement extends AbstractAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
+    this._label1 = this._props.getOrDefault<string>("L1_branch", "");
+    this._label2 = this._props.getOrDefault<string>("L2_branch", "");
+    if (!this._label1 || !this._label2) {
+      throw new Error(
+        "TransformerCoupling: requires L1_branch and L2_branch siblingBranch params.",
+      );
+    }
+
     // findBranch returns the 1-based MNA branch row for the named sibling,
     // lazy-allocating if the sibling's setup() has not yet run (VSRCfindBr
     // pattern). Returns 0 on failure → the sibling has no branchCount,

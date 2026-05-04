@@ -38,7 +38,7 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
-import { isPoolBacked, type AnalogElement } from "./element.js";
+import { isPoolBacked, AbstractAnalogElement, type AnalogElement } from "./element.js";
 import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
@@ -212,36 +212,92 @@ function resolveSubcircuitModels(
  * element's label before `super.setup(ctx)` is called, so that diagnostic node
  * names are attributed to the correct parent instance.
  */
-function makeInternalNetAllocator(
-  labelRef: { value: string },
-  suffix: string,
-  slot: { nodeId: number },
-): AnalogElement {
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.INTERNAL_NET_ALLOC,
-    _pinNodes: new Map(),
-    _stateBase: -1,
-    branchIndex: -1,
+class InternalNetAllocator extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.INTERNAL_NET_ALLOC;
 
-    setup(ctx: import("./setup-context.js").SetupContext): void {
-      slot.nodeId = ctx.makeVolt(labelRef.value, suffix);
-      el._pinNodes.set(suffix, slot.nodeId);
-    },
+  private readonly _labelRef: { value: string };
+  private readonly _suffix: string;
+  private readonly _slot: { nodeId: number };
 
-    load(_ctx: import("./load-context.js").LoadContext): void {
-      // No stamps- allocator only.
-    },
+  constructor(
+    labelRef: { value: string },
+    suffix: string,
+    slot: { nodeId: number },
+  ) {
+    super(new Map());
+    this._labelRef = labelRef;
+    this._suffix = suffix;
+    this._slot = slot;
+  }
 
-    getPinCurrents(_rhs: Float64Array): number[] {
-      return [];
-    },
+  setup(ctx: import("./setup-context.js").SetupContext): void {
+    this._slot.nodeId = ctx.makeVolt(this._labelRef.value, this._suffix);
+    this._pinNodes.set(this._suffix, this._slot.nodeId);
+  }
 
-    setParam(_key: string, _value: number): void {
-      // No params.
-    },
-  };
-  return el;
+  load(_ctx: import("./load-context.js").LoadContext): void {
+    // No stamps- allocator only.
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [];
+  }
+
+  setParam(_key: string, _value: number): void {
+    // No params.
+  }
+}
+
+type PatchWorkItem = {
+  target: Map<string, number>;
+  pinLabel: string;
+  slot: { nodeId: number };
+};
+
+type LabelPatchWorkItem = {
+  target: PropertyBag;
+  paramKey: string;
+  template: (label: string) => string;
+};
+
+class PatcherLeaf extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.INTERNAL_NET_PATCH;
+
+  private readonly _patchWork: ReadonlyArray<PatchWorkItem>;
+  private readonly _labelPatchWork: ReadonlyArray<LabelPatchWorkItem>;
+  private readonly _labelRef: { value: string };
+
+  constructor(
+    patchWork: ReadonlyArray<PatchWorkItem>,
+    labelPatchWork: ReadonlyArray<LabelPatchWorkItem>,
+    labelRef: { value: string },
+  ) {
+    super(new Map());
+    this._patchWork = patchWork;
+    this._labelPatchWork = labelPatchWork;
+    this._labelRef = labelRef;
+  }
+
+  setup(_ctx: import("./setup-context.js").SetupContext): void {
+    for (const { target, pinLabel, slot } of this._patchWork) {
+      target.set(pinLabel, slot.nodeId);
+    }
+    for (const { target, paramKey, template } of this._labelPatchWork) {
+      target.set(paramKey, template(this._labelRef.value));
+    }
+  }
+
+  load(_ctx: import("./load-context.js").LoadContext): void {
+    // No stamps- patcher only.
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [];
+  }
+
+  setParam(_key: string, _value: number): void {
+    // No params.
+  }
 }
 
 /**
@@ -355,6 +411,12 @@ function compileSubcircuitToMnaModel(
         slot: { nodeId: number };
       }> = [];
 
+      const labelPatchWork: Array<{
+        target: PropertyBag;
+        paramKey: string;
+        template: (label: string) => string;
+      }> = [];
+
       for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
         const subEl = netlist.elements[elIdx];
         const connectivity = netlist.netlist[elIdx];
@@ -394,10 +456,11 @@ function compileSubcircuitToMnaModel(
                 }
                 // Write the GLOBAL label into the dependent leaf's prop bag.
                 // The dependent leaf's setup() calls ctx.findBranch(label).
-                subProps.set(
+                labelPatchWork.push({
+                  target: subProps,
                   paramKey,
-                  `${labelRef.value}:${ref.subElementName}`,
-                );
+                  template: (label) => `${label}:${ref.subElementName}`,
+                });
               } else if (tag === "siblingState") {
                 const ref = v as { kind: "siblingState"; subElementName: string; slotName: string };
                 const sibling = elementsByName.get(ref.subElementName);
@@ -515,38 +578,14 @@ function compileSubcircuitToMnaModel(
         const slot = internalNetSlots[i]!;
         const suffix = `int${i}`;
         internalNetLabelsResolved.push(suffix);
-        allChildren.push(makeInternalNetAllocator(labelRef, suffix, slot));
+        allChildren.push(new InternalNetAllocator(labelRef, suffix, slot));
       }
 
       // Patcher leaf element: runs after allocators, before real sub-elements,
       // to write resolved internal-node IDs into each sub-element's _pinNodes.
-      const patcher: AnalogElement = {
-        label: "",
-        ngspiceLoadOrder: NGSPICE_LOAD_ORDER.INTERNAL_NET_PATCH,
-        _pinNodes: new Map(),
-        _stateBase: -1,
-        branchIndex: -1,
+      const patcher = new PatcherLeaf(patchWork, labelPatchWork, labelRef);
 
-        setup(_ctx: import("./setup-context.js").SetupContext): void {
-          for (const { target, pinLabel, slot } of patchWork) {
-            target.set(pinLabel, slot.nodeId);
-          }
-        },
-
-        load(_ctx: import("./load-context.js").LoadContext): void {
-          // No stamps- patcher only.
-        },
-
-        getPinCurrents(_rhs: Float64Array): number[] {
-          return [];
-        },
-
-        setParam(_key: string, _value: number): void {
-          // No params.
-        },
-      };
-
-      if (patchWork.length > 0) {
+      if (patchWork.length > 0 || labelPatchWork.length > 0) {
         allChildren.push(patcher);
       }
 

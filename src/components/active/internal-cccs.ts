@@ -55,9 +55,10 @@ export class InternalCccsElement extends AbstractAnalogElement {
   /** Gain (CTR). Hot-loadable via setParam("gain", v). */
   private _gain: number;
   /** Global label of the sense branch sibling. Compiler-stamped. */
-  private readonly _senseLabel: string;
+  private _senseLabel = "";
   /** Resolved sense branch index (1-based MNA branch number). */
   private _senseBranch = -1;
+  private readonly _props: PropertyBag;
 
   // Cached matrix-entry handles — ccssetup.c TSTALLOC at (pos, b_sense)
   // and (neg, b_sense).
@@ -66,18 +67,18 @@ export class InternalCccsElement extends AbstractAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
+    this._props = props;
     this._gain = props.hasModelParam("gain") ? props.getModelParam<number>("gain") : 1;
-    // siblingBranch resolution: compiler stamps "${parentLabel}:${subName}"
-    // into the regular prop partition (compiler.ts:391-394).
-    this._senseLabel = props.getOrDefault<string>("sense", "");
+  }
+
+  setup(ctx: SetupContext): void {
+    this._senseLabel = this._props.getOrDefault<string>("sense", "");
     if (!this._senseLabel) {
       throw new Error(
         "InternalCccs: requires sense siblingBranch param.",
       );
     }
-  }
 
-  setup(ctx: SetupContext): void {
     const solver = ctx.solver;
     const posNode = this._pinNodes.get("pos")!;
     const negNode = this._pinNodes.get("neg")!;

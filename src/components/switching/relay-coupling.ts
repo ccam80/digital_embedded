@@ -35,23 +35,17 @@ export class RelayCouplingElement extends AbstractPoolBackedAnalogElement {
   readonly stateSchema = SCHEMA;
   readonly stateSize = 0;
 
-  private readonly _coilBranchLabel: string;
+  private _coilBranchLabel = "";
   private readonly _switchClosedRef: PoolSlotRef;
   private _pullInI: number;
   private _dropOutI: number;
   private _coilBranchIndex = -1;
+  private readonly _props: PropertyBag;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
 
-    // siblingBranch resolution: compiler stamps "${parentLabel}:${subName}"
-    // into the regular prop partition (compiler.ts:391-394).
-    this._coilBranchLabel = props.getOrDefault<string>("coilBranch", "");
-    if (!this._coilBranchLabel) {
-      throw new Error(
-        "RelayCoupling: requires coilBranch siblingBranch param.",
-      );
-    }
+    this._props = props;
 
     // siblingState resolution: compiler writes a PoolSlotRef struct via
     // PropertyBag.set (compiler.ts siblingState resolver).
@@ -62,6 +56,12 @@ export class RelayCouplingElement extends AbstractPoolBackedAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
+    this._coilBranchLabel = this._props.getOrDefault<string>("coilBranch", "");
+    if (!this._coilBranchLabel) {
+      throw new Error(
+        "RelayCoupling: requires coilBranch siblingBranch param.",
+      );
+    }
     this._coilBranchIndex = ctx.findBranch(this._coilBranchLabel);
     if (this._coilBranchIndex === 0) {
       throw new Error(
