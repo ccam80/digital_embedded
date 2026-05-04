@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Clock component  periodic signal source or manual toggle.
  *
  * When autoRun is true (default), the ClockManager toggles the output
@@ -21,9 +21,11 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -240,6 +242,154 @@ export interface AnalogClockElement extends AnalogElement {
 }
 
 /**
+ * Class-based analog clock element. Stamps a square-wave voltage source
+ * via the unified load(ctx) interface.
+ *
+ * Non-standard ctor: accepts nodePos as a number and builds pinNodes
+ * internally, preserving the call-site signature of makeAnalogClockElement.
+ */
+class AnalogClockElementImpl
+  extends AbstractAnalogElement
+  implements AnalogClockElement
+{
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+
+  private readonly _nodePos: number;
+  private readonly _nodeNeg: number;
+  private readonly _halfPeriod: number;
+  private readonly _vdd: number;
+  private readonly _getTime: () => number;
+
+  private _hPosBranch = -1;
+  private _hNegBranch = -1;
+  private _hBranchPos = -1;
+  private _hBranchNeg = -1;
+
+  constructor(
+    nodePos: number,
+    nodeNeg: number,
+    branchIdx: number,
+    frequency: number,
+    vdd: number,
+    getTime: () => number,
+  ) {
+    super(new Map<string, number>([["out", nodePos]]));
+    this.branchIndex = branchIdx;
+    this._nodePos = nodePos;
+    this._nodeNeg = nodeNeg;
+    this._halfPeriod = 1 / (2 * frequency);
+    this._vdd = vdd;
+    this._getTime = getTime;
+  }
+
+  setup(ctx: SetupContext): void {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    const k = this.branchIndex;
+    if (this._nodePos !== 0) this._hPosBranch = ctx.solver.allocElement(this._nodePos, k);
+    if (this._nodeNeg !== 0) this._hNegBranch = ctx.solver.allocElement(this._nodeNeg, k);
+    if (this._nodePos !== 0) this._hBranchPos = ctx.solver.allocElement(k, this._nodePos);
+    if (this._nodeNeg !== 0) this._hBranchNeg = ctx.solver.allocElement(k, this._nodeNeg);
+  }
+
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    return this.branchIndex;
+  }
+
+  setParam(_key: string, _value: number): void {}
+
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const k = this.branchIndex;
+
+    // Branch incidence (B and C sub-matrices)- handles allocated in setup().
+    if (this._nodePos !== 0) solver.stampElement(this._hPosBranch, 1);
+    if (this._nodeNeg !== 0) solver.stampElement(this._hNegBranch, -1);
+    if (this._nodePos !== 0) solver.stampElement(this._hBranchPos, 1);
+    if (this._nodeNeg !== 0) solver.stampElement(this._hBranchNeg, -1);
+
+    // Square-wave voltage value at current simulation time.
+    const t = this._getTime();
+    const halfPeriods = Math.floor(t / this._halfPeriod);
+    const v = halfPeriods % 2 === 0 ? this._vdd : 0;
+    stampRHS(ctx.rhs, k, v * ctx.srcFact);
+  }
+
+  stampAtTime(rhs: Float64Array, t: number): void {
+    const k = this.branchIndex;
+    const halfPeriods = Math.floor(t / this._halfPeriod);
+    const v = halfPeriods % 2 === 0 ? this._vdd : 0;
+    stampRHS(rhs, k, v);
+  }
+
+  nextBreakpoint(afterTime: number): number | null {
+    const idx = Math.floor(afterTime / this._halfPeriod) + 1;
+    const result = idx * this._halfPeriod;
+    return result > afterTime ? result : (idx + 1) * this._halfPeriod;
+  }
+
+  /**
+   * Mirrors ngspice VSRCaccept PULSE branch (vsrcacct.c:50-145) collapsed
+   * for the clock-specific case TR = TF = 0. Phase boundaries land at
+   * integer multiples of halfPeriod; SAMETIME tolerance scales with halfP
+   * (the natural plateau width). atBreakpoint mirrors CKTbreak.
+   */
+  acceptStep(
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+    atBreakpoint: boolean,
+  ): void {
+    if (!atBreakpoint) return;
+    const PW = this._halfPeriod;
+    const PER = 2 * this._halfPeriod;
+    const TIMETOL = 1e-7;
+    const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+    let time = simTime;
+    let basetime = 0;
+    if (time >= PER) {
+      basetime = PER * Math.floor(time / PER);
+      time -= basetime;
+    }
+
+    // TR = TF = 0 collapses VSRCaccept's switch to two boundaries: time = 0
+    // (rising edge) and time = halfPeriod (falling edge). After hitting one,
+    // register the next.
+    if (sametime(time, 0)) {
+      addBreakpoint(basetime + PW);
+    } else if (sametime(time, PW)) {
+      addBreakpoint(basetime + PER);
+    } else if (sametime(time, PER)) {
+      addBreakpoint(basetime + PER + PW);
+    }
+  }
+
+  getBreakpoints(tStart: number, tEnd: number): number[] {
+    const out: number[] = [];
+    let t = tStart;
+    while (true) {
+      const next = this.nextBreakpoint(t);
+      if (next === null || next >= tEnd) break;
+      if (next <= t) {
+        throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
+      }
+      out.push(next);
+      t = next;
+    }
+    return out;
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
+    return [-I];
+  }
+}
+
+/**
  * Create an analog clock element that stamps a square-wave voltage source
  * via the unified load(ctx) interface.
  *
@@ -256,129 +406,7 @@ export function makeAnalogClockElement(
   vdd: number,
   getTime: () => number,
 ): AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } {
-  const halfPeriod = 1 / (2 * frequency);
-
-  let _hPosBranch = -1;
-  let _hNegBranch = -1;
-  let _hBranchPos = -1;
-  let _hBranchNeg = -1;
-
-  const el: AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } = {
-    label: "",
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    _stateBase: -1,
-    _pinNodes: new Map<string, number>([["out", nodePos]]),
-
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      if (el.branchIndex === -1) {
-        el.branchIndex = ctx.makeCur(el.label, "branch");
-      }
-      const k = el.branchIndex;
-      if (nodePos !== 0) _hPosBranch = ctx.solver.allocElement(nodePos, k);
-      if (nodeNeg !== 0) _hNegBranch = ctx.solver.allocElement(nodeNeg, k);
-      if (nodePos !== 0) _hBranchPos = ctx.solver.allocElement(k, nodePos);
-      if (nodeNeg !== 0) _hBranchNeg = ctx.solver.allocElement(k, nodeNeg);
-    },
-
-    findBranchFor(_name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
-      if (el.branchIndex === -1) {
-        el.branchIndex = ctx.makeCur(el.label, "branch");
-      }
-      return el.branchIndex;
-    },
-
-    setParam(_key: string, _value: number): void {
-    },
-
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      const k = el.branchIndex;
-
-      // Branch incidence (B and C sub-matrices)- handles allocated in setup().
-      if (nodePos !== 0) solver.stampElement(_hPosBranch, 1);
-      if (nodeNeg !== 0) solver.stampElement(_hNegBranch, -1);
-      if (nodePos !== 0) solver.stampElement(_hBranchPos, 1);
-      if (nodeNeg !== 0) solver.stampElement(_hBranchNeg, -1);
-
-      // Square-wave voltage value at current simulation time.
-      const t = getTime();
-      const halfPeriods = Math.floor(t / halfPeriod);
-      const v = halfPeriods % 2 === 0 ? vdd : 0;
-      stampRHS(ctx.rhs, k, v * ctx.srcFact);
-    },
-
-    stampAtTime(rhs: Float64Array, t: number): void {
-      const k = el.branchIndex;
-      const halfPeriods = Math.floor(t / halfPeriod);
-      const v = halfPeriods % 2 === 0 ? vdd : 0;
-      stampRHS(rhs, k, v);
-    },
-
-    nextBreakpoint(afterTime: number): number | null {
-      const idx = Math.floor(afterTime / halfPeriod) + 1;
-      const result = idx * halfPeriod;
-      return result > afterTime ? result : (idx + 1) * halfPeriod;
-    },
-
-    /**
-     * Mirrors ngspice VSRCaccept PULSE branch (vsrcacct.c:50-145) collapsed
-     * for the clock-specific case TR = TF = 0. Phase boundaries land at
-     * integer multiples of halfPeriod; SAMETIME tolerance scales with halfP
-     * (the natural plateau width). atBreakpoint mirrors CKTbreak.
-     */
-    acceptStep(
-      simTime: number,
-      addBreakpoint: (t: number) => void,
-      atBreakpoint: boolean,
-    ): void {
-      if (!atBreakpoint) return;
-      const PW = halfPeriod;
-      const PER = 2 * halfPeriod;
-      const TIMETOL = 1e-7;
-      const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
-
-      let time = simTime;
-      let basetime = 0;
-      if (time >= PER) {
-        basetime = PER * Math.floor(time / PER);
-        time -= basetime;
-      }
-
-      // TR = TF = 0 collapses VSRCaccept's switch to two boundaries: time = 0
-      // (rising edge) and time = halfPeriod (falling edge). After hitting one,
-      // register the next.
-      if (sametime(time, 0)) {
-        addBreakpoint(basetime + halfPeriod);
-      } else if (sametime(time, halfPeriod)) {
-        addBreakpoint(basetime + PER);
-      } else if (sametime(time, PER)) {
-        addBreakpoint(basetime + PER + halfPeriod);
-      }
-    },
-
-    getBreakpoints(tStart: number, tEnd: number): number[] {
-      const out: number[] = [];
-      let t = tStart;
-      while (true) {
-        const next = el.nextBreakpoint(t);
-        if (next === null || next >= tEnd) break;
-        if (next <= t) {
-          throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
-        }
-        out.push(next);
-        t = next;
-      }
-      return out;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const I = rhs[el.branchIndex];
-      return [-I];
-    },
-  };
-
-  return el;
+  return new AnalogClockElementImpl(nodePos, nodeNeg, branchIdx, frequency, vdd, getTime);
 }
 
 // ---------------------------------------------------------------------------

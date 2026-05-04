@@ -228,6 +228,10 @@ import { RelayResistorDefinition } from "./switching/relay-resistor.js";
 import { FGNFETBlownDriverDefinition } from "./switching/fgnfet-blown-driver.js";
 import { FGPFETBlownDriverDefinition } from "./switching/fgpfet-blown-driver.js";
 
+// FET / TransGate sub-elements (internalOnly)
+import { FetSWDefinition } from "./switching/fet-sw.js";
+import { BehavioralFETDriverDefinition } from "./switching/behavioral-fet-driver.js";
+
 // Gate behavioral drivers (internalOnly)
 import { BehavioralAndDriverDefinition } from "../solver/analog/behavioral-drivers/and-driver.js";
 import { BehavioralOrDriverDefinition } from "../solver/analog/behavioral-drivers/or-driver.js";
@@ -273,6 +277,9 @@ import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.
 
 // Transformer coupling sub-element (internalOnly)
 import { TransformerCouplingDefinition } from "./passives/transformer-coupling.js";
+
+// Triode analog leaf (internalOnly)
+import { TriodeAnalogDefinition } from "./semiconductors/triode-analog-element.js";
 
 /**
  * Create a ComponentRegistry populated with every built-in component type.
@@ -518,6 +525,10 @@ export function createDefaultRegistry(
   registry.register(FGNFETBlownDriverDefinition);
   registry.register(FGPFETBlownDriverDefinition);
 
+  // FET / TransGate sub-elements (internalOnly)
+  registry.register(FetSWDefinition);
+  registry.register(BehavioralFETDriverDefinition);
+
   // Gate behavioral drivers (internalOnly)
   registry.register(BehavioralAndDriverDefinition);
   registry.register(BehavioralOrDriverDefinition);
@@ -563,6 +574,9 @@ export function createDefaultRegistry(
 
   // Transformer coupling sub-element (internalOnly)
   registry.register(TransformerCouplingDefinition);
+
+  // Triode analog leaf (internalOnly)
+  registry.register(TriodeAnalogDefinition);
 
   return registry;
 }

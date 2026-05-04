@@ -9,6 +9,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { ModelEntry } from '../core/registry.js';
+import { PropertyBag } from '../core/properties.js';
 import type {
   DtsDocument,
   DtsCircuit,
@@ -230,7 +231,18 @@ function serializeModelEntry(entry: ModelEntry): DtsSerializedModelEntry {
   if (entry.kind === 'inline') {
     return { kind: 'inline', params: encodeModelParams(entry.params) as Record<string, number> };
   }
-  return { kind: 'netlist', netlist: entry.netlist, paramDefs: entry.paramDefs, params: encodeModelParams(entry.params) as Record<string, number> };
+  const rawNetlist = entry.netlist;
+  let resolvedNetlist;
+  if (typeof rawNetlist === 'function') {
+    const bag = new PropertyBag();
+    for (const [k, v] of Object.entries(entry.params)) {
+      bag.setModelParam(k, v);
+    }
+    resolvedNetlist = rawNetlist(bag);
+  } else {
+    resolvedNetlist = rawNetlist;
+  }
+  return { kind: 'netlist', netlist: resolvedNetlist, paramDefs: entry.paramDefs, params: encodeModelParams(entry.params) as Record<string, number> };
 }
 
 /**

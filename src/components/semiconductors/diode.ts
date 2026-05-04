@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Diode analog component  Shockley equation with NR linearization.
  *
  * Implements the ideal diode equation:
@@ -29,6 +29,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -49,7 +50,6 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -452,20 +452,13 @@ export function createDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // Pool binding  only the pool reference is retained. Individual state
-  // arrays are NOT cached as member variables: every access inside load()
-  // reads pool.states[N] at call time. Mirrors ngspice CKTstate0/1/2/3
-  // pointer access (cktload.c never caches state pointers on devices).
-  let pool: StatePoolRef;
-  let base: number;
-
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
 
   // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
   let _posPrimeNode = nodeAnode;
 
-  // TSTALLOC handles- closure-local, set during setup(), read inside load()
+  // TSTALLOC handles- set during setup(), read inside load()
   let _hPosPP  = -1;
   let _hNegPP  = -1;
   let _hPPPos  = -1;
@@ -477,38 +470,36 @@ export function createDiodeElement(
   // Internal node labels- recorded during setup() when RS > 0
   const internalLabels: string[] = [];
 
-  const element: PoolBackedAnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+  class DiodeAnalogElement extends AbstractPoolBackedAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+    readonly stateSize: number;
+    readonly stateSchema: import("../../solver/analog/state-schema.js").StateSchema;
 
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-
-    poolBacked: true as const,
-    stateSize: hasCapacitance ? 7 : 4,
-    stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA,
+    constructor(pinNodes: ReadonlyMap<string, number>) {
+      super(pinNodes);
+      this.stateSize = hasCapacitance ? 7 : 4;
+      this.stateSchema = hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA;
+    }
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver = ctx.solver;
-      const posNode = element._pinNodes.get("A")!;
-      const negNode = element._pinNodes.get("K")!;
+      const posNode = this.pinNodes.get("A")!;
+      const negNode = this.pinNodes.get("K")!;
 
       // State slots- diosetup.c:198-199 (*states += DIOstateCount; here->DIOstate = *states)
       // Idempotent guard mirrors mutual-inductor.ts:94-95. When a composite
       // (e.g. polarized-cap) pre-partitions _stateBase into its own state
-      // region before forwarding setup(), don't re-allocate and waste slots.
-      if (element._stateBase === -1) {
-        element._stateBase = ctx.allocStates(element.stateSize);
+      // region before forwarding setup(), don’t re-allocate and waste slots.
+      if (this._stateBase === -1) {
+        this._stateBase = ctx.allocStates(this.stateSize);
       }
-      base = element._stateBase;
 
       // Internal node- diosetup.c:204-224
-      // ngspice gating: RC (series resistance) > 0 â†’ allocate anode-prime node
+      // ngspice gating: RC (series resistance) > 0 → allocate anode-prime node
       if (params.RS === 0) {
         _posPrimeNode = posNode;
       } else {
-        _posPrimeNode = ctx.makeVolt(element.label ?? "D", "internal");
+        _posPrimeNode = ctx.makeVolt(this.label ?? "D", "internal");
         internalLabels.push("internal");
       }
 
@@ -520,20 +511,17 @@ export function createDiodeElement(
       _hPosPos = solver.allocElement(posNode,       posNode);       // (5)
       _hNegNeg = solver.allocElement(negNode,       negNode);       // (6)
       _hPPPP   = solver.allocElement(_posPrimeNode, _posPrimeNode); // (7)
-    },
+    }
 
     getInternalNodeLabels(): readonly string[] {
       return internalLabels;
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = element._stateBase;
-    },
+    }
 
     load(ctx: LoadContext): void {
       // Direct state-array access per call  no cached Float64Array refs.
       // Mirrors ngspice CKTstate0/1/2/3 pointer semantics in dioload.c.
+      const pool = this._pool;
+      const base = this._stateBase;
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -613,8 +601,8 @@ export function createDiodeElement(
         | ((mode & MODEINITFIX) && params.OFF ? MODEINITFIX : 0);
       if (!(mode & skipLimitingMask) && ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: element.elementIndex ?? -1,
-          label: element.label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "AK",
           limitType: "pnjlim",
           vBefore: vdRaw,
@@ -803,9 +791,11 @@ export function createDiodeElement(
           stampRHS(ctx.rhs, nodeCathode, capIeq);
         }
       }
-    },
+    }
 
     checkConvergence(ctx: LoadContext): boolean {
+      const pool = this._pool;
+      const base = this._stateBase;
       const s0 = pool.states[0];
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
@@ -824,14 +814,14 @@ export function createDiodeElement(
       const cdhat = id + gd * delvd;
       const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
       return Math.abs(cdhat - id) <= tol;
-    },
+    }
 
     getPinCurrents(_rhs: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      const id = pool.states[0][base + SLOT_ID];
+      const id = this._pool.states[0][this._stateBase + SLOT_ID];
       return [id, -id];
-    },
+    }
 
     getLteTimestep(
       dt: number,
@@ -841,6 +831,8 @@ export function createDiodeElement(
       lteParams: LteParams,
     ): number {
       if (!hasCapacitance) return Infinity;
+      const pool = this._pool;
+      const base = this._stateBase;
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -852,17 +844,17 @@ export function createDiodeElement(
       const ccap0 = s0[base + SLOT_CCAP];
       const ccap1 = s1[base + SLOT_CCAP];
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
-    },
+    }
 
     setParam(key: string, value: number): void {
       if (key in params) {
         params[key] = value;
         recomputeTemp();
       }
-    },
-  };
+    }
+  }
 
-  return element;
+  return new DiodeAnalogElement(pinNodes);
 }
 
 // ---------------------------------------------------------------------------

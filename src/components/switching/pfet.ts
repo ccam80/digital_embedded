@@ -1,15 +1,24 @@
-﻿/**
+/**
  * PFET- P-channel MOSFET voltage-controlled switch.
  *
  * Gate input G controls source-drain connection (inverted logic vs NFET):
- *   G=0 â†’ conducting (closed): S and D connected
- *   G=1 â†’ non-conducting (open): S and D disconnected
+ *   G=0 -> conducting (closed): S and D connected
+ *   G=1 -> non-conducting (open): S and D disconnected
  *
  * Pins:
  *   Input:         G  (gate, 1-bit)
  *   Bidirectional: S (source), D (drain)
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
+ *
+ * Analog model (kind: "netlist"):
+ *   drv (BehavioralFETDriver, polarity p): reads V(G) - V(S), classifies
+ *        on as `vGS < -Vth` (active-low gate semantics for P-channel).
+ *   sw  (FetSW, invertCtrl=1): the driver writes 1 to OUTPUT_LOGIC_LEVEL
+ *        when the channel should be on; sw passes that through unchanged.
+ *        invertCtrl=1 is preserved here for symmetry with the TransGate
+ *        PFET path where invertCtrl is the natural way to express
+ *        active-low control of an on/off switch.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -25,12 +34,8 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import type { FETLayout } from "./nfet.js";
-import { NFETSWSubElement } from "./nfet.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -155,7 +160,7 @@ export class PFETElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executePFET- flat simulation function
 //
-// G=0 â†’ closed=1; G=1 â†’ closed=0 (inverted compared to NFET)
+// G=0 -> closed=1; G=1 -> closed=0 (inverted compared to NFET)
 // ---------------------------------------------------------------------------
 
 export function executePFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -182,67 +187,51 @@ export function executePFET(index: number, state: Uint32Array, highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// PFETAnalogElement- AnalogElement implementation (composite, delegates to SW)
+// buildPfetNetlist- analog netlist builder
 //
-// PFET is structurally identical to NFET- same 4-stamp SW setup.
-// Polarity inversion: control voltage is V(S) - V(G) (inverted vs NFET).
-// ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
+// Ports: G=0, D=1, S=2
+//
+// Elements:
+//   drv (BehavioralFETDriver, isNType=0): on-condition is `vGS < -Vth`,
+//        writes 1 to OUTPUT_LOGIC_LEVEL when the channel should conduct.
+//   sw  (FetSW, invertCtrl=0): consumes drv.OUTPUT_LOGIC_LEVEL via
+//        siblingState. The driver already encodes "on" as logic=1, so the
+//        switch reads the slot directly without inversion.
 // ---------------------------------------------------------------------------
 
-export class PFETAnalogElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+export const buildPfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
+  const ron = params.hasModelParam("Ron") ? params.getModelParam<number>("Ron") : 1;
+  const roff = params.hasModelParam("Roff") ? params.getModelParam<number>("Roff") : 1e9;
+  const vth = params.hasModelParam("Vth") ? params.getModelParam<number>("Vth") : 2.5;
 
-  readonly _sw: NFETSWSubElement = new NFETSWSubElement();
-
-  setup(ctx: SetupContext): void {
-    // PFET composite forwards directly to its single SW sub-element.
-    // SW sub-element uses D as posNode, S as negNode.
-    // Inverted polarity is a load-time concern only- setup is identical to NFET.
-    this._sw.setup(ctx);
-  }
-
-  load(ctx: LoadContext): void {
-    // Inverted control: PFET turns ON when source is higher than gate by |Vth|
-    // Negate vCtrl so the same SW threshold logic applies
-    const gateNode = this._pinNodes.get("G")!;
-    const sourceNode = this._pinNodes.get("S")!;
-    const vCtrl = ctx.rhsOld[sourceNode] - ctx.rhsOld[gateNode];
-    this._sw.setCtrlVoltage(vCtrl);
-    this._sw.load(ctx);
-  }
-
-  setParam(key: string, value: number): void {
-    this._sw.setParam(key, value);
-  }
-
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [0, 0, 0];
-  }
-}
-
-function pfetAnalogFactory(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): PFETAnalogElement {
-  const el = new PFETAnalogElement();
-  el._pinNodes = new Map(pinNodes);
-  el._sw._pinNodes = new Map([
-    ["D", pinNodes.get("D")!],
-    ["S", pinNodes.get("S")!],
-  ]);
-  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
-  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
-  const vth = props.getOrDefault<number>("Vth", 2.5);
-  el._sw.setParam("Ron", ron);
-  el._sw.setParam("Roff", roff);
-  el._sw.setParam("threshold", vth);
-  return el;
-}
+  return {
+    ports: ["G", "D", "S"],
+    elements: [
+      {
+        typeId: "BehavioralFETDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: { Vth: vth, isNType: 0 },
+      },
+      {
+        typeId: "FetSW",
+        modelRef: "default",
+        subElementName: "sw",
+        params: {
+          Ron: ron,
+          Roff: roff,
+          invertCtrl: 0,
+          inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2], // drv: G, D, S
+      [1, 2],    // sw:  D, S
+    ],
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Attribute mappings and property definitions
@@ -251,9 +240,9 @@ function pfetAnalogFactory(
 export const PFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
-  { xmlName: "Ron", propertyKey: "Ron", convert: (v) => parseFloat(v) },
-  { xmlName: "Roff", propertyKey: "Roff", convert: (v) => parseFloat(v) },
-  { xmlName: "Vth", propertyKey: "Vth", convert: (v) => parseFloat(v) },
+  { xmlName: "Ron", propertyKey: "Ron", modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "Roff", propertyKey: "Roff", modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "Vth", propertyKey: "Vth", modelParam: true, convert: (v) => parseFloat(v) },
 ];
 
 const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
@@ -277,7 +266,7 @@ const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Î©)",
+    label: "Ron (Ohm)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms",
@@ -285,7 +274,7 @@ const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Î©)",
+    label: "Roff (Ohm)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms",
@@ -311,7 +300,7 @@ export const PFETDefinition: StandaloneComponentDefinition = {
   propertyDefs: PFET_PROPERTY_DEFS,
   attributeMap: PFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "PFET- P-channel MOSFET. G=0 â†’ conducting.",
+  helpText: "PFET- P-channel MOSFET. G=0 -> conducting.",
   models: {
     digital: {
       executeFn: executePFET,
@@ -324,9 +313,13 @@ export const PFETDefinition: StandaloneComponentDefinition = {
   },
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: pfetAnalogFactory,
-      paramDefs: [],
+      kind: "netlist",
+      netlist: buildPfetNetlist,
+      paramDefs: [
+        { key: "Ron", default: 1 },
+        { key: "Roff", default: 1e9 },
+        { key: "Vth", default: 2.5 },
+      ],
       params: { Ron: 1, Roff: 1e9, Vth: 2.5 },
     },
   },

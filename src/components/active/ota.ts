@@ -70,7 +70,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -143,114 +143,113 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// OTAAnalogElement
+// OtaAnalogElement
 // ---------------------------------------------------------------------------
 
-function createOTAElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): AnalogElement {
-  const p: Record<string, number> = {
-    gmMax: props.getModelParam<number>("gmMax"),
-    vt:    props.getModelParam<number>("vt"),
-  };
+class OtaAnalogElement extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
 
-  const nVp   = pinNodes.get("V+")!;
-  const nVm   = pinNodes.get("V-")!;
-  const nIabc = pinNodes.get("Iabc")!;
-  const nOutP = pinNodes.get("OUT+")!;
-  const nOutN = pinNodes.get("OUT")!;
+  private readonly p: Record<string, number>;
+  private readonly nVp: number;
+  private readonly nVm: number;
+  private readonly nIabc: number;
+  private readonly nOutP: number;
+  private readonly nOutN: number;
 
   // Operating-point state
-  let vDiff = 0;
-  let iBias = 0;
-  let iOut = 0; // cached output current for getPinCurrents
+  private vDiff = 0;
+  private iBias = 0;
+  private iOut = 0; // cached output current for getPinCurrents
 
   // Cached TSTALLOC handles (vccsset.c:43-46): 4 entries for VCCS
-  // Closure-locals per ssA.9; allocated once in setup(), used every NR iteration in load().
-  let _hPCP = -1;  // (nOutP, nVp) - VCCSposContPosptr
-  let _hPCN = -1;  // (nOutP, nVm) - VCCSposContNegptr
-  let _hNCP = -1;  // (nOutN, nVp) - VCCSnegContPosptr
-  let _hNCN = -1;  // (nOutN, nVm) - VCCSnegContNegptr
+  // Allocated once in setup(), used every NR iteration in load().
+  private hPCP = -1;  // (nOutP, nVp) - VCCSposContPosptr
+  private hPCN = -1;  // (nOutP, nVm) - VCCSposContNegptr
+  private hNCP = -1;  // (nOutN, nVp) - VCCSnegContPosptr
+  private hNCN = -1;  // (nOutN, nVm) - VCCSnegContNegptr
 
-  function readNode(rhs: Float64Array, n: number): number {
-    return rhs[n];
+  constructor(
+    pinNodes: ReadonlyMap<string, number>,
+    props: PropertyBag,
+    _getTime: () => number,
+  ) {
+    super(pinNodes);
+    this.p = {
+      gmMax: props.getModelParam<number>("gmMax"),
+      vt:    props.getModelParam<number>("vt"),
+    };
+    this.nVp   = pinNodes.get("V+")!;
+    this.nVm   = pinNodes.get("V-")!;
+    this.nIabc = pinNodes.get("Iabc")!;
+    this.nOutP = pinNodes.get("OUT+")!;
+    this.nOutN = pinNodes.get("OUT")!;
   }
 
-  return {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCCS,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
+  setup(ctx: SetupContext): void {
+    // VCCS TSTALLOC sequence (vccsset.c:43-46): 4 entries
+    // Skip entries where either node is ground (0).
+    if (this.nOutP > 0 && this.nVp > 0) this.hPCP = ctx.solver.allocElement(this.nOutP, this.nVp);
+    if (this.nOutP > 0 && this.nVm > 0) this.hPCN = ctx.solver.allocElement(this.nOutP, this.nVm);
+    if (this.nOutN > 0 && this.nVp > 0) this.hNCP = ctx.solver.allocElement(this.nOutN, this.nVp);
+    if (this.nOutN > 0 && this.nVm > 0) this.hNCN = ctx.solver.allocElement(this.nOutN, this.nVm);
+  }
 
-    setup(ctx: SetupContext): void {
-      // VCCS TSTALLOC sequence (vccsset.c:43-46): 4 entries
-      // Skip entries where either node is ground (0).
-      if (nOutP > 0 && nVp > 0) _hPCP = ctx.solver.allocElement(nOutP, nVp);
-      if (nOutP > 0 && nVm > 0) _hPCN = ctx.solver.allocElement(nOutP, nVm);
-      if (nOutN > 0 && nVp > 0) _hNCP = ctx.solver.allocElement(nOutN, nVp);
-      if (nOutN > 0 && nVm > 0) _hNCN = ctx.solver.allocElement(nOutN, nVm);
-    },
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const voltages = ctx.rhsOld;
+    const twoVt = 2 * this.p.vt;
 
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      const voltages = ctx.rhsOld;
-      const twoVt = 2 * p.vt;
+    // Read operating-point voltages
+    const vp = voltages[this.nVp];
+    const vm = voltages[this.nVm];
+    this.vDiff = vp - vm;
+    const vIabc = voltages[this.nIabc];
+    // Bias current must be non-negative (OTA requires positive bias current)
+    this.iBias = Math.max(0, vIabc);
 
-      // Read operating-point voltages
-      const vp = readNode(voltages, nVp);
-      const vm = readNode(voltages, nVm);
-      vDiff = vp - vm;
-      const vIabc = readNode(voltages, nIabc);
-      // Bias current must be non-negative (OTA requires positive bias current)
-      iBias = Math.max(0, vIabc);
+    // Evaluate tanh-limited output current at current operating point.
+    const x = this.vDiff / twoVt;
+    const xClamped = Math.max(-50, Math.min(50, x));
+    const tanhX = Math.tanh(xClamped);
+    const iOutNow = this.iBias * tanhX;
+    this.iOut = iOutNow;
 
-      // Evaluate tanh-limited output current at current operating point.
-      const x = vDiff / twoVt;
-      const xClamped = Math.max(-50, Math.min(50, x));
-      const tanhX = Math.tanh(xClamped);
-      const iOutNow = iBias * tanhX;
-      iOut = iOutNow;
+    // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sech²(x)
+    // sech²(x) = 1 - tanh²(x)
+    const sech2 = 1 - tanhX * tanhX;
+    const gmRaw = (this.iBias / twoVt) * sech2;
+    const gmEff = Math.min(Math.abs(gmRaw), this.p.gmMax);
 
-      // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sech²(x)
-      // sech²(x) = 1 - tanh²(x)
-      const sech2 = 1 - tanhX * tanhX;
-      const gmRaw = (iBias / twoVt) * sech2;
-      const gmEff = Math.min(Math.abs(gmRaw), p.gmMax);
+    // NR constant term (Norton offset)
+    const iNR = iOutNow - gmEff * this.vDiff;
 
-      // NR constant term (Norton offset)
-      const iNR = iOutNow - gmEff * vDiff;
+    // Stamp VCCS using cached handles (vccsset.c:43-46).
+    if (this.hPCP >= 0) solver.stampElement(this.hPCP, -gmEff);
+    if (this.hPCN >= 0) solver.stampElement(this.hPCN,  gmEff);
+    if (this.hNCP >= 0) solver.stampElement(this.hNCP,  gmEff);
+    if (this.hNCN >= 0) solver.stampElement(this.hNCN, -gmEff);
 
-      // Stamp VCCS using cached handles (vccsset.c:43-46).
-      if (_hPCP >= 0) solver.stampElement(_hPCP, -gmEff);
-      if (_hPCN >= 0) solver.stampElement(_hPCN,  gmEff);
-      if (_hNCP >= 0) solver.stampElement(_hNCP,  gmEff);
-      if (_hNCN >= 0) solver.stampElement(_hNCN, -gmEff);
+    // RHS: Norton constant
+    if (this.nOutP !== 0) stampRHS(ctx.rhs, this.nOutP,  iNR);
+    if (this.nOutN !== 0) stampRHS(ctx.rhs, this.nOutN, -iNR);
+  }
 
-      // RHS: Norton constant
-      if (nOutP !== 0) stampRHS(ctx.rhs, nOutP,  iNR);
-      if (nOutN !== 0) stampRHS(ctx.rhs, nOutN, -iNR);
-    },
+  /**
+   * Per-pin currents in pinLayout order: [V+, V-, Iabc, OUT+, OUT].
+   *
+   * V+, V-, Iabc are high-impedance inputs that draw no current from the
+   * OTA element itself. The output current iOut flows INTO OUT+ and OUT OF
+   * OUT (OUT-), satisfying KCL: 0 + 0 + 0 + iOut + (-iOut) = 0.
+   *
+   * Positive value = current flowing INTO the element at that pin.
+   */
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [0, 0, 0, this.iOut, -this.iOut];
+  }
 
-    /**
-     * Per-pin currents in pinLayout order: [V+, V-, Iabc, OUT+, OUT].
-     *
-     * V+, V-, Iabc are high-impedance inputs that draw no current from the
-     * OTA element itself. The output current iOut flows INTO OUT+ and OUT OF
-     * OUT (OUT-), satisfying KCL: 0 + 0 + 0 + iOut + (-iOut) = 0.
-     *
-     * Positive value = current flowing INTO the element at that pin.
-     */
-    getPinCurrents(_rhs: Float64Array): number[] {
-      return [0, 0, 0, iOut, -iOut];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
-    },
-  };
+  setParam(key: string, value: number): void {
+    if (key in this.p) this.p[key] = value;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +394,7 @@ export const OTADefinition: StandaloneComponentDefinition = {
     "behavioral": {
       kind: "inline",
       factory: (pinNodes, props, getTime) =>
-        createOTAElement(pinNodes, props, getTime),
+        new OtaAnalogElement(pinNodes, props, getTime),
       paramDefs: OTA_PARAM_DEFS,
       params: OTA_DEFAULTS,
     },

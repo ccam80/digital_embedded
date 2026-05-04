@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AC Voltage Source  time-varying independent voltage source.
  *
  * Supports four waveforms: sine, square, triangle, sawtooth.
@@ -29,7 +29,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -552,389 +552,404 @@ export interface AcVoltageSourceAnalogElement extends AnalogElement {
   setParam(key: string, value: number): void;
 }
 
+class AcVoltageSourceAnalogImpl extends AbstractAnalogElement implements AcVoltageSourceAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+
+  // Cached matrix-entry handles — vsrcset.c TSTALLOC sequence
+  private _hPosBr = -1;
+  private _hNegBr = -1;
+  private _hBrNeg = -1;
+  private _hBrPos = -1;
+
+  // Mutable param record (hot-loadable via setParam)
+  private readonly _p: Record<string, number>;
+  private _amplitude: number;
+  private _frequency: number;
+  private _phase: number;
+  private _dcOffset: number;
+  private _riseTime: number;
+  private _fallTime: number;
+  private _noiseSampleTime: number;
+  private readonly _waveform: Waveform;
+  private readonly _ext: ExtendedWaveformParams;
+  private readonly _getTime: () => number;
+
+  _parsedExpr: ExprNode | null;
+  _parseError: string | null;
+
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) {
+    super(pinNodes);
+    this._getTime = getTime;
+    this._p = {
+      amplitude: props.getModelParam<number>("amplitude"),
+      frequency: props.getModelParam<number>("frequency"),
+      phase:     props.getModelParam<number>("phase"),
+      dcOffset:  props.getModelParam<number>("dcOffset"),
+      riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
+      fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
+      noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
+    };
+    this._amplitude = this._p.amplitude;
+    this._frequency = this._p.frequency;
+    this._phase = this._p.phase;
+    this._dcOffset = this._p.dcOffset;
+    this._riseTime = this._p.riseTime;
+    this._fallTime = this._p.fallTime;
+    this._noiseSampleTime = this._p.noiseSampleTime;
+    this._waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
+    this._ext = {
+      freqStart: props.getOrDefault<number>("freqStart", 100),
+      freqEnd: props.getOrDefault<number>("freqEnd", 10000),
+      sweepDuration: props.getOrDefault<number>("sweepDuration", 1),
+      sweepMode: props.getOrDefault<string>("sweepMode", "linear") as "linear" | "log",
+      modulationFreq: props.getOrDefault<number>("modulationFreq", 100),
+      modulationDepth: props.getOrDefault<number>("modulationDepth", 1),
+      modulationIndex: props.getOrDefault<number>("modulationIndex", 1),
+      riseTime: this._riseTime,
+      fallTime: this._fallTime,
+      noiseSampleTime: this._noiseSampleTime,
+    };
+
+    // Parse expression once at creation for expression waveform mode.
+    this._parsedExpr = null;
+    this._parseError = null;
+    if (this._waveform === "expression") {
+      const exprText = props.getOrDefault<string>("expression", "sin(2 * pi * 1000 * t)");
+      try {
+        this._parsedExpr = parseExpression(exprText);
+      } catch (err) {
+        this._parseError = err instanceof ExprParseError ? err.message : String(err);
+      }
+    }
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode    = this.pinNodes.get("pos")!;
+    const negNode    = this.pinNodes.get("neg")!;
+
+    // Port of vsrcset.c:40-43- idempotent branch allocation
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    const branchNode = this.branchIndex;
+
+    // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
+    this._hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
+    this._hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
+    this._hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
+    this._hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
+  }
+
+  findBranchFor(name: string, ctx: SetupContext): number {
+    // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+    const dev = ctx.findDevice(name);
+    if (!dev) return 0;
+    if (dev.branchIndex === -1) {
+      dev.branchIndex = ctx.makeCur(name, "branch");
+    }
+    return dev.branchIndex;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._p) {
+      this._p[key] = value;
+      this._amplitude = this._p.amplitude;
+      this._frequency = this._p.frequency;
+      this._phase = this._p.phase;
+      this._dcOffset = this._p.dcOffset;
+      this._riseTime = this._p.riseTime;
+      this._fallTime = this._p.fallTime;
+      this._noiseSampleTime = this._p.noiseSampleTime;
+      this._ext.riseTime = this._riseTime;
+      this._ext.fallTime = this._fallTime;
+      this._ext.noiseSampleTime = this._noiseSampleTime;
+    }
+  }
+
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const t = this._getTime();
+
+    // ngspice srcFact gating mirrors vsrcload.c. The waveform-evaluation path
+    // (vsrcload.c:56-401) is followed by `if (CKTmode & MODETRANOP) value *= srcFact`
+    // at vsrcload.c:410-412. The dcGiven branch (vsrcload.c:47-55) applies srcFact
+    // when MODEDCOP|MODEDCTRANCURVE bits are set with a DC value present. digiTS's
+    // AC source folds dcOffset into the waveform computation, so we treat the
+    // combined output as having an effective DC content and gate srcFact across
+    // all three source-stepping modes- matching the ssA.13 canonical pattern.
+    // Outside these modes (regular MODETRAN steps, MODEAC), srcFact must NOT be
+    // applied: AC small-signal analysis goes through stampAc / vsrcacld.c which
+    // never multiplies by srcFact (vsrcacld.c:29-30).
+    const ramp = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
+      ? ctx.srcFact
+      : 1.0;
+
+    let v: number;
+    if (this._waveform === "expression") {
+      if (this._parsedExpr !== null) {
+        v = evaluateExpression(this._parsedExpr, { t }) * ramp;
+      } else {
+        v = 0;
+      }
+    } else {
+      v = computeWaveformValue(this._waveform, this._amplitude, this._frequency, this._phase, this._dcOffset, t, this._ext) * ramp;
+    }
+
+    // vsrcload.c:43-46
+    solver.stampElement(this._hPosBr, +1.0);
+    solver.stampElement(this._hNegBr, -1.0);
+    solver.stampElement(this._hBrPos, +1.0);
+    solver.stampElement(this._hBrNeg, -1.0);
+    // vsrcload.c:416- RHS
+    ctx.rhs[this.branchIndex] += v;
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    // MNA branch variable: rhs[branchIndex] = I flowing from nodeNeg
+    // through source to nodePos.
+    // Pin layout order: [neg, pos].
+    // "Into element at neg" = -I (current exits neg into external circuit).
+    // "Into element at pos" = +I (current enters pos from external circuit).
+    const I = rhs[this.branchIndex];
+    return [-I, I];
+  }
+
+  nextBreakpoint(afterTime: number): number | null {
+    if (this._waveform === "square" || this._waveform === "triangle" || this._waveform === "sawtooth") {
+      if (this._frequency <= 0) return null;
+      const period = 1 / this._frequency;
+      const halfPeriod = period / 2;
+      const phaseShift = this._phase / (2 * Math.PI * this._frequency);
+
+      // Per-period offsets of points where the waveform has a first-derivative
+      // discontinuity (square: edge endpoints; triangle: valley + peak;
+      // sawtooth: start of sharp fall + start of next rise).
+      let offsets: number[];
+      switch (this._waveform) {
+        case "square":
+          // ngspice PULSE: rising-edge start/end and falling-edge start/end.
+          offsets = [0, this._riseTime, halfPeriod, halfPeriod + this._fallTime];
+          break;
+        case "triangle":
+          // PULSE-aligned triangle (Fix 1): valley at tMod=0, peak at tMod=halfPeriod.
+          offsets = [0, halfPeriod];
+          break;
+        case "sawtooth": {
+          // PULSE-aligned sawtooth (Fix 2): start of fall at tMod=riseSpan,
+          // end of fall / start of next rise at tMod=period (≡ 0 of next cycle).
+          const riseSpan = period - this._fallTime;
+          offsets = [riseSpan, period];
+          break;
+        }
+      }
+
+      // Start searching from the period that could contain afterTime.
+      const nMin = Math.floor((afterTime + phaseShift) / period) - 1;
+
+      let best: number | null = null;
+
+      for (let n = nMin; n <= nMin + 2; n++) {
+        const tPeriodStart = n * period - phaseShift;
+        for (const offset of offsets) {
+          const c = tPeriodStart + offset;
+          if (c > afterTime + 1e-18) {
+            if (best === null || c < best) {
+              best = c;
+            }
+          }
+        }
+      }
+
+      return best;
+    }
+    if (this._waveform === "noise") {
+      // ngspice TRNOISE schedule (vsrcacct.c:209-224): samples land at integer
+      // multiples of TS. The next sample strictly after `afterTime` is
+      // (floor(afterTime/TS) + 1) * TS  works whether afterTime is exactly
+      // n*TS (returns (n+1)*TS) or in between (returns next n*TS).
+      if (this._noiseSampleTime <= 0) return null;
+      return (Math.floor(afterTime / this._noiseSampleTime) + 1) * this._noiseSampleTime;
+    }
+    return null;
+  }
+
+  /**
+   * Mirrors ngspice VSRCaccept (vsrcacct.c:24-310). Registers at most one
+   * breakpoint per call, gated on:
+   *   - CKTbreak (atBreakpoint flag)  non-boundary acceptances do nothing
+   *   - SAMETIME(time, phase-boundary)  current CKTtime must sit on a
+   *     phase boundary; the registration target is the NEXT phase boundary
+   *
+   * SAMETIME(a,b) := |a-b| <= 1e-7 * PW (vsrcacct.c:21). PW maps to
+   * `halfPeriod - riseTime` for our square wave (matches load() math). For
+   * triangle/sawtooth (digiTS-only waveforms with no ngspice analogue) we
+   * apply the same SAMETIME pattern using each waveform's natural phase
+   * boundaries; PW is taken as halfPeriod (triangle) or riseSpan (sawtooth)
+   * so the tolerance scales with the local phase width.
+   */
+  acceptStep(
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+    atBreakpoint: boolean,
+  ): void {
+    // ngspice gates every CKTsetBreak inside VSRCaccept on CKTbreak.
+    if (!atBreakpoint) return;
+
+    // SINE / EXP / SFFM / AM-equivalent / expression: ngspice empty cases
+    // (vsrcacct.c:147-165). No breakpoints to register.
+    if (this._waveform === "sine" || this._waveform === "expression"
+        || this._waveform === "am" || this._waveform === "fm" || this._waveform === "sweep") {
+      return;
+    }
+    if (this._frequency <= 0) return;
+
+    const period = 1 / this._frequency;
+    const halfP = period / 2;
+    const tshift = this._phase / (2 * Math.PI * this._frequency);
+
+    if (this._waveform === "square") {
+      // Direct port of vsrcacct.c:50-145 PULSE branch.
+      // PW maps to halfPeriod - riseTime (consistent with load() math).
+      const TR = this._riseTime;
+      const TF = this._fallTime;
+      const PW = Math.max(0, halfP - TR);
+      const PER = period;
+      const TIMETOL = 1e-7;
+      const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+      // ngspice: time = CKTtime - TD; tshift = TD. We use phase-derived tshift
+      // (TD-equivalent for sinusoidal alignment); same algebra applies.
+      let time = simTime - tshift;
+      let basetime = 0;
+      if (time >= PER) {
+        basetime = PER * Math.floor(time / PER);
+        time -= basetime;
+      }
+
+      if (time <= 0 || time >= TR + PW + TF) {
+        if (sametime(time, 0)) {
+          addBreakpoint(basetime + TR + tshift);
+        } else if (sametime(TR + PW + TF, time)) {
+          addBreakpoint(basetime + PER + tshift);
+        } else if (time === -tshift) {
+          addBreakpoint(basetime + tshift);
+        } else if (sametime(PER, time)) {
+          addBreakpoint(basetime + tshift + TR + PER);
+        }
+      } else if (time >= TR && time <= TR + PW) {
+        if (sametime(time, TR)) {
+          addBreakpoint(basetime + tshift + TR + PW);
+        } else if (sametime(TR + PW, time)) {
+          addBreakpoint(basetime + tshift + TR + PW + TF);
+        }
+      } else if (time > 0 && time < TR) {
+        if (sametime(time, 0)) {
+          addBreakpoint(basetime + tshift + TR);
+        } else if (sametime(time, TR)) {
+          addBreakpoint(basetime + tshift + TR + PW);
+        }
+      } else {
+        // time in (TR + PW, TR + PW + TF)
+        if (sametime(time, TR + PW)) {
+          addBreakpoint(basetime + tshift + TR + PW + TF);
+        } else if (sametime(time, TR + PW + TF)) {
+          addBreakpoint(basetime + tshift + PER);
+        }
+      }
+      return;
+    }
+
+    if (this._waveform === "triangle") {
+      // digiTS extension (no ngspice analogue). Phase boundaries: tMod = 0
+      // (valley) and tMod = halfP (peak). PW = halfP for SAMETIME scaling.
+      const PW = halfP;
+      const TIMETOL = 1e-7;
+      const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+      let time = simTime - tshift;
+      let basetime = 0;
+      if (time >= period) {
+        basetime = period * Math.floor(time / period);
+        time -= basetime;
+      }
+
+      if (sametime(time, 0)) {
+        addBreakpoint(basetime + tshift + halfP);
+      } else if (sametime(time, halfP)) {
+        addBreakpoint(basetime + tshift + period);
+      } else if (sametime(time, period)) {
+        addBreakpoint(basetime + tshift + period + halfP);
+      } else if (time === -tshift) {
+        addBreakpoint(basetime + tshift);
+      }
+      return;
+    }
+
+    if (this._waveform === "sawtooth") {
+      // digiTS extension (no ngspice analogue). Phase boundaries:
+      // tMod = riseSpan (start of sharp fall) and tMod = period (valley of
+      // next cycle). PW = riseSpan for SAMETIME scaling (the dominant
+      // phase width).
+      const TF = this._fallTime;
+      const riseSpan = period - TF;
+      const PW = riseSpan;
+      const TIMETOL = 1e-7;
+      const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+      let time = simTime - tshift;
+      let basetime = 0;
+      if (time >= period) {
+        basetime = period * Math.floor(time / period);
+        time -= basetime;
+      }
+
+      if (sametime(time, 0)) {
+        addBreakpoint(basetime + tshift + riseSpan);
+      } else if (sametime(time, riseSpan)) {
+        addBreakpoint(basetime + tshift + period);
+      } else if (sametime(time, period)) {
+        addBreakpoint(basetime + tshift + period + riseSpan);
+      } else if (time === -tshift) {
+        addBreakpoint(basetime + tshift);
+      }
+      return;
+    }
+
+    if (this._waveform === "noise") {
+      // Direct port of vsrcacct.c:209-224 TRNOISE branch.
+      const TS = this._noiseSampleTime;
+      if (TS <= 0) return;
+      const n = Math.floor(simTime / TS + 0.5);
+      const nearest = n * TS;
+      if (almostEqualUlps(nearest, simTime, 3)) {
+        addBreakpoint((n + 1) * TS);
+      }
+      return;
+    }
+  }
+
+  getBreakpoints(tStart: number, tEnd: number): number[] {
+    const out: number[] = [];
+    let t = tStart;
+    while (true) {
+      const next = this.nextBreakpoint(t);
+      if (next === null || next >= tEnd) break;
+      if (next <= t) {
+        throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
+      }
+      out.push(next);
+      t = next;
+    }
+    return out;
+  }
+}
+
 export function makeAcVoltageSourceElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   getTime: () => number,
 ): AcVoltageSourceAnalogElement {
-  let _hPosBr = -1;
-  let _hNegBr = -1;
-  let _hBrNeg = -1;
-  let _hBrPos = -1;
-  const p: Record<string, number> = {
-    amplitude: props.getModelParam<number>("amplitude"),
-    frequency: props.getModelParam<number>("frequency"),
-    phase:     props.getModelParam<number>("phase"),
-    dcOffset:  props.getModelParam<number>("dcOffset"),
-    riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
-    fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
-    noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
-  };
-  let amplitude = p.amplitude;
-  let frequency = p.frequency;
-  let phase = p.phase;
-  let dcOffset = p.dcOffset;
-  let riseTime  = p.riseTime;
-  let fallTime  = p.fallTime;
-  let noiseSampleTime = p.noiseSampleTime;
-  const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
-  const ext: ExtendedWaveformParams = {
-    freqStart: props.getOrDefault<number>("freqStart", 100),
-    freqEnd: props.getOrDefault<number>("freqEnd", 10000),
-    sweepDuration: props.getOrDefault<number>("sweepDuration", 1),
-    sweepMode: props.getOrDefault<string>("sweepMode", "linear") as "linear" | "log",
-    modulationFreq: props.getOrDefault<number>("modulationFreq", 100),
-    modulationDepth: props.getOrDefault<number>("modulationDepth", 1),
-    modulationIndex: props.getOrDefault<number>("modulationIndex", 1),
-    riseTime,
-    fallTime,
-    noiseSampleTime,
-  };
-
-  // Parse expression once at creation for expression waveform mode.
-  let parsedExpr: ExprNode | null = null;
-  let parseError: string | null = null;
-  if (waveform === "expression") {
-    const exprText = props.getOrDefault<string>("expression", "sin(2 * pi * 1000 * t)");
-    try {
-      parsedExpr = parseExpression(exprText);
-    } catch (err) {
-      parseError = err instanceof ExprParseError ? err.message : String(err);
-    }
-  }
-
-  const element: AcVoltageSourceAnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    _stateBase: -1,
-    _pinNodes: new Map<string, number>(pinNodes),
-    branchIndex: -1,
-
-    setup(ctx: SetupContext): void {
-      const posNode    = element._pinNodes.get("pos")!;
-      const negNode    = element._pinNodes.get("neg")!;
-
-      // Port of vsrcset.c:40-43- idempotent branch allocation
-      if (element.branchIndex === -1) {
-        element.branchIndex = ctx.makeCur(element.label, "branch");
-      }
-      const branchNode = element.branchIndex;
-
-      // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
-      _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
-      _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
-      _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
-      _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
-    },
-
-    findBranchFor(name: string, ctx: SetupContext): number {
-      // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
-      const dev = ctx.findDevice(name);
-      if (!dev) return 0;
-      if (dev.branchIndex === -1) {
-        dev.branchIndex = ctx.makeCur(name, "branch");
-      }
-      return dev.branchIndex;
-    },
-
-    _parsedExpr: parsedExpr,
-    _parseError: parseError,
-
-    setParam(key: string, value: number): void {
-      if (key in p) {
-        (p as Record<string, number>)[key] = value;
-        amplitude = p.amplitude;
-        frequency = p.frequency;
-        phase = p.phase;
-        dcOffset = p.dcOffset;
-        riseTime = p.riseTime;
-        fallTime = p.fallTime;
-        noiseSampleTime = p.noiseSampleTime;
-        ext.riseTime = riseTime;
-        ext.fallTime = fallTime;
-        ext.noiseSampleTime = noiseSampleTime;
-      }
-    },
-
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      const t = getTime();
-
-      // ngspice srcFact gating mirrors vsrcload.c. The waveform-evaluation path
-      // (vsrcload.c:56-401) is followed by `if (CKTmode & MODETRANOP) value *= srcFact`
-      // at vsrcload.c:410-412. The dcGiven branch (vsrcload.c:47-55) applies srcFact
-      // when MODEDCOP|MODEDCTRANCURVE bits are set with a DC value present. digiTS's
-      // AC source folds dcOffset into the waveform computation, so we treat the
-      // combined output as having an effective DC content and gate srcFact across
-      // all three source-stepping modes- matching the ssA.13 canonical pattern.
-      // Outside these modes (regular MODETRAN steps, MODEAC), srcFact must NOT be
-      // applied: AC small-signal analysis goes through stampAc / vsrcacld.c which
-      // never multiplies by srcFact (vsrcacld.c:29-30).
-      const ramp = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
-        ? ctx.srcFact
-        : 1.0;
-
-      let v: number;
-      if (waveform === "expression") {
-        if (element._parsedExpr !== null) {
-          v = evaluateExpression(element._parsedExpr, { t }) * ramp;
-        } else {
-          v = 0;
-        }
-      } else {
-        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * ramp;
-      }
-
-      // vsrcload.c:43-46
-      solver.stampElement(_hPosBr, +1.0);
-      solver.stampElement(_hNegBr, -1.0);
-      solver.stampElement(_hBrPos, +1.0);
-      solver.stampElement(_hBrNeg, -1.0);
-      // vsrcload.c:416- RHS
-      ctx.rhs[element.branchIndex] += v;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // MNA branch variable: rhs[branchIndex] = I flowing from nodeNeg
-      // through source to nodePos.
-      // Pin layout order: [neg, pos].
-      // "Into element at neg" = -I (current exits neg into external circuit).
-      // "Into element at pos" = +I (current enters pos from external circuit).
-      const I = rhs[element.branchIndex];
-      return [-I, I];
-    },
-
-    nextBreakpoint(afterTime: number): number | null {
-      if (waveform === "square" || waveform === "triangle" || waveform === "sawtooth") {
-        if (frequency <= 0) return null;
-        const period = 1 / frequency;
-        const halfPeriod = period / 2;
-        const phaseShift = phase / (2 * Math.PI * frequency);
-
-        // Per-period offsets of points where the waveform has a first-derivative
-        // discontinuity (square: edge endpoints; triangle: valley + peak;
-        // sawtooth: start of sharp fall + start of next rise).
-        let offsets: number[];
-        switch (waveform) {
-          case "square":
-            // ngspice PULSE: rising-edge start/end and falling-edge start/end.
-            offsets = [0, riseTime, halfPeriod, halfPeriod + fallTime];
-            break;
-          case "triangle":
-            // PULSE-aligned triangle (Fix 1): valley at tMod=0, peak at tMod=halfPeriod.
-            offsets = [0, halfPeriod];
-            break;
-          case "sawtooth": {
-            // PULSE-aligned sawtooth (Fix 2): start of fall at tMod=riseSpan,
-            // end of fall / start of next rise at tMod=period (â‰¡ 0 of next cycle).
-            const riseSpan = period - fallTime;
-            offsets = [riseSpan, period];
-            break;
-          }
-        }
-
-        // Start searching from the period that could contain afterTime.
-        const nMin = Math.floor((afterTime + phaseShift) / period) - 1;
-
-        let best: number | null = null;
-
-        for (let n = nMin; n <= nMin + 2; n++) {
-          const tPeriodStart = n * period - phaseShift;
-          for (const offset of offsets) {
-            const c = tPeriodStart + offset;
-            if (c > afterTime + 1e-18) {
-              if (best === null || c < best) {
-                best = c;
-              }
-            }
-          }
-        }
-
-        return best;
-      }
-      if (waveform === "noise") {
-        // ngspice TRNOISE schedule (vsrcacct.c:209-224): samples land at integer
-        // multiples of TS. The next sample strictly after `afterTime` is
-        // (floor(afterTime/TS) + 1) * TS  works whether afterTime is exactly
-        // n*TS (returns (n+1)*TS) or in between (returns next n*TS).
-        if (noiseSampleTime <= 0) return null;
-        return (Math.floor(afterTime / noiseSampleTime) + 1) * noiseSampleTime;
-      }
-      return null;
-    },
-
-    /**
-     * Mirrors ngspice VSRCaccept (vsrcacct.c:24-310). Registers at most one
-     * breakpoint per call, gated on:
-     *   - CKTbreak (atBreakpoint flag)  non-boundary acceptances do nothing
-     *   - SAMETIME(time, phase-boundary)  current CKTtime must sit on a
-     *     phase boundary; the registration target is the NEXT phase boundary
-     *
-     * SAMETIME(a,b) := |a-b| <= 1e-7 * PW (vsrcacct.c:21). PW maps to
-     * `halfPeriod - riseTime` for our square wave (matches load() math). For
-     * triangle/sawtooth (digiTS-only waveforms with no ngspice analogue) we
-     * apply the same SAMETIME pattern using each waveform's natural phase
-     * boundaries; PW is taken as halfPeriod (triangle) or riseSpan (sawtooth)
-     * so the tolerance scales with the local phase width.
-     */
-    acceptStep(
-      simTime: number,
-      addBreakpoint: (t: number) => void,
-      atBreakpoint: boolean,
-    ): void {
-      // ngspice gates every CKTsetBreak inside VSRCaccept on CKTbreak.
-      if (!atBreakpoint) return;
-
-      // SINE / EXP / SFFM / AM-equivalent / expression: ngspice empty cases
-      // (vsrcacct.c:147-165). No breakpoints to register.
-      if (waveform === "sine" || waveform === "expression"
-          || waveform === "am" || waveform === "fm" || waveform === "sweep") {
-        return;
-      }
-      if (frequency <= 0) return;
-
-      const period = 1 / frequency;
-      const halfP = period / 2;
-      const tshift = phase / (2 * Math.PI * frequency);
-
-      if (waveform === "square") {
-        // Direct port of vsrcacct.c:50-145 PULSE branch.
-        // PW maps to halfPeriod - riseTime (consistent with load() math).
-        const TR = riseTime;
-        const TF = fallTime;
-        const PW = Math.max(0, halfP - TR);
-        const PER = period;
-        const TIMETOL = 1e-7;
-        const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
-
-        // ngspice: time = CKTtime - TD; tshift = TD. We use phase-derived tshift
-        // (TD-equivalent for sinusoidal alignment); same algebra applies.
-        let time = simTime - tshift;
-        let basetime = 0;
-        if (time >= PER) {
-          basetime = PER * Math.floor(time / PER);
-          time -= basetime;
-        }
-
-        if (time <= 0 || time >= TR + PW + TF) {
-          if (sametime(time, 0)) {
-            addBreakpoint(basetime + TR + tshift);
-          } else if (sametime(TR + PW + TF, time)) {
-            addBreakpoint(basetime + PER + tshift);
-          } else if (time === -tshift) {
-            addBreakpoint(basetime + tshift);
-          } else if (sametime(PER, time)) {
-            addBreakpoint(basetime + tshift + TR + PER);
-          }
-        } else if (time >= TR && time <= TR + PW) {
-          if (sametime(time, TR)) {
-            addBreakpoint(basetime + tshift + TR + PW);
-          } else if (sametime(TR + PW, time)) {
-            addBreakpoint(basetime + tshift + TR + PW + TF);
-          }
-        } else if (time > 0 && time < TR) {
-          if (sametime(time, 0)) {
-            addBreakpoint(basetime + tshift + TR);
-          } else if (sametime(time, TR)) {
-            addBreakpoint(basetime + tshift + TR + PW);
-          }
-        } else {
-          // time in (TR + PW, TR + PW + TF)
-          if (sametime(time, TR + PW)) {
-            addBreakpoint(basetime + tshift + TR + PW + TF);
-          } else if (sametime(time, TR + PW + TF)) {
-            addBreakpoint(basetime + tshift + PER);
-          }
-        }
-        return;
-      }
-
-      if (waveform === "triangle") {
-        // digiTS extension (no ngspice analogue). Phase boundaries: tMod = 0
-        // (valley) and tMod = halfP (peak). PW = halfP for SAMETIME scaling.
-        const PW = halfP;
-        const TIMETOL = 1e-7;
-        const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
-
-        let time = simTime - tshift;
-        let basetime = 0;
-        if (time >= period) {
-          basetime = period * Math.floor(time / period);
-          time -= basetime;
-        }
-
-        if (sametime(time, 0)) {
-          addBreakpoint(basetime + tshift + halfP);
-        } else if (sametime(time, halfP)) {
-          addBreakpoint(basetime + tshift + period);
-        } else if (sametime(time, period)) {
-          addBreakpoint(basetime + tshift + period + halfP);
-        } else if (time === -tshift) {
-          addBreakpoint(basetime + tshift);
-        }
-        return;
-      }
-
-      if (waveform === "sawtooth") {
-        // digiTS extension (no ngspice analogue). Phase boundaries:
-        // tMod = riseSpan (start of sharp fall) and tMod = period (valley of
-        // next cycle). PW = riseSpan for SAMETIME scaling (the dominant
-        // phase width).
-        const TF = fallTime;
-        const riseSpan = period - TF;
-        const PW = riseSpan;
-        const TIMETOL = 1e-7;
-        const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
-
-        let time = simTime - tshift;
-        let basetime = 0;
-        if (time >= period) {
-          basetime = period * Math.floor(time / period);
-          time -= basetime;
-        }
-
-        if (sametime(time, 0)) {
-          addBreakpoint(basetime + tshift + riseSpan);
-        } else if (sametime(time, riseSpan)) {
-          addBreakpoint(basetime + tshift + period);
-        } else if (sametime(time, period)) {
-          addBreakpoint(basetime + tshift + period + riseSpan);
-        } else if (time === -tshift) {
-          addBreakpoint(basetime + tshift);
-        }
-        return;
-      }
-
-      if (waveform === "noise") {
-        // Direct port of vsrcacct.c:209-224 TRNOISE branch.
-        const TS = noiseSampleTime;
-        if (TS <= 0) return;
-        const n = Math.floor(simTime / TS + 0.5);
-        const nearest = n * TS;
-        if (almostEqualUlps(nearest, simTime, 3)) {
-          addBreakpoint((n + 1) * TS);
-        }
-        return;
-      }
-    },
-
-    getBreakpoints(tStart: number, tEnd: number): number[] {
-      const out: number[] = [];
-      let t = tStart;
-      while (true) {
-        const next = element.nextBreakpoint(t);
-        if (next === null || next >= tEnd) break;
-        if (next <= t) {
-          throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
-        }
-        out.push(next);
-        t = next;
-      }
-      return out;
-    },
-  };
-
-  return element;
+  return new AcVoltageSourceAnalogImpl(pinNodes, props, getTime);
 }
 
 // ---------------------------------------------------------------------------

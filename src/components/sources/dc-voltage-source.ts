@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DC Voltage Source  ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
@@ -27,6 +27,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -155,6 +156,80 @@ const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// DcVoltageSourceAnalogElement  AnalogElement class implementation
+// ---------------------------------------------------------------------------
+
+class DcVoltageSourceAnalogElement extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+
+  private _voltage: number;
+
+  // TSTALLOC handles — allocated in setup(), consumed by load().
+  // Mirror ngspice VSRC instance pointers (vsrcset.c:52-55).
+  private _hPosBr: number = -1;
+  private _hNegBr: number = -1;
+  private _hBrNeg: number = -1;
+  private _hBrPos: number = -1;
+
+  constructor(pinNodes: ReadonlyMap<string, number>, voltage: number) {
+    super(pinNodes);
+    this._voltage = voltage;
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
+
+    // Port of vsrcset.c:40-43- idempotent branch allocation
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    const k = this.branchIndex;
+
+    // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
+    this._hPosBr = ctx.solver.allocElement(posNode, k);    // VSRCposNode, VSRCbranch
+    this._hNegBr = ctx.solver.allocElement(negNode, k);    // VSRCnegNode, VSRCbranch
+    this._hBrNeg = ctx.solver.allocElement(k, negNode);    // VSRCbranch,  VSRCnegNode
+    this._hBrPos = ctx.solver.allocElement(k, posNode);    // VSRCbranch,  VSRCposNode
+  }
+
+  findBranchFor(name: string, ctx: SetupContext): number {
+    // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+    const dev = ctx.findDevice(name);
+    if (!dev) return 0;
+    if (dev.branchIndex === -1) {
+      dev.branchIndex = ctx.makeCur(name, "branch");
+    }
+    return dev.branchIndex;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "voltage") this._voltage = value;
+  }
+
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    // vsrcload.c:43-46
+    solver.stampElement(this._hPosBr, +1.0);
+    solver.stampElement(this._hNegBr, -1.0);
+    solver.stampElement(this._hBrPos, +1.0);
+    solver.stampElement(this._hBrNeg, -1.0);
+    // ngspice srcFact gating: applied in MODEDCOP|MODEDCTRANCURVE (vsrcload.c:47-55)
+    // and MODETRANOP (vsrcload.c:405-413). Outside these modes the source value
+    // is applied directly. Match this gating; do not multiply unconditionally.
+    const ramp = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
+      ? ctx.srcFact
+      : 1.0;
+    ctx.rhs[this.branchIndex] += this._voltage * ramp;
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
+    return [-I, I];   // pinLayout order ["neg", "pos"]
+  }
+}
+
+// ---------------------------------------------------------------------------
 // makeDcVoltageSource- canonical inline-factory (ssA.13 / ssA.3: 3-arg form)
 // ---------------------------------------------------------------------------
 
@@ -168,73 +243,7 @@ export function makeDcVoltageSource(
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElement {
-  const p = { voltage: props.getModelParam<number>("voltage") };
-
-  // TSTALLOC handles- closure-local, NOT object fields.
-  let _hPosBr = -1, _hNegBr = -1, _hBrNeg = -1, _hBrPos = -1;
-
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-
-    setup(ctx: SetupContext): void {
-      const posNode = el._pinNodes.get("pos")!;
-      const negNode = el._pinNodes.get("neg")!;
-
-      // Port of vsrcset.c:40-43- idempotent branch allocation
-      if (el.branchIndex === -1) {
-        el.branchIndex = ctx.makeCur(el.label, "branch");
-      }
-      const k = el.branchIndex;
-
-      // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
-      _hPosBr = ctx.solver.allocElement(posNode, k);    // VSRCposNode, VSRCbranch
-      _hNegBr = ctx.solver.allocElement(negNode, k);    // VSRCnegNode, VSRCbranch
-      _hBrNeg = ctx.solver.allocElement(k, negNode);    // VSRCbranch,  VSRCnegNode
-      _hBrPos = ctx.solver.allocElement(k, posNode);    // VSRCbranch,  VSRCposNode
-    },
-
-    findBranchFor(name: string, ctx: SetupContext): number {
-      // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
-      const dev = ctx.findDevice(name);
-      if (!dev) return 0;
-      if (dev.branchIndex === -1) {
-        dev.branchIndex = ctx.makeCur(name, "branch");
-      }
-      return dev.branchIndex;
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) (p as Record<string, number>)[key] = value;
-    },
-
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      // vsrcload.c:43-46
-      solver.stampElement(_hPosBr, +1.0);
-      solver.stampElement(_hNegBr, -1.0);
-      solver.stampElement(_hBrPos, +1.0);
-      solver.stampElement(_hBrNeg, -1.0);
-      // ngspice srcFact gating: applied in MODEDCOP|MODEDCTRANCURVE (vsrcload.c:47-55)
-      // and MODETRANOP (vsrcload.c:405-413). Outside these modes the source value
-      // is applied directly. Match this gating; do not multiply unconditionally.
-      const ramp = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
-        ? ctx.srcFact
-        : 1.0;
-      ctx.rhs[el.branchIndex] += p.voltage * ramp;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const I = rhs[el.branchIndex];
-      return [-I, I];   // pinLayout order ["neg", "pos"]
-    },
-  };
-
-  return el;
+  return new DcVoltageSourceAnalogElement(pinNodes, props.getModelParam<number>("voltage"));
 }
 
 // ---------------------------------------------------------------------------

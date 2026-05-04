@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Zener diode analog component  Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
@@ -24,7 +24,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import {
@@ -39,7 +39,6 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { createDiodeElement } from "./diode.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
@@ -165,33 +164,62 @@ function computeTBV(
 // createZenerElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
-export function createZenerElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): PoolBackedAnalogElement {
-  const nodeAnode = pinNodes.get("A")!;
-  const nodeCathode = pinNodes.get("K")!;
+// ---------------------------------------------------------------------------
+// ZenerAnalogElement  pool-backed class
+// ---------------------------------------------------------------------------
 
-  const params: Record<string, number> = { ...ZENER_PARAM_DEFAULTS };
-  for (const key of props.getModelParamKeys()) {
-    params[key] = props.getModelParam<number>(key);
+interface ZenerTp {
+  vt: number;
+  nVt: number;
+  nbvVt: number;
+  tVcrit: number;
+  vcritBrk: number;
+  tBV: number;
+}
+
+class ZenerAnalogElement extends AbstractPoolBackedAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+  readonly stateSchema = ZENER_STATE_SCHEMA;
+  readonly stateSize = 4;
+
+  private readonly _params: Record<string, number>;
+  private readonly _nodeCathode: number;
+  private _tp: ZenerTp;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
+  private _pnjlimLimited = false;
+
+  // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
+  private _posPrimeNode: number;
+
+  // TSTALLOC handles- set during setup(), read inside load()
+  private _hPosPP  = -1;
+  private _hNegPP  = -1;
+  private _hPPPos  = -1;
+  private _hPPNeg  = -1;
+  private _hPosPos = -1;
+  private _hNegNeg = -1;
+  private _hPPPP   = -1;
+
+  // Internal node labels- recorded during setup() when RS > 0
+  private readonly _internalLabels: string[] = [];
+
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    super(pinNodes);
+    const params: Record<string, number> = { ...ZENER_PARAM_DEFAULTS };
+    for (const key of props.getModelParamKeys()) {
+      params[key] = props.getModelParam<number>(key);
+    }
+    // diosetup.c:93-95: NBV (DIObrkdEmissionCoeff) defaults to N (DIOemissionCoeff)
+    if (isNaN(params.NBV)) params.NBV = params.N;
+    this._params = params;
+    this._nodeCathode = pinNodes.get("K")!;
+    this._posPrimeNode = pinNodes.get("A")!;
+    this._tp = this._computeZenerTp();
   }
-  // diosetup.c:93-95: NBV (DIObrkdEmissionCoeff) defaults to N (DIOemissionCoeff)
-  if (isNaN(params.NBV)) params.NBV = params.N;
 
-  // Temperature-derived working values  recomputed whenever params.TEMP changes.
-  // cite: dioload.c / diotemp.c  per-instance TEMP (maps to ngspice DIOtemp)
-  interface ZenerTp {
-    vt: number;
-    nVt: number;
-    nbvVt: number;
-    tVcrit: number;
-    vcritBrk: number;
-    tBV: number;
-  }
-
-  function computeZenerTp(): ZenerTp {
+  private _computeZenerTp(): ZenerTp {
+    const params = this._params;
     // cite: dioload.c / diotemp.c  per-instance TEMP (maps to ngspice DIOtemp)
     const circuitTemp = params.TEMP;
     const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
@@ -211,310 +239,276 @@ export function createZenerElement(
     return { vt, nVt, nbvVt, tVcrit, vcritBrk, tBV };
   }
 
-  let tp = computeZenerTp();
+  setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this.pinNodes.get("A")!;
+    const negNode = this.pinNodes.get("K")!;
 
-  // State pool slot indices
-  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+    // State slots- diosetup.c:198-199
+    this._stateBase = ctx.allocStates(4);
 
-  // Pool binding  only the pool reference is retained. Individual state
-  // arrays are NOT cached as member variables: every access inside load()
-  // reads pool.states[N] at call time. Mirrors ngspice CKTstate0 pointer
-  // access (dioload.c never caches state pointers on devices).
-  let pool: StatePoolRef;
-  let base: number;
+    // Internal node- diosetup.c:204-224
+    // ngspice gating: RS > 0 â†’ allocate anode-prime node
+    if (this._params.RS === 0 || !this._params.RS) {
+      this._posPrimeNode = posNode;
+    } else {
+      this._posPrimeNode = ctx.makeVolt(this.label ?? "Z", "internal");
+      this._internalLabels.push("internal");
+    }
 
-  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
-  let pnjlimLimited = false;
+    // TSTALLOC sequence- diosetup.c:232-238 (identical to PB-DIO)
+    this._hPosPP  = solver.allocElement(posNode,            this._posPrimeNode); // (1)
+    this._hNegPP  = solver.allocElement(negNode,            this._posPrimeNode); // (2)
+    this._hPPPos  = solver.allocElement(this._posPrimeNode, posNode);            // (3)
+    this._hPPNeg  = solver.allocElement(this._posPrimeNode, negNode);            // (4)
+    this._hPosPos = solver.allocElement(posNode,            posNode);            // (5)
+    this._hNegNeg = solver.allocElement(negNode,            negNode);            // (6)
+    this._hPPPP   = solver.allocElement(this._posPrimeNode, this._posPrimeNode); // (7)
+  }
 
-  // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
-  let _posPrimeNode = nodeAnode;
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
+  }
 
-  // TSTALLOC handles- closure-local, set during setup(), read inside load()
-  let _hPosPP  = -1;
-  let _hNegPP  = -1;
-  let _hPPPos  = -1;
-  let _hPPNeg  = -1;
-  let _hPosPos = -1;
-  let _hNegNeg = -1;
-  let _hPPPP   = -1;
+  load(ctx: LoadContext): void {
+    const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 
-  // Internal node labels- recorded during setup() when RS > 0
-  const internalLabels: string[] = [];
+    // Direct state-array access per call  no cached Float64Array refs.
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const base = this._stateBase;
 
-  const zenerElement: PoolBackedAnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    const voltages = ctx.rhsOld;
+    const mode = ctx.cktMode;
+    const params = this._params;
+    const tp = this._tp;
 
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-
-    poolBacked: true as const,
-    stateSize: 4,
-    stateSchema: ZENER_STATE_SCHEMA,
-
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      const solver = ctx.solver;
-      const posNode = zenerElement._pinNodes.get("A")!;
-      const negNode = zenerElement._pinNodes.get("K")!;
-
-      // State slots- diosetup.c:198-199
-      zenerElement._stateBase = ctx.allocStates(4);
-      base = zenerElement._stateBase;
-
-      // Internal node- diosetup.c:204-224
-      // ngspice gating: RS > 0 â†’ allocate anode-prime node
-      if (params.RS === 0 || !params.RS) {
-        _posPrimeNode = posNode;
-      } else {
-        _posPrimeNode = ctx.makeVolt(zenerElement.label ?? "Z", "internal");
-        internalLabels.push("internal");
-      }
-
-      // TSTALLOC sequence- diosetup.c:232-238 (identical to PB-DIO)
-      _hPosPP  = solver.allocElement(posNode,       _posPrimeNode); // (1)
-      _hNegPP  = solver.allocElement(negNode,       _posPrimeNode); // (2)
-      _hPPPos  = solver.allocElement(_posPrimeNode, posNode);       // (3)
-      _hPPNeg  = solver.allocElement(_posPrimeNode, negNode);       // (4)
-      _hPosPos = solver.allocElement(posNode,       posNode);       // (5)
-      _hNegNeg = solver.allocElement(negNode,       negNode);       // (6)
-      _hPPPP   = solver.allocElement(_posPrimeNode, _posPrimeNode); // (7)
-    },
-
-    getInternalNodeLabels(): readonly string[] {
-      return internalLabels;
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = zenerElement._stateBase;
-    },
-
-    load(ctx: LoadContext): void {
-      // Direct state-array access per call  no cached Float64Array refs.
-      const s0 = pool.states[0];
-      const s1 = pool.states[1];
-
-      const voltages = ctx.rhsOld;
-      const mode = ctx.cktMode;
-
-      // -----------------------------------------------------------------------
-      // Z-W3-8: MODEINITSMSIG branch  cite: dioload.c:126-128
-      // -----------------------------------------------------------------------
-      if (mode & MODEINITSMSIG) {
-        // Read vd from state0 (DC operating point voltage), compute OP values,
-        // skip pnjlim and stamps, then return.
-        const vdOp = s0[base + SLOT_VD];
-        // compute conductance at OP point (for AC small-signal analysis)
-        // three-region eval at vdOp  cite: dioload.c:245-265
-        let gdOp: number;
-        if (vdOp >= -3 * tp.nVt) {
-          // forward
-          const evd = Math.exp(vdOp / tp.nVt);
-          gdOp = params.IS * evd / tp.nVt;
-        } else if (!isFinite(tp.tBV) || vdOp >= -tp.tBV) {
-          // reverse-cubic  cite: dioload.c:251-257
-          const arg = 3 * tp.nVt / (vdOp * CONSTe);
-          const arg3 = arg * arg * arg;
-          gdOp = params.IS * 3 * arg3 / (-vdOp);
-        } else {
-          // breakdown  cite: dioload.c:261-263
-          const evrev = Math.exp(-(tp.tBV + vdOp) / tp.nbvVt);
-          gdOp = params.IS * evrev / tp.nbvVt;
-        }
-        // store capd (small-signal conductance)  dioload.c:363 stores capd here;
-        // for a resistive zener (no cap), we store gd for any bypass/convergence use.
-        s0[base + SLOT_GEQ] = gdOp + GMIN;
-        // cite: dioload.c:374: continue (skip stamps)
-        return;
-      }
-
-      // -----------------------------------------------------------------------
-      // Z-W3-4: 4-branch MODEINITJCT dispatch  cite: dioload.c:130-138
-      // In-load priming: MODEINITJCT sets SLOT_VD = tVcrit (OFF==0) or 0 (OFF!=0)
-      // directly inside load(), matching ngspice dioload.c:130-138.
-      // -----------------------------------------------------------------------
-      let vdRaw: number;
-      if (mode & MODEINITTRAN) {
-        // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
-        vdRaw = s1[base + SLOT_VD];
-      } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC  DIOinitCond
-        // Simplified model has no IC param; fall back to 0  (DIOinitCond default).
-        vdRaw = 0;
-      } else if ((mode & MODEINITJCT) && (params.OFF !== undefined && params.OFF !== 0)) {
-        // dioload.c:133-134: MODEINITJCT && DIOoff  vd = 0
-        vdRaw = 0;
-      } else if (mode & MODEINITJCT) {
-        // dioload.c:135-136: MODEINITJCT else  vd = tVcrit
-        vdRaw = tp.tVcrit;
-      } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
-        // dioload.c:137-138: MODEINITFIX && DIOoff  vd = 0
-        vdRaw = 0;
-      } else {
-        // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
-        const va = voltages[_posPrimeNode];
-        const vc = voltages[nodeCathode];
-        vdRaw = va - vc;
-      }
-
-      // -----------------------------------------------------------------------
-      // Apply pnjlim  cite: dioload.c:180-204
-      // -----------------------------------------------------------------------
-      const vdOld = s0[base + SLOT_VD];
-      let vdLimited: number;
-
-      if (mode & (MODEINITJCT | MODEINITTRAN)) {
-        // These phases set vd directly  no pnjlim  cite: dioload.c:126-138
-        vdLimited = vdRaw;
-        pnjlimLimited = false;
-      } else if (isFinite(tp.tBV) && vdRaw < Math.min(0, -tp.tBV + 10 * tp.nbvVt)) {
-        // dioload.c:183-195: breakdown path  pnjlim in reflected domain.
-        // Z-W3-6: use vcritBrk (computed from nbvVt) not tVcrit  cite: dioload.c:189-190
-        const vdtemp = -(vdRaw + tp.tBV);
-        const vdtempOld = -(vdOld + tp.tBV);
-        const reflResult = pnjlim(vdtemp, vdtempOld, tp.nbvVt, tp.vcritBrk);
-        pnjlimLimited = reflResult.limited;
-        vdLimited = -(reflResult.value + tp.tBV);
-      } else {
-        // dioload.c:196-204: standard pnjlim for forward/normal-reverse.
-        const vdResult = pnjlim(vdRaw, vdOld, tp.nVt, tp.tVcrit);
-        vdLimited = vdResult.value;
-        pnjlimLimited = vdResult.limited;
-      }
-
-      if (pnjlimLimited) ctx.noncon.value++;
-
-      if (ctx.limitingCollector) {
-        ctx.limitingCollector.push({
-          elementIndex: zenerElement.elementIndex ?? -1,
-          label: zenerElement.label ?? "",
-          junction: "AK",
-          limitType: "pnjlim",
-          vBefore: vdRaw,
-          vAfter: vdLimited,
-          wasLimited: pnjlimLimited,
-        });
-      }
-
-      // -----------------------------------------------------------------------
-      // Z-W3-1/Z-W3-2: Three-region I-V structure  cite: dioload.c:245-265
-      // Z-W3-5: use tBV (temperature-scaled) throughout  cite: diotemp.c:244
-      // -----------------------------------------------------------------------
-      let cdb: number;
-      let gdb: number;
-
-      if (vdLimited >= -3 * tp.nVt) {
-        // Forward region  cite: dioload.c:245-249
-        const evd = Math.exp(vdLimited / tp.nVt);
-        cdb = params.IS * (evd - 1);
-        gdb = params.IS * evd / tp.nVt;
-      } else if (!isFinite(tp.tBV) || vdLimited >= -tp.tBV) {
-        // Reverse-cubic region  cite: dioload.c:251-258
-        // arg = 3*vte / (vd * CONSTe); cdb = -IS*(1+arg^3); gdb = IS*3*arg^3/(-vd)
-        const arg = 3 * tp.nVt / (vdLimited * CONSTe);
+    // -----------------------------------------------------------------------
+    // Z-W3-8: MODEINITSMSIG branch  cite: dioload.c:126-128
+    // -----------------------------------------------------------------------
+    if (mode & MODEINITSMSIG) {
+      // Read vd from state0 (DC operating point voltage), compute OP values,
+      // skip pnjlim and stamps, then return.
+      const vdOp = s0[base + SLOT_VD];
+      // compute conductance at OP point (for AC small-signal analysis)
+      // three-region eval at vdOp  cite: dioload.c:245-265
+      let gdOp: number;
+      if (vdOp >= -3 * tp.nVt) {
+        // forward
+        const evd = Math.exp(vdOp / tp.nVt);
+        gdOp = params.IS * evd / tp.nVt;
+      } else if (!isFinite(tp.tBV) || vdOp >= -tp.tBV) {
+        // reverse-cubic  cite: dioload.c:251-257
+        const arg = 3 * tp.nVt / (vdOp * CONSTe);
         const arg3 = arg * arg * arg;
-        cdb = -params.IS * (1 + arg3);
-        gdb = params.IS * 3 * arg3 / (-vdLimited);
+        gdOp = params.IS * 3 * arg3 / (-vdOp);
       } else {
-        // Breakdown region  cite: dioload.c:259-264
-        // cdb = -IS * exp(-(tBV+vd)/vtebrk); gdb = IS * exp(...)/vtebrk
-        const evrev = Math.exp(-(tp.tBV + vdLimited) / tp.nbvVt);
-        cdb = -params.IS * evrev;
-        gdb = params.IS * evrev / tp.nbvVt;
+        // breakdown  cite: dioload.c:261-263
+        const evrev = Math.exp(-(tp.tBV + vdOp) / tp.nbvVt);
+        gdOp = params.IS * evrev / tp.nbvVt;
       }
+      // store capd (small-signal conductance)  dioload.c:363 stores capd here;
+      // for a resistive zener (no cap), we store gd for any bypass/convergence use.
+      s0[base + SLOT_GEQ] = gdOp + GMIN;
+      // cite: dioload.c:374: continue (skip stamps)
+      return;
+    }
 
-      // cd / gd = intrinsic junction values (no sidewall/tunnel for simplified model)
-      let cd = cdb;
-      let gd = gdb;
+    // -----------------------------------------------------------------------
+    // Z-W3-4: 4-branch MODEINITJCT dispatch  cite: dioload.c:130-138
+    // In-load priming: MODEINITJCT sets SLOT_VD = tVcrit (OFF==0) or 0 (OFF!=0)
+    // directly inside load(), matching ngspice dioload.c:130-138.
+    // -----------------------------------------------------------------------
+    let vdRaw: number;
+    if (mode & MODEINITTRAN) {
+      // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
+      vdRaw = s1[base + SLOT_VD];
+    } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
+      // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC  DIOinitCond
+      // Simplified model has no IC param; fall back to 0  (DIOinitCond default).
+      vdRaw = 0;
+    } else if ((mode & MODEINITJCT) && (params.OFF !== undefined && params.OFF !== 0)) {
+      // dioload.c:133-134: MODEINITJCT && DIOoff  vd = 0
+      vdRaw = 0;
+    } else if (mode & MODEINITJCT) {
+      // dioload.c:135-136: MODEINITJCT else  vd = tVcrit
+      vdRaw = tp.tVcrit;
+    } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
+      // dioload.c:137-138: MODEINITFIX && DIOoff  vd = 0
+      vdRaw = 0;
+    } else {
+      // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
+      const va = voltages[this._posPrimeNode];
+      const vc = voltages[this._nodeCathode];
+      vdRaw = va - vc;
+    }
 
-      // -----------------------------------------------------------------------
-      // Z-W3-3: GMIN as Norton pair  cite: dioload.c:297-299, 310-311
-      // Add GMIN to both gd and cd before ieq computation.
-      // -----------------------------------------------------------------------
-      gd += GMIN;       // cite: dioload.c:298 (else branch: gd += CKTgmin)
-      cd += GMIN * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
+    // -----------------------------------------------------------------------
+    // Apply pnjlim  cite: dioload.c:180-204
+    // -----------------------------------------------------------------------
+    const vdOld = s0[base + SLOT_VD];
+    let vdLimited: number;
 
-      // -----------------------------------------------------------------------
-      // Z-W3-7: state0 writes  store GMIN-adjusted pair  cite: dioload.c:417-419
-      // ngspice writes the post-GMIN cd and gd to CKTstate0.
-      // -----------------------------------------------------------------------
-      s0[base + SLOT_VD]  = vdLimited;
-      s0[base + SLOT_ID]  = cd;           // GMIN-adjusted (matches dioload.c:418)
-      s0[base + SLOT_GEQ] = gd;           // GMIN-adjusted (matches dioload.c:419)
+    if (mode & (MODEINITJCT | MODEINITTRAN)) {
+      // These phases set vd directly  no pnjlim  cite: dioload.c:126-138
+      vdLimited = vdRaw;
+      this._pnjlimLimited = false;
+    } else if (isFinite(tp.tBV) && vdRaw < Math.min(0, -tp.tBV + 10 * tp.nbvVt)) {
+      // dioload.c:183-195: breakdown path  pnjlim in reflected domain.
+      // Z-W3-6: use vcritBrk (computed from nbvVt) not tVcrit  cite: dioload.c:189-190
+      const vdtemp = -(vdRaw + tp.tBV);
+      const vdtempOld = -(vdOld + tp.tBV);
+      const reflResult = pnjlim(vdtemp, vdtempOld, tp.nbvVt, tp.vcritBrk);
+      this._pnjlimLimited = reflResult.limited;
+      vdLimited = -(reflResult.value + tp.tBV);
+    } else {
+      // dioload.c:196-204: standard pnjlim for forward/normal-reverse.
+      const vdResult = pnjlim(vdRaw, vdOld, tp.nVt, tp.tVcrit);
+      vdLimited = vdResult.value;
+      this._pnjlimLimited = vdResult.limited;
+    }
 
-      const ieq = cd - gd * vdLimited;
-      s0[base + SLOT_IEQ] = ieq;
+    if (this._pnjlimLimited) ctx.noncon.value++;
 
-      // -----------------------------------------------------------------------
-      // Stamp Norton companion  cite: dioload.c:429-441
-      // Stamps through pre-allocated handles from setup()
-      //
-      // Series-resistance T-model (gspr) gating mirrors dioload.c:98 and the
-      // setup-side gating at diosetup.c:204 (DIOresist == 0 â†’ no prime node).
-      // When RS == 0, _posPrimeNode aliases the external anode (zener.ts:264)
-      // and the prime-side stamps collapse to no-ops- gspr is skipped to match.
-      // When RS > 0, the seven stamps below mirror dioload.c:431-441 line for
-      // line: gd contributes to (PP,PP), (Neg,Neg), (PP,Neg), (Neg,PP) and gspr
-      // contributes to (PP,PP), (Pos,Pos), (Pos,PP), (PP,Pos). The (PP,PP)
-      // diagonal carries gd+gspr per dioload.c:431.
-      //
-      // gspr = DIOtConductance * AREA (dioload.c:98). DIOtConductance = 1/RS
-      // baseline (diotemp.c:72), with optional polynomial scaling by
-      // DIOresistTemp1/2 (diotemp.c:253-257)- not yet applied here; tracked
-      // for future bit-exact temp parity.
-      // -----------------------------------------------------------------------
-      const solver = ctx.solver;
-      const gspr = params.RS > 0 ? (params.AREA ?? 1) / params.RS : 0;
+    if (ctx.limitingCollector) {
+      ctx.limitingCollector.push({
+        elementIndex: this.elementIndex ?? -1,
+        label: this.label ?? "",
+        junction: "AK",
+        limitType: "pnjlim",
+        vBefore: vdRaw,
+        vAfter: vdLimited,
+        wasLimited: this._pnjlimLimited,
+      });
+    }
 
-      solver.stampElement(_hPPPP,   gd + gspr);   // dioload.c:431
-      solver.stampElement(_hPPNeg,  -gd);         // dioload.c:436
-      solver.stampElement(_hNegPP,  -gd);         // dioload.c:437
-      solver.stampElement(_hNegNeg, gd);          // dioload.c:432
-      if (gspr > 0) {
-        solver.stampElement(_hPosPos, gspr);      // dioload.c:433
-        solver.stampElement(_hPosPP,  -gspr);     // dioload.c:434
-        solver.stampElement(_hPPPos,  -gspr);     // dioload.c:435
-      }
-      stampRHS(ctx.rhs, _posPrimeNode, -ieq);     // dioload.c:439 (cdeq sign-flipped)
-      stampRHS(ctx.rhs, nodeCathode, ieq);        // dioload.c:440
-    },
+    // -----------------------------------------------------------------------
+    // Z-W3-1/Z-W3-2: Three-region I-V structure  cite: dioload.c:245-265
+    // Z-W3-5: use tBV (temperature-scaled) throughout  cite: diotemp.c:244
+    // -----------------------------------------------------------------------
+    let cdb: number;
+    let gdb: number;
 
-    checkConvergence(ctx: LoadContext): boolean {
-      const s0 = pool.states[0];
-      // dioload.c:411-416: CKTnoncon bump on pnjlim  non-convergence
-      if (pnjlimLimited) return false;
+    if (vdLimited >= -3 * tp.nVt) {
+      // Forward region  cite: dioload.c:245-249
+      const evd = Math.exp(vdLimited / tp.nVt);
+      cdb = params.IS * (evd - 1);
+      gdb = params.IS * evd / tp.nVt;
+    } else if (!isFinite(tp.tBV) || vdLimited >= -tp.tBV) {
+      // Reverse-cubic region  cite: dioload.c:251-258
+      // arg = 3*vte / (vd * CONSTe); cdb = -IS*(1+arg^3); gdb = IS*3*arg^3/(-vd)
+      const arg = 3 * tp.nVt / (vdLimited * CONSTe);
+      const arg3 = arg * arg * arg;
+      cdb = -params.IS * (1 + arg3);
+      gdb = params.IS * 3 * arg3 / (-vdLimited);
+    } else {
+      // Breakdown region  cite: dioload.c:259-264
+      // cdb = -IS * exp(-(tBV+vd)/vtebrk); gdb = IS * exp(...)/vtebrk
+      const evrev = Math.exp(-(tp.tBV + vdLimited) / tp.nbvVt);
+      cdb = -params.IS * evrev;
+      gdb = params.IS * evrev / tp.nbvVt;
+    }
 
-      const voltages = ctx.rhsOld;
-      const va = voltages[_posPrimeNode];
-      const vc = voltages[nodeCathode];
-      const vdRaw = va - vc;
+    // cd / gd = intrinsic junction values (no sidewall/tunnel for simplified model)
+    let cd = cdb;
+    let gd = gdb;
 
-      // dioconv.c DIOconvTest: current-prediction convergence
-      const delvd = vdRaw - s0[base + SLOT_VD];
-      const id = s0[base + SLOT_ID];   // GMIN-adjusted
-      const gd = s0[base + SLOT_GEQ]; // GMIN-adjusted
-      const cdhat = id + gd * delvd;
-      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
-      return Math.abs(cdhat - id) <= tol;
-    },
+    // -----------------------------------------------------------------------
+    // Z-W3-3: GMIN as Norton pair  cite: dioload.c:297-299, 310-311
+    // Add GMIN to both gd and cd before ieq computation.
+    // -----------------------------------------------------------------------
+    gd += GMIN;       // cite: dioload.c:298 (else branch: gd += CKTgmin)
+    cd += GMIN * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
 
-    getPinCurrents(_rhs: Float64Array): number[] {
-      // pinLayout order: [A (anode), K (cathode)]
-      // Positive = current flowing INTO element at that pin.
-      const id = pool.states[0][base + SLOT_ID];
-      return [id, -id];
-    },
+    // -----------------------------------------------------------------------
+    // Z-W3-7: state0 writes  store GMIN-adjusted pair  cite: dioload.c:417-419
+    // ngspice writes the post-GMIN cd and gd to CKTstate0.
+    // -----------------------------------------------------------------------
+    s0[base + SLOT_VD]  = vdLimited;
+    s0[base + SLOT_ID]  = cd;           // GMIN-adjusted (matches dioload.c:418)
+    s0[base + SLOT_GEQ] = gd;           // GMIN-adjusted (matches dioload.c:419)
 
-    setParam(key: string, value: number): void {
-      if (key in params) {
-        params[key] = value;
-        tp = computeZenerTp();
-      }
-    },
-  };
+    const ieq = cd - gd * vdLimited;
+    s0[base + SLOT_IEQ] = ieq;
 
-  return zenerElement;
+    // -----------------------------------------------------------------------
+    // Stamp Norton companion  cite: dioload.c:429-441
+    // Stamps through pre-allocated handles from setup()
+    //
+    // Series-resistance T-model (gspr) gating mirrors dioload.c:98 and the
+    // setup-side gating at diosetup.c:204 (DIOresist == 0 â†’ no prime node).
+    // When RS == 0, _posPrimeNode aliases the external anode (zener.ts:264)
+    // and the prime-side stamps collapse to no-ops- gspr is skipped to match.
+    // When RS > 0, the seven stamps below mirror dioload.c:431-441 line for
+    // line: gd contributes to (PP,PP), (Neg,Neg), (PP,Neg), (Neg,PP) and gspr
+    // contributes to (PP,PP), (Pos,Pos), (Pos,PP), (PP,Pos). The (PP,PP)
+    // diagonal carries gd+gspr per dioload.c:431.
+    //
+    // gspr = DIOtConductance * AREA (dioload.c:98). DIOtConductance = 1/RS
+    // baseline (diotemp.c:72), with optional polynomial scaling by
+    // DIOresistTemp1/2 (diotemp.c:253-257)- not yet applied here; tracked
+    // for future bit-exact temp parity.
+    // -----------------------------------------------------------------------
+    const solver = ctx.solver;
+    const gspr = params.RS > 0 ? (params.AREA ?? 1) / params.RS : 0;
+
+    solver.stampElement(this._hPPPP,   gd + gspr);   // dioload.c:431
+    solver.stampElement(this._hPPNeg,  -gd);         // dioload.c:436
+    solver.stampElement(this._hNegPP,  -gd);         // dioload.c:437
+    solver.stampElement(this._hNegNeg, gd);          // dioload.c:432
+    if (gspr > 0) {
+      solver.stampElement(this._hPosPos, gspr);      // dioload.c:433
+      solver.stampElement(this._hPosPP,  -gspr);     // dioload.c:434
+      solver.stampElement(this._hPPPos,  -gspr);     // dioload.c:435
+    }
+    stampRHS(ctx.rhs, this._posPrimeNode, -ieq);     // dioload.c:439 (cdeq sign-flipped)
+    stampRHS(ctx.rhs, this._nodeCathode, ieq);       // dioload.c:440
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_ID = 3;
+    const s0 = this._pool.states[0];
+    const base = this._stateBase;
+
+    // dioload.c:411-416: CKTnoncon bump on pnjlim  non-convergence
+    if (this._pnjlimLimited) return false;
+
+    const voltages = ctx.rhsOld;
+    const va = voltages[this._posPrimeNode];
+    const vc = voltages[this._nodeCathode];
+    const vdRaw = va - vc;
+
+    // dioconv.c DIOconvTest: current-prediction convergence
+    const delvd = vdRaw - s0[base + SLOT_VD];
+    const id = s0[base + SLOT_ID];   // GMIN-adjusted
+    const gd = s0[base + SLOT_GEQ]; // GMIN-adjusted
+    const cdhat = id + gd * delvd;
+    const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
+    return Math.abs(cdhat - id) <= tol;
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    const SLOT_ID = 3;
+    // pinLayout order: [A (anode), K (cathode)]
+    // Positive = current flowing INTO element at that pin.
+    const id = this._pool.states[0][this._stateBase + SLOT_ID];
+    return [id, -id];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._params) {
+      this._params[key] = value;
+      this._tp = this._computeZenerTp();
+    }
+  }
+}
+
+export function createZenerElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  _getTime: () => number,
+): ZenerAnalogElement {
+  return new ZenerAnalogElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

@@ -40,9 +40,9 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -237,105 +237,101 @@ function swLoadHandles(
 }
 
 // ---------------------------------------------------------------------------
-// createSwitchSPSTElement  AnalogElement factory (SPST)
+// AnalogSwitchSPSTElement  pool-backed class (SPST)
 // Direct port of ngspice SW (VSWITCH) primitive. swload.c, swdefs.h.
 // ---------------------------------------------------------------------------
+
+class AnalogSwitchSPSTElement extends AbstractPoolBackedAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly stateSchema = SW_SCHEMA;
+  readonly stateSize = SW_SCHEMA.size;  // 2 (SW_NUM_STATES, swdefs.h:56)
+
+  private readonly _nIn:   number;  // positive signal node (SWposNode, swdefs.h:28)
+  private readonly _nOut:  number;  // negative signal node (SWnegNode, swdefs.h:29)
+  private readonly _nCtrl: number;  // positive control node (SWposCntrlNode, swdefs.h:30)
+
+  // Mutable params for hot-loadable setParam()
+  private _rOn:         number;
+  private _rOff:        number;
+  private _vThreshold:  number;
+  private _vHysteresis: number;
+
+  // Matrix handles allocated in setup() per swsetup.c:59-62 TSTALLOC sequence
+  private _hPP = -1;
+  private _hPN = -1;
+  private _hNP = -1;
+  private _hNN = -1;
+
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    super(pinNodes);
+    this._nIn   = pinNodes.get("in")!;
+    this._nOut  = pinNodes.get("out")!;
+    this._nCtrl = pinNodes.get("ctrl")!;
+    this._rOn         = props.getModelParam<number>("rOn");
+    this._rOff        = props.getModelParam<number>("rOff");
+    this._vThreshold  = props.getModelParam<number>("vThreshold");
+    this._vHysteresis = props.getModelParam<number>("vHysteresis");
+  }
+
+  setup(ctx: SetupContext): void {
+    // swsetup.c:47-48 — allocate 2 state slots (SW_NUM_STATES = 2)
+    this._stateBase = ctx.allocStates(2);
+
+    // swsetup.c:59-62 — TSTALLOC sequence line-for-line
+    this._hPP = ctx.solver.allocElement(this._nIn,  this._nIn);   // SWposPosptr
+    this._hPN = ctx.solver.allocElement(this._nIn,  this._nOut);  // SWposNegptr
+    this._hNP = ctx.solver.allocElement(this._nOut, this._nIn);   // SWnegPosptr
+    this._hNN = ctx.solver.allocElement(this._nOut, this._nOut);  // SWnegNegptr
+  }
+
+  load(ctx: LoadContext): void {
+    const rOnNow  = Math.max(this._rOn, 1e-3);
+    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    swLoadHandles(
+      ctx, this._pool, this._stateBase,
+      this._nCtrl,
+      1 / rOnNow,             // SWonConduct = 1/Ron, swdefs.h:72
+      1 / rOffNow,            // SWoffConduct = 1/Roff, swdefs.h:73
+      this._vThreshold,       // SWvThreshold, swdefs.h:70
+      this._vHysteresis,      // SWvHysteresis, swdefs.h:71
+      false,                  // SWzero_stateGiven = false (default: starts OFF), swdefs.h:44
+      false,                  // invertCtrl = false (SPST: direct control)
+      this._hPP, this._hPN, this._hNP, this._hNN,
+    );
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    // Pin layout order: in, out, ctrl.
+    // Conductance g_now stamped between nIn and nOut; ctrl has no stamp.
+    const current_state = this._pool.states[0][this._stateBase + SLOT_STATE];
+    const rOnNow  = Math.max(this._rOn, 1e-3);
+    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const g_now = ((current_state === REALLY_ON) || (current_state === HYST_ON))
+      ? 1 / rOnNow
+      : 1 / rOffNow;
+    const vIn  = rhs[this._nIn];
+    const vOut = rhs[this._nOut];
+    const iThrough = g_now * (vIn - vOut);
+    return [iThrough, -iThrough, 0];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "rOn")         this._rOn         = value;
+    else if (key === "rOff")        this._rOff        = value;
+    else if (key === "vThreshold")  this._vThreshold  = value;
+    else if (key === "vHysteresis") this._vHysteresis = value;
+  }
+}
 
 function createSwitchSPSTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElement {
-  const nIn   = pinNodes.get("in")!;   // positive signal node (SWposNode, swdefs.h:28)
-  const nOut  = pinNodes.get("out")!;  // negative signal node (SWnegNode, swdefs.h:29)
-  const nCtrl = pinNodes.get("ctrl")!; // positive control node (SWposCntrlNode, swdefs.h:30)
-
-  // p holds mutable params for hot-loadable setParam()
-  const p: Record<string, number> = {
-    rOn:         props.getModelParam<number>("rOn"),
-    rOff:        props.getModelParam<number>("rOff"),
-    vThreshold:  props.getModelParam<number>("vThreshold"),
-    vHysteresis: props.getModelParam<number>("vHysteresis"),
-  };
-
-  // Pool binding  reference held after initState(); individual state arrays
-  // read via pool.states[N] at call time. Mirrors ngspice CKTstate0/1 pointer
-  // access (cktload.c never caches state pointers on devices).
-  let pool: StatePoolRef;
-  let base: number; // = _stateBase, set by initState()
-
-  // Matrix handles allocated in setup() per swsetup.c:59-62 TSTALLOC sequence
-  let _hPP = -1;
-  let _hPN = -1;
-  let _hNP = -1;
-  let _hNN = -1;
-
-  return {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(ctx: SetupContext): void {
-      // swsetup.c:47-48- allocate 2 state slots (SW_NUM_STATES = 2)
-      this._stateBase = ctx.allocStates(2);
-      base = this._stateBase;
-
-      // swsetup.c:59-62- TSTALLOC sequence line-for-line
-      _hPP = ctx.solver.allocElement(nIn,  nIn);   // SWposPosptr
-      _hPN = ctx.solver.allocElement(nIn,  nOut);  // SWposNegptr
-      _hNP = ctx.solver.allocElement(nOut, nIn);   // SWnegPosptr
-      _hNN = ctx.solver.allocElement(nOut, nOut);  // SWnegNegptr
-    },
-
-    poolBacked: true as const,
-    stateSize: SW_SCHEMA.size,   // 2 (SW_NUM_STATES, swdefs.h:56)
-    stateSchema: SW_SCHEMA,
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = this._stateBase;
-    },
-
-    load(ctx: LoadContext): void {
-      const rOnNow  = Math.max(p.rOn, 1e-3);
-      const rOffNow = Math.max(p.rOff, rOnNow * 2);
-      swLoadHandles(
-        ctx, pool, base,
-        nCtrl,
-        1 / rOnNow,           // SWonConduct = 1/Ron, swdefs.h:72
-        1 / rOffNow,          // SWoffConduct = 1/Roff, swdefs.h:73
-        p.vThreshold,         // SWvThreshold, swdefs.h:70
-        p.vHysteresis,        // SWvHysteresis, swdefs.h:71
-        false,                // SWzero_stateGiven = false (default: starts OFF), swdefs.h:44
-        false,                // invertCtrl = false (SPST: direct control)
-        _hPP, _hPN, _hNP, _hNN,
-      );
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // Pin layout order: in, out, ctrl.
-      // Conductance g_now stamped between nIn and nOut; ctrl has no stamp.
-      const current_state = pool.states[0][base + SLOT_STATE];
-      const rOnNow  = Math.max(p.rOn, 1e-3);
-      const rOffNow = Math.max(p.rOff, rOnNow * 2);
-      const g_now = ((current_state === REALLY_ON) || (current_state === HYST_ON))
-        ? 1 / rOnNow
-        : 1 / rOffNow;
-      const vIn  = rhs[nIn];
-      const vOut = rhs[nOut];
-      const iThrough = g_now * (vIn - vOut);
-      return [iThrough, -iThrough, 0];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
-    },
-  };
+): AnalogSwitchSPSTElement {
+  return new AnalogSwitchSPSTElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
-// createSwitchSPDTElement  AnalogElement factory (SPDT)
+// AnalogSwitchSPDTElement  pool-backed class (SPDT)
 // digiTS extension beyond ngspice SW primitive  see F4b-composite discussion.
 // Two complementary SW paths sharing one control voltage:
 //   COM-NO path: normal polarity (closes when v_ctrl > vThreshold)
@@ -345,119 +341,120 @@ function createSwitchSPSTElement(
 //   [base+2]: NC_CURRENT_STATE, [base+3]: NC_V_CTRL   COM-NC path
 // ---------------------------------------------------------------------------
 
+class AnalogSwitchSPDTElement extends AbstractPoolBackedAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly stateSchema = SPDT_SCHEMA;
+  readonly stateSize = SPDT_SCHEMA.size;  // 4 (two SW paths × 2 slots each)
+
+  private readonly _nCom:  number;  // common terminal
+  private readonly _nNO:   number;  // normally-open terminal
+  private readonly _nNC:   number;  // normally-closed terminal
+  private readonly _nCtrl: number;  // control terminal
+
+  // Mutable params for hot-loadable setParam()
+  private _rOn:         number;
+  private _rOff:        number;
+  private _vThreshold:  number;
+  private _vHysteresis: number;
+
+  // Matrix handles for COM-NO path (swsetup.c:59-62, pos=nCom, neg=nNO)
+  private _hNO_PP = -1;
+  private _hNO_PN = -1;
+  private _hNO_NP = -1;
+  private _hNO_NN = -1;
+
+  // Matrix handles for COM-NC path (swsetup.c:59-62, pos=nCom, neg=nNC)
+  private _hNC_PP = -1;
+  private _hNC_PN = -1;
+  private _hNC_NP = -1;
+  private _hNC_NN = -1;
+
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    super(pinNodes);
+    this._nCom  = pinNodes.get("com")!;
+    this._nNO   = pinNodes.get("no")!;
+    this._nNC   = pinNodes.get("nc")!;
+    this._nCtrl = pinNodes.get("ctrl")!;
+    this._rOn         = props.getModelParam<number>("rOn");
+    this._rOff        = props.getModelParam<number>("rOff");
+    this._vThreshold  = props.getModelParam<number>("vThreshold");
+    this._vHysteresis = props.getModelParam<number>("vHysteresis");
+  }
+
+  setup(ctx: SetupContext): void {
+    // COM-NO path: swsetup.c:47-48 (allocStates) + swsetup.c:59-62 (TSTALLOC)
+    this._stateBase = ctx.allocStates(2);
+    this._hNO_PP = ctx.solver.allocElement(this._nCom, this._nCom);  // SWposPosptr (swNO)
+    this._hNO_PN = ctx.solver.allocElement(this._nCom, this._nNO);   // SWposNegptr (swNO)
+    this._hNO_NP = ctx.solver.allocElement(this._nNO,  this._nCom);  // SWnegPosptr (swNO)
+    this._hNO_NN = ctx.solver.allocElement(this._nNO,  this._nNO);   // SWnegNegptr (swNO)
+
+    // COM-NC path: swsetup.c:47-48 (allocStates) + swsetup.c:59-62 (TSTALLOC)
+    ctx.allocStates(2);
+    this._hNC_PP = ctx.solver.allocElement(this._nCom, this._nCom);  // SWposPosptr (swNC)
+    this._hNC_PN = ctx.solver.allocElement(this._nCom, this._nNC);   // SWposNegptr (swNC)
+    this._hNC_NP = ctx.solver.allocElement(this._nNC,  this._nCom);  // SWnegPosptr (swNC)
+    this._hNC_NN = ctx.solver.allocElement(this._nNC,  this._nNC);   // SWnegNegptr (swNC)
+  }
+
+  load(ctx: LoadContext): void {
+    const rOnNow  = Math.max(this._rOn, 1e-3);
+    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const gOn  = 1 / rOnNow;   // SWonConduct, swdefs.h:72
+    const gOff = 1 / rOffNow;  // SWoffConduct, swdefs.h:73
+
+    // COM-NO path: normal polarity SW (swload.c semantics, slots base+0..base+1)
+    swLoadHandles(
+      ctx, this._pool, this._stateBase,
+      this._nCtrl, gOn, gOff,
+      this._vThreshold, this._vHysteresis,
+      false,  // SWzero_stateGiven=false: NO path starts OFF (normally open)
+      false,  // invertCtrl=false: normal polarity
+      this._hNO_PP, this._hNO_PN, this._hNO_NP, this._hNO_NN,
+    );
+
+    // COM-NC path: inverted polarity SW (slots base+2..base+3)
+    // digiTS extension beyond ngspice SW primitive  see F4b-composite discussion
+    swLoadHandles(
+      ctx, this._pool, this._stateBase + 2,
+      this._nCtrl, gOn, gOff,
+      this._vThreshold, this._vHysteresis,
+      true,   // SWzero_stateGiven=true: NC path starts ON (normally closed)
+      true,   // invertCtrl=true: complementary polarity
+      this._hNC_PP, this._hNC_PN, this._hNC_NP, this._hNC_NN,
+    );
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    // Pin layout order: com, no, nc, ctrl.
+    const s0_now = this._pool.states[0];
+    const rOnNow  = Math.max(this._rOn, 1e-3);
+    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const stateNO = s0_now[this._stateBase + 0];
+    const stateNC = s0_now[this._stateBase + 2];
+    const gNO = ((stateNO === REALLY_ON) || (stateNO === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
+    const gNC = ((stateNC === REALLY_ON) || (stateNC === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
+    const vCom = rhs[this._nCom];
+    const vNo  = rhs[this._nNO];
+    const vNc  = rhs[this._nNC];
+    const iNO  = gNO * (vCom - vNo);
+    const iNC  = gNC * (vCom - vNc);
+    return [iNO + iNC, -iNO, -iNC, 0];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "rOn")         this._rOn         = value;
+    else if (key === "rOff")        this._rOff        = value;
+    else if (key === "vThreshold")  this._vThreshold  = value;
+    else if (key === "vHysteresis") this._vHysteresis = value;
+  }
+}
+
 function createSwitchSPDTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElement {
-  const nCom  = pinNodes.get("com")!;  // common terminal
-  const nNO   = pinNodes.get("no")!;   // normally-open terminal
-  const nNC   = pinNodes.get("nc")!;   // normally-closed terminal
-  const nCtrl = pinNodes.get("ctrl")!; // control terminal
-
-  const p: Record<string, number> = {
-    rOn:         props.getModelParam<number>("rOn"),
-    rOff:        props.getModelParam<number>("rOff"),
-    vThreshold:  props.getModelParam<number>("vThreshold"),
-    vHysteresis: props.getModelParam<number>("vHysteresis"),
-  };
-
-  let pool: StatePoolRef;
-  let base: number;
-
-  // Matrix handles for COM-NO path (swsetup.c:59-62, pos=nCom, neg=nNO)
-  let _hNO_PP = -1;
-  let _hNO_PN = -1;
-  let _hNO_NP = -1;
-  let _hNO_NN = -1;
-
-  // Matrix handles for COM-NC path (swsetup.c:59-62, pos=nCom, neg=nNC)
-  let _hNC_PP = -1;
-  let _hNC_PN = -1;
-  let _hNC_NP = -1;
-  let _hNC_NN = -1;
-
-  return {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(ctx: SetupContext): void {
-      // COM-NO path: swsetup.c:47-48 (allocStates) + swsetup.c:59-62 (TSTALLOC)
-      this._stateBase = ctx.allocStates(2);
-      base = this._stateBase;
-      _hNO_PP = ctx.solver.allocElement(nCom, nCom);  // SWposPosptr (swNO)
-      _hNO_PN = ctx.solver.allocElement(nCom, nNO);   // SWposNegptr (swNO)
-      _hNO_NP = ctx.solver.allocElement(nNO,  nCom);  // SWnegPosptr (swNO)
-      _hNO_NN = ctx.solver.allocElement(nNO,  nNO);   // SWnegNegptr (swNO)
-
-      // COM-NC path: swsetup.c:47-48 (allocStates) + swsetup.c:59-62 (TSTALLOC)
-      ctx.allocStates(2);
-      _hNC_PP = ctx.solver.allocElement(nCom, nCom);  // SWposPosptr (swNC)
-      _hNC_PN = ctx.solver.allocElement(nCom, nNC);   // SWposNegptr (swNC)
-      _hNC_NP = ctx.solver.allocElement(nNC,  nCom);  // SWnegPosptr (swNC)
-      _hNC_NN = ctx.solver.allocElement(nNC,  nNC);   // SWnegNegptr (swNC)
-    },
-
-    poolBacked: true as const,
-    stateSize: SPDT_SCHEMA.size,   // 4 (two SW paths × 2 slots each)
-    stateSchema: SPDT_SCHEMA,
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = this._stateBase;
-    },
-
-    load(ctx: LoadContext): void {
-      const rOnNow  = Math.max(p.rOn, 1e-3);
-      const rOffNow = Math.max(p.rOff, rOnNow * 2);
-      const gOn  = 1 / rOnNow;   // SWonConduct, swdefs.h:72
-      const gOff = 1 / rOffNow;  // SWoffConduct, swdefs.h:73
-
-      // COM-NO path: normal polarity SW (swload.c semantics, slots base+0..base+1)
-      swLoadHandles(
-        ctx, pool, base,
-        nCtrl, gOn, gOff,
-        p.vThreshold, p.vHysteresis,
-        false,  // SWzero_stateGiven=false: NO path starts OFF (normally open)
-        false,  // invertCtrl=false: normal polarity
-        _hNO_PP, _hNO_PN, _hNO_NP, _hNO_NN,
-      );
-
-      // COM-NC path: inverted polarity SW (slots base+2..base+3)
-      // digiTS extension beyond ngspice SW primitive  see F4b-composite discussion
-      swLoadHandles(
-        ctx, pool, base + 2,
-        nCtrl, gOn, gOff,
-        p.vThreshold, p.vHysteresis,
-        true,   // SWzero_stateGiven=true: NC path starts ON (normally closed)
-        true,   // invertCtrl=true: complementary polarity
-        _hNC_PP, _hNC_PN, _hNC_NP, _hNC_NN,
-      );
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // Pin layout order: com, no, nc, ctrl.
-      const s0_now = pool.states[0];
-      const rOnNow  = Math.max(p.rOn, 1e-3);
-      const rOffNow = Math.max(p.rOff, rOnNow * 2);
-      const stateNO = s0_now[base + 0];
-      const stateNC = s0_now[base + 2];
-      const gNO = ((stateNO === REALLY_ON) || (stateNO === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
-      const gNC = ((stateNC === REALLY_ON) || (stateNC === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
-      const vCom = rhs[nCom];
-      const vNo  = rhs[nNO];
-      const vNc  = rhs[nNC];
-      const iNO  = gNO * (vCom - vNo);
-      const iNC  = gNC * (vCom - vNc);
-      return [iNO + iNC, -iNO, -iNC, 0];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
-    },
-  };
+): AnalogSwitchSPDTElement {
+  return new AnalogSwitchSPDTElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

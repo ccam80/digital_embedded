@@ -1,9 +1,13 @@
 /**
- * InductorSubElement and MutualInductorElement- sub-element classes used
- * internally by AnalogTransformerElement and AnalogTappedTransformerElement.
+ * MutualInductorElement and InductorSubElement â€” class-based leaves used by
+ * Transformer composites.
  *
- * These classes are NOT registered as top-level MNA models; they are
- * constructed and owned by transformer composites.
+ * After Wave 11a, Transformer (`transformer.ts`) is `kind: "netlist"` and
+ * references `Inductor` + `TransformerCoupling` by typeId for the actual
+ * compiled topology. The classes in this file remain as the abstract-base
+ * forms of the older inline composition primitives, available for any
+ * follow-on composite that wants a 1-to-1 paired coil + K element without
+ * routing through the registered `Inductor`/`TransformerCoupling` pair.
  *
  * ngspice anchors:
  *   indsetup.c:84-100 - IND branch allocation and TSTALLOC sequence
@@ -12,9 +16,8 @@
  *   mutload.c         - MUT load (off-diagonal coupling stamps)
  */
 
-import type { PoolBackedAnalogElement, AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement, AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -29,12 +32,12 @@ import {
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
-// INDUCTOR_SUB_SCHEMA- 2-slot ngspice schema (same semantics as PB-IND)
+// INDUCTOR_SUB_SCHEMA â€” 2-slot ngspice schema (same semantics as PB-IND)
 // ---------------------------------------------------------------------------
 
 const INDUCTOR_SUB_SCHEMA: StateSchema = defineStateSchema("InductorSubElement", [
-  { name: "PHI",  doc: "Flux Φ = L·i- ngspice INDflux (INDstate+0)" },
-  { name: "CCAP", doc: "NIintegrate companion current- ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
+  { name: "PHI",  doc: "Flux Î¦ = LÂ·i â€” ngspice INDflux (INDstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current â€” ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
 ]);
 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
@@ -45,73 +48,86 @@ const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 // ---------------------------------------------------------------------------
 
 /**
- * Lightweight inductor sub-element for use inside transformer composites.
- * Implements the same setup/load/state/LTE behavior as AnalogInductorElement
- * (PB-IND) but is not registered as a top-level MNA model.
- *
- * Pool-backed per PoolBackedAnalogElement interface.
+ * Lightweight inductor leaf for use inside transformer composites or any
+ * caller that needs a registry-free PB-IND element. Implements the same
+ * setup/load/state/LTE behaviour as `AnalogInductorElement` but takes its
+ * inductance and branch label through plain constructor arguments rather
+ * than a PropertyBag â€” this keeps the class usable from imperative composite
+ * factories (e.g. `transformer.ts` ctor body, prior to the netlist-form
+ * migration).
  */
-export class InductorSubElement implements PoolBackedAnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number>;
-  _stateBase: number = -1;
-  branchIndex: number = -1;
-  readonly poolBacked = true as const;
-  readonly stateSchema: StateSchema = INDUCTOR_SUB_SCHEMA;
-  readonly stateSize: number = 2;
+export class InductorSubElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
+  readonly stateSchema: StateSchema = INDUCTOR_SUB_SCHEMA;
+  readonly stateSize: number = INDUCTOR_SUB_SCHEMA.size;
 
   private _hPIbr:   number = -1;
   private _hNIbr:   number = -1;
   private _hIbrN:   number = -1;
   private _hIbrP:   number = -1;
   private _hIbrIbr: number = -1;
-  private _pool!: StatePoolRef;
-  private readonly _label: string;
+  private readonly _branchLabel: string;
   private _inductance: number;
 
-  // Package-internal getter for AnalogTransformerElement.load()- exposes the
-  // branch-diagonal handle allocated during setup() so the parent composite can
-  // stamp it directly without calling this sub-element's own load().
+  /** Package-internal getter for parent composites' load() â€” exposes the
+   *  branch-diagonal handle allocated during setup() so the parent can stamp
+   *  it directly without calling this leaf's own load(). */
   get hIbrIbr(): number { return this._hIbrIbr; }
 
+  /** Package-internal accessor for `MutualInductorElement.load()` â€” exposes
+   *  the inductance value for MUTfactor = K * sqrt(L1 * L2). */
+  get inductanceForMut(): number { return this._inductance; }
+
+  /** Package-internal accessor for `MutualInductorElement.load()` â€” exposes
+   *  the per-step state arrays + base offset so the K element can update
+   *  this coil's flux slot directly (mutload.c off-diagonal contribution). */
+  get statePoolForMut(): { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; base: number } {
+    return {
+      s0: this._pool.states[0],
+      s1: this._pool.states[1],
+      s2: this._pool.states[2],
+      s3: this._pool.states[3],
+      base: this._stateBase,
+    };
+  }
+
   constructor(
-    posNode: number,    // INDposNode
-    negNode: number,    // INDnegNode
-    label: string,      // unique branch label
-    inductance: number = 0,  // L value at construction time
+    pinNodes: ReadonlyMap<string, number>,
+    branchLabel: string,
+    inductance: number = 0,
   ) {
-    this._pinNodes = new Map([["pos", posNode], ["neg", negNode]]);
-    this._label = label;
+    super(pinNodes);
+    this._branchLabel = branchLabel;
     this._inductance = inductance;
   }
 
   setup(ctx: SetupContext): void {
+    if (!this._branchLabel) {
+      throw new Error(
+        "InductorSubElement: requires non-empty branch label.",
+      );
+    }
     const solver = ctx.solver;
-    const posNode = this._pinNodes.get("pos")!;
-    const negNode = this._pinNodes.get("neg")!;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
 
-    // indsetup.c:78-79- *states += 2 (INDflux = state+0, INDvolt = state+1)
+    // indsetup.c:78-79 â€” *states += 2 (INDflux = state+0, INDvolt = state+1)
     if (this._stateBase === -1) {
-      this._stateBase = ctx.allocStates(2);
+      this._stateBase = ctx.allocStates(this.stateSize);
     }
 
-    // indsetup.c:84-88- CKTmkCur guard (idempotent)
+    // indsetup.c:84-88 â€” CKTmkCur guard (idempotent, mirrors VSRCfindBr).
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this._branchLabel, "branch");
     }
     const b = this.branchIndex;
 
-    // indsetup.c:96-100- TSTALLOC sequence, line-for-line.
+    // indsetup.c:96-100 â€” TSTALLOC sequence, line-for-line.
     this._hPIbr   = solver.allocElement(posNode, b);
     this._hNIbr   = solver.allocElement(negNode, b);
     this._hIbrN   = solver.allocElement(b, negNode);
     this._hIbrP   = solver.allocElement(b, posNode);
     this._hIbrIbr = solver.allocElement(b, b);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   load(ctx: LoadContext): void {
@@ -124,34 +140,28 @@ export class InductorSubElement implements PoolBackedAnalogElement {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // indload.c:43-51- flux-from-current update.
+    // indload.c:43-51 â€” flux-from-current update.
     if (!(mode & (MODEDC | MODEINITPRED))) {
       if ((mode & MODEUIC) && (mode & MODEINITTRAN)) {
-        // indload.c:44-46: UIC seed (no IC param on sub-element, so skip IC branch).
+        // No IC param on sub-element â€” fall through to flux from rhsOld.
         s0[base + SLOT_PHI] = L * rhsOld[b];
       } else {
-        // indload.c:48-50: flux from prior NR iterate branch current.
         s0[base + SLOT_PHI] = L * rhsOld[b];
       }
     }
 
-    // indload.c:88-110- req/veq.
+    // indload.c:88-110 â€” req/veq.
     let req = 0;
     let veq = 0;
     if (mode & MODEDC) {
-      // indload.c:88-90.
       req = 0;
       veq = 0;
     } else {
-      // indload.c:93-104 (#ifndef PREDICTOR): mutually-exclusive flux copies.
       if (mode & MODEINITPRED) {
-        // indload.c:94-96: predictor- s0[INDflux] = s1[INDflux].
         s0[base + SLOT_PHI] = s1[base + SLOT_PHI];
       } else if (mode & MODEINITTRAN) {
-        // indload.c:99-102: transient init- s1[INDflux] = s0[INDflux].
         s1[base + SLOT_PHI] = s0[base + SLOT_PHI];
       }
-      // indload.c:106-109: NIintegrate(ckt, &geq, &ceq, L, INDflux).
       const phi0 = s0[base + SLOT_PHI];
       const phi1 = s1[base + SLOT_PHI];
       const phi2 = s2[base + SLOT_PHI];
@@ -171,18 +181,17 @@ export class InductorSubElement implements PoolBackedAnalogElement {
       s0[base + SLOT_CCAP] = ni.ccap;
     }
 
-    // indload.c:114-117: state0[INDvolt] → state1[INDvolt] on MODEINITTRAN.
+    // indload.c:114-117: state0[INDvolt] â†’ state1[INDvolt] on MODEINITTRAN.
     if (mode & MODEINITTRAN) {
       s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
     }
 
     // indload.c:119-123: unconditional 5-stamp sequence through cached handles.
-    solver.stampElement(this._hPIbr, 1);       // *(INDposIbrptr) += 1
-    solver.stampElement(this._hNIbr, -1);      // *(INDnegIbrptr) -= 1
-    solver.stampElement(this._hIbrP, 1);       // *(INDibrPosptr) += 1
-    solver.stampElement(this._hIbrN, -1);      // *(INDibrNegptr) -= 1
-    solver.stampElement(this._hIbrIbr, -req);  // *(INDibrIbrptr) -= req
-    // indload.c:112: *(CKTrhs + INDbrEq) += veq.
+    solver.stampElement(this._hPIbr, 1);
+    solver.stampElement(this._hNIbr, -1);
+    solver.stampElement(this._hIbrP, 1);
+    solver.stampElement(this._hIbrN, -1);
+    solver.stampElement(this._hIbrIbr, -req);
     stampRHS(ctx.rhs, b, veq);
   }
 
@@ -213,27 +222,16 @@ export class InductorSubElement implements PoolBackedAnalogElement {
     }
   }
 
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
+    return [I, -I];
   }
 
   findBranchFor(_name: string, ctx: SetupContext): number {
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this._branchLabel, "branch");
     }
     return this.branchIndex;
-  }
-
-  // Package-internal accessors for MutualInductorElement.load() and transformer composites.
-  get inductanceForMut(): number { return this._inductance; }
-  get statePoolForMut(): { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; base: number } {
-    return {
-      s0: this._pool.states[0],
-      s1: this._pool.states[1],
-      s2: this._pool.states[2],
-      s3: this._pool.states[3],
-      base: this._stateBase,
-    };
   }
 }
 
@@ -242,52 +240,58 @@ export class InductorSubElement implements PoolBackedAnalogElement {
 // ---------------------------------------------------------------------------
 
 /**
- * Mutual inductor (K element) sub-element for use inside transformer composites.
- * Reads branch indices from its paired InductorSubElement refs directly.
- * NOT pool-backed (MUT allocates no state slots- mutsetup.c:28 NG_IGNORE(states)).
+ * Mutual inductor (K element) leaf for use inside transformer composites.
+ * Reads branch indices from its paired `InductorSubElement` refs directly,
+ * stamps the two off-diagonal coupling entries.
+ *
+ * NOT pool-backed â€” MUT allocates no state slots (mutsetup.c:28
+ * `NG_IGNORE(states)`).
  */
-export class MutualInductorElement implements AnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
+export class MutualInductorElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
 
+  private _coupling: number;
+  private readonly _l1: InductorSubElement;
+  private readonly _l2: InductorSubElement;
   private _hBr1Br2: number = -1;
   private _hBr2Br1: number = -1;
 
-  // Package-internal getters for AnalogTransformerElement.load()- expose the
-  // off-diagonal handles allocated during setup() so the parent composite can
-  // stamp mutual coupling directly without calling this sub-element's own load().
+  /** Package-internal getter â€” exposes the off-diagonal handles allocated
+   *  during setup() so a parent composite can stamp them directly. */
   get hBr1Br2(): number { return this._hBr1Br2; }
   get hBr2Br1(): number { return this._hBr2Br1; }
 
   constructor(
-    private _coupling: number,                   // K coupling coefficient (mutable)
-    private readonly _l1: InductorSubElement,    // first coupled inductor (ref)
-    private readonly _l2: InductorSubElement,    // second coupled inductor (ref)
-  ) {}
+    coupling: number,
+    l1: InductorSubElement,
+    l2: InductorSubElement,
+  ) {
+    super(new Map());
+    this._coupling = coupling;
+    this._l1 = l1;
+    this._l2 = l2;
+  }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
 
-    // mutsetup.c:44-57- resolve inductor references via constructor-stored refs.
-    // Pre-condition: both _l1.setup(ctx) and _l2.setup(ctx) MUST have run.
+    // mutsetup.c:44-57 â€” resolve inductor refs. Pre-condition: both
+    // _l1.setup() and _l2.setup() MUST have run.
     const b1 = this._l1.branchIndex;
     const b2 = this._l2.branchIndex;
     if (b1 === -1 || b2 === -1) {
-      throw new Error("MutualInductorElement.setup(): branchIndex not yet allocated on sub-inductor");
+      throw new Error(
+        "MutualInductorElement.setup(): branchIndex not yet allocated on sub-inductor",
+      );
     }
 
-    // mutsetup.c:66-67- TSTALLOC sequence, 2 entries.
+    // mutsetup.c:66-67 â€” TSTALLOC sequence, 2 entries.
     this._hBr1Br2 = solver.allocElement(b1, b2);
     this._hBr2Br1 = solver.allocElement(b2, b1);
   }
 
   load(ctx: LoadContext): void {
-    // Port from mutload.c.
-    // MUTfactor = K * sqrt(L1 * L2) is the mutual inductance M.
-    // In ngspice mutload.c:
+    // Port from mutload.c:
     //   if(!(ckt->CKTmode & (MODEDC|MODEINITPRED))) {
     //     CKTstate0[l1.INDflux] += MUTfactor * CKTrhsOld[l2.INDbrEq]
     //     CKTstate0[l2.INDflux] += MUTfactor * CKTrhsOld[l1.INDbrEq]
@@ -304,16 +308,12 @@ export class MutualInductorElement implements AnalogElement {
     if (!(mode & (MODEDC | MODEINITPRED))) {
       const pool1 = this._l1.statePoolForMut;
       const pool2 = this._l2.statePoolForMut;
-      // CKTstate0[l1.INDflux] += MUTfactor * CKTrhsOld[l2.INDbrEq]
       pool1.s0[pool1.base + SLOT_PHI] += mutFactor * rhsOld[b2];
-      // CKTstate0[l2.INDflux] += MUTfactor * CKTrhsOld[l1.INDbrEq]
       pool2.s0[pool2.base + SLOT_PHI] += mutFactor * rhsOld[b1];
     }
 
-    // *(MUTbr1br2) -= MUTfactor * CKTag[0]
-    ctx.solver.stampElement(this._hBr1Br2, -mutFactor * ag[0]);
-    // *(MUTbr2br1) -= MUTfactor * CKTag[0]
-    ctx.solver.stampElement(this._hBr2Br1, -mutFactor * ag[0]);
+    ctx.solver.stampElement(this._hBr1Br2, -mutFactor * ag[0]!);
+    ctx.solver.stampElement(this._hBr2Br1, -mutFactor * ag[0]!);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
@@ -326,3 +326,4 @@ export class MutualInductorElement implements AnalogElement {
     }
   }
 }
+

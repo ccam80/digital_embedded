@@ -1,4 +1,4 @@
-﻿/**
+/**
  * BJT analog components  NPN and PNP bipolar junction transistors.
  *
  * Simple L0 and SPICE L1 (Gummel-Poon) models ported mechanically from
@@ -37,8 +37,9 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/model-params.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -548,16 +549,7 @@ function _createBjtElementWithPolarity(
   const SLOT_GO  = 7;
   const SLOT_GX  = 8; // bjtdefs.h BJTgx=16; L0 always writes 0 (bjtload.c:780)
 
-  // Pool binding  only the pool reference is retained. Individual state
-  // arrays are NOT cached as member variables: every access inside load()
-  // reads pool.states[N] at call time. Mirrors ngspice CKTstate0/1/2/3
-  // pointer access (bjtload.c never caches state pointers on devices).
-  let pool: StatePoolRef;
-  let base: number;
-
   // Ephemeral per-iteration icheck flag (bjtload.c:405,749-754 CKTnoncon bump).
-  let icheckLimited = false;
-
   // Matrix element handles- allocated in setup(), used in load().
   // L0 has RC=RB=RE=0 always, so prime nodes alias external nodes.
   // 23 TSTALLOC entries per bjtsetup.c:435-464.
@@ -572,28 +564,27 @@ function _createBjtElementWithPolarity(
   // Substrate (entries 19-21) and excess-phase (entries 22-23) are also absent
   // from the L0 model, so those allocations are skipped too. The 9 surviving
   // entries match the L0 load() stamp list line for line.
-  let _hCPBP = -1, _hCPEP = -1;
-  let _hBPCP = -1, _hBPEP = -1;
-  let _hEPCP = -1, _hEPBP = -1;
-  let _hCPCP = -1, _hBPBP = -1, _hEPEP = -1;
+  class BjtL0Element extends AbstractPoolBackedAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+    readonly stateSchema = BJT_SIMPLE_SCHEMA;
+    readonly stateSize = BJT_SIMPLE_SCHEMA.size;
 
-  const el0: PoolBackedAnalogElement = {
-    label: "",
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.BJT,
-    poolBacked: true as const,
-    stateSchema: BJT_SIMPLE_SCHEMA,
-    stateSize: BJT_SIMPLE_SCHEMA.size,
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    private _icheckLimited = false;
+    private _hCPBP = -1; private _hCPEP = -1;
+    private _hBPCP = -1; private _hBPEP = -1;
+    private _hEPCP = -1; private _hEPBP = -1;
+    private _hCPCP = -1; private _hBPBP = -1; private _hEPEP = -1;
+
+    constructor(pn: ReadonlyMap<string, number>) { super(pn); }
+
+    setup(ctx: SetupContext): void {
       const solver   = ctx.solver;
-      const baseNode = el0._pinNodes.get("B")!;
-      const colNode  = el0._pinNodes.get("C")!;
-      const emitNode = el0._pinNodes.get("E")!;
+      const baseNode = this.pinNodes.get("B")!;
+      const colNode  = this.pinNodes.get("C")!;
+      const emitNode = this.pinNodes.get("E")!;
 
       // State slots- bjtsetup.c:366-367
-      el0._stateBase = ctx.allocStates(24);
+      this._stateBase = ctx.allocStates(24);
 
       // L0 has no resistors- prime nodes alias external nodes; ngspice gates
       // the prime-side TSTALLOC entries on `model.RC > 0` etc. (bjtsetup.c).
@@ -604,21 +595,16 @@ function _createBjtElementWithPolarity(
       const ep = emitNode;
 
       // TSTALLOC subset matching L0 load() stamps (cross-terms + self-diagonals).
-      _hCPBP = solver.allocElement(cp, bp);       // (5)
-      _hCPEP = solver.allocElement(cp, ep);       // (6)
-      _hBPCP = solver.allocElement(bp, cp);       // (8)
-      _hBPEP = solver.allocElement(bp, ep);       // (9)
-      _hEPCP = solver.allocElement(ep, cp);       // (11)
-      _hEPBP = solver.allocElement(ep, bp);       // (12)
-      _hCPCP = solver.allocElement(cp, cp);       // (16)
-      _hBPBP = solver.allocElement(bp, bp);       // (17)
-      _hEPEP = solver.allocElement(ep, ep);       // (18)
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = el0._stateBase;
-    },
+      this._hCPBP = solver.allocElement(cp, bp);       // (5)
+      this._hCPEP = solver.allocElement(cp, ep);       // (6)
+      this._hBPCP = solver.allocElement(bp, cp);       // (8)
+      this._hBPEP = solver.allocElement(bp, ep);       // (9)
+      this._hEPCP = solver.allocElement(ep, cp);       // (11)
+      this._hEPBP = solver.allocElement(ep, bp);       // (12)
+      this._hCPCP = solver.allocElement(cp, cp);       // (16)
+      this._hBPBP = solver.allocElement(bp, bp);       // (17)
+      this._hEPEP = solver.allocElement(ep, ep);       // (18)
+    }
 
     /**
      * Single-pass load mirroring bjtload.c::BJTload for the resistive subset
@@ -626,9 +612,10 @@ function _createBjtElementWithPolarity(
      * resistances). L0 is the direct dc-op of the Gummel-Poon equations.
      */
     load(ctx: LoadContext): void {
-      const s0 = pool.states[0];
-      const s1 = pool.states[1];
-      const s2 = pool.states[2];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
+      const s1 = this._pool.states[1];
+      const s2 = this._pool.states[2];
       const mode = ctx.cktMode;
       const voltages = ctx.rhsOld;
 
@@ -708,7 +695,7 @@ function _createBjtElementWithPolarity(
         // cite: bjtload.c:365-380  bypass: restore op-state from state0, skip pnjlim+compute.
         vbeLimited = s0[base + SLOT_VBE];
         vbcLimited = s0[base + SLOT_VBC];
-        icheckLimited = false;
+        this._icheckLimited = false;
       } else {
         // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED  ngspice has no
         // MODEINITPRED skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for
@@ -725,19 +712,19 @@ function _createBjtElementWithPolarity(
           vbcLimited = vbcResult.value;
           vbcLimFlag = vbcResult.limited;
         }
-        icheckLimited = vbeLimFlag || vbcLimFlag;
+        this._icheckLimited = vbeLimFlag || vbcLimFlag;
         // L0 has no substrate junction  substrate is L1-only per the model-registry
         // split (architectural-alignment.md ÂssE1 APPROVED ACCEPT). See also the
         // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
         // the top of this load() body.
 
         // cite: bjtload.c:749-754  icheck++ unless MODEINITFIX && OFF
-        if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
+        if (this._icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
         if (ctx.limitingCollector) {
           ctx.limitingCollector.push({
-            elementIndex: el0.elementIndex ?? -1,
-            label: el0.label,
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label,
             junction: "BE",
             limitType: "pnjlim",
             vBefore: vbeRaw,
@@ -745,8 +732,8 @@ function _createBjtElementWithPolarity(
             wasLimited: vbeLimFlag,
           });
           ctx.limitingCollector.push({
-            elementIndex: el0.elementIndex ?? -1,
-            label: el0.label,
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label,
             junction: "BC",
             limitType: "pnjlim",
             vBefore: vbcRaw,
@@ -901,9 +888,9 @@ function _createBjtElementWithPolarity(
       const solver = ctx.solver;
       // L0 prime nodes alias external nodes (RC=RB=RE=0 per the bjtsetup.c
       // gating already applied in setup()).
-      const bp = el0._pinNodes.get("B")!;
-      const cp = el0._pinNodes.get("C")!;
-      const ep = el0._pinNodes.get("E")!;
+      const bp = this.pinNodes.get("B")!;
+      const cp = this.pinNodes.get("C")!;
+      const ep = this.pinNodes.get("E")!;
 
       // bjtload.c:807-814: RHS stamps per terminal. L0 prime nodes alias external nodes.
       stampRHS(ctx.rhs, bp, m * (-ceqbe - ceqbc));  // BJTbasePrimeNode += -ceqbe-ceqbc
@@ -920,19 +907,20 @@ function _createBjtElementWithPolarity(
       //   BJTbasePrimeEmitPrimePtr  += -gpi
       //   BJTemitPrimeColPrimePtr   += -go   (no geqcb)
       //   BJTemitPrimeBasePrimePtr  += -gpi - gm  (no geqcb)
-      solver.stampElement(_hBPBP, m * (gpi + gmu));
-      solver.stampElement(_hCPCP, m * (gmu + go));
-      solver.stampElement(_hEPEP, m * (gpi + gm + go));
-      solver.stampElement(_hCPBP, m * (-gmu + gm));
-      solver.stampElement(_hCPEP, m * (-gm - go));
-      solver.stampElement(_hBPCP, m * -gmu);
-      solver.stampElement(_hBPEP, m * -gpi);
-      solver.stampElement(_hEPCP, m * -go);
-      solver.stampElement(_hEPBP, m * (-gpi - gm));
-    },
+      solver.stampElement(this._hBPBP, m * (gpi + gmu));
+      solver.stampElement(this._hCPCP, m * (gmu + go));
+      solver.stampElement(this._hEPEP, m * (gpi + gm + go));
+      solver.stampElement(this._hCPBP, m * (-gmu + gm));
+      solver.stampElement(this._hCPEP, m * (-gm - go));
+      solver.stampElement(this._hBPCP, m * -gmu);
+      solver.stampElement(this._hBPEP, m * -gpi);
+      solver.stampElement(this._hEPCP, m * -go);
+      solver.stampElement(this._hEPBP, m * (-gpi - gm));
+    }
 
     checkConvergence(ctx: LoadContext): boolean {
-      const s0 = pool.states[0];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.rhsOld;
@@ -942,7 +930,7 @@ function _createBjtElementWithPolarity(
       const vbeRaw = polarity * (vB - vE);
       const vbcRaw = polarity * (vB - vC);
 
-      if (icheckLimited) return false;
+      if (this._icheckLimited) return false;
 
       // BJTconvTest: bjtload.c:331-337 cchat/cbhat current prediction.
       const delvbe = vbeRaw - s0[base + SLOT_VBE];
@@ -961,25 +949,26 @@ function _createBjtElementWithPolarity(
       const tolB = ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(cb)) + ctx.iabstol;
 
       return Math.abs(cchat - cc) <= tolC && Math.abs(cbhat - cb) <= tolB;
-    },
+    }
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      const s0 = pool.states[0];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
       const ic = polarity * s0[base + SLOT_CC];
       const ib = polarity * s0[base + SLOT_CB];
       const ie = -(ic + ib);
       return [ib, ic, ie];
-    },
+    }
 
     setParam(key: string, value: number): void {
       if (key in params) {
         params[key] = value;
         tp = makeTp();
       }
-    },
-  };
+    }
+  }
 
-  return el0;
+  return new BjtL0Element(pinNodes);
 }
 
 // ---------------------------------------------------------------------------
@@ -1180,65 +1169,60 @@ export function createSpiceL1BjtElement(
   const SLOT_CDSUB = 22;
   const SLOT_GDSUB = 23;
 
-  let pool: StatePoolRef;
-  let base: number;
-
-  let icheckLimited = false;
-
   // Matrix element handles- allocated in setup(), used in load().
   // 23 TSTALLOC entries per bjtsetup.c:435-464.
-  let _hCCP  = -1, _hBBP  = -1, _hEEP  = -1;
-  let _hCPC  = -1, _hCPBP = -1, _hCPEP = -1;
-  let _hBPB  = -1, _hBPCP = -1, _hBPEP = -1;
-  let _hEPE  = -1, _hEPCP = -1, _hEPBP = -1;
-  let _hCC   = -1, _hBB   = -1, _hEE   = -1;
-  let _hCPCP = -1, _hBPBP = -1, _hEPEP = -1;
-  let _hSS   = -1, _hSCS  = -1, _hSSC  = -1;
-  let _hBCP  = -1, _hCPB  = -1;
-  let _hSubstConSubstCon = -1;
-
   const internalLabels: string[] = [];
 
-  const el1: PoolBackedAnalogElement = {
-    label: "",
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.BJT,
-    poolBacked: true as const,
-    stateSchema: BJT_L1_SCHEMA,
-    stateSize: BJT_L1_SCHEMA.size,
+  class BjtL1Element extends AbstractPoolBackedAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+    readonly stateSchema = BJT_L1_SCHEMA;
+    readonly stateSize = BJT_L1_SCHEMA.size;
+
+    private _icheckLimited = false;
+    private _hCCP  = -1; private _hBBP  = -1; private _hEEP  = -1;
+    private _hCPC  = -1; private _hCPBP = -1; private _hCPEP = -1;
+    private _hBPB  = -1; private _hBPCP = -1; private _hBPEP = -1;
+    private _hEPE  = -1; private _hEPCP = -1; private _hEPBP = -1;
+    private _hCC   = -1; private _hBB   = -1; private _hEE   = -1;
+    private _hCPCP = -1; private _hBPBP = -1; private _hEPEP = -1;
+    private _hSS   = -1; private _hSCS  = -1; private _hSSC  = -1;
+    private _hBCP  = -1; private _hCPB  = -1;
+    private _hSubstConSubstCon = -1;
+
+    constructor(pn: ReadonlyMap<string, number>) { super(pn); }
+
     getInternalNodeLabels(): readonly string[] {
       return internalLabels;
-    },
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    }
+
+    setup(ctx: SetupContext): void {
       const solver    = ctx.solver;
-      const baseNode  = el1._pinNodes.get("B")!;
-      const colNode   = el1._pinNodes.get("C")!;
-      const emitNode  = el1._pinNodes.get("E")!;
+      const baseNode  = this.pinNodes.get("B")!;
+      const colNode   = this.pinNodes.get("C")!;
+      const emitNode  = this.pinNodes.get("E")!;
       const substNode = 0;
 
       // State slots- bjtsetup.c:366-367
-      el1._stateBase = ctx.allocStates(24);
+      this._stateBase = ctx.allocStates(24);
 
       // Internal nodes- bjtsetup.c:372-428
       internalLabels.length = 0;
       if (params.RC === 0) {
         nodeC_int = colNode;
       } else {
-        nodeC_int = ctx.makeVolt(el1.label, "collector");
+        nodeC_int = ctx.makeVolt(this.label, "collector");
         internalLabels.push("collector");
       }
       if (params.RB === 0) {
         nodeB_int = baseNode;
       } else {
-        nodeB_int = ctx.makeVolt(el1.label, "base");
+        nodeB_int = ctx.makeVolt(this.label, "base");
         internalLabels.push("base");
       }
       if (params.RE === 0) {
         nodeE_int = emitNode;
       } else {
-        nodeE_int = ctx.makeVolt(el1.label, "emitter");
+        nodeE_int = ctx.makeVolt(this.label, "emitter");
         internalLabels.push("emitter");
       }
 
@@ -1251,51 +1235,46 @@ export function createSpiceL1BjtElement(
       const resolvedSubstConNode = (subs > 0) ? cp : bp;
 
       // TSTALLOC sequence- bjtsetup.c:435-452 (entries 1-18)
-      _hCCP  = solver.allocElement(colNode,  cp);       // (1)
-      _hBBP  = solver.allocElement(baseNode, bp);       // (2)
-      _hEEP  = solver.allocElement(emitNode, ep);       // (3)
-      _hCPC  = solver.allocElement(cp,       colNode);  // (4)
-      _hCPBP = solver.allocElement(cp,       bp);       // (5)
-      _hCPEP = solver.allocElement(cp,       ep);       // (6)
-      _hBPB  = solver.allocElement(bp,       baseNode); // (7)
-      _hBPCP = solver.allocElement(bp,       cp);       // (8)
-      _hBPEP = solver.allocElement(bp,       ep);       // (9)
-      _hEPE  = solver.allocElement(ep,       emitNode); // (10)
-      _hEPCP = solver.allocElement(ep,       cp);       // (11)
-      _hEPBP = solver.allocElement(ep,       bp);       // (12)
-      _hCC   = solver.allocElement(colNode,  colNode);  // (13)
-      _hBB   = solver.allocElement(baseNode, baseNode); // (14)
-      _hEE   = solver.allocElement(emitNode, emitNode); // (15)
-      _hCPCP = solver.allocElement(cp,       cp);       // (16)
-      _hBPBP = solver.allocElement(bp,       bp);       // (17)
-      _hEPEP = solver.allocElement(ep,       ep);       // (18)
+      this._hCCP  = solver.allocElement(colNode,  cp);       // (1)
+      this._hBBP  = solver.allocElement(baseNode, bp);       // (2)
+      this._hEEP  = solver.allocElement(emitNode, ep);       // (3)
+      this._hCPC  = solver.allocElement(cp,       colNode);  // (4)
+      this._hCPBP = solver.allocElement(cp,       bp);       // (5)
+      this._hCPEP = solver.allocElement(cp,       ep);       // (6)
+      this._hBPB  = solver.allocElement(bp,       baseNode); // (7)
+      this._hBPCP = solver.allocElement(bp,       cp);       // (8)
+      this._hBPEP = solver.allocElement(bp,       ep);       // (9)
+      this._hEPE  = solver.allocElement(ep,       emitNode); // (10)
+      this._hEPCP = solver.allocElement(ep,       cp);       // (11)
+      this._hEPBP = solver.allocElement(ep,       bp);       // (12)
+      this._hCC   = solver.allocElement(colNode,  colNode);  // (13)
+      this._hBB   = solver.allocElement(baseNode, baseNode); // (14)
+      this._hEE   = solver.allocElement(emitNode, emitNode); // (15)
+      this._hCPCP = solver.allocElement(cp,       cp);       // (16)
+      this._hBPBP = solver.allocElement(bp,       bp);       // (17)
+      this._hEPEP = solver.allocElement(ep,       ep);       // (18)
 
       // Substrate stamps- bjtsetup.c:453 (entry 19), :461-462 (entries 20-21)
-      _hSS   = solver.allocElement(substNode, substNode); // (19)
+      this._hSS   = solver.allocElement(substNode, substNode); // (19)
       // Substrate alias- bjtsetup.c:454-460
       let sc: number;
       if (isLateral) {
         sc = bp;
-        _hSubstConSubstCon = _hBPBP;  // pointer alias- no new alloc
+        this._hSubstConSubstCon = this._hBPBP;  // pointer alias- no new alloc
       } else {
         sc = cp;
-        _hSubstConSubstCon = _hCPCP;  // pointer alias- no new alloc
+        this._hSubstConSubstCon = this._hCPCP;  // pointer alias- no new alloc
       }
       // Update substConNode to match post-setup prime node resolution.
       // (nodeB_int / nodeC_int may differ from initial nodeB_ext / nodeC_ext when Rx > 0)
       substConNode = resolvedSubstConNode;
-      _hSCS  = solver.allocElement(sc,        substNode); // (20)
-      _hSSC  = solver.allocElement(substNode, sc);        // (21)
+      this._hSCS  = solver.allocElement(sc,        substNode); // (20)
+      this._hSSC  = solver.allocElement(substNode, sc);        // (21)
 
       // Remaining stamps- bjtsetup.c:463-464 (entries 22-23)
-      _hBCP  = solver.allocElement(baseNode, cp);       // (22)
-      _hCPB  = solver.allocElement(cp,       baseNode); // (23)
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = el1._stateBase;
-    },
+      this._hBCP  = solver.allocElement(baseNode, cp);       // (22)
+      this._hCPB  = solver.allocElement(cp,       baseNode); // (23)
+    }
 
     /**
      * Single-pass load mirroring bjtload.c::BJTload. Invented cross-method
@@ -1305,10 +1284,11 @@ export function createSpiceL1BjtElement(
      * D3: cap/charge update gated on ctx.dt > 0 (DC-OP has dt=0).
      */
     load(ctx: LoadContext): void {
-      const s0 = pool.states[0];
-      const s1 = pool.states[1];
-      const s2 = pool.states[2];
-      const s3 = pool.states[3];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
+      const s1 = this._pool.states[1];
+      const s2 = this._pool.states[2];
+      const s3 = this._pool.states[3];
       const voltages = ctx.rhsOld;
       const solver = ctx.solver;
       const mode = ctx.cktMode;
@@ -1460,7 +1440,7 @@ export function createSpiceL1BjtElement(
         vsubLimited = s0[base + SLOT_VSUB];
         gdsub  = s0[base + SLOT_GDSUB];
         cdsub  = s0[base + SLOT_CDSUB];
-        icheckLimited = false;
+        this._icheckLimited = false;
       } else {
         // bjtload.c:383-416: pnjlim on BE, BC, and substrate junctions.
         vbeLimited = vbeRaw;
@@ -1480,15 +1460,15 @@ export function createSpiceL1BjtElement(
           vsubLimited = vsubResult.value;
           vsubLimFlag = vsubResult.limited;
         }
-        icheckLimited = vbeLimFlag || vbcLimFlag || vsubLimFlag;
+        this._icheckLimited = vbeLimFlag || vbcLimFlag || vsubLimFlag;
 
         // cite: bjtload.c:749-754  icheck++ unless MODEINITFIX && OFF
-        if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
+        if (this._icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
         if (ctx.limitingCollector) {
           ctx.limitingCollector.push({
-            elementIndex: el1.elementIndex ?? -1,
-            label: el1.label,
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label,
             junction: "BE",
             limitType: "pnjlim",
             vBefore: vbeRaw,
@@ -1496,8 +1476,8 @@ export function createSpiceL1BjtElement(
             wasLimited: vbeLimFlag,
           });
           ctx.limitingCollector.push({
-            elementIndex: el1.elementIndex ?? -1,
-            label: el1.label,
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label,
             junction: "BC",
             limitType: "pnjlim",
             vBefore: vbcRaw,
@@ -1505,8 +1485,8 @@ export function createSpiceL1BjtElement(
             wasLimited: vbcLimFlag,
           });
           ctx.limitingCollector.push({
-            elementIndex: el1.elementIndex ?? -1,
-            label: el1.label,
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label,
             junction: "SUB",
             limitType: "pnjlim",
             vBefore: vsubRaw,
@@ -1962,49 +1942,50 @@ export function createSpiceL1BjtElement(
       // bjtload.c:819-842: Y-matrix stamps via pre-allocated handles (no allocElement in load).
       // Terminal resistances: RC series (C_ext ↔ C_int), RE series (E_ext ↔ E_int).
       // When Rx=0, prime node aliases external node- handles (1)/(4)/(13)/(16) etc. collapse.
-      solver.stampElement(_hCC,   m * gcpr);   // BJTcolColPtr += gcpr (RC series diag)
-      solver.stampElement(_hCCP,  m * -gcpr);  // BJTcolColPrimePtr += -gcpr
-      solver.stampElement(_hCPC,  m * -gcpr);  // BJTcolPrimeColPtr += -gcpr
-      solver.stampElement(_hCPCP, m * (gmu + go + gcpr + geqbx));  // bjtload.c:822
-      solver.stampElement(_hEE,   m * gepr);   // BJTemitEmitPtr += gepr (RE series diag)
-      solver.stampElement(_hEEP,  m * -gepr);  // BJTemitEmitPrimePtr += -gepr
-      solver.stampElement(_hEPE,  m * -gepr);  // BJTemitPrimeEmitPtr += -gepr
+      solver.stampElement(this._hCC,   m * gcpr);   // BJTcolColPtr += gcpr (RC series diag)
+      solver.stampElement(this._hCCP,  m * -gcpr);  // BJTcolColPrimePtr += -gcpr
+      solver.stampElement(this._hCPC,  m * -gcpr);  // BJTcolPrimeColPtr += -gcpr
+      solver.stampElement(this._hCPCP, m * (gmu + go + gcpr + geqbx));  // bjtload.c:822
+      solver.stampElement(this._hEE,   m * gepr);   // BJTemitEmitPtr += gepr (RE series diag)
+      solver.stampElement(this._hEEP,  m * -gepr);  // BJTemitEmitPrimePtr += -gepr
+      solver.stampElement(this._hEPE,  m * -gepr);  // BJTemitPrimeEmitPtr += -gepr
       // bjtload.c:820: BJTbaseBasePtr += gx + geqbx.
-      solver.stampElement(_hBB,   m * (gx + geqbx));
+      solver.stampElement(this._hBB,   m * (gx + geqbx));
       // cite: bjtload.c:823  BJTsubstConSubstConPtr += geqsub.
-      solver.stampElement(_hSubstConSubstCon, m * geqsub);
+      solver.stampElement(this._hSubstConSubstCon, m * geqsub);
       // bjtload.c:824: BJTbasePrimeBasePrimePtr += gx + gpi + gmu + geqcb.
-      solver.stampElement(_hBPBP, m * (gx + gpi + gmu + geqcb));
+      solver.stampElement(this._hBPBP, m * (gx + gpi + gmu + geqcb));
       // bjtload.c:825: BJTemitPrimeEmitPrimePtr += gpi + gepr + gm + go.
-      solver.stampElement(_hEPEP, m * (gpi + gepr + gm + go));
+      solver.stampElement(this._hEPEP, m * (gpi + gepr + gm + go));
       // bjtload.c:827: BJTbaseBasePrimePtr += -gx.
-      solver.stampElement(_hBBP,  m * -gx);
+      solver.stampElement(this._hBBP,  m * -gx);
       // bjtload.c:832: BJTbasePrimeBasePtr += -gx.
-      solver.stampElement(_hBPB,  m * -gx);
+      solver.stampElement(this._hBPB,  m * -gx);
       // bjtload.c:830: BJTcolPrimeBasePrimePtr += -gmu + gm.
-      solver.stampElement(_hCPBP, m * (-gmu + gm));
+      solver.stampElement(this._hCPBP, m * (-gmu + gm));
       // bjtload.c:831: BJTcolPrimeEmitPrimePtr += -gm - go.
-      solver.stampElement(_hCPEP, m * (-gm - go));
+      solver.stampElement(this._hCPEP, m * (-gm - go));
       // bjtload.c:833: BJTbasePrimeColPrimePtr += -gmu - geqcb.
-      solver.stampElement(_hBPCP, m * (-gmu - geqcb));
+      solver.stampElement(this._hBPCP, m * (-gmu - geqcb));
       // bjtload.c:834: BJTbasePrimeEmitPrimePtr += -gpi.
-      solver.stampElement(_hBPEP, m * -gpi);
+      solver.stampElement(this._hBPEP, m * -gpi);
       // bjtload.c:836: BJTemitPrimeColPrimePtr += -go + geqcb.
-      solver.stampElement(_hEPCP, m * (-go + geqcb));
+      solver.stampElement(this._hEPCP, m * (-go + geqcb));
       // bjtload.c:837: BJTemitPrimeBasePrimePtr += -gpi - gm - geqcb.
-      solver.stampElement(_hEPBP, m * (-gpi - gm - geqcb));
+      solver.stampElement(this._hEPBP, m * (-gpi - gm - geqcb));
       // bjtload.c:838: BJTsubstSubstPtr += geqsub.
-      solver.stampElement(_hSS,   m * geqsub);
+      solver.stampElement(this._hSS,   m * geqsub);
       // bjtload.c:839-840: BJTsubstConSubstPtr / BJTsubstSubstConPtr += -geqsub.
-      solver.stampElement(_hSCS,  m * -geqsub);
-      solver.stampElement(_hSSC,  m * -geqsub);
+      solver.stampElement(this._hSCS,  m * -geqsub);
+      solver.stampElement(this._hSSC,  m * -geqsub);
       // cite: bjtload.c:841-842  BJTbaseColPrimePtr / BJTcolPrimeBasePtr += -geqbx/+(-geqbx).
-      solver.stampElement(_hBCP,  m * -geqbx);
-      solver.stampElement(_hCPB,  m * -geqbx);
-    },
+      solver.stampElement(this._hBCP,  m * -geqbx);
+      solver.stampElement(this._hCPB,  m * -geqbx);
+    }
 
     checkConvergence(ctx: LoadContext): boolean {
-      const s0 = pool.states[0];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.rhsOld;
@@ -2014,7 +1995,7 @@ export function createSpiceL1BjtElement(
       const vbeRaw = polarity * (vBi - vEi);
       const vbcRaw = polarity * (vBi - vCi);
 
-      if (icheckLimited) return false;
+      if (this._icheckLimited) return false;
 
       const delvbe = vbeRaw - s0[base + SLOT_VBE];
       const delvbc = vbcRaw - s0[base + SLOT_VBC];
@@ -2032,7 +2013,7 @@ export function createSpiceL1BjtElement(
       const tolB = ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(cb)) + ctx.iabstol;
 
       return Math.abs(cchat - cc) <= tolC && Math.abs(cbhat - cb) <= tolB;
-    },
+    }
 
     getLteTimestep(
       dt: number,
@@ -2041,10 +2022,11 @@ export function createSpiceL1BjtElement(
       method: IntegrationMethod,
       lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
     ): number {
-      const s0 = pool.states[0];
-      const s1 = pool.states[1];
-      const s2 = pool.states[2];
-      const s3 = pool.states[3];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
+      const s1 = this._pool.states[1];
+      const s2 = this._pool.states[2];
+      const s3 = this._pool.states[3];
       let minDt = Infinity;
       {
         const dtBE = cktTerr(dt, deltaOld, order, method,
@@ -2065,25 +2047,26 @@ export function createSpiceL1BjtElement(
         if (dtCS < minDt) minDt = dtCS;
       }
       return minDt;
-    },
+    }
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      const s0 = pool.states[0];
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
       const ic = polarity * s0[base + SLOT_CC];
       const ib = polarity * s0[base + SLOT_CB];
       const ie = -(ic + ib);
       return [ib, ic, ie];
-    },
+    }
 
     setParam(key: string, value: number): void {
       if (key in params) {
         params[key] = value;
         tp = makeTp();
       }
-    },
-  };
+    }
+  }
 
-  return el1;
+  return new BjtL1Element(pinNodes);
 }
 
 // ---------------------------------------------------------------------------

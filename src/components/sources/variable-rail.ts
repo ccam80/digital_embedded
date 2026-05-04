@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Variable Rail  user-adjustable DC voltage source.
  *
  * Designed for live parameter slider integration: changing the rail voltage
@@ -27,6 +27,7 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -156,79 +157,80 @@ export interface VariableRailAnalogElement extends AnalogElement {
   setParam(key: string, value: number): void;
 }
 
+class VariableRailAnalogImpl extends AbstractAnalogElement implements VariableRailAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+
+  private _voltage: number;
+
+  // Cached TSTALLOC handles- populated in setup(), consumed in load()
+  private _hPosBr = -1;
+  private _hNegBr = -1;
+  private _hBrNeg = -1;
+  private _hBrPos = -1;
+
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    super(pinNodes);
+    this._voltage = props.getModelParam<number>("voltage");
+  }
+
+  get currentVoltage(): number { return this._voltage; }
+
+  setVoltage(v: number): void {
+    this._voltage = v;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "voltage") this._voltage = value;
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = 0;  // ground- variable rail has no neg pin
+
+    // Port of vsrcset.c:40-43- idempotent branch allocation
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    const branchNode = this.branchIndex;
+
+    // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
+    this._hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
+    this._hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode(=0), VSRCbranch
+    this._hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode(=0)
+    this._hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
+  }
+
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    return this.branchIndex;
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    // Branch current = current delivered by the ideal voltage source (into pos terminal).
+    return [rhs[this.branchIndex]];
+  }
+
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+
+    // vsrcload.c:43-46
+    solver.stampElement(this._hPosBr, +1.0);
+    solver.stampElement(this._hNegBr, -1.0);
+    solver.stampElement(this._hBrPos, +1.0);
+    solver.stampElement(this._hBrNeg, -1.0);
+    // vsrcload.c:416- RHS (DC value path: MODEDCOP | MODEDCTRANCURVE with dcGiven)
+    ctx.rhs[this.branchIndex] += this._voltage;
+  }
+}
+
 export function makeVariableRailElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
 ): VariableRailAnalogElement {
-  let _voltage = props.getModelParam<number>("voltage");
-
-  // Cached handles- populated in setup(), consumed in load()
-  let _hPosBr = -1;
-  let _hNegBr = -1;
-  let _hBrNeg = -1;
-  let _hBrPos = -1;
-
-  const element: VariableRailAnalogElement = {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(ctx: SetupContext): void {
-      const posNode = element._pinNodes.get("pos")!;
-      const negNode = 0;  // ground- variable rail has no neg pin
-
-      // Port of vsrcset.c:40-43- idempotent branch allocation
-      if (element.branchIndex === -1) {
-        element.branchIndex = ctx.makeCur(element.label, "branch");
-      }
-      const branchNode = element.branchIndex;
-
-      // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
-      _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
-      _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode(=0), VSRCbranch
-      _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode(=0)
-      _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
-    },
-
-    findBranchFor(_name: string, ctx: SetupContext): number {
-      if (element.branchIndex === -1) {
-        element.branchIndex = ctx.makeCur(element.label, "branch");
-      }
-      return element.branchIndex;
-    },
-
-    get currentVoltage() { return _voltage; },
-
-    setVoltage(v: number): void {
-      _voltage = v;
-    },
-
-    setParam(key: string, value: number): void {
-      if (key === "voltage") _voltage = value;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // Branch current = current delivered by the ideal voltage source (into pos terminal).
-      return [rhs[element.branchIndex]];
-    },
-
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-
-      // vsrcload.c:43-46
-      solver.stampElement(_hPosBr, +1.0);
-      solver.stampElement(_hNegBr, -1.0);
-      solver.stampElement(_hBrPos, +1.0);
-      solver.stampElement(_hBrNeg, -1.0);
-      // vsrcload.c:416- RHS (DC value path: MODEDCOP | MODEDCTRANCURVE with dcGiven)
-      ctx.rhs[element.branchIndex] += _voltage;
-    },
-  };
-
-  return element;
+  return new VariableRailAnalogImpl(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

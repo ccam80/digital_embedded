@@ -34,15 +34,16 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -839,34 +840,33 @@ function _createMosfetElementWithPolarity(
     || params.CGDO > 0 || params.CGSO > 0 || params.CGBO > 0
     || oxideCapProbe > 0);
 
-  let pool: StatePoolRef;
-  let base: number;
+  class MosfetAnalogElement extends AbstractPoolBackedAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MOS;
+    readonly stateSchema: StateSchema = MOSFET_SCHEMA;
+    readonly stateSize: number = MOSFET_SCHEMA.size;
 
-  // Matrix element handles- allocated by setup(), written by load().
-  let _hDD = -1, _hGG = -1, _hSS = -1, _hBB = -1;
-  let _hDPDP = -1, _hSPSP = -1;
-  let _hDDP = -1, _hGB = -1, _hGDP = -1, _hGSP = -1;
-  let _hSSP = -1, _hBDP = -1, _hBSP = -1, _hDPSP = -1;
-  let _hDPD = -1, _hBG = -1, _hDPG = -1, _hSPG = -1;
-  let _hSPS = -1, _hDPB = -1, _hSPB = -1, _hSPDP = -1;
+    private readonly _internalLabels: string[] = [];
 
-  const internalLabels: string[] = [];
+    private _hDD = -1;   private _hGG = -1;   private _hSS = -1;   private _hBB = -1;
+    private _hDPDP = -1; private _hSPSP = -1;
+    private _hDDP = -1;  private _hGB = -1;   private _hGDP = -1;  private _hGSP = -1;
+    private _hSSP = -1;  private _hBDP = -1;  private _hBSP = -1;  private _hDPSP = -1;
+    private _hDPD = -1;  private _hBG = -1;   private _hDPG = -1;  private _hSPG = -1;
+    private _hSPS = -1;  private _hDPB = -1;  private _hSPB = -1;  private _hSPDP = -1;
 
-  const el: import("../../solver/analog/element.js").PoolBackedAnalogElement & { readonly _p: ResolvedMosfetParams } = {
-    label: "",
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.MOS,
-    poolBacked: true as const,
-    stateSchema: MOSFET_SCHEMA,
-    stateSize: MOSFET_SCHEMA.size,
+    constructor(pinNodes: ReadonlyMap<string, number>) {
+      super(pinNodes);
+    }
+
+    get _p(): ResolvedMosfetParams {
+      return params;
+    }
 
     getInternalNodeLabels(): readonly string[] {
-      return internalLabels;
-    },
+      return this._internalLabels;
+    }
 
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    setup(ctx: SetupContext): void {
       const solver = ctx.solver;
       const gNode  = nodeG;
       const sNode  = nodeS_ext;
@@ -874,16 +874,15 @@ function _createMosfetElementWithPolarity(
       const bNode  = sNode;   // 3-terminal: body tied to source
 
       // State slots- mos1set.c:96-97 (MOS1numStates=17) plus digiTS DC-op scalars (slots 17-27).
-      base = ctx.allocStates(MOSFET_SCHEMA.size);
-      el._stateBase = base;
+      this._stateBase = ctx.allocStates(MOSFET_SCHEMA.size);
 
       // Internal nodes- mos1set.c:131-178
-      internalLabels.length = 0;
+      this._internalLabels.length = 0;
       const needDrainPrime = (params.RD !== 0) ||
         (params.RSH !== 0 && params.drainSquares !== 0);
       if (needDrainPrime) {
-        nodeD = ctx.makeVolt(el.label || "M", "drain");
-        internalLabels.push("drain");
+        nodeD = ctx.makeVolt(this.label || "M", "drain");
+        this._internalLabels.push("drain");
       } else {
         nodeD = dNode;
       }
@@ -891,8 +890,8 @@ function _createMosfetElementWithPolarity(
       const needSourcePrime = (params.RS !== 0) ||
         (params.RSH !== 0 && params.sourceSquares !== 0);
       if (needSourcePrime) {
-        nodeS = ctx.makeVolt(el.label || "M", "source");
-        internalLabels.push("source");
+        nodeS = ctx.makeVolt(this.label || "M", "source");
+        this._internalLabels.push("source");
       } else {
         nodeS = sNode;
       }
@@ -901,34 +900,29 @@ function _createMosfetElementWithPolarity(
       const sp = nodeS;
 
       // TSTALLOC sequence- mos1set.c:186-207 (all 22, unconditional)
-      _hDD   = solver.allocElement(dNode, dNode); // (1)
-      _hGG   = solver.allocElement(gNode, gNode); // (2)
-      _hSS   = solver.allocElement(sNode, sNode); // (3)
-      _hBB   = solver.allocElement(bNode, bNode); // (4)
-      _hDPDP = solver.allocElement(dp,    dp);    // (5)
-      _hSPSP = solver.allocElement(sp,    sp);    // (6)
-      _hDDP  = solver.allocElement(dNode, dp);    // (7)
-      _hGB   = solver.allocElement(gNode, bNode); // (8)
-      _hGDP  = solver.allocElement(gNode, dp);    // (9)
-      _hGSP  = solver.allocElement(gNode, sp);    // (10)
-      _hSSP  = solver.allocElement(sNode, sp);    // (11)
-      _hBDP  = solver.allocElement(bNode, dp);    // (12)
-      _hBSP  = solver.allocElement(bNode, sp);    // (13)
-      _hDPSP = solver.allocElement(dp,    sp);    // (14)
-      _hDPD  = solver.allocElement(dp,    dNode); // (15)
-      _hBG   = solver.allocElement(bNode, gNode); // (16)
-      _hDPG  = solver.allocElement(dp,    gNode); // (17)
-      _hSPG  = solver.allocElement(sp,    gNode); // (18)
-      _hSPS  = solver.allocElement(sp,    sNode); // (19)
-      _hDPB  = solver.allocElement(dp,    bNode); // (20)
-      _hSPB  = solver.allocElement(sp,    bNode); // (21)
-      _hSPDP = solver.allocElement(sp,    dp);    // (22)
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = el._stateBase;
-    },
+      this._hDD   = solver.allocElement(dNode, dNode); // (1)
+      this._hGG   = solver.allocElement(gNode, gNode); // (2)
+      this._hSS   = solver.allocElement(sNode, sNode); // (3)
+      this._hBB   = solver.allocElement(bNode, bNode); // (4)
+      this._hDPDP = solver.allocElement(dp,    dp);    // (5)
+      this._hSPSP = solver.allocElement(sp,    sp);    // (6)
+      this._hDDP  = solver.allocElement(dNode, dp);    // (7)
+      this._hGB   = solver.allocElement(gNode, bNode); // (8)
+      this._hGDP  = solver.allocElement(gNode, dp);    // (9)
+      this._hGSP  = solver.allocElement(gNode, sp);    // (10)
+      this._hSSP  = solver.allocElement(sNode, sp);    // (11)
+      this._hBDP  = solver.allocElement(bNode, dp);    // (12)
+      this._hBSP  = solver.allocElement(bNode, sp);    // (13)
+      this._hDPSP = solver.allocElement(dp,    sp);    // (14)
+      this._hDPD  = solver.allocElement(dp,    dNode); // (15)
+      this._hBG   = solver.allocElement(bNode, gNode); // (16)
+      this._hDPG  = solver.allocElement(dp,    gNode); // (17)
+      this._hSPG  = solver.allocElement(sp,    gNode); // (18)
+      this._hSPS  = solver.allocElement(sp,    sNode); // (19)
+      this._hDPB  = solver.allocElement(dp,    bNode); // (20)
+      this._hSPB  = solver.allocElement(sp,    bNode); // (21)
+      this._hSPDP = solver.allocElement(sp,    dp);    // (22)
+    }
 
     /**
      * Single-pass load mirroring `mos1load.c::MOS1load` line-by-line.
@@ -944,9 +938,9 @@ function _createMosfetElementWithPolarity(
       // mos1load.c:108: Check=0  false initially; set true only if pnjlim fires.
       let icheckLimited = false;
 
-      const s0 = pool.states[0];
-      const s1 = pool.states[1];
-      const s2 = pool.states[2];
+      const s0 = this._pool.states[0];
+      const s1 = this._pool.states[1];
+      const s2 = this._pool.states[2];
       const mode = ctx.cktMode;
       const voltages = ctx.rhsOld;
       const solver = ctx.solver;
@@ -995,16 +989,16 @@ function _createMosfetElementWithPolarity(
           // cite: mos1load.c:211-225
           const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
           const xfact = deltaOldRatio;
-          const vbs1 = s1[base + SLOT_VBS];
-          const vgs1 = s1[base + SLOT_VGS];
-          const vds1 = s1[base + SLOT_VDS];
-          s0[base + SLOT_VBS] = vbs1;
-          vbs = (1 + xfact) * vbs1 - xfact * s2[base + SLOT_VBS];
-          s0[base + SLOT_VGS] = vgs1;
-          vgs = (1 + xfact) * vgs1 - xfact * s2[base + SLOT_VGS];
-          s0[base + SLOT_VDS] = vds1;
-          vds = (1 + xfact) * vds1 - xfact * s2[base + SLOT_VDS];
-          s0[base + SLOT_VBD] = s0[base + SLOT_VBS] - s0[base + SLOT_VDS];
+          const vbs1 = s1[this._stateBase + SLOT_VBS];
+          const vgs1 = s1[this._stateBase + SLOT_VGS];
+          const vds1 = s1[this._stateBase + SLOT_VDS];
+          s0[this._stateBase + SLOT_VBS] = vbs1;
+          vbs = (1 + xfact) * vbs1 - xfact * s2[this._stateBase + SLOT_VBS];
+          s0[this._stateBase + SLOT_VGS] = vgs1;
+          vgs = (1 + xfact) * vgs1 - xfact * s2[this._stateBase + SLOT_VGS];
+          s0[this._stateBase + SLOT_VDS] = vds1;
+          vds = (1 + xfact) * vds1 - xfact * s2[this._stateBase + SLOT_VDS];
+          s0[this._stateBase + SLOT_VBD] = s0[this._stateBase + SLOT_VBS] - s0[this._stateBase + SLOT_VDS];
         } else {
           // mos1load.c:226-240: general iteration path (MODEINITFLOAT, MODEINITSMSIG,
           // MODEINITFIX+!OFF). vbs/vgs/vds from CKTrhsOld with polarity sign flip.
@@ -1035,19 +1029,19 @@ function _createMosfetElementWithPolarity(
         // pnjlim/fetlim/limvds events post to ctx.limitingCollector when bypass
         // fires, and icheckLimited stays false on bypass.
         {
-          const prevCd   = s0[base + SLOT_CD];
-          const prevCbs  = s0[base + SLOT_CBS];
-          const prevCbd  = s0[base + SLOT_CBD];
-          const prevGm   = s0[base + SLOT_GM];
-          const prevGds  = s0[base + SLOT_GDS];
-          const prevGmbs = s0[base + SLOT_GMBS];
-          const prevGbd  = s0[base + SLOT_GBD];
-          const prevGbs  = s0[base + SLOT_GBS];
-          const prevMode = s0[base + SLOT_MODE];
-          const prevVbs  = s0[base + SLOT_VBS];
-          const prevVbd  = s0[base + SLOT_VBD];
-          const prevVgs  = s0[base + SLOT_VGS];
-          const prevVds  = s0[base + SLOT_VDS];
+          const prevCd   = s0[this._stateBase + SLOT_CD];
+          const prevCbs  = s0[this._stateBase + SLOT_CBS];
+          const prevCbd  = s0[this._stateBase + SLOT_CBD];
+          const prevGm   = s0[this._stateBase + SLOT_GM];
+          const prevGds  = s0[this._stateBase + SLOT_GDS];
+          const prevGmbs = s0[this._stateBase + SLOT_GMBS];
+          const prevGbd  = s0[this._stateBase + SLOT_GBD];
+          const prevGbs  = s0[this._stateBase + SLOT_GBS];
+          const prevMode = s0[this._stateBase + SLOT_MODE];
+          const prevVbs  = s0[this._stateBase + SLOT_VBS];
+          const prevVbd  = s0[this._stateBase + SLOT_VBD];
+          const prevVgs  = s0[this._stateBase + SLOT_VGS];
+          const prevVds  = s0[this._stateBase + SLOT_VDS];
 
           const delvbs = vbs - prevVbs;
           const delvbd = vbd - prevVbd;
@@ -1083,9 +1077,9 @@ function _createMosfetElementWithPolarity(
             vgd = vgs - vds;
 
             if (mode & (MODETRAN | MODETRANOP)) {
-              bypassCapgs = s0[base + SLOT_CAPGS] + s1[base + SLOT_CAPGS] + GateSourceOverlapCap;
-              bypassCapgd = s0[base + SLOT_CAPGD] + s1[base + SLOT_CAPGD] + GateDrainOverlapCap;
-              bypassCapgb = s0[base + SLOT_CAPGB] + s1[base + SLOT_CAPGB] + GateBulkOverlapCap;
+              bypassCapgs = s0[this._stateBase + SLOT_CAPGS] + s1[this._stateBase + SLOT_CAPGS] + GateSourceOverlapCap;
+              bypassCapgd = s0[this._stateBase + SLOT_CAPGD] + s1[this._stateBase + SLOT_CAPGD] + GateDrainOverlapCap;
+              bypassCapgb = s0[this._stateBase + SLOT_CAPGB] + s1[this._stateBase + SLOT_CAPGB] + GateBulkOverlapCap;
             }
             bypassed = true;
           }
@@ -1100,11 +1094,11 @@ function _createMosfetElementWithPolarity(
           // INITPRED/INITTRAN/INITSMSIG exclude bypass via the gate above, so
           // they always land here.
           // mos1load.c:356: von = MOS1type * here->MOS1von.
-          const vonStored = s0[base + SLOT_VON];
+          const vonStored = s0[this._stateBase + SLOT_VON];
           const vonForLim = vonStored !== 0 ? vonStored : tp.tVto;
 
-          const vgsOldStored = s0[base + SLOT_VGS];
-          const vdsOldStored = s0[base + SLOT_VDS];
+          const vgsOldStored = s0[this._stateBase + SLOT_VGS];
+          const vdsOldStored = s0[this._stateBase + SLOT_VDS];
 
           if (vdsOldStored >= 0) {
             // mos1load.c:368-378: forward  fetlim vgs, derive vds, limvds.
@@ -1117,15 +1111,15 @@ function _createMosfetElementWithPolarity(
 
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: el.elementIndex ?? -1,
-                label: el.label,
+                elementIndex: this.elementIndex ?? -1,
+                label: this.label,
                 junction: "GS", limitType: "fetlim",
                 vBefore: vgsBefore, vAfter: vgs,
                 wasLimited: vgs !== vgsBefore,
               });
               ctx.limitingCollector.push({
-                elementIndex: el.elementIndex ?? -1,
-                label: el.label,
+                elementIndex: this.elementIndex ?? -1,
+                label: this.label,
                 junction: "DS", limitType: "limvds",
                 vBefore: vdsBefore, vAfter: vds,
                 wasLimited: vds !== vdsBefore,
@@ -1146,15 +1140,15 @@ function _createMosfetElementWithPolarity(
 
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: el.elementIndex ?? -1,
-                label: el.label,
+                elementIndex: this.elementIndex ?? -1,
+                label: this.label,
                 junction: "GS", limitType: "fetlim",
                 vBefore: vgdBefore, vAfter: vgd,
                 wasLimited: vgd !== vgdBefore,
               });
               ctx.limitingCollector.push({
-                elementIndex: el.elementIndex ?? -1,
-                label: el.label,
+                elementIndex: this.elementIndex ?? -1,
+                label: this.label,
                 junction: "DS", limitType: "limvds",
                 vBefore: vdsBefore, vAfter: vds,
                 wasLimited: vds !== vdsBefore,
@@ -1167,7 +1161,7 @@ function _createMosfetElementWithPolarity(
           if (vds >= 0) {
             // G1: pnjlim on vbs (bulk-source), vbd derives from vbs - vds.
             const vbsBefore = vbs;
-            const vbsOldStored = s0[base + SLOT_VBS];
+            const vbsOldStored = s0[this._stateBase + SLOT_VBS];
             const vbsResult = pnjlim(vbs, vbsOldStored, vt, tp.sourceVcrit);
             vbs = vbsResult.value;
             vbd = vbs - vds;
@@ -1175,8 +1169,8 @@ function _createMosfetElementWithPolarity(
             icheckLimited = icheckLimited || vbsResult.limited;
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: el.elementIndex ?? -1,
-                label: el.label,
+                elementIndex: this.elementIndex ?? -1,
+                label: this.label,
                 junction: "BS", limitType: "pnjlim",
                 vBefore: vbsBefore, vAfter: vbs,
                 wasLimited: vbsResult.limited,
@@ -1185,7 +1179,7 @@ function _createMosfetElementWithPolarity(
           } else {
             // G1: pnjlim on vbd (bulk-drain), vbs derives from vbd + vds.
             const vbdBefore = vbd;
-            const vbdOldStored = s0[base + SLOT_VBD];
+            const vbdOldStored = s0[this._stateBase + SLOT_VBD];
             const vbdResult = pnjlim(vbd, vbdOldStored, vt, tp.drainVcrit);
             vbd = vbdResult.value;
             vbs = vbd + vds;
@@ -1193,8 +1187,8 @@ function _createMosfetElementWithPolarity(
             icheckLimited = icheckLimited || vbdResult.limited;
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: el.elementIndex ?? -1,
-                label: el.label,
+                elementIndex: this.elementIndex ?? -1,
+                label: this.label,
                 junction: "BD", limitType: "pnjlim",
                 vBefore: vbdBefore, vAfter: vbd,
                 wasLimited: vbdResult.limited,
@@ -1262,14 +1256,14 @@ function _createMosfetElementWithPolarity(
 
       if (bypassed) {
         // cite: mos1load.c:322-340  bypass path: reload conductances from state0.
-        gmNR  = s0[base + SLOT_GM];
-        gdsNR = s0[base + SLOT_GDS];
-        gmbsNR= s0[base + SLOT_GMBS];
-        gbd   = s0[base + SLOT_GBD];
-        gbs   = s0[base + SLOT_GBS];
-        cbd   = s0[base + SLOT_CBD];
-        cbs   = s0[base + SLOT_CBS];
-        cd    = s0[base + SLOT_CD];
+        gmNR  = s0[this._stateBase + SLOT_GM];
+        gdsNR = s0[this._stateBase + SLOT_GDS];
+        gmbsNR= s0[this._stateBase + SLOT_GMBS];
+        gbd   = s0[this._stateBase + SLOT_GBD];
+        gbs   = s0[this._stateBase + SLOT_GBS];
+        cbd   = s0[this._stateBase + SLOT_CBD];
+        cbs   = s0[this._stateBase + SLOT_CBS];
+        cd    = s0[this._stateBase + SLOT_CD];
         // cite: mos1load.c:472-478  Reconstruct cdrain from cd:
         //   cd = opMode * cdrain - cbd  cdrain = opMode * (cd + cbd).
         // ngspice writes `cdrain = here->MOS1mode * (here->MOS1cd + here->MOS1cbd)`
@@ -1343,10 +1337,10 @@ function _createMosfetElementWithPolarity(
         }
 
         // mos1load.c:557-563: von, vdsat, cd write-back with polarity.
-        s0[base + SLOT_VON] = polarity * von;
-        s0[base + SLOT_VDSAT] = polarity * vdsat;
+        s0[this._stateBase + SLOT_VON] = polarity * von;
+        s0[this._stateBase + SLOT_VDSAT] = polarity * vdsat;
         cd = opMode * cdrain - cbd;
-        s0[base + SLOT_CD] = cd;
+        s0[this._stateBase + SLOT_CD] = cd;
 
         // mos1load.c:565-725: cap + charge block.
         // Gate on (MODETRAN|MODETRANOP|MODEINITSMSIG).
@@ -1360,16 +1354,16 @@ function _createMosfetElementWithPolarity(
             const argS = 1 - vbs / tp.tBulkPot;
             const sargS = Math.exp(-params.MJ * Math.log(argS));
             const sargswS = Math.exp(-params.MJSW * Math.log(argS));
-            s0[base + SLOT_QBS] = tp.tBulkPot * (
+            s0[this._stateBase + SLOT_QBS] = tp.tBulkPot * (
               tp.czbs * (1 - argS * sargS) / (1 - params.MJ)
               + tp.czbssw * (1 - argS * sargswS) / (1 - params.MJSW));
             capbs = tp.czbs * sargS + tp.czbssw * sargswS;
           } else {
-            s0[base + SLOT_QBS] = tp.f4s + vbs * (tp.f2s + vbs * (tp.f3s / 2));
+            s0[this._stateBase + SLOT_QBS] = tp.f4s + vbs * (tp.f2s + vbs * (tp.f3s / 2));
             capbs = tp.f2s + tp.f3s * vbs;
           }
         } else {
-          s0[base + SLOT_QBS] = 0;
+          s0[this._stateBase + SLOT_QBS] = 0;
           capbs = 0;
         }
 
@@ -1379,16 +1373,16 @@ function _createMosfetElementWithPolarity(
             const argD = 1 - vbd / tp.tBulkPot;
             const sargD = Math.exp(-params.MJ * Math.log(argD));
             const sargswD = Math.exp(-params.MJSW * Math.log(argD));
-            s0[base + SLOT_QBD] = tp.tBulkPot * (
+            s0[this._stateBase + SLOT_QBD] = tp.tBulkPot * (
               tp.czbd * (1 - argD * sargD) / (1 - params.MJ)
               + tp.czbdsw * (1 - argD * sargswD) / (1 - params.MJSW));
             capbd = tp.czbd * sargD + tp.czbdsw * sargswD;
           } else {
-            s0[base + SLOT_QBD] = tp.f4d + vbd * (tp.f2d + vbd * tp.f3d / 2);
+            s0[this._stateBase + SLOT_QBD] = tp.f4d + vbd * (tp.f2d + vbd * tp.f3d / 2);
             capbd = tp.f2d + vbd * tp.f3d;
           }
         } else {
-          s0[base + SLOT_QBD] = 0;
+          s0[this._stateBase + SLOT_QBD] = 0;
           capbd = 0;
         }
 
@@ -1400,16 +1394,16 @@ function _createMosfetElementWithPolarity(
           const ag = ctx.ag;
           // mos1load.c:714-719: BD junction integrate, lump into gbd & cbd.
           {
-            const qbd_now = s0[base + SLOT_QBD];
-            const qbd1 = s1[base + SLOT_QBD];
+            const qbd_now = s0[this._stateBase + SLOT_QBD];
+            const qbd1 = s1[this._stateBase + SLOT_QBD];
             let qbd2 = 0;
-            if (ctx.order >= 2) qbd2 = s2[base + SLOT_QBD];
+            if (ctx.order >= 2) qbd2 = s2[this._stateBase + SLOT_QBD];
             let ccap_bd: number;
             if (ctx.method === "trapezoidal") {
               if (ctx.order === 1) {
                 ccap_bd = ag[0] * qbd_now + ag[1] * qbd1;
               } else {
-                const ccapPrev = s1[base + SLOT_CQBD];
+                const ccapPrev = s1[this._stateBase + SLOT_CQBD];
                 ccap_bd = -ccapPrev * ag[1] + ag[0] * (qbd_now - qbd1);
               }
             } else {
@@ -1417,25 +1411,25 @@ function _createMosfetElementWithPolarity(
               if (ctx.order >= 2) ccap_bd += ag[2] * qbd2;
             }
             const geq_bd = ag[0] * capbd;
-            s0[base + SLOT_CQBD] = ccap_bd;
+            s0[this._stateBase + SLOT_CQBD] = ccap_bd;
             // mos1load.c:717-719: gbd += geq; cbd += CKTstate0[cqbd]; cd -= CKTstate0[cqbd].
             gbd += geq_bd;
             cbd += ccap_bd;
             // Store updated cd
-            s0[base + SLOT_CD] = cd - ccap_bd;
+            s0[this._stateBase + SLOT_CD] = cd - ccap_bd;
           }
           // mos1load.c:720-724: BS junction integrate, lump into gbs & cbs.
           {
-            const qbs_now = s0[base + SLOT_QBS];
-            const qbs1 = s1[base + SLOT_QBS];
+            const qbs_now = s0[this._stateBase + SLOT_QBS];
+            const qbs1 = s1[this._stateBase + SLOT_QBS];
             let qbs2 = 0;
-            if (ctx.order >= 2) qbs2 = s2[base + SLOT_QBS];
+            if (ctx.order >= 2) qbs2 = s2[this._stateBase + SLOT_QBS];
             let ccap_bs: number;
             if (ctx.method === "trapezoidal") {
               if (ctx.order === 1) {
                 ccap_bs = ag[0] * qbs_now + ag[1] * qbs1;
               } else {
-                const ccapPrev = s1[base + SLOT_CQBS];
+                const ccapPrev = s1[this._stateBase + SLOT_CQBS];
                 ccap_bs = -ccapPrev * ag[1] + ag[0] * (qbs_now - qbs1);
               }
             } else {
@@ -1443,7 +1437,7 @@ function _createMosfetElementWithPolarity(
               if (ctx.order >= 2) ccap_bs += ag[2] * qbs2;
             }
             const geq_bs = ag[0] * capbs;
-            s0[base + SLOT_CQBS] = ccap_bs;
+            s0[this._stateBase + SLOT_CQBS] = ccap_bs;
             gbs += geq_bs;
             cbs += ccap_bs;
           }
@@ -1451,10 +1445,10 @@ function _createMosfetElementWithPolarity(
       }
 
         // mos1load.c:750-753: save vbs, vbd, vgs, vds back to state0.
-        s0[base + SLOT_VBS] = vbs;
-        s0[base + SLOT_VBD] = vbd;
-        s0[base + SLOT_VGS] = vgs;
-        s0[base + SLOT_VDS] = vds;
+        s0[this._stateBase + SLOT_VBS] = vbs;
+        s0[this._stateBase + SLOT_VBD] = vbd;
+        s0[this._stateBase + SLOT_VGS] = vgs;
+        s0[this._stateBase + SLOT_VDS] = vds;
 
         // mos1load.c:759-856: Meyer capacitance + overlap + NIintegrate.
         if (capGate) {
@@ -1473,42 +1467,42 @@ function _createMosfetElementWithPolarity(
         // mos1load.c:787-806: cap averaging.
         // MODETRANOP | MODEINITSMSIG  2 * state0.
         // else  state0 + state1 (incremental averaging).
-        const prevCapgs = s1[base + SLOT_CAPGS];
-        const prevCapgd = s1[base + SLOT_CAPGD];
-        const prevCapgb = s1[base + SLOT_CAPGB];
+        const prevCapgs = s1[this._stateBase + SLOT_CAPGS];
+        const prevCapgd = s1[this._stateBase + SLOT_CAPGD];
+        const prevCapgb = s1[this._stateBase + SLOT_CAPGB];
         const useDouble = (mode & (MODETRANOP | MODEINITSMSIG)) !== 0;
         // Store half-cap in state0 for next-step averaging.
-        s0[base + SLOT_CAPGS] = meyerCapgs;
-        s0[base + SLOT_CAPGD] = meyerCapgd;
-        s0[base + SLOT_CAPGB] = meyerCapgb;
+        s0[this._stateBase + SLOT_CAPGS] = meyerCapgs;
+        s0[this._stateBase + SLOT_CAPGD] = meyerCapgd;
+        s0[this._stateBase + SLOT_CAPGB] = meyerCapgb;
         capgs = (useDouble ? 2 * meyerCapgs : meyerCapgs + prevCapgs) + GateSourceOverlapCap;
         capgd = (useDouble ? 2 * meyerCapgd : meyerCapgd + prevCapgd) + GateDrainOverlapCap;
         capgb = (useDouble ? 2 * meyerCapgb : meyerCapgb + prevCapgb) + GateBulkOverlapCap;
 
         // mos1load.c:827-855: update charges (MODETRAN  incremental,
         // TRANOP  q = c*v).
-        const vgs1 = s1[base + SLOT_VGS];
-        const vgd1 = vgs1 - s1[base + SLOT_VDS];
-        const vgb1 = vgs1 - s1[base + SLOT_VBS];
+        const vgs1 = s1[this._stateBase + SLOT_VGS];
+        const vgd1 = vgs1 - s1[this._stateBase + SLOT_VDS];
+        const vgb1 = vgs1 - s1[this._stateBase + SLOT_VBS];
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
           // mos1load.c:828-836: predictor extrapolation using xfact.
           // xfact = delta/deltaOld[1]; fallback to 0 when deltaOld[1]=0.
           // q0 = (1+xfact)*q1 - xfact*q2. Do NOT use ctx.xfact  compute
           // locally to match mos1load.c verbatim.
           const xfactQ = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
-          s0[base + SLOT_QGS] = (1 + xfactQ) * s1[base + SLOT_QGS] - xfactQ * s2[base + SLOT_QGS];
-          s0[base + SLOT_QGD] = (1 + xfactQ) * s1[base + SLOT_QGD] - xfactQ * s2[base + SLOT_QGD];
-          s0[base + SLOT_QGB] = (1 + xfactQ) * s1[base + SLOT_QGB] - xfactQ * s2[base + SLOT_QGB];
+          s0[this._stateBase + SLOT_QGS] = (1 + xfactQ) * s1[this._stateBase + SLOT_QGS] - xfactQ * s2[this._stateBase + SLOT_QGS];
+          s0[this._stateBase + SLOT_QGD] = (1 + xfactQ) * s1[this._stateBase + SLOT_QGD] - xfactQ * s2[this._stateBase + SLOT_QGD];
+          s0[this._stateBase + SLOT_QGB] = (1 + xfactQ) * s1[this._stateBase + SLOT_QGB] - xfactQ * s2[this._stateBase + SLOT_QGB];
         } else if (mode & MODETRAN) {
           // mos1load.c:840-846: incremental charge.
-          s0[base + SLOT_QGS] = (vgs - vgs1) * capgs + s1[base + SLOT_QGS];
-          s0[base + SLOT_QGD] = (vgd - vgd1) * capgd + s1[base + SLOT_QGD];
-          s0[base + SLOT_QGB] = (vgs - vbs - vgb1) * capgb + s1[base + SLOT_QGB];
+          s0[this._stateBase + SLOT_QGS] = (vgs - vgs1) * capgs + s1[this._stateBase + SLOT_QGS];
+          s0[this._stateBase + SLOT_QGD] = (vgd - vgd1) * capgd + s1[this._stateBase + SLOT_QGD];
+          s0[this._stateBase + SLOT_QGB] = (vgs - vbs - vgb1) * capgb + s1[this._stateBase + SLOT_QGB];
         } else {
           // TRANOP / SMSIG (mos1load.c:847-852): q = c * v.
-          s0[base + SLOT_QGS] = vgs * capgs;
-          s0[base + SLOT_QGD] = vgd * capgd;
-          s0[base + SLOT_QGB] = (vgs - vbs) * capgb;
+          s0[this._stateBase + SLOT_QGS] = vgs * capgs;
+          s0[this._stateBase + SLOT_QGD] = vgd * capgd;
+          s0[this._stateBase + SLOT_QGB] = (vgs - vbs) * capgb;
         }
       }
 
@@ -1522,23 +1516,23 @@ function _createMosfetElementWithPolarity(
           gcgb = 0; ceqgb = 0;
         } else {
           // mos1load.c:875-877: zero cqgs/gd/gb when corresponding cap = 0.
-          if (capgs === 0) s0[base + SLOT_CQGS] = 0;
-          if (capgd === 0) s0[base + SLOT_CQGD] = 0;
-          if (capgb === 0) s0[base + SLOT_CQGB] = 0;
+          if (capgs === 0) s0[this._stateBase + SLOT_CQGS] = 0;
+          if (capgd === 0) s0[this._stateBase + SLOT_CQGD] = 0;
+          if (capgb === 0) s0[this._stateBase + SLOT_CQGB] = 0;
           // mos1load.c:878-894: MODETRAN-only path. NIintegrate the three caps.
           const ag = ctx.ag;
           // Gate-source cap companion.
           {
-            const q0 = s0[base + SLOT_QGS];
-            const q1 = s1[base + SLOT_QGS];
+            const q0 = s0[this._stateBase + SLOT_QGS];
+            const q1 = s1[this._stateBase + SLOT_QGS];
             let q2 = 0;
-            if (ctx.order >= 2) q2 = s2[base + SLOT_QGS];
+            if (ctx.order >= 2) q2 = s2[this._stateBase + SLOT_QGS];
             let ccap_gs: number;
             if (ctx.method === "trapezoidal") {
               if (ctx.order === 1) {
                 ccap_gs = ag[0] * q0 + ag[1] * q1;
               } else {
-                const ccapPrev = s1[base + SLOT_CQGS];
+                const ccapPrev = s1[this._stateBase + SLOT_CQGS];
                 ccap_gs = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
               }
             } else {
@@ -1547,20 +1541,20 @@ function _createMosfetElementWithPolarity(
             }
             gcgs = ag[0] * capgs;
             ceqgs = ccap_gs - gcgs * vgs + ag[0] * q0;
-            s0[base + SLOT_CQGS] = ccap_gs;
+            s0[this._stateBase + SLOT_CQGS] = ccap_gs;
           }
           // Gate-drain cap companion.
           {
-            const q0 = s0[base + SLOT_QGD];
-            const q1 = s1[base + SLOT_QGD];
+            const q0 = s0[this._stateBase + SLOT_QGD];
+            const q1 = s1[this._stateBase + SLOT_QGD];
             let q2 = 0;
-            if (ctx.order >= 2) q2 = s2[base + SLOT_QGD];
+            if (ctx.order >= 2) q2 = s2[this._stateBase + SLOT_QGD];
             let ccap_gd: number;
             if (ctx.method === "trapezoidal") {
               if (ctx.order === 1) {
                 ccap_gd = ag[0] * q0 + ag[1] * q1;
               } else {
-                const ccapPrev = s1[base + SLOT_CQGD];
+                const ccapPrev = s1[this._stateBase + SLOT_CQGD];
                 ccap_gd = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
               }
             } else {
@@ -1569,20 +1563,20 @@ function _createMosfetElementWithPolarity(
             }
             gcgd = ag[0] * capgd;
             ceqgd = ccap_gd - gcgd * vgd + ag[0] * q0;
-            s0[base + SLOT_CQGD] = ccap_gd;
+            s0[this._stateBase + SLOT_CQGD] = ccap_gd;
           }
           // Gate-bulk cap companion.
           {
-            const q0 = s0[base + SLOT_QGB];
-            const q1 = s1[base + SLOT_QGB];
+            const q0 = s0[this._stateBase + SLOT_QGB];
+            const q1 = s1[this._stateBase + SLOT_QGB];
             let q2 = 0;
-            if (ctx.order >= 2) q2 = s2[base + SLOT_QGB];
+            if (ctx.order >= 2) q2 = s2[this._stateBase + SLOT_QGB];
             let ccap_gb: number;
             if (ctx.method === "trapezoidal") {
               if (ctx.order === 1) {
                 ccap_gb = ag[0] * q0 + ag[1] * q1;
               } else {
-                const ccapPrev = s1[base + SLOT_CQGB];
+                const ccapPrev = s1[this._stateBase + SLOT_CQGB];
                 ccap_gb = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
               }
             } else {
@@ -1592,7 +1586,7 @@ function _createMosfetElementWithPolarity(
             gcgb = ag[0] * capgb;
             const vgb_now = vgs - vbs;
             ceqgb = ccap_gb - gcgb * vgb_now + ag[0] * q0;
-            s0[base + SLOT_CQGB] = ccap_gb;
+            s0[this._stateBase + SLOT_CQGB] = ccap_gb;
           }
         }
       } // end if (!bypassed)
@@ -1610,14 +1604,14 @@ function _createMosfetElementWithPolarity(
       }
 
       // Store DC-op scalars for convergence test (mos1conv.c / MOS1convTest).
-      s0[base + SLOT_CBD] = cbd;
-      s0[base + SLOT_CBS] = cbs;
-      s0[base + SLOT_GBD] = gbd;
-      s0[base + SLOT_GBS] = gbs;
-      s0[base + SLOT_GM] = gmNR;
-      s0[base + SLOT_GDS] = gdsNR;
-      s0[base + SLOT_GMBS] = gmbsNR;
-      s0[base + SLOT_MODE] = opMode;
+      s0[this._stateBase + SLOT_CBD] = cbd;
+      s0[this._stateBase + SLOT_CBS] = cbs;
+      s0[this._stateBase + SLOT_GBD] = gbd;
+      s0[this._stateBase + SLOT_GBS] = gbs;
+      s0[this._stateBase + SLOT_GM] = gmNR;
+      s0[this._stateBase + SLOT_GDS] = gdsNR;
+      s0[this._stateBase + SLOT_GMBS] = gmbsNR;
+      s0[this._stateBase + SLOT_MODE] = opMode;
 
       // mos1load.c:917-924: RHS stamps.
       // NOTE: ngspice accounts for Meyer caps at gate node separately from
@@ -1632,48 +1626,48 @@ function _createMosfetElementWithPolarity(
       // Uses pre-allocated handles from setup()- no allocElement calls.
       if (params.RD > 0 && nodeD !== nodeD_ext) {
         const gRD = 1 / params.RD;
-        solver.stampElement(_hDD,   gRD);   // (dNode, dNode)
-        solver.stampElement(_hDDP,  -gRD);  // (dNode, dp)
-        solver.stampElement(_hDPD,  -gRD);  // (dp, dNode)
-        solver.stampElement(_hDPDP, gRD);   // (dp, dp)
+        solver.stampElement(this._hDD,   gRD);   // (dNode, dNode)
+        solver.stampElement(this._hDDP,  -gRD);  // (dNode, dp)
+        solver.stampElement(this._hDPD,  -gRD);  // (dp, dNode)
+        solver.stampElement(this._hDPDP, gRD);   // (dp, dp)
       }
       if (params.RS > 0 && nodeS !== nodeS_ext) {
         const gRS = 1 / params.RS;
-        solver.stampElement(_hSS,   gRS);   // (sNode, sNode)
-        solver.stampElement(_hSSP,  -gRS);  // (sNode, sp)
-        solver.stampElement(_hSPS,  -gRS);  // (sp, sNode)
-        solver.stampElement(_hSPSP, gRS);   // (sp, sp)
+        solver.stampElement(this._hSS,   gRS);   // (sNode, sNode)
+        solver.stampElement(this._hSSP,  -gRS);  // (sNode, sp)
+        solver.stampElement(this._hSPS,  -gRS);  // (sp, sNode)
+        solver.stampElement(this._hSPSP, gRS);   // (sp, sp)
       }
 
       // Y-matrix stamps- mos1load.c:929-956 via cached handles (no allocElement).
       // Handle names match mos1set.c TSTALLOC sequence (setup() entries 1-22).
       // With RD=RS=0: dp=dNode, sp=sNode, so duplicate-position handles alias
       // the same matrix cell; stampElement is idempotent for repeated handles.
-      solver.stampElement(_hDPDP, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);  // (5/1) D',D'
-      solver.stampElement(_hGG,   gcgd + gcgs + gcgb);                             // (2)   G,G
-      solver.stampElement(_hSPSP, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);  // (6/3) S',S'
-      solver.stampElement(_hBB,   gbd + gbs + gcgb);                               // (4)   B,B
-      solver.stampElement(_hGB,   -gcgb);                                           // (8)   G,B
-      solver.stampElement(_hGDP,  -gcgd);                                           // (9)   G,D'
-      solver.stampElement(_hGSP,  -gcgs);                                           // (10)  G,S'
-      solver.stampElement(_hBDP,  -gbd);                                            // (12)  B,D'
-      solver.stampElement(_hBSP,  -gbs);                                            // (13)  B,S'
-      solver.stampElement(_hDPSP, -gdsNR - xnrm * (gmNR + gmbsNR));               // (14)  D',S'
-      solver.stampElement(_hBG,   -gcgb);                                           // (16)  B,G
-      solver.stampElement(_hDPG,  (xnrm - xrev) * gmNR - gcgd);                   // (17)  D',G
-      solver.stampElement(_hSPG,  -(xnrm - xrev) * gmNR - gcgs);                  // (18)  S',G
-      solver.stampElement(_hDPB,  -gbd + (xnrm - xrev) * gmbsNR);                 // (20)  D',B
-      solver.stampElement(_hSPB,  -gbs - (xnrm - xrev) * gmbsNR);                 // (21)  S',B
-      solver.stampElement(_hSPDP, -gdsNR - xrev * (gmNR + gmbsNR));               // (22)  S',D'
+      solver.stampElement(this._hDPDP, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);  // (5/1) D',D'
+      solver.stampElement(this._hGG,   gcgd + gcgs + gcgb);                             // (2)   G,G
+      solver.stampElement(this._hSPSP, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);  // (6/3) S',S'
+      solver.stampElement(this._hBB,   gbd + gbs + gcgb);                               // (4)   B,B
+      solver.stampElement(this._hGB,   -gcgb);                                           // (8)   G,B
+      solver.stampElement(this._hGDP,  -gcgd);                                           // (9)   G,D'
+      solver.stampElement(this._hGSP,  -gcgs);                                           // (10)  G,S'
+      solver.stampElement(this._hBDP,  -gbd);                                            // (12)  B,D'
+      solver.stampElement(this._hBSP,  -gbs);                                            // (13)  B,S'
+      solver.stampElement(this._hDPSP, -gdsNR - xnrm * (gmNR + gmbsNR));               // (14)  D',S'
+      solver.stampElement(this._hBG,   -gcgb);                                           // (16)  B,G
+      solver.stampElement(this._hDPG,  (xnrm - xrev) * gmNR - gcgd);                   // (17)  D',G
+      solver.stampElement(this._hSPG,  -(xnrm - xrev) * gmNR - gcgs);                  // (18)  S',G
+      solver.stampElement(this._hDPB,  -gbd + (xnrm - xrev) * gmbsNR);                 // (20)  D',B
+      solver.stampElement(this._hSPB,  -gbs - (xnrm - xrev) * gmbsNR);                 // (21)  S',B
+      solver.stampElement(this._hSPDP, -gdsNR - xrev * (gmNR + gmbsNR));               // (22)  S',D'
 
       // mos1load.c:737-743: noncon gated on OFF==0 || !(MODEINITFIX|MODEINITSMSIG).
       if (icheckLimited && (params.OFF === 0 || !(mode & (MODEINITFIX | MODEINITSMSIG)))) {
         ctx.noncon.value++;
       }
-    },
+    }
 
     checkConvergence(ctx: LoadContext): boolean {
-      const s0 = pool.states[0];
+      const s0 = this._pool.states[0];
       // mos1conv.c: MOS1convTest early-return on INITFIX/INITSMSIG w/ OFF.
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
@@ -1689,24 +1683,24 @@ function _createMosfetElementWithPolarity(
       const vbdRaw = vbsRaw - vdsRaw;
 
       // mos1conv.c: predicted drain current deltas, mode-dependent.
-      const storedVbs = s0[base + SLOT_VBS];
-      const storedVbd = s0[base + SLOT_VBD];
-      const storedVgs = s0[base + SLOT_VGS];
-      const storedVds = s0[base + SLOT_VDS];
+      const storedVbs = s0[this._stateBase + SLOT_VBS];
+      const storedVbd = s0[this._stateBase + SLOT_VBD];
+      const storedVgs = s0[this._stateBase + SLOT_VGS];
+      const storedVds = s0[this._stateBase + SLOT_VDS];
       const delvbs = vbsRaw - storedVbs;
       const delvbd = vbdRaw - storedVbd;
       const delvgs = vgsRaw - storedVgs;
       const delvds = vdsRaw - storedVds;
 
-      const cd = s0[base + SLOT_CD];
-      const gm = s0[base + SLOT_GM];
-      const gds = s0[base + SLOT_GDS];
-      const gmbs = s0[base + SLOT_GMBS];
-      const gbd = s0[base + SLOT_GBD];
-      const gbs = s0[base + SLOT_GBS];
-      const cbs = s0[base + SLOT_CBS];
-      const cbd = s0[base + SLOT_CBD];
-      const opMode = s0[base + SLOT_MODE];
+      const cd = s0[this._stateBase + SLOT_CD];
+      const gm = s0[this._stateBase + SLOT_GM];
+      const gds = s0[this._stateBase + SLOT_GDS];
+      const gmbs = s0[this._stateBase + SLOT_GMBS];
+      const gbd = s0[this._stateBase + SLOT_GBD];
+      const gbs = s0[this._stateBase + SLOT_GBS];
+      const cbs = s0[this._stateBase + SLOT_CBS];
+      const cbd = s0[this._stateBase + SLOT_CBD];
+      const opMode = s0[this._stateBase + SLOT_MODE];
 
       let cdhat: number;
       if (opMode >= 0) {
@@ -1720,34 +1714,29 @@ function _createMosfetElementWithPolarity(
       const tolD = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(cd)) + ctx.iabstol;
       const tolB = ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(cbs + cbd)) + ctx.iabstol;
       return Math.abs(cdhat - cd) <= tolD && Math.abs(cbhat - (cbs + cbd)) <= tolB;
-    },
+    }
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      const s0 = pool.states[0];
+      const s0 = this._pool.states[0];
       // Drain current: polarity * cd per mos1load.c:563.
-      const id = polarity * s0[base + SLOT_CD];
+      const id = polarity * s0[this._stateBase + SLOT_CD];
       const iG = 0;
       const iD = id;
       const iS = -id;
       const iB = 0;
       // pinLayout order: [G, D, S, B] per registry.
       return [iG, iD, iS, iB];
-    },
+    }
 
     setParam(key: string, value: number): void {
       if (key in params) {
-        (params as unknown as Record<string, number>)[key] = value;
+        Reflect.set(params, key, value);
         tp = computeTempParams(params, polarity);
         params._tKP = tp.tTransconductance;
         params._tPhi = tp.tPhi;
         params._tVto = tp.tVto;
       }
-    },
-
-    // Stored temperature-corrected parameters exposed for tests.
-    get _p(): ResolvedMosfetParams {
-      return params;
-    },
+    }
 
     getLteTimestep(
       dt: number,
@@ -1757,10 +1746,10 @@ function _createMosfetElementWithPolarity(
       lteParams: LteParams,
     ): number {
       // CKTterr on qgs, qgd, qgb, qbd, qbs per mos1load.c state layout.
-      const s0 = pool.states[0];
-      const s1 = pool.states[1];
-      const s2 = pool.states[2];
-      const s3 = pool.states[3];
+      const s0 = this._pool.states[0];
+      const s1 = this._pool.states[1];
+      const s2 = this._pool.states[2];
+      const s3 = this._pool.states[3];
       let minDt = Infinity;
       const pairs: [number, number][] = [
         [SLOT_QGS, SLOT_CQGS],
@@ -1770,20 +1759,20 @@ function _createMosfetElementWithPolarity(
         [SLOT_QBS, SLOT_CQBS],
       ];
       for (const [slotQ, slotCcap] of pairs) {
-        const q0 = s0[base + slotQ];
-        const q1 = s1[base + slotQ];
-        const q2 = s2[base + slotQ];
-        const q3 = s3[base + slotQ];
-        const ccap0 = s0[base + slotCcap];
-        const ccap1 = s1[base + slotCcap];
+        const q0 = s0[this._stateBase + slotQ];
+        const q1 = s1[this._stateBase + slotQ];
+        const q2 = s2[this._stateBase + slotQ];
+        const q3 = s3[this._stateBase + slotQ];
+        const ccap0 = s0[this._stateBase + slotCcap];
+        const ccap1 = s1[this._stateBase + slotCcap];
         const dtSlot = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
         if (dtSlot < minDt) minDt = dtSlot;
       }
       return minDt;
-    },
-  };
+    }
+  }
 
-  return el;
+  return new MosfetAnalogElement(pinNodes);
 }
 
 // ---------------------------------------------------------------------------
@@ -1799,7 +1788,7 @@ export function createMosfetElement(
   _getTime: () => number = () => 0,
 ): AnalogElement {
   void _getTime;
-  return _createMosfetElementWithPolarity(1, pinNodes, props) as unknown as AnalogElement;
+  return _createMosfetElementWithPolarity(1, pinNodes, props);
 }
 
 export function createPmosfetElement(
@@ -1808,7 +1797,7 @@ export function createPmosfetElement(
   _getTime: () => number = () => 0,
 ): AnalogElement {
   void _getTime;
-  return _createMosfetElementWithPolarity(-1, pinNodes, props) as unknown as AnalogElement;
+  return _createMosfetElementWithPolarity(-1, pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

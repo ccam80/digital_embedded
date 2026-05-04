@@ -1,15 +1,21 @@
-﻿/**
+/**
  * NFET- N-channel MOSFET voltage-controlled switch.
  *
  * Gate input G controls source-drain connection:
- *   G=1 â†’ conducting (closed): D and S connected
- *   G=0 â†’ non-conducting (open): D and S disconnected
+ *   G=1 -> conducting (closed): D and S connected
+ *   G=0 -> non-conducting (open): D and S disconnected
  *
  * Pins:
  *   Input:        G  (gate, 1-bit)
  *   Bidirectional: D (drain), S (source)
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
+ *
+ * Analog model (kind: "netlist"):
+ *   drv (BehavioralFETDriver, polarity n): reads V(G) - V(S), classifies
+ *        against Vth, writes OUTPUT_LOGIC_LEVEL slot.
+ *   sw  (FetSW): reads drv.OUTPUT_LOGIC_LEVEL via siblingState, stamps the
+ *        2x2 (D, S) admittance with gOn or gOff based on the classified level.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -25,10 +31,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
 // Layout type with stateOffset
@@ -114,11 +117,11 @@ export class NFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Drain lead: (1,0) â†’ (0.4,0) â†’ (0.4,0.25)
+    // Drain lead: (1,0) -> (0.4,0) -> (0.4,0.25)
     ctx.drawLine(1, 0, 0.4, 0);
     ctx.drawLine(0.4, 0, 0.4, 0.25);
 
-    // Source lead: (1,2) â†’ (0.4,2) â†’ (0.4,1.75)
+    // Source lead: (1,2) -> (0.4,2) -> (0.4,1.75)
     ctx.drawLine(1, 2, 0.4, 2);
     ctx.drawLine(0.4, 2, 0.4, 1.75);
 
@@ -131,7 +134,7 @@ export class NFETElement extends AbstractCircuitElement {
     // Gate lead (THIN): (0.75,1) to (1,1)- connects channel to G pin at (1,1)
     ctx.drawLine(0.75, 1, 1, 1);
 
-    // N-channel arrow (filled triangle): (0.6,1) â†’ (0.85,0.9) â†’ (0.85,1.1)
+    // N-channel arrow (filled triangle): (0.6,1) -> (0.85,0.9) -> (0.85,1.1)
     ctx.drawPolygon([
       { x: 0.6, y: 1 },
       { x: 0.85, y: 0.9 },
@@ -154,7 +157,7 @@ export class NFETElement extends AbstractCircuitElement {
 //
 // Input layout: [G=0]
 // State layout: [closedFlag=0]
-// G=1 â†’ closed=1; G=0 â†’ closed=0
+// G=1 -> closed=1; G=0 -> closed=0
 // ---------------------------------------------------------------------------
 
 export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
@@ -181,128 +184,50 @@ export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// NFETSWSubElement- SW sub-element used by NFET and PFET composites.
+// buildNfetNetlist- analog netlist builder
 //
-// Implements the single SW sub-element decomposition per PB-NFET / PB-PFET.
-// Pin keys: "D" â†’ SWposNode (drain), "S" â†’ SWnegNode (source).
-// ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
+// Ports: G=0, D=1, S=2
+//
+// Elements:
+//   drv (BehavioralFETDriver, isNType=1): reads V(G) - V(S), writes
+//        OUTPUT_LOGIC_LEVEL based on Vth threshold.
+//   sw  (FetSW, invertCtrl=0): consumes drv.OUTPUT_LOGIC_LEVEL via
+//        siblingState, stamps the 2x2 (D, S) admittance.
 // ---------------------------------------------------------------------------
 
-export class NFETSWSubElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+export const buildNfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
+  const ron = params.hasModelParam("Ron") ? params.getModelParam<number>("Ron") : 1;
+  const roff = params.hasModelParam("Roff") ? params.getModelParam<number>("Roff") : 1e9;
+  const vth = params.hasModelParam("Vth") ? params.getModelParam<number>("Vth") : 2.5;
 
-  _hPP: number = -1;
-  _hPN: number = -1;
-  _hNP: number = -1;
-  _hNN: number = -1;
-
-  private _pendingCtrlVoltage: number = 0;
-  private _ron: number = 1;
-  private _roff: number = 1e9;
-  private _vth: number = 2.5;
-
-  setCtrlVoltage(v: number): void {
-    this._pendingCtrlVoltage = v;
-  }
-
-  setup(ctx: SetupContext): void {
-    const drainNode = this._pinNodes.get("D")!;
-    const sourceNode = this._pinNodes.get("S")!;
-
-    // Port of swsetup.c:47-48- state slot allocation (SW_NUM_STATES = 2)
-    this._stateBase = ctx.allocStates(2);
-
-    // Port of swsetup.c:59-62- TSTALLOC sequence (line-for-line)
-    this._hPP = ctx.solver.allocElement(drainNode, drainNode);
-    this._hPN = ctx.solver.allocElement(drainNode, sourceNode);
-    this._hNP = ctx.solver.allocElement(sourceNode, drainNode);
-    this._hNN = ctx.solver.allocElement(sourceNode, sourceNode);
-  }
-
-  load(ctx: LoadContext): void {
-    // swload.c: g_now = on-conductance if vCtrl > vth, else off-conductance
-    const gOn = 1 / this._ron;
-    const gOff = 1 / this._roff;
-    const g_now = this._pendingCtrlVoltage > this._vth ? gOn : gOff;
-
-    // swload.c:149-152- stamp conductance through cached handles
-    ctx.solver.stampElement(this._hPP, +g_now);
-    ctx.solver.stampElement(this._hPN, -g_now);
-    ctx.solver.stampElement(this._hNP, -g_now);
-    ctx.solver.stampElement(this._hNN, +g_now);
-  }
-
-  setParam(key: string, value: number): void {
-    if (key === "Ron") this._ron = Math.max(value, 1e-12);
-    else if (key === "Roff") this._roff = Math.max(value, 1e-12);
-    else if (key === "threshold") this._vth = value;
-  }
-
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [0, 0, 0];
-  }
-}
-
-// ---------------------------------------------------------------------------
-// NFETAnalogElement- AnalogElement implementation (composite, delegates to SW)
-// ---------------------------------------------------------------------------
-
-export class NFETAnalogElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
-
-  readonly _sw: NFETSWSubElement = new NFETSWSubElement();
-
-  setup(ctx: SetupContext): void {
-    // NFET composite forwards directly to its single SW sub-element.
-    // SW sub-element uses D as posNode, S as negNode.
-    this._sw.setup(ctx);
-  }
-
-  load(ctx: LoadContext): void {
-    // Control voltage: V(G) - V(S), compared against threshold
-    const gateNode = this._pinNodes.get("G")!;
-    const sourceNode = this._pinNodes.get("S")!;
-    const vCtrl = ctx.rhsOld[gateNode] - ctx.rhsOld[sourceNode];
-    this._sw.setCtrlVoltage(vCtrl);
-    this._sw.load(ctx);
-  }
-
-  setParam(key: string, value: number): void {
-    this._sw.setParam(key, value);
-  }
-
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [0, 0, 0];
-  }
-}
-
-function nfetAnalogFactory(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): NFETAnalogElement {
-  const el = new NFETAnalogElement();
-  el._pinNodes = new Map(pinNodes);
-  el._sw._pinNodes = new Map([
-    ["D", pinNodes.get("D")!],
-    ["S", pinNodes.get("S")!],
-  ]);
-  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
-  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
-  const vth = props.getOrDefault<number>("Vth", 2.5);
-  el._sw.setParam("Ron", ron);
-  el._sw.setParam("Roff", roff);
-  el._sw.setParam("threshold", vth);
-  return el;
-}
+  return {
+    ports: ["G", "D", "S"],
+    elements: [
+      {
+        typeId: "BehavioralFETDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: { Vth: vth, isNType: 1 },
+      },
+      {
+        typeId: "FetSW",
+        modelRef: "default",
+        subElementName: "sw",
+        params: {
+          Ron: ron,
+          Roff: roff,
+          invertCtrl: 0,
+          inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2], // drv: G, D, S
+      [1, 2],    // sw:  D, S
+    ],
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Attribute mappings and property definitions
@@ -311,9 +236,9 @@ function nfetAnalogFactory(
 export const NFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
-  { xmlName: "Ron", propertyKey: "Ron", convert: (v) => parseFloat(v) },
-  { xmlName: "Roff", propertyKey: "Roff", convert: (v) => parseFloat(v) },
-  { xmlName: "Vth", propertyKey: "Vth", convert: (v) => parseFloat(v) },
+  { xmlName: "Ron", propertyKey: "Ron", modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "Roff", propertyKey: "Roff", modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "Vth", propertyKey: "Vth", modelParam: true, convert: (v) => parseFloat(v) },
 ];
 
 const NFET_PROPERTY_DEFS: PropertyDefinition[] = [
@@ -337,7 +262,7 @@ const NFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Î©)",
+    label: "Ron (Ohm)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms",
@@ -345,7 +270,7 @@ const NFET_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Î©)",
+    label: "Roff (Ohm)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms",
@@ -371,7 +296,7 @@ export const NFETDefinition: StandaloneComponentDefinition = {
   propertyDefs: NFET_PROPERTY_DEFS,
   attributeMap: NFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "NFET- N-channel MOSFET. G=1 â†’ conducting.",
+  helpText: "NFET- N-channel MOSFET. G=1 -> conducting.",
   models: {
     digital: {
       executeFn: executeNFET,
@@ -384,9 +309,13 @@ export const NFETDefinition: StandaloneComponentDefinition = {
   },
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: nfetAnalogFactory,
-      paramDefs: [],
+      kind: "netlist",
+      netlist: buildNfetNetlist,
+      paramDefs: [
+        { key: "Ron", default: 1 },
+        { key: "Roff", default: 1e9 },
+        { key: "Vth", default: 2.5 },
+      ],
       params: { Ron: 1, Roff: 1e9, Vth: 2.5 },
     },
   },

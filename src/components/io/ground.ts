@@ -25,6 +25,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -104,36 +105,38 @@ export function executeGround(index: number, state: Uint32Array, _highZs: Uint32
 // createGroundAnalogElement- AnalogElement factory (no-op stamp)
 // ---------------------------------------------------------------------------
 
+class GroundAnalogElement extends AbstractAnalogElement {
+  // Ground is a no-op stamper (the compiler maps its pin to node 0 directly,
+  // load() does nothing). Ordinal is therefore irrelevant for parity, but
+  // every AnalogElement must declare one. RES is the lowest-ordinal
+  // bucket so any other element loads after it.
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    super(pinNodes);
+  }
+
+  setup(): void {
+    // Ground has no stamps- constraint is enforced by the compiler's node mapping.
+  }
+
+  load(_ctx: LoadContext): void {
+    // Ground constraint is handled by the compiler's node mapping.
+  }
+
+  setParam(_key: string, _value: number): void {}
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [0];
+  }
+}
+
 function createGroundAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
   _getTime: () => number,
 ): AnalogElement {
-  const el: AnalogElement = {
-    label: "",
-    elementIndex: -1,
-    _pinNodes: new Map(pinNodes),
-    branchIndex: -1,
-    _stateBase: -1,
-    // Ground is a no-op stamper (the compiler maps its pin to node 0 directly,
-    // load() does nothing). Ordinal is therefore irrelevant for parity, but
-    // every AnalogElement must declare one. RES is the lowest-ordinal
-    // bucket so any other element loads after it.
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    setup(): void {
-      // Ground has no stamps- constraint is enforced by the compiler's node mapping.
-    },
-    load(_ctx: LoadContext): void {
-      // Ground constraint is handled by the compiler's node mapping.
-    },
-
-    setParam(_key: string, _value: number) {},
-
-    getPinCurrents(_rhs: Float64Array): number[] {
-      return [0];
-    },
-  };
-  return el;
+  return new GroundAnalogElement(pinNodes);
 }
 
 // ---------------------------------------------------------------------------
