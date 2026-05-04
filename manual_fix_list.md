@@ -407,7 +407,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [x] `src/components/passives/__tests__/resistor.test.ts` (3) — landed 2026-05-03. Wave-2A-1 cleanup: deleted all five `ComparisonSession.getAttempt({ phase: "dcopDirect" }).iterations[N].ours.matrix[...]` matrix-peek tests (`Resistor > stamp_places_four_conductance_entries`, `Resistor > resistance_from_props`, `Resistor > minimum_resistance_clamped`, `resistor_load_dcop_parity > 3-resistor divider Vs=5V R=1k/1k/1k matches ngspice bit-exact`, `resistor_load_interface > load(ctx) stamps G=1/R bit-exact for R=1kΩ`) — all category-1 engine-impersonator-via-comparison-harness, finer-grained §4-equivalent violations than direct `.load()` / `.setup()` calls. Bit-exact `G = 1/R` resistor stamping is covered by the ngspice harness parity tests in `src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts` (compared against the instrumented ngspice DLL via `harness_run`, not via in-process matrix peeks). Pruned now-unused `ComparisonSession`, `DefaultSimulatorFacade` imports. Kept `Resistor > branch_index_is_minus_one` (pure factory check) and `Integration > voltage_divider_dc_op` (already on `buildFixture` + observable `engine.getNodeVoltage()`). 2/2 remaining tests pass.
 - [ ] `src/components/passives/__tests__/tapped-transformer.test.ts` (2)
 - [ ] `src/components/passives/__tests__/transformer.test.ts` (5)
-- [ ] `src/components/passives/__tests__/transmission-line.test.ts` (5)
+- [x] `src/components/passives/__tests__/transmission-line.test.ts` (5) — landed pre-§4f-Wave-1 via the surgical `pinNodes`-by-reference fix; §4f exemplar (transmission-segment-{r,l,c}.ts) confirmed all 14 tests pass in ~80ms. Per §4f follow-on at line 654.
 - [x] `src/components/passives/__tests__/tx_trace.test.ts` (2) — landed 2026-05-03 (§3 poison-pattern). DELETED. The file was a single `it("traces transformer with NR per step")` block with **zero `expect()` assertions** — pure `console.log` diagnostic noise wrapped around the deleted `AnalogTappedTransformerElement` class (J-063 ripple) plus a hand-rolled NR loop, hand-rolled `makeVoltageSource`/`makeResistor`/`makeTransientCtx` element impersonators, hand-rolled `loadCtxFromFields`, and direct `solver._initStructure()` / `tx.load(ctx)` / `solver.factor()` / `solver.solve()` engine drives. Authorized for deletion under fix-list line 318: "Either rewrite via harness or delete if it duplicates main suite coverage." TappedTransformer behavioral coverage is owned by `tapped-transformer.test.ts` (still on the §4c list as J-NEW-tt1) and the harness parity suite under `src/solver/analog/__tests__/ngspice-parity/`.
 - [ ] `src/components/semiconductors/__tests__/diac.test.ts` (3)
 - [ ] `src/components/semiconductors/__tests__/diode.test.ts` (9)
@@ -651,7 +651,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 #### 4f follow-ons
 
-- [ ] **Tick fix-list line 410.** `transmission-line.test.ts` was hanging; with the surgical `pinNodes`-by-reference fix landed (pre-migration) plus the §4f exemplar, all 14 tests pass in ~80ms. Tick `[ ]` → `[x]` on §4c row.
+- [x] **Tick fix-list line 410.** `transmission-line.test.ts` was hanging; with the surgical `pinNodes`-by-reference fix landed (pre-migration) plus the §4f exemplar, all 14 tests pass in ~80ms. Ticked 2026-05-04.
 
 ### 4g. Single-class collapse + `#pinNodes` privacy + completeness sweep
 

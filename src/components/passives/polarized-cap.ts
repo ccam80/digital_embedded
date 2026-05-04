@@ -357,8 +357,7 @@ export class AnalogPolarizedCapElement extends AbstractPoolBackedAnalogElement {
     // Pre-partition the clamp diode's state region inside the composite's
     // 9-slot allocation (5 cap-body + 4 diode). The diode's setup has an
     // idempotent guard so it skips its own allocStates when _stateBase is
-    // already set. C.4 fix- eliminates the per-step state-base patching
-    // dance previously needed in tests.
+    // already set.
     this._clampDiode._stateBase = this._stateBase + POLARIZED_CAP_SCHEMA.size;
     // Clamp diode sub-element setup (diosetup.c pattern, anode=neg, cathode=pos).
     this._clampDiode.setup(ctx);

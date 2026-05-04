@@ -100,10 +100,6 @@ export class BridgeOutputDriverElement extends AbstractPoolBackedAnalogElement {
     if (loaded && spec.cOut > 0 && nodeId > 0) {
       const cap = new AnalogCapacitorElement(
         new Map<string, number>([["pos", nodeId], ["neg", 0]]),
-        // capacitor.ts requires a PropertyBag for params; for boundary children
-        // the simplest path is to construct a bare bag with C set inline. The
-        // recovered original used the legacy 7-arg AnalogCapacitorElement
-        // constructor; the current file uses (pinNodes, props) so adapt:
         makeCapPropsBag(spec.cOut),
       );
       this._capChild = cap;
