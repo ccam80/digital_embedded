@@ -1,51 +1,4 @@
-/**
- * Tests for the Transmission Line component (lossy lumped RLCG model).
- *
- * §3 poison-pattern migration (2026-05-03 — manual_fix_list line 410):
- *
- *   The previous test file constructed `new TransmissionLineElement(...)`
- *   instances directly (a class that no longer exists — transmission-line is
- *   now a `kind: "netlist"` composite expanded by the unified compiler), drove
- *   `el.setup(makeTestSetupContext(...))` against hand-rolled `SparseSolver`
- *   stubs, called `el.load(makeStubCtx(...))`, and asserted on per-NR-iteration
- *   matrix stamps and inductor-companion `geq = L/dt` values via stub `stamps[]`
- *   capture arrays. All of these are §4 engine-impersonator and §3
- *   poison-pattern violations (hand-rolled `new StatePool(...)`,
- *   `loadCtxFromFields`, `makeTestSetupContext`, `allocateStatePool`,
- *   `setupAll`).
- *
- *   They are deleted as category-1: bit-exact stamping is covered by the
- *   ngspice comparison harness; per-NR matrix peeks have no observable
- *   meaning at the engine boundary.
- *
- *   The `state_pool_infrastructure` describe block depended on the deleted
- *   `TransmissionLineElement` class and its `_subElements` private field.
- *   Both are architecturally gone after the netlist-composite refactor — the
- *   composite is expanded into its leaves at compile time and the wrapper is
- *   a `SubcircuitWrapperElement` with an opaque private leaves list. There is
- *   no public surface to assert on the leaf schema, and the leaf elements
- *   (TransmissionSegmentL/R/C/G/RL) are themselves registered components with
- *   their own dedicated tests. Deleted as category-1 (architecturally moot).
- *
- *   The two `low_segments_warning` tests built a `Diagnostic` directly via
- *   `makeDiagnostic(...)` and asserted on its struct fields. Nothing in
- *   production code emits this diagnostic for transmission-line; the tests
- *   were testing the diagnostic-builder library, not the transmission-line
- *   component. Deleted (testing nothing real).
- *
- * Replacement coverage routes through `buildFixture` + a registered
- * `TransmissionLine` + voltage source(s) and asserts observable behaviour
- * at the public engine surface (`engine.getNodeVoltage`, `coordinator.step()`,
- * `coordinator.dcOperatingPoint()`).
- *
- *   - Definition smoke checks (name, category, pinLayout, propertyDefs,
- *     attribute mapping)
- *   - Matched-load steady state: V(port2) ≈ Vsrc/2 with source impedance Z0
- *     and load impedance Z0 at the operating point of a lossless line
- *   - Open-circuit reflection: V(port2) → Vsrc with no load (high-Z) at DC
- *   - Loss attenuates: V(port2) lower with lossPerMeter > 0 vs lossless
- *   - Propagation: signal reaches port2 (positive voltage) after τ
- */
+/** Tests for the TransmissionLine component. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -57,6 +10,7 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { PropertyValue } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // Circuit factories
@@ -86,7 +40,7 @@ interface TLineCircuitParams {
  *           (only present if rSrc > 0)
  */
 function buildTLineBench(facade: DefaultSimulatorFacade, p: TLineCircuitParams): Circuit {
-  const components: Array<{ id: string; type: string; props?: Record<string, unknown> }> = [
+  const components: Array<{ id: string; type: string; props?: Record<string, PropertyValue> }> = [
     { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: p.vSource ?? 1.0 } },
     { id: "tl",  type: "TransmissionLine", props: {
         label:        "tl",

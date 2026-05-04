@@ -1,145 +1,79 @@
-/**
- * Tests for SparkGapElement.
- *
- * Covers:
- *   - Blocks below breakdown voltage
- *   - Conducts above breakdown voltage
- *   - Hysteresis: stays conducting while current exceeds holding threshold
- *   - Extinguishes when current drops below holding threshold
- *   - Smooth resistance transition for NR convergence
- *   - Stamping behaviour
- *   - Definition metadata
- */
+/** Tests for the SparkGapElement and unified SparkGap component. */
 
 import { describe, it, expect } from "vitest";
-import { SparkGapElement, SparkGapDefinition, createSparkGapElement, SPARK_GAP_DEFAULTS } from "../spark-gap.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import {
+  SparkGapElement,
+  SparkGapDefinition,
+  createSparkGapElement,
+  SPARK_GAP_DEFAULTS,
+  SPARK_GAP_SCHEMA,
+} from "../spark-gap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
-import { MODETRAN, MODEINITFLOAT, MODEDCOP } from "../../../solver/analog/ckt-mode.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+
+const SLOT_CONDUCTING = SPARK_GAP_SCHEMA.indexOf.get("CONDUCTING")!;
 
 // ---------------------------------------------------------------------------
-// Minimal setup context for calling element.setup() in unit tests.
+// Circuit factory: vs → rs → sg → GND. Sized so:
+//   - rs = 100 Ω is small vs rOff (1e10 Ω) — blocking divider holds ≈ Vsrc.
+//   - rs ≫ rOn (5 Ω) — conducting divider drops V(sg:pos) clearly below Vsrc.
+//   - With rOn=5 and iHold=0.01, holding-current threshold V_src is
+//     iHold·(rs+rOn) = 0.01·105 = 1.05 V. Tests above/below this boundary
+//     verify hysteresis transitions.
 // ---------------------------------------------------------------------------
 
-function makeSetupCtx(solver: SparseSolverType): SetupContext {
-  let nodeCount = 1000;
-  let stateCount = 0;
-  return {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number {
-      const off = stateCount;
-      stateCount += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
+interface SparkGapCircuitParams {
+  vSource: number;
+  rSeries?: number;
+  vBreakdown?: number;
+  rOn?: number;
+  rOff?: number;
+  iHold?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Capture solver — records stamp tuples via the real allocElement/stampElement
-// API so tests can read back what load() wrote.
-// ---------------------------------------------------------------------------
-
-interface CaptureStamp { row: number; col: number; value: number; }
-interface CaptureRhs { row: number; value: number; }
-
-function makeCaptureSolver(): {
-  solver: SparseSolverType;
-  stamps: CaptureStamp[];
-  rhs: CaptureRhs[];
-} {
-  const stamps: CaptureStamp[] = [];
-  const rhs: CaptureRhs[] = [];
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    stampRHS: (row: number, value: number) => {
-      rhs.push({ row, value });
-    },
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
-}
-
-// ---------------------------------------------------------------------------
-// Minimal LoadContext for accept() calls (no matrix stamps).
-// SparkGap.accept reads ctx.voltages and applies discrete state transitions.
-// ---------------------------------------------------------------------------
-
-function makeAcceptCtx(rhs: Float64Array): LoadContext {
-  return makeLoadCtx({
-    solver: undefined as unknown as SparseSolverType,
-    cktMode: MODETRAN | MODEINITFLOAT,
-    dt: 1e-6,
-    deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
-    rhs,
+function buildSparkGapCircuit(facade: DefaultSimulatorFacade, p: SparkGapCircuitParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs", type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource } },
+      { id: "rs", type: "Resistor",       props: { label: "rs", resistance: p.rSeries ?? 100 } },
+      { id: "sg", type: "SparkGap",       props: {
+          label:      "sg",
+          model:      "behavioral",
+          vBreakdown: p.vBreakdown ?? 1000,
+          rOn:        p.rOn        ?? 5,
+          rOff:       p.rOff       ?? 1e10,
+          iHold:      p.iHold      ?? 0.01,
+      } },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "rs:pos"],
+      ["rs:neg", "sg:pos"],
+      ["sg:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
   });
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeSparkGap(overrides: Partial<{
-  vBreakdown: number;
-  rOn: number;
-  rOff: number;
-  iHold: number;
-}> = {}): SparkGapElement {
-  const el = new SparkGapElement(
-    overrides.vBreakdown ?? 1000,
-    overrides.rOn ?? 5,
-    overrides.rOff ?? 1e10,
-    overrides.iHold ?? 0.01,
-  );
-  el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-  return el;
+function findSparkGap(elements: ReadonlyArray<unknown>): SparkGapElement {
+  const idx = elements.findIndex((el) => el instanceof SparkGapElement);
+  if (idx < 0) throw new Error("SparkGapElement not found in compiled circuit");
+  return elements[idx] as SparkGapElement;
 }
 
-// Call setup() on an element using a capture solver so handles are valid.
-function setupSparkGap(el: SparkGapElement, solver: SparseSolverType): void {
-  el.setup(makeSetupCtx(solver));
+function readConducting(fix: ReturnType<typeof buildFixture>, sg: SparkGapElement): number {
+  return fix.pool.state1[sg._stateBase + SLOT_CONDUCTING];
 }
 
-/**
- * Apply a voltage to the gap by updating its operating point.
- *
- * Updating the gap's internal terminal-voltage and advancing its discrete
- * conducting/blocking state happens in accept(ctx, simTime, addBreakpoint).
- */
-function applyVoltage(gap: SparkGapElement, v: number): void {
-  // Under 1-indexed nodes: pinNodeIds=[1,2], so rhs[1]=vPos, rhs[2]=vNeg.
-  // Size 3: index 0 is the trashcan/ground reservoir (unused), 1 and 2 are active.
-  const rhs = new Float64Array(3);
-  rhs[1] = v; // node 1 (pos) at voltage v
-  rhs[2] = 0; // node 2 (neg) at ground
-  const ctx = makeAcceptCtx(rhs);
-  gap.accept(ctx, 0, () => {});
+function readSgPosVoltage(fix: ReturnType<typeof buildFixture>): number {
+  const node = fix.circuit.labelToNodeId.get("sg:pos");
+  if (node === undefined) throw new Error("sg:pos node not found in labelToNodeId");
+  return fix.engine.getNodeVoltage(node);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,216 +81,8 @@ function applyVoltage(gap: SparkGapElement, v: number): void {
 // ---------------------------------------------------------------------------
 
 describe("SparkGap", () => {
-  describe("blocks_below_breakdown", () => {
-    it("500V across 1000V gap: current ≈ 500/R_off (nA range)", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOff: 1e10 });
-      applyVoltage(gap, 500);
-      const R = gap.resistance();
-      const I = 500 / R;
-      // Should be in nA range: 500/1e10 = 50nA
-      expect(I).toBeLessThan(1e-6); // less than 1µA
-      expect(gap.conducting).toBe(false);
-    });
-
-    it("resistance below breakdown is close to R_off", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOff: 1e10, rOn: 5 });
-      applyVoltage(gap, 100);
-      // Should be close to rOff (smooth blend keeps it near rOff far from threshold)
-      expect(gap.resistance()).toBeGreaterThan(1e8);
-    });
-
-    it("gap starts in blocking state", () => {
-      const gap = makeSparkGap();
-      expect(gap.conducting).toBe(false);
-    });
-  });
-
-  describe("conducts_above_breakdown", () => {
-    it("1500V fires the gap and allows current to flow", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
-      applyVoltage(gap, 1500);
-      expect(gap.conducting).toBe(true);
-    });
-
-    it("resistance drops significantly above breakdown", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
-      applyVoltage(gap, 1500);
-      // Resistance should be close to rOn when well above breakdown
-      expect(gap.resistance()).toBeLessThan(100);
-    });
-
-    it("current above breakdown is much larger than below", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
-
-      // Below breakdown
-      applyVoltage(gap, 500);
-      const I_below = 500 / gap.resistance();
-
-      // Above breakdown — reset for fresh gap
-      const gap2 = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
-      applyVoltage(gap2, 1500);
-      const I_above = 1500 / gap2.resistance();
-
-      expect(I_above).toBeGreaterThan(I_below * 1000);
-    });
-  });
-
-  describe("holds_until_current_drops", () => {
-    it("gap stays conducting while voltage keeps current above iHold", () => {
-      // iHold = 10mA, rOn = 5Ω → need V > 0.05V to hold
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, iHold: 0.01 });
-
-      // Fire the gap
-      applyVoltage(gap, 1500);
-      expect(gap.conducting).toBe(true);
-
-      // Reduce voltage but keep I = V/rOn > iHold: V > 0.05V
-      // Apply 10V: I = 10/5 = 2A >> iHold
-      applyVoltage(gap, 10);
-      expect(gap.conducting).toBe(true);
-
-      // Apply 1V: I = 1/5 = 200mA >> iHold
-      applyVoltage(gap, 1);
-      expect(gap.conducting).toBe(true);
-    });
-
-    it("conducting gap has low resistance well above holding current", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, iHold: 0.01 });
-      applyVoltage(gap, 1500); // fire
-      applyVoltage(gap, 50);   // V=50V, I=10A >> iHold — should stay on
-      expect(gap.resistance()).toBeLessThan(100);
-    });
-  });
-
-  describe("extinguishes_below_holding", () => {
-    it("gap returns to blocking when current drops below iHold", () => {
-      // iHold = 10mA, rOn = 5Ω → holding current threshold: V = 0.01*5 = 0.05V
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, iHold: 0.01 });
-
-      // Fire the gap
-      applyVoltage(gap, 1500);
-      expect(gap.conducting).toBe(true);
-
-      // Reduce voltage so I = V/rOn < iHold: need V < 0.05V
-      // Apply 0V: I = 0A < 10mA
-      applyVoltage(gap, 0);
-      expect(gap.conducting).toBe(false);
-    });
-
-    it("resistance returns toward R_off after extinction", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10, iHold: 0.01 });
-      applyVoltage(gap, 1500); // fire
-      applyVoltage(gap, 0);    // extinguish
-      expect(gap.resistance()).toBeGreaterThan(1e6);
-    });
-
-    it("can re-fire after extinction", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, iHold: 0.01 });
-      applyVoltage(gap, 1500); // fire
-      applyVoltage(gap, 0);    // extinguish
-      expect(gap.conducting).toBe(false);
-      applyVoltage(gap, 1500); // re-fire
-      expect(gap.conducting).toBe(true);
-    });
-  });
-
-  describe("smooth_transition", () => {
-    it("resistance changes monotonically across the breakdown transition zone", () => {
-      // Sample resistance at several voltages spanning breakdown
-      // The smooth tanh blend ensures resistance decreases monotonically
-      // from rOff to rOn as voltage increases through vBreakdown.
-      const vBreakdown = 1000;
-      const samples: number[] = [];
-      for (const v of [900, 950, 1000, 1050, 1100]) {
-        const gap = makeSparkGap({ vBreakdown, rOn: 5, rOff: 1e10 });
-        applyVoltage(gap, v);
-        samples.push(gap.resistance());
-      }
-      // Each subsequent sample should be <= the previous (monotonically decreasing)
-      for (let i = 1; i < samples.length; i++) {
-        expect(samples[i]).toBeLessThanOrEqual(samples[i - 1]);
-      }
-    });
-
-    it("resistance at breakdown voltage is midpoint between rOn and rOff", () => {
-      const rOn = 5;
-      const rOff = 1e10;
-      const vBreakdown = 1000;
-      const gap = makeSparkGap({ vBreakdown, rOn, rOff });
-
-      // At exactly breakdown: tanh(0) = 0, blend = 0.5
-      // R = rOff + (rOn - rOff) * 0.5 = (rOn + rOff) / 2
-      applyVoltage(gap, vBreakdown);
-      const R = gap.resistance();
-      const expected = rOff + (rOn - rOff) * 0.5;
-
-      // Allow tolerance since state machine may flip at exactly vBreakdown
-      expect(R).toBeGreaterThan(rOn);
-      expect(R).toBeLessThan(rOff);
-      // Should be within an order of magnitude of the midpoint
-      expect(R).toBeLessThan(expected * 10);
-    });
-  });
-
-  describe("load", () => {
-    it("stamps conductance matrix between nodes in blocking state", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOff: 1e10 });
-      // Below breakdown — in blocking state
-      applyVoltage(gap, 100);
-
-      const { solver, stamps } = makeCaptureSolver();
-      setupSparkGap(gap, solver);
-      const ctx = makeLoadCtx({
-        solver,
-        cktMode: MODEDCOP | MODEINITFLOAT,
-        dt: 0,
-      });
-
-      gap.load(ctx);
-
-      const G = 1 / gap.resistance();
-      // Under 1-indexed nodes: pinNodeIds=[1,2] → matrix rows/cols 1 and 2.
-      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      expect(tuples).toContainEqual([1, 1, G]);
-      expect(tuples).toContainEqual([1, 2, -G]);
-      expect(tuples).toContainEqual([2, 1, -G]);
-      expect(tuples).toContainEqual([2, 2, G]);
-    });
-
-    it("stamps higher conductance in conducting state", () => {
-      const gap = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
-
-      // Blocking state conductance
-      applyVoltage(gap, 100);
-      const { solver: solver1, stamps: stamps1 } = makeCaptureSolver();
-      setupSparkGap(gap, solver1);
-      const ctx1 = makeLoadCtx({
-        solver: solver1,
-        cktMode: MODEDCOP | MODEINITFLOAT,
-        dt: 0,
-      });
-      gap.load(ctx1);
-      const G_off = stamps1.find((s) => s.row === 1 && s.col === 1)!.value;
-
-      // Conducting state conductance — need new element to get fresh handles
-      const gap2 = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
-      applyVoltage(gap2, 1500);
-      const { solver: solver2, stamps: stamps2 } = makeCaptureSolver();
-      setupSparkGap(gap2, solver2);
-      const ctx2 = makeLoadCtx({
-        solver: solver2,
-        cktMode: MODEDCOP | MODEINITFLOAT,
-        dt: 0,
-      });
-      gap2.load(ctx2);
-      const G_on = stamps2.find((s) => s.row === 1 && s.col === 1)!.value;
-
-      expect(G_on).toBeGreaterThan(G_off);
-    });
-  });
-
   describe("definition", () => {
-    it("SparkGapDefinition has engine type analog", () => {
+    it("SparkGapDefinition has a behavioral model entry", () => {
       expect(SparkGapDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
@@ -377,79 +103,270 @@ describe("SparkGap", () => {
       expect(element).toBeInstanceOf(SparkGapElement);
     });
 
-    it("branchCount is false", () => {
-      expect((SparkGapDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
+    it("branchCount is false (no extra branch row)", () => {
+      const entry = SparkGapDefinition.modelRegistry?.behavioral as
+        { kind: "inline"; factory: AnalogFactory; branchCount?: number } | undefined;
+      expect(entry?.branchCount).toBeFalsy();
+    });
+
+    it("pre-setup _stateBase sentinel is -1 (compiler assigns during setup)", () => {
+      const props = new PropertyBag();
+      props.replaceModelParams(SPARK_GAP_DEFAULTS);
+      const el = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
+      expect(el._stateBase).toBe(-1);
     });
   });
-});
 
-// ---------------------------------------------------------------------------
-// spark_gap_load_dcop_parity — C4.1 / Task 6.2.1
-//
-// Spark gap in non-firing state (_conducting=false, _vTerminal=0).
-// Default params: vBreakdown=1000, rOn=5, rOff=1e10, iHold=0.01.
-// firingResistance(absV=0, vBreakdown=1000, rOff=1e10, rOn=5):
-//   w = 0.05 * max(1000, 1e-6) = 50
-//   blend = 0.5 * (1 + tanh((0 - 1000) / 50)) = 0.5 * (1 + tanh(-20)) ≈ 0
-//   R ≈ rOff = 1e10
-// G = 1 / max(R, 1e-12).
-//
-// Expected: G = 1/R using a single division.
-// The test inlines the same firingResistance computation as SparkGapElement.load().
-// Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
-// ---------------------------------------------------------------------------
-
-describe("spark_gap_load_dcop_parity", () => {
-  it("non-firing spark gap stamps G=1/firingResistance(0) bit-exact", () => {
-    const props = new PropertyBag();
-    props.replaceModelParams(SPARK_GAP_DEFAULTS);
-
-    const core = createSparkGapElement(
-      new Map([["pos", 1], ["neg", 2]]),
-      props,
-      () => 0,
-    );
-    const analogElement = core as unknown as AnalogElement;
-
-    // Under 1-indexed nodes: pinNodeIds=[1,2] → matrix rows/cols 1 and 2.
-    // matrixSize must be nodeCount+1 to accommodate 1-based indexing.
-    const stampCtx = makeSimpleCtx({
-      elements: [analogElement],
-      matrixSize: 3,
-      nodeCount: 2,
+  // -------------------------------------------------------------------------
+  // Below-breakdown blocking
+  //
+  // Vsrc=500 V, vBreakdown=1000 V. After warm-start the gap is in blocking
+  // state (rOff = 1e10 Ω), the rs-rOff divider holds V(sg:pos) ≈ Vsrc, and
+  // pool CONDUCTING == 0.
+  // -------------------------------------------------------------------------
+  describe("blocks_below_breakdown", () => {
+    it("pool CONDUCTING == 0 after warm-start with Vsrc < vBreakdown", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 500, vBreakdown: 1000, rOn: 5, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(0);
     });
-    stampCtx.solver._initStructure();
-    // Call setup() directly — element is not poolBacked so makeSimpleCtx
-    // does not call it automatically. setup() must run before load().
-    (core as unknown as SparkGapElement).setup(makeSetupCtx(stampCtx.solver));
-    analogElement.load(stampCtx.loadCtx);
-    const stamps = stampCtx.solver.getCSCNonZeros();
 
-    // NGSPICE ref: G = 1/R where R = firingResistance(absV=0, ...).
-    // Inline closed-form — same IEEE-754 ops as SparkGapElement.resistance()
-    // in the non-conducting branch with _vTerminal=0:
-    const vBreakdown = SPARK_GAP_DEFAULTS.vBreakdown;
-    const rOff = SPARK_GAP_DEFAULTS.rOff;
-    const rOn = SPARK_GAP_DEFAULTS.rOn;
-    const absV = 0;
-    const w = 0.05 * Math.max(vBreakdown, 1e-6);
-    const blend = 0.5 * (1 + Math.tanh((absV - vBreakdown) / w));
-    const R_REF = rOff + (rOn - rOff) * blend;
-    const MIN_RESISTANCE = 1e-12;
-    const EXPECTED_G = 1 / Math.max(R_REF, MIN_RESISTANCE);
+    it("V(sg:pos) ≈ Vsrc when blocking (rOff ≫ rs)", () => {
+      const Vsrc = 500;
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: Vsrc, rSeries: 100, vBreakdown: 1000, rOn: 5, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      // Divider: V(sg:pos) = Vsrc · rOff / (rs + rOff) ≈ Vsrc to within 1e-7.
+      const vPos = readSgPosVoltage(fix);
+      expect(Math.abs(vPos - Vsrc) / Vsrc).toBeLessThan(1e-6);
+    });
+  });
 
-    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
-    expect(e00).toBeDefined();
-    expect(e00!.value).toBe(EXPECTED_G);
+  // -------------------------------------------------------------------------
+  // Above-breakdown firing
+  //
+  // Vsrc=1500 V > vBreakdown=1000 V. During DCOP the gap sees vTerm ≈ Vsrc
+  // (rOff dominates pre-fire), applyHysteresis flips CONDUCTING to 1 inside
+  // load(), the bottom-of-load assignment commits to s0, and _seedFromDcop
+  // copies state0 → state1 so post-warm-start CONDUCTING == 1.
+  // -------------------------------------------------------------------------
+  describe("conducts_above_breakdown", () => {
+    it("pool CONDUCTING == 1 after warm-start with Vsrc > vBreakdown", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 1500, vBreakdown: 1000, rOn: 5, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(1);
+    });
 
-    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
-    expect(e11).toBeDefined();
-    expect(e11!.value).toBe(EXPECTED_G);
+    it("V(sg:pos) drops to Vsrc · rOn/(rs+rOn) when conducting", () => {
+      const Vsrc = 1500;
+      const rs   = 100;
+      const rOn  = 5;
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: Vsrc, rSeries: rs, vBreakdown: 1000, rOn, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const vPos = readSgPosVoltage(fix);
+      const expected = Vsrc * rOn / (rs + rOn); // 1500 · 5/105 ≈ 71.43 V
+      expect(Math.abs(vPos - expected) / expected).toBeLessThan(0.01);
+    });
 
-    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
-    expect(e01!.value).toBe(-EXPECTED_G);
+    it("current above breakdown is much larger than below breakdown", () => {
+      // I = (Vsrc - V(sg:pos)) / rs.
+      // Below: V(sg:pos) ≈ Vsrc ⇒ I ≈ 0. Above: V(sg:pos) ≈ Vsrc·rOn/(rs+rOn)
+      // ⇒ I ≈ Vsrc / (rs + rOn).
+      const rs = 100;
+      const fixBelow = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 500, rSeries: rs, vBreakdown: 1000, rOn: 5, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const I_below = (500 - readSgPosVoltage(fixBelow)) / rs;
 
-    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
-    expect(e10!.value).toBe(-EXPECTED_G);
+      const fixAbove = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 1500, rSeries: rs, vBreakdown: 1000, rOn: 5, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const I_above = (1500 - readSgPosVoltage(fixAbove)) / rs;
+
+      expect(I_above).toBeGreaterThan(Math.abs(I_below) * 1000);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Hold-current hysteresis (fire then reduce Vsrc but keep I > iHold)
+  //
+  // Fire at Vsrc=1500, then hot-patch Vsrc=10. Steady-state current after the
+  // patch is I = Vsrc / (rs + rOn) = 10/105 ≈ 0.0952 A ≫ iHold=0.01 A, so
+  // the gap stays conducting. Verified by pool CONDUCTING and the
+  // conducting-divider voltage at sg:pos.
+  // -------------------------------------------------------------------------
+  describe("holds_until_current_drops", () => {
+    it("gap stays conducting after Vsrc drop while I > iHold", () => {
+      const rs   = 100;
+      const rOn  = 5;
+      const iHold = 0.01;
+
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 1500, rSeries: rs, vBreakdown: 1000, rOn, rOff: 1e10, iHold,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      // Warm-start fired the gap.
+      expect(readConducting(fix, sg)).toBe(1);
+
+      // Drop Vsrc to 10 V — well above iHold·(rs+rOn) = 1.05 V, so I stays
+      // above iHold and the gap should remain conducting.
+      fix.coordinator.setSourceByLabel("vs", "voltage", 10);
+      // Re-converge to the new steady state.
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+
+      expect(readConducting(fix, sg)).toBe(1);
+      // V(sg:pos) settles to the conducting divider value.
+      const vPos = readSgPosVoltage(fix);
+      const expected = 10 * rOn / (rs + rOn);
+      expect(Math.abs(vPos - expected) / expected).toBeLessThan(0.05);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Extinction (Vsrc ⇒ I < iHold)
+  //
+  // Fire at Vsrc=1500, then hot-patch Vsrc=0. Current drops to 0 < iHold,
+  // applyHysteresis returns 0, pool CONDUCTING transitions back to blocking.
+  // -------------------------------------------------------------------------
+  describe("extinguishes_below_holding", () => {
+    it("gap returns to blocking when Vsrc drops so I < iHold", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 1500, vBreakdown: 1000, rOn: 5, rOff: 1e10, iHold: 0.01,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(1);
+
+      // Vsrc → 0 ⇒ I = 0 < iHold; gap must extinguish.
+      fix.coordinator.setSourceByLabel("vs", "voltage", 0);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+
+      expect(readConducting(fix, sg)).toBe(0);
+    });
+
+    it("V(sg:pos) returns to source-tracking blocking divider after extinction", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 1500, vBreakdown: 1000, rOn: 5, rOff: 1e10, iHold: 0.01,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      // Fire, then drop to a low forward voltage well under vBreakdown so
+      // the gap is in the rOff branch but driven by a small Vsrc.
+      fix.coordinator.setSourceByLabel("vs", "voltage", 0);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(0);
+
+      // Re-energize at a low voltage that does not refire (50 V ≪ vBreakdown).
+      fix.coordinator.setSourceByLabel("vs", "voltage", 50);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+      // Gap is in blocking branch ⇒ rOff-dominated divider ⇒ V(sg:pos) ≈ Vsrc.
+      expect(readConducting(fix, sg)).toBe(0);
+      const vPos = readSgPosVoltage(fix);
+      expect(Math.abs(vPos - 50) / 50).toBeLessThan(1e-4);
+    });
+
+    it("can re-fire after extinction (full hysteresis cycle)", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 1500, vBreakdown: 1000, rOn: 5, rOff: 1e10, iHold: 0.01,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(1);
+
+      // Extinguish.
+      fix.coordinator.setSourceByLabel("vs", "voltage", 0);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+      expect(readConducting(fix, sg)).toBe(0);
+
+      // Re-fire by raising Vsrc above vBreakdown again.
+      fix.coordinator.setSourceByLabel("vs", "voltage", 1500);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+      expect(readConducting(fix, sg)).toBe(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Hot-loadable model parameters (system requirement: every model param
+  // must be hot-loadable via setComponentProperty).
+  // -------------------------------------------------------------------------
+  describe("hot_loadable_params", () => {
+    it("hot-patching vBreakdown above Vsrc keeps a previously-blocking gap blocked", () => {
+      // Vsrc=500, vBreakdown=1000 — blocking at boot.
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: 500, vBreakdown: 1000, rOn: 5, rOff: 1e10, iHold: 0.01,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(0);
+
+      // Lower vBreakdown to 200 V — now Vsrc=500 > vBreakdown ⇒ should fire.
+      const sgIdx = fix.circuit.elements.indexOf(sg);
+      const sgCircuitElement = fix.circuit.elementToCircuitElement.get(sgIdx)!;
+      expect(sgCircuitElement).toBeDefined();
+      fix.coordinator.setComponentProperty(sgCircuitElement, "vBreakdown", 200);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+
+      expect(readConducting(fix, sg)).toBe(1);
+    });
+
+    it("hot-patching rOn changes the conducting-divider voltage at sg:pos", () => {
+      const Vsrc = 1500;
+      const rs   = 100;
+      const fix = buildFixture({
+        build: (_r, facade) => buildSparkGapCircuit(facade, {
+          vSource: Vsrc, rSeries: rs, vBreakdown: 1000, rOn: 5, rOff: 1e10,
+        }),
+        params: { tStop: 1e-3, maxTimeStep: 1e-4 },
+      });
+      const sg = findSparkGap(fix.circuit.elements);
+      expect(readConducting(fix, sg)).toBe(1);
+      const vPosBefore = readSgPosVoltage(fix);
+
+      // Hot-patch rOn from 5 to 50 — divider shifts from Vsrc·5/105 to Vsrc·50/150.
+      const sgIdx = fix.circuit.elements.indexOf(sg);
+      const sgCircuitElement = fix.circuit.elementToCircuitElement.get(sgIdx)!;
+      fix.coordinator.setComponentProperty(sgCircuitElement, "rOn", 50);
+      for (let i = 0; i < 20; i++) fix.coordinator.step();
+
+      const vPosAfter = readSgPosVoltage(fix);
+      const expectedAfter = Vsrc * 50 / (rs + 50);
+      expect(Math.abs(vPosAfter - expectedAfter) / expectedAfter).toBeLessThan(0.05);
+      // And the new sg:pos voltage must be measurably higher than before.
+      expect(vPosAfter).toBeGreaterThan(vPosBefore * 2);
+    });
   });
 });

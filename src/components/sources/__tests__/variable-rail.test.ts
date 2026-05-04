@@ -1,30 +1,4 @@
-/**
- * Tests for the Variable Rail source component.
- *
- * §3 poison-pattern migration (2026-05-03, fix-list line 420): the previous
- * file imported `runDcOp`, `loadCtxFromFields`, `makeTestSetupContext`,
- * `setupAll`, drove `element.setup(ctx)` / `element.load(ctx)` directly
- * against hand-rolled `LoadCtxImpl` / `SparseSolver` / capture-solver mocks,
- * and asserted bit-exact `rhs[branch]` values from those mock stamps. All
- * eradicated per §3 poison-pattern warning + §4a helper deletion. Tests now
- * route through `buildFixture` against the real registered VariableRail
- * factory and read voltages off `engine.getNodeVoltage(...)`.
- *
- * The `srcfact_*` describe block (3 tests) is deleted as a category-1
- * engine-impersonator-via-capture-solver pattern: those tests asserted that
- * the variable-rail RHS stamp ignores `ctx.srcFact` (i.e. is bit-exact equal
- * to the nominal voltage at srcFact ∈ {0, 0.5, 1}). The contract is
- * observable through the engine surface — under the production DCOP source
- * stepping path, the rail node settles to the nominal voltage regardless of
- * the internal step factor; the new `dc_node_voltage_matches_set_voltage`
- * test exercises this through `coordinator.dcOperatingPoint()` /
- * `engine.getNodeVoltage()`. Bit-exact RHS stamping for ordinary voltage
- * sources is covered by the ngspice harness parity tests under
- * `src/solver/analog/__tests__/ngspice-parity/` (compared against the
- * instrumented ngspice DLL), so the variable-rail-specific srcfact carve-out
- * is a contract-level promise for any DC-OP-converged result, not an
- * RHS-row-arithmetic check.
- */
+/** Tests for the Variable Rail source component. */
 
 import { describe, it, expect } from "vitest";
 import { VariableRailDefinition } from "../variable-rail.js";
@@ -34,24 +8,11 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
-
-// ---------------------------------------------------------------------------
-// Circuit factory: VariableRail(pos) → R_bleed(pos→neg) → GND.
-//
-// VariableRail's `pos` pin is its only externally exposed node; `neg` is
-// permanently wired to ground inside the element (see variable-rail.ts:181).
-// A 1MΩ bleed resistor to GND gives the matrix a DC reference for the rail
-// node so DCOP converges; the rail node's settled voltage equals the nominal
-// rail voltage (the bleed only draws nA, well below the source stiffness).
-// ---------------------------------------------------------------------------
 
 interface VRailCircuitParams {
   voltage: number;
@@ -77,10 +38,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
 }
-
-// ===========================================================================
-// VariableRail tests
-// ===========================================================================
 
 describe("VariableRail", () => {
   it("dc_node_voltage_matches_set_voltage -- 12V rail settles to 12V at the pos node", () => {

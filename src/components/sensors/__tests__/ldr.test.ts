@@ -1,251 +1,101 @@
-/**
- * Tests for LDRElement (Light Dependent Resistor).
- *
- * Covers:
- *   - Dark resistance at lux=0
- *   - Bright resistance at reference lux
- *   - Power-law formula accuracy
- *   - Slider-adjustable lux changes resistance
- *   - Stamping behaviour
- *   - Definition metadata
- */
+/** Tests for the LDR (Light Dependent Resistor) component. */
 
 import { describe, it, expect } from "vitest";
-import { LDRElement, LDRDefinition, createLDRElement, LDR_DEFAULTS } from "../ldr.js";
+import {
+  LDRElement,
+  LDRDefinition,
+  createLDRElement,
+  LDR_DEFAULTS,
+} from "../ldr.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
+import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+
 import type { AnalogFactory } from "../../../core/registry.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
-
-// ---------------------------------------------------------------------------
-// Minimal setup context for calling element.setup() in unit tests.
-// Allocates handles into a capture solver so load() can write through them.
-// ---------------------------------------------------------------------------
-
-function makeSetupCtx(solver: SparseSolverType): SetupContext {
-  let nodeCount = 1000;
-  let stateCount = 0;
-  return {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number {
-      const off = stateCount;
-      stateCount += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Capture solver- records stamp tuples via the real allocElement/stampElement
-// API so tests can read back what load() wrote. Used where tests assert on
-// the exact matrix entries produced by a single load(ctx) call.
-// ---------------------------------------------------------------------------
-
-interface CaptureStamp { row: number; col: number; value: number; }
-interface CaptureRhs { row: number; value: number; }
-
-function makeCaptureSolver(): {
-  solver: SparseSolverType;
-  stamps: CaptureStamp[];
-  rhs: CaptureRhs[];
-} {
-  const stamps: CaptureStamp[] = [];
-  const rhs: CaptureRhs[] = [];
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    _initStructure: (_n: number) => {},
-    stampRHS: (row: number, value: number) => {
-      rhs.push({ row, value });
-    },
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
-}
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeLDR(overrides: Partial<{
+interface DividerParams {
+  vSource: number;
+  rSeries: number;
   rDark: number;
   luxRef: number;
   gamma: number;
   lux: number;
-}> = {}): LDRElement {
-  const el = new LDRElement(
-    overrides.rDark ?? 1e6,
-    overrides.luxRef ?? 1000,
-    overrides.gamma ?? 0.7,
-    overrides.lux ?? 500,
-  );
-  el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-  return el;
+  ldrLabel?: string;
 }
 
-// Call setup() on an element using a capture solver so handles are valid.
-function setupLDR(el: LDRElement, solver: SparseSolverType): void {
-  el.setup(makeSetupCtx(solver));
+/**
+ * Build a single-loop divider:
+ *   Vsrc(pos) → r1(pos)─r1─r1(neg) → ldr:pos ─ LDR ─ ldr:neg → GND ← Vsrc(neg)
+ *
+ * Steady-state observable:
+ *   V(ldr:pos) = Vsource · R_LDR / (rSeries + R_LDR)
+ * where R_LDR = rDark · (lux/luxRef)^(-gamma) for lux > 0,
+ *       R_LDR = rDark                          for lux = 0.
+ */
+function buildLDRDividerCircuit(facade: DefaultSimulatorFacade, p: DividerParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",  type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource } },
+      { id: "r1",  type: "Resistor",        props: { label: "r1", resistance: p.rSeries } },
+      { id: "ldr", type: "LDR",             props: {
+          label:  p.ldrLabel ?? "L1",
+          rDark:  p.rDark,
+          luxRef: p.luxRef,
+          gamma:  p.gamma,
+          lux:    p.lux,
+      } },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos",  "r1:pos"],
+      ["r1:neg",  "ldr:pos"],
+      ["ldr:neg", "gnd:out"],
+      ["vs:neg",  "gnd:out"],
+    ],
+  });
 }
 
-// ---------------------------------------------------------------------------
-// LDR
-// ---------------------------------------------------------------------------
+function findLDR(elements: ReadonlyArray<unknown>): LDRElement {
+  const idx = elements.findIndex((el) => el instanceof LDRElement);
+  if (idx < 0) throw new Error("LDRElement not found in compiled circuit");
+  return elements[idx] as LDRElement;
+}
+
+function nodeOf(fix: Fixture, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+function ceByLabel(fix: Fixture, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
+/** Closed-form LDR resistance: lux=0 → rDark; else rDark·(lux/luxRef)^(-gamma). */
+function ldrResistance(rDark: number, luxRef: number, gamma: number, lux: number): number {
+  if (lux <= 0) return rDark;
+  return rDark * Math.pow(lux / luxRef, -gamma);
+}
 
 describe("LDR", () => {
-  describe("dark_resistance", () => {
-    it("lux=0 returns R_dark (not power-law formula)", () => {
-      makeLDR({ rDark: 1e6, lux: 0 });
-    });
-
-    it("lux=0 with custom rDark returns that value", () => {
-      makeLDR({ rDark: 500000, lux: 0 });
-    });
-  });
-
-  describe("bright_resistance", () => {
-    it("lux equals luxRef returns rDark (power-law exponent is 1)", () => {
-      // At lux = luxRef: R = rDark * (luxRef/luxRef)^(-γ) = rDark * 1 = rDark
-      const rDark = 100; // set rDark to the expected "light" resistance
-      const luxRef = 1000;
-      makeLDR({ rDark, luxRef, gamma: 0.7, lux: luxRef });
-      // R ≈ rDark (which equals rLight at reference illumination)
-    });
-
-    it("resistance at reference lux matches expected light resistance", () => {
-      // Use rDark=100 as the calibrated light resistance at luxRef=1000
-      const rLight = 100;
-      const luxRef = 1000;
-      makeLDR({ rDark: rLight, luxRef, gamma: 0.7, lux: luxRef });
-    });
-  });
-
-  describe("power_law_correct", () => {
-    it("lux=100 with luxRef=1000, gamma=0.7 matches formula R_dark*(100/lux_ref)^(-gamma)", () => {
-      const rDark = 1e6;
-      const luxRef = 1000;
-      const gamma = 0.7;
-      const lux = 100;
-      makeLDR({ rDark, luxRef, gamma, lux });
-    });
-
-    it("lower lux gives higher resistance than at reference", () => {
-      const ldr100 = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 100 });
-      const ldr1000 = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 1000 });
-      expect(ldr100.resistance()).toBeGreaterThan(ldr1000.resistance());
-    });
-
-    it("higher lux gives lower resistance than at reference", () => {
-      const ldr5000 = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 5000 });
-      const ldr1000 = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 1000 });
-      expect(ldr5000.resistance()).toBeLessThan(ldr1000.resistance());
-    });
-  });
-
-  describe("slider_changes_resistance", () => {
-    it("changing lux via setLux changes resistance", () => {
-      const ldr = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 100 });
-      const rBefore = ldr.resistance();
-
-      ldr.setLux(5000);
-      const rAfter = ldr.resistance();
-
-      expect(rAfter).toBeLessThan(rBefore);
-    });
-
-    it("conductance is consistent with new resistance after lux change", () => {
-      const ldr = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 500 });
-
-      ldr.setLux(2000);
-      const { solver, stamps } = makeCaptureSolver();
-      setupLDR(ldr, solver);
-      const ctx = makeSimpleCtx({
-        solver,
-        elements: [ldr as unknown as AnalogElement],
-        matrixSize: 2,
-        nodeCount: 2,
-      });
-      ldr.load(ctx.loadCtx);
-
-      // Check that diagonal conductance matches expected (nodes are 1-based: pin[0]=node1, pin[1]=node2)
-      const diagStamp = stamps.find((s) => s.row === 1 && s.col === 1);
-      expect(diagStamp).toBeDefined();
-    });
-  });
-
-  describe("load", () => {
-    it("stamps conductance between the two nodes", () => {
-      const ldr = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 1000 });
-      const { solver, stamps } = makeCaptureSolver();
-      setupLDR(ldr, solver);
-      const ctx = makeSimpleCtx({
-        solver,
-        elements: [ldr as unknown as AnalogElement],
-        matrixSize: 2,
-        nodeCount: 2,
-      });
-
-      ldr.load(ctx.loadCtx);
-
-      const G = 1 / ldr.resistance();
-      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
-      expect(tuples).toContainEqual([1, 1, G]);
-      expect(tuples).toContainEqual([1, 2, -G]);
-      expect(tuples).toContainEqual([2, 1, -G]);
-      expect(tuples).toContainEqual([2, 2, G]);
-    });
-
-    it("lux=0 stamps dark conductance", () => {
-      const rDark = 1e6;
-      const ldr = makeLDR({ rDark, lux: 0 });
-      const { solver, stamps } = makeCaptureSolver();
-      setupLDR(ldr, solver);
-      const ctx = makeSimpleCtx({
-        solver,
-        elements: [ldr as unknown as AnalogElement],
-        matrixSize: 2,
-        nodeCount: 2,
-      });
-
-      ldr.load(ctx.loadCtx);
-
-      const G = 1 / rDark;
-      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
-      expect(tuples).toContainEqual([1, 1, G]);
-    });
-  });
-
   describe("definition", () => {
-    it("LDRDefinition has engine type analog", () => {
-      expect(LDRDefinition.modelRegistry?.behavioral).toBeDefined();
+    it("LDRDefinition has behavioral inline factory", () => {
+      const entry = LDRDefinition.modelRegistry?.behavioral;
+      expect(entry).toBeDefined();
+      expect(entry!.kind).toBe("inline");
     });
 
-    it("LDRDefinition has correct category", () => {
+    it("LDRDefinition category is PASSIVES", () => {
       expect(LDRDefinition.category).toBe(ComponentCategory.PASSIVES);
     });
 
@@ -258,76 +108,221 @@ describe("LDR", () => {
     it("analogFactory creates an LDRElement", () => {
       const props = new PropertyBag();
       props.replaceModelParams(LDR_DEFAULTS);
-      const element = createLDRElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
+      const pinNodes = new Map<string, number>();
+      pinNodes.set("pos", 1);
+      pinNodes.set("neg", 2);
+      const element = createLDRElement(pinNodes, props, () => 0);
       expect(element).toBeInstanceOf(LDRElement);
     });
 
-    it("branchCount is false", () => {
-      expect((LDRDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
+    it("behavioral entry has no branchCount (pure two-terminal resistor shape)", () => {
+      const entry = LDRDefinition.modelRegistry?.behavioral;
+      if (!entry || entry.kind !== "inline") throw new Error("Expected inline behavioral entry");
+      const branchCount = (entry as { kind: "inline"; factory: AnalogFactory; branchCount?: number }).branchCount;
+      expect(branchCount).toBeFalsy();
+    });
+  });
+
+  describe("resistance_shape", () => {
+    function buildElement(rDark: number, luxRef: number, gamma: number, lux: number): LDRElement {
+      const props = new PropertyBag();
+      props.replaceModelParams(LDR_DEFAULTS);
+      props.setModelParam("rDark", rDark);
+      props.setModelParam("luxRef", luxRef);
+      props.setModelParam("gamma", gamma);
+      props.setModelParam("lux", lux);
+      const pinNodes = new Map<string, number>();
+      pinNodes.set("pos", 1);
+      pinNodes.set("neg", 2);
+      const el = createLDRElement(pinNodes, props, () => 0);
+      return el as LDRElement;
+    }
+
+    it("lux=0 returns rDark (dark branch, not power law)", () => {
+      const el = buildElement(1e6, 1000, 0.7, 0);
+      expect(el.resistance()).toBe(1e6);
+    });
+
+    it("lux=0 with custom rDark returns that value", () => {
+      const el = buildElement(500_000, 1000, 0.7, 0);
+      expect(el.resistance()).toBe(500_000);
+    });
+
+    it("lux=luxRef gives R=rDark (power-law factor = 1)", () => {
+      const el = buildElement(100, 1000, 0.7, 1000);
+      expect(el.resistance()).toBeCloseTo(100, 9);
+    });
+
+    it("lower lux gives higher resistance than at reference", () => {
+      const dim = buildElement(1e6, 1000, 0.7, 100);
+      const ref = buildElement(1e6, 1000, 0.7, 1000);
+      expect(dim.resistance()).toBeGreaterThan(ref.resistance());
+    });
+
+    it("higher lux gives lower resistance than at reference", () => {
+      const bright = buildElement(1e6, 1000, 0.7, 5000);
+      const ref    = buildElement(1e6, 1000, 0.7, 1000);
+      expect(bright.resistance()).toBeLessThan(ref.resistance());
+    });
+
+    it("R(lux) matches closed-form rDark*(lux/luxRef)^(-gamma) at lux=100, luxRef=1000, gamma=0.7", () => {
+      const el = buildElement(1e6, 1000, 0.7, 100);
+      const expected = 1e6 * Math.pow(100 / 1000, -0.7);
+      expect(el.resistance()).toBeCloseTo(expected, 6);
     });
   });
 });
 
 // ---------------------------------------------------------------------------
-// ldr_load_dcop_parity- C4.1 / Task 6.2.1
+// Integration: Vsrc → R_series → LDR → GND divider on the public surface.
 //
-// LDR at 1000 lux. Default params: rDark=1e6, luxRef=100, gamma=0.7, lux=1000.
-// R(1000lux) = rDark * (lux / luxRef)^(-gamma) = 1e6 * (1000/100)^(-0.7)
-//            = 1e6 * 10^(-0.7)
-// G = 1 / R(1000lux).
-//
-// NGSPICE reference: ngspice resload.c stamps G=1/R using a single division.
-// This test constructs the element via its factory with lux=1000 and asserts
-// the diagonal stamp equals the closed-form G bit-exact.
-// Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
+// At DCOP the LDR is a pure resistor with R(lux). The divider law gives
+//   V(ldr:pos) = Vsrc · R_LDR / (rSeries + R_LDR).
+// Reading V(ldr:pos) via `engine.getNodeVoltage(labelToNodeId.get("ldr:pos"))`
+// confirms the LDR participates in the production compile + DCOP path with
+// the documented R(lux) function. Bit-exact stamp values are in the ngspice
+// harness parity suite.
 // ---------------------------------------------------------------------------
 
-describe("ldr_load_dcop_parity", () => {
-  it("LDR at 1000lux G=1/(rDark*(lux/luxRef)^(-gamma)) bit-exact", () => {
-    const props = new PropertyBag();
-    props.replaceModelParams(LDR_DEFAULTS);
-    props.setModelParam("lux", 1000);
+describe("LDR_divider_dcop", () => {
+  it("V(ldr:pos) = Vsrc · R_LDR / (rSeries + R_LDR) at lux=luxRef (R_LDR=rDark)", () => {
+    // R_LDR = rDark · (1000/1000)^(-0.7) = rDark = 1kΩ.
+    // Match rSeries to rDark for a clean 50% divider.
+    const V       = 5;
+    const rSeries = 1000;
+    const rDark   = 1000;
 
-    const core = createLDRElement(
-      new Map([["pos", 1], ["neg", 2]]),
-      props,
-      () => 0,
-    );
-    const analogElement = core as unknown as AnalogElement;
-
-    const stampCtx = makeSimpleCtx({
-      elements: [analogElement],
-      matrixSize: 2,
-      nodeCount: 2,
+    const fix = buildFixture({
+      build: (_r, facade) => buildLDRDividerCircuit(facade, {
+        vSource: V, rSeries, rDark, luxRef: 1000, gamma: 0.7, lux: 1000,
+      }),
     });
-    // Call setup() directly- element is not poolBacked so makeSimpleCtx
-    // does not call it automatically. setup() must run before load().
-    (core as unknown as LDRElement).setup(makeSetupCtx(stampCtx.solver));
-    analogElement.load(stampCtx.loadCtx);
-    const stamps = stampCtx.solver.getCSCNonZeros();
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    // NGSPICE ref: G = 1/R where R = rDark * (lux/luxRef)^(-gamma).
-    // Inline closed-form- same IEEE-754 operations as LDRElement.resistance():
-    const rDark = LDR_DEFAULTS.rDark;
-    const luxRef = LDR_DEFAULTS.luxRef;
-    const gamma = LDR_DEFAULTS.gamma;
-    const lux = 1000;
-    const R_REF = rDark * Math.pow(lux / luxRef, -gamma);
-    const NGSPICE_G_REF = 1 / R_REF;
+    const vLdrPos = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
+    const R_LDR = ldrResistance(rDark, 1000, 0.7, 1000);
+    const expected = V * R_LDR / (rSeries + R_LDR);
+    expect(vLdrPos).toBeCloseTo(expected, 6);
+  });
 
-    // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
-    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
-    expect(e00).toBeDefined();
-    expect(e00!.value).toBe(NGSPICE_G_REF);
+  it("V(ldr:pos) tracks the closed-form divider at lux=100 (dim → high R_LDR)", () => {
+    // R_LDR(lux=100, luxRef=1000, gamma=0.7) = 1e6 · (100/1000)^(-0.7) ≈ 5.012e6.
+    // With rSeries=1MΩ the divider sits well above 50%.
+    const V       = 5;
+    const rSeries = 1e6;
+    const rDark   = 1e6;
+    const luxRef  = 1000;
+    const gamma   = 0.7;
+    const lux     = 100;
 
-    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
-    expect(e11).toBeDefined();
-    expect(e11!.value).toBe(NGSPICE_G_REF);
+    const fix = buildFixture({
+      build: (_r, facade) => buildLDRDividerCircuit(facade, {
+        vSource: V, rSeries, rDark, luxRef, gamma, lux,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
 
-    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
-    expect(e01!.value).toBe(-NGSPICE_G_REF);
+    const vLdrPos = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
+    const R_LDR = ldrResistance(rDark, luxRef, gamma, lux);
+    const expected = V * R_LDR / (rSeries + R_LDR);
+    expect(vLdrPos).toBeCloseTo(expected, 6);
+  });
 
-    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
-    expect(e10!.value).toBe(-NGSPICE_G_REF);
+  it("V(ldr:pos) collapses toward 0 at lux=5000 (bright → low R_LDR)", () => {
+    // R_LDR(lux=5000) = 1e6 · 5^(-0.7) ≈ 320kΩ; with rSeries=1MΩ the divider
+    // pulls V(ldr:pos) below 25% of Vsrc.
+    const V       = 5;
+    const rSeries = 1e6;
+    const rDark   = 1e6;
+    const luxRef  = 1000;
+    const gamma   = 0.7;
+    const lux     = 5000;
+
+    const fix = buildFixture({
+      build: (_r, facade) => buildLDRDividerCircuit(facade, {
+        vSource: V, rSeries, rDark, luxRef, gamma, lux,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+
+    const vLdrPos = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
+    const R_LDR = ldrResistance(rDark, luxRef, gamma, lux);
+    const expected = V * R_LDR / (rSeries + R_LDR);
+    expect(vLdrPos).toBeCloseTo(expected, 6);
+    expect(vLdrPos).toBeLessThan(V * 0.25);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hot-loadable `lux`: setComponentProperty observable contract.
+//
+// The LDR's `lux` is a slider-driven runtime parameter. Mutating it via
+// `coordinator.setComponentProperty(ce, "lux", value)` must propagate into
+// the element's `_p.lux` (via `setParam`) so the next DCOP picks up the new
+// R(lux). This is the same contract diode `IS`/`N` exercises and the
+// project-wide "all model params hot-loadable via setParam" requirement.
+// ---------------------------------------------------------------------------
+
+describe("LDR_lux_hotloadable", () => {
+  it("setComponentProperty('lux', higher) lowers R_LDR and lowers V(ldr:pos)", () => {
+    const V       = 5;
+    const rSeries = 1e6;
+    const rDark   = 1e6;
+    const luxRef  = 1000;
+    const gamma   = 0.7;
+
+    const fix = buildFixture({
+      build: (_r, facade) => buildLDRDividerCircuit(facade, {
+        vSource: V, rSeries, rDark, luxRef, gamma, lux: 100, // dim
+      }),
+    });
+
+    const before = fix.coordinator.dcOperatingPoint()!;
+    expect(before.converged).toBe(true);
+    const vBefore = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
+    const expectedBefore = V * ldrResistance(rDark, luxRef, gamma, 100)
+                         / (rSeries + ldrResistance(rDark, luxRef, gamma, 100));
+    expect(vBefore).toBeCloseTo(expectedBefore, 6);
+
+    // Bump lux up by 50× — R_LDR shrinks by a factor of 50^0.7 ≈ 16.
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "lux", 5000);
+
+    const after = fix.coordinator.dcOperatingPoint()!;
+    expect(after.converged).toBe(true);
+    const vAfter = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
+    const expectedAfter = V * ldrResistance(rDark, luxRef, gamma, 5000)
+                        / (rSeries + ldrResistance(rDark, luxRef, gamma, 5000));
+    expect(vAfter).toBeCloseTo(expectedAfter, 6);
+    expect(vAfter).toBeLessThan(vBefore);
+  });
+
+  it("setComponentProperty('lux', 0) returns the dark-branch resistance R=rDark", () => {
+    const V       = 5;
+    const rSeries = 1e6;
+    const rDark   = 1e6;
+    const luxRef  = 1000;
+    const gamma   = 0.7;
+
+    const fix = buildFixture({
+      build: (_r, facade) => buildLDRDividerCircuit(facade, {
+        vSource: V, rSeries, rDark, luxRef, gamma, lux: 1000, // ref
+      }),
+    });
+
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "lux", 0);
+
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const vLdrPos = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
+    // lux=0 takes the dark branch in resistance(): R_LDR = rDark.
+    const expected = V * rDark / (rSeries + rDark);
+    expect(vLdrPos).toBeCloseTo(expected, 6);
+
+    // Sanity: also check the in-circuit element's resistance() reads rDark.
+    const ldr = findLDR(fix.circuit.elements);
+    expect(ldr.resistance()).toBe(rDark);
   });
 });

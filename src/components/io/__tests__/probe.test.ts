@@ -1,14 +1,4 @@
-/**
- * Tests for the Probe component.
- *
- * Covers:
- *   - executeProbe: copies input to output/storage slot
- *   - Pin layout: one input, one output (storage slot)
- *   - probeMode and intFormat properties
- *   - Rendering: circle symbol + label
- *   - Attribute mapping: Label, Bits, intFormat, ProbeMode
- *   - ComponentDefinition completeness
- */
+/** Tests for the Probe component. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -23,10 +13,10 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
-import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
-import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -104,6 +94,29 @@ function makeProbe(overrides?: {
   props.set("intFormat", overrides?.intFormat ?? "hex");
   props.set("probeMode", overrides?.probeMode ?? "VALUE");
   return new ProbeElement("test-probe-001", { x: 0, y: 0 }, 0, false, props);
+}
+
+// ---------------------------------------------------------------------------
+// Analog circuit factory: VS=v → Probe:in. Probe is single-pin and a pure
+// voltage-measurement sink, so VS:pos drives probe:in directly and the
+// expected V(probe:in) = v.
+// ---------------------------------------------------------------------------
+
+function buildProbeProbingVsource(facade: DefaultSimulatorFacade, vSource: number): Circuit {
+  return facade.build({
+    components: [
+      // The probe registers a "behavioral" analog factory; selecting it
+      // explicitly mirrors what the property panel does when a user routes
+      // the Probe into the analog partition (LED-style hybrid pattern).
+      { id: "probe", type: "Probe",            props: { label: "probe", model: "behavioral", bitWidth: 1 } },
+      { id: "vs",    type: "DcVoltageSource",  props: { label: "vs",    voltage: vSource } },
+      { id: "gnd",   type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "probe:in"],
+      ["vs:neg", "gnd:out"],
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -364,71 +377,22 @@ describe("Probe", () => {
   // ---------------------------------------------------------------------------
 
   describe("AnalogProbe", () => {
-    it("stamp_is_noop calls no solver methods", () => {
-      const props = new PropertyBag();
-      const allocCalls: [number, number][] = [];
-      const stampElementCalls: [number, number][] = [];
-      const stampRHSCalls: [number, number][] = [];
-
-      const captureSolver = {
-        allocElement: (row: number, col: number): number => { allocCalls.push([row, col]); return 0; },
-        stampElement: (handle: number, value: number): void => { stampElementCalls.push([handle, value]); },
-        stampRHS: (row: number, value: number): void => { stampRHSCalls.push([row, value]); },
-      } as unknown as SparseSolverType;
-
-      const ctx = loadCtxFromFields({
-        solver: captureSolver,
-        matrix: captureSolver,
-        rhs: new Float64Array(8),
-        rhsOld: new Float64Array(8),
-        time: 0,
-        cktMode: MODEDCOP | MODEINITFLOAT,
-        dt: 0,
-        method: "trapezoidal",
-        order: 1,
-        deltaOld: [0, 0, 0, 0, 0, 0, 0],
-        ag: new Float64Array(7),
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        convergenceCollector: null,
-        xfact: 1,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        temp: 300.15,
-        vt: 0.025852,
-        cktFixLimit: false,
-        bypass: false,
-        voltTol: 1e-6,
+    it("reads_node_voltage returns voltage at the wired-up node (V_source = V_probe_in)", () => {
+      // Circuit: VS(4.72V):pos → Probe:in ; VS:neg → GND.
+      // Probe is a single-pin pure-measurement sink that contributes no MNA
+      // stamp (load() is empty). The voltage at the probe's "in" pin is
+      // therefore exactly the source's pos-side voltage = 4.72V at DC.
+      const fix = buildFixture({
+        build: (_r, facade) => buildProbeProbingVsource(facade, 4.72),
       });
+      const dc = fix.coordinator.dcOperatingPoint();
+      expect(dc).not.toBeNull();
+      expect(dc!.converged).toBe(true);
 
-      const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
-        new Map([["in", 3]]),
-        props,
-        () => 0,
-      );
-
-      analogElement.load(ctx);
-
-      expect(allocCalls).toHaveLength(0);
-      expect(stampElementCalls).toHaveLength(0);
-      expect(stampRHSCalls).toHaveLength(0);
-    });
-
-    it("reads_node_voltage returns voltage at node index", () => {
-      const props = new PropertyBag();
-      const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
-        new Map([["in", 3]]),
-        props,
-        () => 0,
-      );
-
-      const voltages = new Float64Array(5);
-      voltages[3] = 4.72;
-
-      const voltage = (analogElement as any).getVoltage(voltages);
-      expect(voltage).toBe(4.72);
+      const probeNode = fix.circuit.labelToNodeId.get("probe:in");
+      expect(probeNode).not.toBeUndefined();
+      const vProbe = fix.engine.getNodeVoltage(probeNode!);
+      expect(vProbe).toBeCloseTo(4.72, 6);
     });
 
     it("definition_has_engine_type_both", () => {

@@ -1,70 +1,8 @@
-/**
- * Tests for the 555 Timer IC composite analog model.
- *
- * Test handling per A1 ssTest handling rule (spec/architectural-alignment.md ssA1):
- *   - Post-load observable state (engine-agnostic, node voltages): KEPT
- *   - Parameter-plumbing (setParam on vDrop, rDischarge): KEPT
- *   - Engine-agnostic interface contracts: KEPT
- *   Timer555 parity (C4.5)::timer555_load_transient_parity
- *                                                bit-exact stamp assertions with
- *                                                 hand-computed NGSPICE_* expected values
- *
- * Kept tests:
- *   Timer555::internal_divider_voltages          observable node voltage (CTRL = 2/3 VCC)
- *                                                 via runDcOp; engine-agnostic.
- *   Astable::oscillates_at_correct_frequency     transient observable (transition count)
- *   Astable::duty_cycle                          transient observable (time-weighted)
- *   Monostable::pulse_width                      transient observable (pulse timing)
- *   Monostable::retrigger_ignored_during_pulse   transient observable (pulse width bound)
- *
- * Astable circuit:
- *   VCC=5V  R1  node_a  R2  node_b(THR=TRIG)  C  GND
- *   DIS connected to node_a (between R1 and R2)
- *   OUT connected to node_out
- *   CTRL connected to node_ctrl (floating via internal divider)
- *   RST connected to VCC
- *
- * The voltage divider inside the 555 sets CTRL  2/3 VCC = 3.33V.
- * Charging: through R1+R2, from 1/3 VCC to 2/3 VCC.
- * Discharging: through R2 (DIS discharges through R2), from 2/3 VCC to 1/3 VCC.
- * f = 1.44 / ((R1 + 2·R2) · C)
- * duty = (R1 + R2) / (R1 + 2·R2)
- */
+/** Tests for the Timer555 component. */
 
 import { describe, it, expect } from "vitest";
-import { Timer555Definition } from "../timer-555.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { createDefaultRegistry } from "../../register-all.js";
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const TIMER555_MODEL_PARAM_KEYS = new Set(["vDrop", "rDischarge"]);
-
-function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
-  const modelParams: Record<string, number> = { vDrop: 1.5, rDischarge: 10 };
-  const staticEntries: [string, number | string][] = [["model", "bipolar"]];
-  for (const [k, v] of Object.entries(overrides)) {
-    if (TIMER555_MODEL_PARAM_KEYS.has(k)) {
-      modelParams[k] = v as number;
-    } else {
-      staticEntries.push([k, v]);
-    }
-  }
-  const bag = new PropertyBag(staticEntries);
-  bag.replaceModelParams(modelParams);
-  return bag;
-}
 
 // ---------------------------------------------------------------------------
 // Timer555 unit tests  observable DC operating point
@@ -73,7 +11,7 @@ function makeProps(overrides: Record<string, number | string> = {}): PropertyBag
 describe("Timer555", () => {
   it("internal_divider_voltages", () => {
     /**
-     * Facade migration: DC-OP only. VCC=5V fixed, CTRL floating.
+     * DC-OP only. VCC=5V fixed, CTRL floating.
      * Internal divider sets CTRL ≈ 2/3 VCC = 3.333V ±1%.
      *
      * Circuit: DcVoltageSource(vcc) + Timer555(t) + Ground.
@@ -132,7 +70,7 @@ describe("Timer555", () => {
 
 
 /**
- * Facade helper: build the astable 555 circuit.
+ * Build the astable 555 circuit.
  * VCC → R1 → node_a(DIS) → R2 → node_b(THR=TRIG) → C → GND
  * OUT connected to labeled "out" resistor probe (high-Z, 1MΩ to GND).
  */
@@ -181,7 +119,7 @@ function buildAstableFacade(R1: number, R2: number, C: number, VCC: number): {
 describe("Astable", () => {
   it("oscillates_at_correct_frequency", async () => {
     /**
-     * Facade migration: sample OUT at 500 points per period over 6.5 periods,
+     * Sample OUT at 500 points per period over 6.5 periods,
      * count threshold crossings in the last 5 periods.
      * Expected: f = 1.44/((R1+2R2)·C) ≈ 6.857 Hz ±10%.
      */
@@ -237,7 +175,7 @@ describe("Astable", () => {
 
   it("duty_cycle", async () => {
     /**
-     * Facade migration: sample OUT at fine resolution, accumulate time-weighted
+     * Sample OUT at fine resolution, accumulate time-weighted
      * duty over 5 steady-state periods.
      * Expected duty = (R1+R2)/(R1+2R2) = 11/21 ≈ 52.38% ±5%.
      */
@@ -297,7 +235,7 @@ describe("Astable", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Facade helper: build the monostable 555 circuit.
+ * Build the monostable 555 circuit.
  * VCC → R → THR(=DIS) → C → GND. TRIG driven by labeled DcVoltageSource "trig".
  * OUT readable via "t:OUT".
  */
@@ -348,7 +286,7 @@ function buildMonostableFacade(R: number, Cval: number, VCC: number): {
 describe("Monostable", () => {
   it("pulse_width", async () => {
     /**
-     * Facade migration: monostable 555.
+     * Monostable 555.
      * 1. Compile circuit with TRIG=VCC (idle).
      * 2. Set TRIG=0.5V, advance one small step to fire comparator.
      * 3. Release TRIG=VCC.
@@ -412,7 +350,7 @@ describe("Monostable", () => {
 
   it("retrigger_ignored_during_pulse", async () => {
     /**
-     * Facade migration: standard 555 retrigger immunity.
+     * Standard 555 retrigger immunity.
      * Applying a second trigger during the output pulse must NOT extend it.
      * Strategy: step through 3 phases using stepToTime + setSignal.
      *   Phase 1: trigger, advance tiny step.

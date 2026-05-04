@@ -1,29 +1,4 @@
-/**
- * Tests for the ADC (Analog-to-Digital Converter) component.
- *
- * §4c migration: all tests route through `buildFixture`, drive via
- * `coordinator.step()` / `coordinator.dcOperatingPoint()`, and read
- * observable state from the ADCDriverElement's pool slots. No direct
- * element.setup() / element.load() / element.accept() calls, no hand-rolled
- * contexts or state pools.
- *
- * Circuit topology (8-bit, unipolar-instant):
- *   clk  (DcVoltageSource, label "clk")  → adc:CLK
- *   vin  (DcVoltageSource, label "vin")  → adc:VIN
- *   vref (DcVoltageSource, label "vref", voltage=5) → adc:VREF
- *   gnd  → adc:GND
- *
- * Observable surface:
- *   findDriver(fix.circuit.elements) → ADCDriverElement (instanceof)
- *   latchedCode = pool.state0[drv._stateBase + SLOT_OUTPUT_CODE]
- *   eocActive   = pool.state0[drv._stateBase + SLOT_OUTPUT_EOC] !== 0
- *
- * Rising-edge protocol:
- *   1. Build with clk.voltage = 0 (low), step once (warm-start).
- *   2. facade.setSignal(coordinator, "clk", vHigh) to go high.
- *   3. coordinator.step() — ADC detects rising edge, latches code.
- *   4. Read latchedCode / eocActive from pool.
- */
+/** Tests for the ADC (Analog-to-Digital Converter) component. */
 
 import { describe, it, expect } from "vitest";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
@@ -31,20 +6,11 @@ import { ADCDriverElement } from "../adc-driver.js";
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const BITS = 8;
 const V_REF = 5.0;
 const MAX_CODE = (1 << BITS) - 1; // 255
 const V_IH_DEFAULT = 2.0;
 const V_IL_DEFAULT = 0.8;
-
-// ---------------------------------------------------------------------------
-// Pool slot indices (from ADCDriverElement's schema, 8-bit)
-// imported at test construction time via the schema the element carries.
-// ---------------------------------------------------------------------------
 
 function getSlots(drv: ADCDriverElement): { outputCode: number; outputEoc: number } {
   return {
@@ -52,10 +18,6 @@ function getSlots(drv: ADCDriverElement): { outputCode: number; outputEoc: numbe
     outputEoc:  drv.stateSchema.indexOf.get("OUTPUT_EOC")!,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Circuit factory
-// ---------------------------------------------------------------------------
 
 interface AdcCircuitParams {
   vIn?: number;
@@ -106,19 +68,11 @@ function buildAdcCircuit(facade: DefaultSimulatorFacade, p: AdcCircuitParams): C
   });
 }
 
-// ---------------------------------------------------------------------------
-// Element finder
-// ---------------------------------------------------------------------------
-
 function findDriver(elements: ReadonlyArray<unknown>): ADCDriverElement {
   const el = elements.find((e) => e instanceof ADCDriverElement);
   if (el === undefined) throw new Error("ADCDriverElement not found in compiled circuit");
   return el as ADCDriverElement;
 }
-
-// ---------------------------------------------------------------------------
-// Observable ADC state helpers
-// ---------------------------------------------------------------------------
 
 function readLatchedCode(fix: ReturnType<typeof buildFixture>): number {
   const drv = findDriver(fix.circuit.elements);
@@ -132,14 +86,6 @@ function readEocActive(fix: ReturnType<typeof buildFixture>): boolean {
   return fix.pool.state0[drv._stateBase + outputEoc] !== 0;
 }
 
-/**
- * Apply a rising clock edge in the real circuit.
- *
- * Steps:
- *   1. Fixture is already warm-started with CLK low.
- *   2. Set CLK to vHigh via facade.setSignal.
- *   3. coordinator.step() — engine runs one transient step, ADC detects edge.
- */
 function applyRisingEdge(
   fix: ReturnType<typeof buildFixture>,
   vHigh: number = V_IH_DEFAULT + 0.1,
@@ -147,10 +93,6 @@ function applyRisingEdge(
   fix.facade.setSignal(fix.coordinator, "clk", vHigh);
   fix.coordinator.step();
 }
-
-// ---------------------------------------------------------------------------
-// ADC tests
-// ---------------------------------------------------------------------------
 
 describe("ADC", () => {
   it("midscale_input", () => {

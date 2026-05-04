@@ -1,19 +1,4 @@
-/**
- * Tests for Switch, SwitchDT components (and PlainSwitch/PlainSwitchDT aliases).
- *
- * Covers:
- *   - Open/close state correctly reflected in isClosed()
- *   - SPDT routing: correct terminal connectivity declarations
- *   - Pin declarations: correct count, labels, directions for SPST and SPDT
- *   - executeSwitch/executeSwitchDT write closed flag into state (bus resolver)
- *   - normallyClosed inverts the effective closed state
- *   - Attribute mappings: .dig XML attributes convert correctly
- *   - Rendering: contact arm lines, dashed lever
- *   - ComponentDefinition completeness for Switch and SwitchDT
- *   - Registry alias: PlainSwitch → Switch, PlainSwitchDT → SwitchDT
- *   - New properties: Ron, Roff, momentary, normallyClosed
- *   - Analog factories: conductance stamping, setClosed()
- */
+/** Tests for Switch and SwitchDT components. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -36,10 +21,6 @@ import type { PropertyValue } from "../../../core/properties.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
-// ---------------------------------------------------------------------------
-// Helpers- ComponentLayout mock
-// ---------------------------------------------------------------------------
-
 function makeLayout(
   inputCount: number,
   outputCount: number = 1,
@@ -59,10 +40,6 @@ function makeLayout(
 function makeState(size: number): Uint32Array {
   return new Uint32Array(size);
 }
-
-// ---------------------------------------------------------------------------
-// Helpers- RenderContext mock
-// ---------------------------------------------------------------------------
 
 interface DrawCall {
   method: string;
@@ -98,10 +75,6 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 
   return { ctx, calls };
 }
-
-// ---------------------------------------------------------------------------
-// Factory helpers
-// ---------------------------------------------------------------------------
 
 function makeSwitch(overrides?: {
   poles?: number;
@@ -142,15 +115,7 @@ function makeSwitchDT(overrides?: {
   return new SwitchDTElement("test-swdt-001", { x: 0, y: 0 }, 0, false, props);
 }
 
-// ===========================================================================
-// Switch tests (SPST)
-// ===========================================================================
-
 describe("Switch", () => {
-  // -------------------------------------------------------------------------
-  // Open/close state
-  // -------------------------------------------------------------------------
-
   describe("openCloseState", () => {
     it("default Switch is open", () => {
       const sw = makeSwitch();
@@ -163,10 +128,6 @@ describe("Switch", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // switchActsAsInput property
-  // -------------------------------------------------------------------------
-
   describe("switchActsAsInput", () => {
     it("default switchActsAsInput is false", () => {
       const sw = makeSwitch();
@@ -178,10 +139,6 @@ describe("Switch", () => {
       expect(sw.switchActsAsInput()).toBe(true);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // New properties: momentary, normallyClosed
-  // -------------------------------------------------------------------------
 
   describe("newProperties", () => {
     it("SwitchDefinition propertyDefs include Ron", () => {
@@ -221,10 +178,6 @@ describe("Switch", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Pin layout
-  // -------------------------------------------------------------------------
-
   describe("pinLayout", () => {
     it("1-pole Switch has 2 BIDIRECTIONAL pins", () => {
       const sw = makeSwitch({ poles: 1 });
@@ -247,10 +200,6 @@ describe("Switch", () => {
       expect(labels).toContain("B1");
     });
   });
-
-  // -------------------------------------------------------------------------
-  // executeSwitch- writes closed flag to state
-  // -------------------------------------------------------------------------
 
   describe("executeFn", () => {
     it("executeSwitch writes 1 to state when closed=true", () => {
@@ -287,10 +236,6 @@ describe("Switch", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-
   describe("rendering", () => {
     it("closed Switch draw() calls drawLine at least once", () => {
       const sw = makeSwitch({ closed: true });
@@ -319,10 +264,6 @@ describe("Switch", () => {
       expect(calls.filter((c) => c.method === "setLineDash").length).toBeGreaterThanOrEqual(2);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Attribute mapping
-  // -------------------------------------------------------------------------
 
   describe("attributeMapping", () => {
     it("SwitchActsAsInput=true maps to switchActsAsInput=true", () => {
@@ -368,10 +309,6 @@ describe("Switch", () => {
       expect(mapping!.convert("true")).toBe(true);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
 
   describe("definitionComplete", () => {
     it("SwitchDefinition has name='Switch'", () => {
@@ -427,15 +364,7 @@ describe("Switch", () => {
   });
 });
 
-// ===========================================================================
-// SwitchDT tests (SPDT)
-// ===========================================================================
-
 describe("SwitchDT", () => {
-  // -------------------------------------------------------------------------
-  // SPDT routing
-  // -------------------------------------------------------------------------
-
   describe("spdtRouting", () => {
     it("default SwitchDT is open", () => {
       const sw = makeSwitchDT();
@@ -447,10 +376,6 @@ describe("SwitchDT", () => {
       expect(sw.isClosed()).toBe(true);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // New properties: Ron, Roff, momentary, normallyClosed
-  // -------------------------------------------------------------------------
 
   describe("newProperties", () => {
     it("SwitchDTDefinition propertyDefs include Ron", () => {
@@ -469,10 +394,6 @@ describe("SwitchDT", () => {
       expect(SwitchDTDefinition.propertyDefs.map((d) => d.key)).toContain("normallyClosed");
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Pin layout- SPDT: 3 pins per pole (A, B, C)
-  // -------------------------------------------------------------------------
 
   describe("pinLayout", () => {
     it("1-pole SwitchDT has 3 pins", () => {
@@ -512,10 +433,6 @@ describe("SwitchDT", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // executeSwitchDT- writes closed flag to state
-  // -------------------------------------------------------------------------
-
   describe("executeFn", () => {
     it("executeSwitchDT writes 1 to state when closed=true", () => {
       const layout = makeLayout(0, 0, { closed: true, normallyClosed: false });
@@ -550,10 +467,6 @@ describe("SwitchDT", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-
   describe("rendering", () => {
     it("draw() calls drawLine at least once", () => {
       const sw = makeSwitchDT();
@@ -586,10 +499,6 @@ describe("SwitchDT", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Attribute mapping
-  // -------------------------------------------------------------------------
-
   describe("attributeMapping", () => {
     it("Bits=8 maps to bitWidth=8", () => {
       const mapping = SWITCH_DT_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
@@ -617,10 +526,6 @@ describe("SwitchDT", () => {
       expect(mapping!.convert("true")).toBe(true);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
 
   describe("definitionComplete", () => {
     it("SwitchDTDefinition has name='SwitchDT'", () => {
@@ -666,10 +571,6 @@ describe("SwitchDT", () => {
     });
   });
 });
-
-// ===========================================================================
-// Registry alias tests
-// ===========================================================================
 
 describe("RegistryAliases", () => {
   it("PlainSwitch alias resolves to Switch definition", () => {
@@ -719,35 +620,9 @@ describe("RegistryAliases", () => {
   });
 });
 
-// ===========================================================================
-// Analog Switch + SwitchDT tests- §4c migration, 2026-05-03
-//
-// The previous engine-impersonator block (`AnalogSwitch` / `AnalogSPDT`)
-// drove `el.setup(ctx)` and `el.load(ctx)` directly through hand-rolled
-// SetupContext/LoadContext mocks and asserted on the private SparseSolver
-// `_getInsertionOrder()` shape (TSTALLOC PP/PN/NP/NN sequence). That is a
-// §4 violation (no test calls element.setup()/element.load() directly) and
-// a §3 poison pattern (matrix-handle order is an engine-internal contract
-// already covered bit-exact by the ngspice harness). Per the §4a precedent
-// for inductor/capacitor, those engine-impersonator tests are deleted. In
-// their place: behavioural circuits routed through `buildFixture` that
-// observe Ron / Roff / NC inversion via DC operating-point node voltages.
-//
-// Integration test (`switched_resistor_divider`) is migrated 1:1 onto the
-// public surface: `buildFixture({ build })` + `coordinator.dcOperatingPoint()`
-// + `engine.getNodeVoltage(...)`.
-// ===========================================================================
-
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-
-// ---------------------------------------------------------------------------
-// Circuit factories. SPST (Switch) and SPDT (SwitchDT) both expose the
-// `behavioral` analog model entry; setting `model: "behavioral"` overrides
-// the digital `defaultModel` so the analog factory wires into the unified
-// compiler. Ron / Roff plumb through the property bag.
-// ---------------------------------------------------------------------------
 
 interface SpstDividerParams {
   vSource: number;
@@ -933,13 +808,6 @@ describe("AnalogSPDT", () => {
     expect(vC).toBeCloseTo(10 * 1000 / 1001, 3);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Integration- switched resistor divider via the public engine surface.
-// 10V → Switch (closed, Ron=1Ω) → 1kΩ → GND. V across R = 10·1000/1001 ≈ 9.99V.
-// (Replaces the previous makeSimpleCtx / solveDcOp / hand-rolled-elements
-// approach; semantics-preserving 1:1 migration.)
-// ---------------------------------------------------------------------------
 
 describe("Integration", () => {
   it("switched_resistor_divider", () => {

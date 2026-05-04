@@ -1,24 +1,4 @@
-/**
- * Tests for the AnalogDiode component.
- *
- * §3 / §4 contract: every simulation-driven test routes through `buildFixture`
- * + the public coordinator/engine surface. No direct `setup()`/`load()`
- * drives, no hand-rolled `LoadContext` / `StatePool` / `SparseSolver`, no
- * private-engine field tunneling. Bit-exact stamp / matrix-cell / pool-slot
- * peeks against hand-computed ngspice formulas are owned by the harness
- * parity suite at `src/solver/analog/__tests__/ngspice-parity/`.
- *
- * Surface-level coverage retained:
- *   - Definition / param-defs / defaults factory probes (no engine drive).
- *   - Pure-function unit tests: `dioTemp`, IBV knee, computeJunctionCapacitance.
- *   - DC-OP integration: `buildFixture` + diode + resistor + Vsrc → assert
- *     V(diode) and I(diode) against ngspice reference (closed-form, not stamps).
- *   - `setParam` / `coordinator.setComponentProperty` observable contract:
- *     mutating IS or N shifts the converged DC-OP voltage.
- *   - AREA scaling: observable through DC-OP at fixed Vd via voltage source.
- *   - Pre-init `_stateBase = -1` factory probe (UC-7 retention pattern).
- *   - Static import-graph assertion: no integrateCapacitor in production.
- */
+/** Tests for the AnalogDiode component. */
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -39,10 +19,6 @@ import type { AnalogFactory } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { CircuitElement } from "../../../core/element.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
 function expectSpiceRef(actual: number, expected: number, label: string): void {
@@ -108,10 +84,6 @@ function ceByLabel(fix: Fixture, label: string): CircuitElement {
   throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
-// ---------------------------------------------------------------------------
-// Diode definition / factory probes (Category F: no engine drive)
-// ---------------------------------------------------------------------------
-
 describe("Diode", () => {
   it("definition_has_correct_fields", () => {
     expect(DiodeDefinition.name).toBe("Diode");
@@ -123,10 +95,6 @@ describe("Diode", () => {
   });
 
   it("factory_returns_element_with_stateBase_minus_one_before_compile", () => {
-    // UC-7 retention: pre-compile element holds `_stateBase = -1` and
-    // `branchIndex = -1`. These are only set by `setup()` during compile.
-    // Pin map authored via Map.set() rather than array-of-tuples so the
-    // banned-pattern linter doesn't false-positive on the diode's anode key.
     const props = makeParamBag({});
     const pinNodes = new Map<string, number>();
     pinNodes.set("A", 1);
@@ -136,10 +104,6 @@ describe("Diode", () => {
     expect(el.branchIndex).toBe(-1);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Integration: diode + resistor DC operating point — observable surface
-// ---------------------------------------------------------------------------
 
 describe("Integration", () => {
   it("diode_resistor_dc_op", () => {
@@ -159,10 +123,6 @@ describe("Integration", () => {
     expectSpiceRef((vSource - vAnode) / 1000, 4.307675e-03, "I(diode)");
   });
 });
-
-// ---------------------------------------------------------------------------
-// setParam / coordinator.setComponentProperty observable contract
-// ---------------------------------------------------------------------------
 
 describe("setParam mutates params object (not captured locals)", () => {
   it("setParam('IS', 1e-11) shifts DC OP to match SPICE reference", () => {
@@ -205,10 +165,6 @@ describe("setParam mutates params object (not captured locals)", () => {
     expectSpiceRef((5 - vAfter) / 1000, 3.623504e-03, "I(diode) after N=2");
   });
 });
-
-// ---------------------------------------------------------------------------
-// dioTemp temperature scaling — pure-function unit tests
-// ---------------------------------------------------------------------------
 
 describe("dioTemp temperature scaling", () => {
   const REFTEMP = 300.15;
@@ -279,10 +235,6 @@ describe("dioTemp temperature scaling", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// IBV knee iteration — pure-function unit test
-// ---------------------------------------------------------------------------
-
 describe("IBV knee iteration", () => {
   it("tBV satisfies knee equation: tIS*(exp((BV-tBV)/(NBV*vt))-1) ≈ IBV", () => {
     const BV = 5.0;
@@ -297,10 +249,6 @@ describe("IBV knee iteration", () => {
     expect(Math.abs(residual) / IBV).toBeLessThan(1e-6);
   });
 });
-
-// ---------------------------------------------------------------------------
-// AREA scaling — observable through DC-OP via voltage source
-// ---------------------------------------------------------------------------
 
 describe("AREA scaling", () => {
   /**
@@ -353,15 +301,8 @@ describe("AREA scaling", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Static import-graph assertion — pure source-text probe
-// ---------------------------------------------------------------------------
-
 describe("integration", () => {
   it("no_integrateCapacitor_import", () => {
-    // Static import-graph assertion: diode.ts must not import
-    // integrateCapacitor / integrateInductor (those are vestigial helpers
-    // replaced by the inline NIintegrate path).
     const src = readFileSync(
       resolvePath(__dirname, "../diode.ts"),
       "utf8",
@@ -370,16 +311,6 @@ describe("integration", () => {
     expect(src).not.toMatch(/integrateInductor/);
   });
 });
-
-// ---------------------------------------------------------------------------
-// computeJunctionCharge / computeJunctionCapacitance — pure-function probe
-// ---------------------------------------------------------------------------
-//
-// The diode.ts module exports computeJunctionCharge and
-// computeJunctionCapacitance for use by other components (e.g. tunnel-diode,
-// LED). A single closed-form sanity check pins the contract that these
-// helpers are reachable from the public export surface.
-// ---------------------------------------------------------------------------
 
 describe("computeJunctionCapacitance / computeJunctionCharge public exports", () => {
   it("computeJunctionCapacitance returns 0 when CJO=0", () => {
@@ -402,10 +333,6 @@ describe("computeJunctionCapacitance / computeJunctionCharge public exports", ()
     expect(q2).toBeGreaterThan(q1);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Diode TEMP — per-instance operating temperature
-// ---------------------------------------------------------------------------
 
 describe("Diode TEMP", () => {
   it("TEMP_default_300_15", () => {
@@ -471,10 +398,6 @@ describe("Diode TEMP", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// DIODE_PARAM_DEFS partition layout
-// ---------------------------------------------------------------------------
-
 describe("DIODE_PARAM_DEFS partition layout", () => {
   it("AREA, TEMP, OFF, IC have partition === 'instance'", () => {
     const instanceKeys = ["AREA", "TEMP", "OFF", "IC"];
@@ -494,10 +417,6 @@ describe("DIODE_PARAM_DEFS partition layout", () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// DIODE_PARAM_DEFAULTS unchanged
-// ---------------------------------------------------------------------------
 
 describe("DIODE_PARAM_DEFAULTS unchanged", () => {
   it("preserves all default values", () => {

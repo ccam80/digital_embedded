@@ -1,20 +1,4 @@
-/**
- * Tests for the Capacitor component.
- *
- * §4c gap-fill (2026-05-03): all engine-impersonator tests that drove
- * `element.load(ctx)` directly with hand-built `LoadContext` and asserted
- * bit-exact `ag[]`-coefficient or pool-slot stamping have been deleted.
- * Bit-exact per-NR-iteration parity is covered by the ngspice comparison
- * harness (`harness_*` MCP tools, `src/solver/analog/__tests__/ngspice-parity/*`).
- *
- * Remaining coverage in this file:
- *   - Component definition / pinLayout / attributeMapping smoke tests
- *   - Property-bag / temperature-coefficient / M-multiplicity factory checks
- *   - State-pool contract: `_stateBase = -1` before compiler assigns it
- *   - RC transient response: closed-form `V * (1 - exp(-t/τ))` step response
- *     verified through `buildFixture` + `coordinator.step()`. Validates
- *     observable RC behaviour without reaching past the engine boundary.
- */
+/** Tests for the Capacitor component. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -30,18 +14,11 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
-
-// ---------------------------------------------------------------------------
-// definition smoke tests
-// ---------------------------------------------------------------------------
 
 describe("Capacitor", () => {
   describe("definition", () => {
@@ -94,10 +71,6 @@ describe("Capacitor", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Temperature coefficients TC1, TC2, TNOM, SCALE
-// ---------------------------------------------------------------------------
-
 describe("Capacitor temperature coefficients", () => {
   it("TC1_zero_TNOM_room_temp_gives_nominal_capacitance", () => {
     // dT=0 → factor=1, C_eff = C_nom * SCALE * M = C_nom
@@ -130,10 +103,6 @@ describe("Capacitor temperature coefficients", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// M multiplicity multiplies C (parallel capacitors = higher C)
-// ---------------------------------------------------------------------------
-
 describe("Capacitor M multiplicity", () => {
   it("M2_doubles_effective_capacitance", () => {
     const props = new PropertyBag();
@@ -154,10 +123,6 @@ describe("Capacitor M multiplicity", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// RC transient response (closed-form parity, observed through public surface)
-// ---------------------------------------------------------------------------
-//
 // Circuit: VS=1V → R=1kΩ → C=1µF → GND.
 // Time constant τ = R*C = 1 ms.
 //
@@ -165,7 +130,6 @@ describe("Capacitor M multiplicity", () => {
 //   V_C(t) = Vsrc * (1 - exp(-t/τ))
 //
 // At t = τ, V_C ≈ Vsrc * (1 - exp(-1)) ≈ 0.63212 V.
-// We assert V_C at t≈τ matches the closed-form value to 1e-3 relative tol.
 
 interface RcCircuitParams {
   vSource: number;

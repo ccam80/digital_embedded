@@ -1,35 +1,4 @@
-/**
- * JFET tests — migrated to §4 contract (2026-05-03).
- *
- * Per `spec/architectural-alignment.md` §A1 test-handling rule, the vast
- * majority of pre-port JFET tests have been deleted (hand-computed expected
- * values on intermediate state, banned `Math.min(expArg, 80)` clamp, etc.).
- *
- * Wave-1B §4 follow-up (2026-05-03): all remaining engine-impersonator
- * `setParam_TEMP_recomputes_tp` tests (one per polarity) deleted. They drove
- * `core.setup(setupCtx)` + `core.load(makeLoadCtx(...))` directly with
- * hand-rolled rhsOld vectors — bit-exact arithmetic that is covered by the
- * ngspice comparison harness (NJFET/PJFET map to ngspice `jfet` device via
- * `device-mappings.ts::JFET_MAPPING`). Plumbing-level "TEMP propagates into
- * tp" coverage survives via the closed-form `tp_vt_reflects_TEMP`,
- * `tSatCur_scales_with_TEMP`, and `TNOM_stays_nominal` tests below, which
- * exercise the same `computeJfetTempParams`/`computePjfetTempParams` path
- * without touching `.setup()` or `.load()`.
- *
- * Surface-level coverage retained:
- *   - Registration: NJfetDefinition / PJfetDefinition resolve via
- *     ComponentRegistry.
- *   - Pin layout: G/S/D pins present.
- *   - Param schema: instance/model partitioning matches Phase 2.5 W1.4 layout.
- *   - DC operating point: common-source NJFET self-biases via `buildFixture`
- *     + `coordinator.dcOperatingPoint()` + `engine.getNodeVoltage()`.
- *   - PJFET conduction smoke test: drain current observed via
- *     `engine.getNodeVoltage(j1:D)` proves saturation conduction without
- *     poking at matrix-row labels (latent capture.ts label-format bug
- *     surfaced and bypassed).
- *   - TEMP plumbing: closed-form `computeJfetTempParams` exercises tp recompute
- *     directly; instance temperature flows through factory params.
- */
+/** Tests for the NJFET and PJFET components. */
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -56,24 +25,6 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-
-// ---------------------------------------------------------------------------
-// PJFET — saturation conduction test via the public engine surface.
-//
-// Wave-1B latent-bug fold-in (2026-05-03): the prior `emits_stamps_when_conducting`
-// test asserted on row labels `jfet:DP`/`jfet:SP` extracted from
-// `ComparisonSession`'s `_ourTopology.matrixRowLabels`. That label format is
-// not produced anywhere in the codebase — `capture.ts::buildTopology` emits
-// `<elLabel>:<internalLabel>` (e.g. `jfet:drain`, `jfet:source`), and even
-// those labels are merged onto the wrong matrix rows by capture.ts's
-// `nodeId = pinCount + p` heuristic (capture.ts:122) which doesn't match
-// the actual internal-node IDs allocated by `ctx.makeVolt`. The assertion
-// therefore never matched in baseline. The bit-exact matrix-stamp contract
-// for JFET drain/source primes is already covered by the ngspice comparison
-// harness (NJFET/PJFET → ngspice `jfet` device via JFET_MAPPING); this test
-// is rewritten to assert the same engineering intent (PJFET conducts in
-// saturation) through the engine's public surface (`getNodeVoltage`).
-// ---------------------------------------------------------------------------
 
 describe("PJFET", () => {
   it("conducts_in_saturation", () => {
@@ -135,12 +86,6 @@ describe("PJFET", () => {
     expect(iD).toBeLessThan(1e-1);    // device not shorted
   });
 });
-
-// ---------------------------------------------------------------------------
-// NR convergence test — common-source NJFET routed through `buildFixture`
-// + `coordinator.dcOperatingPoint()` + `engine.getNodeVoltage()`. No direct
-// `setup()` / `load()` calls; no hand-rolled `runDcOp` helper.
-// ---------------------------------------------------------------------------
 
 function buildCommonSourceNJfetCircuit(facade: DefaultSimulatorFacade): Circuit {
   // VDD=10V → Rd=10kΩ → JFET drain ; gate=0V ; source=GND.
@@ -216,10 +161,6 @@ describe("NR", () => {
     expect(iD).toBeLessThan(1e-3);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Registration tests — parameter plumbing / component registry.
-// ---------------------------------------------------------------------------
 
 describe("Registration", () => {
   it("njfet_registered", () => {
@@ -306,10 +247,6 @@ describe("PJFET_PARAM_DEFS partition layout", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Helpers for TEMP tests.
-// ---------------------------------------------------------------------------
-
 function makeNjfetProps(overrides: Record<string, number> = {}): ReturnType<typeof createTestPropertyBag> {
   const propsObj = createTestPropertyBag();
   propsObj.replaceModelParams({ ...NJFET_PARAM_DEFAULTS, ...overrides });
@@ -343,10 +280,6 @@ function basePjfetParams(overrides: Partial<PjfetParams> = {}): PjfetParams {
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// NJFET TEMP tests (Tasks 7.2.1 + 7.2.2).
-// ---------------------------------------------------------------------------
 
 describe("NJFET TEMP", () => {
   it("TEMP_default_300_15", () => {
@@ -382,10 +315,6 @@ describe("NJFET TEMP", () => {
     expect(count).toBe(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// PJFET TEMP tests (Tasks 7.2.1 + 7.2.2 + 7.2.3).
-// ---------------------------------------------------------------------------
 
 describe("PJFET TEMP", () => {
   it("TEMP_default_300_15", () => {

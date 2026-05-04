@@ -1,20 +1,4 @@
-/**
- * Tests for the Inductor component.
- *
- * §4c gap-fill (2026-05-03): all engine-impersonator tests that drove
- * `element.load(ctx)` directly with hand-built `LoadContext` and asserted
- * bit-exact `ag[]`-coefficient or pool-slot stamping have been deleted.
- * Bit-exact per-NR-iteration parity is covered by the ngspice comparison
- * harness (`harness_*` MCP tools, `src/solver/analog/__tests__/ngspice-parity/*`).
- *
- * Remaining coverage in this file:
- *   - Component definition / pinLayout / attributeMapping smoke tests
- *   - Property-bag / temperature-coefficient / M-multiplicity factory checks
- *   - State-pool contract: `_stateBase = -1` before compiler assigns it
- *   - RL transient response: closed-form `V * (1 - exp(-t/τ))` step response
- *     verified through `buildFixture` + `coordinator.step()`. Validates
- *     observable RL behaviour without reaching past the engine boundary.
- */
+/** Tests for the Inductor component. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -30,18 +14,11 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
-
-// ---------------------------------------------------------------------------
-// definition smoke tests
-// ---------------------------------------------------------------------------
 
 describe("Inductor", () => {
   describe("definition", () => {
@@ -111,10 +88,6 @@ describe("Inductor", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Temperature coefficients TC1, TC2, TNOM, SCALE
-// ---------------------------------------------------------------------------
-
 describe("Inductor temperature coefficients", () => {
   it("TC1_scales_inductance_linearly", () => {
     const props = new PropertyBag();
@@ -148,10 +121,6 @@ describe("Inductor temperature coefficients", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// M multiplicity divides L (parallel inductors = lower L)
-// ---------------------------------------------------------------------------
-
 describe("Inductor M multiplicity", () => {
   it("M2_halves_effective_inductance", () => {
     const props = new PropertyBag();
@@ -172,10 +141,6 @@ describe("Inductor M multiplicity", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// RL transient response (closed-form parity, observed through public surface)
-// ---------------------------------------------------------------------------
-//
 // Circuit: VS=1V → R=1kΩ → L=1mH → GND.
 // Time constant τ = L/R = 1µs.
 //
@@ -188,7 +153,6 @@ describe("Inductor M multiplicity", () => {
 //   V(M) = Vsrc - V_R(t) = Vsrc * exp(-t/τ)
 //
 // At t = τ, V(M) ≈ Vsrc * exp(-1) ≈ 0.36788 V.
-// We assert V(M) at t≈τ matches the closed-form value to 1e-3 relative tol.
 
 interface RlCircuitParams {
   vSource: number;

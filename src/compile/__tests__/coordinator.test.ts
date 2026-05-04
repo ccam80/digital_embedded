@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DefaultSimulationCoordinator } from '../../solver/coordinator.js';
 import { compileUnified } from '../compile.js';
-import { Circuit } from '../../core/circuit.js';
+import { Circuit, Wire } from '../../core/circuit.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
@@ -101,14 +101,14 @@ function buildDigitalRegistry(): ComponentRegistry {
     name: 'In', typeId: -1,
     factory: (props) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], props),
     pinLayout: [], propertyDefs: [{ key: 'label', label: 'Label', type: PropertyType.STRING, defaultValue: '', description: 'Label' }],
-    attributeMap: [], category: 'IO' as any, helpText: 'In',
+    attributeMap: [], category: ComponentCategory.IO, helpText: 'In',
     models: { digital: { executeFn: executePassThrough } },
   });
   registry.register({
     name: 'Out', typeId: -1,
     factory: (props) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], props),
     pinLayout: [], propertyDefs: [{ key: 'label', label: 'Label', type: PropertyType.STRING, defaultValue: '', description: 'Label' }],
-    attributeMap: [], category: 'IO' as any, helpText: 'Out',
+    attributeMap: [], category: ComponentCategory.IO, helpText: 'Out',
     models: { digital: { executeFn: noopExecFn } },
   });
   registry.register({
@@ -119,7 +119,7 @@ function buildDigitalRegistry(): ComponentRegistry {
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], props),
     pinLayout: [], propertyDefs: [],
-    attributeMap: [], category: 'LOGIC' as any, helpText: 'AND',
+    attributeMap: [], category: ComponentCategory.LOGIC, helpText: 'AND',
     models: { digital: { executeFn: executeAnd2 } },
   });
   return registry;
@@ -136,9 +136,9 @@ function buildAndGateCircuit(registry: ComponentRegistry): Circuit {
   ], makePropBag());
   const outY = new TestElement('Out', 'outY', { x: 9, y: 1 }, [makePin('in', PinDirection.INPUT, 0, 0)], makePropBag({ label: 'Y' }));
   circuit.elements.push(inA, inB, and, outY);
-  circuit.wires.push({ start: { x: 2, y: 0 }, end: { x: 4, y: 0 } } as any);
-  circuit.wires.push({ start: { x: 2, y: 2 }, end: { x: 4, y: 2 } } as any);
-  circuit.wires.push({ start: { x: 8, y: 1 }, end: { x: 9, y: 1 } } as any);
+  circuit.wires.push(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));
+  circuit.wires.push(new Wire({ x: 2, y: 2 }, { x: 4, y: 2 }));
+  circuit.wires.push(new Wire({ x: 8, y: 1 }, { x: 9, y: 1 }));
   void registry;
   return circuit;
 }

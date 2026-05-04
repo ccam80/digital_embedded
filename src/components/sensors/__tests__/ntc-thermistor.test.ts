@@ -1,14 +1,4 @@
-/**
- * Tests for NTCThermistorElement.
- *
- * Covers:
- *   - Resistance equals R₀ at T₀
- *   - NTC behaviour: resistance decreases with increasing temperature
- *   - B-parameter formula accuracy
- *   - Self-heating raises temperature under power dissipation
- *   - Self-heating reaches correct thermal equilibrium
- *   - Steinhart-Hart mode
- */
+/** Tests for NTCThermistorElement. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -20,420 +10,119 @@ import {
 } from "../ntc-thermistor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
+import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+
 import type { AnalogFactory } from "../../../core/registry.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { StatePoolRef } from "../../../solver/analog/state-pool.js";
-import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
-import { MODETRAN, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Slot index resolved by name from schema (ss0 rule #4- no raw SLOT_* imports)
+// Slot index resolved by name from schema (ss0 rule #4 — no raw SLOT_* imports)
 // ---------------------------------------------------------------------------
 
 const SLOT_TEMPERATURE = NTC_SCHEMA.indexOf.get("TEMPERATURE")!;
 
 // ---------------------------------------------------------------------------
-// Minimal setup context for calling element.setup() in unit tests.
-// ---------------------------------------------------------------------------
-
-function makeSetupCtx(solver: SparseSolverType): SetupContext {
-  let nodeCount = 1000;
-  let stateCount = 0;
-  return {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number {
-      const off = stateCount;
-      stateCount += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Minimal StatePoolRef for unit tests.
-// pool.states[0] = s0 (current step write target)
-// pool.states[1] = s1 (last accepted read source)
-// Rotation: copy s0 into s1 between steps.
-// ---------------------------------------------------------------------------
-
-function makePool(stateSize: number): StatePoolRef {
-  const s0 = new Float64Array(stateSize);
-  const s1 = new Float64Array(stateSize);
-  const s2 = new Float64Array(stateSize);
-  const s3 = new Float64Array(stateSize);
-  return {
-    states: [s0, s1, s2, s3],
-    state0: s0,
-    state1: s1,
-    state2: s2,
-    state3: s3,
-  } as unknown as StatePoolRef;
-}
-
-// Rotate pool: promote s0 -> s1 (simulate engine step boundary).
-function rotatePool(pool: StatePoolRef): void {
-  const s0 = pool.states[0];
-  const s1 = pool.states[1];
-  s1.set(s0);
-}
-
-// ---------------------------------------------------------------------------
-// Capture solver- records stamp tuples via the real allocElement/stampElement
-// API so tests can read back what load() wrote.
-// ---------------------------------------------------------------------------
-
-interface CaptureStamp { row: number; col: number; value: number; }
-interface CaptureRhs { row: number; value: number; }
-
-function makeCaptureSolver(): {
-  solver: SparseSolverType;
-  stamps: CaptureStamp[];
-  rhs: CaptureRhs[];
-} {
-  const stamps: CaptureStamp[] = [];
-  const rhs: CaptureRhs[] = [];
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    _initStructure: (_n: number) => {},
-    stampRHS: (row: number, value: number) => {
-      rhs.push({ row, value });
-    },
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeNTC(overrides: Partial<{
-  r0: number;
-  beta: number;
-  t0: number;
-  temperature: number;
-  selfHeating: boolean;
-  thermalResistance: number;
-  thermalCapacitance: number;
-  shA: number;
-  shB: number;
-  shC: number;
-}> = {}): NTCThermistorElement {
-  const el = new NTCThermistorElement(
-    overrides.r0 ?? 10000,
-    overrides.beta ?? 3950,
-    overrides.t0 ?? 298.15,
-    overrides.temperature ?? 298.15,
-    overrides.selfHeating ?? false,
-    overrides.thermalResistance ?? 50,
-    overrides.thermalCapacitance ?? 0.01,
-    overrides.shA,
-    overrides.shB,
-    overrides.shC,
-  );
-  el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-  return el;
+interface NtcDividerParams {
+  /** Voltage source magnitude across the divider (V). Default 5. */
+  vSource?: number;
+  /** Pull-up resistor between vs:pos and ntc:pos (Ω). Default 10000. */
+  rPull?: number;
+  /** NTC reference resistance R₀ (Ω). Default 10000. */
+  r0?: number;
+  /** B-parameter (K). Default 3950. */
+  beta?: number;
+  /** Reference temperature T₀ (K). Default 298.15. */
+  t0?: number;
+  /** Operating temperature (K). Default 298.15. */
+  temperature?: number;
+  /** Enable self-heating thermal model. Default false. */
+  selfHeating?: boolean;
+  /** Thermal resistance to ambient (K/W). Default 50. */
+  thermalResistance?: number;
+  /** Thermal capacitance (J/K). Default 0.01. */
+  thermalCapacitance?: number;
+  /** Steinhart-Hart A coefficient (optional). */
+  shA?: number;
+  /** Steinhart-Hart B coefficient (optional). */
+  shB?: number;
+  /** Steinhart-Hart C coefficient (optional). */
+  shC?: number;
 }
 
-// Set up an NTC element with a capture solver and initialised pool.
-// Returns { pool, solver, stamps } so tests can advance state via load().
-function setupAndInitNTC(el: NTCThermistorElement): {
-  pool: StatePoolRef;
-  solver: SparseSolverType;
-  stamps: CaptureStamp[];
-} {
-  const { solver, stamps } = makeCaptureSolver();
-  el.setup(makeSetupCtx(solver));
-  const pool = makePool(el.stateSize + 4);
-  // Seed s1 with ambient temperature so first load() reads the correct value.
-  el.initState(pool);
-  rotatePool(pool);
-  return { pool, solver, stamps };
+/**
+ * Build a single-loop voltage divider:
+ *   Vsrc → R_pull → ntc:pos ─ NTC ─ ntc:neg → GND ← Vsrc:neg
+ *
+ * At DCOP the NTC body is a pure resistor `R(T)`, so the divider node
+ * voltage is `V(ntc:pos) = Vs · R_ntc / (R_pull + R_ntc)`. Solving for
+ * `R_ntc` yields `R_ntc = R_pull · V_div / (Vs − V_div)`, which we use
+ * to verify the B-parameter / Steinhart-Hart resistance formulas at the
+ * public engine surface.
+ */
+function buildNtcDivider(facade: DefaultSimulatorFacade, p: NtcDividerParams): Circuit {
+  const ntcProps: Record<string, number | string | boolean> = {
+    label: "ntc",
+    r0:                 p.r0          ?? 10000,
+    beta:               p.beta        ?? 3950,
+    t0:                 p.t0          ?? 298.15,
+    temperature:        p.temperature ?? 298.15,
+    selfHeating:        p.selfHeating ?? false,
+    thermalResistance:  p.thermalResistance  ?? 50,
+    thermalCapacitance: p.thermalCapacitance ?? 0.01,
+  };
+  if (p.shA !== undefined) ntcProps.shA = p.shA;
+  if (p.shB !== undefined) ntcProps.shB = p.shB;
+  if (p.shC !== undefined) ntcProps.shC = p.shC;
+
+  return facade.build({
+    components: [
+      { id: "vs",  type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource ?? 5 } },
+      { id: "rp",  type: "Resistor",        props: { label: "rp", resistance: p.rPull ?? 10000 } },
+      { id: "ntc", type: "NTCThermistor",   props: ntcProps },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos",  "rp:pos"],
+      ["rp:neg",  "ntc:pos"],
+      ["ntc:neg", "gnd:out"],
+      ["vs:neg",  "gnd:out"],
+    ],
+  });
 }
 
-// Call setup() on an element using a capture solver so handles are valid.
-function setupNTC(el: NTCThermistorElement, solver: SparseSolverType): void {
-  el.setup(makeSetupCtx(solver));
+function findNTC(elements: ReadonlyArray<unknown>): NTCThermistorElement {
+  const idx = elements.findIndex((el) => el instanceof NTCThermistorElement);
+  if (idx < 0) throw new Error("NTCThermistorElement not found in compiled circuit");
+  return elements[idx] as NTCThermistorElement;
 }
 
-// ---------------------------------------------------------------------------
-// NTC
-// ---------------------------------------------------------------------------
+function nodeOf(fix: Fixture, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+/** Extract R_ntc from the divider node voltage. */
+function rNtcFromDividerVoltage(vDiv: number, vSrc: number, rPull: number): number {
+  return (rPull * vDiv) / (vSrc - vDiv);
+}
+
+/** Closed-form B-parameter resistance: R(T) = R₀ · exp(β · (1/T − 1/T₀)). */
+function rBParam(r0: number, beta: number, t0: number, t: number): number {
+  return r0 * Math.exp(beta * (1 / t - 1 / t0));
+}
 
 describe("NTC", () => {
-  describe("resistance_at_t0_equals_r0", () => {
-    it("resistance at T₀ equals R₀", () => {
-      makeNTC({ r0: 10000, t0: 298.15, temperature: 298.15 });
-    });
-
-    it("resistance at T₀ = 300K with R₀ = 5000Ω equals 5000Ω", () => {
-      makeNTC({ r0: 5000, t0: 300, temperature: 300 });
-    });
-  });
-
-  describe("resistance_decreases_with_temperature", () => {
-    it("resistance at 348K is less than R₀ at T₀=298K (NTC behaviour)", () => {
-      const ntc298 = makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 298.15 });
-      const ntc348 = makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 348 });
-      const { pool: pool298, solver: solver298 } = setupAndInitNTC(ntc298);
-      const { pool: pool348, solver: solver348 } = setupAndInitNTC(ntc348);
-      // Set pool state to the respective temperature
-      pool298.states[1][ntc298._stateBase + SLOT_TEMPERATURE] = 298.15;
-      pool348.states[1][ntc348._stateBase + SLOT_TEMPERATURE] = 348;
-      // Load at t=298K
-      const rhs298 = new Float64Array(4);
-      const ctx298 = makeLoadCtx({ solver: solver298, rhs: rhs298, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 });
-      ntc298.load(ctx298);
-      const stamp298 = (ntc298 as unknown as { _hPP: number })["_hPP"];
-      // Load at t=348K
-      const rhs348 = new Float64Array(4);
-      const ctx348 = makeLoadCtx({ solver: solver348, rhs: rhs348, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 });
-      ntc348.load(ctx348);
-      // At 348K resistance should be less than at 298K (NTC behaviour)
-      // Verify by checking that G at 348K > G at 298K
-      // (higher G = lower R = more conductive at higher temperature)
-      expect(stamp298).toBeDefined();
-      // NTC behaviour: R decreases with T, so G increases with T.
-      // Both elements were loaded - as long as they don't throw, NTC model is correct.
-      expect(true).toBe(true);
-    });
-
-    it("resistance at 273K is greater than R₀ at T₀=298K (NTC below ref)", () => {
-      makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 273 });
-    });
-  });
-
-  describe("beta_model_formula", () => {
-    it("R₀=10k, B=3950, T=350K gives expected resistance", () => {
-      makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 350 });
-    });
-
-    it("B-parameter formula: result is approximately 1.4kΩ at 350K", () => {
-      // R = 10000 · exp(3950 · (1/350 - 1/298.15)) ≈ 1405 Ω
-      // G = 1/R, assert G is in the right range
-      const ntc = makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 350 });
-      const { pool, solver } = setupAndInitNTC(ntc);
-      // Seed temperature slot to 350K
-      pool.states[1][ntc._stateBase + SLOT_TEMPERATURE] = 350;
-      const { stamps } = makeCaptureSolver();
-      const rhsBuf = new Float64Array(4);
-      const ctx = makeLoadCtx({ solver, rhs: rhsBuf, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 });
-      ntc.load(ctx);
-      // G = 1/R where R ≈ 1405 Ω → G ≈ 7.12e-4
-      // We verify G is in the expected range by reading from pool after load
-      // G_actual is embedded in stamps; read diagonal (pos,pos) stamp sum
-      const { stamps: freshStamps } = makeCaptureSolver();
-      void freshStamps;
-      // The load() call ran without error at 350K - that confirms NTC behaviour.
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("self_heating_increases_temperature", () => {
-    it("temperature rises from ambient under power dissipation", () => {
-      // 1V across ~100Ω NTC (P≈10mW), selfHeating enabled
-      const ntc = makeNTC({
-        r0: 100,
-        beta: 3950,
-        t0: 298.15,
-        temperature: 298.15,
-        selfHeating: true,
-        thermalResistance: 50,
-        thermalCapacitance: 0.01,
-      });
-
-      const { pool, solver } = setupAndInitNTC(ntc);
-      const initialTemp = pool.states[1][ntc._stateBase + SLOT_TEMPERATURE];
-
-      const dt = 1e-4;
-      // rhs[1] = 1V on pos node, rhs[2] = 0 on neg node (1-indexed)
-      const rhsBuf = new Float64Array(4);
-      rhsBuf[1] = 1.0;
-      rhsBuf[2] = 0.0;
-
-      // Run many timesteps via load() + pool rotation to accumulate heating.
-      for (let i = 0; i < 5000; i++) {
-        const ctx = makeLoadCtx({ solver, rhs: rhsBuf, cktMode: MODETRAN | MODEINITFLOAT, dt });
-        ntc.load(ctx);
-        rotatePool(pool);
-      }
-
-      const finalTemp = pool.states[1][ntc._stateBase + SLOT_TEMPERATURE];
-      expect(finalTemp).toBeGreaterThan(initialTemp);
-    });
-  });
-
-  describe("thermal_equilibrium", () => {
-    it("self-heating reaches T_ambient + P·R_thermal at steady state", () => {
-      const thermalResistance = 100; // K/W
-      const thermalCapacitance = 0.001; // J/K - small for faster convergence
-
-      const r0 = 10000;
-      const ntc = makeNTC({
-        r0,
-        beta: 3950,
-        t0: 298.15,
-        temperature: 298.15,
-        selfHeating: true,
-        thermalResistance,
-        thermalCapacitance,
-      });
-
-      const { pool, solver } = setupAndInitNTC(ntc);
-
-      const voltage = 1.0; // V across the thermistor
-      // Nodes are 1-based: pinNodes=[pos:1, neg:2]
-      const rhsBuf = new Float64Array(4);
-      rhsBuf[1] = voltage;
-      rhsBuf[2] = 0.0;
-
-      // Run to steady state: time constant = R_thermal * C_thermal = 100 * 0.001 = 0.1s
-      const dt = 1e-3;
-      for (let i = 0; i < 2000; i++) {
-        const ctx = makeLoadCtx({ solver, rhs: rhsBuf, cktMode: MODETRAN | MODEINITFLOAT, dt });
-        ntc.load(ctx);
-        rotatePool(pool);
-      }
-
-      const finalTemp = pool.states[1][ntc._stateBase + SLOT_TEMPERATURE];
-
-      // At equilibrium: P = V²/R(T_eq), T_eq = T_ambient + P · R_thermal
-      const P_approx = (voltage * voltage) / r0;
-      const tAmbient = 298.15;
-      const expectedEq = tAmbient + P_approx * thermalResistance;
-
-      // Allow 10% tolerance due to resistance-temperature feedback
-      expect(finalTemp).toBeGreaterThan(expectedEq * 0.9);
-      expect(finalTemp).toBeLessThan(expectedEq * 1.1 + 1);
-    });
-  });
-
-  describe("steinhart_hart_mode", () => {
-    it("Steinhart-Hart mode returns resistance consistent with the formula at 25°C", () => {
-      // S-H coefficients for a typical 10kΩ NTC at 25°C
-      const shA = 1.1e-3;
-      const shB = 2.4e-4;
-      const shC = 7.5e-8;
-
-      const t25 = 298.15;
-      const ntc = makeNTC({ temperature: t25, shA, shB, shC });
-      const { pool, solver } = setupAndInitNTC(ntc);
-      pool.states[1][ntc._stateBase + SLOT_TEMPERATURE] = t25;
-
-      // Load at t25 and capture conductance stamp to derive R
-      const { stamps } = makeCaptureSolver();
-      const rhsBuf = new Float64Array(4);
-      const ctx = makeLoadCtx({ solver, rhs: rhsBuf, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 });
-      ntc.load(ctx);
-      void stamps;
-
-      // The element loads without error in S-H mode.
-      expect(true).toBe(true);
-    });
-
-    it("Steinhart-Hart resistance at higher temperature is lower than at 25°C", () => {
-      const shA = 1.1e-3;
-      const shB = 2.4e-4;
-      const shC = 7.5e-8;
-
-      const ntcCold = makeNTC({ temperature: 298.15, shA, shB, shC });
-      const ntcHot = makeNTC({ temperature: 358.15, shA, shB, shC });
-
-      const { pool: poolCold, solver: solverCold } = setupAndInitNTC(ntcCold);
-      const { pool: poolHot, solver: solverHot } = setupAndInitNTC(ntcHot);
-
-      poolCold.states[1][ntcCold._stateBase + SLOT_TEMPERATURE] = 298.15;
-      poolHot.states[1][ntcHot._stateBase + SLOT_TEMPERATURE] = 358.15;
-
-      const stampsCold: CaptureStamp[] = [];
-      const stampsHot: CaptureStamp[] = [];
-
-      // Capture conductance for cold element
-      const capCold = makeCaptureSolver();
-      const ntcCold2 = makeNTC({ temperature: 298.15, shA, shB, shC });
-      ntcCold2._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-      ntcCold2.setup(makeSetupCtx(capCold.solver));
-      const poolCold2 = makePool(ntcCold2.stateSize + 4);
-      ntcCold2.initState(poolCold2);
-      poolCold2.states[1][ntcCold2._stateBase + SLOT_TEMPERATURE] = 298.15;
-      const rhsCold = new Float64Array(4);
-      ntcCold2.load(makeLoadCtx({ solver: capCold.solver, rhs: rhsCold, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 }));
-      for (const s of capCold.stamps) stampsCold.push(s);
-
-      // Capture conductance for hot element
-      const capHot = makeCaptureSolver();
-      const ntcHot2 = makeNTC({ temperature: 358.15, shA, shB, shC });
-      ntcHot2._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-      ntcHot2.setup(makeSetupCtx(capHot.solver));
-      const poolHot2 = makePool(ntcHot2.stateSize + 4);
-      ntcHot2.initState(poolHot2);
-      poolHot2.states[1][ntcHot2._stateBase + SLOT_TEMPERATURE] = 358.15;
-      const rhsHot = new Float64Array(4);
-      ntcHot2.load(makeLoadCtx({ solver: capHot.solver, rhs: rhsHot, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 }));
-      for (const s of capHot.stamps) stampsHot.push(s);
-
-      // G_hot > G_cold means R_hot < R_cold (NTC behaviour)
-      const gCold = stampsCold.filter((s) => s.row === 1 && s.col === 1).reduce((a, s) => a + s.value, 0);
-      const gHot = stampsHot.filter((s) => s.row === 1 && s.col === 1).reduce((a, s) => a + s.value, 0);
-      expect(gHot).toBeGreaterThan(gCold);
-
-      void poolCold;
-      void poolHot;
-      void solverCold;
-      void solverHot;
-    });
-  });
-
-  describe("load", () => {
-    it("stamps conductance between nodes", () => {
-      const ntc = makeNTC({ r0: 10000, temperature: 298.15 });
-      const { pool, solver, stamps } = setupAndInitNTC(ntc);
-      const rhsBuf = new Float64Array(4);
-      const ctx = makeLoadCtx({ solver, rhs: rhsBuf, cktMode: MODEDCOP | MODEINITFLOAT, dt: 0 });
-
-      ntc.load(ctx);
-
-      const t = pool.states[1][ntc._stateBase + SLOT_TEMPERATURE];
-      // At T₀=298.15K, R = r0 = 10000, G = 1/10000
-      void t;
-      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      // Nodes are 1-based: pinNodes=[pos:1, neg:2] → row/col 1 and 2
-      expect(tuples).toContainEqual([1, 1, 1 / 10000]);
-      expect(tuples).toContainEqual([1, 2, -1 / 10000]);
-      expect(tuples).toContainEqual([2, 1, -1 / 10000]);
-      expect(tuples).toContainEqual([2, 2, 1 / 10000]);
-    });
-  });
-
   describe("definition", () => {
-    it("NTCThermistorDefinition has correct engine type", () => {
+    it("NTCThermistorDefinition has a behavioral inline factory", () => {
       expect(NTCThermistorDefinition.modelRegistry?.behavioral).toBeDefined();
     });
 
-    it("NTCThermistorDefinition has correct category", () => {
+    it("NTCThermistorDefinition category is PASSIVES", () => {
       expect(NTCThermistorDefinition.category).toBe(ComponentCategory.PASSIVES);
     });
 
@@ -450,66 +139,243 @@ describe("NTC", () => {
       expect(element).toBeInstanceOf(NTCThermistorElement);
     });
 
-    it("branchCount is false", () => {
-      expect((NTCThermistorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
+    it("branchCount is falsy (NTC stamps in-place; no branch row)", () => {
+      const entry = NTCThermistorDefinition.modelRegistry?.behavioral as
+        | { kind: "inline"; factory: AnalogFactory; branchCount?: number }
+        | undefined;
+      expect(entry?.branchCount).toBeFalsy();
+    });
+
+    it("factory_returns_element_with_stateBase_minus_one_before_compile", () => {
+      const props = new PropertyBag();
+      props.replaceModelParams(NTC_DEFAULTS);
+      const el = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
+      expect(el._stateBase).toBe(-1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resistance_at_t0_equals_r0
+  //
+  // At T = T₀ the B-parameter exponent is zero, so R(T₀) = R₀. With a
+  // matched pull-up R_pull = R₀ the divider lands at exactly Vs / 2.
+  // -------------------------------------------------------------------------
+  describe("resistance_at_t0_equals_r0", () => {
+    it("at T = T₀ = 298.15K with R_pull = R₀ = 10kΩ, V(ntc:pos) = Vs/2", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, r0: 10000, t0: 298.15, temperature: 298.15,
+        }),
+      });
+      const result = fix.coordinator.dcOperatingPoint()!;
+      expect(result.converged).toBe(true);
+
+      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+      expect(vDiv).toBeCloseTo(2.5, 6);
+
+      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+      expect(rNtc).toBeCloseTo(10000, 0);
+    });
+
+    it("at T = T₀ = 300K with R_pull = R₀ = 5kΩ, R_ntc reads back as 5kΩ", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 5000, r0: 5000, t0: 300, temperature: 300,
+        }),
+      });
+      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 5000);
+      expect(rNtc).toBeCloseTo(5000, 0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // resistance_decreases_with_temperature (NTC behaviour)
+  //
+  // At T > T₀ the B-parameter formula gives R(T) < R₀, so the divider
+  // node voltage on the NTC arm (NTC pulled to GND, R_pull to Vs) drops.
+  // At T < T₀ the divider node rises above Vs/2.
+  // -------------------------------------------------------------------------
+  describe("resistance_decreases_with_temperature", () => {
+    it("R(348K) < R₀ ⇒ divider node falls below Vs/2 (NTC behaviour above T₀)", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 348,
+        }),
+      });
+      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
+
+      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+      const rExpected = rBParam(10000, 3950, 298.15, 348);
+      expect(vDiv).toBeLessThan(2.5);
+      expect(rNtc).toBeCloseTo(rExpected, -1); // ~1Ω relative on a ~2.4kΩ value
+    });
+
+    it("R(273K) > R₀ ⇒ divider node rises above Vs/2 (NTC behaviour below T₀)", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 273,
+        }),
+      });
+      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
+
+      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+      const rExpected = rBParam(10000, 3950, 298.15, 273);
+      expect(vDiv).toBeGreaterThan(2.5);
+      expect(rNtc).toBeCloseTo(rExpected, -2); // expected ≈ 27kΩ
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // beta_model_formula
+  //
+  // R(T=350K, R₀=10k, β=3950, T₀=298.15) ≈ 1405 Ω. Verify the divider
+  // observation matches the closed-form value.
+  // -------------------------------------------------------------------------
+  describe("beta_model_formula", () => {
+    it("R(350K, 10k, 3950, 298.15) ≈ 1405Ω via DCOP divider observation", () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 350,
+        }),
+      });
+      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
+
+      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+      const rExpected = rBParam(10000, 3950, 298.15, 350);
+      expect(rExpected).toBeGreaterThan(1300);
+      expect(rExpected).toBeLessThan(1500);
+      // Engine-observed R within 0.1% of closed-form (DCOP convergence).
+      expect(Math.abs(rNtc - rExpected) / rExpected).toBeLessThan(0.001);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // self_heating_increases_temperature
+  //
+  // With self-heating enabled and a low-impedance NTC dissipating real
+  // power, the pool TEMPERATURE slot must rise above ambient after a
+  // sustained transient. We observe the slot through `fix.pool.state1`
+  // (last-accepted history) after stepping for several thermal RC
+  // periods.
+  // -------------------------------------------------------------------------
+  describe("self_heating_increases_temperature", () => {
+    it("pool TEMPERATURE slot rises from ambient under sustained power", () => {
+      // Vs=1V across r0=100Ω NTC ⇒ ~10 mW dissipated.
+      // τ_th = R_th · C_th = 50 · 0.01 = 0.5 s. Step for several τ.
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 1, rPull: 1, // tiny pull-up so most of Vs drops across NTC
+          r0: 100, beta: 3950, t0: 298.15, temperature: 298.15,
+          selfHeating: true, thermalResistance: 50, thermalCapacitance: 0.01,
+        }),
+        params: { tStop: 5.0, maxTimeStep: 1e-3 },
+      });
+      const ntc = findNTC(fix.circuit.elements);
+      const slotIdx = ntc._stateBase + SLOT_TEMPERATURE;
+      const initialTemp = fix.pool.state1[slotIdx];
+
+      // Step ~2 s of sim time (≥ 4 thermal time constants).
+      while (fix.engine.simTime < 2.0) fix.coordinator.step();
+
+      const finalTemp = fix.pool.state1[slotIdx];
+      expect(finalTemp).toBeGreaterThan(initialTemp);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // thermal_equilibrium
+  //
+  // At steady state: T_eq = T_ambient + P · R_thermal, where P = V²/R(T_eq).
+  // Tight thermal capacitance shrinks τ; we step well past 5 τ.
+  // -------------------------------------------------------------------------
+  describe("thermal_equilibrium", () => {
+    it("self-heating reaches T_amb + P · R_th at steady state (within feedback margin)", () => {
+      const thermalResistance = 100;   // K/W
+      const thermalCapacitance = 0.001; // J/K — small for fast convergence (τ = 0.1 s)
+      const r0 = 10000;
+      const tAmbient = 298.15;
+      const vSource = 1.0;
+
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource,
+          rPull: 1, // negligible pull-up so V across NTC ≈ Vs
+          r0, beta: 3950, t0: tAmbient, temperature: tAmbient,
+          selfHeating: true, thermalResistance, thermalCapacitance,
+        }),
+        params: { tStop: 5.0, maxTimeStep: 1e-3 },
+      });
+      const ntc = findNTC(fix.circuit.elements);
+      const slotIdx = ntc._stateBase + SLOT_TEMPERATURE;
+
+      while (fix.engine.simTime < 2.0) fix.coordinator.step();
+      const finalTemp = fix.pool.state1[slotIdx];
+
+      // Ambient-power estimate: P ≈ V² / R₀ at T₀ before feedback.
+      const pApprox = (vSource * vSource) / r0;
+      const expectedEq = tAmbient + pApprox * thermalResistance;
+
+      // Allow 10% margin around expectedEq for resistance-temperature feedback.
+      expect(finalTemp).toBeGreaterThan(expectedEq * 0.9);
+      expect(finalTemp).toBeLessThan(expectedEq * 1.1 + 1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // steinhart_hart_mode
+  //
+  // S-H coefficients for a typical 10kΩ NTC at 25°C land R(25°C) ≈ 10kΩ.
+  // We verify via the same divider observation that the divider behaves
+  // consistently and that R(hot) < R(cold) (NTC behaviour) under the S-H
+  // formula.
+  // -------------------------------------------------------------------------
+  describe("steinhart_hart_mode", () => {
+    it("S-H mode converges DCOP and R(25°C) ≈ 10kΩ via divider", () => {
+      const shA = 1.1e-3;
+      const shB = 2.4e-4;
+      const shC = 7.5e-8;
+
+      const fix = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, temperature: 298.15, shA, shB, shC,
+        }),
+      });
+      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
+
+      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+      // The chosen S-H coefficients land R(25°C) within ±20% of 10kΩ.
+      expect(rNtc).toBeGreaterThan(8000);
+      expect(rNtc).toBeLessThan(12000);
+    });
+
+    it("S-H mode: R(358.15K) < R(298.15K) (NTC behaviour)", () => {
+      const shA = 1.1e-3;
+      const shB = 2.4e-4;
+      const shC = 7.5e-8;
+
+      const fixCold = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, temperature: 298.15, shA, shB, shC,
+        }),
+      });
+      const fixHot = buildFixture({
+        build: (_r, facade) => buildNtcDivider(facade, {
+          vSource: 5, rPull: 10000, temperature: 358.15, shA, shB, shC,
+        }),
+      });
+
+      const vCold = fixCold.engine.getNodeVoltage(nodeOf(fixCold, "ntc:pos"));
+      const vHot  = fixHot .engine.getNodeVoltage(nodeOf(fixHot,  "ntc:pos"));
+      const rCold = rNtcFromDividerVoltage(vCold, 5, 10000);
+      const rHot  = rNtcFromDividerVoltage(vHot,  5, 10000);
+
+      expect(rHot).toBeLessThan(rCold);
     });
   });
 });
 
-// ---------------------------------------------------------------------------
-// ntc_load_dcop_parity- C4.1 / Task 6.2.1
-//
-// NTC at 25°C nominal (T = T₀ = 298.15 K), self-heating OFF.
-// Default params: r0=10000, beta=3950, t0=298.15, temperature=298.15.
-// At T = T₀: R = r0 · exp(beta · (1/T - 1/T₀)) = 10000 · exp(0) = 10000 Ω.
-// G = 1 / R = 1 / 10000.
-//
-// Expected: G = 1/r0 = 1/10000.
-// Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
-// ---------------------------------------------------------------------------
-
-describe("ntc_load_dcop_parity", () => {
-  it("NTC at 25°C (T=T₀) G=1/r0=1/10000 bit-exact", () => {
-    const props = new PropertyBag();
-    props.replaceModelParams(NTC_DEFAULTS);
-    // Ensure temperature equals t0 so exponent is zero
-    props.setModelParam("temperature", NTC_DEFAULTS.t0);
-
-    const core = createNTCThermistorElement(
-      new Map([["pos", 1], ["neg", 2]]),
-      props,
-      () => 0,
-    );
-    const analogElement = core as unknown as AnalogElement;
-
-    const stampCtx = makeSimpleCtx({
-      elements: [analogElement],
-      matrixSize: 2,
-      nodeCount: 2,
-    });
-    // Call setup() directly- element is not poolBacked so makeSimpleCtx
-    // does not call it automatically. setup() must run before load().
-    (core as unknown as NTCThermistorElement).setup(makeSetupCtx(stampCtx.solver));
-    analogElement.load(stampCtx.loadCtx);
-    const stamps = stampCtx.solver.getCSCNonZeros();
-
-    // Expected: G = 1/r0 when T == T₀ (exponent = 0, exp(0) = 1).
-    // Single IEEE-754 division: 1 / 10000.
-    const EXPECTED_G = 1 / NTC_DEFAULTS.r0;
-
-    // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
-    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
-    expect(e00).toBeDefined();
-    expect(e00!.value).toBe(EXPECTED_G);
-
-    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
-    expect(e11).toBeDefined();
-    expect(e11!.value).toBe(EXPECTED_G);
-
-    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
-    expect(e01!.value).toBe(-EXPECTED_G);
-
-    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
-    expect(e10!.value).toBe(-EXPECTED_G);
-  });
-});

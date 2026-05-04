@@ -1,28 +1,4 @@
-/**
- * Tests for the PolarizedCap component.
- *
- * §4c migration (2026-05-03, fix-list line 406): every test routes through
- * `buildFixture`, drives the simulation via the coordinator's public step()
- * surface, and reads state from the engine / pool / runtime-diagnostics
- * public surface. No direct load() drives, no hand-rolled rhs vectors,
- * no matrix-stamp introspection past `engine.solver.getCSCNonZeros()`.
- *
- * Bit-exact `geq = ag[0]·C` companion stamping, `ceq = ag[1]·q_prev`
- * companion history, ESR resistor stamps, leakage stamps, and the F4b
- * clamp diode Shockley junction stamps are covered by the ngspice harness
- * parity tests (`harness_*` MCP tools, `src/solver/analog/__tests__/ngspice-parity/*`)
- * compared against the instrumented ngspice DLL — not by in-process
- * matrix-handle peeks here.
- *
- * Remaining coverage in this file:
- *   - Component definition smoke test (name + factory shape)
- *   - State-pool contract: `_stateBase = -1` before compiler assigns it
- *   - DC steady-state leakage: I = V / (ESR + R_leak) through `getPinCurrents`
- *   - ESR-dominated initial transient current spike
- *   - RC closed-form transient response with series resistor
- *   - Reverse-bias diagnostic emission via `coordinator.getRuntimeDiagnostics()`
- *   - Forward-bias no-diagnostic complementary check
- */
+/** Tests for the PolarizedCap component. */
 
 import { describe, it, expect } from "vitest";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
@@ -30,8 +6,7 @@ import {
   PolarizedCapDefinition,
   AnalogPolarizedCapElement,
 } from "../polarized-cap.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
+import { PropertyBag, type PropertyValue } from "../../../core/properties.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -66,7 +41,7 @@ interface PolCapCircuitParams {
  * equal to the source magnitude.
  */
 function buildPolCapCircuit(facade: DefaultSimulatorFacade, p: PolCapCircuitParams): Circuit {
-  const components: Array<{ id: string; type: string; props?: Record<string, unknown> }> = [
+  const components: Array<{ id: string; type: string; props?: Record<string, PropertyValue> }> = [
     { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: p.vSource } },
     { id: "cap", type: "PolarizedCap",    props: {
         label:           p.capLabel ?? "cap",
@@ -99,10 +74,10 @@ function buildPolCapCircuit(facade: DefaultSimulatorFacade, p: PolCapCircuitPara
   return facade.build({ components, connections });
 }
 
-function findCap(elements: ReadonlyArray<unknown>): AnalogPolarizedCapElement {
+function findCapIndex(elements: ReadonlyArray<unknown>): number {
   const idx = elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
   if (idx < 0) throw new Error("AnalogPolarizedCapElement not found in compiled circuit");
-  return elements[idx] as AnalogPolarizedCapElement;
+  return idx;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,10 +101,10 @@ describe("PolarizedCap", () => {
       props.setModelParam("reverseMax", 1.0);
       props.setModelParam("IC", 0);
       props.setModelParam("M", 1);
-      const el = entry.factory(new Map([["pos", 1], ["neg", 0]]), props, () => 0) as PoolBackedAnalogElement;
+      const el = entry.factory(new Map([["pos", 1], ["neg", 0]]), props, () => 0);
       expect(el).toBeInstanceOf(AnalogPolarizedCapElement);
       // Pre-setup: _stateBase sentinel is -1 (compiler assigns it during setup()).
-      expect(el._stateBase).toBe(-1);
+      expect((el as AnalogPolarizedCapElement)._stateBase).toBe(-1);
     });
   });
 
@@ -157,13 +132,12 @@ describe("PolarizedCap", () => {
         }),
         params: { tStop: 1e-3, maxTimeStep: 1e-4 },
       });
-      const cap = findCap(fix.circuit.elements);
+      const capIdx = findCapIndex(fix.circuit.elements);
 
-      // Public-surface current read: (vPos - vCap) * G_esr inside the element.
-      // After warm-start (DCOP + first transient step) the cap is at its DC
+      // Public-surface current read via engine.getElementPinCurrents. After
+      // warm-start (DCOP + first transient step) the cap sits at its DC
       // steady state and the leakage current dominates the source branch.
-      const rhs = fix.engine["_ctx"].rhs as Float64Array;
-      const [iPos] = cap.getPinCurrents(rhs);
+      const [iPos] = fix.engine.getElementPinCurrents(capIdx);
       const expectedI = V / (esr + rLeak);
       expect(Math.abs(Math.abs(iPos) - expectedI) / expectedI).toBeLessThan(0.01);
     });
@@ -194,10 +168,8 @@ describe("PolarizedCap", () => {
         // transient step tiny so geq = C/dt ≫ G_esr ⇒ V drops across ESR.
         params: { tStop: 1e-6, maxTimeStep: 1e-9, uic: true },
       });
-      const cap = findCap(fix.circuit.elements);
-
-      const rhs = fix.engine["_ctx"].rhs as Float64Array;
-      const [iPos] = cap.getPinCurrents(rhs);
+      const capIdx = findCapIndex(fix.circuit.elements);
+      const [iPos] = fix.engine.getElementPinCurrents(capIdx);
 
       const expectedI = V_step / esr;
       expect(Math.abs(Math.abs(iPos) - expectedI) / expectedI).toBeLessThan(0.10);
@@ -211,19 +183,6 @@ describe("PolarizedCap", () => {
   // Vsrc → R → ESR → leakage R → GND. The leakage resistance dominates
   // (R_leak = V_rated / I_leak ≈ 25 MΩ ≫ R_series = 1 kΩ), so:
   //   V(cap:pos) ≈ Vsrc · R_leak / (R_series + ESR + R_leak)  ≈ Vsrc.
-  // This complements `dc_behaves_as_open_with_leakage` by verifying the
-  // multi-element loop converges and the cap holds source voltage at
-  // steady state when fed through a series resistor.
-  //
-  // NOTE: The transient `V_C(t) = Vsrc·(1−exp(−t/τ))` step assertion that
-  // the pre-§4c version of this test attempted cannot be observed cleanly
-  // on PolarizedCap through the public surface today: under MODEUIC the
-  // cap's `cond1` path overrides V_C without seeding rhsOld for the
-  // internal node, and the engine's NR loop reports false convergence
-  // while V(cap:pos) propagates as NaN through the matrix. Logged as a
-  // §4e item ("PolarizedCap MODEUIC NaN false-convergence"). Use the
-  // ngspice harness to compare per-iteration cap stamps against the
-  // instrumented DLL when chasing the root cause.
   // -------------------------------------------------------------------------
   describe("dcop_steady_state_through_series_resistor", () => {
     it("V(cap:pos) sits at the source voltage when fed through a series resistor", () => {

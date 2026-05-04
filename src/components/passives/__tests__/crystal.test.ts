@@ -1,39 +1,4 @@
-/**
- * Tests for the QuartzCrystal (Butterworth-Van Dyke) component.
- *
- * §3 poison-pattern migration (2026-05-03, fix-list line 404): the previous
- * file imported `runDcOp`, `makeTestSetupContext`, `setupAll`, `makeLoadCtx`,
- * `allocateStatePool` from the deleted `__tests__/test-helpers.ts`, drove
- * `element.setup(ctx)` / `element.load(ctx)` directly via a hand-rolled
- * `withState()` helper + a hand-rolled `SparseSolver()` + a fake capture
- * solver, and asserted bit-exact stamp values at `(1,1)` matrix entries.
- * All eradicated per §3 poison-pattern warning + §4a helper deletion.
- *
- * Deletions justified per "ComparisonSession matrix-peek tests" rule
- * (category-1, user-approved):
- *   - `factory creates element with 2 external pins and correct branchIndex
- *     after setup` — drove element.setup(ctx) directly with a hand-rolled
- *     SparseSolver + makeTestSetupContext + the local `withState` helper.
- *   - `factory creates element that stamps R_s conductance at A-node
- *     diagonal after setup` — engine-impersonator-via-capture-solver: built
- *     a fake `{ allocElement, stampElement, stampRHS }` solver, called
- *     element.load(ctx) directly with a hand-built ag[] vector, peeked the
- *     matrix value at handle (1,1) and asserted bit-exact `G_s + geqC0`.
- *     Bit-exact BVD R_s + C_0 stamping is covered by the ngspice harness
- *     parity tests (`harness_run` + `harness_get_attempt` against the
- *     instrumented ngspice DLL).
- *   - `_stateBase is -1 before compiler assigns it` (UC-7 retention from
- *     fix-list line 265, J-048) — kept and rewritten as a pure factory check
- *     (no setup() call), since the contract it pins is "factory leaves
- *     _stateBase = -1 until the compiler walks setup()".
- *
- * Rewritten on top of `buildFixture` + the registered QuartzCrystal /
- * DcVoltageSource / Resistor / Ground components. The `dc_blocks` test now
- * routes through the production compile + DCOP path and reads observable
- * branch current via `engine.getElementCurrent(...)` — confirming via the
- * public engine surface that the crystal contributes zero DC conductance
- * (current through the source equals the bleed-resistor current).
- */
+/** Tests for the QuartzCrystal (Butterworth-Van Dyke) component. */
 
 import { describe, it, expect } from "vitest";
 import {
@@ -48,9 +13,6 @@ import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { Circuit } from "../../../core/circuit.js";
@@ -60,10 +22,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
-
-// ---------------------------------------------------------------------------
-// Analytical impedance of BVD model (kept; pure math helper)
-// ---------------------------------------------------------------------------
 
 function bvdImpedanceMagnitude(
   freqHz: number,
@@ -84,10 +42,6 @@ function bvdImpedanceMagnitude(
   const Y_mag2 = Y_re * Y_re + Y_im * Y_im;
   return 1 / Math.sqrt(Y_mag2);
 }
-
-// ---------------------------------------------------------------------------
-// DC-block circuit: VS=1V → Crystal → R_bleed(1GΩ) → GND.
-// ---------------------------------------------------------------------------
 
 interface DcBlockParams {
   V: number;
@@ -127,14 +81,9 @@ function findCrystal(elements: ReadonlyArray<unknown>): AnalogCrystalElement {
   return elements[idx] as AnalogCrystalElement;
 }
 
-// ---------------------------------------------------------------------------
-// Crystal tests
-// ---------------------------------------------------------------------------
-
 describe("Crystal", () => {
   describe("derived_parameters_consistent", () => {
     it("L_s = 1/(4π²·f²·C_s) for default parameters", () => {
-      // Pure math helper smoke check: L_s formula stays callable.
       const f = 32768;
       const Cs = 12.5e-15;
       const Ls = crystalMotionalInductance(f, Cs);
@@ -329,10 +278,7 @@ describe("Crystal", () => {
       expect(m!.propertyKey).toBe("frequency");
     });
 
-    it("_stateBase is -1 before compiler assigns it (UC-7 retention, J-048)", () => {
-      // Pure factory check: the analog factory must NOT touch `_stateBase`.
-      // The compiler walks setup() and assigns _stateBase via the StatePool
-      // allocator; until that walk runs, the contract sentinel is -1.
+    it("_stateBase is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("frequency", 1e6);
       props.setModelParam("qualityFactor", 1000);
