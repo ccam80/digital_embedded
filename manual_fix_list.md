@@ -276,7 +276,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [ ] `src/solver/analog/__tests__/ac-analysis.test.ts` -- **spec:** phase-component-model-correctness-job ssB13 -- Pin-key rename at lines 50, 80, 109 (J-106).
 - [ ] `src/solver/analog/__tests__/ckt-context.test.ts` -- **spec:** phase-component-model-correctness-job ssB14 + phase-1-engine-infrastructure File 7 -- Pin-key rename at line 26; replace `allocates_all_buffers_at_init` with `allocates_all_buffers_after_setup` (J-114).
 - [ ] `src/solver/analog/__tests__/competing-voltage-constraints.test.ts` -- **spec:** phase-1-engine-infrastructure File 8 -- Migrate from `compileUnified+result.analog.diagnostics` to `facade.compile()+coordinator.dcOperatingPoint()+coordinator.getRuntimeDiagnostics()` (J-118).
-- [ ] `src/solver/analog/__tests__/setup-stamp-order.test.ts` -- **spec:** phase-test-contract-updates Test 1.43 + phase-component-model-correctness-job ssA6 + phase-composite-architecture ssE1 -- 56-site UC-1 sweep; switch to L1 BJT factory; re-record 20-entry TSTALLOC golden; update goldens for shifted fixtures (J-129).
+- [x] `src/solver/analog/__tests__/setup-stamp-order.test.ts` -- **DELETED 2026-05-04 with parity citation** (J-129). All 55 active `it()` blocks + 1 `it.todo` were Category P1 engine-impersonator stamp-order tests: hand-rolled `ConcreteCompiledAnalogCircuit` literal via `makeMinimalCircuit`, `(engine as any)._setup()`, `(engine as any)._solver._getInsertionOrder()`, golden-array `expect(order).toEqual([...])`. Coverage owner: `src/solver/analog/__tests__/ngspice-parity/load-order-parity.test.ts:28-77` (asserts first-NR-iteration matrix entries match ngspice bit-exact via the `ComparisonSession` structural-parity gate fired on every `runDcOp()`). Per-test enumeration would have produced 55 identical citations to the same parity owner. Pattern matches §4c exemplar `tx_trace.test.ts` whole-file delete. Same-pattern dangling block in `src/components/active/__tests__/analog-switch.test.ts:203-285` (PB-ANALOG_SWITCH SPST + SPDT TSTALLOC tests) deleted in the same commit. **Production-side note:** `src/solver/analog/sparse-solver.ts:1027-1034` `_getInsertionOrder()` accessor remains; legitimate unit-test caller at `sparse-expandable.test.ts:190` exercises the method's own contract (encounter order + idempotency through `_resetForAssembly` / `_initStructure`).
 - [ ] `src/solver/analog/__tests__/dc-operating-point.test.ts` -- **spec:** phase-test-contract-updates Test 1.36 + phase-component-model-correctness-job ssB17 -- Delete `makeDiode` helper; migrate 5 tests to M1 with `params.noOpIter`; pin-key rename at line 60 (J-120).
 - [ ] `src/solver/analog/__tests__/analog-engine.test.ts` -- **spec:** phase-test-contract-updates Test 1.27 + Test 1.27b + phase-component-model-correctness-job ssB12 -- UC-1 sweep + accessor-test rename + delete `accessors return null/empty before init` test + pin-key rename at line 43 (J-107).
 - [ ] `src/solver/analog/__tests__/convergence-regression.test.ts` -- **spec:** phase-test-contract-updates Test 1.35 + phase-component-model-correctness-job ssB18 -- Migrate HWR tests to M1/M3; delete `makeHalfWaveRectifier`/`makeRCCircuit`; pin-key rename at line 26 (J-119).
@@ -319,7 +319,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [ ] `src/components/passives/__tests__/transformer.test.ts` -- **spec:** phase-test-contract-updates Test 1.13 + phase-1-engine-infrastructure File 6 + UC-7 -- UC-2 at line 176; unskip `analogFactory creates element with correct branch indices` test; line 663 retained (J-054).
 - [ ] `src/components/passives/__tests__/transmission-line.test.ts` -- **spec:** phase-test-contract-updates Test 1.14 -- UC-1 + UC-2 mutations across 6 engine sites and 3 `_stateBase` writes (J-055).
 - [ ] `src/components/semiconductors/__tests__/bjt.test.ts` -- **spec:** phase-component-model-correctness-job ssA5 -- BJT factory rename at 24 sites (J-071).
-- [ ] `src/components/semiconductors/__tests__/diode.test.ts` -- **spec:** phase-test-contract-updates Test 1.15 -- UC-2 sweep at 18 lines (J-072).
+- [x] `src/components/semiconductors/__tests__/diode.test.ts` -- **§3 J-072 + §4c migration LANDED 2026-05-04.** Full rewrite onto `buildFixture` + registered `Diode`/`DcVoltageSource`/`Resistor`/`Ground`. Pre-migration: 38 tests, 38+ poison-pattern lint blocks (16 B1-private-tunneling + 22 B6-stale-pin-key). Post-migration: 16 tests (5 migrated to observable surface via `coordinator.dcOperatingPoint()` + `engine.getNodeVoltage()`; 13 Category F factory/pure-function probes retained including UC-7 `_stateBase===-1` / `branchIndex===-1` retentions; 4 new closed-form sanity probes anchoring the `computeJunctionCapacitance` / `computeJunctionCharge` public-export surface contract that was previously asserted only via the deleted P2 matrix peeks — these helpers are imported by tunnel-diode/LED/etc. and the public-export anchor prevents silent breakage of those consumers). 22 P1/P2 engine-impersonator tests deleted with citation to `src/solver/analog/__tests__/ngspice-parity/diode-resistor.test.ts` (per-NR-iteration matrix/RHS bit-exact comparison vs the instrumented ngspice DLL covers stamp arithmetic, pnjlim limiting, MODE* mode dispatch, OFF gating, IKF/IKR Norton-pair re-derivation, junction-cap NIintegrate, and `tVcrit` recompute on TEMP change). File: 1435 → 423 lines.
 - [ ] `src/components/semiconductors/__tests__/jfet.test.ts` -- **spec:** phase-test-contract-updates Test 1.16 -- Entry 9 saturation-circuit migration + UC-2 sweep; jfetload.c citations (J-073).
 - [ ] `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` -- **spec:** phase-component-model-correctness-job ssA8 -- L1 conversion at lines 11, 313 (J-074).
 - [ ] `src/components/semiconductors/__tests__/schottky.test.ts` -- **spec:** phase-test-contract-updates Test 1.17 -- UC-1 + UC-2 at lines 71, 285, 314 (J-075).
@@ -589,7 +589,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [x] `src/components/semiconductors/triode.ts` — Pattern B. **Wave 0a sweep target.** *(Note: Wave 11a converts the parent to `kind: "netlist"` form.)*
 - [x] `src/components/passives/analog-fuse.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rCold, rBlown, i2tRating, onStateChange?)`. Has the diagnostic-emitter setter coupling — keep `setDiagnosticEmitter` body untouched. Land last in case the diagnostic-wiring contract changes mid-migration.
 
-#### 4f Wave 8 — test-mock migration to abstract base classes (~30 files)
+#### 4f Wave 8 — test-mock migration to abstract base classes (~30 files) (LANDED, verified 2026-05-04)
 
 > **Rationale:** mocks must exercise the same constructor pipeline production uses. Today every test that needs an `AnalogElement` declares an inline object literal — `const el: AnalogElement = { _pinNodes: new Map([...]), label: "", _stateBase: -1, branchIndex: -1, ngspiceLoadOrder: 0, setup() {...}, load() {...}, getPinCurrents() {...}, setParam() {...} };` — which never goes through the `AbstractAnalogElement` constructor at all. The literal happens to work because tests pass already-resolved `pinNodes` (no patcher in the unit-test path), but the divergence means a test cannot catch a regression in the production constructor pipeline. A passing unit test against the literal does not imply the same shape against the abstract base. Aligning the mocks to the production class hierarchy closes that gap.
 >
@@ -609,43 +609,45 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 > **Acceptance per file:** zero `_pinNodes: new Map(` literals remain in the file body; no `as unknown as AnalogElement` casts that exist solely because the mock had a divergent shape; the file's tests still pass.
 >
 > **Wave 8a — production-adjacent test fixtures (2 files; land first).** These are imported by production-code-path tests and thus most exposed to literal-vs-class divergence.
-> - [ ] `src/test-fixtures/registry-builders.ts`
-> - [ ] `src/test-fixtures/model-fixtures.ts`
+> - [x] `src/test-fixtures/registry-builders.ts`
+> - [x] `src/test-fixtures/model-fixtures.ts`
 >
 > **Wave 8b — engine-internal unit tests.** Cover analog-engine, ckt-context/ckt-load, sparse-solver, dc-operating-point, ac-analysis, rc-ac-transient, timestep, compile / compiler / compile-analog-partition, setup-stamp-order.
-> - [ ] `src/solver/analog/__tests__/analog-engine.test.ts`
-> - [ ] `src/solver/analog/__tests__/ckt-context.test.ts`
-> - [ ] `src/solver/analog/__tests__/ckt-load.test.ts`
-> - [ ] `src/solver/analog/__tests__/sparse-solver.test.ts`
-> - [ ] `src/solver/analog/__tests__/dc-operating-point.test.ts`
-> - [ ] `src/solver/analog/__tests__/ac-analysis.test.ts`
-> - [ ] `src/solver/analog/__tests__/rc-ac-transient.test.ts`
-> - [ ] `src/solver/analog/__tests__/timestep.test.ts`
-> - [ ] `src/solver/analog/__tests__/compiler.test.ts`
-> - [ ] `src/solver/analog/__tests__/compile-analog-partition.test.ts`
-> - [ ] `src/solver/analog/__tests__/setup-stamp-order.test.ts`
-> - [ ] `src/compile/__tests__/compile.test.ts`
-> - [ ] `src/compile/__tests__/compile-integration.test.ts`
-> - [ ] `src/compile/__tests__/coordinator.test.ts`
-> - [ ] `src/compile/__tests__/pin-loading-menu.test.ts`
+> - [x] `src/solver/analog/__tests__/analog-engine.test.ts`
+> - [x] `src/solver/analog/__tests__/ckt-context.test.ts`
+> - [x] `src/solver/analog/__tests__/ckt-load.test.ts`
+> - [x] `src/solver/analog/__tests__/sparse-solver.test.ts`
+> - [x] `src/solver/analog/__tests__/dc-operating-point.test.ts`
+> - [x] `src/solver/analog/__tests__/ac-analysis.test.ts`
+> - [x] `src/solver/analog/__tests__/rc-ac-transient.test.ts`
+> - [x] `src/solver/analog/__tests__/timestep.test.ts`
+> - [x] `src/solver/analog/__tests__/compiler.test.ts`
+> - [x] `src/solver/analog/__tests__/compile-analog-partition.test.ts`
+> - [x] `src/solver/analog/__tests__/setup-stamp-order.test.ts`
+> - [x] `src/compile/__tests__/compile.test.ts`
+> - [x] `src/compile/__tests__/compile-integration.test.ts`
+> - [x] `src/compile/__tests__/coordinator.test.ts`
+> - [x] `src/compile/__tests__/pin-loading-menu.test.ts`
 >
 > **Wave 8c — coordinator + integration tests.**
-> - [ ] `src/solver/__tests__/coordinator-clock.test.ts`
-> - [ ] `src/solver/__tests__/coordinator-capability.test.ts`
-> - [ ] `src/solver/__tests__/coordinator-speed-control.test.ts`
-> - [ ] `src/solver/analog/__tests__/digital-pin-loading.test.ts`
-> - [ ] `src/solver/analog/__tests__/spice-import-dialog.test.ts`
-> - [ ] `src/solver/analog/__tests__/harness/harness-integration.test.ts`
-> - [ ] `src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts`
-> - [ ] `src/editor/__tests__/wire-current-resolver.test.ts`
+> - [x] `src/solver/__tests__/coordinator-clock.test.ts`
+> - [x] `src/solver/__tests__/coordinator-capability.test.ts`
+> - [x] `src/solver/__tests__/coordinator-speed-control.test.ts`
+> - [x] `src/solver/analog/__tests__/digital-pin-loading.test.ts`
+> - [x] `src/solver/analog/__tests__/spice-import-dialog.test.ts`
+> - [x] `src/solver/analog/__tests__/harness/harness-integration.test.ts` — also dropped dead `accept()` method on `HarnessCapacitorEl` (no-accept invariant).
+> - [x] `src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts`
+> - [x] `src/editor/__tests__/wire-current-resolver.test.ts` — also dropped redundant `as unknown as AnalogElement` cast.
+
+> **Wave 8e — gap-closure (out-of-spec discovery, landed in same commit).** A literal in `src/solver/analog/__tests__/harness/netlist-generator.test.ts:74` matched the recipe but was not enumerated in 8b/c/d; converted in the same pass. Acceptance grep across `src/**/__tests__/**` and `src/test-fixtures/` for `_pinNodes:\s*new Map`, `:\s*AnalogElement\s*=\s*\{`, `:\s*PoolBackedAnalogElement\s*=\s*\{`, and the function-return-type variants returns zero hits.
 >
 > **Wave 8d — component-specific unit tests.**
-> - [ ] `src/components/active/__tests__/real-opamp.test.ts`
-> - [ ] `src/components/active/__tests__/ota.test.ts`
-> - [ ] `src/components/semiconductors/__tests__/mosfet.test.ts`
-> - [ ] `src/components/semiconductors/__tests__/diode.test.ts`
-> - [ ] `src/components/semiconductors/__tests__/bjt.test.ts` (uses `AnalogElement & { ... }` intersection casts on factory-returned elements; check whether the cast becomes unnecessary post-migration)
-> - [ ] `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` (uses `as PoolBackedAnalogElement & { _stateBase: number }` cast — should be unnecessary once the element is a real `AbstractPoolBackedAnalogElement` instance)
+> - [x] `src/components/active/__tests__/real-opamp.test.ts` — investigated; no eligible literals (file uses production factory directly).
+> - [x] `src/components/active/__tests__/ota.test.ts`
+> - [x] `src/components/semiconductors/__tests__/mosfet.test.ts`
+> - [x] `src/components/semiconductors/__tests__/diode.test.ts`
+> - [ ] `src/components/semiconductors/__tests__/bjt.test.ts` — investigated; 3 `as AnalogElement & { label?: string; elementIndex?: number }` intersection casts at lines ~409 / ~460 / ~2750 RETAINED pending Wave 11b migration of `bjt.ts:580/584/1202/1206` (production BJT L0/L1 factories still return object literals; casts cannot drop until the production class instances satisfy the abstract base directly).
+> - [x] `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` — also dropped redundant `as PoolBackedAnalogElement & { _stateBase: number }` casts at lines ~61 and ~326 (`_stateBase` is now declared on the abstract base, casts were fully redundant).
 
 #### 4f follow-ons
 
@@ -667,7 +669,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 > **Surfaced 2026-05-04 by audit-before-launch.** §4f Waves 1–7 are functionally complete (no `_pinNodes = new Map(pinNodes)` defensive copies in any of the 53 named files; every one extends the abstract base; `super(pinNodes)` first; transmission-line.test.ts smoke gate 14/14 green). What remains is mechanical cleanup that the §4f recipe step "Replace `implements X` → `extends Abstract`" partially executed: 9 files added `extends Abstract...` *alongside* the original `implements (Pool)?AnalogElement` clause rather than replacing it. The double-declaration is a no-op at compile time but trips Phase C (which deletes the loose interface) and the original Wave 0 acceptance grep.
 
-- [ ] **Strip redundant `implements AnalogElement` / `implements PoolBackedAnalogElement` clauses on 9 files where the class already `extends Abstract(PoolBacked)?AnalogElement`:**
+- [x] **Strip redundant `implements AnalogElement` / `implements PoolBackedAnalogElement` clauses on 9 files where the class already `extends Abstract(PoolBacked)?AnalogElement`:** (LANDED, verified 2026-05-04)
   - `src/components/active/internal-cccs.ts`
   - `src/components/active/internal-zero-volt-sense.ts`
   - `src/components/switching/trans-gate.ts`
@@ -680,13 +682,13 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
   **Do NOT touch:** `switch.ts implements SpstAnalogElement` and `switch-dt.ts implements SpdtAnalogElement` — these are domain marker interfaces, not the loose `AnalogElement`/`PoolBackedAnalogElement` interfaces Phase C deletes. They remain.
 
-- [ ] **Acceptance:** `Grep` for `extends\s+Abstract\w*\s+implements\s+(AnalogElement|PoolBackedAnalogElement)\b` across `src/` returns zero hits. `tsc --noEmit -p .` clean. No targeted-test runs needed (the sweep is purely lexical; behavior is unchanged).
+- [x] **Acceptance:** `Grep` for `extends\s+Abstract\w*\s+implements\s+(AnalogElement|PoolBackedAnalogElement)\b` across `src/` returns zero hits. `tsc --noEmit -p .` baseline unchanged (no new errors introduced). Verified 2026-05-04.
 
 #### 4g Wave 0 — Hard prerequisites (must land before Phase A)
 
 - [x] All §4f Waves 1–7 production-file migrations complete (load-bearing property: zero `_pinNodes = new Map(pinNodes)` defensive copies in any §4f-named file; every class extends the abstract base; `super(pinNodes)` first). Verified by audit 2026-05-04.
-- [ ] Wave 0a redundant-implements sweep landed (above).
-- [ ] §4f Wave 8 test-mock migration complete. Every inline `const el: AnalogElement = { ... }` in `src/**/__tests__/*.test.ts` and `src/test-fixtures/*.ts` rewritten as a local `class TestEl extends AbstractAnalogElement` declaration. **Acceptance:** `Grep` for `:\s*AnalogElement\s*=\s*\{` returns zero hits across `src/`.
+- [x] Wave 0a redundant-implements sweep landed (above). 2026-05-04.
+- [x] §4f Wave 8 test-mock migration complete. Every inline `(Pool)?AnalogElement` literal — typed-const, typed-fn-return, typed-arrow-return, and inline-factory forms — in `src/**/__tests__/*.test.ts` and `src/test-fixtures/*.ts` rewritten as a local `class TestEl extends Abstract(PoolBacked)?AnalogElement` declaration. **Acceptance grep results across `src/**/__tests__/**` and `src/test-fixtures/`:** `_pinNodes:\s*new Map` → 0; `:\s*(Pool)?AnalogElement\s*=\s*\{` → 0; `\):\s*(Pool)?AnalogElement\s*\{` → 0. **Caveat:** `bjt.test.ts` retains 3 intersection casts pending Wave 11b `bjt.ts` literal-to-class migration (see §4f Wave 8d row).
 
 > **Rationale:** Phase C deletes the loose interface. Any unmigrated literal or `implements` site becomes a `tsc` error after Phase C. Landing all Wave 8 work first means Phase C is a single atomic rename, not a multi-day red build. The original "no `implements` clauses outside element.ts" gate is replaced by the architectural-smell gate (`_pinNodes\s*=\s*new Map\(`) at Wave 11; the residual `implements` clauses on Wave-9-target files are part of those files' migration scope, not Wave 0's.
 

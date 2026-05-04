@@ -25,13 +25,28 @@ import {
   TestSubcircuitElement,
 } from "@/test-fixtures/subcircuit-elements";
 import { noopExecFn } from "@/test-fixtures/execute-stubs";
+import { AbstractAnalogElement } from "@/solver/analog/element";
+import type { LoadContext } from "@/solver/analog/load-context";
+import type { SetupContext } from "@/solver/analog/setup-context";
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element stub
+// ---------------------------------------------------------------------------
+
+class FlattenNoopEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(): number[] { return []; }
+  setParam(_k: string, _v: number): void {}
+}
 
 // ---------------------------------------------------------------------------
 // Registry helpers
 // ---------------------------------------------------------------------------
 
 function noopAnalogFactory() {
-  return { label: "", branchIndex: -1, _stateBase: -1, _pinNodes: new Map<string, number>(), ngspiceLoadOrder: 0, load: (_ctx: unknown) => {}, setup: (_ctx: unknown) => {}, getPinCurrents: () => [] as number[], setParam: (_k: string, _v: number) => {} };
+  return new FlattenNoopEl(new Map<string, number>());
 }
 
 function makeAnalogDef(typeId: string): StandaloneComponentDefinition {

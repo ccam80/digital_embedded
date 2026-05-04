@@ -10,9 +10,23 @@ import { AbstractCircuitElement } from "../../../../core/element.js";
 import type { RenderContext } from "../../../../core/renderer-interface.js";
 import type { Pin } from "../../../../core/pin.js";
 import type { AnalogElement } from "../../element.js";
+import { AbstractAnalogElement } from "../../element.js";
 import type { LoadContext } from "../../load-context.js";
+import type { SetupContext } from "../../setup-context.js";
 import type { StatePool } from "../../state-pool.js";
 import { createDefaultRegistry } from "../../../../components/register-all.js";
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element stub
+// ---------------------------------------------------------------------------
+
+class NetlistGenTestEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(): number[] { return []; }
+  setParam(): void {}
+}
 
 const testRegistry = createDefaultRegistry();
 
@@ -70,17 +84,9 @@ class TestCircuitElement extends AbstractCircuitElement {
 }
 
 function makeAnalogEl(nodeIds: number[]): AnalogElement {
-  return {
-    _pinNodes: new Map(nodeIds.map((id, i) => [String(i), id])),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    label: "test",
-    setup: (_ctx: unknown) => void 0,
-    load: (_ctx: LoadContext) => void 0,
-    getPinCurrents: () => [],
-    setParam: () => {},
-  } as unknown as AnalogElement;
+  const el = new NetlistGenTestEl(new Map(nodeIds.map((id, i) => [String(i), id])));
+  el.label = "test";
+  return el;
 }
 
 type CEMap = Map<number, import("../../../../core/element.js").CircuitElement>;

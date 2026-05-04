@@ -18,6 +18,45 @@ import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { AbstractAnalogElement } from '../analog/element.js';
+import type { SetupContext } from '../analog/setup-context.js';
+import type { LoadContext } from '../analog/load-context.js';
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element mocks for coordinator-clock tests
+// ---------------------------------------------------------------------------
+
+class ClockTestGroundEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
+class ClockTestResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  private readonly _nodeA: number;
+  private readonly _nodeB: number;
+  private readonly _g: number;
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    super(pinNodes);
+    this._nodeA = pinNodes.get('p1') ?? 0;
+    this._nodeB = pinNodes.get('p2') ?? 0;
+    this._g = 1 / 1000;
+  }
+  setup(_ctx: SetupContext): void {}
+  load(ctx: LoadContext): void {
+    const nodeA = this._nodeA;
+    const nodeB = this._nodeB;
+    const g = this._g;
+    if (nodeA > 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), g);
+    if (nodeB > 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), g);
+    if (nodeA > 0 && nodeB > 0) { ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -g); ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -g); }
+  }
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
 
 function makeAnalogElementObj(
   typeId: string,
@@ -50,17 +89,7 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     pinElectrical: {},
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => ({
-        label: "",
-        _pinNodes: new Map(gndPinNodes),
-        _stateBase: -1,
-        branchIndex: -1 as const,
-        ngspiceLoadOrder: 0,
-        setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
-        load(_ctx: import('../analog/load-context.js').LoadContext): void {},
-        getPinCurrents(_v: Float64Array) { return [0]; },
-        setParam(_key: string, _value: number) {},
-      }), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => new ClockTestGroundEl(gndPinNodes), paramDefs: [], params: {} },
     },
   } as unknown as StandaloneComponentDefinition;
 
@@ -81,26 +110,7 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     pinElectrical: {},
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => {
-        const nodeA = pinNodes.get('p1') ?? 0;
-        const nodeB = pinNodes.get('p2') ?? 0;
-        const g = 1 / 1000;
-        return {
-          label: "",
-          _pinNodes: new Map(pinNodes),
-          _stateBase: -1,
-          branchIndex: -1 as const,
-          ngspiceLoadOrder: 0,
-          setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
-          load(ctx: import('../analog/load-context.js').LoadContext): void {
-            if (nodeA > 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), g);
-            if (nodeB > 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), g);
-            if (nodeA > 0 && nodeB > 0) { ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -g); ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -g); }
-          },
-          getPinCurrents(_v: Float64Array) { return [0, 0]; },
-          setParam(_key: string, _value: number) {},
-        };
-      }, paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => new ClockTestResistorEl(pinNodes), paramDefs: [], params: {} },
     },
   } as unknown as StandaloneComponentDefinition;
 

@@ -33,11 +33,35 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
 import type { ExecuteFunction } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
+import type { SetupContext } from "../setup-context.js";
 import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
 import { compileUnified } from "@/compile/compile.js";
 import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element mocks for digital-pin-loading tests
+// ---------------------------------------------------------------------------
+
+class PinLoadingTestGroundEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return []; }
+  setParam(_k: string, _v: number): void {}
+}
+
+
+class PinLoadingTestStubEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
+  getPinCurrents(_v: Float64Array): number[] { return []; }
+  setParam(_key: string, _value: number): void {}
+}
 
 // ---------------------------------------------------------------------------
 // Stub helpers (mirrored from digital-bridge-path.test.ts)
@@ -64,18 +88,7 @@ function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]
 }
 
 function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogElement {
-  return {
-    label: "",
-    ngspiceLoadOrder: 0,
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return []; },
-  };
+  return new PinLoadingTestStubEl(pinNodes);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,17 +117,7 @@ function buildRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => ({
-        label: "",
-        ngspiceLoadOrder: 0,
-        _pinNodes: new Map(_pinNodes),
-        _stateBase: -1,
-        branchIndex: -1,
-        setup(_ctx: unknown): void {},
-        load(_ctx: unknown): void {},
-        setParam(_k: string, _v: number): void {},
-        getPinCurrents(_v: Float64Array): number[] { return []; },
-      }), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => new PinLoadingTestGroundEl(_pinNodes), paramDefs: [], params: {} },
     },
   });
 

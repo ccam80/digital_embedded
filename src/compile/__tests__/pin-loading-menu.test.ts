@@ -26,9 +26,24 @@ import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
+import { AbstractAnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
+import type { SetupContext } from '../../solver/analog/setup-context.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element stub
+// ---------------------------------------------------------------------------
+
+class PinLoadingMenuTestEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
+  stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
 
 // ---------------------------------------------------------------------------
 // Minimal digital CircuitElement
@@ -51,18 +66,7 @@ function makeAnalogPin(x: number, y: number): Pin {
 }
 
 function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx) {},
-    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
-    stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
-    getPinCurrents(_v: Float64Array) { return [0, 0]; },
-    setParam(_key: string, _value: number) {},
-  };
+  return new PinLoadingMenuTestEl(new Map([["a", nodeA], ["b", nodeB]]));
 }
 
 function makeAnalogElement(

@@ -13,63 +13,62 @@ import { allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
+  class TestResistor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+    private _hPP = -1;
+    private _hNN = -1;
+    private _hPN = -1;
+    private _hNP = -1;
     setup(ctx: SetupContext): void {
       const s = ctx.solver;
-      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
       if (nodeA !== 0 && nodeB !== 0) {
-        _hPN = s.allocElement(nodeA, nodeB);
-        _hNP = s.allocElement(nodeB, nodeA);
+        this._hPN = s.allocElement(nodeA, nodeB);
+        this._hNP = s.allocElement(nodeB, nodeA);
       }
-    },
+    }
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      if (_hPP !== -1) s.stampElement(_hPP,  G);
-      if (_hNN !== -1) s.stampElement(_hNN,  G);
-      if (_hPN !== -1) s.stampElement(_hPN, -G);
-      if (_hNP !== -1) s.stampElement(_hNP, -G);
-    },
+      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
+      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
+      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
+      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
+    }
     getPinCurrents(rhs: Float64Array): number[] {
       const vA = rhs[nodeA] ?? 0;
       const vB = rhs[nodeB] ?? 0;
       return [G * (vA - vB), G * (vB - vA)];
-    },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+    }
+    setParam(_key: string, _value: number): void {}
+  }
+  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
 }
 
 function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number): AnalogElement {
   const VT = 0.025852;
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: new Map([["A", nodeAnode], ["K", nodeCathode]]),
-    _stateBase: -1,
-    branchIndex: -1,
+  class TestDiode extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+    private _hAA = -1;
+    private _hKK = -1;
+    private _hAK = -1;
+    private _hKA = -1;
     setup(ctx: SetupContext): void {
       const s = ctx.solver;
-      if (nodeAnode !== 0) _hAA = s.allocElement(nodeAnode, nodeAnode);
-      if (nodeCathode !== 0) _hKK = s.allocElement(nodeCathode, nodeCathode);
+      if (nodeAnode !== 0) this._hAA = s.allocElement(nodeAnode, nodeAnode);
+      if (nodeCathode !== 0) this._hKK = s.allocElement(nodeCathode, nodeCathode);
       if (nodeAnode !== 0 && nodeCathode !== 0) {
-        _hAK = s.allocElement(nodeAnode, nodeCathode);
-        _hKA = s.allocElement(nodeCathode, nodeAnode);
+        this._hAK = s.allocElement(nodeAnode, nodeCathode);
+        this._hKA = s.allocElement(nodeCathode, nodeAnode);
       }
-    },
+    }
     load(ctx: LoadContext): void {
       const vA = ctx.rhsOld[nodeAnode] ?? 0;
       const vK = ctx.rhsOld[nodeCathode] ?? 0;
@@ -78,47 +77,46 @@ function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number
       const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
       const Ieq = Id - Gd * vD;
       const s = ctx.solver;
-      if (_hAA !== -1) s.stampElement(_hAA,  Gd);
-      if (_hKK !== -1) s.stampElement(_hKK,  Gd);
-      if (_hAK !== -1) s.stampElement(_hAK, -Gd);
-      if (_hKA !== -1) s.stampElement(_hKA, -Gd);
+      if (this._hAA !== -1) s.stampElement(this._hAA,  Gd);
+      if (this._hKK !== -1) s.stampElement(this._hKK,  Gd);
+      if (this._hAK !== -1) s.stampElement(this._hAK, -Gd);
+      if (this._hKA !== -1) s.stampElement(this._hKA, -Gd);
       if (nodeAnode !== 0) ctx.rhs[nodeAnode] -= Ieq;
       if (nodeCathode !== 0) ctx.rhs[nodeCathode] += Ieq;
-    },
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+    }
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
+    setParam(_key: string, _value: number): void {}
+  }
+  return new TestDiode(new Map([["A", nodeAnode], ["K", nodeCathode]]));
 }
 
 function makeCapacitor(nodePos: number, nodeNeg: number, _capacitance: number): AnalogElement {
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
-    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: -1,
+  class TestCapacitor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
+    private _hPP = -1;
+    private _hNN = -1;
+    private _hPN = -1;
+    private _hNP = -1;
     setup(ctx: SetupContext): void {
       const s = ctx.solver;
-      if (nodePos !== 0) _hPP = s.allocElement(nodePos, nodePos);
-      if (nodeNeg !== 0) _hNN = s.allocElement(nodeNeg, nodeNeg);
+      if (nodePos !== 0) this._hPP = s.allocElement(nodePos, nodePos);
+      if (nodeNeg !== 0) this._hNN = s.allocElement(nodeNeg, nodeNeg);
       if (nodePos !== 0 && nodeNeg !== 0) {
-        _hPN = s.allocElement(nodePos, nodeNeg);
-        _hNP = s.allocElement(nodeNeg, nodePos);
+        this._hPN = s.allocElement(nodePos, nodeNeg);
+        this._hNP = s.allocElement(nodeNeg, nodePos);
       }
-    },
+    }
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      if (_hPP !== -1) s.stampElement(_hPP,  0);
-      if (_hNN !== -1) s.stampElement(_hNN,  0);
-      if (_hPN !== -1) s.stampElement(_hPN,  0);
-      if (_hNP !== -1) s.stampElement(_hNP,  0);
-    },
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+      if (this._hPP !== -1) s.stampElement(this._hPP,  0);
+      if (this._hNN !== -1) s.stampElement(this._hNN,  0);
+      if (this._hPN !== -1) s.stampElement(this._hPN,  0);
+      if (this._hNP !== -1) s.stampElement(this._hNP,  0);
+    }
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
+    setParam(_key: string, _value: number): void {}
+  }
+  return new TestCapacitor(new Map([["pos", nodePos], ["neg", nodeNeg]]));
 }
 
 // ---------------------------------------------------------------------------

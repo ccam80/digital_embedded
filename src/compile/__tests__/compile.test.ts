@@ -21,11 +21,61 @@ import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { PropertyBag as PropertyBagType, PropertyValue } from "../../core/properties.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { ComplexSparseSolver } from "../../solver/analog/complex-sparse-solver.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SerializedElement } from "../../core/element.js";
 import { createTestElementFromDecls } from "../../test-fixtures/test-element.js";
 import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element stubs
+// ---------------------------------------------------------------------------
+
+class CompileTestResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  private readonly _resistance: number;
+  private readonly _n1: number;
+  private readonly _n2: number;
+  constructor(pinNodes: ReadonlyMap<string, number>, resistance: number) {
+    super(pinNodes);
+    this._n1 = pinNodes.get("p1") ?? 0;
+    this._n2 = pinNodes.get("p2") ?? 0;
+    this._resistance = resistance;
+  }
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
+  stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
+    const g = 1 / this._resistance;
+    const n1 = this._n1;
+    const n2 = this._n2;
+    if (n1 !== 0) {
+      const h = solver.allocComplexElement(n1 - 1, n1 - 1);
+      solver.stampComplexElement(h, g, 0);
+    }
+    if (n2 !== 0) {
+      const h = solver.allocComplexElement(n2 - 1, n2 - 1);
+      solver.stampComplexElement(h, g, 0);
+    }
+    if (n1 !== 0 && n2 !== 0) {
+      const hab = solver.allocComplexElement(n1 - 1, n2 - 1);
+      solver.stampComplexElement(hab, -g, 0);
+      const hba = solver.allocComplexElement(n2 - 1, n1 - 1);
+      solver.stampComplexElement(hba, -g, 0);
+    }
+  }
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
+class CompileTestGroundStubEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0]; }
+  setParam(_key: string, _value: number): void {}
+}
 
 // ---------------------------------------------------------------------------
 // Minimal plain-object CircuitElement (analog-style, no AbstractCircuitElement)
@@ -168,34 +218,7 @@ function makeResistorAnalogEl(
   n2: number,
   resistance: number,
 ): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["p1", n1], ["p2", n2]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx) {},
-    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
-    stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
-      const g = 1 / resistance;
-      if (n1 !== 0) {
-        const h = solver.allocComplexElement(n1 - 1, n1 - 1);
-        solver.stampComplexElement(h, g, 0);
-      }
-      if (n2 !== 0) {
-        const h = solver.allocComplexElement(n2 - 1, n2 - 1);
-        solver.stampComplexElement(h, g, 0);
-      }
-      if (n1 !== 0 && n2 !== 0) {
-        const hab = solver.allocComplexElement(n1 - 1, n2 - 1);
-        solver.stampComplexElement(hab, -g, 0);
-        const hba = solver.allocComplexElement(n2 - 1, n1 - 1);
-        solver.stampComplexElement(hba, -g, 0);
-      }
-    },
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-    setParam(_key: string, _value: number): void {},
-  };
+  return new CompileTestResistorEl(new Map([["p1", n1], ["p2", n2]]), resistance);
 }
 
 function makeAnalogDef(
@@ -251,17 +274,7 @@ function makeGroundDef(): StandaloneComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => ({
-        label: "",
-        _pinNodes: new Map<string, number>(),
-        _stateBase: -1,
-        branchIndex: -1,
-        ngspiceLoadOrder: 0,
-        setup(_ctx: import('../../solver/analog/setup-context.js').SetupContext) {},
-        load(_ctx: LoadContext) {},
-        getPinCurrents(_v: Float64Array) { return [0]; },
-        setParam(_key: string, _value: number) {},
-      }), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => new CompileTestGroundStubEl(new Map<string, number>()), paramDefs: [], params: {} },
     },
   };
 }

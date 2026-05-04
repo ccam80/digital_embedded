@@ -25,10 +25,6 @@ import {
 } from "../analog-switch.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory
@@ -200,86 +196,3 @@ describe("SPDT_SCHEMA structure", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Setup-stamp-order tests (PB-ANALOG_SWITCH verification gate)
-//
-// These tests mirror setup-stamp-order.test.ts pattern for the ANALOG_SWITCH
-// rows (it.todo("PB-ANALOG_SWITCH TSTALLOC sequence") in that file is locked
-// by the 5.B.sw agent during this wave; covered here per PB spec gate).
-// ---------------------------------------------------------------------------
-
-function makeMinimalCircuit(
-  elements: AnalogElement[],
-  nodeCount: number,
-): ConcreteCompiledAnalogCircuit {
-  return {
-    nodeCount,
-    elements,
-    labelToNodeId: new Map(),
-    labelPinNodes: new Map(),
-    wireToNodeId: new Map(),
-    models: new Map(),
-    statePool: null,
-    componentCount: elements.length,
-    netCount: nodeCount,
-    diagnostics: [],
-    branchCount: 0,
-    matrixSize: nodeCount,
-    bridgeOutputAdapters: [],
-    bridgeInputAdapters: [],
-    elementToCircuitElement: new Map(),
-    resolvedPins: [],
-  } as unknown as ConcreteCompiledAnalogCircuit;
-}
-
-describe("PB-ANALOG_SWITCH TSTALLOC sequence", () => {
-  it("SPST: allocStates(2) then 4×SW TSTALLOC (swsetup.c:47-48, 59-62)", () => {
-    // Nodes: in=1, out=2, ctrl=3
-    // Expected TSTALLOC sequence (swsetup.c:59-62):
-    //   (1,1) SWposPosptr, (1,2) SWposNegptr, (2,1) SWnegPosptr, (2,2) SWnegNegptr
-    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
-      makeProps(), () => 0,
-    );
-    const solver = new SparseSolver();
-    const ctx = makeTestSetupContext({ solver, elements: [el as unknown as AnalogElement] });
-    (el as unknown as AnalogElement).setup(ctx);
-    const order = (solver as any)._getInsertionOrder();
-    expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // SWposPosptr
-      { extRow: 1, extCol: 2 },  // SWposNegptr
-      { extRow: 2, extCol: 1 },  // SWnegPosptr
-      { extRow: 2, extCol: 2 },  // SWnegNegptr
-    ]);
-  });
-
-  it("SPDT: swNO allocStates(2)+4×TSTALLOC then swNC allocStates(2)+4×TSTALLOC", () => {
-    // Nodes: com=1, no=2, nc=3, ctrl=4
-    // swNO path: pos=nCom=1, neg=nNO=2
-    //   (1,1) PP, (1,2) PN, (2,1) NP, (2,2) NN
-    // swNC path: pos=nCom=1, neg=nNC=3
-    //   (1,1) PP, (1,3) PN, (3,1) NP, (3,3) NN
-    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
-      makeProps(), () => 0,
-    );
-    const solver = new SparseSolver();
-    const ctx = makeTestSetupContext({ solver, elements: [el as unknown as AnalogElement] });
-    (el as unknown as AnalogElement).setup(ctx);
-    const order = (solver as any)._getInsertionOrder();
-    expect(order).toEqual([
-      // swNO path (com=1, no=2)- swsetup.c:59-62
-      { extRow: 1, extCol: 1 },  // SWposPosptr (swNO)
-      { extRow: 1, extCol: 2 },  // SWposNegptr (swNO)
-      { extRow: 2, extCol: 1 },  // SWnegPosptr (swNO)
-      { extRow: 2, extCol: 2 },  // SWnegNegptr (swNO)
-      // swNC path (com=1, nc=3)- swsetup.c:59-62
-      { extRow: 1, extCol: 1 },  // SWposPosptr (swNC)
-      { extRow: 1, extCol: 3 },  // SWposNegptr (swNC)
-      { extRow: 3, extCol: 1 },  // SWnegPosptr (swNC)
-      { extRow: 3, extCol: 3 },  // SWnegNegptr (swNC)
-    ]);
-  });
-});

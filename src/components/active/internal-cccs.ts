@@ -49,7 +49,7 @@ const INTERNAL_CCCS_PIN_LAYOUT: PinDeclaration[] = [
 // InternalCccsElement
 // ---------------------------------------------------------------------------
 
-export class InternalCccsElement extends AbstractAnalogElement implements AnalogElement {
+export class InternalCccsElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
 
   /** Gain (CTR). Hot-loadable via setParam("gain", v). */

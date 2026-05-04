@@ -38,7 +38,7 @@ const INTERNAL_ZERO_VOLT_SENSE_PIN_LAYOUT: PinDeclaration[] = [
 // InternalZeroVoltSenseElement
 // ---------------------------------------------------------------------------
 
-export class InternalZeroVoltSenseElement extends AbstractAnalogElement implements AnalogElement {
+export class InternalZeroVoltSenseElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
 
   // Cached matrix-entry handles — mirror vsrcsetup.c TSTALLOC sequence for

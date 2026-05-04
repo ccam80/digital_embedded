@@ -58,7 +58,7 @@ function makeDiode(paramOverrides: Record<string, number> = {}) {
  */
 function initPool(element: PoolBackedAnalogElement): StatePool {
   const pool = new StatePool(Math.max(element.stateSize, 1));
-  (element as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
+  element._stateBase = 0;
   element.initState(pool);
   return pool;
 }
@@ -323,7 +323,7 @@ function makeBjtL1(paramOverrides: Record<string, number> = {}) {
 
 function initBjtPool(element: ReturnType<typeof makeBjtL0> | ReturnType<typeof makeBjtL1>): StatePool {
   const pool = new StatePool(Math.max(element.stateSize, 1));
-  (element as { _stateBase: number })._stateBase = 0;
+  element._stateBase = 0;
   element.initState(pool);
   return pool;
 }

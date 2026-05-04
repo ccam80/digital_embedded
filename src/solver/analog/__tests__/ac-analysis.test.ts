@@ -19,6 +19,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
 import type { AcCompiledCircuit } from "../ac-analysis.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComplexSparseSolverStamp as ComplexSparseSolver } from "../complex-sparse-solver.js";
@@ -46,16 +47,13 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
     }
   }
 
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
+  class AcResistor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
     stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const a = nodeA > 0 ? nodeA - 1 : -1;
       const b = nodeB > 0 ? nodeB - 1 : -1;
@@ -67,8 +65,9 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
         solver.stampComplexElement(hba, -G, 0);
       }
       stampMatrix(solver, b, b, G, 0);
-    },
-  };
+    }
+  }
+  return new AcResistor(pinNodes);
 }
 
 /**
@@ -76,16 +75,13 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
  * Stamps imaginary admittance jωC at the node positions.
  */
 function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
+  class AcCapacitor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
     stampAc(solver: ComplexSparseSolver, omega: number, _ctx: LoadContext): void {
       const jOmegaC = omega * capacitance; // imaginary part of admittance
       const a = nodeA > 0 ? nodeA - 1 : -1;
@@ -96,8 +92,9 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
         const hba = solver.allocComplexElement(b, a); solver.stampComplexElement(hba, 0, -jOmegaC);
       }
       if (b >= 0) { const h = solver.allocComplexElement(b, b); solver.stampComplexElement(h, 0, jOmegaC); }
-    },
-  };
+    }
+  }
+  return new AcCapacitor(pinNodes);
 }
 
 /**
@@ -105,16 +102,13 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
  * Stamps admittance 1/(jωL) = -j/(ωL) at the node positions.
  */
 function makeAcInductor(nodeA: number, nodeB: number, inductance: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
+  class AcInductor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
     stampAc(solver: ComplexSparseSolver, omega: number, _ctx: LoadContext): void {
       // Y_L = 1/(jωL) = -j/(ωL)
       const admIm = -1 / (omega * inductance);
@@ -126,8 +120,9 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
         const hba = solver.allocComplexElement(b, a); solver.stampComplexElement(hba, 0, -admIm);
       }
       if (b >= 0) { const h = solver.allocComplexElement(b, b); solver.stampComplexElement(h, 0, admIm); }
-    },
-  };
+    }
+  }
+  return new AcInductor(pinNodes);
 }
 
 // ---------------------------------------------------------------------------

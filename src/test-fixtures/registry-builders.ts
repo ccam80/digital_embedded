@@ -10,6 +10,9 @@ import type { StandaloneComponentDefinition, ExecuteFunction } from "../core/reg
 import { PropertyBag } from "../core/properties.js";
 import { TestElement } from "./test-element.js";
 import { noopExecFn } from "./execute-stubs.js";
+import { AbstractAnalogElement } from "../solver/analog/element.js";
+import type { SetupContext } from "../solver/analog/setup-context.js";
+import type { LoadContext } from "../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Component config types
@@ -57,18 +60,16 @@ export interface MixedComponentConfig {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+class NoopAnalogElement extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_rhs: Float64Array): number[] { return []; }
+  setParam(_key: string, _value: number): void {}
+}
+
 function makeNoopAnalogFactory(pinNodes: ReadonlyMap<string, number>) {
-  return {
-    label: "",
-    ngspiceLoadOrder: 0,
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1 as const,
-    setup: (_ctx: unknown) => {},
-    load: (_ctx: unknown) => {},
-    getPinCurrents: () => [] as number[],
-    setParam: (_key: string, _value: number) => {},
-  };
+  return new NoopAnalogElement(pinNodes);
 }
 
 function makeDigitalDef(config: DigitalComponentConfig): Omit<StandaloneComponentDefinition, "typeId"> & { typeId: -1 } {

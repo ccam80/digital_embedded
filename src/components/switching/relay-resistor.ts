@@ -11,7 +11,7 @@ import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
-export class RelayResSubElement extends AbstractAnalogElement implements AnalogElement {
+export class RelayResSubElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   // Handle fields- port of ressetup.c:46-49 TSTALLOC sequence

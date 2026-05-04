@@ -167,7 +167,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 // AnalogPotentiometerElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-class AnalogPotentiometerElement extends AbstractAnalogElement implements AnalogElement {
+class AnalogPotentiometerElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private R: number;

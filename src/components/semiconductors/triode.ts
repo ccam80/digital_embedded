@@ -139,7 +139,7 @@ function computeTriodeOp(
 // TriodeElement- composite analog element
 // ---------------------------------------------------------------------------
 
-class TriodeElement extends AbstractAnalogElement implements AnalogElement {
+class TriodeElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
 
   /** VCCS sub-element carrying the 4 transconductance handles. */

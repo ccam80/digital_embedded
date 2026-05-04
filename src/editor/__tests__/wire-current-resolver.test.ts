@@ -22,47 +22,51 @@ import { PropertyBag } from "@/core/properties";
 import { makeAcVoltageSourceElement } from "@/components/sources/ac-voltage-source";
 import type { SetupContext } from "@/solver/analog/setup-context";
 import type { LoadContext } from "@/solver/analog/load-context";
+import { AbstractAnalogElement } from "@/solver/analog/element";
 
 // ---------------------------------------------------------------------------
 // Local element factory helpers- use production constructors / factories
 // ---------------------------------------------------------------------------
 
 /** Inline resistor factory: 2-terminal, stamps conductance G=1/R. */
+class WireTestResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 40;
+  private _hPP = -1;
+  private _hNN = -1;
+  private _hPN = -1;
+  private _hNP = -1;
+  private readonly _G: number;
+  constructor(pinNodes: ReadonlyMap<string, number>, resistance: number) {
+    super(pinNodes);
+    this._G = 1 / Math.max(resistance, 1e-9);
+  }
+  setup(ctx: SetupContext): void {
+    const p = this._pinNodes.get("pos")!;
+    const n = this._pinNodes.get("neg")!;
+    this._hPP = ctx.solver.allocElement(p, p);
+    this._hNN = ctx.solver.allocElement(n, n);
+    this._hPN = ctx.solver.allocElement(p, n);
+    this._hNP = ctx.solver.allocElement(n, p);
+  }
+  load(ctx: LoadContext): void {
+    ctx.solver.stampElement(this._hPP, this._G);
+    ctx.solver.stampElement(this._hNN, this._G);
+    ctx.solver.stampElement(this._hPN, -this._G);
+    ctx.solver.stampElement(this._hNP, -this._G);
+  }
+  getPinCurrents(rhs: Float64Array): number[] {
+    const vA = rhs[this._pinNodes.get("pos")!];
+    const vB = rhs[this._pinNodes.get("neg")!];
+    const I = this._G * (vA - vB);
+    return [I, -I];
+  }
+  setParam(key: string, value: number): void {
+    void key; void value;
+  }
+}
+
 function makeResistor(posNode: number, negNode: number, resistance: number): AnalogElement {
-  const G = 1 / Math.max(resistance, 1e-9);
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const pinNodes = new Map([["pos", posNode], ["neg", negNode]]);
-  const res: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: 40,
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx) {
-      const p = res._pinNodes.get("pos")!;
-      const n = res._pinNodes.get("neg")!;
-      _hPP = ctx.solver.allocElement(p, p);
-      _hNN = ctx.solver.allocElement(n, n);
-      _hPN = ctx.solver.allocElement(p, n);
-      _hNP = ctx.solver.allocElement(n, p);
-    },
-    load(ctx) {
-      ctx.solver.stampElement(_hPP, G);
-      ctx.solver.stampElement(_hNN, G);
-      ctx.solver.stampElement(_hPN, -G);
-      ctx.solver.stampElement(_hNP, -G);
-    },
-    getPinCurrents(rhs) {
-      const vA = rhs[res._pinNodes.get("pos")!];
-      const vB = rhs[res._pinNodes.get("neg")!];
-      const I = G * (vA - vB);
-      return [I, -I];
-    },
-    setParam(key, value) {
-      void key; void value;
-    },
-  };
-  return res;
+  return new WireTestResistorEl(new Map([["pos", posNode], ["neg", negNode]]), resistance);
 }
 
 /** DC voltage source factory wrapping makeDcVoltageSource. */
@@ -124,19 +128,23 @@ function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
 }
 
 /** Minimal AnalogElement stub with stamp no-op. */
+class WireTestMockEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  private readonly _pinCount: number;
+  constructor(pinNodes: ReadonlyMap<string, number>, branchIndex: number) {
+    super(pinNodes);
+    this.branchIndex = branchIndex;
+    this._pinCount = pinNodes.size;
+  }
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(): number[] { return Array(this._pinCount).fill(0); }
+  setParam(_k: string, _v: number): void {}
+}
+
 function makeMockElement(pinNodes: number[], branchIndex = -1): AnalogElement {
   const pins = new Map(pinNodes.map((n, i) => [`p${i}`, n]));
-  return {
-    label: "",
-    ngspiceLoadOrder: 0,
-    _pinNodes: pins,
-    _stateBase: -1,
-    branchIndex,
-    setup(_ctx: SetupContext) {},
-    load(_ctx: LoadContext) {},
-    getPinCurrents() { return pinNodes.map(() => 0); },
-    setParam(_k: string, _v: number) {},
-  } as unknown as AnalogElement;
+  return new WireTestMockEl(pins, branchIndex);
 }
 
 /**

@@ -17,10 +17,49 @@ import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../analog/element.js';
+import { AbstractAnalogElement } from '../analog/element.js';
 import type { ComplexSparseSolverStamp as ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
 import type { LoadContext } from '../analog/load-context.js';
+import type { SetupContext } from '../analog/setup-context.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stubs.js';
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element mocks for coordinator-speed-control tests
+// ---------------------------------------------------------------------------
+
+class SpeedTestGroundEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
+class SpeedTestResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  private readonly _n1: number;
+  private readonly _n2: number;
+  private readonly _resistance: number;
+  constructor(n1: number, n2: number, resistance: number) {
+    super(new Map([["p1", n1], ["p2", n2]]));
+    this._n1 = n1;
+    this._n2 = n2;
+    this._resistance = resistance;
+  }
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
+  stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
+    const g = 1 / this._resistance;
+    const n1 = this._n1;
+    const n2 = this._n2;
+    if (n1 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n1), g, 0); }
+    if (n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n2, n2), g, 0); }
+    if (n1 !== 0 && n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n2), -g, 0); solver.stampComplexElement(solver.allocComplexElement(n2, n1), -g, 0); }
+  }
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
   const bag = new PropertyBag();
@@ -52,23 +91,7 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ 
 }
 
 function makeResistorAnalogEl(n1: number, n2: number, resistance: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["p1", n1], ["p2", n2]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
-    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
-    stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
-      const g = 1 / resistance;
-      if (n1 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n1), g, 0); }
-      if (n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n2, n2), g, 0); }
-      if (n1 !== 0 && n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n2), -g, 0); solver.stampComplexElement(solver.allocComplexElement(n2, n1), -g, 0); }
-    },
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-    setParam(_key: string, _value: number) {},
-  };
+  return new SpeedTestResistorEl(n1, n2, resistance);
 }
 
 function buildDigitalRegistry(): ComponentRegistry {
@@ -110,17 +133,7 @@ function makeGroundDef(): StandaloneComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => ({
-        label: "",
-        _pinNodes: new Map(gndPinNodes),
-        _stateBase: -1,
-        branchIndex: -1 as const,
-        ngspiceLoadOrder: 0,
-        setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
-        load(_ctx: import('../analog/load-context.js').LoadContext): void {},
-        getPinCurrents(_v: Float64Array) { return [0]; },
-        setParam(_key: string, _value: number) {},
-      }), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => new SpeedTestGroundEl(gndPinNodes), paramDefs: [], params: {} },
     },
   };
 }

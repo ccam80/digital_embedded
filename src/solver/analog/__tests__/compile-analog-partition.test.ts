@@ -16,7 +16,10 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentCategory } from "../../../core/registry.js";
+import { AbstractAnalogElement, AbstractPoolBackedAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
+import { defineStateSchema } from "../state-schema.js";
+import type { SetupContext } from "../setup-context.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import { compileAnalogPartition } from "../compiler.js";
@@ -25,6 +28,36 @@ import { pinWorldPosition } from "../../../core/pin.js";
 import { StatePool } from "../state-pool.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { makeTestSetupContext, setupAll } from "./test-helpers.js";
+
+// ---------------------------------------------------------------------------
+// Pool-backed element stub for setup() allocation test
+// ---------------------------------------------------------------------------
+
+const PARTITION_STATEFUL_SCHEMA = defineStateSchema("PartitionStatefulEl", [
+  { name: "S0", doc: "slot 0" },
+  { name: "S1", doc: "slot 1" },
+  { name: "S2", doc: "slot 2" },
+  { name: "S3", doc: "slot 3" },
+  { name: "S4", doc: "slot 4" },
+  { name: "S5", doc: "slot 5" },
+  { name: "S6", doc: "slot 6" },
+]);
+
+class PartitionStatefulEl extends AbstractPoolBackedAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  readonly stateSchema = PARTITION_STATEFUL_SCHEMA;
+  readonly stateSize = this.stateSchema.size;
+
+  setup(ctx: SetupContext): void {
+    this._stateBase = ctx.allocStates(this.stateSize);
+  }
+  load(_ctx: LoadContext): void { /* no-op */ }
+  setParam(_key: string, _value: number): void {}
+  getPinCurrents(_v: Float64Array) { return []; }
+  override initState(pool: import("../state-pool.js").StatePoolRef): void {
+    pool.state0[this._stateBase] = 99.0;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers- mirror the helpers from analog-compiler.test.ts
@@ -83,18 +116,16 @@ function makeElement(
 
 function makeStubElement(nodeIds: number[]): AnalogElement {
   const pinEntries: [string, number][] = nodeIds.map((id, i) => [`p${i}`, id]);
-  return {
-    label: "",
-    _pinNodes: new Map(pinEntries),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void { /* no-op */ },
-    load(_ctx: LoadContext): void { /* no-op */ },
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array) { return nodeIds.map(() => 0); },
-  };
+  const pinNodes = new Map(pinEntries);
+  class StubElement extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: import("../setup-context.js").SetupContext): void { /* no-op */ }
+    load(_ctx: LoadContext): void { /* no-op */ }
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array) { return nodeIds.map(() => 0); }
+  }
+  return new StubElement(pinNodes);
 }
 
 function makeBaseDef(name: string) {
@@ -537,24 +568,7 @@ describe("compileAnalogPartition", () => {
       models: {},
     });
 
-    const elementWithState = {
-      poolBacked: true as const,
-      stateSize: 7,
-      label: "",
-      _pinNodes: new Map<string, number>(),
-      _stateBase: -1,
-      branchIndex: -1,
-      ngspiceLoadOrder: 0,
-      setup(ctx: import("../setup-context.js").SetupContext): void {
-        this._stateBase = ctx.allocStates(this.stateSize);
-      },
-      load(_ctx: LoadContext): void { /* no-op */ },
-      setParam(_key: string, _value: number): void {},
-      getPinCurrents(_v: Float64Array) { return []; },
-      initState(pool: StatePool): void {
-        pool.state0[this._stateBase] = 99.0;
-      },
-    };
+    const elementWithState = new PartitionStatefulEl(new Map<string, number>());
 
     const factoryReturningStateElement = vi.fn((_pinNodes: ReadonlyMap<string, number>) => {
       return elementWithState;

@@ -60,7 +60,7 @@
  * (contracts_group_05.md). ngspice anchors: mutsetup.c:66-67, mutload.c.
  */
 
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -71,7 +71,7 @@ import type { ComponentDefinition } from "../../core/registry.js";
 // TransformerCouplingElement
 // ---------------------------------------------------------------------------
 
-export class TransformerCouplingElement extends AbstractAnalogElement implements AnalogElement {
+export class TransformerCouplingElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
 
   /** Global label of sibling 1 (e.g. `parentLabel:L1`). Compiler-stamped. */

@@ -22,6 +22,9 @@ import { makeLoadCtx, makeSimpleCtx } from "../../../solver/analog/__tests__/tes
 import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../../solver/analog/element.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
@@ -74,16 +77,10 @@ function makeOTAElement(
 
 function makeInlineResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  return {
-    label: "",
-    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(): number[] { return []; },
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(ctx): void {
+  class InlineResistorEl extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: SetupContext): void {}
+    load(ctx: LoadContext): void {
       const { solver } = ctx;
       if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
       if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
@@ -91,8 +88,11 @@ function makeInlineResistor(nodeA: number, nodeB: number, resistance: number): A
         solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
         solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
       }
-    },
-  };
+    }
+    getPinCurrents(): number[] { return []; }
+    setParam(_key: string, _value: number): void {}
+  }
+  return new InlineResistorEl(new Map<string, number>([["pos", nodeA], ["neg", nodeB]]));
 }
 
 // ---------------------------------------------------------------------------

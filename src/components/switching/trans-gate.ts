@@ -33,7 +33,7 @@ import {
 } from "../../core/registry.js";
 import type { FETLayout } from "./nfet.js";
 import { NFETSWSubElement } from "./nfet.js";
-import { AbstractAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -211,7 +211,7 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 // ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62 (applied twice)
 // ---------------------------------------------------------------------------
 
-export class TransGateAnalogElement extends AbstractAnalogElement implements AnalogElement {
+export class TransGateAnalogElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
 
   readonly _nfetSW: NFETSWSubElement;

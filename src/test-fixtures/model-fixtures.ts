@@ -1,6 +1,17 @@
 import { PropertyBag } from "../core/properties.js";
 import { defineModelParams } from "../core/model-params.js";
 import type { AnalogFactory, ModelEntry } from "../core/registry.js";
+import { AbstractAnalogElement } from "../solver/analog/element.js";
+import type { SetupContext } from "../solver/analog/setup-context.js";
+import type { LoadContext } from "../solver/analog/load-context.js";
+
+class StubAnalogElement extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_rhs: Float64Array): number[] { return []; }
+  setParam(_key: string, _value: number): void {}
+}
 
 /**
  * Stub AnalogFactory that returns a minimal AnalogElement.
@@ -10,17 +21,7 @@ export const STUB_ANALOG_FACTORY: AnalogFactory = (
   pinNodes,
   _props,
   _getTime,
-) => ({
-  label: "",
-  ngspiceLoadOrder: 0,
-  _pinNodes: new Map(pinNodes),
-  _stateBase: -1,
-  branchIndex: -1,
-  setup: (_ctx: unknown) => {},
-  load: (_ctx: unknown) => {},
-  getPinCurrents: () => [],
-  setParam: (_key: string, _value: number) => {},
-});
+) => new StubAnalogElement(pinNodes);
 
 /**
  * Sample param definitions for a resistor-like component.

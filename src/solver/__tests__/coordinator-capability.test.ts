@@ -23,7 +23,9 @@ import { GroundDefinition } from '../../components/io/ground.js';
 import type { Pin } from '../../core/pin.js';
 import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import type { AnalogElement } from '../analog/element.js';
+import { AbstractAnalogElement } from '../analog/element.js';
 import type { LoadContext } from '../analog/load-context.js';
+import type { SetupContext } from '../analog/setup-context.js';
 import type { ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { SerializedElement } from '../../core/element.js';
@@ -31,36 +33,57 @@ import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
+// ---------------------------------------------------------------------------
+// Local class-based analog element mocks for coordinator-capability tests
+// ---------------------------------------------------------------------------
+
+class CapabilityTestGroundEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
 function makeAnalogElementObj(typeId: string, instanceId: string, pinDescs: { x: number; y: number; label: string }[]): TestElement {
   const pins = pinDescs.map(p => makePin(p.label, PinDirection.BIDIRECTIONAL, p.x, p.y));
   return new TestElement(typeId, instanceId, { x: 0, y: 0 }, pins);
 }
 
+class CapabilityTestResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  private readonly _nodeA: number;
+  private readonly _nodeB: number;
+  private readonly _g: number;
+  constructor(nodeA: number, nodeB: number, r: number) {
+    super(new Map([["p1", nodeA], ["p2", nodeB]]));
+    this._nodeA = nodeA;
+    this._nodeB = nodeB;
+    this._g = 1 / r;
+  }
+  setup(_ctx: SetupContext): void {}
+  load(ctx: LoadContext): void {
+    const nodeA = this._nodeA;
+    const nodeB = this._nodeB;
+    const g = this._g;
+    if (nodeA !== 0 && nodeB !== 0) {
+      ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
+      ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
+      ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -g);
+      ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -g);
+    } else if (nodeA !== 0) {
+      ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
+    } else if (nodeB !== 0) {
+      ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
+    }
+  }
+  stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
 function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogElement {
-  const g = 1 / r;
-  return {
-    label: "",
-    _pinNodes: new Map([["p1", nodeA], ["p2", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
-    load(ctx: LoadContext): void {
-      if (nodeA !== 0 && nodeB !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -g);
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -g);
-      } else if (nodeA !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
-      } else if (nodeB !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
-      }
-    },
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
-    getPinCurrents(_v: Float64Array) { return [0, 0]; },
-    setParam(_key: string, _value: number) {},
-  };
+  return new CapabilityTestResistorEl(nodeA, nodeB, r);
 }
 
 function makeAnalogDef(
@@ -104,17 +127,7 @@ function makeGroundDef(): StandaloneComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => ({
-        label: "",
-        _pinNodes: new Map(gndPinNodes),
-        _stateBase: -1,
-        branchIndex: -1 as const,
-        ngspiceLoadOrder: 0,
-        setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
-        load(_ctx: LoadContext): void {},
-        getPinCurrents(_v: Float64Array) { return [0]; },
-        setParam(_key: string, _value: number) {},
-      }), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => new CapabilityTestGroundEl(gndPinNodes), paramDefs: [], params: {} },
     },
   };
 }

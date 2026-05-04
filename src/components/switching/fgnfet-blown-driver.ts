@@ -35,7 +35,7 @@ const FGNFET_BLOWN_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 // FGNFETBlownDriverElement
 // ---------------------------------------------------------------------------
 
-export class FGNFETBlownDriverElement extends AbstractAnalogElement implements AnalogElement {
+export class FGNFETBlownDriverElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _blown: boolean;

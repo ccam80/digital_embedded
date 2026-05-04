@@ -32,6 +32,7 @@ import { createDefaultRegistry } from "../../../components/register-all.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
@@ -56,37 +57,36 @@ function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
+  class TestResistor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+    private _hPP = -1;
+    private _hNN = -1;
+    private _hPN = -1;
+    private _hNP = -1;
     setup(ctx: SetupContext): void {
       const s = ctx.solver;
-      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
       if (nodeA !== 0 && nodeB !== 0) {
-        _hPN = s.allocElement(nodeA, nodeB);
-        _hNP = s.allocElement(nodeB, nodeA);
+        this._hPN = s.allocElement(nodeA, nodeB);
+        this._hNP = s.allocElement(nodeB, nodeA);
       }
-    },
+    }
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      if (_hPP !== -1) s.stampElement(_hPP,  G);
-      if (_hNN !== -1) s.stampElement(_hNN,  G);
-      if (_hPN !== -1) s.stampElement(_hPN, -G);
-      if (_hNP !== -1) s.stampElement(_hNP, -G);
-    },
+      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
+      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
+      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
+      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
+    }
     getPinCurrents(rhs: Float64Array): number[] {
       const vA = rhs[nodeA] ?? 0;
       const vB = rhs[nodeB] ?? 0;
       return [G * (vA - vB), G * (vB - vA)];
-    },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+    }
+    setParam(_key: string, _value: number): void {}
+  }
+  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
 }
 
 // ---------------------------------------------------------------------------
@@ -322,22 +322,19 @@ describe("MNAEngine", () => {
     const edgePeriod = 100e-6;
     const scheduledEdges: number[] = [];
 
-    const pulseElement = {
-      label: "",
-      _pinNodes: new Map<string, number>(),
-      _stateBase: -1 as number,
-      branchIndex: -1 as number,
-      ngspiceLoadOrder: 0,
-      setup(_ctx: unknown) {},
-      setParam(_k: string, _v: number) {},
-      load(_ctx: unknown) {},
-      getPinCurrents(_v: Float64Array): number[] { return []; },
+    class PulseElement extends AbstractAnalogElement {
+      readonly ngspiceLoadOrder = 0;
+      setup(_ctx: SetupContext): void {}
+      load(_ctx: LoadContext): void {}
+      getPinCurrents(_v: Float64Array): number[] { return []; }
+      setParam(_k: string, _v: number): void {}
       acceptStep(simTime: number, addBreakpoint: (t: number) => void, _atBreakpoint: boolean): void {
         const nextEdge = Math.ceil((simTime + 1e-20) / edgePeriod) * edgePeriod;
         scheduledEdges.push(nextEdge);
         addBreakpoint(nextEdge);
-      },
-    };
+      }
+    }
+    const pulseElement = new PulseElement(new Map<string, number>());
 
     const compiled = wrapHandElements({
       nodeCount: 2,
@@ -349,7 +346,7 @@ describe("MNAEngine", () => {
         })(),
         makeResistor(1, 2, 1000),
         makeResistor(2, 0, 1000),
-        pulseElement as unknown as import("../element.js").AnalogElement,
+        pulseElement,
       ],
     });
 

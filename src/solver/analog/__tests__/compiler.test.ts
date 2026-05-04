@@ -16,6 +16,7 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentCategory } from "../../../core/registry.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
@@ -93,48 +94,50 @@ function makeElement(
 // ---------------------------------------------------------------------------
 
 function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-  };
+  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
+  class TestResistor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  }
+  return new TestResistor(pinNodes);
 }
 
 function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-  };
+  const pinNodes = new Map([["pos", nodePos], ["neg", nodeNeg]]);
+  class TestVs extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    constructor(pins: ReadonlyMap<string, number>) {
+      super(pins);
+      this.branchIndex = branchIdx;
+    }
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  }
+  return new TestVs(pinNodes);
 }
 
 function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
-    _stateBase: -1,
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: 0,
-    setup(_ctx): void {},
-    load(_ctx: LoadContext): void {},
-    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-  };
+  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
+  class TestInductor extends AbstractAnalogElement {
+    readonly ngspiceLoadOrder = 0;
+    constructor(pins: ReadonlyMap<string, number>) {
+      super(pins);
+      this.branchIndex = branchIdx;
+    }
+    setup(_ctx: import("../setup-context.js").SetupContext): void {}
+    load(_ctx: LoadContext): void {}
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
+    setParam(_key: string, _value: number): void {}
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  }
+  return new TestInductor(pinNodes);
 }
 
 // ---------------------------------------------------------------------------

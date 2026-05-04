@@ -23,9 +23,45 @@ import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
+import { AbstractAnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
+import type { SetupContext } from '../../solver/analog/setup-context.js';
+import type { IntegrationMethod } from '../../solver/analog/integration.js';
+import type { LteParams } from '../../solver/analog/ckt-terr.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element stubs
+// ---------------------------------------------------------------------------
+
+class IntegrationResistorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
+  stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
+class IntegrationVsEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
+  stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
+
+class IntegrationCapacitorEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
+  stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}
+  getLteTimestep(_dt: number, _deltaOld: readonly number[], _order: number, _method: IntegrationMethod, _lteParams: LteParams): number { return Infinity; }
+  getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
+  setParam(_key: string, _value: number): void {}
+}
 
 // ---------------------------------------------------------------------------
 // Minimal flat CircuitElement (analog circuits)
@@ -97,49 +133,19 @@ function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclar
 // ---------------------------------------------------------------------------
 
 function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setup(_ctx) {},
-    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
-    stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
-    getPinCurrents(_v: Float64Array) { return [0, 0]; },
-    setParam(_key: string, _value: number) {},
-  };
+  return new IntegrationResistorEl(new Map([["a", nodeA], ["b", nodeB]]));
 }
 
 function makeVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: 0,
-    setup(_ctx) {},
-    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
-    stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
-    getPinCurrents(_v: Float64Array) { return [0, 0]; },
-    setParam(_key: string, _value: number) {},
-  };
+  const el = new IntegrationVsEl(new Map([["pos", nodePos], ["neg", nodeNeg]]));
+  el.branchIndex = branchIdx;
+  return el;
 }
 
 function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
-  return {
-    label: "",
-    _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
-    _stateBase: -1,
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: 0,
-    setup(_ctx) {},
-    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
-    stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
-    getLteTimestep(_dt: number, _deltaOld: readonly number[], _order: number, _method: import('../../solver/analog/integration.js').IntegrationMethod, _lteParams: import('../../solver/analog/ckt-terr.js').LteParams): number { return Infinity; },
-    getPinCurrents(_v: Float64Array) { return [0, 0]; },
-    setParam(_key: string, _value: number) {},
-  };
+  const el = new IntegrationCapacitorEl(new Map([["a", nodeA], ["b", nodeB]]));
+  el.branchIndex = branchIdx;
+  return el;
 }
 
 // ---------------------------------------------------------------------------

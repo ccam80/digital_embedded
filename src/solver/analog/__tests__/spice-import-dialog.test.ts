@@ -23,14 +23,28 @@ import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
-import type { AnalogElement } from "../element.js";
+import { AbstractAnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
+import type { SetupContext } from "../setup-context.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// Local class-based analog element mock for spice-import-dialog tests
+// ---------------------------------------------------------------------------
+
+class SpiceImportTestStubEl extends AbstractAnalogElement {
+  readonly ngspiceLoadOrder = 0;
+  setup(_ctx: SetupContext): void {}
+  load(_ctx: LoadContext): void {}
+  stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}
+  getPinCurrents(_v: Float64Array): number[] { return []; }
+  setParam(_k: string, _v: number): void {}
 }
 
 
@@ -139,17 +153,7 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({
-            label: "",
-            ngspiceLoadOrder: 0,
-            _pinNodes: new Map<string, number>(),
-            _stateBase: -1,
-            branchIndex: -1,
-            setup() {},
-            load(_ctx: LoadContext) {},
-            getPinCurrents(_rhs: Float64Array) { return []; },
-            setParam(_k: string, _v: number) {},
-          }),
+          factory: () => new SpiceImportTestStubEl(new Map<string, number>()),
           paramDefs: [],
           params: {},
         },
@@ -187,17 +191,7 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({
-            label: "",
-            ngspiceLoadOrder: 0,
-            _pinNodes: new Map<string, number>(),
-            _stateBase: -1,
-            branchIndex: -1,
-            setup() {},
-            load(_ctx: LoadContext) {},
-            getPinCurrents(_rhs: Float64Array) { return []; },
-            setParam(_k: string, _v: number) {},
-          }),
+          factory: () => new SpiceImportTestStubEl(new Map<string, number>()),
           paramDefs: [],
           params: {},
         },
@@ -238,17 +232,7 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({
-            label: "",
-            ngspiceLoadOrder: 0,
-            _pinNodes: new Map<string, number>(),
-            _stateBase: -1,
-            branchIndex: -1,
-            setup() {},
-            load(_ctx: LoadContext) {},
-            getPinCurrents(_rhs: Float64Array) { return []; },
-            setParam(_k: string, _v: number) {},
-          }),
+          factory: () => new SpiceImportTestStubEl(new Map<string, number>()),
           paramDefs: [],
           params: {},
         },
@@ -288,17 +272,7 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({
-            label: "",
-            ngspiceLoadOrder: 0,
-            _pinNodes: new Map<string, number>(),
-            _stateBase: -1,
-            branchIndex: -1,
-            setup() {},
-            load(_ctx: LoadContext) {},
-            getPinCurrents(_rhs: Float64Array) { return []; },
-            setParam(_k: string, _v: number) {},
-          }),
+          factory: () => new SpiceImportTestStubEl(new Map<string, number>()),
           paramDefs: [],
           params: {},
         },
@@ -334,19 +308,7 @@ describe("spice-import-dialog: compile integration", () => {
       capturedModelParams = props.getModelParamKeys().length > 0
         ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
         : undefined;
-      const stub: AnalogElement = {
-        label: "",
-        ngspiceLoadOrder: 0,
-        _pinNodes: new Map(_pinNodes),
-        _stateBase: -1,
-        branchIndex: -1,
-        setup() {},
-        load(_ctx: LoadContext): void {},
-        stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {},
-        setParam(_k: string, _v: number): void {},
-        getPinCurrents(_v: Float64Array): number[] { return []; },
-      };
-      return stub;
+      return new SpiceImportTestStubEl(_pinNodes);
     };
 
     const registry = new ComponentRegistry();
@@ -472,17 +434,7 @@ describe("spice-import-dialog: compile integration", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({
-            label: "",
-            ngspiceLoadOrder: 0,
-            _pinNodes: new Map<string, number>(),
-            _stateBase: -1,
-            branchIndex: -1,
-            setup() {},
-            load(_ctx: LoadContext) {},
-            getPinCurrents(_rhs: Float64Array) { return []; },
-            setParam(_k: string, _v: number) {},
-          }),
+          factory: () => new SpiceImportTestStubEl(new Map<string, number>()),
           paramDefs: [],
           params: {},
         },
