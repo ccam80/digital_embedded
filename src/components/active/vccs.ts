@@ -340,9 +340,7 @@ export const VCCSDefinition: StandaloneComponentDefinition = {
           ? `${transconductance} * V(ctrl)`
           : expression);
         const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
-        const el = new VCCSAnalogElement(rawExpr, deriv, "V(ctrl)", "voltage");
-        el._pinNodes = new Map(pinNodes);
-        return el;
+        return new VCCSAnalogElement(pinNodes, rawExpr, deriv, "V(ctrl)", "voltage");
       },
       paramDefs: VCCS_PARAM_DEFS,
       params: VCCS_DEFAULTS,

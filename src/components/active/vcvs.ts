@@ -360,9 +360,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
           ? `${gain} * V(ctrl)`
           : expression);
         const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
-        const el = new VCVSAnalogElement(rawExpr, deriv, "V(ctrl)", "voltage");
-        el._pinNodes = new Map(pinNodes);
-        return el;
+        return new VCVSAnalogElement(pinNodes, rawExpr, deriv, "V(ctrl)", "voltage");
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
@@ -371,9 +369,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
       kind: "inline",
       factory: (pinNodes, _props, _getTime) => {
         const { expr, deriv } = makeVcvsComparatorExpression();
-        const el = new VCVSAnalogElement(expr, deriv, "V(ctrl)", "voltage");
-        el._pinNodes = new Map(pinNodes);
-        return el;
+        return new VCVSAnalogElement(pinNodes, expr, deriv, "V(ctrl)", "voltage");
       },
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_PARAM_DEFAULTS,

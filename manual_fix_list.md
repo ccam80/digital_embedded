@@ -696,27 +696,40 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 Migrate every class-based analog element regardless of current netlist usage. **Scope-narrowed 2026-05-04:** `nfet.ts`, `pfet.ts`, and `mutual-inductor.ts` removed from this wave because Wave 11a converts their parents to `kind: "netlist"` form (the parent classes disappear; the new top-level sub-elements are authored as `extends Abstract...` from the start). Doing implements→extends on a class about to be deleted is wasted motion.
 
-##### 9a — Standalone passives §4f missed (2 files)
+##### 9a — Standalone passives §4f missed (2 files) (LANDED, 2026-05-04)
 
-- [ ] `src/components/passives/resistor.ts` — Pattern B (plain `AnalogElement`, confirmed not pool-backed). Standard `(pinNodes, props)` ctor. The most-used analog primitive; will be a child of every analog netlist composite ever written.
-- [ ] `src/components/passives/polarized-cap.ts` — Pattern A (pool-backed). Standard `(pinNodes, props)` ctor. **Land alongside §4e PolarizedCap MODEUIC fix** so the new `initVoltages` (or `icLoad` if the typed `IcLoadable` interface lands first) can be added cleanly to the migrated class body.
+- [x] `src/components/passives/resistor.ts` — Pattern B (plain `AnalogElement`, confirmed not pool-backed). Standard `(pinNodes, props)` ctor. The most-used analog primitive; will be a child of every analog netlist composite ever written.
+- [x] `src/components/passives/polarized-cap.ts` — Pattern A (pool-backed). Standard `(pinNodes, props)` ctor. **§4e PolarizedCap MODEUIC fix NOT folded in** — landed migration only; the MODEUIC fix remains a separate task on §4e.
 
-##### 9b — Sensor passives (3 files)
+##### 9b — Sensor passives (3 files) (LANDED, 2026-05-04)
 
-- [ ] `src/components/sensors/ldr.ts` — pattern per current schema.
-- [ ] `src/components/sensors/ntc-thermistor.ts` — same.
-- [ ] `src/components/sensors/spark-gap.ts` — same.
+- [x] `src/components/sensors/ldr.ts` — Pattern B (no pool).
+- [x] `src/components/sensors/ntc-thermistor.ts` — Pattern A (pool-backed; custom `initState` retained for temperature seed).
+- [x] `src/components/sensors/spark-gap.ts` — Pattern A (pool-backed).
 
-##### 9d — Behavioral bridge drivers §4f missed (2 files)
+##### 9d — Behavioral bridge drivers §4f missed (2 files) (LANDED, 2026-05-04)
 
-- [ ] `src/solver/analog/behavioral-drivers/bridge-input-driver.ts` — same shape as Wave 3 gate drivers.
-- [ ] `src/solver/analog/behavioral-drivers/bridge-output-driver.ts` — same.
+- [x] `src/solver/analog/behavioral-drivers/bridge-input-driver.ts` — Pattern A. **Non-standard ctor:** `(spec, nodeId, loaded)` builds pinNodes inline → `super(new Map([["node", nodeId]]))`. Custom `initState` retained (forwards to capChild).
+- [x] `src/solver/analog/behavioral-drivers/bridge-output-driver.ts` — Pattern A. **Non-standard ctor:** `(spec, nodeId, branchIdx, loaded)`; `this.branchIndex = branchIdx` retained in ctor body to override base `-1` default.
 
-##### 9e — IO + special-case (3 files)
+##### 9e — IO + special-case (3 files) (LANDED, 2026-05-04)
 
-- [ ] `src/components/io/probe.ts` — Pattern B likely (no state).
-- [ ] `src/solver/analog/controlled-source-base.ts` — **Decision: option 9e.i (extend the base).** Make `ControlledSourceBase extends AbstractAnalogElement`. Subclasses (`cccs.ts`, `ccvs.ts`, `vccs.ts`, `vcvs.ts`) inherit transitively; the four subclasses pick up the new contract automatically. Land the base-class change first; verify the four subclasses compile without modification.
-- [ ] `src/solver/analog/subcircuit-wrapper-element.ts` — Pattern B. The wrapper is intentionally a no-op pass-through; outer `pinNodes` are pre-resolved by `groupToNodeId`. Migration is type-system completeness only — runtime behavior is unchanged.
+- [x] `src/components/io/probe.ts` — Pattern B. Ctor widened from `()` to `(pinNodes)`.
+- [x] `src/solver/analog/controlled-source-base.ts` — Made `ControlledSourceElement extends AbstractAnalogElement`. **Spec was wrong about subclasses compiling without modification:** `AbstractAnalogElement`'s ctor requires `pinNodes`, so the abstract base's ctor signature changed from `(expression, derivative, controlLabel, controlType)` to `(pinNodes, expression, derivative, controlLabel, controlType)`. The 4 subclasses (`vcvs.ts`, `vccs.ts`, `ccvs.ts`, `cccs.ts`) inherit the ctor implicitly but their factory closures had to be updated to prepend `pinNodes` to `new XAnalogElement(...)` and drop the `el._pinNodes = new Map(pinNodes)` post-ctor lines. Test mock `TestControlledSource` in `__tests__/controlled-source-base.test.ts` updated alongside (drop redeclared `_pinNodes`/`branchIndex`; helper `makeSource` now prepends a literal pinNodes Map). **In-blast-radius fold-in:** `src/components/semiconductors/triode.ts:202` was constructing a child `VCCSAnalogElement` and post-assigning `_pinNodes` via the same factory-defensive-copy pattern §4f closes — switched to building the pinNodes Map first and passing it through the new ctor.
+- [x] `src/solver/analog/subcircuit-wrapper-element.ts` — Pattern B. Was itself an instance of the bug (`this._pinNodes = new Map(opts.pinNodes)` defensive copy in ctor body); now `super(opts.pinNodes)` first, by reference.
+
+##### 9f — Test follow-ons (NEWLY-BROKEN by Wave 9 ctor signature changes)
+
+> **Surfaced 2026-05-04** as expected blast radius from Wave 9 ctor widenings. Each test file directly instantiates a class whose ctor now takes `pinNodes` first, OR mocks an interface whose abstract base now owns redeclared fields. These tests pre-date Wave 9 and were not in §3's enumeration of pin-key/UC migrations.
+
+- [ ] `src/components/sensors/__tests__/ldr.test.ts` — line 99 `new LDRElement(rDark, …)` → prepend pinNodes literal.
+- [ ] `src/components/sensors/__tests__/ntc-thermistor.test.ts` — line 145 `new NTCThermistorElement(...)` → prepend pinNodes literal.
+- [ ] `src/components/sensors/__tests__/spark-gap.test.ts` — line 114 `new SparkGapElement(...)` → prepend pinNodes literal.
+- [ ] `src/components/io/__tests__/probe.test.ts` — verify whether it directly instantiates `AnalogProbeElement()`; if so, update.
+- [ ] §3 row J-051 (`polarized-cap.test.ts`) and §3 row J-053 (`resistor.test.ts`) — already-tracked migrations now also need to absorb the `(pinNodes, …)` ctor signature change, not just the spec items they were originally scoped for.
+- [ ] §3 rows J-009 / J-010 / J-016 / J-017 (cccs/ccvs/vccs/vcvs tests) — verify whether any of them directly instantiate the `*AnalogElement` classes with the OLD signature; if so, the same prepend-pinNodes update folds into the existing rows.
+
+> Note: the controlled-source-base mock (`TestControlledSource`) was updated in the same commit as Wave 9e, so no row is needed for it.
 
 > **Wave 9c (switching FETs) — DELETED.** `nfet.ts` / `pfet.ts` were originally listed here for implements→extends migration. Wave 11a converts both to `kind: "netlist"` composites (NFETSWSubElement + behavioral driver leaf as siblings); the parent class is deleted, so Wave 9c migration would be thrown away. The new top-level sub-elements emerging from Wave 11a are authored as `extends Abstract...` from the start.
 >

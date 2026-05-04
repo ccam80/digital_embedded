@@ -42,7 +42,7 @@
 
 import { defineStateSchema, type StateSchema } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { StatePoolRef } from "../state-pool.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -55,16 +55,11 @@ import { stampRHS } from "../stamp-helpers.js";
 // the bridge's stateSize includes the child's stateSize.
 const BRIDGE_OUTPUT_SCHEMA: StateSchema = defineStateSchema("BridgeOutputDriver", []);
 
-export class BridgeOutputDriverElement implements PoolBackedAnalogElement {
+export class BridgeOutputDriverElement extends AbstractPoolBackedAnalogElement {
   // ---------- AnalogElement contract ----------
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  label = "";
-  _pinNodes: Map<string, number>;
-  branchIndex: number;
-  _stateBase = -1;
 
   // ---------- PoolBackedAnalogElement contract ----------
-  readonly poolBacked = true as const;
   readonly stateSchema = BRIDGE_OUTPUT_SCHEMA;
   readonly stateSize: number;
 
@@ -96,11 +91,11 @@ export class BridgeOutputDriverElement implements PoolBackedAnalogElement {
     branchIdx: number,
     loaded: boolean,
   ) {
+    super(new Map([["node", nodeId]]));
     this._spec = { ...spec };
     this._nodeId = nodeId;
     this.branchIndex = branchIdx;
     this._loaded = loaded;
-    this._pinNodes = new Map([["node", nodeId]]);
 
     if (loaded && spec.cOut > 0 && nodeId > 0) {
       const cap = new AnalogCapacitorElement(

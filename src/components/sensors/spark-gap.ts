@@ -32,9 +32,8 @@
  *                     CONDUCTING state read from s1; bottom-of-load updates s0.
  */
 
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
@@ -127,15 +126,10 @@ function applyHysteresis(conductingOld: number, absV: number, vBreakdown: number
 // SparkGapElement - MNA implementation
 // ---------------------------------------------------------------------------
 
-export class SparkGapElement implements PoolBackedAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
+export class SparkGapElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly poolBacked = true as const;
   readonly stateSchema = SPARK_GAP_SCHEMA;
   readonly stateSize = SPARK_GAP_SCHEMA.size;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   private _hPP: number = -1; // (posNode, posNode) - swsetup.c:59
   private _hPN: number = -1; // (posNode, negNode) - swsetup.c:60
@@ -147,20 +141,21 @@ export class SparkGapElement implements PoolBackedAnalogElement {
   private _rOff: number;
   private _iHold: number;
 
-  private _pool!: StatePoolRef;
-
   /**
+   * @param pinNodes    - pin-name → node-index map (stored by reference)
    * @param vBreakdown  - Breakdown voltage in volts
    * @param rOn         - On-state resistance in ohms
    * @param rOff        - Off-state resistance in ohms
    * @param iHold       - Holding current in amps; below this the gap extinguishes
    */
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     vBreakdown: number,
     rOn: number,
     rOff: number,
     iHold: number,
   ) {
+    super(pinNodes);
     this._vBreakdown = Math.max(vBreakdown, 1e-6);
     this._rOn = Math.max(rOn, MIN_RESISTANCE);
     this._rOff = Math.max(rOff, 1);
@@ -181,10 +176,6 @@ export class SparkGapElement implements PoolBackedAnalogElement {
     this._hPN = solver.allocElement(posNode, negNode); // :60 (SWposNode, SWnegNode)
     this._hNP = solver.allocElement(negNode, posNode); // :61 (SWnegNode, SWposNode)
     this._hNN = solver.allocElement(negNode, negNode); // :62 (SWnegNode, SWnegNode)
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {
@@ -262,8 +253,7 @@ export function createSparkGapElement(
     rOff:       props.getOrDefault<number>("rOff",       SPARK_GAP_DEFAULTS.rOff),
     iHold:      props.getOrDefault<number>("iHold",      SPARK_GAP_DEFAULTS.iHold),
   };
-  const el = new SparkGapElement(p.vBreakdown, p.rOn, p.rOff, p.iHold);
-  el._pinNodes = new Map(pinNodes);
+  const el = new SparkGapElement(pinNodes, p.vBreakdown, p.rOn, p.rOff, p.iHold);
   return el;
 }
 

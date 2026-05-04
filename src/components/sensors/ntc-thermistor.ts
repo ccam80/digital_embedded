@@ -22,7 +22,7 @@
  *               bottom-of-load integrates thermal ODE reading s1, writing s0.
  */
 
-import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -124,15 +124,10 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 // NTCThermistorElement - MNA implementation
 // ---------------------------------------------------------------------------
 
-export class NTCThermistorElement implements PoolBackedAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
+export class NTCThermistorElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly poolBacked = true as const;
   readonly stateSchema = NTC_SCHEMA;
   readonly stateSize = NTC_SCHEMA.size;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   private _hPP: number = -1; // (posNode, posNode) - ressetup.c:46
   private _hNN: number = -1; // (negNode, negNode) - ressetup.c:47
@@ -150,9 +145,8 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
   private _rTh: number;
   private _cTh: number;
 
-  private _pool!: StatePoolRef;
-
   /**
+   * @param pinNodes            - pin-name → node-index map (stored by reference)
    * @param r0                  - Resistance at T0 in ohms
    * @param beta                - B-parameter in Kelvin
    * @param t0                  - Reference temperature in Kelvin
@@ -165,6 +159,7 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
    * @param shC                 - Steinhart-Hart C coefficient (optional)
    */
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     r0: number,
     beta: number,
     t0: number,
@@ -176,6 +171,7 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
     shB?: number,
     shC?: number,
   ) {
+    super(pinNodes);
     this._r0 = Math.max(r0, MIN_RESISTANCE);
     this._beta = beta;
     this._t0 = Math.max(t0, MIN_TEMPERATURE);
@@ -204,8 +200,8 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
     this._hNP = solver.allocElement(negNode, posNode); // :49 (RESnegNode, RESposNode)
   }
 
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
+  override initState(pool: StatePoolRef): void {
+    super.initState(pool);
     // Seed temperature slot from ambient
     pool.state0[this._stateBase + SLOT_TEMPERATURE] = this._tAmbient;
   }
@@ -307,6 +303,7 @@ export function createNTCThermistorElement(
   const shB = props.has("shB") ? props.getOrDefault<number>("shB", 0) : undefined;
   const shC = props.has("shC") ? props.getOrDefault<number>("shC", 0) : undefined;
   const el = new NTCThermistorElement(
+    pinNodes,
     r0,
     beta,
     t0,
@@ -318,7 +315,6 @@ export function createNTCThermistorElement(
     shB,
     shC,
   );
-  el._pinNodes = new Map(pinNodes);
   return el;
 }
 

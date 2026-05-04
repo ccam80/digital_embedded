@@ -23,7 +23,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement } from "./element.js";
+import { AbstractAnalogElement } from "./element.js";
 import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
 import type { ExprNode } from "./expression.js";
@@ -91,12 +91,7 @@ export class MutableExpressionContext implements ExpressionContext {
  * Sources that own a branch row (VCVS, CCVS) inherit the shared
  * `findBranchFor` implementation from this base class (per ssA.6).
  */
-export abstract class ControlledSourceElement implements AnalogElement {
-  label: string = "";
-  _pinNodes: Map<string, number> = new Map();
-  _stateBase: number = -1;
-  branchIndex: number = -1;
-
+export abstract class ControlledSourceElement extends AbstractAnalogElement {
   abstract readonly ngspiceLoadOrder: number;
   abstract getPinCurrents(rhs: Float64Array): number[];
 
@@ -118,11 +113,13 @@ export abstract class ControlledSourceElement implements AnalogElement {
   protected _ctrlValue = 0;
 
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     expression: ExprNode,
     derivative: ExprNode,
     public readonly controlLabel: string,
     public readonly controlType: "voltage" | "current",
   ) {
+    super(pinNodes);
     this._compiledExpr = compileExpression(expression);
     this._compiledDeriv = compileExpression(derivative);
   }

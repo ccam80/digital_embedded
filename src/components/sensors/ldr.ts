@@ -28,6 +28,7 @@
  */
 
 import type { AnalogElement } from "../../solver/analog/element.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -70,12 +71,8 @@ export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModel
 // LDRElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class LDRElement implements AnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
+export class LDRElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   private _hPP: number = -1; // (posNode, posNode)- ressetup.c:46
   private _hNN: number = -1; // (negNode, negNode)- ressetup.c:47
@@ -85,17 +82,20 @@ export class LDRElement implements AnalogElement {
   private readonly _p: Record<string, number>;
 
   /**
+   * @param pinNodes - pin-name → node-index map (stored by reference)
    * @param rDark  - Resistance in darkness (lux=0) in ohms
    * @param luxRef - Reference illumination level in lux
    * @param gamma  - Power-law exponent (positive)
    * @param lux    - Current illumination level in lux
    */
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     rDark: number,
     luxRef: number,
     gamma: number,
     lux: number,
   ) {
+    super(pinNodes);
     this._p = {
       rDark:  Math.max(rDark, MIN_RESISTANCE),
       luxRef: Math.max(luxRef, 1e-12),
@@ -171,8 +171,7 @@ export function createLDRElement(
   const luxRef = props.getModelParam<number>("luxRef");
   const gamma = props.getModelParam<number>("gamma");
   const lux = props.getModelParam<number>("lux");
-  const el = new LDRElement(rDark, luxRef, gamma, lux);
-  el._pinNodes = new Map(pinNodes);
+  const el = new LDRElement(pinNodes, rDark, luxRef, gamma, lux);
   return el;
 }
 

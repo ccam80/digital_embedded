@@ -26,8 +26,6 @@ import { makeSimpleCtx } from "./test-helpers.js";
  * what was passed from the load() dispatch.
  */
 class TestControlledSource extends ControlledSourceElement {
-  _pinNodes: Map<string, number> = new Map([["pos", 1], ["neg", 0]]);
-  readonly branchIndex = -1;
   readonly ngspiceLoadOrder = 0;
 
   lastValue = 0;
@@ -67,7 +65,13 @@ function makeSource(
 ): TestControlledSource {
   const expr = parseExpression(exprStr);
   const deriv = simplify(differentiate(expr, variable));
-  return new TestControlledSource(expr, deriv, variable, controlType);
+  return new TestControlledSource(
+    new Map([["pos", 1], ["neg", 0]]),
+    expr,
+    deriv,
+    variable,
+    controlType,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -380,8 +380,7 @@ export const CCVSDefinition: StandaloneComponentDefinition = {
           ? `${transresistance} * I(sense)`
           : expression);
         const deriv = simplify(differentiate(rawExpr, "I(sense)"));
-        const el = new CCVSAnalogElement(rawExpr, deriv, "I(sense)", "current");
-        el._pinNodes = new Map(pinNodes);
+        const el = new CCVSAnalogElement(pinNodes, rawExpr, deriv, "I(sense)", "current");
         // Wire the sense-source link via the public setParam path so the
         // build-spec entry point can drive CCVS without reaching past the
         // factory boundary. Empty string = unset; setup() will throw with

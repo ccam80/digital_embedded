@@ -39,6 +39,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -258,14 +259,8 @@ function makeClampDiodeProps(): PropertyBag {
 // AnalogPolarizedCapElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
-  label: string = "";
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
-
+export class AnalogPolarizedCapElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly poolBacked = true as const;
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;
   // PC-W3-1: total state = cap-body slots + clamp diode slots (dioload.c:245-265)
@@ -286,7 +281,6 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
   private reverseMax: number;
   private _IC: number;     // PC-W3-5: capload.c:46-51 CAPinitCond
   private _M: number;      // PC-W3-6: capload.c:44 CAPm  applied at stamp time
-  private _pool!: StatePoolRef;
 
   // PC-W3-1: clamp diode sub-element (F4b composition  dioload.c:245-265)
   // Oriented: A=nNeg, K=nPos so it conducts when cap is reverse-biased.
@@ -308,6 +302,7 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
    * `setDiagnosticEmitter()` after construction (RuntimeDiagnosticAware).
    */
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     capacitance: number,
     esr: number,
     rLeak: number,
@@ -316,6 +311,7 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
     M: number,
     clampDiode: PoolBackedAnalogElement,
   ) {
+    super(pinNodes);
     this.C = capacitance;
     this.G_esr = 1 / Math.max(esr, MIN_RESISTANCE);
     this.G_leak = 1 / Math.max(rLeak, MIN_RESISTANCE);
@@ -617,6 +613,7 @@ function createPolarizedCapElement(
   const clampDiode = createDiodeElement(clampPinNodes, makeClampDiodeProps(), () => 0) as PoolBackedAnalogElement;
 
   const el = new AnalogPolarizedCapElement(
+    pinNodes,
     p.capacitance,
     p.esr,
     rLeak,
@@ -625,8 +622,6 @@ function createPolarizedCapElement(
     p.M,
     clampDiode,
   );
-
-  el._pinNodes = new Map(pinNodes);
 
   el.setParam = function(key: string, value: number): void {
     if (key in p) {

@@ -24,6 +24,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { AbstractAnalogElement } from "../../solver/analog/element.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -215,14 +216,14 @@ const PROBE_PROPERTY_DEFS: PropertyDefinition[] = [
 // Analog probe factory and element
 // ---------------------------------------------------------------------------
 
-class AnalogProbeElement implements AnalogElement {
-  _pinNodes: Map<string, number> = new Map();
-  label: string = "";
-  branchIndex: number = -1;
-  _stateBase: number = -1;
+class AnalogProbeElement extends AbstractAnalogElement {
   // Probe is a pure voltage measurement- no MNA contribution. Ordinal is
   // therefore irrelevant for parity, but every AnalogElement must declare one.
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    super(pinNodes);
+  }
 
   setup(): void {
     // Probe is a pure voltage measurement- no allocation needed.
@@ -251,8 +252,7 @@ function probeAnalogFactory(
   _props: PropertyBag,
   _getTime: () => number,
 ): AnalogElement {
-  const el = new AnalogProbeElement();
-  el._pinNodes = new Map(pinNodes);
+  const el = new AnalogProbeElement(pinNodes);
   return el;
 }
 

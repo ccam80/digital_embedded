@@ -31,7 +31,7 @@
 
 import { defineStateSchema, type StateSchema } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import type { PoolBackedAnalogElement } from "../element.js";
+import { AbstractPoolBackedAnalogElement } from "../element.js";
 import type { StatePoolRef } from "../state-pool.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -41,14 +41,8 @@ import { PropertyBag } from "../../../core/properties.js";
 
 const BRIDGE_INPUT_SCHEMA: StateSchema = defineStateSchema("BridgeInputDriver", []);
 
-export class BridgeInputDriverElement implements PoolBackedAnalogElement {
+export class BridgeInputDriverElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
-  label = "";
-  _pinNodes: Map<string, number>;
-  branchIndex = -1;
-  _stateBase = -1;
-
-  readonly poolBacked = true as const;
   readonly stateSchema = BRIDGE_INPUT_SCHEMA;
   readonly stateSize: number;
 
@@ -64,10 +58,10 @@ export class BridgeInputDriverElement implements PoolBackedAnalogElement {
     nodeId: number,
     loaded: boolean,
   ) {
+    super(new Map([["node", nodeId]]));
     this._spec = { ...spec };
     this._nodeId = nodeId;
     this._loaded = loaded;
-    this._pinNodes = new Map([["node", nodeId]]);
 
     if (loaded && spec.cIn > 0 && nodeId > 0) {
       const bag = new PropertyBag();

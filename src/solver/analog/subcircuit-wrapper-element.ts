@@ -16,6 +16,7 @@
  * can name internal nodes `${parentLabel}:intN`, and (c) every sub-element so
  * each leaf carries `${parentLabel}:${subElementName}` (Composite I5).
  */
+import { AbstractAnalogElement } from "./element.js";
 import type { AnalogElement } from "./element.js";
 import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
@@ -59,12 +60,8 @@ export interface SubcircuitWrapperOptions {
   labelRef: { value: string };
 }
 
-export class SubcircuitWrapperElement implements AnalogElement {
-  label: string = "";
+export class SubcircuitWrapperElement extends AbstractAnalogElement {
   readonly ngspiceLoadOrder: number;
-  _pinNodes: Map<string, number>;
-  _stateBase: number = -1;
-  branchIndex: number = -1;
   readonly _subcircuitLeaves: readonly AnalogElement[];
 
   private readonly _subElements: readonly AnalogElement[];
@@ -77,8 +74,8 @@ export class SubcircuitWrapperElement implements AnalogElement {
   private readonly _labelRef: { value: string };
 
   constructor(opts: SubcircuitWrapperOptions) {
+    super(opts.pinNodes);
     this.ngspiceLoadOrder = opts.ngspiceLoadOrder;
-    this._pinNodes = new Map(opts.pinNodes);
     this._subcircuitLeaves = opts.leaves;
     this._subElements = opts.subElements;
     this._bindings = opts.bindings;

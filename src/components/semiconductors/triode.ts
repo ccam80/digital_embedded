@@ -199,13 +199,13 @@ class TriodeElement extends AbstractAnalogElement {
     // using the sub-element's cached TSTALLOC handles via this._vccs.stamps.
     const vccsExpr = parseExpression("V(ctrl)");
     const vccsDeriv = simplify(differentiate(vccsExpr, "V(ctrl)"));
-    this._vccs = new VCCSAnalogElement(vccsExpr, vccsDeriv, "V(ctrl)", "voltage");
-    this._vccs._pinNodes = new Map([
+    const vccsPinNodes = new Map<string, number>([
       ["ctrl+", this._nodeG],
       ["ctrl-", this._nodeK],
       ["out+",  this._nodeP],
       ["out-",  this._nodeK],
     ]);
+    this._vccs = new VCCSAnalogElement(vccsPinNodes, vccsExpr, vccsDeriv, "V(ctrl)", "voltage");
 
     // Forward Koren params to the VCCS sub-element parameter store (per
     // PB-TRIODE setParam routing rule).
