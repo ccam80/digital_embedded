@@ -422,12 +422,12 @@ function compileSubcircuitToMnaModel(
 
         const leafDef = registry.get(subEl.typeId);
         // CLAUDE.md "Component Model Architecture": defaultModel is for
-        // placement-time UI only and MUST NOT be used as a compile-time
-        // lookup key. modelRef is the canonical sub-element model selector;
-        // params.model is the legacy fallback for callsites that pre-date
-        // the typed field. Silent-skip on a missing entry was masking
-        // bogus modelRefs (Switch "default" / NMOS "spice" / PMOS "spice"),
-        // surfacing later as confusing siblingState/siblingBranch errors.
+        // placement-time UI only and MUST NOT be a compile-time lookup
+        // key. modelRef is the canonical sub-element model selector;
+        // params.model is accepted as a secondary key. Missing entries
+        // throw at the point of origin so unresolvable models surface
+        // loudly instead of as downstream siblingState / siblingBranch
+        // errors when the unconstructed leaf is referenced.
         const leafModelKey =
           subEl.modelRef
           ?? (subEl.params?.model as string | undefined);
