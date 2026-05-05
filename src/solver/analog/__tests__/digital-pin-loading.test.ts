@@ -11,7 +11,7 @@
  *                            only groups receive an injected "analog" domain
  *                            entry so each net gets a per-net bridge.
  *   none:                    bridges at real boundaries only, with zero
- *                            loading (BridgeInputAdapter stamps nothing,
+ *                            loading (BridgeInputDriverElement stamps nothing,
  *                            cIn=0, cOut=0).
  *
  * Bridge count is measured per-net (one BridgeAdapter per boundary group),
@@ -36,9 +36,10 @@ import { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
-import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
+import { BridgeOutputDriverElement } from "../behavioral-drivers/bridge-output-driver.js";
+import { BridgeInputDriverElement } from "../behavioral-drivers/bridge-input-driver.js";
 import { compileUnified } from "@/compile/compile.js";
-import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
+import type { CompiledAnalogCircuit } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
 // Local class-based analog element mocks for digital-pin-loading tests
@@ -294,7 +295,7 @@ function buildCircuit(
 // analog domain's bridgeAdaptersByGroupId map.
 // ---------------------------------------------------------------------------
 
-function countBridgeAdapters(analogDomain: ConcreteCompiledAnalogCircuit | null): number {
+function countBridgeAdapters(analogDomain: CompiledAnalogCircuit | null): number {
   if (analogDomain === null) return 0;
   let count = 0;
   for (const adapters of analogDomain.bridgeAdaptersByGroupId.values()) {
@@ -347,25 +348,25 @@ describe("digitalPinLoading: all", () => {
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
     const compiled = compileUnified(circuit, registry);
-    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+    const analogDomain = compiled.analog;
 
     expect(analogDomain).not.toBeNull();
     // One boundary group per digital net- DigitalXor has 3 pins â†’ 3 nets.
     expect(analogDomain!.bridgeAdaptersByGroupId.size).toBeGreaterThan(0);
   });
 
-  it("all mode: each bridge group contains BridgeInputAdapter or BridgeOutputAdapter instances", () => {
+  it("all mode: each bridge group contains BridgeInputDriverElement or BridgeOutputDriverElement instances", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
     const compiled = compileUnified(circuit, registry);
-    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+    const analogDomain = compiled.analog;
 
     expect(analogDomain).not.toBeNull();
     for (const adapters of analogDomain!.bridgeAdaptersByGroupId.values()) {
       expect(adapters.length).toBeGreaterThan(0);
       for (const adapter of adapters) {
-        const isBridge = adapter instanceof BridgeInputAdapter || adapter instanceof BridgeOutputAdapter;
+        const isBridge = adapter instanceof BridgeInputDriverElement || adapter instanceof BridgeOutputDriverElement;
         expect(isBridge).toBe(true);
       }
     }
@@ -380,8 +381,8 @@ describe("digitalPinLoading: all", () => {
     const compiledAll   = compileUnified(circuitAll, registry);
     const compiledCross = compileUnified(circuitCross, registry);
 
-    expect(countBridgeAdapters(compiledAll.analog as ConcreteCompiledAnalogCircuit | null)).toBeGreaterThan(
-      countBridgeAdapters(compiledCross.analog as ConcreteCompiledAnalogCircuit | null),
+    expect(countBridgeAdapters(compiledAll.analog)).toBeGreaterThan(
+      countBridgeAdapters(compiledCross.analog),
     );
   });
 
@@ -455,13 +456,13 @@ describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", (
     expect(compiledNone.bridges.length).toBe(compiledCross.bridges.length);
   });
 
-  it("all mode: BridgeInputAdapter and BridgeOutputAdapter both appear in bridgeAdaptersByGroupId", () => {
+  it("all mode: BridgeInputDriverElement and BridgeOutputDriverElement both appear in bridgeAdaptersByGroupId", () => {
     // DigitalXor has 2 inputs and 1 output; both adapter types must be present.
     const registry = buildRegistry();
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
     const compiled = compileUnified(circuit, registry);
-    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+    const analogDomain = compiled.analog;
 
     expect(analogDomain).not.toBeNull();
 
@@ -469,8 +470,8 @@ describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", (
     let hasOutput = false;
     for (const adapters of analogDomain!.bridgeAdaptersByGroupId.values()) {
       for (const adapter of adapters) {
-        if (adapter instanceof BridgeInputAdapter) hasInput = true;
-        if (adapter instanceof BridgeOutputAdapter) hasOutput = true;
+        if (adapter instanceof BridgeInputDriverElement) hasInput = true;
+        if (adapter instanceof BridgeOutputDriverElement) hasOutput = true;
       }
     }
     expect(hasInput).toBe(true);

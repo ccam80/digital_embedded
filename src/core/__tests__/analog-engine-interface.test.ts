@@ -12,6 +12,7 @@ import type { Engine, CompiledCircuit, EngineState, EngineChangeListener, Measur
 import type {
   AnalogEngine,
   SimulationParams,
+  ResolvedSimulationParams,
   DcOpResult,
   DiagnosticSuggestion,
   CompiledAnalogCircuit,
@@ -104,6 +105,7 @@ describe("AnalogEngineTypes", () => {
         totalSlots: 0,
         tranStep: 0,
       },
+      bridgeAdaptersByGroupId: new Map(),
     };
 
     // Assignment to CompiledCircuit must be valid (structural subtype check)
@@ -216,6 +218,8 @@ describe("AnalogEngineTypes", () => {
       addMeasurementObserver(_observer: MeasurementObserver): void {},
       removeMeasurementObserver(_observer: MeasurementObserver): void {},
       getElementPinCurrents(_elementId: number): number[] { return []; },
+      setSimTime(_t: number): void {},
+      getResolvedParams(): ResolvedSimulationParams { return { ...DEFAULT_SIMULATION_PARAMS }; },
     };
 
     // Assignment to Engine base must be valid

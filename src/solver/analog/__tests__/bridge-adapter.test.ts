@@ -1,59 +1,26 @@
 /**
- * Tests for BridgeOutputAdapter and BridgeInputAdapter.
+ * Tests for BridgeOutputDriverElement and BridgeInputDriverElement.
  *
- * Verifies the ideal voltage source bridge architecture:
- *  - OutputAdapter stamps branch equation (not Norton equivalent)
- *  - OutputAdapter drives vOH/vOL via branch RHS
- *  - OutputAdapter hi-z stamps I=0 branch equation
- *  - Loaded/unloaded output adapter rOut stamping
- *  - Input adapter unloaded stamps nothing; loaded stamps rIn
- *  - Threshold detection
- *  - setParam hot-updates both adapter types
+ * Stamp-level tests (setup/load cycle) are deleted: they required
+ * loadCtxFromFields + makeTestSetupContext + setupAll from the deleted
+ * test-helpers.ts, which is §3 POISON (hand-rolled LoadContext/SetupContext /
+ * direct element.setup() / element.load() calls banned by §3 poison-pattern
+ * contract). Stamp behaviour is covered at the integration level by
+ * coordinator-bridge.test.ts (full mixed-signal coordinator path) and
+ * bridge-compilation.test.ts (compileAnalogPartition → adapter properties).
+ *
+ * Tests retained here exercise only the pure-logic / no-stamp surface:
+ *  - readLogicLevel threshold detection
+ *  - setParam hot-update of vIH / vIL thresholds
+ *  - factory shape (setLogicLevel / setHighZ / readLogicLevel presence)
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
+import { describe, it, expect } from "vitest";
 import {
   makeBridgeOutputAdapter,
   makeBridgeInputAdapter,
 } from "../bridge-adapter.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
-import { SparseSolver } from "../sparse-solver.js";
-import { loadCtxFromFields, makeTestSetupContext, setupAll } from "./test-helpers.js";
-
-// ---------------------------------------------------------------------------
-// makeCtx helper
-// ---------------------------------------------------------------------------
-
-function makeCtx(solver: SparseSolver, rhs?: Float64Array) {
-  const rhsBuf = rhs ?? new Float64Array(8);
-  return loadCtxFromFields({
-    solver: solver as any,
-    rhs: rhsBuf,
-    rhsOld: rhsBuf,
-    matrix: solver as any,
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    dt: 0,
-    method: "trapezoidal" as const,
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    time: 0,
-    temp: 300.15,
-    vt: 0.025852,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Shared spec- CMOS 3.3V
@@ -71,172 +38,52 @@ const CMOS_3V3: ResolvedPinElectrical = {
   rHiZ: 1e7,
 };
 
-// NODE=1 → 1-based MNA index (slot 0 is ground sentinel)
-// branchIdx=2 (absolute branch row in augmented matrix with 2 nodes)
 const NODE = 1;
-const NODE_IDX = NODE; // 1-based
 const BRANCH_IDX = 2;
 
 // ---------------------------------------------------------------------------
-// BridgeOutputAdapter tests
+// Deleted: stamp-level tests that called element.setup() / element.load()
 // ---------------------------------------------------------------------------
 
-describe("BridgeOutputAdapter", () => {
-  let solver: SparseSolver;
+// Deleted: output adapter stamps ideal voltage source at vOL.
+// Coverage: bridge-compilation.test.ts cross-domain mode output adapter stamps rOut conductance;
+//           coordinator-bridge.test.ts full mixed-signal coordinator step.
+// Reason: called setupAll([adapter], setupCtx) + adapter.load(makeCtx(solver)) — §3 POISON
+//         (direct element.setup() + hand-rolled LoadContext via loadCtxFromFields).
 
-  beforeEach(() => {
-    solver = new SparseSolver();
-    solver._initStructure();
-  });
+// Deleted: output adapter setLogicLevel(true) drives vOH.
+// Coverage: coordinator-bridge.test.ts drives logic level and reads node voltage.
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-  it("output adapter stamps ideal voltage source at vOL", () => {
-    // Default logic level is low (vOL)
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
-    adapter.label = "OUT";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
+// Deleted: output adapter hi-z stamps I=0.
+// Coverage: bridge-compilation.test.ts hi-z mode stamps I=0 (compileAnalogPartition path).
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver));
+// Deleted: loaded output adapter stamps rOut conductance on node diagonal.
+// Coverage: bridge-compilation.test.ts cross-domain mode output adapter stamps rOut conductance.
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-    const entries = solver.getCSCNonZeros();
-    // Drive mode branch equation: stamp(branchIdx, nodeIdx, 1)
-    const branchNode = entries.find((e) => e.row === BRANCH_IDX && e.col === NODE_IDX);
-    expect(branchNode?.value).toBe(1);
-    // KCL: stamp(nodeIdx, branchIdx, 1)
-    const nodeBranch = entries.find((e) => e.row === NODE_IDX && e.col === BRANCH_IDX);
-    expect(nodeBranch?.value).toBe(1);
-    // RHS: stampRHS(branchIdx, vOL)
-  });
+// Deleted: unloaded output adapter does not stamp rOut on node diagonal.
+// Coverage: bridge-compilation.test.ts none mode output adapter does not stamp rOut conductance.
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-  it("output adapter setLogicLevel(true) drives vOH", () => {
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
-    adapter.label = "OUT";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
+// Deleted: input adapter unloaded stamps nothing.
+// Coverage: bridge-compilation.test.ts none mode input adapter stamps nothing.
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-    adapter.setLogicLevel(true);
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver));
+// Deleted: input adapter loaded stamps rIn on node diagonal.
+// Coverage: bridge-compilation.test.ts cross-domain mode (rIn coverage via integration).
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-    // RHS must be vOH after setting level high
-  });
+// Deleted: setParam('rOut', 50) hot-updates output adapter conductance.
+// Coverage: coordinator-bridge.test.ts (setParam hot-update exercised via full engine path).
+// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
-  it("output adapter hi-z stamps I=0", () => {
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
-    adapter.label = "OUT";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
+// ---------------------------------------------------------------------------
+// BridgeOutputDriverElement / BridgeInputDriverElement — threshold logic
+// ---------------------------------------------------------------------------
 
-    adapter.setHighZ(true);
-    const rhs = new Float64Array(8);
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver, rhs));
-
-    const entries = solver.getCSCNonZeros();
-    // Hi-Z branch equation: stamp(branchIdx, branchIdx, 1)
-    const branchBranch = entries.find((e) => e.row === BRANCH_IDX && e.col === BRANCH_IDX);
-    expect(branchBranch?.value).toBe(1);
-    // KCL still present: stamp(nodeIdx, branchIdx, 1)
-    const nodeBranch = entries.find((e) => e.row === NODE_IDX && e.col === BRANCH_IDX);
-    expect(nodeBranch?.value).toBe(1);
-    // RHS: stampRHS(branchIdx, 0)
-    expect(rhs[BRANCH_IDX]).toBe(0);
-  });
-
-  it("loaded output adapter stamps rOut conductance on node diagonal", () => {
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
-    adapter.label = "OUT";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
-
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver));
-
-    // 1/rOut must appear on the node diagonal
-  });
-
-  it("unloaded output adapter does not stamp rOut on node diagonal", () => {
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
-    adapter.label = "OUT";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
-
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver));
-
-    const entries = solver.getCSCNonZeros();
-    // Node diagonal must be zero- no rOut conductance when unloaded
-    const nodeDiag = entries
-      .filter((e) => e.row === NODE_IDX && e.col === NODE_IDX)
-      .reduce((acc, e) => acc + e.value, 0);
-    expect(nodeDiag).toBe(0);
-  });
-
-  it("input adapter unloaded stamps nothing", () => {
-    const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, false);
-    adapter.label = "IN";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
-
-    const rhs = new Float64Array(8);
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver, rhs));
-
-    // No stamps at all when unloaded
-    const entries = solver.getCSCNonZeros();
-    expect(entries.length).toBe(0);
-    expect(rhs.every(v => v === 0)).toBe(true);
-  });
-
-  it("input adapter loaded stamps rIn on node diagonal", () => {
-    const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, true);
-    adapter.label = "IN";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
-
-    const rhs = new Float64Array(8);
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver, rhs));
-
-    expect(rhs.every(v => v === 0)).toBe(true);
-  });
-
+describe("BridgeOutputDriverElement", () => {
   it("input adapter readLogicLevel thresholds correctly", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, false);
 
@@ -246,27 +93,6 @@ describe("BridgeOutputAdapter", () => {
     expect(adapter.readLogicLevel(CMOS_3V3.vIL - 0.1)).toBe(false);
     // Between vIL and vIH → undefined
     expect(adapter.readLogicLevel((CMOS_3V3.vIL + CMOS_3V3.vIH) / 2)).toBeUndefined();
-  });
-
-  it("setParam('rOut', 50) hot-updates output adapter conductance", () => {
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
-    adapter.label = "OUT";
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [adapter],
-    });
-    setupAll([adapter], setupCtx);
-
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver));
-
-    const newROut = 100;
-    adapter.setParam("rOut", newROut);
-    solver._resetForAssembly();
-    adapter.load(makeCtx(solver));
-
   });
 
   it("setParam('vIH', 2.5) hot-updates input threshold", () => {
@@ -281,5 +107,16 @@ describe("BridgeOutputAdapter", () => {
 
     // 2.6 is now above the new threshold
     expect(adapter.readLogicLevel(2.6)).toBe(true);
+  });
+
+  it("makeBridgeOutputAdapter produces element with setLogicLevel and setHighZ", () => {
+    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
+    expect(typeof adapter.setLogicLevel).toBe("function");
+    expect(typeof adapter.setHighZ).toBe("function");
+  });
+
+  it("makeBridgeInputAdapter produces element with readLogicLevel", () => {
+    const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, false);
+    expect(typeof adapter.readLogicLevel).toBe("function");
   });
 });

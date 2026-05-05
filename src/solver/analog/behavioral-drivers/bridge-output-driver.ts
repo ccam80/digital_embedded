@@ -30,7 +30,7 @@
  * (contracts_group_09.md). Logic migrated verbatim from the recovered
  * `DigitalOutputPinModel.load()` (`role="branch"` path) at
  * `.recovery/digital-pin-model.ts.orig:147-198`. Composite-class shape
- * (recovered `BridgeOutputAdapter`) replaced with direct PoolBackedAnalogElement
+ * (recovered `BridgeOutputDriverElement`) replaced with direct PoolBackedAnalogElement
  * implementation- the deleted `extends CompositeElement` is forbidden by
  * ss0 hard rule #16.
  *

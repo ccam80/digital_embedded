@@ -1,8 +1,8 @@
 /**
  * Tests for coordinator bridge logic (Task 1.7).
  *
- * Verifies that DefaultSimulationCoordinator uses BridgeOutputAdapter and
- * BridgeInputAdapter from compiledAnalog.bridgeAdaptersByGroupId instead of
+ * Verifies that DefaultSimulationCoordinator uses BridgeOutputDriverElement and
+ * BridgeInputDriverElement from compiledAnalog.bridgeAdaptersByGroupId instead of
  * inline voltage read/write logic.
  *
  * §4-compliant: every test reaches the bridge adapter through a fully
@@ -15,8 +15,8 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import type { BridgeOutputAdapter, BridgeInputAdapter } from "../analog/bridge-adapter.js";
-import type { ConcreteCompiledAnalogCircuit } from "../analog/compiled-analog-circuit.js";
+import type { BridgeOutputDriverElement } from "../analog/behavioral-drivers/bridge-output-driver.js";
+import type { BridgeInputDriverElement } from "../analog/behavioral-drivers/bridge-input-driver.js";
 import { buildFixture } from "../analog/__tests__/fixtures/build-fixture.js";
 import type { Fixture } from "../analog/__tests__/fixtures/build-fixture.js";
 import { BitVector } from "../../core/signal.js";
@@ -32,7 +32,7 @@ import { BitVector } from "../../core/signal.js";
 // The `In` component has only a digital model; the `Rload` resistor has only
 // an analog model. The wire between `A:out` and `Rload:pos` therefore
 // produces a real cross-domain boundary group, which the unified compiler
-// turns into a `BridgeOutputAdapter` (digital→analog direction).
+// turns into a `BridgeOutputDriverElement` (digital→analog direction).
 //
 // `Rpull = 1MΩ` to ground gives every test an *observable* analog node
 // voltage at `Rload:neg`:
@@ -50,8 +50,8 @@ import { BitVector } from "../../core/signal.js";
 
 interface BridgeFixture {
   readonly fix: Fixture;
-  readonly outputAdapter: BridgeOutputAdapter;
-  readonly inputAdapter: BridgeInputAdapter | undefined;
+  readonly outputAdapter: BridgeOutputDriverElement;
+  readonly inputAdapter: BridgeInputDriverElement | undefined;
   readonly nodeXId: number;
   readonly inputNetId: number;
   readonly bitWidth: number;
@@ -85,19 +85,18 @@ function buildOutputBridgeFixture(): BridgeFixture {
     throw new Error('buildOutputBridgeFixture: no digital-to-analog bridge produced');
   }
 
-  const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
-  const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId);
+  const adapters = compiled.analog!.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId);
   if (adapters === undefined) {
     throw new Error(`buildOutputBridgeFixture: no adapters for group ${bridge.boundaryGroupId}`);
   }
   const outputAdapter = adapters.find(
-    (a): a is BridgeOutputAdapter => 'setLogicLevel' in a,
+    (a): a is BridgeOutputDriverElement => 'setLogicLevel' in a,
   );
   if (outputAdapter === undefined) {
-    throw new Error('buildOutputBridgeFixture: bridge has no BridgeOutputAdapter');
+    throw new Error('buildOutputBridgeFixture: bridge has no BridgeOutputDriverElement');
   }
   const inputAdapter = adapters.find(
-    (a): a is BridgeInputAdapter => 'readLogicLevel' in a,
+    (a): a is BridgeInputDriverElement => 'readLogicLevel' in a,
   );
 
   // node_X = analog side of the bridge = `Rload:pos`. We assert via
@@ -162,9 +161,8 @@ describe('bridge adapter: digital output drives analog node', () => {
     const { fix, outputAdapter } = buildOutputBridgeFixture();
     const compiled = fix.coordinator.compiled;
     const bridge = compiled.bridges.find(b => b.direction === 'digital-to-analog')!;
-    const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
-    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
-    const found = adapters.find((a): a is BridgeOutputAdapter => 'setLogicLevel' in a);
+    const adapters = compiled.analog!.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
+    const found = adapters.find((a): a is BridgeOutputDriverElement => 'setLogicLevel' in a);
     expect(found).toBe(outputAdapter);
     fix.coordinator.dispose();
   });
@@ -181,7 +179,7 @@ describe('bridge adapter: digital output drives analog node', () => {
 
 function buildInputBridgeFixture(): {
   fix: Fixture;
-  inputAdapter: BridgeInputAdapter;
+  inputAdapter: BridgeInputDriverElement;
 } {
   const fix = buildFixture({
     build: (_registry, facade) => facade.build({
@@ -203,11 +201,10 @@ function buildInputBridgeFixture(): {
   if (bridge === undefined) {
     throw new Error('buildInputBridgeFixture: no analog-to-digital bridge produced');
   }
-  const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
-  const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
-  const inputAdapter = adapters.find((a): a is BridgeInputAdapter => 'readLogicLevel' in a);
+  const adapters = compiled.analog!.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
+  const inputAdapter = adapters.find((a): a is BridgeInputDriverElement => 'readLogicLevel' in a);
   if (inputAdapter === undefined) {
-    throw new Error('buildInputBridgeFixture: bridge has no BridgeInputAdapter');
+    throw new Error('buildInputBridgeFixture: bridge has no BridgeInputDriverElement');
   }
   return { fix, inputAdapter };
 }
@@ -237,9 +234,8 @@ describe('bridge adapter: analog voltage thresholds to digital via inputAdapter'
     const { fix, inputAdapter } = buildInputBridgeFixture();
     const compiled = fix.coordinator.compiled;
     const bridge = compiled.bridges.find(b => b.direction === 'analog-to-digital')!;
-    const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
-    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
-    const found = adapters.find((a): a is BridgeInputAdapter => 'readLogicLevel' in a);
+    const adapters = compiled.analog!.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId)!;
+    const found = adapters.find((a): a is BridgeInputDriverElement => 'readLogicLevel' in a);
     expect(found).toBe(inputAdapter);
     fix.coordinator.dispose();
   });

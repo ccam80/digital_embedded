@@ -1,148 +1,189 @@
 /**
- * R5: Mid-simulation hot-load test for bridge output adapter.
+ * Mid-simulation hot-load test for the bridge output adapter.
  *
- * Verifies that calling setParam("vOH", 5.0) on a BridgeOutputAdapter
- * mid-simulation (after reaching steady state) causes the analog node
- * voltage target to change to the new vOH on the next stamp cycle.
+ * Verifies that calling `setParam("vOH", 5.0)` on a `BridgeOutputDriverElement`
+ * mid-simulation causes the analog node voltage target to change to the new
+ * vOH on the next stamp cycle, and that hot-loading vOH does not affect the
+ * vOL drive when the output is logic LOW.
  *
- * The bridge output adapter uses an ideal voltage source branch equation.
- * At steady state the analog node voltage equals the branch RHS, so verifying
- * the RHS after re-stamping is equivalent to verifying the node voltage.
+ * §4-compliant: every assertion is observed at the engine boundary by
+ * stepping the real coordinator and reading node voltages. Topology mirrors
+ * the canonical `coordinator-bridge.test.ts` fixture:
+ *
+ *   In(A) ──out──► Rload(50Ω) ──► node_X ──► Rpull(1MΩ) ──► Ground
+ *
+ * With Rpull = 1MΩ the resistive divider barely loads the bridge:
+ *
+ *   V(node_X) ≈ vOH · Rpull / (rOut + Rload + Rpull)
+ *             = vOH · 1e6 / (50 + 50 + 1e6)
+ *             ≈ vOH · 0.9999
+ *
+ * so a driven HIGH at vOH=3.3 settles to ~3.2997 V, and at vOH=5.0 to
+ * ~4.9995 V. Driven LOW settles to ~0 V independent of vOH.
  */
 
-import { describe, it } from 'vitest';
-import { makeBridgeOutputAdapter } from '../analog/bridge-adapter.js';
-import type { ResolvedPinElectrical } from '../../core/pin-electrical.js';
-import { MODEDCOP, MODEINITFLOAT } from '../analog/ckt-mode.js';
-import { loadCtxFromFields } from '../analog/__tests__/test-helpers.js';
-
-const CMOS: ResolvedPinElectrical = {
-  rOut: 50, cOut: 0, rIn: 1e7, cIn: 0,
-  vOH: 3.3, vOL: 0.0, vIH: 2.0, vIL: 0.8, rHiZ: 1e9,
-};
-
-// Branch index in the augmented MNA matrix (matches coordinator-bridge.test.ts)
-const BRANCH_IDX = 2;
+import { describe, it, expect } from "vitest";
+import type { BridgeOutputDriverElement } from "../analog/behavioral-drivers/bridge-output-driver.js";
+import { buildFixture } from "../analog/__tests__/fixtures/build-fixture.js";
+import type { Fixture } from "../analog/__tests__/fixtures/build-fixture.js";
 
 // ---------------------------------------------------------------------------
-// MockSolver- records stamp/stampRHS calls
+// Real digital→analog bridge fixture (mirrors coordinator-bridge.test.ts).
+// Self-contained: no cross-test-file imports.
 // ---------------------------------------------------------------------------
 
-class MockSolver {
-  private readonly _handles: Array<{ row: number; col: number }> = [];
+interface BridgeFixture {
+  readonly fix: Fixture;
+  readonly outputAdapter: BridgeOutputDriverElement;
+  readonly nodeXId: number;
+}
 
-  allocElement(row: number, col: number): number {
-    this._handles.push({ row, col });
-    return this._handles.length - 1;
+function buildOutputBridgeFixture(): BridgeFixture {
+  const fix = buildFixture({
+    build: (_registry, facade) => facade.build({
+      components: [
+        { id: 'A',     type: 'In',       props: { label: 'A', bitWidth: 1 } },
+        { id: 'Rload', type: 'Resistor', props: { label: 'Rload', resistance: 50 } },
+        { id: 'Rpull', type: 'Resistor', props: { label: 'Rpull', resistance: 1e6 } },
+        { id: 'gnd',   type: 'Ground' },
+      ],
+      connections: [
+        ['A:out',     'Rload:pos'],   // digital→analog boundary
+        ['Rload:neg', 'Rpull:pos'],
+        ['Rpull:neg', 'gnd:out'],
+      ],
+    }),
+  });
+
+  const compiled = fix.coordinator.compiled;
+  const bridge = compiled.bridges.find(b => b.direction === 'digital-to-analog');
+  if (bridge === undefined) {
+    throw new Error('buildOutputBridgeFixture: no digital-to-analog bridge produced');
   }
 
-  stampElement(_handle: number, _value: number): void { /* not needed for RHS checks */ }
+  const adapters = compiled.analog!.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId);
+  if (adapters === undefined) {
+    throw new Error(`buildOutputBridgeFixture: no adapters for group ${bridge.boundaryGroupId}`);
+  }
+  const outputAdapter = adapters.find(
+    (a): a is BridgeOutputDriverElement => 'setLogicLevel' in a,
+  );
+  if (outputAdapter === undefined) {
+    throw new Error('buildOutputBridgeFixture: bridge has no BridgeOutputDriverElement');
+  }
 
-  reset(): void { /* no-op: RHS is captured via ctx.rhs buffer now */ }
+  return {
+    fix,
+    outputAdapter,
+    nodeXId: bridge.analogNodeId,
+  };
 }
 
-function makeCtx(solver: MockSolver, rhs?: Float64Array) {
-  const rhsBuf = rhs ?? new Float64Array(8);
-  return loadCtxFromFields({
-    solver: solver as any,
-    rhs: rhsBuf,
-    rhsOld: rhsBuf,
-    matrix: solver as any,
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    dt: 0,
-    method: 'trapezoidal' as const,
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    time: 0,
-    temp: 300.15,
-    vt: 0.025852,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  });
+/**
+ * Step the coordinator until the analog node voltage at `nodeId` settles to
+ * within `tol` of itself across two consecutive steps, or `maxSteps` runs
+ * out. Returns the final voltage.
+ */
+function stepToSteadyState(
+  fix: Fixture,
+  nodeId: number,
+  maxSteps = 200,
+  tol = 1e-6,
+): number {
+  const analog = fix.coordinator.getAnalogEngine();
+  if (analog === null) throw new Error('stepToSteadyState: no analog engine');
+  let prev = analog.getNodeVoltage(nodeId);
+  for (let i = 0; i < maxSteps; i++) {
+    fix.coordinator.step();
+    const cur = analog.getNodeVoltage(nodeId);
+    if (Math.abs(cur - prev) < tol) return cur;
+    prev = cur;
+  }
+  return prev;
+}
+
+/** Divider target: V(node_X) = vOH · Rpull / (rOut + Rload + Rpull). */
+function dividerTarget(vOH: number): number {
+  const rOut = 50;
+  const Rload = 50;
+  const Rpull = 1e6;
+  return vOH * Rpull / (rOut + Rload + Rpull);
 }
 
 // ---------------------------------------------------------------------------
-// R5: hot-load vOH mid-simulation
+// Hot-load vOH mid-simulation
 // ---------------------------------------------------------------------------
 
 describe('bridge adapter: hot-load vOH mid-simulation', () => {
-  it('setParam("vOH", 5.0) after N steps causes analog node target to change to 5.0', () => {
-    const adapter = makeBridgeOutputAdapter(CMOS, 1, BRANCH_IDX, false);
-    const solver = new MockSolver();
+  it('setParam("vOH", 5.0) after steady-state HIGH causes analog node target to change to ~5.0', () => {
+    const { fix, outputAdapter, nodeXId } = buildOutputBridgeFixture();
 
-    // Drive high from the start (coordinator sets logic level before each step)
-    adapter.setLogicLevel(true);
+    // Drive HIGH and step to steady state with default vOH = 3.3.
+    fix.coordinator.writeByLabel('A', { type: 'digital', value: 1 });
+    outputAdapter.setLogicLevel(true);
+    const vBefore = stepToSteadyState(fix, nodeXId);
 
-    // Step N=5 times to reach steady state- each step re-stamps the branch equation
-    const N = 5;
-    for (let i = 0; i < N; i++) {
-      solver.reset();
-      adapter.load(makeCtx(solver));
-    }
+    const vTargetBefore = dividerTarget(3.3); // ≈ 3.2997
+    expect(vBefore).toBeGreaterThan(vTargetBefore - 1e-3);
+    expect(vBefore).toBeLessThan(vTargetBefore + 1e-3);
 
-    // Verify steady state: branch RHS equals vOH = 3.3
+    // Hot-load: update vOH to 5.0 mid-simulation.
+    outputAdapter.setParam('vOH', 5.0);
 
-    // Hot-load: update vOH to 5.0 mid-simulation
-    adapter.setParam('vOH', 5.0);
+    // Step again — the next load() must restamp using the new vOH.
+    const vAfter = stepToSteadyState(fix, nodeXId);
 
-    // Step again- coordinator re-stamps after param change
-    solver.reset();
-    adapter.load(makeCtx(solver));
+    const vTargetAfter = dividerTarget(5.0); // ≈ 4.9995
+    expect(vAfter).toBeGreaterThan(vTargetAfter - 1e-3);
+    expect(vAfter).toBeLessThan(vTargetAfter + 1e-3);
 
-    // Verify: analog node target has changed to the new vOH
-    // Confirm it is different from the original vOH
+    // The hot-load must have moved the node voltage by ~1.7 V.
+    expect(vAfter - vBefore).toBeGreaterThan(1.5);
+
+    fix.coordinator.dispose();
   });
 
-  it('setParam("vOH", 5.0) does not affect vOL drive (logic low still drives 0V)', () => {
-    const adapter = makeBridgeOutputAdapter(CMOS, 1, BRANCH_IDX, false);
-    const solver = new MockSolver();
+  it('setParam("vOH", 5.0) does not affect vOL drive (logic low still drives ~0V)', () => {
+    const { fix, outputAdapter, nodeXId } = buildOutputBridgeFixture();
 
-    // Drive low
-    adapter.setLogicLevel(false);
+    // Drive LOW and step to steady state.
+    fix.coordinator.writeByLabel('A', { type: 'digital', value: 0 });
+    outputAdapter.setLogicLevel(false);
+    const vLowBefore = stepToSteadyState(fix, nodeXId);
+    expect(Math.abs(vLowBefore)).toBeLessThan(1e-3);
 
-    // Reach steady state
-    for (let i = 0; i < 5; i++) {
-      solver.reset();
-      adapter.load(makeCtx(solver));
-    }
+    // Hot-load vOH — must not affect a logic-LOW drive (vOL is unchanged).
+    outputAdapter.setParam('vOH', 5.0);
+    const vLowAfter = stepToSteadyState(fix, nodeXId);
+    expect(Math.abs(vLowAfter)).toBeLessThan(1e-3);
 
-    // Hot-load vOH- should not affect the low-level voltage
-    adapter.setParam('vOH', 5.0);
-    solver.reset();
-    adapter.load(makeCtx(solver));
-
-    // vOL is unchanged
+    fix.coordinator.dispose();
   });
 
-  it('setParam("vOH", 5.0) then switch to high drives 5.0', () => {
-    const adapter = makeBridgeOutputAdapter(CMOS, 1, BRANCH_IDX, false);
-    const solver = new MockSolver();
+  it('setParam("vOH", 5.0) then switch to HIGH drives ~5.0', () => {
+    const { fix, outputAdapter, nodeXId } = buildOutputBridgeFixture();
 
-    // Start low, reach steady state
-    adapter.setLogicLevel(false);
-    for (let i = 0; i < 3; i++) {
-      solver.reset();
-      adapter.load(makeCtx(solver));
-    }
+    // Start LOW, reach steady state at ~0 V.
+    fix.coordinator.writeByLabel('A', { type: 'digital', value: 0 });
+    outputAdapter.setLogicLevel(false);
+    const vLow = stepToSteadyState(fix, nodeXId);
+    expect(Math.abs(vLow)).toBeLessThan(1e-3);
 
-    // Hot-load new vOH
-    adapter.setParam('vOH', 5.0);
+    // Hot-load new vOH while still LOW.
+    outputAdapter.setParam('vOH', 5.0);
 
-    // Coordinator switches to high (digital output goes high)
-    adapter.setLogicLevel(true);
-    solver.reset();
-    adapter.load(makeCtx(solver));
+    // Now switch to HIGH — the analog node target must be the *new* vOH = 5.0.
+    fix.coordinator.writeByLabel('A', { type: 'digital', value: 1 });
+    outputAdapter.setLogicLevel(true);
+    const vHigh = stepToSteadyState(fix, nodeXId);
 
-    // Analog node target must now be 5.0, not the original 3.3
+    const vTarget = dividerTarget(5.0); // ≈ 4.9995
+    expect(vHigh).toBeGreaterThan(vTarget - 1e-3);
+    expect(vHigh).toBeLessThan(vTarget + 1e-3);
+
+    // Confirm we moved well past the original vOH = 3.3 ceiling.
+    expect(vHigh).toBeGreaterThan(3.3 + 0.5);
+
+    fix.coordinator.dispose();
   });
 });

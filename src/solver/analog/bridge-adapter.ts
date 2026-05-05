@@ -16,15 +16,6 @@ import { BridgeOutputDriverElement } from "./behavioral-drivers/bridge-output-dr
 import { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driver.js";
 
 // ---------------------------------------------------------------------------
-// Type aliases — keep existing typed-import sites in compiler.ts,
-// coordinator.ts, and compiled-analog-circuit.ts compiling without
-// per-call-site changes.
-// ---------------------------------------------------------------------------
-
-export type BridgeOutputAdapter = BridgeOutputDriverElement;
-export type BridgeInputAdapter = BridgeInputDriverElement;
-
-// ---------------------------------------------------------------------------
 // Factory helpers
 // ---------------------------------------------------------------------------
 

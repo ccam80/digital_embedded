@@ -12,7 +12,8 @@ import type { Diagnostic } from "../../compile/types.js";
 import type { Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { AnalogElement } from "./element.js";
-import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
+import type { BridgeOutputDriverElement } from "./behavioral-drivers/bridge-output-driver.js";
+import type { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driver.js";
 import type { ResolvedPin } from "../../core/pin.js";
 import { StatePool } from "./state-pool.js";
 
@@ -98,12 +99,12 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Maps element index → bridge adapters owned by that element. Used by the
    *  coordinator to route composite pin-param keys (e.g. "A.rOut") to the
    *  correct bridge adapter at runtime without re-scanning all elements. */
-  readonly elementBridgeAdapters: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+  readonly elementBridgeAdapters: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
 
   /** Maps boundary group ID → bridge adapters for that cross-domain boundary.
    *  Populated by compileAnalogPartition after the main element loop.
    *  The coordinator looks up adapters by boundaryGroupId to drive/read each boundary. */
-  readonly bridgeAdaptersByGroupId: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+  readonly bridgeAdaptersByGroupId: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
 
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: Diagnostic[];
@@ -139,8 +140,8 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     elementPinVertices?: Map<number, Array<{ x: number; y: number } | null>>;
     elementResolvedPins?: Map<number, ResolvedPin[]>;
     groupToNodeId?: Map<number, number>;
-    elementBridgeAdapters?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
-    bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+    elementBridgeAdapters?: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
+    bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
     statePool: StatePool | null;

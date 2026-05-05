@@ -77,17 +77,17 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         vIH: params.getModelParam<number>("vIH"),
         vIL: params.getModelParam<number>("vIL"),
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: inputPinType,
       modelRef: "default",
       subElementName: "inPin",
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: inputPinType,
       modelRef: "default",
       subElementName: "selPin",
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: outputPinType,
       modelRef: "default",
@@ -100,7 +100,7 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         inputLogic:  { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
         enableLogic: { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_ENABLE" },
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   // Net indices: in=0, sel=1, out=2, gnd=3
@@ -154,17 +154,17 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
         vIH: params.getModelParam<number>("vIH"),
         vIL: params.getModelParam<number>("vIL"),
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: inputPinType,
       modelRef: "default",
       subElementName: "inPin",
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: inputPinType,
       modelRef: "default",
       subElementName: "selPin",
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: outputPinType,
       modelRef: "default",
@@ -177,7 +177,7 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
         inputLogic:  { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
         enableLogic: { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_ENABLE" },
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   // Net indices: in=0, sel=1, out=2, gnd=3
@@ -275,7 +275,7 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: { inputCount, outputCount },
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   const netlist: number[][] = [drvNets];
@@ -286,7 +286,7 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: `inPin_${i}`,
       params: {},
-    } as SubcircuitElement & { subElementName: string });
+    });
     netlist.push([i, netGnd]);
   }
 
@@ -298,7 +298,7 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       params: {
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_LOGIC_LEVEL_${i}` },
       },
-    } as SubcircuitElement & { subElementName: string });
+    });
     netlist.push([inputCount + i, netGnd]);
   }
 
@@ -338,7 +338,7 @@ export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   const netlist: number[][] = [drvNets];
@@ -349,7 +349,7 @@ export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: `${segmentLabels[i]}Pin`,
       params: {},
-    } as SubcircuitElement & { subElementName: string });
+    });
     netlist.push([i, netGnd]);
   }
 
@@ -385,13 +385,13 @@ export function buildButtonLEDNetlist(): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "inPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
@@ -399,7 +399,7 @@ export function buildButtonLEDNetlist(): MnaSubcircuitNetlist {
       params: {
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   // Net indices: out=0, in=1, gnd=2

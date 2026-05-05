@@ -64,25 +64,25 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: { bitWidth },
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "enPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "clockPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "clrPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   const netlist: number[][] = [
@@ -100,7 +100,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       params: {
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_LOGIC_LEVEL_${i}` },
       },
-    } as SubcircuitElement & { subElementName: string });
+    });
     netlist.push([netOutBase + i, netGnd]);
   }
 
@@ -111,7 +111,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
     params: {
       inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_OVF" },
     },
-  } as SubcircuitElement & { subElementName: string });
+  });
   netlist.push([netOvf, netGnd]);
 
   return {
@@ -166,43 +166,43 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
       modelRef: "default",
       subElementName: "drv",
       params: { bitWidth },
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "enPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "clockPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "dirPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "inPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "ldPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "clrPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
@@ -210,7 +210,7 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
       params: {
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_OUT" },
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
@@ -218,7 +218,7 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
       params: {
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_OVF" },
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   // drv port order: en, C, dir, in, ld, clr, out, ovf, gnd
@@ -278,25 +278,25 @@ export function buildRegisterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: { bitWidth },
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "dPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "clockPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalInputPinLoaded",
       modelRef: "default",
       subElementName: "enPin",
       params: {},
-    } as SubcircuitElement & { subElementName: string },
+    },
     {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
@@ -304,7 +304,7 @@ export function buildRegisterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       params: {
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_Q" },
       },
-    } as SubcircuitElement & { subElementName: string },
+    },
   ];
 
   // drv port order: D, C, en, Q, gnd

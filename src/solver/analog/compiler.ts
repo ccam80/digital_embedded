@@ -33,7 +33,8 @@ import { defaultLogicFamily } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter } from "./bridge-adapter.js";
-import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
+import type { BridgeOutputDriverElement } from "./behavioral-drivers/bridge-output-driver.js";
+import type { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driver.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
@@ -1074,7 +1075,7 @@ export function compileAnalogPartition(
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
   const elementResolvedPins = new Map<number, ResolvedPin[]>();
-  const elementBridgeAdapters = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
+  const elementBridgeAdapters = new Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>();
 
   const timeRef = { value: 0 };
   const getTime = (): number => timeRef.value;
@@ -1267,7 +1268,7 @@ export function compileAnalogPartition(
   }
 
   // Bridge stub processing- create MNA elements for each cross-domain boundary.
-  const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
+  const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputDriverElement | BridgeInputDriverElement>>();
 
   for (const stub of partition.bridgeStubs) {
     const { boundaryGroupId, descriptor } = stub;
@@ -1283,10 +1284,10 @@ export function compileAnalogPartition(
     );
 
     const spec = resolvePinElectrical(circuitFamily, descriptor.electricalSpec);
-    const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> = [];
+    const adapters: Array<BridgeOutputDriverElement | BridgeInputDriverElement> = [];
 
     if (descriptor.direction === "digital-to-analog") {
-      // Digital output pin drives the analog node- BridgeOutputAdapter (voltage source).
+      // Digital output pin drives the analog node- BridgeOutputDriverElement (voltage source).
       // 1-based slot indexing per the absoluteBranchIdx convention above.
       const branchIdx = totalNodeCount + 1 + branchCount;
       branchCount++;
@@ -1297,7 +1298,7 @@ export function compileAnalogPartition(
       analogElements.push(adapter);
       adapters.push(adapter);
     } else {
-      // Analog voltage drives digital input- BridgeInputAdapter (loading sense)
+      // Analog voltage drives digital input- BridgeInputDriverElement (loading sense)
       const adapter = makeBridgeInputAdapter(spec, nodeId, loaded);
       const sensePin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
       if (sensePin) adapter.label = `bridge-${boundaryGroupId}:${sensePin.pinLabel}`;

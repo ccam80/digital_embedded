@@ -18,6 +18,8 @@ import type { IntegrationMethod } from "../solver/analog/integration.js";
 import type { DiagnosticSuggestion } from "../compile/types.js";
 import type { ConvergenceLog } from "../solver/analog/convergence-log.js";
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
+import type { BridgeOutputDriverElement } from "../solver/analog/behavioral-drivers/bridge-output-driver.js";
+import type { BridgeInputDriverElement } from "../solver/analog/behavioral-drivers/bridge-input-driver.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
 export type { Diagnostic, DiagnosticCode };
 
@@ -300,6 +302,18 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
    * stamps on every NR iteration.
    */
   readonly ics?: Map<number, number>;
+  /**
+   * Bridge adapters for cross-domain (digital↔analog) boundary groups, keyed
+   * by `boundaryGroupId`. The compiler instantiates one
+   * `BridgeOutputDriverElement` per digital-to-analog stub and one
+   * `BridgeInputDriverElement` per analog-to-digital stub, attached to the
+   * same MNA node as the boundary group's analog face. Read by the
+   * coordinator at step time to drive logic levels and read voltages.
+   */
+  readonly bridgeAdaptersByGroupId: ReadonlyMap<
+    number,
+    ReadonlyArray<BridgeOutputDriverElement | BridgeInputDriverElement>
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,6 +412,15 @@ export interface AnalogEngine extends Engine {
   // -------------------------------------------------------------------------
   // Configuration
   // -------------------------------------------------------------------------
+
+  /**
+   * Return a frozen copy of the fully-resolved SimulationParams snapshot.
+   *
+   * This is the post-`resolveSimulationParams` result: all auto-derived fields
+   * (maxTimeStep, minTimeStep, firstStep) are concrete values, never undefined.
+   * Returns a shallow copy so callers cannot mutate engine state.
+   */
+  getResolvedParams(): ResolvedSimulationParams;
 
   /**
    * Update solver parameters. Merges the given partial set into the active

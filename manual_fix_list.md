@@ -138,16 +138,20 @@ Folded-in (in-blast-radius, not on §2e list):
 ### §2f Gate user-facing components — COMPLETE
 J-037, J-042, J-039, J-040, J-044, J-043, J-041, J-038.
 
-### §2g Behavioural-element file deletions — partially done
+### §2g Behavioural-element file deletions — COMPLETE 2026-05-05
 
-**REMAINING:**
-- [ ] `src/solver/analog/behavioral-gate.ts` — ssM10 — Delete `BehavioralGateElement` and `GateTruthTable`; delete file if no exports (J-170).
-- [ ] `src/solver/analog/behavioral-combinational.ts` — ssG10 + ssM11 — Delete 3 empty `accept(){}` stubs and 3 composite classes (J-133).
-- [ ] `src/solver/analog/behavioral-sequential.ts` — ssM12 — Delete 3 composite classes (J-173).
-- [ ] `src/solver/analog/behavioral-remaining.ts` — ssG11 + ssM13 — Delete 3 empty `accept(){}` stubs and 5 composite classes (J-172).
-- [ ] `src/solver/analog/bridge-adapter.ts` — ssM21 — Delete `BridgeOutputAdapter`/`BridgeInputAdapter`; keep factories wrapping new driver leaves (J-174). **NB**: `digital-pin-loading.test.ts:368,472,473` uses constructor-as-value for these classes; tsc errors expected until J-174 lands.
+**COMPLETE (this session)**: J-170 (`behavioral-gate.ts` deleted; orphan `AnalogElementFactory` had zero importers), J-133 (`behavioral-combinational.ts` verified — composites and `accept(){}` stubs were already deleted in a prior session; nothing left to do), J-173 (`behavioral-sequential.ts` — 20 dead `as SubcircuitElement & { subElementName: string }` casts stripped per §0 fix-on-contact), J-172 (`behavioral-remaining.ts` — 16 dead casts stripped), J-174 (`bridge-adapter.ts` type aliases `BridgeOutputAdapter`/`BridgeInputAdapter` deleted; production callers `compiler.ts` / `coordinator.ts` / `compiled-analog-circuit.ts` and bridge driver leaves updated to use `BridgeOutputDriverElement` / `BridgeInputDriverElement` directly; 5 test files import-renamed; `digital-pin-loading.test.ts:368,472,473` constructor-as-value sites resolved per spec NB).
 
-**COMPLETE**: J-162, J-163, J-164, J-165, J-166, J-167, J-169, J-168 (flip-flop class deletions; `behavioral-flipflop/` directory removed; orphan `behavioral-flipflop-variants.ts` and `behavioral-flipflop/index.ts` also deleted).
+**§2g extension fold-in (sanctioned-surface architectural cleanup):**
+- `bridgeAdaptersByGroupId` lifted from `ConcreteCompiledAnalogCircuit` (concrete class) to `CompiledAnalogCircuit` (interface) at `src/core/analog-engine-interface.ts:303-313` with `ReadonlyMap<number, ReadonlyArray<…>>` typing. Eliminates the `as ConcreteCompiledAnalogCircuit` downcasts that were the canonical idiom in test files for accessing bridge adapters.
+- Casts removed: `coordinator-bridge.test.ts` (4 sites), `coordinator-bridge-hotload.test.ts` (1 site), `digital-pin-loading.test.ts` (5 sites incl. `countBridgeAdapters` helper signature). Replacement is single-`!` non-null assertion on `compiled.analog!` (was implicit in the previous downcast — strictly less type-erasing than the cast it replaced).
+- `analog-engine-interface.test.ts` literal at line 88 extended with `bridgeAdaptersByGroupId: new Map()` to keep the structural-subtyping test typecheck-clean.
+- Other production casts (`coordinator.ts`, `analog-engine.ts`) and other test casts (`digital-pin-loading-mcp.test.ts`, harness files, fixture files, `dac.test.ts`, `mna-end-to-end.test.ts`, `analog-engine.test.ts`, `wire-current-resolver.test.ts`, `monte-carlo.test.ts`, `buckbjt-nr-probe.test.ts`, etc.) retain `as ConcreteCompiledAnalogCircuit` because they access OTHER concrete-only fields (`statePool`, `nodeCount`, etc., still on the concrete class only). Lifting those is out of §2g scope.
+
+**Coordinator-bridge-hotload.test.ts §4c migration (touched-test-file fold-in):**
+The file was full §3 POISON pre-this-session: `MockSolver`, hand-rolled `LoadContext` via `loadCtxFromFields`, direct `adapter.load(makeCtx(solver))`, and (worst) the `expect()` assertions had been stripped — leaving "calls without verification" smell. Rebuilt on `buildFixture` + `coordinator.step()` + `engine.getNodeVoltage()` against the same `In→Rload→Rpull→Ground` topology as `coordinator-bridge.test.ts`. Three vOH-hot-load test cases preserved by intent with proper divider-target math (`V(node_X) = vOH · Rpull / (rOut + Rload + Rpull)`). vOH/vOL hot-load coverage was unique to this file (`coordinator-bridge.test.ts` covers `rOut`/`rIn`/`setHighZ` but not vOH/vOL).
+
+**COMPLETE (prior sessions)**: J-162, J-163, J-164, J-165, J-166, J-167, J-169, J-168 (flip-flop class deletions; `behavioral-flipflop/` directory removed; orphan `behavioral-flipflop-variants.ts` and `behavioral-flipflop/index.ts` also deleted).
 
 ---
 
@@ -258,6 +262,8 @@ The §4a deletion of `test-helpers.ts` removed the official engine-impersonator 
 - [ ] `trans-gate.test.ts` — Test 1.23 — UC-1 + UC-3 with state inspection (J-090). **NB Wave 11a**: line 18 imports `TransGateAnalogElement` which became internalOnly; rebuild via netlist composite.
 - [ ] `resolve-simulation-params.test.ts` — Test 1.25 — UC-1 M2 at 115, 130, 137 (J-099).
 - [ ] `wire-current-resolver.test.ts` — Test 1.26 + ssB10 — UC-1 M2 at 7 sites; pin-key at 33, 111 (J-102).
+- [ ] `src/components/sources/__tests__/dc-voltage-source.test.ts` — **NEW §3e item added 2026-05-05** — file imports deleted `test-helpers.js` and uses `solver as unknown as SparseSolver` engine-impersonator POISON pattern at 7 sites (lines 100, 129, 148, 162, 185, 217, 237, 255). Full §4c POISON migration to `buildFixture` / `ComparisonSession`. Cite deleted stamp-level tests to `ngspice-parity/dc-voltage-source.test.ts` (or equivalent ngspice-parity file) where coverage exists (J-NEW-dvs).
+- [ ] `src/components/sources/__tests__/current-source.test.ts` — **NEW §3e item added 2026-05-05** — file imports deleted `test-helpers.js` and uses `solver as unknown as SparseSolver` engine-impersonator POISON pattern at 8 sites (lines 101, 121, 140, 153, 176, 202, 223, 237). Full §4c POISON migration to `buildFixture` / `ComparisonSession`. Cite deleted stamp-level tests to `ngspice-parity/dc-voltage-source.test.ts` (or equivalent ngspice-parity file) where coverage exists (J-NEW-csr).
 
 ### §3f E2E tests — REMAINING
 - [ ] `e2e/gui/analog-bjt-convergence.spec.ts` — Test 1.1 — Insert `placeLabeled('Diode', 43, 12, 'TD', 90)` after line 153 (J-002).
@@ -383,6 +389,6 @@ End-state: `interface AnalogElement` / `interface PoolBackedAnalogElement` delet
 
 - Total files: 183 (185 J-IDs in source contracts; J-001 and J-005 struck)
 - Engine: 21 — COMPLETE
-- Components: 89 — §2a/§2b/§2c/§2d/§2e/§2f COMPLETE; §2g (5 items) REMAINING
+- Components: 89 — §2a/§2b/§2c/§2d/§2e/§2f/§2g COMPLETE
 - Tests: 73 — §3 mostly REMAINING; partial completions in §3c (J-129) and §3e (J-072)
 - Unclassified: 0

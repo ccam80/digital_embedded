@@ -36,7 +36,8 @@ import type {
   SignalValue,
 } from '../compile/types.js';
 import type { ConcreteCompiledAnalogCircuit } from './analog/compiled-analog-circuit.js';
-import type { BridgeOutputAdapter, BridgeInputAdapter } from './analog/bridge-adapter.js';
+import type { BridgeOutputDriverElement } from './analog/behavioral-drivers/bridge-output-driver.js';
+import type { BridgeInputDriverElement } from './analog/behavioral-drivers/bridge-input-driver.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyType } from '../core/properties.js';
 
@@ -70,7 +71,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _bridges: BridgeAdapter[];
   private readonly _topLevelBridgeStates: TopLevelBridgeState[];
   /** Resolved MNA bridge adapters parallel to _bridges. Index i → adapters for _bridges[i]. */
-  private readonly _resolvedBridgeAdapters: Array<Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+  private readonly _resolvedBridgeAdapters: Array<Array<BridgeOutputDriverElement | BridgeInputDriverElement>>;
   private readonly _clockManager: ClockManager | null;
   private _diagnostics: DiagnosticCollector | null = null;
   private readonly _observers: Set<MeasurementObserver> = new Set();
@@ -289,14 +290,14 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       const adapters = this._resolvedBridgeAdapters[i]!;
       let bit: number;
       const inputAdapter = adapters.find(
-        (a): a is BridgeInputAdapter => 'readLogicLevel' in a,
+        (a): a is BridgeInputDriverElement => 'readLogicLevel' in a,
       );
       if (inputAdapter === undefined) {
         this._diagnostics?.emit({
           code: 'bridge-missing-inner-pin',
           severity: 'error',
-          message: `No BridgeInputAdapter for boundary group ${bridge.boundaryGroupId}`,
-          explanation: 'An analog-to-digital bridge has no registered BridgeInputAdapter. This indicates a compilation error- the bridge was not fully assembled.',
+          message: `No BridgeInputDriverElement for boundary group ${bridge.boundaryGroupId}`,
+          explanation: 'An analog-to-digital bridge has no registered BridgeInputDriverElement. This indicates a compilation error- the bridge was not fully assembled.',
           suggestions: [],
         });
         continue;
@@ -336,7 +337,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       }
       const adapters = this._resolvedBridgeAdapters[i]!;
       const outputAdapter = adapters.find(
-        (a): a is BridgeOutputAdapter => 'setLogicLevel' in a,
+        (a): a is BridgeOutputDriverElement => 'setLogicLevel' in a,
       );
       if (outputAdapter !== undefined) {
         outputAdapter.setLogicLevel(high);
