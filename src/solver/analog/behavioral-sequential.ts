@@ -32,7 +32,7 @@ import type { PropertyBag } from "../../core/properties.js";
  *   ovfPin   - DigitalOutputPinLoaded for ovf
  */
 export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
-  const bitWidth: number = (props.has("bitWidth") ? props.get("bitWidth") as number : undefined) ?? 4;
+  const bitWidth = props.getOrDefault<number>("bitWidth", 4);
 
   const ports: string[] = ["en", "C", "clr"];
   for (let i = 0; i < bitWidth; i++) {
@@ -146,7 +146,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
  *   ovfPin   - DigitalOutputPinLoaded for ovf
  */
 export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetlist {
-  const bitWidth: number = (props.has("bitWidth") ? props.get("bitWidth") as number : undefined) ?? 4;
+  const bitWidth = props.getOrDefault<number>("bitWidth", 4);
 
   const ports = ["en", "C", "dir", "in", "ld", "clr", "out", "ovf", "gnd"];
 
@@ -262,7 +262,7 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
  *   qPin     - DigitalOutputPinLoaded for Q (bus)
  */
 export function buildRegisterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
-  const bitWidth: number = (props.has("bitWidth") ? props.get("bitWidth") as number : undefined) ?? 8;
+  const bitWidth = props.getOrDefault<number>("bitWidth", 8);
 
   const ports = ["D", "C", "en", "Q", "gnd"];
 
