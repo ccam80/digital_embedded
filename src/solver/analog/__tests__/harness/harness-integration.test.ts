@@ -1,231 +1,21 @@
 ﻿/**
  * Integration test for the comparison harness infrastructure.
  */
-import { describe, it, expect, beforeEach } from "vitest";
-import { MNAEngine } from "../../analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
+import { describe, it, expect } from "vitest";
 import { EngineState } from "../../../../core/engine-interface.js";
-import { allocateStatePool, makeSimpleCtx } from "../test-helpers.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
-import { PropertyBag } from "../../../../core/properties.js";
-import { AnalogElement, PoolBackedAnalogElement } from "../../element.js";
-import type { SetupContext } from "../../setup-context.js";
-import type { LoadContext } from "../../load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../ngspice-load-order.js";
-import type { StateSchema } from "../../state-schema.js";
-import type { StatePoolRef } from "../../state-pool.js";
 import { captureTopology, captureElementStates, createIterationCaptureHook, createStepCaptureHook } from "./capture.js";
 import { convergenceSummary, nodeVoltageTrajectory, findLargestDelta, querySteps } from "./query.js";
 import { compareSnapshots, formatComparison, findFirstDivergence } from "./compare.js";
 import { canonicalizeNgspiceName, canonicalizeOurLabel } from "./node-mapping.js";
 import type { CaptureSession, IntegrationCoefficients } from "./types.js";
 import { buildHwrFixture } from "./hwr-fixture.js";
+import { buildFixture } from "../fixtures/build-fixture.js";
 
 const ZERO_INTEG_COEFF: IntegrationCoefficients = {
   ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
   ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
 };
 
-// ---------------------------------------------------------------------------
-// Minimal inline element factories- implement the new AnalogElement contract.
-// These exist only to give the engine a functioning circuit; they are NOT
-// testing element correctness.
-// ---------------------------------------------------------------------------
-
-class HarnessResistorEl extends AnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  private _hPP = -1;
-  private _hNN = -1;
-  private _hPN = -1;
-  private _hNP = -1;
-  private readonly _G: number;
-  constructor(pinNodes: ReadonlyMap<string, number>, resistance: number) {
-    super(pinNodes);
-    this._G = 1 / resistance;
-  }
-  setup(ctx: SetupContext): void {
-    const s = ctx.solver;
-    const p = this.pinNodes.get("pos")!;
-    const n = this.pinNodes.get("neg")!;
-    this._hPP = s.allocElement(p, p);
-    this._hNN = s.allocElement(n, n);
-    this._hPN = s.allocElement(p, n);
-    this._hNP = s.allocElement(n, p);
-  }
-  load(ctx: LoadContext): void {
-    ctx.solver.stampElement(this._hPP, this._G);
-    ctx.solver.stampElement(this._hNN, this._G);
-    ctx.solver.stampElement(this._hPN, -this._G);
-    ctx.solver.stampElement(this._hNP, -this._G);
-  }
-  getPinCurrents(_rhs: Float64Array): number[] { return []; }
-  setParam(_key: string, _value: number): void {}
-}
-
-function makeResistorEl(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  return new HarnessResistorEl(new Map([["pos", nodeA], ["neg", nodeB]]), resistance);
-}
-
-class HarnessDiodeEl extends AnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
-  private _hAA = -1;
-  private _hKK = -1;
-  private _hAK = -1;
-  private _hKA = -1;
-  private readonly _nodeA: number;
-  private readonly _nodeK: number;
-  private readonly _IS: number;
-  private readonly _N: number;
-  private readonly _VT = 0.025852;
-  private _vd = 0;
-  constructor(pinNodes: ReadonlyMap<string, number>, IS: number, N: number) {
-    super(pinNodes);
-    this._nodeA = pinNodes.get("A")!;
-    this._nodeK = pinNodes.get("K")!;
-    this._IS = IS;
-    this._N = N;
-  }
-  setup(ctx: SetupContext): void {
-    const s = ctx.solver;
-    this._hAA = s.allocElement(this._nodeA, this._nodeA);
-    this._hKK = s.allocElement(this._nodeK, this._nodeK);
-    this._hAK = s.allocElement(this._nodeA, this._nodeK);
-    this._hKA = s.allocElement(this._nodeK, this._nodeA);
-  }
-  load(ctx: LoadContext): void {
-    const vA = ctx.rhsOld[this._nodeA] ?? 0;
-    const vK = ctx.rhsOld[this._nodeK] ?? 0;
-    this._vd = vA - vK;
-    const expArg = Math.min(this._vd / (this._N * this._VT), 40);
-    const Id = this._IS * (Math.exp(expArg) - 1);
-    const Gd = this._IS * Math.exp(expArg) / (this._N * this._VT);
-    const Ieq = Id - Gd * this._vd;
-    ctx.solver.stampElement(this._hAA, Gd);
-    ctx.solver.stampElement(this._hKK, Gd);
-    ctx.solver.stampElement(this._hAK, -Gd);
-    ctx.solver.stampElement(this._hKA, -Gd);
-    ctx.rhs[this._nodeA] -= Ieq;
-    ctx.rhs[this._nodeK] += Ieq;
-  }
-  checkConvergence(ctx: LoadContext): boolean {
-    const vA = ctx.rhsOld[this._nodeA] ?? 0;
-    const vK = ctx.rhsOld[this._nodeK] ?? 0;
-    const vdNew = vA - vK;
-    return Math.abs(vdNew - this._vd) < ctx.voltTol + ctx.reltol * Math.abs(vdNew);
-  }
-  getPinCurrents(_rhs: Float64Array): number[] { return []; }
-  setParam(_key: string, _value: number): void {}
-}
-
-function makeDiodeEl(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
-  const diodePins = new Map<string, number>();
-  diodePins.set("A", nodeA);
-  diodePins.set("K", nodeK);
-  return new HarnessDiodeEl(diodePins, IS, N);
-}
-
-const CAP_SCHEMA: StateSchema = {
-  owner: "TestCapacitor",
-  slots: [
-    { name: "QCAP", doc: "Capacitor charge" },
-    { name: "VCAP", doc: "Capacitor voltage" },
-  ],
-  size: 2,
-  indexOf: new Map([["QCAP", 0], ["VCAP", 1]]),
-};
-
-class HarnessCapacitorEl extends PoolBackedAnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly stateSchema = CAP_SCHEMA;
-  readonly stateSize = CAP_SCHEMA.size;
-  private _hPP = -1;
-  private _hNN = -1;
-  private _hPN = -1;
-  private _hNP = -1;
-  private readonly _nodePos: number;
-  private readonly _nodeNeg: number;
-  private readonly _capacitance: number;
-  private static readonly SLOT_Q = 0;
-  private static readonly SLOT_V = 1;
-  constructor(pinNodes: ReadonlyMap<string, number>, capacitance: number) {
-    super(pinNodes);
-    this._nodePos = pinNodes.get("pos")!;
-    this._nodeNeg = pinNodes.get("neg")!;
-    this._capacitance = capacitance;
-  }
-  setup(ctx: SetupContext): void {
-    const base = ctx.allocStates(CAP_SCHEMA.size);
-    this._stateBase = base;
-    const s = ctx.solver;
-    this._hPP = s.allocElement(this._nodePos, this._nodePos);
-    this._hNN = s.allocElement(this._nodeNeg, this._nodeNeg);
-    this._hPN = s.allocElement(this._nodePos, this._nodeNeg);
-    this._hNP = s.allocElement(this._nodeNeg, this._nodePos);
-  }
-  override initState(pool: StatePoolRef): void {
-    super.initState(pool);
-    const base = this._stateBase;
-    pool.state0[base + HarnessCapacitorEl.SLOT_Q] = 0;
-    pool.state0[base + HarnessCapacitorEl.SLOT_V] = 0;
-  }
-  load(ctx: LoadContext): void {
-    if (!this._pool) return;
-    const { ag, dt } = ctx;
-    const Geq = ag[0] * this._capacitance;
-    const vOld = this._pool.state1[this._stateBase + HarnessCapacitorEl.SLOT_V] ?? 0;
-    const Ieq = ag[1] * this._capacitance * vOld;
-    ctx.solver.stampElement(this._hPP, Geq);
-    ctx.solver.stampElement(this._hNN, Geq);
-    ctx.solver.stampElement(this._hPN, -Geq);
-    ctx.solver.stampElement(this._hNP, -Geq);
-    const vPos = ctx.rhsOld[this._nodePos] ?? 0;
-    const vNeg = ctx.rhsOld[this._nodeNeg] ?? 0;
-    void vPos; void vNeg; void dt; void Ieq;
-    ctx.rhs[this._nodePos] -= Ieq;
-    ctx.rhs[this._nodeNeg] += Ieq;
-  }
-  getPinCurrents(_rhs: Float64Array): number[] { return []; }
-  setParam(_key: string, _value: number): void {}
-}
-
-function makeCapacitorEl(nodePos: number, nodeNeg: number, capacitance: number): PoolBackedAnalogElement {
-  return new HarnessCapacitorEl(new Map([["pos", nodePos], ["neg", nodeNeg]]), capacitance);
-}
-
-// ---------------------------------------------------------------------------
-// Helper: create a DC voltage source using the 3-arg production factory.
-// ---------------------------------------------------------------------------
-
-function makeVsrc(posNode: number, negNode: number, voltage: number) {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
-
-// ---------------------------------------------------------------------------
-// Circuit builders
-// ---------------------------------------------------------------------------
-
-function makeRC() {
-  const vs = makeVsrc(1, 0, 5.0);
-  vs.label = "Vs";
-  const r = makeResistorEl(1, 2, 1000);
-  r.label = "R1";
-  const cap = makeCapacitorEl(2, 0, 1e-6);
-  cap.label = "C1";
-
-  const matrixSize = 3;
-  const elements = [vs, r, cap];
-  makeSimpleCtx({ elements, matrixSize, nodeCount: 2, startBranch: 2 });
-  const pool = allocateStatePool(elements);
-  return {
-    circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2,
-      elements, labelToNodeId: new Map([["Vs", 1], ["C1:pos", 2]]), statePool: pool,
-    } as unknown as ConcreteCompiledAnalogCircuit,
-    pool,
-  };
-}
 
 describe("harness integration", () => {
 
@@ -247,7 +37,7 @@ describe("harness integration", () => {
   });
 
   it("iteration capture hook records NR iterations during DC OP", () => {
-    const { circuit, pool, engine } = buildHwrFixture();
+    const { pool, engine } = buildHwrFixture();
     const { hook, preFactorHook, getSnapshots, clear } = createIterationCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = hook;
     engine.preFactorHook = preFactorHook;
@@ -270,7 +60,7 @@ describe("harness integration", () => {
   });
 
   it("postIterationHook fires during DC OP (nonlinear circuit)", () => {
-    const { circuit, engine } = buildHwrFixture();
+    const { engine } = buildHwrFixture();
     let hookCallCount = 0;
     engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, _g: boolean, _e: boolean, _le: unknown[], _cf: string[]) => { hookCallCount++; };
     const result = engine.dcOperatingPoint();
@@ -279,8 +69,20 @@ describe("harness integration", () => {
   });
 
   it("postIterationHook fires during DC OP (linear circuit)", () => {
-    const { circuit } = makeRC();
-    engine.init(circuit);
+    const { engine } = buildFixture({
+      build: (_registry, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { voltage: 5.0 } },
+          { id: "r1",  type: "Resistor",        props: { resistance: 1000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r1:pos"],
+          ["r1:neg", "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+    });
     let hookCallCount = 0;
     let lastGlobalConverged = false;
     engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, g: boolean, _e: boolean, _le: unknown[], _cf: string[]) => {
@@ -294,7 +96,7 @@ describe("harness integration", () => {
   });
 
   it("step capture hook packages iterations into step snapshots", () => {
-    const { circuit, pool, engine } = buildHwrFixture();
+    const { pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -458,7 +260,7 @@ describe("harness integration", () => {
   });
 
   it("step capture hook supports retry tracking via beginAttempt/endAttempt", () => {
-    const { circuit, pool, engine } = buildHwrFixture();
+    const { pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
 
@@ -484,7 +286,7 @@ describe("harness integration", () => {
   });
 
   it("step capture hook emits single attempt when no retries", () => {
-    const { circuit, pool, engine } = buildHwrFixture();
+    const { pool, engine } = buildHwrFixture();
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
     engine.stepPhaseHook = {
@@ -511,7 +313,7 @@ describe("harness integration", () => {
   });
 
   it("SparseSolver exposes dimension, getCSCNonZeros", () => {
-    const { circuit, engine } = buildHwrFixture();
+    const { engine } = buildHwrFixture();
     const solver = engine.solver!;
     engine.dcOperatingPoint();
     expect(solver.dimension).toBe(3);

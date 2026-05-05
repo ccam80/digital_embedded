@@ -37,7 +37,7 @@ describe("OpAmp", () => {
         ["rl:neg",   "gnd:out"],
       ],
     });
-    const coordinator = facade.compile(circuit);
+    facade.compile(circuit);
     const result = facade.getDcOpResult();
     expect(result?.converged).toBe(true);
   });
@@ -72,7 +72,7 @@ describe("Integration", () => {
         ["vinp:neg",  "gnd:out"],
       ],
     });
-    const coordinator = facade.compile(circuit);
+    facade.compile(circuit);
     const result = facade.getDcOpResult();
     expect(result?.converged).toBe(true);
   });
@@ -99,7 +99,7 @@ describe("Integration", () => {
         ["rg:neg",    "gnd:out"],
       ],
     });
-    const coordinator = facade.compile(circuit);
+    facade.compile(circuit);
     const result = facade.getDcOpResult();
     expect(result?.converged).toBe(true);
   });

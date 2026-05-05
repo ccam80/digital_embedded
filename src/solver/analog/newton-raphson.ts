@@ -475,6 +475,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // condition- error code AND structural arm- so non-singular reuse
       // failures (spZERO_DIAG, spNO_MEMORY) and any reorder failure
       // surface as a singular-matrix diagnostic instead of looping.
+      // niiter.c:888-891: on E_SINGULAR in the reuse (SMPluFac) arm,
+      // set NISHOULDREORDER and continue to retry with full reorder.
       if (errorCode === spSINGULAR && !solver.lastFactorWalkedReorder) {
         solver.forceReorder();
         continue;

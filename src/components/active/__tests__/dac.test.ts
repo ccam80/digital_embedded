@@ -23,6 +23,7 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { ComponentSpec } from "../../../headless/netlist-types.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -47,7 +48,7 @@ function buildDacCircuit(facade: DefaultSimulatorFacade, p: DacCircuitParams): C
   const driveHigh = p.vHigh ?? vRef;
   const overrides = p.paramOverrides ?? {};
 
-  const components: Array<{ id: string; type: string; props: Record<string, unknown> }> = [
+  const components: ComponentSpec[] = [
     {
       id: "dac",
       type: "DAC",
@@ -65,7 +66,7 @@ function buildDacCircuit(facade: DefaultSimulatorFacade, p: DacCircuitParams): C
       type: "Resistor",
       props: { label: "rload", resistance: 1e6 },
     },
-    { id: "gnd", type: "Ground" },
+    { id: "gnd", type: "Ground", props: {} },
   ];
 
   // One DcVoltageSource per bit
@@ -105,7 +106,12 @@ function solveDac(
   paramOverrides?: Record<string, number>,
 ): { converged: boolean; vOut: number } {
   const fix = buildFixture({
-    build: (_r, facade) => buildDacCircuit(facade, { inputBits, vRef, vHigh, paramOverrides }),
+    build: (_r, facade) => buildDacCircuit(facade, {
+      inputBits,
+      vRef,
+      ...(vHigh !== undefined ? { vHigh } : {}),
+      ...(paramOverrides !== undefined ? { paramOverrides } : {}),
+    }),
   });
 
   const result = fix.coordinator.dcOperatingPoint();

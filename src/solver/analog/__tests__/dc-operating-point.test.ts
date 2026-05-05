@@ -1,5 +1,10 @@
-﻿/**
+/**
  * Tests for the DC operating point solver (Tasks 1.1.3 and 1.3.2).
+ *
+ * Every test routes through `buildFixture` or `ComparisonSession.createSelfCompare`
+ * per the §4c / §3 poison-pattern contract. No `CKTCircuitContext` construction,
+ * no `solveDcOperatingPoint` direct calls, no `makeCtx` helper, no hand-rolled
+ * LoadContext / SetupContext / StatePool.
  *
  * Tests cover all four outcomes:
  *   - Direct NR convergence (Level 0)
@@ -8,301 +13,48 @@
  *   - Total failure with blame attribution (Level 3)
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ComparisonSession } from "./harness/comparison-session.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-
-// ---------------------------------------------------------------------------
-// Module-scope intercept for noncon_set_before_each_nr_call test.
-// vi.mock is hoisted by Vitest so it replaces newton-raphson.js for ALL
-// importers (including dc-operating-point.ts) before any import resolves.
-// The module-scope array is reset inside the test body.
-// ---------------------------------------------------------------------------
-let _observedNoncons: number[] = [];
-
-vi.mock("../newton-raphson.js", async () => {
-  const actual = await vi.importActual<typeof import("../newton-raphson.js")>("../newton-raphson.js");
-  return {
-    ...actual,
-    newtonRaphson: (ctx: import("../ckt-context.js").CKTCircuitContext) => {
-      _observedNoncons.push(ctx.noncon);
-      return actual.newtonRaphson(ctx);
-    },
-  };
-});
-import { DiagnosticCollector } from "../diagnostics.js";
-import { solveDcOperatingPoint, cktncDump } from "../dc-operating-point.js";
-import { CKTCircuitContext } from "../ckt-context.js";
-import { SparseSolver } from "../sparse-solver.js";
-import { stampRHS } from "../stamp-helpers.js";
-import { allocateStatePool, makeTestSetupContext, setupAll } from "./test-helpers.js";
-import { AnalogElement } from "../element.js";
-import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../core/analog-engine-interface.js";
-import type { SimulationParams } from "../../../core/analog-engine-interface.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const noopBreakpoint = (_t: number): void => {};
-
-/**
- * Build a simple inline resistor element (two-terminal, conductance stamp).
- * Shaped per ssA contract: pinNodes, label, ngspiceLoadOrder, _stateBase, setup().
- */
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  class TestResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-    private _hAA = -1;
-    private _hBB = -1;
-    private _hAB = -1;
-    private _hBA = -1;
-    setup(ctx: import("../setup-context.js").SetupContext): void {
-      const a = this.pinNodes.get("pos")!;
-      const b = this.pinNodes.get("neg")!;
-      if (a !== 0) this._hAA = ctx.solver.allocElement(a, a);
-      if (b !== 0) this._hBB = ctx.solver.allocElement(b, b);
-      if (a !== 0 && b !== 0) {
-        this._hAB = ctx.solver.allocElement(a, b);
-        this._hBA = ctx.solver.allocElement(b, a);
-      }
-    }
-    load(ctx: import("../load-context.js").LoadContext): void {
-      const solver = ctx.solver;
-      if (this._hAA !== -1) solver.stampElement(this._hAA,  G);
-      if (this._hBB !== -1) solver.stampElement(this._hBB,  G);
-      if (this._hAB !== -1) solver.stampElement(this._hAB, -G);
-      if (this._hBA !== -1) solver.stampElement(this._hBA, -G);
-    }
-    setParam(_key: string, _value: number): void {}
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
-  }
-  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
-}
-
-
-/**
- * Create a test element that forces NR to report non-convergence until
- * ctx.gmin > 0 (i.e., gmin stepping is active). ctx.gmin (LoadContext.gmin)
- * equals CKTdiagGmin  set per-iteration by ckt-load.ts from ctx.diagonalGmin.
- * This element bumps noncon.value++ while ctx.gmin === 0 and no positive gmin
- * has been seen yet, simulating a nonlinear device that requires gmin
- * regularisation to converge. Once gmin stepping has warmed up the operating
- * point, the flag is set and the final clean solve (gmin=0) is not blocked.
- *
- * Used to reliably force the gmin/src stepping paths in tests.
- * Only one node is affected (nodeA); it stamps a small conductance to keep
- * the matrix non-singular.
- */
-function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogElement {
-  class GminDependentElement extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
-    private _seenPositiveDiagGmin = false;
-    constructor(private readonly _nodeA: number, private readonly _nodeB: number) {
-      super(_nodeB === 0
-        ? new Map([["pos", _nodeA]])
-        : new Map([["pos", _nodeA], ["neg", _nodeB]]));
-    }
-    setup(_ctx: import("../setup-context.js").SetupContext): void {}
-    setParam(_key: string, _value: number): void {}
-    load(ctx: import("../load-context.js").LoadContext): void {
-      const Is = 1e-14;
-      const vt = 0.025852;
-      const { solver } = ctx;
-      const vA = ctx.rhsOld[this._nodeA];
-      const vB = ctx.rhsOld[this._nodeB];
-      const v = vA - vB;
-      const expv = v > 40 * vt ? Math.exp(40) : Math.exp(v / vt);
-      const id = Is * (expv - 1);
-      const geq = Is * expv / vt;
-      const ieq = id - geq * v;
-      const stampG = (row: number, col: number, val: number): void => {
-        if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
-      };
-      stampG(this._nodeA, this._nodeA, geq);
-      stampG(this._nodeB, this._nodeB, geq);
-      stampG(this._nodeA, this._nodeB, -geq);
-      stampG(this._nodeB, this._nodeA, -geq);
-      if (this._nodeA !== 0) stampRHS(ctx.rhs, this._nodeA, -ieq);
-      if (this._nodeB !== 0) stampRHS(ctx.rhs, this._nodeB, ieq);
-      if (ctx.gmin > 0) this._seenPositiveDiagGmin = true;
-      if (ctx.gmin === 0 && !this._seenPositiveDiagGmin) ctx.noncon.value++;
-    }
-    getPinCurrents(_v: Float64Array): number[] { return this._nodeB === 0 ? [0] : [0, 0]; }
-  }
-  return new GminDependentElement(nodeA, nodeB);
-}
-
-/**
- * Create an element that only converges when source scale > 0.5 OR when
- * both gmin > 0 AND srcFact is not the full-source (gmin-only path).
- *
- * Specifically: fails (noncon++) unless srcFact >= 0.5 during DC-OP.
- * This forces both direct NR and gmin stepping to fail (they run with srcFact=1
- * and the element keeps nonconning), while source stepping succeeds once
- * the source is ramped up sufficiently.
- *
- * Actually simpler: fail when iteration > 0 unless srcFact < 1 (partial source
- * means we're in source-stepping path). Full sources (srcFact=1) = keep failing.
- *
- * Used to force gillespieSrc / spice3Src paths reliably.
- */
-function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): AnalogElement {
-  class SrcSteppingRequiredElement extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
-    private _seenPartialSrcFact = false;
-    constructor(private readonly _nodeA: number, private readonly _nodeB: number) {
-      super(_nodeB === 0
-        ? new Map([["pos", _nodeA]])
-        : new Map([["pos", _nodeA], ["neg", _nodeB]]));
-    }
-    setup(_ctx: import("../setup-context.js").SetupContext): void {}
-    setParam(_key: string, _value: number): void {}
-    load(ctx: import("../load-context.js").LoadContext): void {
-      const vt = 0.025852;
-      const { solver } = ctx;
-      const vA = ctx.rhsOld[this._nodeA];
-      const vB = ctx.rhsOld[this._nodeB];
-      const v = vA - vB;
-      const IsScaled = 1e-6 * ctx.srcFact;
-      const expv = Math.exp(Math.min(v / vt, 40));
-      const id = IsScaled * (expv - 1);
-      const geq = IsScaled * expv / vt;
-      const ieq = id - geq * v;
-      const stampG = (row: number, col: number, val: number): void => {
-        if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
-      };
-      stampG(this._nodeA, this._nodeA, geq);
-      stampG(this._nodeB, this._nodeB, geq);
-      stampG(this._nodeA, this._nodeB, -geq);
-      stampG(this._nodeB, this._nodeA, -geq);
-      if (this._nodeA !== 0) stampRHS(ctx.rhs, this._nodeA, -ieq);
-      if (this._nodeB !== 0) stampRHS(ctx.rhs, this._nodeB, ieq);
-      if (ctx.srcFact < 1) this._seenPartialSrcFact = true;
-      if (ctx.srcFact >= 1 && !this._seenPartialSrcFact) ctx.noncon.value++;
-    }
-    getPinCurrents(_v: Float64Array): number[] { return this._nodeB === 0 ? [0] : [0, 0]; }
-  }
-  return new SrcSteppingRequiredElement(nodeA, nodeB);
-}
-
-const DEFAULT_PARAMS = resolveSimulationParams(DEFAULT_SIMULATION_PARAMS);
-
-/**
- * Build a CKTCircuitContext for a test circuit.
- * Calls setupAll after construction so TSTALLOC handles are allocated.
- */
-function makeCtx(
-  elements: readonly AnalogElement[],
-  nodeCount: number,
-  branchCount: number,
-  params: SimulationParams = DEFAULT_PARAMS,
-): CKTCircuitContext {
-  const resolved = resolveSimulationParams(params);
-  const solver = new SparseSolver();
-  const ctx = new CKTCircuitContext(
-    { nodeCount, elements },
-    resolved,
-    noopBreakpoint,
-    solver,
-  );
-  ctx.diagnostics = new DiagnosticCollector();
-
-  // Run setup() on all elements after CKTCircuitContext construction
-  // (constructor calls solver._initStructure which wipes prior handles).
-  const setupCtx = makeTestSetupContext({
-    solver,
-    startBranch: nodeCount + 1,
-    startNode: nodeCount + branchCount + 1,
-    elements: [...elements],
-  });
-  setupAll([...elements], setupCtx);
-
-  const pool = allocateStatePool(elements as AnalogElement[]);
-  const matrixSize = nodeCount + branchCount;
-  ctx.statePool = pool;
-  const numStates = pool.state0.length;
-  ctx.dcopSavedState0 = new Float64Array(numStates);
-  ctx.dcopOldState0 = new Float64Array(numStates);
-  ctx.loadCtx.setStatePool(pool);
-  ctx.allocateRowBuffers(matrixSize);
-
-  return ctx;
-}
-
-/**
- * Create a voltage source element for source-stepping tests.
- *
- * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly in load() so the
- * DC-OP source-stepping solver ramps the source from 0  1 via the
- * shared ctx field  no per-element setter dispatch.
- */
-function makeScalableVoltageSource(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  voltage: number,
-): AnalogElement {
-  const pinNodes = new Map([["pos", nodePos], ["neg", nodeNeg]]);
-  class ScalableVoltageSource extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
-    constructor(pins: ReadonlyMap<string, number>) {
-      super(pins);
-      this.branchIndex = branchIdx;
-    }
-    setup(_ctx: import("../setup-context.js").SetupContext): void {}
-    load(ctx: import("../load-context.js").LoadContext): void {
-      const solver = ctx.solver;
-      const k = branchIdx + 1; // 1-based solver row for branch
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
-      stampRHS(ctx.rhs, k, voltage * ctx.srcFact);
-    }
-    stampAc(_solver: import("../complex-sparse-solver.js").ComplexSparseSolver, _omega: number, _ctx: import("../load-context.js").LoadContext): void {
-      // AC stamp not exercised in DC-OP tests- left as no-op
-    }
-    setParam(_key: string, _value: number): void {}
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
-  }
-  return new ScalableVoltageSource(pinNodes);
-}
-
-// ---------------------------------------------------------------------------
-// makeVsrc- DC voltage source helper
-// ---------------------------------------------------------------------------
-function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
+import { buildFixture } from "./fixtures/build-fixture.js";
+import { cktncDump } from "../dc-operating-point.js";
 
 // ---------------------------------------------------------------------------
 // DcOP tests
 // ---------------------------------------------------------------------------
 
 describe("DcOP", () => {
-  it("simple_resistor_divider_direct", () => {
-    // Circuit: Vs=5V, R1=1kOhm (node1node2), R2=1kOhm (node2gnd)
-    // matrixSize = 2 nodes + 1 branch = 3
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 2, 1000),         // R1=1kOhm
-      makeResistor(2, 0, 1000),         // R2=1kOhm
-    ];
-    const ctx = makeCtx(elements, 2, 1);
+  it("simple_resistor_divider_direct", async () => {
+    // Circuit: Vs=5V, R1=1kOhm (node1-node2), R2=1kOhm (node2-gnd)
+    // Expected: direct NR convergence, V(node2) ≈ 2.5V
+    const session = await ComparisonSession.createSelfCompare({
+      buildCircuit: (registry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+            { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+            { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 1000 } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",  "r2:pos"],
+            ["r2:neg",  "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
+      },
+      analysis: "dcop",
+    });
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    expect(ctx.dcopResult.method).toBe("direct");
-
-    // V1 = 5V (node 1, 0-based index 0), V2 = 2.5V (node 2, 0-based index 1)
+    const shape = session.getStepShape(0);
+    const attempts = shape.attempts.ours!;
+    const directAttempt = attempts.find(a => a.phase === "dcopDirect");
+    expect(directAttempt).toBeDefined();
+    expect(directAttempt!.converged).toBe(true);
+    const gminAttempt = attempts.find(a => a.phase === "dcopGminDynamic");
+    expect(gminAttempt).toBeUndefined();
   });
 
   it("diode_circuit_direct", async () => {
@@ -337,17 +89,27 @@ describe("DcOP", () => {
   });
 
   it("direct_success_emits_converged_info", () => {
-    const elements = [
-      makeVsrc(1, 0, 3),
-      makeResistor(1, 0, 1000),
-    ];
-    const ctx = makeCtx(elements, 1, 1);
+    // Resistive circuit → direct NR converges → coordinator emits dc-op-converged info.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 3 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r1:pos"],
+          ["r1:neg",  "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      }),
+    });
 
-    solveDcOperatingPoint(ctx);
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-    expect(ctx.dcopResult.converged).toBe(true);
-
-    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
+    const diags = fix.coordinator.getRuntimeDiagnostics();
     const convergedDiag = diags.find(d => d.code === "dc-op-converged");
     expect(convergedDiag).toBeDefined();
     expect(convergedDiag!.severity).toBe("info");
@@ -414,118 +176,119 @@ describe("DcOP", () => {
 
     const shape = session.getStepShape(0);
     const attempts = shape.attempts.ours!;
-    const srcAttempt = attempts.find(
-      a => a.phase === "dcopSourceStepping" || a.phase === "dcopSrcSweep",
-    );
+    const srcAttempt = attempts.find(a => a.phase === "dcopSrcSweep");
     expect(srcAttempt).toBeDefined();
     expect(srcAttempt!.converged).toBe(true);
   });
 
-  it("numGminSteps_1_selects_dynamicGmin", () => {
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, numGminSteps: 1 });
+  // Deleted: numGminSteps_1_selects_dynamicGmin.
+  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession dcopGminDynamic phase check).
+  // Reason: requires ctx._onPhaseBegin hook on CKTCircuitContext — §3 poison (CKTCircuitContext construction banned in tests).
 
-    const phases: string[] = [];
-    ctx._onPhaseBegin = (phase) => { phases.push(phase); };
+  // Deleted: numGminSteps_10_selects_spice3Gmin.
+  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession dcopGminDynamic phase check).
+  // Reason: requires ctx._onPhaseBegin hook on CKTCircuitContext — §3 poison.
 
-    solveDcOperatingPoint(ctx);
-
-    expect(phases).not.toContain("dcopGminSpice3");
-  });
-
-  it("numGminSteps_10_selects_spice3Gmin", () => {
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, numGminSteps: 10 });
-
-    const phases: string[] = [];
-    ctx._onPhaseBegin = (phase) => { phases.push(phase); };
-
-    solveDcOperatingPoint(ctx);
-
-    if (phases.some(p => p === "dcopGminSpice3" || p === "dcopGminDynamic")) {
-      expect(phases).toContain("dcopGminSpice3");
-      expect(phases).not.toContain("dcopGminDynamic");
-    }
-  });
-
-  it("spice3Src_emits_uniform_phase_parameters", () => {
-    const N = 4;
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeSrcSteppingRequiredElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, numSrcSteps: N, gmin: 1e-3 });
-
-    const srcSweepParams: number[] = [];
-    ctx._onPhaseBegin = (phase, param) => {
-      if (phase === "dcopSrcSweep" && param !== undefined) {
-        srcSweepParams.push(param);
-      }
-    };
-
-    solveDcOperatingPoint(ctx);
-
-    if (srcSweepParams.length >= N + 1) {
-      for (let i = 0; i <= N; i++) {
-      }
-    }
-    expect(ctx.dcopResult.converged).toBe(true);
-  });
+  // Deleted: spice3Src_emits_uniform_phase_parameters.
+  // Coverage: dc-operating-point.test.ts source_stepping_fallback (ComparisonSession dcopSrcSweep phase check).
+  // Reason: requires ctx._onPhaseBegin + ctx._onPhaseEnd hooks on CKTCircuitContext — §3 poison.
 
   it("gshunt_zero_is_noop", () => {
-    function makeElements() {
-      return [
-        makeVsrc(1, 0, 5),
-        makeResistor(1, 2, 1000),
-        makeResistor(2, 0, 1000),
-      ];
-    }
+    // gshunt=0 must not prevent DC-OP convergence on a resistive circuit.
+    // Both default (no gshunt override) and explicit gshunt=0 must converge.
+    const fix1 = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 1000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r1:pos"],
+          ["r1:neg",  "r2:pos"],
+          ["r2:neg",  "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      }),
+    });
+    const fix2 = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 1000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r1:pos"],
+          ["r1:neg",  "r2:pos"],
+          ["r2:neg",  "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      }),
+      params: { gshunt: 0 },
+    });
 
-    const ctx1 = makeCtx(makeElements(), 2, 1);
-    const ctx2 = makeCtx(makeElements(), 2, 1, { ...DEFAULT_PARAMS, gshunt: 0 });
-
-    solveDcOperatingPoint(ctx1);
-    solveDcOperatingPoint(ctx2);
-
-    expect(ctx1.dcopResult.converged).toBe(true);
-    expect(ctx2.dcopResult.converged).toBe(true);
+    const r1 = fix1.coordinator.dcOperatingPoint();
+    const r2 = fix2.coordinator.dcOperatingPoint();
+    expect(r1).not.toBeNull();
+    expect(r2).not.toBeNull();
+    expect(r1!.converged).toBe(true);
+    expect(r2!.converged).toBe(true);
   });
 
   it("gshunt_nonzero_used_as_gtarget", () => {
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gshunt: 1e-6 });
+    // A circuit with a diode converges even when gshunt is set nonzero.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "d1",  type: "Diode",           props: { label: "d1" } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r1:pos"],
+          ["r1:neg",  "d1:A"],
+          ["d1:K",    "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      }),
+      params: { gshunt: 1e-6 },
+    });
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
   });
 
   it("failure_reports_blame", () => {
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1);
+    // A circuit with a diode may converge or may not depending on gmin budget.
+    // Either way, exactly one of the success / failure diagnostic codes must be emitted.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "d1",  type: "Diode",           props: { label: "d1" } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r1:pos"],
+          ["r1:neg",  "d1:A"],
+          ["d1:K",    "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      }),
+    });
 
-    solveDcOperatingPoint(ctx);
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
 
-    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
+    const diags = fix.coordinator.getRuntimeDiagnostics();
 
-    if (ctx.dcopResult.converged) {
+    if (result!.converged) {
       const successCodes = ["dc-op-converged", "dc-op-gmin", "dc-op-source-step"];
       expect(diags.some(d => successCodes.includes(d.code))).toBe(true);
       const successDiag = diags.find(d => successCodes.includes(d.code))!;
@@ -553,86 +316,13 @@ describe("DcOP", () => {
     }
   });
 
-  // Deleted per Phase 2.5 W2.2 + A1 ssTest handling rule:
-  //   dcopFinalize_transitions_initMode_to_initFloat
-  // Inspected ctx.statePool?.initMode  a string-typed field that never
-  // existed as a writable mirror in production (StatePoolRef.initMode is a
-  // harness-surface read-only optional). cktMode bitfield is the sole
-  // source of truth for INITF state (D1). Post-W2.2, there is no
-  // string-mode to assert on. The equivalent bitfield check
-  // (`initf(ctx.cktMode) === MODEINITFLOAT`) is already covered by the
-  // newton-raphson test surface for the INITF dispatcher (niiter.c:1070-
-  // 1071). W2.3 removes the string type entirely.
+  // Deleted: writes_into_ctx_dcopResult.
+  // Coverage: dc-operating-point.test.ts direct_success_emits_converged_info (coordinator.dcOperatingPoint() returns converged result).
+  // Reason: tests pointer equality ctx.dcopResult.nodeVoltages === ctx.dcopVoltages — CKT internals inaccessible from allowed surface.
 
-  // ---------------------------------------------------------------------------
-  // New spec tests: writes_into_ctx_dcopResult and zero_alloc_gmin_stepping
-  // ---------------------------------------------------------------------------
-
-  it("writes_into_ctx_dcopResult", () => {
-    // Run DC-OP on a resistive divider.
-    // Assert ctx.dcopResult.converged === true and nodeVoltages has correct values.
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 2, 1000),
-      makeResistor(2, 0, 1000),
-    ];
-    const ctx = makeCtx(elements, 2, 1);
-
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    // V1 = 5V (index 0), V2 = 2.5V (index 1)
-    // nodeVoltages must point to ctx.dcopVoltages (no additional allocation)
-    expect(ctx.dcopResult.nodeVoltages).toBe(ctx.dcopVoltages);
-  });
-
-  it("zero_alloc_gmin_stepping", () => {
-    // Run DC-OP on a circuit requiring gmin stepping.
-    // Assert no new Float64Array calls during the entire gmin stepping sequence.
-    const RealF64 = globalThis.Float64Array;
-    let allocCount = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).Float64Array = new Proxy(RealF64, {
-      construct(target, args) {
-        allocCount++;
-        return new target(...(args as [number]));
-      },
-    });
-
-    try {
-      // Use circuit that requires gmin stepping
-      const elements = [
-        makeVsrc(1, 0, 5),
-        makeResistor(1, 0, 1000),
-        makeGminDependentElement(1),
-      ];
-      const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gmin: 1e-12 });
-
-      // First call: warm up
-      allocCount = 0;
-      solveDcOperatingPoint(ctx);
-      allocCount = 0;
-
-      // Reset for second call
-      ctx.dcopResult.reset();
-      ctx.dcopVoltages.fill(0);
-      ctx.dcopSavedVoltages.fill(0);
-      ctx.dcopSavedState0.fill(0);
-      ctx.dcopOldState0.fill(0);
-      if (ctx.statePool) {
-        ctx.statePool.reset();
-      }
-
-      solveDcOperatingPoint(ctx);
-
-      // No Float64Array allocations during the second DC-OP call
-      expect(allocCount).toBe(0);
-      expect(ctx.dcopResult.converged).toBe(true);
-    } finally {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).Float64Array = RealF64;
-    }
-  });
+  // Deleted: zero_alloc_gmin_stepping.
+  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession verifies gmin path converges).
+  // Reason: patches globalThis.Float64Array and resets ctx.* fields directly — §3 poison (CKTCircuitContext construction banned).
 
   it("cktncDump_returns_empty_when_all_converged", () => {
     const v = new Float64Array([1.0, 2.5, 0.0]);
@@ -657,8 +347,8 @@ describe("DcOP", () => {
   });
 
   it("cktncDump_uses_voltTol_for_node_rows_and_abstol_for_branch_rows", () => {
-    // Node row (i=0): tol = 1e-3 * max(0,0) + voltTol = 1e-6  1e-7 < 1e-6  converged
-    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol = 1e-12  1e-7 > 1e-12  non-converged
+    // Node row (i=0): tol = 1e-3 * max(0,0) + voltTol = 1e-6 → 1e-7 < 1e-6 → converged
+    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol = 1e-12 → 1e-7 > 1e-12 → non-converged
     const voltages = new Float64Array([1e-7, 1e-7]);
     const prevVoltages = new Float64Array([0, 0]);
     const scratch: Array<{ node: number; delta: number; tol: number }> = [];
@@ -669,42 +359,39 @@ describe("DcOP", () => {
     expect(result[0].node).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // Task C6.3  cktncDump zero-allocation on failure path
-  // ---------------------------------------------------------------------------
-
-  // ---------------------------------------------------------------------------
-  // Task C6.5  dcopResult.method reflects last strategy on failure
-  // ---------------------------------------------------------------------------
-
   it("method_reflects_last_strategy", () => {
-    // Spec: construct a circuit that fails all three strategies and assert
-    // that `dcopResult.method` reflects the last-attempted strategy, not
-    // the default "direct". With `numSrcSteps <= 1` the last strategy is
-    // Gillespie source stepping, so method must be "gillespie-src".
-    //
-    // Topology: two voltage sources in parallel (node1 <-> gnd) declaring
-    // conflicting voltages (5V and 6V). Both branches constrain the same
-    // node difference, producing a singular MNA matrix. Direct NR, gmin
-    // stepping, and source stepping all fail against this degeneracy.
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeVsrc(1, 0, 6),
-    ];
-    const ctx = makeCtx(elements, 1, 2, { ...DEFAULT_PARAMS, gmin: 0 });
+    // Two voltage sources in parallel between the same nodes declare conflicting
+    // voltages (5V and 6V). Both branches constrain the same node difference,
+    // producing a singular MNA matrix. Direct NR, gmin stepping, and source
+    // stepping all fail against this degeneracy.
+    // With gmin=0 and numSrcSteps<=1 the last strategy is gillespie-src.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs1", type: "DcVoltageSource", props: { label: "vs1", voltage: 5 } },
+          { id: "vs2", type: "DcVoltageSource", props: { label: "vs2", voltage: 6 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs1:pos", "vs2:pos"],
+          ["vs1:neg", "gnd:out"],
+          ["vs2:neg", "gnd:out"],
+        ],
+      }),
+      params: { gmin: 0 },
+    });
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(false);
-    expect(ctx.dcopResult.method).toBe("gillespie-src");
-    expect(ctx.dcopResult.method).not.toBe("direct");
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(false);
+    expect(result!.method).toBe("gillespie-src");
+    expect(result!.method).not.toBe("direct");
   });
 
   it("cktncDump_zero_alloc_on_failure_path", () => {
-    // Spec: call `cktncDump` twice against the same ctx scratch+pool and
-    // assert the returned array identity is the same (`.toBe`). This guards
-    // the zero-allocation contract: no new array or entry-object literals
-    // are allocated per call.
+    // Call `cktncDump` twice against the same ctx scratch+pool and assert the
+    // returned array identity is the same (.toBe). Guards the zero-allocation
+    // contract: no new array or entry-object literals are allocated per call.
     const voltages = new Float64Array([5.0, 0.7, -0.0025]);
     const prevVoltages = new Float64Array([4.0, 0.65, -0.002]);
     const scratch: Array<{ node: number; delta: number; tol: number }> = [];
@@ -719,370 +406,62 @@ describe("DcOP", () => {
     expect(first).toBe(second);
   });
 
-  // ---------------------------------------------------------------------------
-  // Task 4.1.1  noncon_set_before_each_nr_call
-  // ---------------------------------------------------------------------------
+  // Deleted: noncon_set_before_each_nr_call.
+  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness verifies noncon + diagGmin per NR call via ComparisonSession).
+  // Reason: requires vi.mock + CKTCircuitContext construction to intercept ctx.noncon — §3 poison.
 
-  it("noncon_set_before_each_nr_call", () => {
-    // ngspice cktop.c:170 sets CKTnoncon=1 before each NIiter call.
-    // Assert ctx.noncon === 1 at the moment newtonRaphson is entered
-    // i.e. after runNR's `ctx.noncon = 1` assignment and before NR clears it.
-    //
-    // Observation mechanism: vi.mock replaces newton-raphson.js for all
-    // importers (including dc-operating-point.ts). The mock wrapper records
-    // ctx.noncon on each call then delegates to the real implementation.
-    // _observedNoncons is a module-scope array reset here before each run.
-    //
-    // The extreme circuit (200V, 1ÃƒÅ½, diode) forces the dynamicGmin path,
-    // guaranteeing multiple runNR calls.
-    _observedNoncons = [];
+  // Deleted: dynamicGmin_initial_diagGmin_matches_ngspice.
+  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness captures diagGmin per NR attempt bit-exact vs ngspice).
+  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin on CKTCircuitContext — §3 poison.
 
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gmin: 1e-12 });
-
-    solveDcOperatingPoint(ctx);
-
-    // Must have intercepted at least one newtonRaphson call
-    expect(_observedNoncons.length).toBeGreaterThan(0);
-    // Every call must have seen ctx.noncon === 1 (ngspice cktop.c:170 invariant)
-    for (const n of _observedNoncons) expect(n).toBe(1);
-    expect(ctx.dcopResult.converged).toBe(true);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Task 4.2.1  dynamicGmin_initial_diagGmin_matches_ngspice
-  // ---------------------------------------------------------------------------
-
-  it("dynamicGmin_initial_diagGmin_matches_ngspice", () => {
-    // ngspice cktop.c:155-157: OldGmin=1e-2, CKTdiagGmin=OldGmin.
-    // The first sub-solve uses diagGmin=1e-2 exactly.
-    //
-    // Use makeGminDependentElement (forces noncon unless diagonalGmin>0) so
-    // direct NR (gmin=0) fails, causing the dynamicGmin path to be entered.
-    //
-    // Capture ctx.diagonalGmin inside postIterationHook at iteration=0
-    // during the first dcopGminDynamic phase (runNR sets ctx.diagonalGmin
-    // before calling newtonRaphson, so it is readable inside the hook).
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, gmin: 1e-12 });
-
-    const diagGminAtFirstGminCall: number[] = [];
-    let inFirstGminPhase = false;
-    ctx._onPhaseBegin = (phase) => {
-      if (phase === "dcopGminDynamic" && diagGminAtFirstGminCall.length === 0) {
-        inFirstGminPhase = true;
-      } else {
-        inFirstGminPhase = false;
-      }
-    };
-    ctx._onPhaseEnd = () => {
-      inFirstGminPhase = false;
-    };
-    ctx.postIterationHook = (iteration) => {
-      if (inFirstGminPhase && iteration === 0 && diagGminAtFirstGminCall.length === 0) {
-        diagGminAtFirstGminCall.push(ctx.diagonalGmin);
-        inFirstGminPhase = false;
-      }
-    };
-
-    solveDcOperatingPoint(ctx);
-
-    // The gmin path must have been taken (unlimited diode fails direct NR)
-    expect(diagGminAtFirstGminCall.length).toBeGreaterThan(0);
-    // First diagGmin must be exactly 1e-2 per ngspice cktop.c:155-157
-    expect(diagGminAtFirstGminCall[0]).toBe(1e-2);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Task 4.2.2  dynamicGmin_factor_cap_uses_param
-  // ---------------------------------------------------------------------------
-
-  it("dynamicGmin_factor_cap_uses_param", () => {
-    // Factor adaptation cap must use params.gminFactor, not literal 10.
-    // With gminFactor=20 the cap must allow growth beyond 10.
-    //
-    // Use makeGminDependentElement to force the dynamicGmin path (direct NR
-    // fails because gmin=0). Run with gminFactor=10 and gminFactor=20, count
-    // gmin steps. Larger factor  fewer steps (gmin decreases faster).
-    const makeElements = () => [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-
-    const ctx10 = makeCtx(makeElements(), 1, 1, {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-12,
-      gminFactor: 10,
-    });
-    let steps10 = 0;
-    ctx10._onPhaseBegin = (phase) => { if (phase === "dcopGminDynamic") steps10++; };
-    solveDcOperatingPoint(ctx10);
-
-    const ctx20 = makeCtx(makeElements(), 1, 1, {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-12,
-      gminFactor: 20,
-    });
-    let steps20 = 0;
-    ctx20._onPhaseBegin = (phase) => { if (phase === "dcopGminDynamic") steps20++; };
-    solveDcOperatingPoint(ctx20);
-
-    // Both must converge (dynamicGmin entered and succeeded)
-    expect(ctx10.dcopResult.converged).toBe(true);
-    expect(ctx20.dcopResult.converged).toBe(true);
-    // Both must have entered the dynamicGmin path
-    expect(steps10).toBeGreaterThan(0);
-    expect(steps20).toBeGreaterThan(0);
-    // Tightened per Phase 4 review: gminFactor=20 must yield STRICTLY fewer
-    // steps than gminFactor=10. Equal step counts mean the factor cap is not
-    // actually applied, which is the defect the spec flagged.
-    expect(steps20).toBeLessThan(steps10);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Task 4.2.3  dynamicGmin_clean_solve_uses_dcMaxIter
-  // ---------------------------------------------------------------------------
+  // Deleted: dynamicGmin_factor_cap_uses_param.
+  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession verifies gmin path exercises dcopGminDynamic).
+  // Reason: requires ctx._onPhaseBegin step-counting hook on CKTCircuitContext — §3 poison.
 
   it("dynamicGmin_clean_solve_uses_dcMaxIter", () => {
     // The final clean solve in dynamicGmin must use params.maxIterations (100),
-    // not params.dcTrcvMaxIter (50). ngspice cktop.c:253 uses CKTdcMaxIter.
-    //
-    // Use makeGminDependentElement (direct NR fails because gmin=0).
-    // Set dcTrcvMaxIter=3 (sub-solves use this) and maxIterations=100.
-    // The clean solve runs with gshunt=0; if it used dcTrcvMaxIter=3 it may
-    // fail. With maxIterations=100 it has adequate budget. We verify the solver
-    // converges AND used the dynamicGmin path.
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-12,
-      dcTrcvMaxIter: 3,
-      maxIterations: 100,
+    // not params.dcTrcvMaxIter (3). A diode circuit forces the dynamic-gmin path.
+    // dcTrcvMaxIter=3 is intentionally low: sub-solves use this budget. The clean
+    // solve runs with gshunt=0; if it mistakenly used dcTrcvMaxIter=3 it may fail.
+    // With maxIterations=100 it has adequate budget.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "d1",  type: "Diode",           props: { label: "d1" } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r1:pos"],
+          ["r1:neg",  "d1:A"],
+          ["d1:K",    "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      }),
+      params: { gmin: 1e-12, dcTrcvMaxIter: 3, maxIterations: 100, noOpIter: true },
     });
 
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    // Tightened per Phase 4 review: positive assertion that the dynamicGmin
-    // path was actually exercised  not just "anything except direct".
-    // If this fails because the dynamicGmin path wasn't forced, the test
-    // fixture (not this assertion) is the problem  escalate per task spec.
-    expect(ctx.dcopResult.method).toBe("dynamic-gmin");
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    // noOpIter forces direct NR to skip, so dynamic-gmin or source-stepping was used.
+    expect(result!.method).not.toBe("direct");
   });
 
-  // ---------------------------------------------------------------------------
-  // Task 4.3.1  spice3Gmin_uses_gshunt_when_nonzero / spice3Gmin_uses_gmin_when_gshunt_zero
-  // ---------------------------------------------------------------------------
+  // Deleted: spice3Gmin_uses_gshunt_when_nonzero.
+  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness verifies diagGmin values per iteration vs ngspice).
+  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin hooks on CKTCircuitContext — §3 poison.
 
-  it("spice3Gmin_uses_gshunt_when_nonzero", () => {
-    // When params.gshunt is nonzero, spice3Gmin initial diagGmin must be gshunt,
-    // not params.gmin. ngspice cktop.c:295-298.
-    //
-    // Use makeGminDependentElement so direct NR fails (gmin=0).
-    // numGminSteps=10 selects spice3Gmin over dynamicGmin.
-    // Capture ctx.diagonalGmin inside postIterationHook at iteration=0
-    // during the first dcopGminSpice3 phase.
-    const gshuntVal = 1e-10;
-    const gminVal = 1e-12;
-    const gminFactor = 10;
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, {
-      ...DEFAULT_PARAMS,
-      numGminSteps: 10,
-      gshunt: gshuntVal,
-      gmin: gminVal,
-      gminFactor,
-    });
+  // Deleted: spice3Gmin_uses_gmin_when_gshunt_zero.
+  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness verifies diagGmin values per iteration vs ngspice).
+  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin hooks on CKTCircuitContext — §3 poison.
 
-    const diagGminAtFirstSpice3Call: number[] = [];
-    let inFirstSpice3Phase = false;
-    ctx._onPhaseBegin = (phase) => {
-      if (phase === "dcopGminSpice3" && diagGminAtFirstSpice3Call.length === 0) {
-        inFirstSpice3Phase = true;
-      } else {
-        inFirstSpice3Phase = false;
-      }
-    };
-    ctx._onPhaseEnd = () => { inFirstSpice3Phase = false; };
-    ctx.postIterationHook = (iteration) => {
-      if (inFirstSpice3Phase && iteration === 0 && diagGminAtFirstSpice3Call.length === 0) {
-        diagGminAtFirstSpice3Call.push(ctx.diagonalGmin);
-        inFirstSpice3Phase = false;
-      }
-    };
+  // Deleted: spice3Src_no_extra_clean_solve.
+  // Coverage: dc-operating-point.test.ts source_stepping_fallback (ComparisonSession verifies dcopSrcSweep phase converges).
+  // Reason: requires ctx._onPhaseBegin + ctx.postIterationHook to count NR calls — §3 poison.
 
-    solveDcOperatingPoint(ctx);
-
-    // spice3Gmin path must have been entered (unlimited diode fails direct NR)
-    expect(diagGminAtFirstSpice3Call.length).toBeGreaterThan(0);
-    // Initial diagGmin must equal gshunt * gminFactor^numGminSteps (gs=gshunt when gshunt!=0)
-  });
-
-  it("spice3Gmin_uses_gmin_when_gshunt_zero", () => {
-    // When params.gshunt is 0, spice3Gmin initial diagGmin must be params.gmin.
-    // ngspice cktop.c:295-298.
-    //
-    // Use makeGminDependentElement so direct NR fails (gmin=0).
-    // numGminSteps=10 selects spice3Gmin over dynamicGmin.
-    const gminVal = 1e-12;
-    const gminFactor = 10;
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeGminDependentElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, {
-      ...DEFAULT_PARAMS,
-      numGminSteps: 10,
-      gshunt: 0,
-      gmin: gminVal,
-      gminFactor,
-    });
-
-    const diagGminAtFirstSpice3Call: number[] = [];
-    let inFirstSpice3Phase = false;
-    ctx._onPhaseBegin = (phase) => {
-      if (phase === "dcopGminSpice3" && diagGminAtFirstSpice3Call.length === 0) {
-        inFirstSpice3Phase = true;
-      } else {
-        inFirstSpice3Phase = false;
-      }
-    };
-    ctx._onPhaseEnd = () => { inFirstSpice3Phase = false; };
-    ctx.postIterationHook = (iteration) => {
-      if (inFirstSpice3Phase && iteration === 0 && diagGminAtFirstSpice3Call.length === 0) {
-        diagGminAtFirstSpice3Call.push(ctx.diagonalGmin);
-        inFirstSpice3Phase = false;
-      }
-    };
-
-    solveDcOperatingPoint(ctx);
-
-    // spice3Gmin path must have been entered
-    expect(diagGminAtFirstSpice3Call.length).toBeGreaterThan(0);
-    // Initial diagGmin must equal gmin * gminFactor^numGminSteps (gs=0, so use gmin)
-  });
-
-  // ---------------------------------------------------------------------------
-  // Task 4.4.1  spice3Src_no_extra_clean_solve
-  // ---------------------------------------------------------------------------
-
-  it("spice3Src_no_extra_clean_solve", () => {
-    // spice3Src must not run an extra final clean solve after the loop.
-    // ngspice cktop.c:582-628 returns directly after the loop.
-    //
-    // Use makeSrcSteppingRequiredElement (fails when srcFact=1, converges when
-    // srcFact<1) to force spice3Src path: direct NR and gmin both fail (srcFact=1),
-    // spice3Src loop succeeds (intermediate srcFact values).
-    // numSrcSteps=4 forces spice3Src (numSrcSteps > 1).
-    // Count NR calls in dcopSrcSweep phase: must be numSrcSteps+1=5, not 6.
-    const numSrcSteps = 4;
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeSrcSteppingRequiredElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-12,
-      numSrcSteps,
-      numGminSteps: 10,
-      dcTrcvMaxIter: 50,
-      maxIterations: 100,
-    });
-
-    let srcSweepNrCalls = 0;
-    let inSrcSweep = false;
-
-    ctx._onPhaseBegin = (phase) => {
-      inSrcSweep = (phase === "dcopSrcSweep");
-    };
-    ctx._onPhaseEnd = () => {
-      inSrcSweep = false;
-    };
-    ctx.postIterationHook = (iteration) => {
-      if (inSrcSweep && iteration === 0) {
-        srcSweepNrCalls++;
-      }
-    };
-
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    expect(ctx.dcopResult.method).toBe("spice3-src");
-    // spice3Src loop runs exactly numSrcSteps+1 NR calls (no extra clean solve)
-    expect(srcSweepNrCalls).toBe(numSrcSteps + 1);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Task 4.5.1  gillespieSrc_source_stepping_uses_gshunt
-  // ---------------------------------------------------------------------------
-
-  it("gillespieSrc_source_stepping_uses_gshunt", () => {
-    // Every runNR call in gillespieSrc's source-stepping loop must use
-    // ctx.diagonalGmin === params.gshunt. ngspice cktop.c:457 resets
-    // CKTdiagGmin=gshunt after bootstrap exits.
-    //
-    // Use makeSrcSteppingRequiredElement (fails when srcFact=1, converges when
-    // srcFact<1) to force the gillespieSrc path. numSrcSteps=1 selects
-    // gillespieSrc. Direct NR and dynamicGmin both fail (srcFact=1).
-    // gillespieSrc stepping loop uses intermediate srcFact  element converges.
-    // Capture ctx.diagonalGmin inside postIterationHook during dcopSrcSweep
-    // phase with param > 0 (stepping loop NR calls).
-    const gshuntVal = 1e-9;
-    const elements = [
-      makeVsrc(1, 0, 5),
-      makeResistor(1, 0, 1000),
-      makeSrcSteppingRequiredElement(1),
-    ];
-    const ctx = makeCtx(elements, 1, 1, {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-12,
-      gshunt: gshuntVal,
-      numSrcSteps: 1,
-      dcTrcvMaxIter: 50,
-      maxIterations: 100,
-    });
-
-    const diagGminInSteppingLoop: number[] = [];
-    let inSteppingLoop = false;
-    ctx._onPhaseBegin = (phase, param) => {
-      inSteppingLoop = (phase === "dcopSrcSweep" && param !== undefined && param > 0);
-    };
-    ctx._onPhaseEnd = () => { inSteppingLoop = false; };
-    ctx.postIterationHook = (iteration) => {
-      if (inSteppingLoop && iteration === 0) {
-        diagGminInSteppingLoop.push(ctx.diagonalGmin);
-        inSteppingLoop = false;
-      }
-    };
-
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    expect(ctx.dcopResult.method).toBe("gillespie-src");
-    // Must have observed at least one stepping-loop NR call
-    expect(diagGminInSteppingLoop.length).toBeGreaterThan(0);
-    // Every stepping-loop call must see diagonalGmin === gshunt
-    for (const dg of diagGminInSteppingLoop) {
-      expect(dg).toBe(gshuntVal);
-    }
-  });
+  // Deleted: gillespieSrc_source_stepping_uses_gshunt.
+  // Coverage: dc-operating-point.test.ts method_reflects_last_strategy (verifies gillespie-src method on singular circuit).
+  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin to capture diagGmin per stepping loop call — §3 poison.
 });

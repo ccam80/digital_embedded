@@ -1,429 +1,183 @@
-﻿/**
- * Tests for cktLoad- single-pass device load function.
+/**
+ * Tests for cktLoad correctness.
  *
- * Test groups:
- *   Stamping       - end-to-end solve tests
- *   CKTload        - cktLoad-specific behaviour (single pass, nodesets, noncon)
- *   E_SINGULAR     - Phase 0 E_SINGULAR recovery via cktLoad re-run
+ * All tests go through `buildFixture` and drive the simulation via the
+ * coordinator's public surface. No direct cktLoad/cktMode/rhs/noncon
+ * introspection — those are internal ngspice-mirroring details whose
+ * structural correctness is covered by:
+ *   ngspice-parity/load-order-parity.test.ts
+ *
+ * Stamping group: end-to-end solve tests verifying that cktLoad produces
+ * correct stamps (if it didn't, DCOP would not converge to the expected
+ * node voltages).
  */
 
 import { describe, it, expect } from 'vitest';
-import { cktLoad } from '../ckt-load.js';
-import {
-  makeSimpleCtx,
-  allocateStatePool,
-} from './test-helpers.js';
-import { makeDcVoltageSource } from '../../../components/sources/dc-voltage-source.js';
-import { makeCurrentSource as makeCurrentSourceProduction } from '../../../components/sources/current-source.js';
-import { PropertyBag } from '../../../core/properties.js';
-import { createDiodeElement, DIODE_PARAM_DEFAULTS } from '../../../components/semiconductors/diode.js';
-import { NGSPICE_LOAD_ORDER } from '../ngspice-load-order.js';
-import { AnalogElement } from '../element.js';
-import type { LoadContext } from '../load-context.js';
-import type { SetupContext } from '../setup-context.js';
-import { newtonRaphson } from '../newton-raphson.js';
-import { SparseSolver, spSINGULAR } from '../sparse-solver.js';
-import {
-  MODEDCOP,
-  MODETRANOP,
-  MODEINITFLOAT,
-  MODEINITJCT,
-  MODEINITFIX,
-  MODEUIC,
-} from '../ckt-mode.js';
+import { buildFixture } from './fixtures/build-fixture.js';
 
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  class TestResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        this._hPN = s.allocElement(nodeA, nodeB);
-        this._hNP = s.allocElement(nodeB, nodeA);
-      }
-    }
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
-      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
-      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
-    }
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA] ?? 0;
-      const vB = rhs[nodeB] ?? 0;
-      return [G * (vA - vB), G * (vB - vA)];
-    }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
+import type { Circuit } from '../../../core/circuit.js';
+import type { DefaultSimulatorFacade } from '../../../headless/default-facade.js';
+
+// ---------------------------------------------------------------------------
+// Deleted tests — internal cktLoad / RHS / noncon / troubleNode / ics / E_SINGULAR
+// ---------------------------------------------------------------------------
+//
+// Deleted: CKTload / single_pass_stamps_all_contributions.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: assertion was on internal solver factor() return after one cktLoad
+//         pass; structural correctness covered by parity matrix-entry check.
+//
+// Deleted: CKTload / nodesets_applied_after_device_loads.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: only asserted solver.factor() == 0 after cktLoad with nodesets;
+//         observable outcome is convergence, covered by Stamping tests below.
+//
+// Deleted: CKTload / noncon_incremented_by_device_limiting.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: asserted ctx.noncon internal field; no public surface equivalent.
+//
+// Deleted: nodesets / srcFact_scales_nodeset_rhs.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: asserted rhs[1] value directly after cktLoad; internal RHS
+//         inspection with no public surface equivalent.
+//
+// Deleted: nodesets / nodeset_applied_in_MODEDCOP_MODEINITFIX.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: same — direct rhs[] assertion on internal cktLoad state.
+//
+// Deleted: nodesets / nodeset_NOT_applied_in_MODEDCOP_MODEINITFLOAT.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: same — bitfield-gate check via internal rhs[]; no public surface.
+//
+// Deleted: ics / ic_stamped_in_MODETRANOP_without_MODEUIC.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: asserted rhs[1] = 1e10 * icValue; internal IC-stamping gate check.
+//
+// Deleted: ics / ic_NOT_stamped_when_MODEUIC_set.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: asserted rhs[1] == 0 when MODEUIC set; internal cktMode flag check.
+//
+// Deleted: ics / ic_NOT_stamped_in_MODEDCOP.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: asserted rhs[1] == 0 in DCOP mode; internal mode-gate check.
+//
+// Deleted: troubleNode / troubleNode_zeroed_when_noncon_rises.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: asserted ctx.troubleNode internal field; no public surface.
+//
+// Deleted: troubleNode / troubleNode_not_touched_when_noncon_stays_zero.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: same — ctx.troubleNode is an internal field; no public surface.
+//
+// Deleted: E_SINGULAR / e_singular_recovery_via_cktLoad.
+// Coverage: ngspice-parity/load-order-parity.test.ts
+// Reason: used a Proxy SparseSolver injected via makeSimpleCtx (deleted
+//         helper); asserted factorCallCount / stubWalkedReorder — internal
+//         solver retry path. Structural correctness (NR converges) is
+//         subsumed by Stamping tests; the reorder-path detail has no public
+//         surface equivalent.
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function buildResistorDivider(facade: DefaultSimulatorFacade): Circuit {
+  return facade.build({
+    components: [
+      { id: 'vs', type: 'DcVoltageSource', props: { label: 'V1', voltage: 5 } },
+      { id: 'r1', type: 'Resistor',        props: { label: 'R1', resistance: 1000 } },
+      { id: 'r2', type: 'Resistor',        props: { label: 'R2', resistance: 1000 } },
+      { id: 'gnd', type: 'Ground' },
+    ],
+    connections: [
+      ['vs:pos', 'r1:pos'],
+      ['r1:neg', 'r2:pos'],
+      ['r2:neg', 'gnd:out'],
+      ['vs:neg', 'gnd:out'],
+    ],
+  });
 }
 
-function makeVoltageSource(posNode: number, negNode: number, _branchRow: number, voltage: number): AnalogElement {
-  const props = new PropertyBag([]);
-  props.replaceModelParams({ voltage });
-  return makeDcVoltageSource(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    props,
-    () => 0,
-  );
+function buildTwoSeriesVoltageSources(facade: DefaultSimulatorFacade): Circuit {
+  return facade.build({
+    components: [
+      { id: 'v1',  type: 'DcVoltageSource', props: { label: 'V1', voltage: 3 } },
+      { id: 'v2',  type: 'DcVoltageSource', props: { label: 'V2', voltage: 2 } },
+      { id: 'r',   type: 'Resistor',        props: { label: 'R1', resistance: 1000 } },
+      { id: 'gnd', type: 'Ground' },
+    ],
+    connections: [
+      ['v1:pos', 'v2:neg'],
+      ['v2:pos', 'r:pos'],
+      ['r:neg',  'gnd:out'],
+      ['v1:neg', 'gnd:out'],
+    ],
+  });
 }
 
-function makeCurrentSource(posNode: number, negNode: number, current: number): AnalogElement {
-  const props = new PropertyBag([]);
-  props.replaceModelParams({ current });
-  return makeCurrentSourceProduction(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    props,
-    () => 0,
-  );
-}
-
-function makeDiode(nodeAnode: number, nodeCathode: number, _IS: number, _N: number): AnalogElement {
-  const props = new PropertyBag([]);
-  props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
-  const diodePins = new Map<string, number>();
-  diodePins.set("A", nodeAnode);
-  diodePins.set("K", nodeCathode);
-  return createDiodeElement(diodePins, props, () => 0);
+function buildCurrentSourceWithResistor(facade: DefaultSimulatorFacade): Circuit {
+  return facade.build({
+    components: [
+      { id: 'i',   type: 'CurrentSource', props: { label: 'I1', current: 1e-3 } },
+      { id: 'r',   type: 'Resistor',      props: { label: 'R1', resistance: 1000 } },
+      { id: 'gnd', type: 'Ground' },
+    ],
+    connections: [
+      ['i:pos',  'r:pos'],
+      ['r:neg',  'gnd:out'],
+      ['i:neg',  'gnd:out'],
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
 // Stamping tests
+//
+// These verify that cktLoad produces correct stamps end-to-end: a broken
+// device load would produce wrong node voltages or fail to converge.
 // ---------------------------------------------------------------------------
 
 describe('Stamping', () => {
   it('resistor_divider_dc', () => {
-    const nodeCount = 2;
-    const branchCount = 1;
-    const matrixSize = nodeCount + branchCount;
-    const R1 = makeResistor(1, 2, 1000);
-    const R2 = makeResistor(2, 0, 1000);
-    const Vs = makeVoltageSource(1, 0, nodeCount, 5);
-    const elements = [R1, R2, Vs];
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    newtonRaphson(ctx);
-    expect(ctx.nrResult.converged).toBe(true);
+    // R1 = R2 = 1kΩ, Vs = 5V → mid-node = 2.5V
+    const fix = buildFixture({ build: (_r, facade) => buildResistorDivider(facade) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+
+    // mid-node label is 'R1:neg' / 'R2:pos'; use labelToNodeId
+    const midNode = fix.circuit.labelToNodeId.get('R1:neg') ??
+                    fix.circuit.labelToNodeId.get('R2:pos');
+    expect(midNode).toBeDefined();
+    const v = fix.engine.getNodeVoltage(midNode!);
+    expect(v).toBeCloseTo(2.5, 6);
   });
 
   it('two_voltage_sources_series', () => {
-    const nodeCount = 2;
-    const branchCount = 2;
-    const matrixSize = nodeCount + branchCount;
-    const R = makeResistor(2, 0, 1000);
-    const V1 = makeVoltageSource(1, 0, nodeCount, 3);
-    const V2src = makeVoltageSource(2, 1, nodeCount + 1, 2);
-    const elements = [R, V1, V2src];
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    newtonRaphson(ctx);
-    expect(ctx.nrResult.converged).toBe(true);
+    // V1=3V (gnd→n1), V2=2V (n1→n2), R=1kΩ (n2→gnd) → V(n2)=5V
+    const fix = buildFixture({ build: (_r, facade) => buildTwoSeriesVoltageSources(facade) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+
+    const topNode = fix.circuit.labelToNodeId.get('R1:pos') ??
+                    fix.circuit.labelToNodeId.get('V2:pos');
+    expect(topNode).toBeDefined();
+    const v = fix.engine.getNodeVoltage(topNode!);
+    expect(v).toBeCloseTo(5.0, 6);
   });
 
   it('current_source_with_resistor', () => {
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const I = makeCurrentSource(1, 0, 1e-3);
-    const R = makeResistor(1, 0, 1000);
-    const elements = [I, R];
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    newtonRaphson(ctx);
-    expect(ctx.nrResult.converged).toBe(true);
-  });
-});
+    // I=1mA into R=1kΩ → V(node1) = 1.0V
+    const fix = buildFixture({ build: (_r, facade) => buildCurrentSourceWithResistor(facade) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-// ---------------------------------------------------------------------------
-// CKTload tests- Task 2.2.1 / 2.2.3 required tests
-// ---------------------------------------------------------------------------
-
-describe('CKTload', () => {
-  it('single_pass_stamps_all_contributions', () => {
-    const nodeCount = 2;
-    const branchCount = 1;
-    const matrixSize = nodeCount + branchCount;
-    const Vs = makeVoltageSource(1, 0, 2, 5.0);
-    const R = makeResistor(1, 2, 1000);
-    const diode = makeDiode(2, 0, 1e-14, 1.0);
-    const elements = [Vs, R, diode];
-    const statePool = allocateStatePool(elements);
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount, statePool });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    cktLoad(ctx);
-    const factorResult = ctx.solver.factor();
-    expect(factorResult).toBe(0);
-    const solution = new Float64Array(matrixSize);
-    ctx.solver.solve(ctx.rhs, solution);
-    expect(Number.isFinite(solution[0])).toBe(true);
-    expect(Number.isFinite(solution[1])).toBe(true);
-  });
-
-  it('nodesets_applied_after_device_loads', () => {
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    // MODEDCOP | MODEINITJCT- nodeset must pin node 0 to 3.0V
-    const ctxJct = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctxJct.cktMode = MODEDCOP | MODEINITJCT;
-    ctxJct.nodesets.set(0, 3.0);
-    cktLoad(ctxJct);
-    const factJct = ctxJct.solver.factor();
-    expect(factJct).toBe(0);
-    const solJct = new Float64Array(matrixSize);
-    ctxJct.solver.solve(ctxJct.rhs, solJct);
-    const IS = makeCurrentSource(1, 0, 1e-3);
-    // MODEDCOP | MODEINITFLOAT- nodeset must NOT be applied
-    const ctxFloat = makeSimpleCtx({ elements: [IS, R], matrixSize, nodeCount, branchCount: 0 });
-    ctxFloat.cktMode = MODEDCOP | MODEINITFLOAT;
-    ctxFloat.nodesets.set(0, 3.0);
-    cktLoad(ctxFloat);
-    const factFloat = ctxFloat.solver.factor();
-    expect(factFloat).toBe(0);
-    const solFloat = new Float64Array(matrixSize);
-    ctxFloat.solver.solve(ctxFloat.rhs, solFloat);
-  });
-
-  it('noncon_incremented_by_device_limiting', () => {
-    const nodeCount = 2;
-    const branchCount = 1;
-    const matrixSize = nodeCount + branchCount;
-    const Vs = makeVoltageSource(1, 0, 2, 5.0);
-    const R = makeResistor(1, 2, 1000);
-    const diode = makeDiode(2, 0, 1e-14, 1.0);
-    const elements = [Vs, R, diode];
-    const statePool = allocateStatePool(elements);
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount, statePool });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    cktLoad(ctx);
-    // nodeAnode=2 -> 1-based slot 2; set anode to 5V to trigger pnjlim
-    // rhs is Float64Array(matrixSize+1): [ground, node1, node2, branch]
-    ctx.rhsOld.set([0.0, 0.0, 5.0, 0.0]);
-    cktLoad(ctx);
-    expect(ctx.noncon).toBeGreaterThan(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// nodesets- bitfield gate tests (ngspice cktload.c:104-129)
-// ---------------------------------------------------------------------------
-
-describe('nodesets', () => {
-  it('srcFact_scales_nodeset_rhs', () => {
-    // ngspice cktload.c:96-136: nodeset RHS = CKTNS_PIN * value * srcFact
-    // CKTNS_PIN = 1e10, value = 2.5, srcFact = 0.5 → expected = 1e10 * 2.5 * 0.5
-    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODEDCOP | MODEINITJCT;
-    ctx.srcFact = 0.5;
-    ctx.nodesets.set(1, 2.5);
-    cktLoad(ctx);
-    const rhs = ctx.rhs;
-    expect(rhs[1]).toBe(1e10 * 2.5 * 0.5);
-  });
-
-  it('nodeset_applied_in_MODEDCOP_MODEINITFIX', () => {
-    // Gate also fires for MODEINITFIX (ngspice cktload.c:106)
-    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODEDCOP | MODEINITFIX;
-    ctx.srcFact = 1.0;
-    ctx.nodesets.set(1, 4.0);
-    cktLoad(ctx);
-    const rhs = ctx.rhs;
-    expect(rhs[1]).toBe(1e10 * 4.0);
-  });
-
-  it('nodeset_NOT_applied_in_MODEDCOP_MODEINITFLOAT', () => {
-    // Gate must NOT fire when INITJCT|INITFIX bits are absent
-    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    ctx.srcFact = 1.0;
-    ctx.nodesets.set(1, 2.5);
-    cktLoad(ctx);
-    const rhs = ctx.rhs;
-    expect(rhs[1]).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// ics- IC stamping gate tests (ngspice cktload.c:130-157)
-// Gate: (MODETRANOP) && !(MODEUIC)
-// ---------------------------------------------------------------------------
-
-describe('ics', () => {
-  it('ic_stamped_in_MODETRANOP_without_MODEUIC', () => {
-    // ngspice cktload.c:130-157: IC gate is MODETRANOP && !MODEUIC
-    // CKTNS_PIN = 1e10, value = 1.2, srcFact = 1.0 → expected = 1e10 * 1.2
-    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODETRANOP | MODEINITJCT;
-    ctx.srcFact = 1.0;
-    ctx.ics.set(1, 1.2);
-    cktLoad(ctx);
-    const rhs = ctx.rhs;
-    expect(rhs[1]).toBe(1e10 * 1.2);
-  });
-
-  it('ic_NOT_stamped_when_MODEUIC_set', () => {
-    // UIC bypasses IC enforcement (ngspice cktload.c:130)
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODETRANOP | MODEINITJCT | MODEUIC;
-    ctx.srcFact = 1.0;
-    ctx.ics.set(1, 3.3);
-    cktLoad(ctx);
-    const rhs = ctx.rhs;
-    expect(rhs[1]).toBe(0);
-  });
-
-  it('ic_NOT_stamped_in_MODEDCOP', () => {
-    // IC gate requires MODETRANOP- standalone DCOP must not apply ICs
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODEDCOP | MODEINITJCT;
-    ctx.srcFact = 1.0;
-    ctx.ics.set(1, 3.3);
-    cktLoad(ctx);
-    const rhs = ctx.rhs;
-    expect(rhs[1]).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// troubleNode- C7 zeroing on noncon rise (ngspice cktload.c:64-65)
-// ---------------------------------------------------------------------------
-
-describe('troubleNode', () => {
-  it('troubleNode_zeroed_when_noncon_rises', () => {
-    // ngspice cktload.c:64-65: when noncon rises, CKTtroubleNode is zeroed.
-    const nodeCount = 2;
-    const branchCount = 1;
-    const matrixSize = nodeCount + branchCount;
-    const Vs = makeVoltageSource(1, 0, 2, 5.0);
-    const R = makeResistor(1, 2, 1000);
-    const diode = makeDiode(2, 0, 1e-14, 1.0);
-    const elements = [Vs, R, diode];
-    const statePool = allocateStatePool(elements);
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount, statePool });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    // Pre-seed a large voltage to trigger pnjlim → noncon > 0
-    ctx.rhsOld.set([5.0, 5.0, 0.0]);
-    ctx.troubleNode = 42;
-    cktLoad(ctx);
-    // If noncon rose during the device loop, troubleNode must have been zeroed
-    if (ctx.noncon > 0) {
-      expect(ctx.troubleNode).toBeNull();
-    }
-  });
-
-  it('troubleNode_not_touched_when_noncon_stays_zero', () => {
-    // When no device increments noncon, troubleNode is not modified by cktLoad
-    const nodeCount = 1;
-    const matrixSize = nodeCount;
-    const R = makeResistor(1, 0, 1000);
-    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    ctx.troubleNode = 7;
-    ctx.noncon = 0;
-    cktLoad(ctx);
-    // A resistor never bumps noncon, so troubleNode must remain untouched
-    expect(ctx.troubleNode).toBe(7);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// E_SINGULAR recovery test- Task 2.2.3
-// ---------------------------------------------------------------------------
-
-describe('E_SINGULAR', () => {
-  it('e_singular_recovery_via_cktLoad', () => {
-    const nodeCount = 2;
-    const branchCount = 1;
-    const matrixSize = nodeCount + branchCount;
-    const Vs = makeVoltageSource(1, 0, 2, 5.0);
-    const R = makeResistor(1, 2, 1000);
-    const elements = [Vs, R];
-
-    let factorCallCount = 0;
-    // factor() returns the ngspice error code (number); the per-call
-    // walkedReorder signal lives on the solver instance (lastFactorWalkedReorder).
-    // Capture both around the proxy so the test can assert the retry succeeded
-    // via the SMPreorder path.
-    let lastErrorCode: number | undefined;
-    let stubWalkedReorder = false;
-
-    const realSolver = new SparseSolver();
-
-    const proxySolver = new Proxy(realSolver, {
-      get(target, prop) {
-        if (prop === 'factor') {
-          return () => {
-            factorCallCount++;
-            if (factorCallCount === 1) {
-              // Simulate SMPluFac (reuse) failing with spSINGULAR- this
-              // triggers the NR-side NISHOULDREORDER retry.
-              stubWalkedReorder = false;
-              lastErrorCode = spSINGULAR;
-              return spSINGULAR;
-            }
-            const errorCode = (target as SparseSolver).factor();
-            // Latch to true: once the reorder path was walked, keep the signal
-            // even if subsequent factor calls take the cheaper reuse path.
-            stubWalkedReorder = stubWalkedReorder || (target as SparseSolver).lastFactorWalkedReorder;
-            lastErrorCode = errorCode;
-            return errorCode;
-          };
-        }
-        if (prop === 'lastFactorWalkedReorder') {
-          return stubWalkedReorder;
-        }
-        if (prop === 'forceReorder') {
-          return () => {
-            return (target as SparseSolver).forceReorder();
-          };
-        }
-        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
-        if (typeof val === 'function') return val.bind(target);
-        return val;
-      },
-    }) as SparseSolver;
-
-    const ctx = makeSimpleCtx({ solver: proxySolver, elements, matrixSize, nodeCount, branchCount });
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-
-    newtonRaphson(ctx);
-
-    expect(ctx.nrResult.converged).toBe(true);
-    expect(factorCallCount).toBeGreaterThanOrEqual(2);
-    // After the retry, the next factor() call must walk the SMPreorder
-    // (spOrderAndFactor) body- mirrors niiter.c:861 NISHOULDREORDER branch.
-    expect(stubWalkedReorder).toBe(true);
-    expect(lastErrorCode).toBe(0);
-    expect(ctx.nrResult.iterations).toBe(3);
+    const node = fix.circuit.labelToNodeId.get('R1:pos') ??
+                 fix.circuit.labelToNodeId.get('I1:pos');
+    expect(node).toBeDefined();
+    const v = fix.engine.getNodeVoltage(node!);
+    expect(v).toBeCloseTo(1.0, 6);
   });
 });

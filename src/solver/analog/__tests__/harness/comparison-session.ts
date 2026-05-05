@@ -408,12 +408,17 @@ export class ComparisonSession {
     analysis: "dcop" | "tran";
     tStop?: number;
     maxStep?: number;
+    params?: Partial<SimulationParams>;
   }): Promise<ComparisonSession> {
     const session = new ComparisonSession({
       dtsPath: opts.dtsPath ?? "<inline>",
       selfCompare: true,
     });
     await session.initSelfCompare(opts.buildCircuit);
+
+    if (opts.params !== undefined) {
+      session._engine.configure(opts.params);
+    }
 
     if (opts.analysis === "dcop") {
       await session.runDcOp();

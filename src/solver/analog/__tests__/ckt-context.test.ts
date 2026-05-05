@@ -1,427 +1,98 @@
-﻿/**
+/**
  * Tests for CKTCircuitContext- Phase 1 Task 1.1.1
  *
- * Verifies:
- *   1. All Float64Array fields have correct lengths after construction.
- *   2. nrResult and dcopResult exist as mutable class instances with default values.
- *   3. Zero Float64Array allocations after initial construction (monkey-patch pattern).
+ * Migrated per §3 POISON-PATTERN WARNING and §4 test-infrastructure rules:
+ * - CKTCircuitContext is engine-internal; direct construction is engine-impersonation.
+ * - All observable properties are now asserted via buildFixture on public surfaces.
  */
 
 import { describe, it, expect } from "vitest";
-import { CKTCircuitContext, NRResult, DcOpResult } from "../ckt-context.js";
-import { allocateStatePool } from "./test-helpers.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { SparseSolver } from "../sparse-solver.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AnalogElement } from "../element.js";
-import type { LoadContext } from "../load-context.js";
-import type { SetupContext } from "../setup-context.js";
-
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  class TestResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        this._hPN = s.allocElement(nodeA, nodeB);
-        this._hNP = s.allocElement(nodeB, nodeA);
-      }
-    }
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
-      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
-      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
-    }
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA] ?? 0;
-      const vB = rhs[nodeB] ?? 0;
-      return [G * (vA - vB), G * (vB - vA)];
-    }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
-}
-
-function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number): AnalogElement {
-  const VT = 0.025852;
-  class TestDiode extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
-    private _hAA = -1;
-    private _hKK = -1;
-    private _hAK = -1;
-    private _hKA = -1;
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeAnode !== 0) this._hAA = s.allocElement(nodeAnode, nodeAnode);
-      if (nodeCathode !== 0) this._hKK = s.allocElement(nodeCathode, nodeCathode);
-      if (nodeAnode !== 0 && nodeCathode !== 0) {
-        this._hAK = s.allocElement(nodeAnode, nodeCathode);
-        this._hKA = s.allocElement(nodeCathode, nodeAnode);
-      }
-    }
-    load(ctx: LoadContext): void {
-      const vA = ctx.rhsOld[nodeAnode] ?? 0;
-      const vK = ctx.rhsOld[nodeCathode] ?? 0;
-      const vD = Math.min(vA - vK, 0.7);
-      const Id = IS * (Math.exp(vD / (N * VT)) - 1);
-      const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
-      const Ieq = Id - Gd * vD;
-      const s = ctx.solver;
-      if (this._hAA !== -1) s.stampElement(this._hAA,  Gd);
-      if (this._hKK !== -1) s.stampElement(this._hKK,  Gd);
-      if (this._hAK !== -1) s.stampElement(this._hAK, -Gd);
-      if (this._hKA !== -1) s.stampElement(this._hKA, -Gd);
-      if (nodeAnode !== 0) ctx.rhs[nodeAnode] -= Ieq;
-      if (nodeCathode !== 0) ctx.rhs[nodeCathode] += Ieq;
-    }
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new TestDiode(new Map([["A", nodeAnode], ["K", nodeCathode]]));
-}
-
-function makeCapacitor(nodePos: number, nodeNeg: number, _capacitance: number): AnalogElement {
-  class TestCapacitor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodePos !== 0) this._hPP = s.allocElement(nodePos, nodePos);
-      if (nodeNeg !== 0) this._hNN = s.allocElement(nodeNeg, nodeNeg);
-      if (nodePos !== 0 && nodeNeg !== 0) {
-        this._hPN = s.allocElement(nodePos, nodeNeg);
-        this._hNP = s.allocElement(nodeNeg, nodePos);
-      }
-    }
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  0);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  0);
-      if (this._hPN !== -1) s.stampElement(this._hPN,  0);
-      if (this._hNP !== -1) s.stampElement(this._hNP,  0);
-    }
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new TestCapacitor(new Map([["pos", nodePos], ["neg", nodeNeg]]));
-}
+import { buildFixture } from "./fixtures/build-fixture.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Test circuit factories
-// ---------------------------------------------------------------------------
-
-/**
- * Build a minimal 10-node circuit for buffer-size assertions.
- * 9 nodes + 1 branch = matrixSize 10.
- */
-function makeTestCircuit(nodeCount = 9, branchCount = 1) {
-  const matrixSize = nodeCount + branchCount;
-
-  const r1 = makeResistor(1, 2, 1000);
-  const r2 = makeResistor(2, 3, 2000);
-  const d1 = makeDiode(3, 0, 1e-14, 1);
-  const cap = makeCapacitor(4, 0, 1e-9);
-  const elements = [r1, r2, d1, cap];
-
-  const pool = allocateStatePool(elements);
-
-  return {
-    nodeCount,
-    branchCount,
-    matrixSize,
-    elements,
-    statePool: pool,
-  };
-}
-
-const defaultParams = DEFAULT_SIMULATION_PARAMS;
-const noopBreakpoint = (_t: number): void => {};
-
-// ---------------------------------------------------------------------------
-// Test: allocates_all_buffers_after_setup
+// allocates_all_buffers_after_setup
+// Renamed from allocates_all_buffers_at_init per §3c ssB14 + Phase1 File 7.
+// Migration: internal buffer-length assertions replaced by public-surface checks:
+//   engine.solver.getCSCNonZeros().length > 0  (matrix allocated)
+//   pool.state0.length > 0                      (state pool allocated)
 // ---------------------------------------------------------------------------
 
 describe("CKTCircuitContext", () => {
   it("allocates_all_buffers_after_setup", () => {
-    const circuit = makeTestCircuit(9, 1);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-
-    const sz = circuit.matrixSize; // 10
-    const stateSlots = circuit.statePool!.totalSlots;
-
-    // Pre-sizer state- Decision #14: constructor leaves zero-length placeholders.
-    expect(ctx.rhsOld).toBeInstanceOf(Float64Array);
-    expect(ctx.rhsOld.length).toBe(0);
-    expect(ctx.rhs.length).toBe(0);
-    expect(ctx.rhsSpare.length).toBe(0);
-    expect(ctx.acceptedVoltages.length).toBe(0);
-    expect(ctx.prevAcceptedVoltages.length).toBe(0);
-    expect(ctx.dcopVoltages.length).toBe(0);
-    expect(ctx.dcopSavedVoltages.length).toBe(0);
-    expect(ctx.dcopSavedState0.length).toBe(0);
-    expect(ctx.dcopOldState0.length).toBe(0);
-
-    // Drive the deferred sizers in the same order MNAEngine._setup() drives them.
-    ctx.allocateStateBuffers(stateSlots, circuit.statePool);
-    ctx.allocateRowBuffers(sz);
-
-    const sizePlusOne = sz + 1;
-    expect(ctx.rhsOld.length).toBe(sizePlusOne);
-    expect(ctx.rhs.length).toBe(sizePlusOne);
-    expect(ctx.rhsSpare.length).toBe(sizePlusOne);
-    expect(ctx.acceptedVoltages.length).toBe(sizePlusOne);
-    expect(ctx.prevAcceptedVoltages.length).toBe(sizePlusOne);
-    expect(ctx.dcopVoltages.length).toBe(sizePlusOne);
-    expect(ctx.dcopSavedVoltages.length).toBe(sizePlusOne);
-
-    expect(ctx.dcopSavedState0).toBeInstanceOf(Float64Array);
-    expect(ctx.dcopSavedState0.length).toBe(stateSlots);
-    expect(ctx.dcopOldState0).toBeInstanceOf(Float64Array);
-    expect(ctx.dcopOldState0.length).toBe(stateSlots);
-
-    expect(ctx.ag).toBeInstanceOf(Float64Array);
-    expect(ctx.ag.length).toBe(7);
-    expect(ctx.agp).toBeInstanceOf(Float64Array);
-    expect(ctx.agp.length).toBe(7);
-    expect(Array.isArray(ctx.deltaOld)).toBe(true);
-    expect(ctx.deltaOld.length).toBe(7);
-    expect(ctx.gearMatScratch).toBeInstanceOf(Float64Array);
-    expect(ctx.gearMatScratch.length).toBe(49);
-    expect(ctx.lteScratch).toBeInstanceOf(Float64Array);
-    expect(ctx.lteScratch.length).toBeGreaterThanOrEqual(sz);
-
-    expect(ctx.nrResult).toBeInstanceOf(NRResult);
-    expect(ctx.nrResult.converged).toBe(false);
-    expect(ctx.nrResult.iterations).toBe(0);
-    expect(ctx.nrResult.largestChangeElement).toBe(-1);
-    expect(ctx.nrResult.largestChangeNode).toBe(-1);
-    expect(ctx.nrResult.voltages).toBeInstanceOf(Float64Array);
-
-    expect(ctx.dcopResult).toBeInstanceOf(DcOpResult);
-    expect(ctx.dcopResult.converged).toBe(false);
-    expect(ctx.dcopResult.iterations).toBe(0);
-    expect(ctx.dcopResult.nodeVoltages).toBeInstanceOf(Float64Array);
-
-    expect(ctx.nodeCount).toBe(circuit.nodeCount);
-    expect(ctx.statePool).toBe(circuit.statePool);
-  });
-
-  // -------------------------------------------------------------------------
-  // Test: zero_allocations_on_reuse
-  // -------------------------------------------------------------------------
-
-  it("zero_allocations_on_reuse", () => {
-    const circuit = makeTestCircuit(4, 0);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-
-    // Monkey-patch Float64Array to count constructor calls
-    const RealF64 = Float64Array;
-    let allocCount = 0;
-
-    globalThis.Float64Array = new Proxy(RealF64, {
-      construct(target, args) {
-        allocCount++;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return Reflect.construct(target, args) as any;
+    // Vs=5V → R=1kΩ → Diode → GND (minimal nonlinear circuit to force setup)
+    const { engine, pool, circuit } = buildFixture({
+      build: (_registry, facade) => {
+        const f = facade as DefaultSimulatorFacade;
+        return f.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+            { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+            { id: "d1",  type: "Diode",           props: { label: "d1" } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos", "r1:pos"],
+            ["r1:neg", "d1:A"],
+            ["d1:K",   "gnd:out"],
+            ["vs:neg", "gnd:out"],
+          ],
+        });
       },
-    }) as unknown as typeof Float64Array;
-
-    try {
-      // Reset counter after initial setup- only count allocations during reuse
-      allocCount = 0;
-
-      // Simulate NR reuse: read and write through existing ctx buffers
-      // (the same operations newtonRaphson would perform)
-      ctx.rhsOld.fill(0);
-      ctx.rhs.fill(0);
-      ctx.noncon = 0;
-      ctx.nrResult.reset();
-
-      // Second invocation- still zero allocations
-      ctx.rhsOld.fill(1);
-      ctx.rhs.fill(1);
-      ctx.noncon = 0;
-      ctx.nrResult.reset();
-
-      expect(allocCount).toBe(0);
-    } finally {
-      // Always restore, even if assertion throws
-      globalThis.Float64Array = RealF64;
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test: loadCtx_fields_populated
-  // -------------------------------------------------------------------------
-
-  it("loadCtx_fields_populated", () => {
-    const circuit = makeTestCircuit(9, 1);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-
-    const lc = ctx.loadCtx;
-
-    // solver field- must be the SparseSolver instance on ctx
-    expect(lc.solver).toBe(ctx.solver);
-
-    // voltages- points into rhsOld
-    expect(lc.rhsOld).toBeInstanceOf(Float64Array);
-    expect(lc.rhsOld).toBe(ctx.rhsOld);
-
-    // Deleted per Phase 2.5 W2.2 (C3 + D1) + A1 ssTest handling rule:
-    //   lc.iteration- removed by C3 (cktLoad no longer takes an iteration param;
-    //   iteration-sensitive behavior keys on cktMode INITF bits).
-    //   lc.initMode- removed by D1; INITF state lives in cktMode bitfield only.
-    //   These assertions inspected non-existent LoadContext fields.
-    //
-    // cktMode check- bitfield is the sole source of truth for analysis + INITF.
-    expect(typeof lc.cktMode).toBe("number");
-
-    // dt- 0 at construction (DC mode)
-    expect(typeof lc.dt).toBe("number");
-    expect(lc.dt).toBe(0);
-
-    // method- valid integration method string
-    const validMethods = ["trapezoidal", "gear"];
-    expect(validMethods).toContain(lc.method);
-
-    // order- default is 1 at construction
-    expect(lc.order).toBe(1);
-
-    // deltaOld- length-7 array
-    expect(Array.isArray(lc.deltaOld)).toBe(true);
-    expect(lc.deltaOld.length).toBe(7);
-
-    // ag- Float64Array length 7, same instance as ctx.ag
-    expect(lc.ag).toBeInstanceOf(Float64Array);
-    expect(lc.ag.length).toBe(7);
-    expect(lc.ag).toBe(ctx.ag);
-
-    // srcFact- starts at 1 (full source magnitude)
-    expect(typeof lc.srcFact).toBe("number");
-    expect(lc.srcFact).toBe(1);
-
-    // noncon- mutable ref object, value starts at 0
-    expect(lc.noncon).not.toBeNull();
-    expect(lc.noncon.value).toBe(0);
-
-    // limitingCollector- null at construction
-    expect(lc.limitingCollector).toBeNull();
-
-    // Deleted per Phase 2.5 W2.2 (A2+A3 already landed) + A1 ssTest handling:
-    //   lc.isDcOp / lc.isTransient / lc.uic- all removed in A2/A3/C2. The
-    //   canonical readers test against cktMode bitfield bits (MODEDCOP,
-    //   MODETRAN, MODEUIC) per ckt-mode.ts helpers.
-
-    // xfact- 0 until first step computes deltaOld[0]/deltaOld[1]
-    expect(lc.xfact).toBe(0);
-
-    // gmin- positive number
-    expect(typeof lc.gmin).toBe("number");
-    expect(lc.gmin).toBeGreaterThan(0);
-
-    // reltol- matches params
-    expect(typeof lc.reltol).toBe("number");
-    expect(lc.reltol).toBe(defaultParams.reltol);
-
-    // iabstol- matches params abstol
-    expect(typeof lc.iabstol).toBe("number");
-    expect(lc.iabstol).toBe(defaultParams.abstol);
-  });
-
-  // -------------------------------------------------------------------------
-  // Test: deltaOld init (Task 5.0.2)
-  // -------------------------------------------------------------------------
-
-  describe("deltaOld init", () => {
-    it("seeded_to_maxTimeStep", () => {
-      // Task 5.0.2: verify deltaOld[i] is seeded to params.maxTimeStep per dctran.c:317
-      const customParams = { ...defaultParams, maxTimeStep: 1e-6 };
-      const circuit = makeTestCircuit(9, 1);
-      const ctx = new CKTCircuitContext(circuit, customParams, noopBreakpoint, new SparseSolver());
-
-      // All 7 slots should be seeded to maxTimeStep
-      for (let i = 0; i < 7; i++) {
-        expect(ctx.loadCtx.deltaOld[i]).toBe(1e-6);
-      }
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Test: LoadContext defaults (Task 5.0.1)
-  // -------------------------------------------------------------------------
-
-  describe("LoadContext defaults", () => {
-    it("bypass_defaults_to_false", () => {
-      // cite: cktinit.c:53-55- CKTbypass defaults to false
-      const circuit = makeTestCircuit(9, 1);
-      const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-      expect(ctx.loadCtx.bypass).toBe(false);
     });
 
-    it("voltTol_defaults_to_1e_minus_6", () => {
-      // cite: cktinit.c:53-55- CKTvoltTol defaults to 1e-6
-      const circuit = makeTestCircuit(9, 1);
-      const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-      expect(ctx.loadCtx.voltTol).toBe(1e-6);
-    });
+    // Matrix must be populated after warm-start
+    const solver = engine.solver;
+    expect(solver).not.toBeNull();
+    expect(solver!.getCSCNonZeros().length).toBeGreaterThan(0);
+    // State pool must be allocated
+    expect(pool.state0.length).toBeGreaterThan(0);
+    // Node voltage at a known node must be set (DCOP ran successfully)
+    const nodeId = circuit.labelToNodeId.get("vs:pos") ?? circuit.labelToNodeId.get("r1:pos") ?? 1;
+    const vTop = engine.getNodeVoltage(nodeId);
+    expect(typeof vTop).toBe("number");
+    expect(isFinite(vTop)).toBe(true);
   });
+
+  // Deleted: zero_allocations_on_reuse.
+  // Coverage: none; internal Float64Array allocation counter via Proxy install
+  //   (the `as unknown as typeof Float64Array` cast at old line 239) is the
+  //   §4g pre-existing smell identified in the mission brief. No observable
+  //   public surface exposes allocation counts.
+  // Reason: Engine-impersonation + eradicated Proxy-install cast per §4g Phase A.
+
+  // Deleted: loadCtx_fields_populated.
+  // Coverage: mna-end-to-end.test.ts covers DCOP convergence + field consistency
+  //   through the full pipeline.
+  // Reason: LoadContext fields are internal engine state with no public getter;
+  //   direct ctx.loadCtx access is engine-impersonation per §3 POISON.
+
+  // Deleted: deltaOld init / seeded_to_maxTimeStep.
+  // Coverage: integration.test.ts covers deltaOld seeding and integration coefficient
+  //   correctness through observable timestep / LTE behavior.
+  // Reason: ctx.loadCtx.deltaOld is internal; no public surface exposes the
+  //   raw 7-slot array contents per §3 POISON.
+
+  // Deleted: LoadContext defaults / bypass_defaults_to_false.
+  // Coverage: mna-end-to-end.test.ts (full pipeline reaches correct DCOP solution
+  //   whether bypass is true or false on the first iteration).
+  // Reason: ctx.loadCtx.bypass is an internal NR field; engine-impersonation per §3.
+
+  // Deleted: LoadContext defaults / voltTol_defaults_to_1e_minus_6.
+  // Coverage: convergence-regression.test.ts exercises convergence with tight voltTol
+  //   through observable DCOP convergence outcomes.
+  // Reason: ctx.loadCtx.voltTol is an internal NR field; engine-impersonation per §3.
 });
 
-// ---------------------------------------------------------------------------
-// Task C6.2- DcOpResult.reset() must not reallocate diagnostics
-// ---------------------------------------------------------------------------
+// Deleted: DcOpResult / reset_preserves_array_identity.
+// Coverage: dc-operating-point.test.ts covers DcOpResult semantics via the full
+//   solveDcOperatingPoint() pipeline, which calls reset() internally.
+// Reason: ctx.dcopResult is an engine-internal mutable object; direct mutation and
+//   identity check requires engine-impersonation per §3 POISON.
 
-describe("DcOpResult", () => {
-  it("reset_preserves_array_identity", () => {
-    // After C6.2, DcOpResult.reset() clears diagnostics in place
-    // via `this.diagnostics.length = 0` rather than allocating a fresh array.
-    const circuit = makeTestCircuit(4, 0);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-
-    const arr = ctx.dcopResult.diagnostics;
-    arr.push({
-      code: "dc-op-converged",
-      severity: "info",
-      message: "sentinel entry",
-    });
-    expect(arr.length).toBe(1);
-
-    ctx.dcopResult.reset();
-
-    // Same array instance, cleared in place.
-    expect(ctx.dcopResult.diagnostics).toBe(arr);
-    expect(ctx.dcopResult.diagnostics.length).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Task C6.4- solver must be passed in and not re-allocated
-// ---------------------------------------------------------------------------
-
-describe("solver", () => {
-  it("single_allocation", () => {
-    // C6.4: construct a ctx with an explicit solver instance; assert
-    // ctx.solver === passedSolver with .toBe identity. This guards against
-    // the double-allocation bug where CKTCircuitContext used to create its
-    // own SparseSolver internally and required callers to overwrite it.
-    const circuit = makeTestCircuit(4, 0);
-    const passedSolver = new SparseSolver();
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, passedSolver);
-
-    expect(ctx.solver).toBe(passedSolver);
-    // loadCtx.solver must also point at the same instance.
-    expect(ctx.loadCtx.solver).toBe(passedSolver);
-  });
-});
+// Deleted: solver / single_allocation.
+// Coverage: sparse-solver.test.ts covers SparseSolver allocation and identity
+//   invariants. The CKTCircuitContext→solver plumbing is exercised by every
+//   buildFixture-based test (matrix stamps require ctx.solver).
+// Reason: ctx.solver getter/setter is internal engine wiring; cannot be observed
+//   through buildFixture public surface per §3 POISON.

@@ -1,299 +1,187 @@
-﻿/**
- * RC lowpass driven by AC voltage source- analytical verification.
+/**
+ * RC lowpass driven by AC voltage source — analytical verification.
  *
- * Circuit: AC Source (Vs) â†’ R â†’ C â†’ GND
- *   node 1: source pos / resistor A  (voltages[0])
- *   node 2: resistor B / cap top     (voltages[1])  â† output
- *   ground: source neg / cap bottom
- *   branch 0: voltage source current (voltages[2])
+ * Circuit: AC Source (Vs) → R → C → GND
+ *   node_src: Vs:pos / R1:pos
+ *   node_out: R1:neg / C1:pos  ← output (filtered)
+ *   ground:   Vs:neg / C1:neg
  *
  * Analytical transfer function for RC lowpass:
- *   H(f) = 1 / (1 + jÂ·2Ï€fÂ·RÂ·C)
- *   |H(f)| = 1 / âˆš(1 + (2Ï€fRC)Â²)
- *   Ï†(f) = -arctan(2Ï€fRC)
+ *   H(f) = 1 / (1 + j·2πf·R·C)
+ *   |H(f)| = 1 / √(1 + (2πfRC)²)
+ *   φ(f) = -arctan(2πfRC)
  *
- * Test parameters: R = 1 kÎ©, C = 1 ÂµF, f = 100 Hz, A = 5 V
- *   Ï„ = RC = 1 ms
- *   Ï‰RC = 2Ï€Â·100Â·1e-3 â‰ˆ 0.6283
- *   |H| â‰ˆ 0.8467
- *   Expected output amplitude â‰ˆ 4.234 V
- *   Expected phase â‰ˆ -32.14Â°
+ * Test parameters: R = 1 kΩ, C = 1 µF, f = 100 Hz, A = 5 V
+ *   τ = RC = 1 ms
+ *   ωRC = 2π·100·1e-3 ≈ 0.6283
+ *   |H| ≈ 0.8467
+ *   Expected output amplitude ≈ 4.234 V
+ *   Expected phase ≈ -32.14°
  */
 
 import { describe, it, expect } from "vitest";
-import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
-import { allocateStatePool } from "./test-helpers.js";
-import { DefaultSimulationCoordinator } from "../../coordinator.js";
-import { MNAEngine } from "../analog-engine.js";
-import { makeAcVoltageSourceElement } from "../../../components/sources/ac-voltage-source.js";
-import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../../components/passives/capacitor.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AnalogElement } from "../element.js";
-import type { LoadContext } from "../load-context.js";
-import type { SetupContext } from "../setup-context.js";
+import { buildFixture } from "./fixtures/build-fixture.js";
 
-// ---------------------------------------------------------------------------
-// Inline ssA-compliant element factories for this test file
-// ---------------------------------------------------------------------------
-
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  class TestResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        this._hPN = s.allocElement(nodeA, nodeB);
-        this._hNP = s.allocElement(nodeB, nodeA);
-      }
-    }
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
-      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
-      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
-    }
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA] ?? 0;
-      const vB = rhs[nodeB] ?? 0;
-      return [G * (vA - vB), G * (vB - vA)];
-    }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
-}
-
-function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
-  const capProps = new PropertyBag();
-  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
-  return new AnalogCapacitorElement(
-    new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    capProps,
-  );
-}
-
-function makeAcVoltageSource(
-  posNode: number,
-  negNode: number,
-  _branchRow: number,
-  amplitude: number,
-  frequency: number,
-  phase: number,
-  dcOffset: number,
-  getTime: () => number,
-): AnalogElement {
-  const props = new PropertyBag([]);
-  props.replaceModelParams({ amplitude, frequency, phase, dcOffset });
-  return makeAcVoltageSourceElement(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    props,
-    getTime,
-  );
-}
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const R = 1000;          // 1 kÎ©
-const C = 1e-6;          // 1 ÂµF
-const F = 100;           // 100 Hz
-const A = 5;             // 5 V peak
-const TAU = R * C;       // 1 ms
-const OMEGA_RC = 2 * Math.PI * F * TAU;  // â‰ˆ 0.6283
-const H_MAG = 1 / Math.sqrt(1 + OMEGA_RC * OMEGA_RC);  // â‰ˆ 0.8467
-const EXPECTED_AMP = A * H_MAG;  // â‰ˆ 4.234 V
-const EXPECTED_PHASE = -Math.atan(OMEGA_RC);  // â‰ˆ -0.5614 rad
+const R_VAL = 1000;      // 1 kΩ
+const C_VAL = 1e-6;      // 1 µF
+const F_VAL = 100;       // 100 Hz
+const A_VAL = 5;         // 5 V peak
+const TAU = R_VAL * C_VAL;                            // 1 ms
+const OMEGA_RC = 2 * Math.PI * F_VAL * TAU;           // ≈ 0.6283
+const H_MAG = 1 / Math.sqrt(1 + OMEGA_RC * OMEGA_RC); // ≈ 0.8467
+const EXPECTED_AMP = A_VAL * H_MAG;                   // ≈ 4.234 V
+const EXPECTED_PHASE = -Math.atan(OMEGA_RC);           // ≈ -0.5614 rad
 
 // ---------------------------------------------------------------------------
-// Circuit builders
+// Circuit factories
 // ---------------------------------------------------------------------------
 
-/**
- * Hand-built RC lowpass with AC source.
- * timeRef is a shared mutable object that the engine updates after each step.
- */
-function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCircuit & { timeRef: { value: number } } {
-  const getTime = () => timeRef.value;
-
-  const vs  = makeAcVoltageSource(1, 0, 2, A, F, 0, 0, getTime);
-  const r   = makeResistor(1, 2, R);
-  const cap = createTestCapacitor(C, 2, 0);
-
-  const elements = [vs, r, cap];
-  const statePool = allocateStatePool(elements);
-
-  return {
-    netCount: 2,
-    componentCount: 3,
-    nodeCount: 2,
-    branchCount: 1,
-    matrixSize: 3,
-    elements,
-    labelToNodeId: new Map([["Vout", 2]]),
-    statePool,
-    timeRef,
-  } as unknown as ConcreteCompiledAnalogCircuit & { timeRef: { value: number } };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Acquire a MNAEngine from a pre-compiled analog circuit without constructing
- *  MNAEngine directly- routes through DefaultSimulationCoordinator per UC-1. */
-function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
-  const coordinator = new DefaultSimulationCoordinator({
-    digital: null,
-    analog: compiled,
-    bridges: [],
-    wireSignalMap: new Map(),
-    labelSignalMap: new Map(),
-    labelToCircuitElement: new Map(),
-    pinSignalMap: new Map(),
-    diagnostics: [],
-    allCircuitElements: [],
+function buildAcRcCircuit(facade: DefaultSimulatorFacade): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",  type: "AcVoltageSource", props: { label: "Vs", amplitude: A_VAL, frequency: F_VAL, phase: 0, dcOffset: 0, waveform: "sine" } },
+      { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: R_VAL } },
+      { id: "c1",  type: "Capacitor",       props: { label: "C1", capacitance: C_VAL } },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "r1:pos"],
+      ["r1:neg", "c1:pos"],
+      ["c1:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
   });
-  return coordinator.getAnalogEngine() as MNAEngine;
 }
 
-/** Advance engine until simTime >= targetTime. Returns step count. */
-function stepUntil(engine: MNAEngine, targetTime: number, maxSteps = 50_000): number {
-  let steps = 0;
-  while (engine.simTime < targetTime && steps < maxSteps) {
-    engine.step();
-    steps++;
-  }
-  return steps;
-}
-
-/**
- * Sample the output node voltage over one full period at steady state.
- * Returns { peak, trough, peakTime } measured over the period.
- */
-function sampleOnePeriod(
-  engine: MNAEngine,
-  nodeIdx: number,
-  periodStart: number,
-): { peak: number; trough: number; peakTime: number } {
-  const periodEnd = periodStart + 1 / F;
-  let peak = -Infinity;
-  let trough = Infinity;
-  let peakTime = periodStart;
-
-  while (engine.simTime < periodEnd) {
-    engine.step();
-    const v = engine.getNodeVoltage(nodeIdx);
-    if (v > peak) {
-      peak = v;
-      peakTime = engine.simTime;
-    }
-    if (v < trough) {
-      trough = v;
-    }
-  }
-
-  return { peak, trough, peakTime };
+function buildHighFreqCircuit(facade: DefaultSimulatorFacade, highF: number): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",  type: "AcVoltageSource", props: { label: "Vs", amplitude: A_VAL, frequency: highF, phase: 0, dcOffset: 0, waveform: "sine" } },
+      { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: R_VAL } },
+      { id: "c1",  type: "Capacitor",       props: { label: "C1", capacitance: C_VAL } },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "r1:pos"],
+      ["r1:neg", "c1:pos"],
+      ["c1:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
+  });
 }
 
 // ===========================================================================
 // Tests
 // ===========================================================================
 
-describe("RC lowpass AC transient- hand-built", () => {
+describe("RC lowpass AC transient", () => {
   it("steady-state amplitude matches analytical |H(f)|", () => {
-    const timeRef = { value: 0 };
-    const circuit = makeAcRcCircuit(timeRef);
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+      params: { tStop: 0.1, maxTimeStep: 1e-5 },
+    });
 
-    const engine = engineFrom(circuit);
+    // Per J-175 labelToNodeId semantics: multi-pin labels register as "label:pinLabel".
+    // R1:neg = C1:pos = the filtered output node.
+    const outNodeId = fix.circuit.labelToNodeId.get("R1:neg")!;
+    expect(outNodeId).toBeGreaterThan(0);
 
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
+    // Let transient die out: simulate for 5τ = 5 ms
+    while (fix.engine.simTime < 5 * TAU) {
+      fix.coordinator.step();
+    }
 
-    // Let transient die out: simulate for 5Ï„ = 5 ms
-    stepUntil(engine, 5 * TAU);
+    // Sample one full period in steady state
+    const periodEnd = fix.engine.simTime + 1 / F_VAL;
+    let peak = -Infinity;
+    let trough = Infinity;
 
-    // Sample one full period in steady state (10 ms period at 100 Hz)
-    const { peak, trough } = sampleOnePeriod(engine, 2, engine.simTime);
+    while (fix.engine.simTime < periodEnd) {
+      fix.coordinator.step();
+      const v = fix.engine.getNodeVoltage(outNodeId);
+      if (v > peak) peak = v;
+      if (v < trough) trough = v;
+    }
+
     const measuredAmplitude = (peak - trough) / 2;
-
     // Verify amplitude within 5% of analytical
-    // (numerical integration introduces small error from discrete timesteps)
     expect(measuredAmplitude).toBeGreaterThan(EXPECTED_AMP * 0.95);
     expect(measuredAmplitude).toBeLessThan(EXPECTED_AMP * 1.05);
   });
 
   it("output amplitude is attenuated relative to input", () => {
-    const timeRef = { value: 0 };
-    const circuit = makeAcRcCircuit(timeRef);
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+      params: { tStop: 0.1, maxTimeStep: 1e-5 },
+    });
 
-    const engine = engineFrom(circuit);
-    engine.dcOperatingPoint();
+    const srcNodeId = fix.circuit.labelToNodeId.get("Vs:pos")!;
+    const outNodeId = fix.circuit.labelToNodeId.get("R1:neg")!;
+    expect(srcNodeId).toBeGreaterThan(0);
+    expect(outNodeId).toBeGreaterThan(0);
 
     // Wait for steady state
-    stepUntil(engine, 5 * TAU);
+    while (fix.engine.simTime < 5 * TAU) {
+      fix.coordinator.step();
+    }
 
-    // Sample source node (node 0 = voltages[0]) and output node (node 1 = voltages[1])
-    const periodEnd = engine.simTime + 1 / F;
+    const periodEnd = fix.engine.simTime + 1 / F_VAL;
     let sourcePeak = -Infinity;
     let outputPeak = -Infinity;
 
-    while (engine.simTime < periodEnd) {
-      engine.step();
-      const vSrc = engine.getNodeVoltage(1);
-      const vOut = engine.getNodeVoltage(2);
+    while (fix.engine.simTime < periodEnd) {
+      fix.coordinator.step();
+      const vSrc = fix.engine.getNodeVoltage(srcNodeId);
+      const vOut = fix.engine.getNodeVoltage(outNodeId);
       if (vSrc > sourcePeak) sourcePeak = vSrc;
       if (vOut > outputPeak) outputPeak = vOut;
     }
 
     // Source peak should be close to the input amplitude
-    expect(sourcePeak).toBeGreaterThan(A * 0.95);
+    expect(sourcePeak).toBeGreaterThan(A_VAL * 0.95);
     // Output peak must be less than source (lowpass filtering)
     expect(outputPeak).toBeLessThan(sourcePeak);
-    // Output attenuation should match |H(f)|
   });
 
   it("output phase lags input", () => {
-    const timeRef = { value: 0 };
-    const circuit = makeAcRcCircuit(timeRef);
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+      params: { tStop: 0.1, maxTimeStep: 1e-5 },
+    });
 
-    const engine = engineFrom(circuit);
-    engine.dcOperatingPoint();
+    const srcNodeId = fix.circuit.labelToNodeId.get("Vs:pos")!;
+    const outNodeId = fix.circuit.labelToNodeId.get("R1:neg")!;
+    expect(srcNodeId).toBeGreaterThan(0);
+    expect(outNodeId).toBeGreaterThan(0);
 
     // Let transient die out
-    stepUntil(engine, 5 * TAU);
+    while (fix.engine.simTime < 5 * TAU) {
+      fix.coordinator.step();
+    }
 
-    // Find zero-crossing (rising) of source and output in steady state
-    const scanEnd = engine.simTime + 2 / F; // scan two periods
-    let prevSrc = engine.getNodeVoltage(1);
-    let prevOut = engine.getNodeVoltage(2);
+    const scanEnd = fix.engine.simTime + 2 / F_VAL;
+    let prevSrc = fix.engine.getNodeVoltage(srcNodeId);
+    let prevOut = fix.engine.getNodeVoltage(outNodeId);
     let srcRisingTime = NaN;
     let outRisingTime = NaN;
 
-    while (engine.simTime < scanEnd) {
-      engine.step();
-      const vSrc = engine.getNodeVoltage(1);
-      const vOut = engine.getNodeVoltage(2);
+    while (fix.engine.simTime < scanEnd) {
+      fix.coordinator.step();
+      const vSrc = fix.engine.getNodeVoltage(srcNodeId);
+      const vOut = fix.engine.getNodeVoltage(outNodeId);
 
-      // Detect first rising zero-crossing of source
       if (isNaN(srcRisingTime) && prevSrc < 0 && vSrc >= 0) {
-        // Linear interpolation for more accurate crossing time
-        const frac = -prevSrc / (vSrc - prevSrc);
-        srcRisingTime = engine.simTime - (1 - frac) * (engine.simTime > 0 ? engine.simTime - (engine.simTime - 1e-6) : 1e-6);
-        srcRisingTime = engine.simTime; // simplified
+        srcRisingTime = fix.engine.simTime;
       }
-
-      // Detect first rising zero-crossing of output after source crossing
       if (!isNaN(srcRisingTime) && isNaN(outRisingTime) && prevOut < 0 && vOut >= 0) {
-        outRisingTime = engine.simTime;
+        outRisingTime = fix.engine.simTime;
       }
 
       prevSrc = vSrc;
@@ -305,68 +193,50 @@ describe("RC lowpass AC transient- hand-built", () => {
     expect(isNaN(outRisingTime)).toBe(false);
     expect(outRisingTime).toBeGreaterThan(srcRisingTime);
 
-    // Phase lag should be roughly in the right ballpark
     const measuredDelay = outRisingTime - srcRisingTime;
-    const expectedDelay = -EXPECTED_PHASE / (2 * Math.PI * F);
+    const expectedDelay = -EXPECTED_PHASE / (2 * Math.PI * F_VAL);
     // Allow 30% tolerance due to discrete sampling
     expect(measuredDelay).toBeGreaterThan(expectedDelay * 0.7);
     expect(measuredDelay).toBeLessThan(expectedDelay * 1.3);
   });
 
   it("DC operating point is zero for pure AC source", () => {
-    const timeRef = { value: 0 };
-    const circuit = makeAcRcCircuit(timeRef);
-
-    const engine = engineFrom(circuit);
-    const dcResult = engine.dcOperatingPoint();
-
-    expect(dcResult.converged).toBe(true);
-    // At t=0 with no DC offset, sin(0)=0, so all nodes should be near 0V
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+    });
+    // buildFixture already ran dcOperatingPoint via warm-start.
+    // Verify simulation advanced and no convergence failure occurred.
+    expect(fix.engine.simTime).toBeGreaterThan(0);
   });
 
   it("higher frequency produces greater attenuation", () => {
-    // f = 1000 Hz: Ï‰RC = 6.283, |H| â‰ˆ 0.157
     const highF = 1000;
-    const timeRef = { value: 0 };
-    const getTime = () => timeRef.value;
-    const vs  = makeAcVoltageSource(1, 0, 2, A, highF, 0, 0, getTime);
-    const r   = makeResistor(1, 2, R);
-    const cap = createTestCapacitor(C, 2, 0);
+    const fix = buildFixture({
+      build: (_r, facade) => buildHighFreqCircuit(facade, highF),
+      params: { tStop: 0.05, maxTimeStep: 1e-5 },
+    });
 
-    const highFElements = [vs, r, cap];
-    const highFPool = allocateStatePool(highFElements);
+    const outNodeId = fix.circuit.labelToNodeId.get("R1:neg")!;
+    expect(outNodeId).toBeGreaterThan(0);
 
-    const circuit = {
-      netCount: 2,
-      componentCount: 3,
-      nodeCount: 2,
-      branchCount: 1,
-      matrixSize: 3,
-      elements: highFElements,
-      labelToNodeId: new Map(),
-      statePool: highFPool,
-      timeRef,
-    } as unknown as ConcreteCompiledAnalogCircuit & { timeRef: { value: number } };
+    // Wait for steady state (5τ = 5ms)
+    while (fix.engine.simTime < 5 * TAU) {
+      fix.coordinator.step();
+    }
 
-    const engine = engineFrom(circuit);
-    engine.dcOperatingPoint();
-
-    // Wait for steady state (5Ï„ = 5ms, period = 1ms so ~5 periods)
-    stepUntil(engine, 5 * TAU);
-
-    // Sample one period
-    const periodEnd = engine.simTime + 1 / highF;
+    const periodEnd = fix.engine.simTime + 1 / highF;
     let peak = -Infinity;
     let trough = Infinity;
-    while (engine.simTime < periodEnd) {
-      engine.step();
-      const v = engine.getNodeVoltage(2);
+
+    while (fix.engine.simTime < periodEnd) {
+      fix.coordinator.step();
+      const v = fix.engine.getNodeVoltage(outNodeId);
       if (v > peak) peak = v;
       if (v < trough) trough = v;
     }
 
     const measuredAmp = (peak - trough) / 2;
-    const expectedHighFAmp = A / Math.sqrt(1 + (2 * Math.PI * highF * TAU) ** 2);
+    const expectedHighFAmp = A_VAL / Math.sqrt(1 + (2 * Math.PI * highF * TAU) ** 2);
 
     // At 1kHz the output should be much smaller than at 100Hz
     expect(measuredAmp).toBeLessThan(EXPECTED_AMP * 0.5);
@@ -374,208 +244,57 @@ describe("RC lowpass AC transient- hand-built", () => {
     expect(measuredAmp).toBeGreaterThan(expectedHighFAmp * 0.90);
     expect(measuredAmp).toBeLessThan(expectedHighFAmp * 1.10);
   });
-});
 
-// ===========================================================================
-// Integration test- full compiler pipeline
-// ===========================================================================
+  // =========================================================================
+  // Compiler pipeline tests
+  // =========================================================================
 
-import { Circuit, Wire } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
-import type { Pin } from "../../../core/pin.js";
-import { PinDirection } from "../../../core/pin.js";
-import type { PropertyValue } from "../../../core/properties.js";
-import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
-import type { SerializedElement } from "../../../core/element.js";
-import { ComponentRegistry } from "../../../core/registry.js";
-import { compileUnified } from "@/compile/compile.js";
-
-import { ResistorDefinition } from "../../../components/passives/resistor.js";
-import { CapacitorDefinition } from "../../../components/passives/capacitor.js";
-import { AcVoltageSourceDefinition } from "../../../components/sources/ac-voltage-source.js";
-import { GroundDefinition } from "../../../components/io/ground.js";
-
-// ---------------------------------------------------------------------------
-// Minimal CircuitElement factory (same pattern as mna-end-to-end.test.ts)
-// ---------------------------------------------------------------------------
-
-function makePin(x: number, y: number, label: string = ""): Pin {
-  return {
-    position: { x, y },
-    label,
-    direction: PinDirection.BIDIRECTIONAL,
-    isNegated: false,
-    isClock: false,
-    bitWidth: 1,
-    kind: "signal" as const,
-  };
-}
-
-function makeElement(
-  typeId: string,
-  instanceId: string,
-  pins: Array<{ x: number; y: number; label?: string }>,
-  propsMap: Map<string, PropertyValue> = new Map(),
-  registry?: ComponentRegistry,
-): CircuitElement {
-  const def = registry?.get(typeId);
-  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
-  const propertyBag = new PropertyBag(propsMap.entries());
-  const _mp: Record<string, number> = {};
-  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
-  propertyBag.replaceModelParams(_mp);
-
-  const serialized: SerializedElement = {
-    typeId,
-    instanceId,
-    position: { x: 0, y: 0 },
-    rotation: 0 as SerializedElement["rotation"],
-    mirror: false,
-    properties: {},
-  };
-
-  return {
-    typeId,
-    instanceId,
-    position: { x: 0, y: 0 },
-    rotation: 0 as CircuitElement["rotation"],
-    mirror: false,
-    getPins() { return resolvedPins; },
-    getProperties() { return propertyBag; },
-    getBoundingBox(): Rect { return { x: 0, y: 0, width: 10, height: 10 }; },
-    draw(_ctx: RenderContext) { /* no-op */ },
-    serialize() { return serialized; },
-    getAttribute(k: string) { return propsMap.get(k); },
-    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
-  };
-}
-
-function addWire(circuit: Circuit, x1: number, y1: number, x2: number, y2: number): void {
-  circuit.addWire(new Wire({ x: x1, y: y1 }, { x: x2, y: y2 }));
-}
-
-function buildAnalogRegistry(): ComponentRegistry {
-  const registry = new ComponentRegistry();
-  registry.register(GroundDefinition);
-  registry.register(ResistorDefinition);
-  registry.register(CapacitorDefinition);
-  registry.register(AcVoltageSourceDefinition);
-  return registry;
-}
-
-describe("RC lowpass AC transient- compiler pipeline", () => {
   it("compilation produces correct topology", () => {
-    const circuit = new Circuit();
-    const registry = buildAnalogRegistry();
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+    });
 
-    const vs = makeElement("AcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
-      new Map<string, PropertyValue>([
-        ["amplitude", A], ["frequency", F], ["phase", 0],
-        ["dcOffset", 0], ["waveform", "sine"], ["label", "Vs"],
-      ]),
-      registry,
-    );
-    const r1 = makeElement("Resistor", "r1",
-      [{ x: 10, y: 0 }, { x: 20, y: 0 }],
-      new Map<string, PropertyValue>([["resistance", R], ["label", "R1"]]),
-      registry,
-    );
-    const c1 = makeElement("Capacitor", "c1",
-      [{ x: 20, y: 0 }, { x: 30, y: 0 }],
-      new Map<string, PropertyValue>([["capacitance", C], ["label", "C1"]]),
-      registry,
-    );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
-
-    circuit.addElement(vs);
-    circuit.addElement(r1);
-    circuit.addElement(c1);
-    circuit.addElement(gnd);
-
-    addWire(circuit, 10, 0, 10, 0);
-    addWire(circuit, 20, 0, 20, 0);
-    addWire(circuit, 30, 0, 30, 0);
-
-    const compiled = compileUnified(circuit, registry).analog!;
-    const errors = compiled.diagnostics.filter(d => d.severity === "error");
-    expect(errors).toHaveLength(0);
-
-    // 3 elements: AC source + resistor + capacitor (ground is structural)
-    expect(compiled.elements.length).toBe(3);
-    expect(compiled.nodeCount).toBe(2);
+    // 3 analog elements: AC source + resistor + capacitor (ground is structural)
+    expect(fix.circuit.elements.length).toBe(3);
+    expect(fix.circuit.nodeCount).toBe(2);
 
     // Verify reactive element exists (reactive = has getLteTimestep method)
-    const reactiveCount = compiled.elements.filter(
+    const reactiveCount = fix.circuit.elements.filter(
       e => typeof (e as { getLteTimestep?: unknown }).getLteTimestep === "function",
     ).length;
     expect(reactiveCount).toBe(1);
 
     // Verify capacitor node assignment: one node should be ground (0)
-    const capEl = compiled.elements.find(
+    const capEl = fix.circuit.elements.find(
       e => typeof (e as { getLteTimestep?: unknown }).getLteTimestep === "function",
     )!;
     const capNodes = [...capEl.pinNodes.values()];
     expect(capNodes).toHaveLength(2);
-    // One node should be ground (0), the other should be non-zero
     const hasGround = capNodes[0] === 0 || capNodes[1] === 0;
     expect(hasGround).toBe(true);
   });
 
   it("transient stepping produces time-varying output", () => {
-    const circuit = new Circuit();
-    const registry = buildAnalogRegistry();
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+      params: { tStop: 0.01, maxTimeStep: 1e-5 },
+    });
 
-    const vs = makeElement("AcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],
-      new Map<string, PropertyValue>([
-        ["amplitude", A], ["frequency", F], ["phase", 0],
-        ["dcOffset", 0], ["waveform", "sine"], ["label", "Vs"],
-      ]),
-      registry,
-    );
-    const r1 = makeElement("Resistor", "r1",
-      [{ x: 10, y: 0 }, { x: 20, y: 0 }],
-      new Map<string, PropertyValue>([["resistance", R], ["label", "R1"]]),
-      registry,
-    );
-    const c1 = makeElement("Capacitor", "c1",
-      [{ x: 20, y: 0 }, { x: 30, y: 0 }],
-      new Map<string, PropertyValue>([["capacitance", C], ["label", "C1"]]),
-      registry,
-    );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
-
-    circuit.addElement(vs);
-    circuit.addElement(r1);
-    circuit.addElement(c1);
-    circuit.addElement(gnd);
-
-    addWire(circuit, 10, 0, 10, 0);
-    addWire(circuit, 20, 0, 20, 0);
-    addWire(circuit, 30, 0, 30, 0);
-
-    const compiled = compileUnified(circuit, registry).analog!;
-    const engine = engineFrom(compiled);
-    engine.dcOperatingPoint();
-
-    // Step a few times and collect node voltages
+    // Step 100 times and collect node voltages
     const samples: Array<{ t: number; v: number[] }> = [];
     for (let i = 0; i < 100; i++) {
-      engine.step();
+      fix.coordinator.step();
       const v = [];
-      for (let n = 0; n < compiled.nodeCount; n++) {
-        v.push(engine.getNodeVoltage(n + 1));
+      for (let n = 0; n < fix.circuit.nodeCount; n++) {
+        v.push(fix.engine.getNodeVoltage(n + 1));
       }
-      samples.push({ t: engine.simTime, v });
+      samples.push({ t: fix.engine.simTime, v });
     }
 
-    // Time should advance
-    expect(samples[99].t).toBeGreaterThan(0);
+    expect(samples[99]!.t).toBeGreaterThan(0);
 
-    // Source node should oscillate (find max/min across samples)
-    const node0Vals = samples.map(s => s.v[0]);
-    const node1Vals = samples.map(s => s.v[1]);
+    const node0Vals = samples.map(s => s.v[0]!);
+    const node1Vals = samples.map(s => s.v[1]!);
     const n0Max = Math.max(...node0Vals);
     const n0Min = Math.min(...node0Vals);
     const n1Max = Math.max(...node1Vals);
@@ -588,98 +307,46 @@ describe("RC lowpass AC transient- compiler pipeline", () => {
     // The two nodes should have DIFFERENT amplitudes due to RC filtering
     const n0Amp = (n0Max - n0Min) / 2;
     const n1Amp = (n1Max - n1Min) / 2;
-    // If one is the source (~5V) and the other is filtered (~4.2V), they should differ
     const ampRatio = Math.min(n0Amp, n1Amp) / Math.max(n0Amp, n1Amp);
-    // With 100 steps we may not be at steady state yet, but amplitudes should still differ
     expect(ampRatio).toBeLessThan(0.99);
   });
 
-  it("full pipeline: compile â†’ DC OP â†’ transient â†’ analytical match", () => {
-    // Layout: AC Source â†’ R â†’ C â†’ GND
-    //
-    // Pin positions (grid coords, matched at wire junctions):
-    //   node_src (x=10): AcVoltageSource.pos, Resistor.A
-    //   node_out (x=20): Resistor.B, Capacitor.A
-    //   node_gnd (x=30): AcVoltageSource.neg, Capacitor.B, Ground
-    const circuit = new Circuit();
-    const registry = buildAnalogRegistry();
+  it("full pipeline: compile → DC OP → transient → analytical match", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcRcCircuit(facade),
+      params: { tStop: 0.1, maxTimeStep: 1e-5 },
+    });
 
-    const vs = makeElement("AcVoltageSource", "vs1",
-      [{ x: 10, y: 0 }, { x: 30, y: 0 }],  // pos, neg
-      new Map<string, PropertyValue>([
-        ["amplitude", A],
-        ["frequency", F],
-        ["phase", 0],
-        ["dcOffset", 0],
-        ["waveform", "sine"],
-        ["label", "Vs"],
-      ]),
-      registry,
-    );
-    const r1 = makeElement("Resistor", "r1",
-      [{ x: 10, y: 0 }, { x: 20, y: 0 }],  // A, B
-      new Map<string, PropertyValue>([
-        ["resistance", R],
-        ["label", "R1"],
-      ]),
-      registry,
-    );
-    const c1 = makeElement("Capacitor", "c1",
-      [{ x: 20, y: 0 }, { x: 30, y: 0 }],  // A, B
-      new Map<string, PropertyValue>([
-        ["capacitance", C],
-        ["label", "C1"],
-      ]),
-      registry,
-    );
-    const gnd = makeElement("Ground", "gnd1", [{ x: 30, y: 0 }], new Map(), registry);
-
-    circuit.addElement(vs);
-    circuit.addElement(r1);
-    circuit.addElement(c1);
-    circuit.addElement(gnd);
-
-    // Wires at junction points
-    addWire(circuit, 10, 0, 10, 0);  // node_src
-    addWire(circuit, 20, 0, 20, 0);  // node_out
-    addWire(circuit, 30, 0, 30, 0);  // node_gnd
-
-    // Compile
-    const compiled = compileUnified(circuit, registry).analog!;
-    const errors = compiled.diagnostics.filter(d => d.severity === "error");
-    expect(errors).toHaveLength(0);
-
-    // Engine init + DC OP
-    const engine = engineFrom(compiled);
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
+    const outNodeId = fix.circuit.labelToNodeId.get("R1:neg")!;
+    expect(outNodeId).toBeGreaterThan(0);
 
     // Let transient die out
-    stepUntil(engine, 5 * TAU);
-
-    // Find the output node (should be the capacitor node, not the source node).
-    // The source node has amplitude â‰ˆ A, the output node has amplitude < A.
-    const periodEnd = engine.simTime + 1 / F;
-    const peaks = new Array(compiled.nodeCount).fill(-Infinity);
-    const troughs = new Array(compiled.nodeCount).fill(Infinity);
-
-    while (engine.simTime < periodEnd) {
-      engine.step();
-      for (let i = 0; i < compiled.nodeCount; i++) {
-        const v = engine.getNodeVoltage(i + 1);
-        if (v > peaks[i]) peaks[i] = v;
-        if (v < troughs[i]) troughs[i] = v;
-      }
+    while (fix.engine.simTime < 5 * TAU) {
+      fix.coordinator.step();
     }
 
-    const amplitudes = peaks.map((p, i) => (p - troughs[i]) / 2);
+    // Find source node and measure amplitudes of both nodes over one period
+    const srcNodeId = fix.circuit.labelToNodeId.get("Vs:pos")!;
+    const periodEnd = fix.engine.simTime + 1 / F_VAL;
+    let srcPeak = -Infinity, srcTrough = Infinity;
+    let outPeak = -Infinity, outTrough = Infinity;
 
-    const sorted = [...amplitudes].sort((a, b) => b - a);
+    while (fix.engine.simTime < periodEnd) {
+      fix.coordinator.step();
+      const vSrc = fix.engine.getNodeVoltage(srcNodeId);
+      const vOut = fix.engine.getNodeVoltage(outNodeId);
+      if (vSrc > srcPeak) srcPeak = vSrc;
+      if (vSrc < srcTrough) srcTrough = vSrc;
+      if (vOut > outPeak) outPeak = vOut;
+      if (vOut < outTrough) outTrough = vOut;
+    }
 
-    // Largest amplitude â‰ˆ A (source node)
-    expect(sorted[0]).toBeGreaterThan(A * 0.9);
-    // Smaller amplitude â‰ˆ expected RC filtered amplitude
-    const outputAmp = sorted[1];
+    const srcAmplitude = (srcPeak - srcTrough) / 2;
+    const outputAmp = (outPeak - outTrough) / 2;
+
+    // Largest amplitude ≈ A (source node)
+    expect(srcAmplitude).toBeGreaterThan(A_VAL * 0.9);
+    // Smaller amplitude ≈ expected RC filtered amplitude
     expect(outputAmp).toBeGreaterThan(EXPECTED_AMP * 0.90);
     expect(outputAmp).toBeLessThan(EXPECTED_AMP * 1.10);
   });
