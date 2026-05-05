@@ -1,6 +1,6 @@
 # Manual Fix List
 
-> Generated 2026-05-01, compacted 2026-05-04, recompacted 2026-05-05 (§4g landed; §4f→§4g sections collapsed; §4c landed except 2 Wave-11a-blocked escalations). Source: `spec/merged-implementer-contracts.md` cross-referenced against the four phase docs.
+> Generated 2026-05-01, compacted 2026-05-04, recompacted 2026-05-05 (§4g landed; §4f→§4g sections collapsed; §4c landed except 2 Wave-11a-blocked escalations; §2e verified complete with §4d follow-up fold-ins). Source: `spec/merged-implementer-contracts.md` cross-referenced against the four phase docs.
 > Phase tags: `phase-1-engine-infrastructure` (Phase1 File N), `phase-component-model-correctness-job` (Component A/B/C/G), `phase-composite-architecture` (Composite I/D/M/E), `phase-test-contract-updates` (Test 1.x / UC-7).
 
 ## How to read this file
@@ -122,22 +122,18 @@ J-061 (resistor + 23-file `ngspiceNodeMap` deletion sweep), J-059 (inductor), J-
 ### §2d BJT factory rename — COMPLETE
 J-078 (bjt.ts), J-082 (triac.ts), J-026 (optocoupler.ts), J-031 (timer-555.ts), J-032 (vcvs.ts comparator preset).
 
-### §2e Composite class deletions / netlist conversions — REMAINING
+### §2e Composite class deletions / netlist conversions — COMPLETE 2026-05-05
 
-- [ ] `src/components/semiconductors/scr.ts` — ssM1 — Declare `SCR_NETLIST`; delete `ScrCompositeElement`, `createScrElement` (J-081).
-- [ ] `src/components/semiconductors/diac.ts` — ssM2 — Declare `DIAC_NETLIST`; delete `createDiacElement` (J-079).
-- [ ] `src/components/semiconductors/diode.ts` — Test 1.46 — Architecture-fix: gate `ctx.limitingCollector?.push(...)` on MODEINIT* mask matching `dioload.c:139-205` (J-080).
-- [ ] `src/components/active/adc.ts` — ssM23 — Declare `buildAdcNetlist`; delete `ADCAnalogElement` (J-019).
-- [ ] `src/components/active/dac.ts` — ssM22 + Phase1 ssG — Declare `buildDacNetlist`; delete `DACAnalogElement`; set `rOut.default: 1` (J-023).
-- [ ] `src/components/active/schmitt-trigger.ts` — ssG9 + ssM25 — Delete empty `accept(){}`; declare netlist + driver (J-029).
-- [ ] `src/components/passives/transmission-line.ts` — ssM6 — Declare `buildTransmissionLineNetlist`; delete `TransmissionLineElement` and 5 inline sub-element classes (J-064). **NB**: §4g Wave 11a ALSO converts this — coordinate.
-- [ ] `src/components/passives/tapped-transformer.ts` — ssM26 — Declare `buildTappedTransformerNetlist`; delete `AnalogTappedTransformerElement` (J-062).
-- [ ] `src/components/passives/capacitor.ts` — ssD3 — Docstring-only update on `AnalogCapacitorElement` (J-057).
-- [ ] `src/components/switching/switch.ts` — ssM7 — Add `SWITCH_SCHEMA` with `CLOSED` slot; reads `s1[CLOSED]`; remove `closed` ctor param (J-098).
-- [ ] `src/components/switching/relay.ts` — ssB6 + ssM7 — Pin-key rename; declare `RELAY_NETLIST`; delete composite (J-097).
-- [ ] `src/components/switching/relay-dt.ts` — ssB7 + ssM7 — Pin-key rename; declare double-throw netlist; delete composite (J-096).
-- [ ] `src/components/switching/fgnfet.ts` — ssM8 — Declare `FGNFET_NETLIST`; delete `FGNFETAnalogElement` and inline sub-elements (J-092). **NB**: §4g Wave 11a coordinates.
-- [ ] `src/components/switching/fgpfet.ts` — ssM9 — Declare `FGPFET_NETLIST`; delete `FGPFETAnalogElement` and inline sub-elements (J-094). **NB**: §4g Wave 11a coordinates.
+Verified-complete-from-prior-sessions (no diff this session):
+- J-081 (`scr.ts`), J-079 (`diac.ts`), J-080 (`diode.ts` — `dioload.c:139-205` MODEINIT* gate already in place at lines 596-611), J-029 (`schmitt-trigger.ts`), J-064 (`transmission-line.ts` — 5 segments are now own-file `internalOnly` typeIds: `transmission-segment-{r,l,g,c,rl}.ts` registered in `register-all.ts`), J-062 (`tapped-transformer.ts` — Inductor×3 + TransformerCoupling×3 expansion), J-057 (`capacitor.ts` — docstring), J-097 (`relay.ts`), J-096 (`relay-dt.ts`), J-092 (`fgnfet.ts`), J-094 (`fgpfet.ts`).
+
+Latent-fold-ins this session:
+- J-019 (`adc.ts`): stripped 2 dead `as SubcircuitElement & { subElementName: string }` intersection casts (§0 declared field directly on interface).
+- J-023 (`dac.ts`): stripped 2 dead intersection casts; fixed `params.getModelParam<boolean>("bipolar")` → `params.getOrDefault<number>("bipolar", 0)` (closed `SubcircuitElementParam` 4-arm union forbids booleans; structural props use `getOrDefault`).
+- J-098 (`switch.ts`): substantive §4d-compliance landing — see §4e Bug 5 entry below.
+
+Folded-in (in-blast-radius, not on §2e list):
+- `src/components/switching/switch-dt.ts` — `SwitchDTAnalogElement` extended plain `AnalogElement` and hand-rolled two `SwitchAnalogElement` children whose `initState` was never called by the engine; load() crashed reading `_pool.states` once switch.ts (J-098) moved its pool seeding out of `setup()`. Converted to `extends PoolBackedAnalogElement` with empty schema; `override initState` forwards pool ref to children. Mirrors `polarized-cap.ts:372-380` / `bridge-output-driver.ts:136`. Restored `switches.test.ts` 89/89 pass.
 
 ### §2f Gate user-facing components — COMPLETE
 J-037, J-042, J-039, J-040, J-044, J-043, J-041, J-038.
@@ -325,6 +321,11 @@ Three round-1 agents satisfied the literal "zero references to deleted helpers" 
 - 16 other pool-backed elements audited and migrated (mosfet MODE, diode/zener GEQ, bjt VBE/GX, analog-switch NC_CURRENT_STATE, adc-driver PREV_CLK NaN/SAR_BIT_INDEX, 9 behavioral driver leaves) — see §0 for the four-part seeding contract.
 - Diagnostic-emission setter pattern landed (`RuntimeDiagnosticAware` interface).
 
+**§4d follow-up audit 2026-05-05** — three elements were still violating §1.1.x rule 1 ("`initState` does not write to the pool") via `override initState(pool) { …; pool.state0[…] = …; }`. Migrated to the first-load `_seeded` sentinel + `s0`-seed-from-instance-field pattern in the same session as §2e:
+- `src/components/sensors/ntc-thermistor.ts` — was seeding `pool.state0[SLOT_TEMPERATURE] = _tAmbient` in initState. Now: first-load seed + inDc gate on self-heating tOld read (mirrors memristor); getPinCurrents falls back to `_tAmbient` when `!_seeded`.
+- `src/components/passives/memristor.ts` — was seeding `pool.state0[SLOT_W] = initialState` in initState. Now: first-load seed; existing inDc gate retained; getPinCurrents falls back to `initialState` when `!_seeded`. setParam("initialState") dual-write to s0+s1 retained as the sanctioned runtime-override idiom.
+- `src/components/switching/switch.ts` (J-098) — see §4e Bug 5 entry; uses dual-seed (s0+s1) on first load due to discrete-state stamp-stability requirement.
+
 ### §4e Engine quirks — open critical bugs
 
 - [x] **LED color-preset `EG`** — landed 2026-05-03 (red/green/yellow/blue/white assigned proper LED bandgaps in eV; restores negative TC).
@@ -337,7 +338,12 @@ Three round-1 agents satisfied the literal "zero references to deleted helpers" 
 
 - [ ] **§4e Bug 4 — Optocoupler `InternalCccs` sense-branch invisibility**. `src/components/active/__tests__/optocoupler-cccs.test.ts:69` fails at sub-element setup: `InternalCccs: ctx.findBranch("tx:vSense") returned 0; sibling "vSense" did not allocate a branch`. The label resolves correctly post-Wave-10 (`tx:vSense`, not `:vSense` — Bug 2 verified fixed); the bug is downstream. `InternalZeroVoltSense` declares `branchCount: 1` in `OPTOCOUPLER_NETLIST` (`optocoupler.ts:53`) but its branch is not visible to `InternalCccs.findBranch` at sibling-setup time. Possible causes: (a) `InternalZeroVoltSense.setup()` does not call `ctx.makeCur(...)` / write `branchIndex`; (b) `findBranchFor` is not implemented on `InternalZeroVoltSense` and the engine has no lazy-allocation fallback; (c) sub-element load order interleaves under the global ngspice ordinal so the cccs leaf's setup runs before the sense leaf's, with no lazy resolution. **Course of action**: audit `InternalZeroVoltSense.ts` against `vsrcsetup.c` (the digiTS analogue is just a 0V VSRC); confirm whether `findBranchFor` is mandatory for siblingBranch resolution; verify that the netlist's element iteration order maps to setup order through the global `ngspiceLoadOrder` sort.
 
-- [ ] **§4e Bug 5 — Compiler siblingState slot lookup returns -1 for Switch `CLOSED`**. `relay-actuation.test.ts:90` fails at compile (pre-setup): `siblingState: unknown slot "CLOSED" on "contactSW"` thrown from `compiler.ts:492`. Switch declares `SWITCH_SCHEMA = defineStateSchema("Switch", [{ name: "CLOSED", … }])` (`switch.ts:40-42`); `SwitchAnalogElement extends PoolBackedAnalogElement` with `readonly stateSchema = SWITCH_SCHEMA` (`switch.ts:322`). Compiler's `siblingSchema?.indexOf.get(ref.slotName) ?? -1` returns -1 — either `siblingEl` not recognised as pool-backed by `isPoolBacked(...)` at `constructedByName.get("contactSW")`, or `defineStateSchema.indexOf` is keyed differently than the slot-name string. **Course**: (a) breakpoint `compiler.ts:485-490` to inspect `siblingEl` and `siblingSchema?.indexOf`; (b) verify `defineStateSchema.indexOf` keying; (c) confirm Switch's `kind: "default"` factory returns `SwitchAnalogElement` (not a wrapper failing the type guard).
+- [x] **§4e Bug 5 — Compiler siblingState slot lookup for Switch `CLOSED`** — landed 2026-05-05. The described compile-time throw at `compiler.ts:516` is no longer reproducible — `relay-actuation.test.ts:90` reaches the engine NR loop. Diagnosis: `siblingSchema?.indexOf.get("CLOSED")` resolves correctly (returns 0); `isPoolBacked(SwitchAnalogElement)` returns true post-§4g; `SWITCH_SCHEMA.indexOf` is the canonical `ReadonlyMap<Names, number>` per `state-schema.ts:33-41`. Whatever wave fixed `isPoolBacked` recognition for class-based pool-backed elements (likely §4g Phase C) closed this prong. The §2e switching agent's first switch.ts diff regressed by accessing `_pool.states` in `setup()` (pre-`initState`) — landed-this-session fix moves the seed to first-`load()` per the §4d ngspice-faithful seeding contract:
+  - `_initClosed` is the boot constant (instance field, §1.1.x rule 2).
+  - First `load()` seeds BOTH `s0[CLOSED]` and `s1[CLOSED]` from `_initClosed` — per-element analogue of the engine's post-DCOP bulk copy at `analog-engine.ts:1437`. The dual-seed is required because Switch's Ron/Roff conductance differs by ~10⁹ — the NR-loop stamp must read a frozen source (s1) for stability, but DCOP needs s1 to carry the boot constant before the engine's post-DCOP copy runs.
+  - Same-pass §4d cleanup folded in: `ntc-thermistor.ts` and `memristor.ts` had `override initState(pool)` writing to the pool — explicit §1.1.x rule-1 violations. Migrated both to first-load `_seeded` sentinel + `s0`-only seed (with the existing inDc-gate read in memristor; new inDc-gate read added to ntc-thermistor's self-heating branch). `getPinCurrents` falls back to instance field when `!_seeded` to handle pre-first-load probes. `memristor.test.ts` 13/13 and `ntc-thermistor.test.ts` 15/15 still pass.
+
+- [ ] **§4e Bug 6 — relay-actuation runtime stagnation**. Surfaced 2026-05-05 once §4e Bug 5's compile/setup chain was unblocked. `relay-actuation.test.ts:73` throws `Analog engine stagnation: simTime stuck at 0s` from `coordinator.ts:250` — engine cannot advance past the warm-start step. Test bench: 10V across 100Ω coil ⇒ I_coil = 0.1A at DC steady state, well above default `pullInI = 0.05A`; expectation is RelayCoupling writes `s0[CLOSED]=1`, engine post-DCOP copies into `s1`, first transient step stamps Ron. Suspected: Switch's discrete Ron/Roff conductance jump (~10⁹) interacts badly with NR/LTE retry when RelayCoupling flips the slot mid-iter — the s1-only read ensures NR-loop stamp stability but lets RelayCoupling's `s0[CLOSED]=1` write reach Switch only after DCOP convergence. Possible causes: (a) DCOP itself fails to converge with switch=Roff and coil-I=0.1A as the sole steady state and the gmin ladder doesn't recover; (b) first transient step's NR retries on the Ron-vs-Roff transition; (c) coordinator's stagnation guard fires before normal recovery completes. **Course**: enable convergence log (`coordinator.setConvergenceLogEnabled(true)`) at the top of the test, run, inspect per-step records to identify the blame element and dt collapse pattern. Likely needs gmin-stepping / source-stepping tuning OR separating the discrete-state coupling channel from the NR-stamp source via `acceptStep` rather than first-load.
 
 ### §4f AnalogElement → abstract base migration — COMPLETE 2026-05-04
 
@@ -377,6 +383,6 @@ End-state: `interface AnalogElement` / `interface PoolBackedAnalogElement` delet
 
 - Total files: 183 (185 J-IDs in source contracts; J-001 and J-005 struck)
 - Engine: 21 — COMPLETE
-- Components: 89 — §2a/§2b/§2c/§2d/§2f COMPLETE; §2e (14 items) and §2g (5 items) REMAINING
+- Components: 89 — §2a/§2b/§2c/§2d/§2e/§2f COMPLETE; §2g (5 items) REMAINING
 - Tests: 73 — §3 mostly REMAINING; partial completions in §3c (J-129) and §3e (J-072)
 - Unclassified: 0

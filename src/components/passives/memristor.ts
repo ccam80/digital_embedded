@@ -43,7 +43,6 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDC } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -109,6 +108,12 @@ export class MemristorElement extends PoolBackedAnalogElement {
   private windowOrder: number;
   private initialState: number;
 
+  // One-shot first-load seed sentinel for s0[W] = initialState. Per §4d
+  // ngspice-faithful seeding contract (phase-component-model-correctness-job.md
+  // §1.1.x rule 2): boot constants live on the instance struct and propagate
+  // into s0 via the bottom-of-load idiom on the first NR iteration.
+  private _seeded: boolean = false;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     const rOn          = props.hasModelParam("rOn")          ? props.getModelParam<number>("rOn")          : MEMRISTOR_DEFAULTS["rOn"]!;
@@ -159,12 +164,6 @@ export class MemristorElement extends PoolBackedAnalogElement {
     }
   }
 
-  override initState(pool: StatePoolRef): void {
-    super.initState(pool);
-    // Apply initial state from params into s0 slot W
-    pool.state0[this._stateBase + SLOT_W] = this.initialState;
-  }
-
   setParam(key: string, value: number): void {
     if (key === "rOn") this.rOn = Math.max(value, MIN_R);
     else if (key === "rOff") this.rOff = Math.max(value, MIN_R);
@@ -209,6 +208,16 @@ export class MemristorElement extends PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const s0 = this._pool.states[0];
 
+    // First-load seed of `initialState` into s0[W] per §4d ngspice-faithful
+    // seeding contract (phase-component-model-correctness-job.md §1.1.x).
+    // State arrays start zero; the boot constant lives on the instance struct
+    // (`this.initialState`) and propagates into s0 here on the first NR iter,
+    // then through analog-engine.ts:1437's post-DCOP s0→s1 copy into transient.
+    if (!this._seeded) {
+      s0[base + SLOT_W] = this.initialState;
+      this._seeded = true;
+    }
+
     // In DCOP s1 is still zero (the engine's _seedFromDcop runs `state1.set(
     // state0)` only AFTER DCOP converges), so the seeded `state0[W] =
     // initialState` is the only valid source of W during the DC NR loop.
@@ -252,8 +261,10 @@ export class MemristorElement extends PoolBackedAnalogElement {
     const negNode = this.pinNodes.get("neg")!;
     const vPos = rhs[posNode];
     const vNeg = rhs[negNode];
-    const s1 = this._pool.states[1];
-    const wOld = s1[this._stateBase + SLOT_W];
+    // Pre-first-load probes have no pool history; use the boot constant.
+    const wOld = this._seeded
+      ? this._pool.states[1][this._stateBase + SLOT_W]
+      : this.initialState;
     const I = this.conductanceAt(wOld) * (vPos - vNeg);
     return [I, -I];
   }

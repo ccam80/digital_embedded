@@ -25,11 +25,28 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { AnalogElement } from "../../solver/analog/element.js";
+import {
+  AnalogElement,
+  PoolBackedAnalogElement,
+} from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import {
+  defineStateSchema,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
 import { SwitchAnalogElement } from "./switch.js";
+
+// ---------------------------------------------------------------------------
+// State-pool schema — empty parent schema; pool slots live on the swAB / swAC
+// children. Required only because PoolBackedAnalogElement enforces the
+// stateSchema/stateSize contract; the override exists so initState() can
+// forward to the hand-rolled children.
+// ---------------------------------------------------------------------------
+
+const SWITCH_DT_SCHEMA = defineStateSchema("SwitchDT", []) satisfies StateSchema;
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -315,8 +332,10 @@ export interface SpdtAnalogElement extends AnalogElement {
   setClosed(closed: boolean): void;
 }
 
-export class SwitchDTAnalogElement extends AnalogElement implements SpdtAnalogElement {
+export class SwitchDTAnalogElement extends PoolBackedAnalogElement implements SpdtAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
+  readonly stateSchema = SWITCH_DT_SCHEMA;
+  readonly stateSize = SWITCH_DT_SCHEMA.size;
 
   readonly swAB: SwitchAnalogElement;
   readonly swAC: SwitchAnalogElement;
@@ -358,9 +377,20 @@ export class SwitchDTAnalogElement extends AnalogElement implements SpdtAnalogEl
 
   setup(ctx: SetupContext): void {
     // Composite forwards to sub-elements in subElements[] order.
-    // swAB runs first (A1â†”B1), swAC runs second (A1â†”C1).
-    this.swAB.setup(ctx);  // allocates SW_AB's 2 state slots + 4 matrix handles
-    this.swAC.setup(ctx);  // allocates SW_AC's 2 state slots + 4 matrix handles
+    // swAB runs first (A1↔B1), swAC runs second (A1↔C1).
+    this.swAB.setup(ctx);  // allocates SW_AB's state slots + 4 matrix handles
+    this.swAC.setup(ctx);  // allocates SW_AC's state slots + 4 matrix handles
+  }
+
+  override initState(pool: StatePoolRef): void {
+    super.initState(pool);
+    // The hand-rolled swAB / swAC children are not registered in the engine's
+    // element list, so the engine's initState walk skips them. Forward the
+    // pool reference here so each child's load() can read this._pool.states.
+    // Mirrors the polarized-cap.ts:372-380 / bridge-output-driver.ts:136
+    // forward-to-child pattern.
+    this.swAB.initState(pool);
+    this.swAC.initState(pool);
   }
 
   load(ctx: LoadContext): void {

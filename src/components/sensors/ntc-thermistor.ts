@@ -24,8 +24,8 @@
 
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import { MODEDC } from "../../solver/analog/ckt-mode.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   defineStateSchema,
@@ -145,6 +145,12 @@ export class NTCThermistorElement extends PoolBackedAnalogElement {
   private _rTh: number;
   private _cTh: number;
 
+  // One-shot first-load seed sentinel for s0[TEMPERATURE] = _tAmbient. Per
+  // §4d ngspice-faithful seeding contract (phase-component-model-correctness-job.md
+  // §1.1.x rule 2): boot constants live on the instance struct and propagate
+  // into s0 via the bottom-of-load idiom on the first NR iteration.
+  private _seeded: boolean = false;
+
   /**
    * @param pinNodes            - pin-name → node-index map (stored by reference)
    * @param r0                  - Resistance at T0 in ohms
@@ -200,12 +206,6 @@ export class NTCThermistorElement extends PoolBackedAnalogElement {
     this._hNP = solver.allocElement(negNode, posNode); // :49 (RESnegNode, RESposNode)
   }
 
-  override initState(pool: StatePoolRef): void {
-    super.initState(pool);
-    // Seed temperature slot from ambient
-    pool.state0[this._stateBase + SLOT_TEMPERATURE] = this._tAmbient;
-  }
-
   setParam(key: string, value: number): void {
     if (key === "r0") this._r0 = Math.max(value, MIN_RESISTANCE);
     else if (key === "beta") this._beta = value;
@@ -238,12 +238,29 @@ export class NTCThermistorElement extends PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const s0 = this._pool.states[0];
 
+    // First-load seed of _tAmbient into s0[TEMPERATURE] per §4d ngspice-faithful
+    // seeding contract. Required for self-heating mode where the integration
+    // depends on tOld; harmless for non-self-heating (the bottom-of-load
+    // unconditional write reseats s0 each iter).
+    if (!this._seeded) {
+      s0[base + SLOT_TEMPERATURE] = this._tAmbient;
+      this._seeded = true;
+    }
+
     // In self-heating mode, T evolves dynamically and lives in the slot.
+    // - In DCOP: s1 is still zero (engine seeds s1 from s0 only after DCOP
+    //   converges, mirrors dctran.c:349-350); read s0, which carries the
+    //   seeded ambient + any in-iter integration update.
+    // - In transient: read s1 (last-accepted) for stamp stability.
     // In non-self-heating mode, T = ambient — read from the live instance
     // field so setParam("temperature", ...) propagates without recompile.
-    const tOld = this._selfHeating
-      ? s1[base + SLOT_TEMPERATURE]
-      : this._tAmbient;
+    let tOld: number;
+    if (this._selfHeating) {
+      const inDc = (ctx.cktMode & MODEDC) !== 0;
+      tOld = inDc ? s0[base + SLOT_TEMPERATURE] : s1[base + SLOT_TEMPERATURE];
+    } else {
+      tOld = this._tAmbient;
+    }
     const rTerm = this.computeRFromT(tOld);
     const G = 1 / Math.max(rTerm, MIN_RESISTANCE);
 
@@ -275,8 +292,10 @@ export class NTCThermistorElement extends PoolBackedAnalogElement {
     const nNeg = this.pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
-    const s1 = this._pool.states[1];
-    const tOld = s1[this._stateBase + SLOT_TEMPERATURE];
+    // Pre-first-load probes have no pool history; use the boot constant.
+    const tOld = this._seeded
+      ? this._pool.states[1][this._stateBase + SLOT_TEMPERATURE]
+      : this._tAmbient;
     const G = 1 / this.computeRFromT(tOld);
     const I = G * (vPos - vNeg);
     return [I, -I];

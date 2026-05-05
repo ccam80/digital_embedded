@@ -189,7 +189,7 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
       vOL: "vOL",
       inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_EOC" },
     },
-  } as SubcircuitElement & { subElementName: string });
+  });
   netlist.push([4 /* EOC */, 3 /* GND */]);
 
   // D0..D(N-1) digital output pins
@@ -205,7 +205,7 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
         vOL: "vOL",
         inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_D${i}` },
       },
-    } as SubcircuitElement & { subElementName: string });
+    });
     netlist.push([5 + i /* D_i */, 3 /* GND */]);
   }
 

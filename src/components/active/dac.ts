@@ -216,13 +216,13 @@ export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   // for the loading model only (R+C to GND); the actual voltage flows
   // through the loaded R back to whatever drives VREF externally.
   elements.push({ typeId: "DigitalInputPinLoaded", modelRef: "default", subElementName: "vrefPin",
-                  params: { rIn: "rIn", cIn: "cIn" } } as SubcircuitElement & { subElementName: string });
+                  params: { rIn: "rIn", cIn: "cIn" } });
   netlist.push([0 /* VREF */, 2 /* GND */]);
 
   // N digital data input pins
   for (let i = 0; i < N; i++) {
     elements.push({ typeId: "DigitalInputPinLoaded", modelRef: "default", subElementName: `dPin${i}`,
-                    params: { rIn: "rIn", cIn: "cIn" } } as SubcircuitElement & { subElementName: string });
+                    params: { rIn: "rIn", cIn: "cIn" } });
     netlist.push([3 + i /* D_i port */, 2 /* GND */]);
   }
 
@@ -232,7 +232,7 @@ export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   for (let i = 0; i < N; i++) drvPins.push(3 + i);
   elements.push({ typeId: "DACDriver", modelRef: "default", subElementName: "drv",
                   branchCount: 1,
-                  params: { bits: N, bipolar: params.getModelParam<boolean>("bipolar") ? 1 : 0 } });
+                  params: { bits: N, bipolar: params.getOrDefault<number>("bipolar", 0) ? 1 : 0 } });
   netlist.push(drvPins);
 
   return { ports, elements, internalNetCount: 0, netlist };

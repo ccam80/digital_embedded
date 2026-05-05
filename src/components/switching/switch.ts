@@ -320,35 +320,35 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
 
   readonly stateSchema = SWITCH_SCHEMA;
-  readonly stateSize = 1;
+  readonly stateSize = SWITCH_SCHEMA.size;
 
   private readonly _ron: number;
   private readonly _roff: number;
   private readonly _normallyClosed: boolean;
 
-  // Voltage-controlled state. _pendingCtrlVoltage stores the latest value passed
-  // to setCtrlVoltage(); _useCtrlVoltage gates load() consumption (true while
-  // setCtrlVoltage is the active driver, cleared by setClosed / setSwState which
-  // override). Mirrors ngspice swload.c which reads SWcontVoltage from CKTrhsOld
-  // every NR iteration; digiTS exposes the same live-update semantics through
-  // this hook when an external driver supplies the control voltage explicitly.
-  // Default thresholds mirror ngspice SW model defaults: SWonThreshold = 0V,
-  // SWoffThreshold = 0V (no hysteresis). Hysteresis can be added later as model
-  // params if needed.
+  // Initial effective closed state from props — the boot constant per §4d
+  // ngspice-faithful seeding contract (phase-component-model-correctness-job.md
+  // §1.1.x rule 2). load() seeds s0[CLOSED] from this on the first iteration
+  // and flips _seeded; thereafter the pool is the sole source of truth.
+  private readonly _initClosed: boolean;
+
+  // One-shot first-load seed sentinel. False until load() copies _initClosed
+  // into s0[CLOSED]; never reset. Mirrors the analog-fuse `_intact` /
+  // behavioral-driver `_firstSample` instance-field pattern.
+  private _seeded: boolean = false;
+
+  // Pending override staging — used when external drivers call setClosed /
+  // setCtrlVoltage / setSwState before or between simulation steps.
+  // Flushed in load() by writing immediately to both s0 and s1 so the
+  // override takes effect in the current NR iteration without waiting for
+  // step acceptance.  _useCtrlVoltage gates load() re-evaluation on each
+  // NR iteration (voltage-controlled path, mirrors ngspice swload.c).
   private _pendingCtrlVoltage: number = 0;
   private _useCtrlVoltage: boolean = false;
   private _forcedState: boolean | null = null;
   private _pendingClosed: boolean | null = null;
 
-  // §4d-faithful instance state: the current effective closed state.
-  // Seeded from the `closed` (and `normallyClosed`) props at construction so
-  // the very first load() picks the correct Ron/Roff before any pool history
-  // is seeded. Mirrors `analog-fuse._intact`. Updated by setClosed /
-  // setSwState / setCtrlVoltage and re-read from s1 on subsequent iters
-  // (after _seedFromDcop's state1.set(state0) at dctran.c:349-350).
-  private _currentClosed: boolean;
-
-  // Matrix handles allocated in setup()- port of swsetup.c:59-62 TSTALLOC sequence
+  // Matrix handles allocated in setup() — port of swsetup.c:59-62 TSTALLOC sequence
   private _hPP: number = -1;
   private _hPN: number = -1;
   private _hNP: number = -1;
@@ -359,20 +359,23 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
     this._ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
     this._roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
     this._normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-    // Seed effective closed state from props. NC inverts the user-visible
-    // `closed` prop (NC + closed=false ⇒ effectively closed at rest).
+    // Compute initial effective closed state from props. NC inverts the
+    // user-visible `closed` prop (NC + closed=false ⇒ effectively closed at rest).
     const userClosed = props.getOrDefault<boolean>("closed", false);
-    this._currentClosed = this._normallyClosed ? !userClosed : userClosed;
+    this._initClosed = this._normallyClosed ? !userClosed : userClosed;
   }
 
   setup(ctx: SetupContext): void {
     const posNode = this.pinNodes.get("A1")!;
     const negNode = this.pinNodes.get("B1")!;
 
-    // Port of swsetup.c:47-48- state slot allocation
-    this._stateBase = ctx.allocStates(1);  // SWITCH_SCHEMA: 1 slot (CLOSED)
+    // Port of swsetup.c:47-48 — state slot allocation (idempotent guard per
+    // §1.1 canonical pattern).
+    if (this._stateBase === -1) {
+      this._stateBase = ctx.allocStates(this.stateSize);
+    }
 
-    // Port of swsetup.c:59-62- TSTALLOC sequence (line-for-line)
+    // Port of swsetup.c:59-62 — TSTALLOC sequence (line-for-line)
     this._hPP = ctx.solver.allocElement(posNode, posNode); // SWposNode, SWposNode
     this._hPN = ctx.solver.allocElement(posNode, negNode); // SWposNode, SWnegNode
     this._hNP = ctx.solver.allocElement(negNode, posNode); // SWnegNode, SWposNode
@@ -380,42 +383,69 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
   }
 
   load(ctx: LoadContext): void {
-    const s0 = ctx.state0;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    // Apply pending state writes before stamping. _pendingClosed flows in via
-    // setClosed() and supersedes any prior driver.
+    // First-load boot-constant seed. The §4d ngspice-faithful seeding contract
+    // (phase-component-model-correctness-job.md §1.1.x) places non-zero
+    // startup values in instance fields and propagates them into s0 via the
+    // bottom-of-load idiom, then into s1 via the engine's post-DCOP copy at
+    // analog-engine.ts:1437. Switch is a discrete-state device with
+    // cross-element coupling (RelayCoupling writes s0[CLOSED] each iter):
+    // the NR-loop stamp must therefore read a value that is FROZEN across
+    // the iter loop, which means s1. To make the boot constant visible to
+    // the very first DCOP NR iter, we seed s1 alongside s0 — a per-element
+    // analogue of the engine's bulk post-DCOP copy.
+    if (!this._seeded) {
+      const v = this._initClosed ? 1 : 0;
+      s0[base + SLOT_CLOSED] = v;
+      s1[base + SLOT_CLOSED] = v;
+      this._seeded = true;
+    }
+
+    // Flush any pending external override. Write to BOTH s0 and s1 so the
+    // override takes effect within the current NR iteration. Mirrors
+    // memristor.ts setParam("initialState") hard-reset idiom.
     if (this._pendingClosed !== null) {
-      this._currentClosed = this._pendingClosed;
+      const v = this._pendingClosed ? 1 : 0;
+      s0[base + SLOT_CLOSED] = v;
+      s1[base + SLOT_CLOSED] = v;
       this._pendingClosed = null;
     }
 
-    // Hot-patch consumption: when setCtrlVoltage() is the active driver, derive
-    // the switch state from _pendingCtrlVoltage every NR iteration. Mirrors
-    // ngspice swload.c which evaluates SWcontVoltage live each iteration. With
-    // ngspice default thresholds (SWonThreshold = SWoffThreshold = 0V) and no
-    // hysteresis, the switch is closed for v > 0 and open for v <= 0 (inverted
-    // when normallyClosed).
+    // Voltage-controlled path: re-evaluate on every NR iteration.
+    // Mirrors ngspice swload.c which reads SWcontVoltage from CKTrhsOld
+    // each iteration. Write to both s0 and s1 for immediate effect.
     if (this._useCtrlVoltage) {
       const v = this._pendingCtrlVoltage;
-      this._currentClosed = this._normallyClosed ? v <= 0 : v > 0;
+      const closed = this._normallyClosed ? v <= 0 : v > 0;
+      const val = closed ? 1 : 0;
+      s0[base + SLOT_CLOSED] = val;
+      s1[base + SLOT_CLOSED] = val;
     }
 
-    // _forcedState is a one-shot override (setSwState).
+    // _forcedState is a one-shot override (setSwState). Clears after flush.
     if (this._forcedState !== null) {
-      this._currentClosed = this._forcedState;
+      const val = this._forcedState ? 1 : 0;
+      s0[base + SLOT_CLOSED] = val;
+      s1[base + SLOT_CLOSED] = val;
       this._forcedState = null;
     }
 
-    const on = this._currentClosed;
+    // Read s1 (frozen across the NR loop) for stamp stability — switch's
+    // Ron/Roff conductance differ by ~10^9, so any mid-iter state flip would
+    // break NR convergence. Sibling RelayCoupling writes s0[CLOSED] each
+    // iter; those writes propagate into s1 either via the engine's post-DCOP
+    // copy or via the per-step s0→s1 rotation on accept (port of swload.c).
+    const on = s1[base + SLOT_CLOSED] >= 0.5;
 
-    // Bottom-of-load history write — keep CKTstate0 in sync for inspection /
-    // pool-slot rollback (mirrors ngspice CKTstate0 idiom for SW devices).
+    // Bottom-of-load history write (ngspice CKTstate0 idiom — swload.c).
     s0[base + SLOT_CLOSED] = on ? 1 : 0;
 
     const G = on ? 1 / this._ron : 1 / this._roff;
 
-    // Port of swload.c:149-152- stamp through cached handles
+    // Port of swload.c:149-152 — stamp through cached handles
     ctx.solver.stampElement(this._hPP, +G);
     ctx.solver.stampElement(this._hPN, -G);
     ctx.solver.stampElement(this._hNP, -G);
@@ -443,9 +473,12 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
     const negNode = this.pinNodes.get("B1")!;
     const vA = rhs[posNode];
     const vB = rhs[negNode];
-    // Use the same effective state load() last stamped. After warm-start,
-    // _currentClosed and s0/s1[CLOSED] agree.
-    const G = this._currentClosed ? 1 / this._ron : 1 / this._roff;
+    // Pre-first-load probes have no pool history yet (s1 is still zero-init);
+    // fall back to the boot constant. Post-first-load reads s1 (last-accepted).
+    const on = this._seeded
+      ? this._pool.states[1][this._stateBase + SLOT_CLOSED] >= 0.5
+      : this._initClosed;
+    const G = on ? 1 / this._ron : 1 / this._roff;
     const I = G * (vA - vB);
     return [I, -I];
   }
