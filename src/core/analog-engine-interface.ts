@@ -414,15 +414,6 @@ export interface AnalogEngine extends Engine {
   // -------------------------------------------------------------------------
 
   /**
-   * Return a frozen copy of the fully-resolved SimulationParams snapshot.
-   *
-   * This is the post-`resolveSimulationParams` result: all auto-derived fields
-   * (maxTimeStep, minTimeStep, firstStep) are concrete values, never undefined.
-   * Returns a shallow copy so callers cannot mutate engine state.
-   */
-  getResolvedParams(): ResolvedSimulationParams;
-
-  /**
    * Update solver parameters. Merges the given partial set into the active
    * `SimulationParams`. Takes effect from the next `step()` or
    * `dcOperatingPoint()` call.

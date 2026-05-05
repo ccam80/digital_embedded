@@ -73,11 +73,21 @@ function getDacSchema(bits: number): StateSchema {
 // Positions are placeholders; the driver is internal-only (no canvas render).
 // ---------------------------------------------------------------------------
 
-const DAC_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT,  label: "VREF", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "OUT",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "GND",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-];
+/**
+ * Build the pin layout for an N-bit DACDriver.
+ * Pin order MUST match parent buildDacNetlist drvPins: VREF, OUT, GND, D0..D(N-1).
+ */
+function buildDacDriverPinLayout(bits: number): PinDeclaration[] {
+  const layout: PinDeclaration[] = [
+    { direction: PinDirection.INPUT,  label: "VREF", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "OUT",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "GND",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  ];
+  for (let i = 0; i < bits; i++) {
+    layout.push({ direction: PinDirection.INPUT, label: `D${i}`, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" });
+  }
+  return layout;
+}
 
 // ---------------------------------------------------------------------------
 // Param defs
@@ -212,7 +222,7 @@ export const DACDriverDefinition: ComponentDefinition = {
   name: "DACDriver",
   typeId: -1,
   internalOnly: true,
-  pinLayout: DAC_DRIVER_PIN_LAYOUT,
+  pinLayoutFactory: (props: PropertyBag) => buildDacDriverPinLayout(props.getModelParam<number>("bits")),
   modelRegistry: {
     default: {
       kind: "inline",

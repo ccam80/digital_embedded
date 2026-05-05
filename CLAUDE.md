@@ -33,6 +33,15 @@ A component's `modelRegistry` may contain any number of models- behavioral, spec
 
 A feature can work headless but break in MCP serialization, or work in MCP but fail in the browser. All three surfaces are non-negotiable.
 
+### Component Test Authoring
+
+Authoring or migrating an analog component test (Surface 1, headless API) goes through the canonical reference set:
+
+- `docs/api-reference/test-tools.md` — picks the tier (T1 `buildFixture`, T2 `ComparisonSession.createSelfCompare`, T3 `ComparisonSession.create` + MCP `harness_*`), the canonical category (1–9), and the worked code template. Also lists the banned patterns (engine-impersonator constructions, private-field tunnelling, slot-index access bypassing the schema, etc.).
+- `docs/api-reference/engine-flow.md` — what's observable at each step boundary and what is harness-only. Read this before asserting on any internal state.
+
+Do not assemble a `LoadContext` / `SetupContext` / `StatePool` by hand, do not call `element.setup()` / `element.load()` directly, do not import `SLOT_*` constants — every sanctioned access pattern is in those two docs.
+
 ### No Pragmatic Patches
 
 Never propose "pragmatic", "simple", "fastest", or "minimal" solutions. Always implement the cleanest final architecture. If the correct fix requires interface changes, larger blast radius, or new infrastructure- do that work. Never defer the real fix until later.

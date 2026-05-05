@@ -145,9 +145,10 @@ export class CircuitBuilder {
         }
       }
     }
-    // 'position' and 'label' are universal implicit keys
+    // 'position', 'label', and 'model' are universal implicit keys
     knownKeys.add('position');
     knownKeys.add('label');
+    knownKeys.add('model');
 
     const translated: Record<string, PropertyValue> = {};
 

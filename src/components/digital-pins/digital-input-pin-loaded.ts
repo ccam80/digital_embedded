@@ -5,8 +5,8 @@ export const DIGITAL_INPUT_PIN_LOADED_NETLIST: MnaSubcircuitNetlist = {
   ports: ["node", "gnd"],
   params: { rIn: 1e6, cIn: 1e-12 },
   elements: [
-    { typeId: "Resistor",  modelRef: "default", subElementName: "rIn", params: { R: "rIn" } },
-    { typeId: "Capacitor", modelRef: "default", subElementName: "cIn", params: { C: "cIn" } },
+    { typeId: "Resistor",  modelRef: "behavioral", subElementName: "rIn", params: { R: "rIn" } },
+    { typeId: "Capacitor", modelRef: "behavioral", subElementName: "cIn", params: { C: "cIn" } },
   ],
   internalNetCount: 0,
   netlist: [

@@ -48,9 +48,9 @@ export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = d
 
 export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [
-    { typeId: "Resistor",            modelRef: "default",    subElementName: "rDiv1", params: { R: 5000 } },
-    { typeId: "Resistor",            modelRef: "default",    subElementName: "rDiv2", params: { R: 5000 } },
-    { typeId: "Resistor",            modelRef: "default",    subElementName: "rDiv3", params: { R: 5000 } },
+    { typeId: "Resistor",            modelRef: "behavioral", subElementName: "rDiv1", params: { R: 5000 } },
+    { typeId: "Resistor",            modelRef: "behavioral", subElementName: "rDiv2", params: { R: 5000 } },
+    { typeId: "Resistor",            modelRef: "behavioral", subElementName: "rDiv3", params: { R: 5000 } },
     { typeId: "VCVS",                modelRef: "comparator", subElementName: "comp1" },
     { typeId: "VCVS",                modelRef: "comparator", subElementName: "comp2" },
     { typeId: "NpnBJT",              modelRef: "spice",      subElementName: "bjtDis" },

@@ -37,7 +37,7 @@ export const DIGITAL_OUTPUT_PIN_LOADED_NETLIST: MnaSubcircuitNetlist = {
   elements: [
     { typeId: "BehavioralOutputDriver", modelRef: "default", subElementName: "drv",
       params: { vOH: "vOH", vOL: "vOL", rOut: "rOut", bitIndex: "bitIndex" /* inputLogic + optional enableLogic injected by parent */ } },
-    { typeId: "Capacitor", modelRef: "default", subElementName: "cOut", params: { C: "cOut" } },
+    { typeId: "Capacitor", modelRef: "behavioral", subElementName: "cOut", params: { C: "cOut" } },
   ],
   internalNetCount: 0,
   netlist: [
