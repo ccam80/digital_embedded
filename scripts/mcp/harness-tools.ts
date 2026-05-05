@@ -171,7 +171,7 @@ export function registerHarnessTools(
             ? engineEl.stateSchema.slots.map((s: any) => s.name)
             : [];
         const elPinIds: number[] = engineEl
-          ? [...engineEl._pinNodes.values()]
+          ? [...engineEl.pinNodes.values()]
           : [];
         const pins: string[] = elPinIds.map((nodeId: number) => {
           if (nodeId === 0) return "gnd";
@@ -196,7 +196,7 @@ export function registerHarnessTools(
         for (const el of topology.elements) {
           const engineEl = (engine?.elements ?? [])[el.index];
           const elPinIds: number[] = engineEl
-            ? [...engineEl._pinNodes.values()]
+            ? [...engineEl.pinNodes.values()]
             : [];
           if (elPinIds.includes(nodeId)) {
             connectedComponents.push(el.label);
@@ -311,7 +311,7 @@ export function registerHarnessTools(
             ? engineEl.stateSchema.slots.map((s: any) => s.name)
             : [];
         const elPinIds: number[] = engineEl
-          ? [...engineEl._pinNodes.values()]
+          ? [...engineEl.pinNodes.values()]
           : [];
         const pins = elPinIds.map((nodeId: number) => ({
           label:
@@ -392,7 +392,7 @@ export function registerHarnessTools(
         for (const el of topology.elements) {
           const engineEl = (engine?.elements ?? [])[el.index];
           const pinIds: number[] = engineEl
-            ? [...engineEl._pinNodes.values()]
+            ? [...engineEl.pinNodes.values()]
             : [];
           for (let p = 0; p < pinIds.length; p++) {
             if (pinIds[p] === nodeId) {
@@ -695,7 +695,7 @@ export function registerHarnessTools(
             ? engineEl.stateSchema.slots.map((s: any) => s.name)
             : [];
         const elPinIds: number[] = engineEl
-          ? [...engineEl._pinNodes.values()]
+          ? [...engineEl.pinNodes.values()]
           : [];
         const pins = elPinIds.map((nodeId: number) => ({
           label:
@@ -724,7 +724,7 @@ export function registerHarnessTools(
         for (const el of topology.elements) {
           const engineEl = (engine?.elements ?? [])[el.index];
           const pinIds: number[] = engineEl
-            ? [...engineEl._pinNodes.values()]
+            ? [...engineEl.pinNodes.values()]
             : [];
           for (let p = 0; p < pinIds.length; p++) {
             if (pinIds[p] === nodeId) {

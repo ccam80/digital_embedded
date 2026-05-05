@@ -245,7 +245,7 @@ export const RELAY_NETLIST: MnaSubcircuitNetlist = {
   elements: [
     { typeId: "RelayInductor", modelRef: "default", subElementName: "coilL",     branchCount: 1, params: { L: "inductance" } },
     { typeId: "RelayResistor", modelRef: "default", subElementName: "coilR",                     params: { R: "coilResistance" } },
-    { typeId: "Switch",        modelRef: "default", subElementName: "contactSW",                 params: { Ron: "Ron", Roff: "Roff" } },
+    { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactSW",              params: { Ron: "Ron", Roff: "Roff" } },
     { typeId: "RelayCoupling", modelRef: "default", subElementName: "coupling",
       params: {
         coilBranch:    { kind: "siblingBranch", subElementName: "coilL" },

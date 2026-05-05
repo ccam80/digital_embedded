@@ -52,6 +52,19 @@ export class InternalZeroVoltSenseElement extends AnalogElement {
     super(pinNodes);
   }
 
+  // ngspice vsrcfbr.c:27-33 (VSRCfindBr): lazy branch allocation for
+  // controlling-source dispatch. A sibling InternalCccs whose ngspiceLoadOrder
+  // (CCCS=18) precedes ours (VSRC=48) calls ctx.findBranch(label) at its own
+  // setup() time â€” before this elementâ€™s setup() has run. The engineâ€™s
+  // _findBranch dispatches here; we allocate the branch row on demand. The
+  // guard is idempotent with setup()'s identical guard.
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    return this.branchIndex;
+  }
+
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
     const posNode = this.pinNodes.get("pos")!;

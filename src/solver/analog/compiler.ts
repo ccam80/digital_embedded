@@ -421,9 +421,36 @@ function compileSubcircuitToMnaModel(
         const connectivity = netlist.netlist[elIdx];
 
         const leafDef = registry.get(subEl.typeId);
-        const leafModelKey = subEl.params?.model as string | undefined ?? leafDef?.defaultModel ?? "";
+        // CLAUDE.md "Component Model Architecture": defaultModel is for
+        // placement-time UI only and MUST NOT be used as a compile-time
+        // lookup key. modelRef is the canonical sub-element model selector;
+        // params.model is the legacy fallback for callsites that pre-date
+        // the typed field. Silent-skip on a missing entry was masking
+        // bogus modelRefs (Switch "default" / NMOS "spice" / PMOS "spice"),
+        // surfacing later as confusing siblingState/siblingBranch errors.
+        const leafModelKey =
+          subEl.modelRef
+          ?? (subEl.params?.model as string | undefined);
+        if (leafModelKey === undefined) {
+          throw new Error(
+            `Composite sub-element "${subEl.subElementName ?? `el${elIdx}`}" ` +
+              `(typeId="${subEl.typeId}") has no modelRef and no params.model. ` +
+              `defaultModel is for placement-time UI only and is not a valid ` +
+              `compile-time lookup key.`,
+          );
+        }
         const leafEntry = leafDef ? resolveModelEntry(leafDef, leafModelKey) : null;
-        if (!leafEntry || leafEntry.kind !== "inline") continue;
+        if (!leafEntry) {
+          const available = leafDef?.modelRegistry
+            ? Object.keys(leafDef.modelRegistry).join(", ") || "(none)"
+            : "(typeId not in registry)";
+          throw new Error(
+            `Composite sub-element "${subEl.subElementName ?? `el${elIdx}`}" ` +
+              `requested model "${leafModelKey}" on typeId "${subEl.typeId}", ` +
+              `but the component has no such model entry. Available: ${available}.`,
+          );
+        }
+        if (leafEntry.kind !== "inline") continue;
         const leafFactory = leafEntry.factory;
 
         const subProps = new PropertyBag();

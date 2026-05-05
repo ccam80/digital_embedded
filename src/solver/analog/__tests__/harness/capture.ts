@@ -85,10 +85,21 @@ export function buildElementLabelMap(
  * (ngspice CKTmaxEqNum + 1) since ConcreteCompiledAnalogCircuit no longer
  * carries it.
  */
+/**
+ * Internal-node table entry as produced by MNAEngine._makeNode (ngspice
+ * CKTnodeTab analogue). Names follow `${elementLabel}#${suffix}`.
+ */
+export interface CapturedNodeTableEntry {
+  readonly name: string;
+  readonly number: number;
+  readonly type: "voltage" | "current";
+}
+
 export function captureTopology(
   compiled: ConcreteCompiledAnalogCircuit,
   matrixSize: number,
   elementLabels?: Map<number, string>,
+  nodeTable?: readonly CapturedNodeTableEntry[],
 ): TopologySnapshot {
   const nodeLabels = new Map<number, string>();
 
@@ -111,23 +122,23 @@ export function captureTopology(
       }
     }
 
-    // Internal (prime) nodes- labels from getInternalNodeLabels(); IDs are
-    // allocated in order starting at pinNodes.size (allocation offset per ssA.23).
-    const pinCount = el.pinNodes.size;
-    const internalLabels = (el as any).getInternalNodeLabels?.() ?? [];
-    for (let p = 0; p < internalLabels.length; p++) {
-      // Internal node IDs follow pin nodes in allocation order: offset = pinCount + p.
-      // The element's own nodeId bookkeeping is not on the public interface, so we
-      // derive the ID from the allocation offset as specified in ssA.23.
-      const nodeId = pinCount + p;
-      if (nodeId === 0) continue;
-      const tag = `${elLabel}:${internalLabels[p]}`;
-      const existing = perNode.get(nodeId);
-      if (existing) {
-        if (existing.length < 3) existing.push(tag);
-      } else {
-        perNode.set(nodeId, [tag]);
-      }
+  }
+
+  // Internal (prime) nodes- IDs and names come from MNAEngine._nodeTable
+  // (ngspice CKTnodeTab analogue, populated by ctx.makeVolt during setup()).
+  // Replaces the prior per-element `pinCount + p` heuristic, which conflated
+  // a per-element pin count with the engine's global equation counter and
+  // mis-mapped internal-node labels onto pin-node rows for any multi-element
+  // circuit. ngspice path: cktnoddmp.c walks CKTnodeTab; we walk the same
+  // table here. Names from _makeNode are `${label}#${suffix}`; convert to
+  // the existing `${label}:${suffix}` convention so internal-node tags read
+  // consistently with pin-node tags downstream.
+  if (nodeTable) {
+    for (const entry of nodeTable) {
+      if (entry.type !== "voltage") continue;
+      if (perNode.has(entry.number)) continue;
+      const tag = entry.name.replace("#", ":");
+      perNode.set(entry.number, [tag]);
     }
   }
   for (const [nodeId, tags] of perNode) {

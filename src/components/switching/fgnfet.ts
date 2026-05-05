@@ -131,7 +131,7 @@ export const FGNFET_NETLIST: MnaSubcircuitNetlist = {
   },
   elements: [
     { typeId: "Capacitor",         modelRef: "default", subElementName: "capCG",    params: { C: "capCG" } },
-    { typeId: "NMOS",              modelRef: "spice",   subElementName: "mos",      params: { VTO: "VTO", KP: "KP", LAMBDA: "LAMBDA", PHI: "PHI", GAMMA: "GAMMA", CBD: "CBD", CBS: "CBS", RD: "RD", RS: "RS", IS: "IS", W: "W", L: "L", TEMP: "TEMP" } },
+    { typeId: "NMOS",              modelRef: "spice-l1", subElementName: "mos",      params: { VTO: "VTO", KP: "KP", LAMBDA: "LAMBDA", PHI: "PHI", GAMMA: "GAMMA", CBD: "CBD", CBS: "CBS", RD: "RD", RS: "RS", IS: "IS", W: "W", L: "L", TEMP: "TEMP" } },
     { typeId: "FGNFETBlownDriver", modelRef: "default", subElementName: "blownDrv", params: { blown: "blown" } },
   ],
   internalNetCount: 1,

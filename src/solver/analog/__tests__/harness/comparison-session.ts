@@ -474,7 +474,12 @@ export class ComparisonSession {
 
     const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
     this._elementLabels = buildElementLabelMap(compiled);
-    this._ourTopology = captureTopology(compiled, this._engine.matrixSize, this._elementLabels);
+    this._ourTopology = captureTopology(
+      compiled,
+      this._engine.matrixSize,
+      this._elementLabels,
+      this._engine.getNodeTable(),
+    );
 
     this._stepCapture = createStepCaptureHook(
       this._engine.solver!,
@@ -2634,6 +2639,7 @@ export class ComparisonSession {
       compiled,
       this._engine.matrixSize,
       this._elementLabels,
+      this._engine.getNodeTable(),
     );
   }
 

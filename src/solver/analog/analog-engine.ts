@@ -102,6 +102,17 @@ export class MNAEngine implements AnalogEngine {
   private _nodeTable: Array<{ name: string; number: number; type: "voltage" | "current" }> = [];
   private _deviceMap: Map<string, AnalogElement> = new Map();
 
+  /**
+   * Read access to the internal-node table populated by `_makeNode` during
+   * setup(). Direct analogue of ngspice `CKTnodeTab` walked by `cktnoddmp.c`.
+   * Each entry pairs a `${label}#${suffix}` name with the equation number
+   * returned by ctx.makeVolt / ctx.makeCur. Pin nodes (1..compiled.nodeCount)
+   * are NOT in this table- they're allocated by the compiler before setup.
+   */
+  getNodeTable(): readonly { name: string; number: number; type: "voltage" | "current" }[] {
+    return this._nodeTable;
+  }
+
   // -------------------------------------------------------------------------
   // Engine lifecycle state
   // -------------------------------------------------------------------------
@@ -1436,6 +1447,22 @@ export class MNAEngine implements AnalogEngine {
   ): void {
     const ctx = this._ctx!;
     ctx.rhs.set(result.nodeVoltages);
+
+    // ngspice keeps the converged DCOP solution in CKTrhsOld implicitly via
+    // the NR pointer-swap pattern in niiter.c:631-632 (final iteration's
+    // SMPsolve writes the answer to CKTrhs, then CKTrhsOld <-> CKTrhs swap
+    // leaves CKTrhsOld holding the converged DCOP). dctran.c:346-350 then
+    // never touches CKTrhsOld because it already carries the right values.
+    //
+    // digiTS's DCOP returns a separate result object, so we have to mirror
+    // the buffer parity explicitly. Without this, every internal node
+    // allocated by ctx.makeVolt (BJT primes, MOSFET primes, JFET primes,
+    // diode posPrime, polarized-cap nCap, crystal/mutual-inductor coupling
+    // nodes) reads zero from rhsOld at NR iteration >= 1 of the first
+    // transient step- the cond1=true MODEINITTRAN branch hides this on
+    // iteration 0 only. Manifests as NaN/garbage on UIC + non-zero IC and
+    // as silent wrong companion currents on the standard transient path.
+    ctx.rhsOld.set(result.nodeVoltages);
 
     for (const el of _elements) {
       if (typeof (el as any).initVoltages === "function") {
