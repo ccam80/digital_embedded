@@ -82,6 +82,7 @@ import type {
 } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
 import type { IntegrationMethod } from "../../integration.js";
+import { expect } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -3049,6 +3050,73 @@ export class ComparisonSession {
     if (phase === "tranInit") return "tranInit";
     if (phase === "tranFloat") return "tranFloat";
     return "dcop";
+  }
+
+  // -------------------------------------------------------------------------
+  // Canonical full-sweep parity assertions (Cat 3 / Cat 5)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Assert every step end (nodes, branches, component slots, pin currents, dt)
+   * matches ngspice bit-exact across all steps. Sole canonical assertion for
+   * Category 3 (transient response). Failure-stack hint identifies the step
+   * index, observable label, and paired ours/ngspice values.
+   */
+  compareAllSteps(): void {
+    const { stepCount } = this.getSummary();
+    for (let s = 0; s < stepCount.ours; s++) {
+      const stepEnd = this.getStepEnd(s);
+      expect(
+        stepEnd.dt.withinTol,
+        `step ${s} dt: ours=${stepEnd.dt.ours} ngspice=${stepEnd.dt.ngspice} absDelta=${stepEnd.dt.absDelta}`,
+      ).toBe(true);
+      for (const [label, cv] of Object.entries(stepEnd.nodes)) {
+        expect(
+          cv.withinTol,
+          `step ${s} node ${label}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
+        ).toBe(true);
+      }
+      for (const [label, cv] of Object.entries(stepEnd.branches)) {
+        expect(
+          cv.withinTol,
+          `step ${s} branch ${label}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
+        ).toBe(true);
+      }
+      for (const [compLabel, comp] of Object.entries(stepEnd.components)) {
+        for (const [slot, cv] of Object.entries(comp.slots ?? {})) {
+          expect(
+            cv.withinTol,
+            `step ${s} ${compLabel}.${slot}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
+          ).toBe(true);
+        }
+        for (const [pin, cv] of Object.entries(comp.pinCurrents ?? {})) {
+          expect(
+            cv.withinTol,
+            `step ${s} ${compLabel} pin ${pin}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
+          ).toBe(true);
+        }
+      }
+    }
+  }
+
+  /**
+   * Assert every per-iteration paired comparison (matrix entries, RHS entries,
+   * element state slots) at every iteration of every attempt of every step
+   * matches ngspice bit-exact. Sole canonical assertion for Category 5
+   * (full-iteration parity). Covers all cktMode-gated branches (MODEINITPRED,
+   * MODEINITJCT, NOBYPASS, MODEINITSMSIG, MODEINITTRAN, XTF-conditional cap
+   * formulas, excess-phase IIR, substrate aggregation) without naming them.
+   */
+  compareAllAttempts(): void {
+    const { entries } = this.getDivergences({ limit: Number.MAX_SAFE_INTEGER });
+    if (entries.length === 0) return;
+    const first = entries[0];
+    const msg =
+      `${entries.length} per-iteration divergence(s); first: ${first.category} ` +
+      `step ${first.stepIndex}/iter ${first.iteration} ` +
+      `${first.componentLabel ? `${first.componentLabel}.` : ""}${first.label} ` +
+      `ours=${first.ours} ngspice=${first.ngspice} absDelta=${first.absDelta}`;
+    expect(entries.length, msg).toBe(0);
   }
 }
 
