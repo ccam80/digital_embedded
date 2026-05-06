@@ -1,151 +1,261 @@
-/**
- * Tests for Voltage-Controlled Current Source (VCCS) analog element.
- *
- * All tests use the real factory path via ComparisonSession.createSelfCompare (M1).
- *
- * VCCS circuit pattern:
- *   - Voltage source Vs sets the control voltage V_ctrl at node_ctrl.
- *   - VCCS outputs current I_out = gm * V_ctrl into node_out.
- *   - Load resistor R_load at node_out → GND converts current to voltage:
- *     V_out = I_out * R_load = gm * V_ctrl * R_load
- */
-
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as path from "path";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import {
+  describeIfDll,
+  DLL_PATH,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// VCCS tests
+// DTS fixture paths (T3 harness)
 // ---------------------------------------------------------------------------
 
-describe("VCCS", () => {
-  it("linear_transconductance", async () => {
-    // gm=0.01 S, V_ctrl=1V → I_out=10mA, R_load=100Ω → V_out=1V
-    //
-    // Circuit:
-    //   Vs=1V: pos→ctrl node, neg→GND
-    //   VCCS: ctrl+=ctrl node, ctrl-=GND, out+=out node, out-=GND, gm=0.01S
-    //   R=100Ω: out node→GND
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",   type: "DcVoltageSource", props: { label: "vs",   voltage: 1.0 } },
-            { id: "vccs", type: "VCCS",            props: { label: "vccs", transconductance: 0.01 } },
-            { id: "r",    type: "Resistor",        props: { label: "r",    resistance: 100 } },
-            { id: "gnd",  type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",    "vccs:ctrl+"],
-            ["vs:neg",    "gnd:out"],
-            ["vccs:ctrl-","gnd:out"],
-            ["vccs:out+", "r:A"],
-            ["vccs:out-", "gnd:out"],
-            ["r:B",       "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
-    });
+const DTS_LINEAR = path.resolve(
+  "src/components/active/__tests__/fixtures/vccs-canon-linear.dts",
+);
+const DTS_NONLINEAR = path.resolve(
+  "src/components/active/__tests__/fixtures/vccs-canon-nonlinear.dts",
+);
 
-    const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
-    // V_out = I_out * R = gm * V_ctrl * R = 0.01 * 1 * 100 = 1V
+// ---------------------------------------------------------------------------
+// Circuit factory (T1 programmatic)
+// ---------------------------------------------------------------------------
+//
+// Topology:
+//   Vs:pos --> vccs:ctrl+      vccs:out+ --> Rload:pos
+//   Vs:neg --> GND             Rload:neg --> GND
+//   vccs:ctrl- --> GND         vccs:out-  --> GND
+//
+// Linear default: I_out = transconductance * V(ctrl).
+// Nonlinear: when `expression` differs from "V(ctrl)", I_out = f(V(ctrl)).
+// V_ctrl = Vs (since ctrl- is grounded). V_out = I_out * Rload.
+
+interface VccsCircuitParams {
+  vsVoltage?: number;
+  rLoad?: number;
+  transconductance?: number;
+  expression?: string;
+}
+
+function buildVccsCircuit(facade: DefaultSimulatorFacade, p: VccsCircuitParams): Circuit {
+  const vccsProps: Record<string, string | number> = {
+    label: "vccs1",
+  };
+  if (p.expression !== undefined) vccsProps.expression = p.expression;
+  if (p.transconductance !== undefined) vccsProps.transconductance = p.transconductance;
+  return facade.build({
+    components: [
+      { id: "vs",    type: "DcVoltageSource", props: { label: "vs1",   voltage: p.vsVoltage ?? 1.0 } },
+      { id: "vccs",  type: "VCCS",            props: vccsProps },
+      { id: "rload", type: "Resistor",        props: { label: "rload", resistance: p.rLoad ?? 100 } },
+      { id: "gnd",   type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos",      "vccs:ctrl+"],
+      ["vs:neg",      "gnd:out"],
+      ["vccs:ctrl-",  "gnd:out"],
+      ["vccs:out+",   "rload:pos"],
+      ["vccs:out-",   "gnd:out"],
+      ["rload:neg",   "gnd:out"],
+    ],
+  });
+}
+
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
+// ---------------------------------------------------------------------------
+// VCCS — Cat 1 initialization (T1)
+// ---------------------------------------------------------------------------
+
+describe("VCCS initialization (T1)", () => {
+  it("init_post_warm_start_node_voltages_match_dcop_linear", () => {
+    // Cat 1: post-warm-start node voltage at vccs1:out+ must equal the
+    // DCOP-seeded value. With Vs=1V, gm=0.01 S, Rload=100Ω:
+    //   V_ctrl = 1V → I_out = 0.01 * 1 = 10mA → V_out = 10mA * 100Ω = 1V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVccsCircuit(facade, {
+        vsVoltage: 1.0, transconductance: 0.01, rLoad: 100,
+      }),
+    });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vccs1:ctrl+"))).toBeCloseTo(1.0, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vccs1:out+"))).toBeCloseTo(1.0, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VCCS — Cat 2 DCOP analytical (T1)
+// ---------------------------------------------------------------------------
+
+describe("VCCS DCOP analytical (T1)", () => {
+  it("dcop_linear_transconductance", () => {
+    // gm=0.01 S, V_ctrl=1V → I_out=10mA, R_load=100Ω → V_out=1V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVccsCircuit(facade, {
+        vsVoltage: 1.0, transconductance: 0.01, rLoad: 100,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const vOut = fix.engine.getNodeVoltage(nodeOf(fix, "vccs1:out+"));
+    // V_out = gm * V_ctrl * R = 0.01 * 1 * 100 = 1.0 V
+    expect(vOut).toBeCloseTo(1.0, 6);
   });
 
-  it("zero_control_zero_output", async () => {
-    // V_ctrl=0 → I_out=0 → V_out=0 across any load
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",   type: "DcVoltageSource", props: { label: "vs",   voltage: 0.0 } },
-            { id: "vccs", type: "VCCS",            props: { label: "vccs", transconductance: 0.01 } },
-            { id: "r",    type: "Resistor",        props: { label: "r",    resistance: 1000 } },
-            { id: "gnd",  type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",    "vccs:ctrl+"],
-            ["vs:neg",    "gnd:out"],
-            ["vccs:ctrl-","gnd:out"],
-            ["vccs:out+", "r:A"],
-            ["vccs:out-", "gnd:out"],
-            ["r:B",       "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
+  it("dcop_zero_control_zero_output", () => {
+    // V_ctrl=0 → I_out=0 → V_out=0V across any load.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVccsCircuit(facade, {
+        vsVoltage: 0.0, transconductance: 0.01, rLoad: 1000,
+      }),
     });
-
-    const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const vOut = fix.engine.getNodeVoltage(nodeOf(fix, "vccs1:out+"));
+    expect(vOut).toBeCloseTo(0.0, 9);
   });
 
-  it("nonlinear_square_law", async () => {
-    // expression: 0.001 * V(ctrl)^2; V_ctrl=3V → I_out = 0.001*9 = 9mA
-    // R_load=100Ω → V_out = 9mA * 100 = 0.9V
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",   type: "DcVoltageSource", props: { label: "vs",   voltage: 3.0 } },
-            { id: "vccs", type: "VCCS",            props: { label: "vccs", expression: "0.001 * V(ctrl)^2" } },
-            { id: "r",    type: "Resistor",        props: { label: "r",    resistance: 100 } },
-            { id: "gnd",  type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",    "vccs:ctrl+"],
-            ["vs:neg",    "gnd:out"],
-            ["vccs:ctrl-","gnd:out"],
-            ["vccs:out+", "r:A"],
-            ["vccs:out-", "gnd:out"],
-            ["r:B",       "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
+  it("dcop_nonlinear_square_law", () => {
+    // expression: 0.001 * V(ctrl)^2; V_ctrl=3V → I_out = 0.001*9 = 9mA.
+    // R_load=100Ω → V_out = 9mA * 100 = 0.9V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVccsCircuit(facade, {
+        vsVoltage: 3.0, expression: "0.001 * V(ctrl)^2", rLoad: 100,
+      }),
     });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const vOut = fix.engine.getNodeVoltage(nodeOf(fix, "vccs1:out+"));
+    expect(vOut).toBeCloseTo(0.9, 6);
+  });
+});
 
-    const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
-    // I_out = 0.001 * 9 = 9mA; V_out = 9mA * 100Ω = 0.9V
+// ---------------------------------------------------------------------------
+// VCCS — Cat 4 parameter hot-load (T1)
+// ---------------------------------------------------------------------------
+
+describe("VCCS parameter hot-load (T1)", () => {
+  it("hotload_transconductance_changes_output_voltage", () => {
+    // Cat 4: setComponentProperty on transconductance must change V(rload+).
+    // Start at gm=0.01 S, Vs=1V, Rload=100Ω → V_out=1V.
+    // After gm=0.02 S → I_out=20mA → V_out=2V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVccsCircuit(facade, {
+        vsVoltage: 1.0, transconductance: 0.01, rLoad: 100,
+      }),
+    });
+    const outNode = nodeOf(fix, "vccs1:out+");
+    const before = fix.engine.getNodeVoltage(outNode);
+    expect(before).toBeCloseTo(1.0, 6);
+
+    const vccsEl = ceByLabel(fix, "vccs1");
+    fix.coordinator.setComponentProperty(vccsEl, "transconductance", 0.02);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(outNode);
+    // Documented contract: doubling gm doubles V_out for the linear default.
+    expect(after).not.toBeCloseTo(before);
+    expect(after).toBeCloseTo(2.0, 6);
   });
 
-  it("stamps_accessor_returns_valid_handles_after_setup", async () => {
-    // After engine setup, VCCS must converge in a complete circuit.
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",   type: "DcVoltageSource", props: { label: "vs",   voltage: 1.0 } },
-            { id: "vccs", type: "VCCS",            props: { label: "vccs", transconductance: 0.01 } },
-            { id: "r",    type: "Resistor",        props: { label: "r",    resistance: 100 } },
-            { id: "gnd",  type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",    "vccs:ctrl+"],
-            ["vs:neg",    "gnd:out"],
-            ["vccs:ctrl-","gnd:out"],
-            ["vccs:out+", "r:A"],
-            ["vccs:out-", "gnd:out"],
-            ["r:B",       "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
+  it("hotload_vs_drives_vctrl_changes_output", () => {
+    // Cat 4 sibling: changing the upstream Vs voltage changes V(ctrl) and
+    // therefore V(rload+). With gm=0.01 S, Rload=100Ω:
+    //   start Vs=1V → V_out=1V; after Vs=2V → V_out=2V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVccsCircuit(facade, {
+        vsVoltage: 1.0, transconductance: 0.01, rLoad: 100,
+      }),
     });
+    const outNode = nodeOf(fix, "vccs1:out+");
+    const before = fix.engine.getNodeVoltage(outNode);
+    expect(before).toBeCloseTo(1.0, 6);
 
+    fix.coordinator.setSourceByLabel("vs1", "voltage", 2.0);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(outNode);
+    expect(after).not.toBeCloseTo(before);
+    expect(after).toBeCloseTo(2.0, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VCCS — T3 harness: linear transconductance vs ngspice (Cat 2 / 3 / 5)
+// ---------------------------------------------------------------------------
+
+describeIfDll("VCCS linear transconductance paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_LINEAR, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_linear", async () => {
+    // First it() owns the run; tStop=1e-4 s, maxStep=1e-6 s.
+    await session.runTransient(0, 1e-4, 1e-6);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_linear", () => {
+    // Cat 2-numerical: reads from the recorded session (step 0 = DCOP seed).
     const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
-    // Handles are indices >= 0 (TrashCan is handle 0; real handles start at 1 but
-    // ground-adjacent entries may return TrashCan=0). Non-(-1) means allocated.
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
-    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
-    expect(lastIter).toBeDefined();
-    expect(lastIter.matrixSize).toBeGreaterThan(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_linear", () => {
+    // Cat 5: all NR iterations across all attempts of all steps.
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VCCS — T3 harness: nonlinear square-law vs ngspice (Cat 2 / 3 / 5)
+// ---------------------------------------------------------------------------
+
+describeIfDll("VCCS nonlinear square-law paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_NONLINEAR, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_nonlinear", async () => {
+    await session.runTransient(0, 1e-4, 1e-6);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_nonlinear", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_nonlinear", () => {
+    session.compareAllAttempts();
   });
 });

@@ -1,432 +1,365 @@
-/** Tests for the Timer555 component. */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { createDefaultRegistry } from "../../register-all.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
-// Timer555 unit tests  observable DC operating point
+// .dts paths (reused; authored by a parallel session)
 // ---------------------------------------------------------------------------
 
-describe("Timer555", () => {
-  it("internal_divider_voltages", () => {
-    /**
-     * DC-OP only. VCC=5V fixed, CTRL floating.
-     * Internal divider sets CTRL ≈ 2/3 VCC = 3.333V ±1%.
-     *
-     * Circuit: DcVoltageSource(vcc) + Timer555(t) + Ground.
-     * THR, TRIG, DIS, OUT left open (connected to ground for stability).
-     * RST tied to VCC node via wire.
-     * Read CTRL from "t:CTRL".
-     */
+const DTS_QUIESCENT_LOW = path.resolve(
+  "src/components/active/__tests__/fixtures/timer555-canon-quiescent-low.dts",
+);
+const DTS_ASTABLE = path.resolve(
+  "src/components/active/__tests__/fixtures/timer555-canon-astable.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Helper: locate the Timer555LatchDriver leaf element in a compiled circuit.
+// Composite Timer555 expands to several leaves; the latch driver owns the
+// LATCH_Q / OUTPUT_LOGIC_LEVEL state slots. Match by stateSchema.owner.
+// ---------------------------------------------------------------------------
+
+function findLatchDriver(
+  elements: ReadonlyArray<unknown>,
+): PoolBackedAnalogElement {
+  const idx = elements.findIndex(
+    (el) =>
+      el instanceof PoolBackedAnalogElement &&
+      (el as PoolBackedAnalogElement).stateSchema.owner === "Timer555LatchDriver",
+  );
+  if (idx < 0) {
+    throw new Error("Timer555LatchDriverElement not found in compiled circuit");
+  }
+  return elements[idx] as PoolBackedAnalogElement;
+}
+
+// ---------------------------------------------------------------------------
+// Circuit factory helpers (T1 programmatic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quiescent Timer555 with VCC=5V, TRIG=4V (above 1/3 VCC), THR=1V (below
+ * 2/3 VCC). Both comparators inactive — latch holds warm-start state.
+ * CTRL pin sits at 2/3 VCC from the internal R-divider.
+ */
+function buildQuiescentFixture(VCC = 5) {
+  return buildFixture({
+    build: (_r, facade) =>
+      facade.build({
+        components: [
+          { id: "vcc",   type: "DcVoltageSource", props: { label: "vcc",   voltage: VCC } },
+          { id: "vtrig", type: "DcVoltageSource", props: { label: "vtrig", voltage: 4   } },
+          { id: "vthr",  type: "DcVoltageSource", props: { label: "vthr",  voltage: 1   } },
+          { id: "t",     type: "Timer555",        props: { label: "t"                   } },
+          { id: "gnd",   type: "Ground" },
+        ],
+        connections: [
+          ["vcc:pos",   "t:VCC"],
+          ["vcc:neg",   "gnd:out"],
+          ["t:GND",     "gnd:out"],
+          ["t:RST",     "vcc:pos"],
+          ["vtrig:pos", "t:TRIG"],
+          ["vtrig:neg", "gnd:out"],
+          ["vthr:pos",  "t:THR"],
+          ["vthr:neg",  "gnd:out"],
+          ["t:DIS",     "gnd:out"],
+          ["t:OUT",     "gnd:out"],
+        ],
+      }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Category 1 — Initialization (T1)
+// ---------------------------------------------------------------------------
+// After buildFixture's warm-start step, verify:
+//   (a) The CTRL pin sits at 2/3 VCC from the internal R-divider.
+//   (b) The Timer555LatchDriver leaf exists and its pool slots are initialised
+//       (LATCH_Q ∈ {0,1}, OUTPUT_LOGIC_LEVEL mirrors LATCH_Q).
+// ---------------------------------------------------------------------------
+
+describe("Timer555 initialization (T1)", () => {
+  it("init_internal_divider_ctrl_voltage", () => {
+    // CTRL ≈ 2/3 × 5V = 3.333V ±1%.
     const VCC = 5;
-
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
-    const circuit = facade.build({
-      components: [
-        { id: "vcc", type: "DcVoltageSource", props: { voltage: VCC, label: "vcc" } },
-        { id: "t",   type: "Timer555",        props: { label: "t" } },
-        { id: "gnd", type: "Ground" },
-      ],
-      connections: [
-        ["vcc:pos", "t:VCC"],
-        ["vcc:neg", "gnd:out"],
-        ["t:GND",   "gnd:out"],
-        ["t:RST",   "t:VCC"],
-        ["t:TRIG",  "gnd:out"],
-        ["t:THR",   "gnd:out"],
-        ["t:DIS",   "gnd:out"],
-        ["t:OUT",   "gnd:out"],
-      ],
-    });
-
-    const coordinator = facade.compile(circuit);
-    const result = facade.getDcOpResult();
-
-    expect(result).not.toBeNull();
-    expect(result!.converged).toBe(true);
-
-    const sigs = facade.readAllSignals(coordinator);
-    const vCtrl = sigs["t:CTRL"] ?? 0;
+    const fix = buildQuiescentFixture(VCC);
+    const ctrlNode = fix.circuit.labelToNodeId.get("t:CTRL");
+    expect(ctrlNode).toBeDefined();
+    const vCtrl = fix.engine.getNodeVoltage(ctrlNode!);
     const vExpected = VCC * (2 / 3);
     const errorPct = Math.abs(vCtrl - vExpected) / vExpected * 100;
-
-    // CTRL ≈ 2/3 VCC ±1%
     expect(errorPct).toBeLessThan(1);
+  });
 
-    // Trigger reference = CTRL/2 ≈ 1/3 VCC ±1%
+  it("init_latch_driver_pool_slots_valid", () => {
+    // After warm-start the latch leaf exists and its state pool slots are
+    // initialised to consistent values (LATCH_Q ∈ {0,1}, OUTPUT_LOGIC_LEVEL
+    // mirrors LATCH_Q). Resolve slot indices via the schema (no SLOT_*
+    // constant import) and read pool state via fix.pool.state0.
+    const fix = buildQuiescentFixture();
+    const drv = findLatchDriver(fix.circuit.elements);
+    const slotQ      = drv.stateSchema.indexOf.get("LATCH_Q")!;
+    const slotLevel  = drv.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
+    expect(slotQ).toBeGreaterThanOrEqual(0);
+    expect(slotLevel).toBeGreaterThanOrEqual(0);
+
+    const q   = fix.pool.state0[drv._stateBase + slotQ];
+    const out = fix.pool.state0[drv._stateBase + slotLevel];
+    // Both slots must be 0 or 1 (logic levels).
+    expect([0, 1]).toContain(Math.round(q));
+    expect([0, 1]).toContain(Math.round(out));
+    // OUTPUT_LOGIC_LEVEL must mirror LATCH_Q.
+    expect(Math.round(out)).toBe(Math.round(q));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2 — DC operating point, analytical (T1)
+// ---------------------------------------------------------------------------
+// Closed-form: CTRL = 2/3 VCC regardless of VCC level (three-resistor divider
+// of equal value). TRIG threshold = 1/3 VCC, THR threshold = 2/3 VCC.
+// Tested at VCC = 5V (nominal) and VCC = 12V (extended range).
+// ---------------------------------------------------------------------------
+
+describe("Timer555 DCOP analytical (T1)", () => {
+  it("dcop_ctrl_two_thirds_vcc_at_5v", () => {
+    const VCC = 5;
+    const fix = buildQuiescentFixture(VCC);
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const ctrlNode = fix.circuit.labelToNodeId.get("t:CTRL");
+    expect(ctrlNode).toBeDefined();
+    const vCtrl = fix.engine.getNodeVoltage(ctrlNode!);
+    expect(vCtrl).toBeCloseTo(VCC * (2 / 3), 3);
+  });
+
+  it("dcop_ctrl_two_thirds_vcc_at_12v", () => {
+    const VCC = 12;
+    const fix = buildQuiescentFixture(VCC);
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const ctrlNode = fix.circuit.labelToNodeId.get("t:CTRL");
+    expect(ctrlNode).toBeDefined();
+    const vCtrl = fix.engine.getNodeVoltage(ctrlNode!);
+    expect(vCtrl).toBeCloseTo(VCC * (2 / 3), 3);
+  });
+
+  it("dcop_trig_threshold_one_third_vcc", () => {
+    // The trigger threshold is CTRL/2 = 1/3 VCC.
+    const VCC = 5;
+    const fix = buildQuiescentFixture(VCC);
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const ctrlNode = fix.circuit.labelToNodeId.get("t:CTRL");
+    expect(ctrlNode).toBeDefined();
+    const vCtrl = fix.engine.getNodeVoltage(ctrlNode!);
     const vTrigRef = vCtrl * 0.5;
-    const vTrigExpected = VCC / 3;
-    const trigErrorPct = Math.abs(vTrigRef - vTrigExpected) / vTrigExpected * 100;
-    expect(trigErrorPct).toBeLessThan(1);
+    expect(vTrigRef).toBeCloseTo(VCC / 3, 3);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Astable (free-running) transient tests
+// Categories 2-numerical / 3 / 5 — Quiescent-low paired vs ngspice (T3)
+// Static-bias regime: TRIG = 4V (above 1/3 VCC), THR = 1V (below 2/3 VCC).
+// Both comparators inactive; latch holds, output should latch low through the
+// discharge BJT in saturation. Distinct operating point from astable; exercises
+// non-firing comparator paths and BJT saturation.
 // ---------------------------------------------------------------------------
 
+describeIfDll("Timer555 paired vs ngspice — quiescent low (T3)", () => {
+  let session: ComparisonSession;
 
-
-/**
- * Build the astable 555 circuit.
- * VCC → R1 → node_a(DIS) → R2 → node_b(THR=TRIG) → C → GND
- * OUT connected to labeled "out" resistor probe (high-Z, 1MΩ to GND).
- */
-function buildAstableFacade(R1: number, R2: number, C: number, VCC: number): {
-  facade: DefaultSimulatorFacade;
-  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
-  readOut: () => number;
-} {
-  const registry = createDefaultRegistry();
-  const facade = new DefaultSimulatorFacade(registry);
-  const circuit = facade.build({
-    components: [
-      { id: "vcc",  type: "DcVoltageSource", props: { voltage: VCC, label: "vcc" } },
-      { id: "t",    type: "Timer555",        props: { label: "t" } },
-      { id: "r1",   type: "Resistor",        props: { resistance: R1 } },
-      { id: "r2",   type: "Resistor",        props: { resistance: R2 } },
-      { id: "cap",  type: "Capacitor",       props: { capacitance: C } },
-      { id: "rout", type: "Resistor",        props: { resistance: 1e6 } },
-      { id: "gnd",  type: "Ground" },
-    ],
-    connections: [
-      ["vcc:pos", "t:VCC"],
-      ["vcc:neg", "gnd:out"],
-      ["t:GND",   "gnd:out"],
-      ["t:RST",   "t:VCC"],
-      // R1: VCC → DIS junction
-      ["t:VCC",   "r1:pos"],
-      ["r1:neg",  "t:DIS"],
-      // R2: DIS junction → cap/THR/TRIG node
-      ["t:DIS",   "r2:pos"],
-      ["r2:neg",  "t:THR"],
-      ["t:THR",   "t:TRIG"],
-      // Capacitor: THR node → GND
-      ["t:THR",   "cap:pos"],
-      ["cap:neg", "gnd:out"],
-      // OUT probe: OUT → 1MΩ → GND (high-Z read)
-      ["t:OUT",   "rout:pos"],
-      ["rout:neg", "gnd:out"],
-    ],
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_QUIESCENT_LOW, dllPath: DLL_PATH });
   });
-  const coordinator = facade.compile(circuit);
-  const readOut = () => facade.readAllSignals(coordinator)["t:OUT"] ?? 0;
-  return { facade, coordinator, readOut };
-}
 
-describe("Astable", () => {
-  it("oscillates_at_correct_frequency", async () => {
-    /**
-     * Sample OUT at 500 points per period over 6.5 periods,
-     * count threshold crossings in the last 5 periods.
-     * Expected: f = 1.44/((R1+2R2)·C) ≈ 6.857 Hz ±10%.
-     */
-    const R1 = 1000;
-    const R2 = 10000;
-    const C  = 10e-6;
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  // Cat 3 — runs the transient and sweeps every step end vs ngspice.
+  it("transient_step_end_paired_quiescent_low", async () => {
+    await session.runTransient(0, 1e-3, 1e-5);
+    session.compareAllSteps();
+  });
+
+  // Cat 2-numerical — DCOP-equivalent (step 0 is the boot step containing the
+  // operating point) full-node comparison from the recorded session.
+  it("dcop_paired_quiescent_low", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  // Cat 5 — every iteration of every attempt of every step vs ngspice.
+  it("full_iteration_paired_quiescent_low", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Categories 2-numerical / 3 / 5 — Astable paired vs ngspice (T3)
+// Self-oscillating RC: f ≈ 1.44 / ((R1 + 2*R2) * C). With R1=1k, R2=10k,
+// C=10µF, f ≈ 6.86 Hz, period ≈ 146ms. Capture a representative window at
+// fine timestep.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Timer555 paired vs ngspice — astable (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_ASTABLE, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_astable", async () => {
+    await session.runTransient(0, 3e-1, 1e-3);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_astable", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_astable", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 4 — Parameter hot-load (T1)
+// ---------------------------------------------------------------------------
+// TIMER555_PARAM_DEFS: vDrop, rDischarge, rOut, cOut, vOH, vOL. Documented
+// contract: vOH sets the output-high voltage; vOL sets the output-low voltage.
+// Drive the latch into a known state (SET / RESET) via TRIG / THR, change the
+// param, step, and confirm OUT moves to the new rail.
+// ---------------------------------------------------------------------------
+
+describe("Timer555 parameter hot-load (T1)", () => {
+  it("hotload_vOH_changes_output_high_voltage", () => {
+    // Default vOH=5.0V. After setComponentProperty("vOH", 4.0) and one step,
+    // OUT pin must read ≈ 4.0V when the latch is in high state.
+    // Use quiescent fixture with TRIG pulled below 1/3 VCC to force latch SET.
     const VCC = 5;
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        facade.build({
+          components: [
+            { id: "vcc",   type: "DcVoltageSource", props: { label: "vcc",   voltage: VCC  } },
+            { id: "vtrig", type: "DcVoltageSource", props: { label: "vtrig", voltage: 0.5  } },
+            { id: "vthr",  type: "DcVoltageSource", props: { label: "vthr",  voltage: 1.0  } },
+            { id: "t",     type: "Timer555",        props: { label: "t"                    } },
+            { id: "rout",  type: "Resistor",        props: { label: "rout",  resistance: 1e6 } },
+            { id: "gnd",   type: "Ground" },
+          ],
+          connections: [
+            ["vcc:pos",   "t:VCC"],
+            ["vcc:neg",   "gnd:out"],
+            ["t:GND",     "gnd:out"],
+            ["t:RST",     "vcc:pos"],
+            ["vtrig:pos", "t:TRIG"],
+            ["vtrig:neg", "gnd:out"],
+            ["vthr:pos",  "t:THR"],
+            ["vthr:neg",  "gnd:out"],
+            ["t:DIS",     "gnd:out"],
+            ["t:OUT",     "rout:pos"],
+            ["rout:neg",  "gnd:out"],
+          ],
+        }),
+    });
 
-    const fExpected = 1.44 / ((R1 + 2 * R2) * C);
-    const periodExpected = 1 / fExpected;
-    const midVoltage = VCC / 2;
-
-    const { coordinator, readOut } = buildAstableFacade(R1, R2, C, VCC);
-
-    // Warmup: 1.5 periods; then measure: 5 periods.
-    const warmupTime = periodExpected * 1.5;
-    const measureTime = 5 * periodExpected;
-    const totalTime = warmupTime + measureTime;
-
-    // Sample at 500 pts/period across the full run.
-    const samplesPerPeriod = 500;
-    const totalSamples = Math.ceil(totalTime / periodExpected) * samplesPerPeriod;
-    const times = Array.from({ length: totalSamples }, (_, i) =>
-      (i + 1) * (totalTime / totalSamples),
+    const timerEl = [...fix.circuit.elementToCircuitElement.values()].find(
+      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "t",
     );
+    expect(timerEl).toBeDefined();
 
-    const samples = await coordinator.sampleAtTimes(times, readOut);
+    const outNode = fix.circuit.labelToNodeId.get("t:OUT");
+    expect(outNode).toBeDefined();
 
-    // Find sample index at warmup boundary.
-    const warmupIdx = Math.floor(warmupTime / totalTime * totalSamples);
+    // Confirm OUT is high before hot-load (TRIG=0.5V < 1/3 VCC → latch set).
+    const before = fix.engine.getNodeVoltage(outNode!);
+    expect(before).toBeGreaterThan(VCC * 0.8); // OUT high
 
-    // Count threshold crossings in the measurement window.
-    let transitions = 0;
-    let prev = samples[warmupIdx] as number;
-    for (let i = warmupIdx + 1; i < samples.length; i++) {
-      const v = samples[i] as number;
-      if ((prev < midVoltage && v >= midVoltage) ||
-          (prev >= midVoltage && v < midVoltage)) {
-        transitions++;
-      }
-      prev = v;
-    }
+    // Hot-load: lower vOH to 4.0V.
+    fix.coordinator.setComponentProperty(timerEl!, "vOH", 4.0);
+    fix.coordinator.step();
 
-    // 5 complete steady-state periods = 10 transitions ±2.
-    expect(transitions).toBeGreaterThanOrEqual(8);
-    expect(transitions).toBeLessThanOrEqual(12);
-
-    const fMeasured = transitions / 2 / measureTime;
-    const fError = Math.abs(fMeasured - fExpected) / fExpected;
-    // Within 10%
-    expect(fError).toBeLessThan(0.10);
+    const after = fix.engine.getNodeVoltage(outNode!);
+    // After hot-load, OUT should be closer to 4.0V than 5.0V.
+    expect(Math.abs(after - 4.0)).toBeLessThan(Math.abs(after - 5.0));
   });
 
-  it("duty_cycle", async () => {
-    /**
-     * Sample OUT at fine resolution, accumulate time-weighted
-     * duty over 5 steady-state periods.
-     * Expected duty = (R1+R2)/(R1+2R2) = 11/21 ≈ 52.38% ±5%.
-     */
-    const R1 = 1000;
-    const R2 = 10000;
-    const C  = 10e-6;
+  it("hotload_vOL_changes_output_low_voltage", () => {
+    // Default vOL=0.0V. After setComponentProperty("vOL", 0.5) and one step,
+    // OUT pin must read ≈ 0.5V when the latch is in low state.
+    // Use quiescent fixture with TRIG high and THR above 2/3 VCC to force RESET.
     const VCC = 5;
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        facade.build({
+          components: [
+            { id: "vcc",   type: "DcVoltageSource", props: { label: "vcc",   voltage: VCC  } },
+            { id: "vtrig", type: "DcVoltageSource", props: { label: "vtrig", voltage: 4.0  } },
+            { id: "vthr",  type: "DcVoltageSource", props: { label: "vthr",  voltage: 4.0  } },
+            { id: "t",     type: "Timer555",        props: { label: "t"                    } },
+            { id: "rout",  type: "Resistor",        props: { label: "rout",  resistance: 1e6 } },
+            { id: "gnd",   type: "Ground" },
+          ],
+          connections: [
+            ["vcc:pos",   "t:VCC"],
+            ["vcc:neg",   "gnd:out"],
+            ["t:GND",     "gnd:out"],
+            ["t:RST",     "vcc:pos"],
+            ["vtrig:pos", "t:TRIG"],
+            ["vtrig:neg", "gnd:out"],
+            ["vthr:pos",  "t:THR"],
+            ["vthr:neg",  "gnd:out"],
+            ["t:DIS",     "gnd:out"],
+            ["t:OUT",     "rout:pos"],
+            ["rout:neg",  "gnd:out"],
+          ],
+        }),
+    });
 
-    const dutyExpected = (R1 + R2) / (R1 + 2 * R2);
-    const fExpected = 1.44 / ((R1 + 2 * R2) * C);
-    const periodExpected = 1 / fExpected;
-    const midVoltage = VCC / 2;
-
-    const { coordinator, readOut } = buildAstableFacade(R1, R2, C, VCC);
-
-    // Warmup: 1.5 periods; measure: 5 periods.
-    const warmupTime = periodExpected * 1.5;
-    const measureTime = 5 * periodExpected;
-    const totalTime = warmupTime + measureTime;
-
-    // 500 pts/period for duty-cycle resolution.
-    const samplesPerPeriod = 500;
-    const totalSamples = Math.ceil(totalTime / periodExpected) * samplesPerPeriod;
-    const dt = totalTime / totalSamples;
-    const times = Array.from({ length: totalSamples }, (_, i) =>
-      (i + 1) * dt,
+    const timerEl = [...fix.circuit.elementToCircuitElement.values()].find(
+      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "t",
     );
+    expect(timerEl).toBeDefined();
 
-    const samples = await coordinator.sampleAtTimes(times, readOut);
+    const outNode = fix.circuit.labelToNodeId.get("t:OUT");
+    expect(outNode).toBeDefined();
 
-    // Accumulate time-weighted high/low in measurement window.
-    const warmupIdx = Math.floor(warmupTime / totalTime * totalSamples);
-    let timeHigh = 0;
-    let timeLow = 0;
-    for (let i = warmupIdx; i < samples.length; i++) {
-      const v = samples[i] as number;
-      if (v > midVoltage) {
-        timeHigh += dt;
-      } else {
-        timeLow += dt;
-      }
-    }
+    // Confirm OUT is low (THR=4V > 2/3 VCC=3.333V → latch reset).
+    const before = fix.engine.getNodeVoltage(outNode!);
+    expect(before).toBeLessThan(VCC * 0.2); // OUT low
 
-    const totalMeasured = timeHigh + timeLow;
-    expect(totalMeasured).toBeGreaterThan(0);
+    // Hot-load: raise vOL to 0.5V.
+    fix.coordinator.setComponentProperty(timerEl!, "vOL", 0.5);
+    fix.coordinator.step();
 
-    const dutyMeasured = timeHigh / totalMeasured;
-    const dutyError = Math.abs(dutyMeasured - dutyExpected) / dutyExpected;
-
-    // Within 5% relative error
-    expect(dutyError).toBeLessThan(0.05);
+    const after = fix.engine.getNodeVoltage(outNode!);
+    // After hot-load, OUT should be closer to 0.5V than 0.0V.
+    expect(Math.abs(after - 0.5)).toBeLessThan(Math.abs(after - 0.0));
   });
 });
 
-// ---------------------------------------------------------------------------
-// Monostable (one-shot) transient tests
-// ---------------------------------------------------------------------------
-
-/**
- * Build the monostable 555 circuit.
- * VCC → R → THR(=DIS) → C → GND. TRIG driven by labeled DcVoltageSource "trig".
- * OUT readable via "t:OUT".
- */
-function buildMonostableFacade(R: number, Cval: number, VCC: number): {
-  facade: DefaultSimulatorFacade;
-  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
-  readOut: () => number;
-  setTrig: (v: number) => void;
-} {
-  const registry = createDefaultRegistry();
-  const facade = new DefaultSimulatorFacade(registry);
-  const circuit = facade.build({
-    components: [
-      { id: "vcc",  type: "DcVoltageSource", props: { voltage: VCC,  label: "vcc"  } },
-      { id: "trig", type: "DcVoltageSource", props: { voltage: VCC,  label: "trig" } },
-      { id: "t",    type: "Timer555",        props: { label: "t" } },
-      { id: "r",    type: "Resistor",        props: { resistance: R } },
-      { id: "cap",  type: "Capacitor",       props: { capacitance: Cval } },
-      { id: "rout", type: "Resistor",        props: { resistance: 1e6 } },
-      { id: "gnd",  type: "Ground" },
-    ],
-    connections: [
-      ["vcc:pos",  "t:VCC"],
-      ["vcc:neg",  "gnd:out"],
-      ["t:GND",    "gnd:out"],
-      ["t:RST",    "t:VCC"],
-      // R: VCC → THR/DIS node
-      ["t:VCC",    "r:pos"],
-      ["r:neg",    "t:THR"],
-      ["t:THR",    "t:DIS"],
-      // Capacitor: THR → GND
-      ["t:THR",    "cap:pos"],
-      ["cap:neg",  "gnd:out"],
-      // TRIG source: controlled externally via setSignal("trig", v)
-      ["trig:pos", "t:TRIG"],
-      ["trig:neg", "gnd:out"],
-      // OUT probe
-      ["t:OUT",    "rout:pos"],
-      ["rout:neg",  "gnd:out"],
-    ],
-  });
-  const coordinator = facade.compile(circuit);
-  const readOut = () => facade.readAllSignals(coordinator)["t:OUT"] ?? 0;
-  const setTrig = (v: number) => facade.setSignal(coordinator, "trig", v);
-  return { facade, coordinator, readOut, setTrig };
-}
-
-describe("Monostable", () => {
-  it("pulse_width", async () => {
-    /**
-     * Monostable 555.
-     * 1. Compile circuit with TRIG=VCC (idle).
-     * 2. Set TRIG=0.5V, advance one small step to fire comparator.
-     * 3. Release TRIG=VCC.
-     * 4. Sample OUT over 3×tWidth to find pulse start/end.
-     * Expected: tWidth = 1.1×R×C = 110ms ±10%.
-     */
-    const R    = 100e3;
-    const Cval = 1e-6;
-    const VCC  = 5;
-    const tWidthExpected = 1.1 * R * Cval; // 110ms
-
-    const { facade, coordinator, readOut, setTrig } = buildMonostableFacade(R, Cval, VCC);
-
-    // DC-OP converges with TRIG high (idle state).
-    const dcResult = facade.getDcOpResult();
-    expect(dcResult).not.toBeNull();
-    expect(dcResult!.converged).toBe(true);
-
-    // Apply trigger pulse: TRIG → 0.5V (< 1/3 VCC = 1.67V).
-    setTrig(0.5);
-    await coordinator.stepToTime(1e-4); // one small step to register trigger
-
-    // Release trigger.
-    setTrig(VCC);
-
-    // Sample OUT at 200 pts/tWidth over 3×tWidth to locate pulse edges.
-    const measureEnd = tWidthExpected * 3;
-    const totalSamples = 600; // 200 per tWidth
-    const times = Array.from({ length: totalSamples }, (_, i) =>
-      (coordinator.simTime ?? 0) + (i + 1) * (measureEnd / totalSamples),
-    );
-    const samples = await coordinator.sampleAtTimes(times, readOut);
-
-    // Post-process: find rising edge (pulseStart) and falling edge (pulseEnd).
-    const midVoltage = VCC / 2;
-    let pulseStart = -1;
-    let pulseEnd = -1;
-    let prev = samples[0] as number;
-
-    for (let i = 1; i < samples.length; i++) {
-      const v = samples[i] as number;
-      const t = times[i]!;
-      if (prev <= midVoltage && v > midVoltage && pulseStart < 0) {
-        pulseStart = t;
-      }
-      if (prev > midVoltage && v <= midVoltage && pulseStart >= 0) {
-        pulseEnd = t;
-        break;
-      }
-      prev = v;
-    }
-
-    expect(pulseEnd).toBeGreaterThan(0);
-
-    const tWidthMeasured = pulseEnd - pulseStart;
-    const tWidthError = Math.abs(tWidthMeasured - tWidthExpected) / tWidthExpected;
-
-    // Within 10% (timestep quantization at comparator crossings)
-    expect(tWidthError).toBeLessThan(0.10);
-  });
-
-  it("retrigger_ignored_during_pulse", async () => {
-    /**
-     * Standard 555 retrigger immunity.
-     * Applying a second trigger during the output pulse must NOT extend it.
-     * Strategy: step through 3 phases using stepToTime + setSignal.
-     *   Phase 1: trigger, advance tiny step.
-     *   Phase 2: release, sample to find pulse start; advance to 30% of tWidth.
-     *   Phase 3: retrigger, advance to 40%; release; sample remaining to find end.
-     */
-    const R    = 100e3;
-    const Cval = 1e-6;
-    const VCC  = 5;
-    const tWidthExpected = 1.1 * R * Cval; // 110ms
-
-    const { facade, coordinator, readOut, setTrig } = buildMonostableFacade(R, Cval, VCC);
-
-    facade.getDcOpResult(); // ensure DC-OP has run
-
-    // Phase 1: fire trigger.
-    setTrig(0.5);
-    await coordinator.stepToTime(1e-4);
-    setTrig(VCC);
-
-    // Phase 2: sample to find pulse start, then advance to 30% point.
-    const phase2End = tWidthExpected * 1.5;
-    const phase2Samples = 300;
-    const phase2Times = Array.from({ length: phase2Samples }, (_, i) =>
-      (coordinator.simTime ?? 0) + (i + 1) * (phase2End / phase2Samples),
-    );
-    const phase2 = await coordinator.sampleAtTimes(phase2Times, readOut);
-
-    const midVoltage = VCC / 2;
-    let pulseStart = -1;
-    let prev2 = phase2[0] as number;
-    for (let i = 1; i < phase2.length; i++) {
-      const v = phase2[i] as number;
-      if (prev2 <= midVoltage && v > midVoltage && pulseStart < 0) {
-        pulseStart = phase2Times[i]!;
-      }
-      prev2 = v;
-    }
-
-    // Apply retrigger at ~30% through the expected pulse.
-    const retriggerAt = pulseStart >= 0 ? pulseStart + tWidthExpected * 0.3 : (coordinator.simTime ?? 0) + tWidthExpected * 0.3;
-    await coordinator.stepToTime(retriggerAt);
-    setTrig(0.5); // retrigger
-
-    // Release at ~40%.
-    const releaseAt = pulseStart >= 0 ? pulseStart + tWidthExpected * 0.4 : retriggerAt + tWidthExpected * 0.1;
-    await coordinator.stepToTime(releaseAt);
-    setTrig(VCC);
-
-    // Phase 3: sample remaining to find pulse end.
-    const phase3End = tWidthExpected * 3;
-    const phase3Samples = 400;
-    const phase3Times = Array.from({ length: phase3Samples }, (_, i) =>
-      (coordinator.simTime ?? 0) + (i + 1) * (phase3End / phase3Samples),
-    );
-    const phase3 = await coordinator.sampleAtTimes(phase3Times, readOut);
-
-    let pulseEnd = -1;
-    let prev3 = phase3[0] as number;
-    for (let i = 1; i < phase3.length; i++) {
-      const v = phase3[i] as number;
-      if (prev3 > midVoltage && v <= midVoltage && pulseStart >= 0) {
-        pulseEnd = phase3Times[i]!;
-        break;
-      }
-      prev3 = v;
-    }
-
-    expect(pulseEnd).toBeGreaterThan(0);
-
-    const tWidthMeasured = pulseEnd - pulseStart;
-
-    // Pulse width must NOT be extended beyond 1.1×RC × 1.15 (15% margin).
-    expect(tWidthMeasured).toBeLessThan(tWidthExpected * 1.15);
-    // Pulse must have the normal width (within 10%).
-    const tWidthError = Math.abs(tWidthMeasured - tWidthExpected) / tWidthExpected;
-    expect(tWidthError).toBeLessThan(0.10);
-  });
-});

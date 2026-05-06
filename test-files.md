@@ -9,22 +9,22 @@
 - [x] src/components/active/__tests__/comparator-rollback.test.ts
 - [x] src/components/active/__tests__/comparator.test.ts
 - [x] src/components/active/__tests__/dac.test.ts
-- [ ] src/components/active/__tests__/opamp.test.ts
-- [ ] src/components/active/__tests__/optocoupler-cccs.test.ts
-- [ ] src/components/active/__tests__/optocoupler.test.ts
-- [ ] src/components/active/__tests__/ota.test.ts
-- [ ] src/components/active/__tests__/real-opamp-raillim.test.ts
-- [ ] src/components/active/__tests__/real-opamp.test.ts
-- [ ] src/components/active/__tests__/schmitt-trigger.test.ts
-- [ ] src/components/active/__tests__/timer-555-debug.test.ts
-- [ ] src/components/active/__tests__/timer-555.test.ts
-- [ ] src/components/active/__tests__/vccs.test.ts
-- [ ] src/components/active/__tests__/vcvs.test.ts
-- [ ] src/components/arithmetic/__tests__/arithmetic-utils.test.ts
-- [ ] src/components/arithmetic/__tests__/arithmetic.test.ts
-- [ ] src/components/basic/__tests__/function.test.ts
-- [ ] src/components/flipflops/__tests__/flipflops.test.ts
-- [ ] src/components/flipflops/__tests__/monoflop.test.ts
+- [x] src/components/active/__tests__/opamp.test.ts
+- [x] src/components/active/__tests__/optocoupler-cccs.test.ts
+- [x] src/components/active/__tests__/optocoupler.test.ts
+- [x] src/components/active/__tests__/ota.test.ts
+- [x] src/components/active/__tests__/real-opamp-raillim.test.ts
+- [x] src/components/active/__tests__/real-opamp.test.ts
+- [x] src/components/active/__tests__/schmitt-trigger.test.ts
+- [x] src/components/active/__tests__/timer-555-debug.test.ts
+- [x] src/components/active/__tests__/timer-555.test.ts
+- [x] src/components/active/__tests__/vccs.test.ts
+- [x] src/components/active/__tests__/vcvs.test.ts
+- [x] src/components/arithmetic/__tests__/arithmetic-utils.test.ts
+- [x] src/components/arithmetic/__tests__/arithmetic.test.ts
+- [x] src/components/basic/__tests__/function.test.ts
+- [x] src/components/flipflops/__tests__/flipflops.test.ts
+- [x] src/components/flipflops/__tests__/monoflop.test.ts
 - [ ] src/components/flipflops/__tests__/two-phase-flipflops.test.ts
 - [ ] src/components/gates/__tests__/analog-gates.test.ts
 - [ ] src/components/gates/__tests__/and.test.ts
