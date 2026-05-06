@@ -1,0 +1,88 @@
+{
+  "circuit": {
+    "description": "CCVS transresistance=1k: Vs=5V, Rsense=5k, Rload=1M. Isense=1mA, Vout=1V.",
+    "elements": [
+      {
+        "id": "ccvs-1k-01-0000-0000-0000-000000000001",
+        "position": { "x": 0, "y": 0 },
+        "properties": {
+          "_modelParams": { "voltage": 5 },
+          "label": "vs1",
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "ccvs-1k-02-0000-0000-0000-000000000002",
+        "position": { "x": 4, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 5000 },
+          "label": "rsense",
+          "resistance": 5000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "ccvs-1k-03-0000-0000-0000-000000000003",
+        "position": { "x": 8, "y": 0 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "label": "senseVsrc",
+          "voltage": 0
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "ccvs-1k-04-0000-0000-0000-000000000004",
+        "position": { "x": 12, "y": 0 },
+        "properties": {
+          "_modelParams": { "transresistance": 1000 },
+          "label": "ccvs1",
+          "transresistance": 1000,
+          "senseSourceLabel": "senseVsrc"
+        },
+        "rotation": 0,
+        "type": "CCVS"
+      },
+      {
+        "id": "ccvs-1k-05-0000-0000-0000-000000000005",
+        "position": { "x": 18, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 1000000 },
+          "label": "rload",
+          "resistance": 1000000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "ccvs-1k-06-0000-0000-0000-000000000006",
+        "position": { "x": 22, "y": 0 },
+        "properties": { "label": "gnd" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "ccvs-canon-1k",
+    "wires": [
+      { "points": [ { "x": 4, "y": 0 }, { "x": 4, "y": 0 } ] },
+      { "points": [ { "x": 8, "y": 0 }, { "x": 8, "y": 0 } ] },
+      { "points": [ { "x": 12, "y": 0 }, { "x": 12, "y": 0 } ] },
+      { "points": [ { "x": 18, "y": 0 }, { "x": 18, "y": 0 } ] },
+      { "points": [ { "x": 0, "y": 0 }, { "x": 0, "y": 4 } ] },
+      { "points": [ { "x": 0, "y": 4 }, { "x": 8, "y": 4 } ] },
+      { "points": [ { "x": 8, "y": 0 }, { "x": 8, "y": 4 } ] },
+      { "points": [ { "x": 8, "y": 4 }, { "x": 12, "y": 4 } ] },
+      { "points": [ { "x": 12, "y": 2 }, { "x": 12, "y": 4 } ] },
+      { "points": [ { "x": 12, "y": 4 }, { "x": 18, "y": 4 } ] },
+      { "points": [ { "x": 18, "y": 2 }, { "x": 18, "y": 4 } ] },
+      { "points": [ { "x": 18, "y": 4 }, { "x": 22, "y": 4 } ] },
+      { "points": [ { "x": 22, "y": 0 }, { "x": 22, "y": 4 } ] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

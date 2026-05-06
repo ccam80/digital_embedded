@@ -1,0 +1,151 @@
+{
+  "circuit": {
+    "description": "DAC 8-bit zero-code: all digital inputs at 0V, VREF=5V, 1MOhm load on OUT. Canon categories 2/3/5.",
+    "elements": [
+      {
+        "id": "dac",
+        "position": { "x": 10, "y": 0 },
+        "properties": {
+          "_modelParams": { "bits": 8, "bipolar": 0, "vIH": 2.0, "vIL": 0.8, "rOut": 1, "rIn": 10000000, "cIn": 5e-12 },
+          "bits": 8,
+          "label": "dac"
+        },
+        "rotation": 0,
+        "type": "DAC"
+      },
+      {
+        "id": "vref",
+        "position": { "x": 9, "y": -2 },
+        "properties": {
+          "_modelParams": { "voltage": 5 },
+          "voltage": 5,
+          "label": "vref"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd0",
+        "position": { "x": 6, "y": 0 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd0"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd1",
+        "position": { "x": 6, "y": 1 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd1"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd2",
+        "position": { "x": 6, "y": 2 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd2"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd3",
+        "position": { "x": 6, "y": 3 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd3"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd4",
+        "position": { "x": 6, "y": 4 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd4"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd5",
+        "position": { "x": 6, "y": 5 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd5"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd6",
+        "position": { "x": 6, "y": 6 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd6"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "vd7",
+        "position": { "x": 6, "y": 7 },
+        "properties": {
+          "_modelParams": { "voltage": 0 },
+          "voltage": 0,
+          "label": "vd7"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "rload",
+        "position": { "x": 16, "y": 3 },
+        "properties": {
+          "_modelParams": { "resistance": 1000000 },
+          "resistance": 1000000,
+          "label": "rload"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "gnd",
+        "position": { "x": 0, "y": 20 },
+        "properties": { "label": "gnd" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "dac-canon-zero",
+    "wires": [
+      { "points": [ { "x": 9, "y": -2 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 0 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 1 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 2 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 3 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 4 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 5 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 6 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 6, "y": 7 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 13, "y": 9 }, { "x": 0, "y": 20 } ] },
+      { "points": [ { "x": 20, "y": 3 }, { "x": 0, "y": 20 } ] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

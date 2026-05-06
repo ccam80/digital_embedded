@@ -1,0 +1,80 @@
+{
+  "circuit": {
+    "description": "SPDT switch NC path closed: VCC=5V through R_load=1kΩ into sw:com; sw:nc to GND; sw:no floating via R_no=1MΩ to GND; V_ctrl=0V < vThreshold=1.65V (COM-NO open, COM-NC closed). Cat 3/5 transient parity vs ngspice.",
+    "elements": [
+      {
+        "id": "sw-spdt-nc-vcc",
+        "position": { "x": 0, "y": 0 },
+        "properties": { "_modelParams": { "voltage": 5 }, "label": "vcc", "voltage": 5 },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "sw-spdt-nc-rload",
+        "position": { "x": 8, "y": 0 },
+        "properties": { "_modelParams": { "resistance": 1000 }, "label": "rload", "resistance": 1000 },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "sw-spdt-nc-sw",
+        "position": { "x": 16, "y": 0 },
+        "properties": {
+          "_modelParams": { "rOn": 1, "rOff": 1000000000, "vThreshold": 1.65, "vHysteresis": 0 },
+          "label": "sw",
+          "model": "behavioral",
+          "rOn": 1,
+          "rOff": 1000000000,
+          "vThreshold": 1.65,
+          "vHysteresis": 0
+        },
+        "rotation": 0,
+        "type": "SwitchSPDT"
+      },
+      {
+        "id": "sw-spdt-nc-rno",
+        "position": { "x": 24, "y": -1 },
+        "properties": { "_modelParams": { "resistance": 1000000 }, "label": "rno", "resistance": 1000000 },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "sw-spdt-nc-vctrl",
+        "position": { "x": 16, "y": 4 },
+        "properties": { "_modelParams": { "voltage": -3.3 }, "label": "vctrl", "voltage": -3.3 },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "sw-spdt-nc-gnd",
+        "position": { "x": 0, "y": 6 },
+        "properties": { "label": "gnd" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "SPDT switch NC closed",
+    "wires": [
+      { "points": [ { "x": 4, "y": 0 }, { "x": 8, "y": 0 } ] },
+      { "points": [ { "x": 12, "y": 0 }, { "x": 16, "y": 0 } ] },
+      { "points": [ { "x": 20, "y": 1 }, { "x": 23, "y": 1 } ] },
+      { "points": [ { "x": 23, "y": 1 }, { "x": 23, "y": 6 } ] },
+      { "points": [ { "x": 23, "y": 6 }, { "x": 0, "y": 6 } ] },
+      { "points": [ { "x": 0, "y": 0 }, { "x": -1, "y": 0 } ] },
+      { "points": [ { "x": -1, "y": 0 }, { "x": -1, "y": 6 } ] },
+      { "points": [ { "x": -1, "y": 6 }, { "x": 0, "y": 6 } ] },
+      { "points": [ { "x": 20, "y": -1 }, { "x": 24, "y": -1 } ] },
+      { "points": [ { "x": 28, "y": -1 }, { "x": 29, "y": -1 } ] },
+      { "points": [ { "x": 29, "y": -1 }, { "x": 29, "y": 6 } ] },
+      { "points": [ { "x": 29, "y": 6 }, { "x": 23, "y": 6 } ] },
+      { "points": [ { "x": 18, "y": -1 }, { "x": 18, "y": 2 } ] },
+      { "points": [ { "x": 18, "y": 2 }, { "x": 20, "y": 2 } ] },
+      { "points": [ { "x": 20, "y": 2 }, { "x": 20, "y": 4 } ] },
+      { "points": [ { "x": 20, "y": 4 }, { "x": 23, "y": 4 } ] },
+      { "points": [ { "x": 23, "y": 4 }, { "x": 23, "y": 6 } ] },
+      { "points": [ { "x": 16, "y": 4 }, { "x": 16, "y": 6 } ] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

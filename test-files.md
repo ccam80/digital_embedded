@@ -1,14 +1,14 @@
 # Test Files
 
 ## Component
-- [ ] src/components/__tests__/library-74xx.test.ts
-- [ ] src/components/active/__tests__/adc.test.ts
-- [ ] src/components/active/__tests__/analog-switch.test.ts
-- [ ] src/components/active/__tests__/cccs.test.ts
-- [ ] src/components/active/__tests__/ccvs.test.ts
-- [ ] src/components/active/__tests__/comparator-rollback.test.ts
-- [ ] src/components/active/__tests__/comparator.test.ts
-- [ ] src/components/active/__tests__/dac.test.ts
+- [x] src/components/__tests__/library-74xx.test.ts
+- [x] src/components/active/__tests__/adc.test.ts
+- [x] src/components/active/__tests__/analog-switch.test.ts
+- [x] src/components/active/__tests__/cccs.test.ts
+- [x] src/components/active/__tests__/ccvs.test.ts
+- [x] src/components/active/__tests__/comparator-rollback.test.ts
+- [x] src/components/active/__tests__/comparator.test.ts
+- [x] src/components/active/__tests__/dac.test.ts
 - [ ] src/components/active/__tests__/opamp.test.ts
 - [ ] src/components/active/__tests__/optocoupler-cccs.test.ts
 - [ ] src/components/active/__tests__/optocoupler.test.ts
@@ -77,7 +77,7 @@
 - [ ] src/components/passives/__tests__/transmission-line.test.ts
 - [ ] src/components/pld/__tests__/pld.test.ts
 - [ ] src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts
-- [ ] src/components/semiconductors/__tests__/bjt.test.ts
+- [x] src/components/semiconductors/__tests__/bjt.test.ts
 - [ ] src/components/semiconductors/__tests__/diac.test.ts
 - [ ] src/components/semiconductors/__tests__/diode.test.ts
 - [ ] src/components/semiconductors/__tests__/jfet.test.ts

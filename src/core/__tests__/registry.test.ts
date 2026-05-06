@@ -18,6 +18,10 @@ import type { PropertyValue } from "../properties.js";
 import type { Pin } from "../pin.js";
 import type { RenderContext, Rect } from "../renderer-interface.js";
 import type { Rotation } from "../pin.js";
+import {
+  register74xxLibrary,
+  LIBRARY_74XX,
+} from "../../components/library-74xx.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -517,3 +521,66 @@ describe("ComponentRegistry", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// register*Library round-trip — framework-layer generic contract
+//
+// One row per discovered `register*Library` helper. The contract under test is:
+// after the helper runs, every entry it claims to have registered is reachable
+// via getByCategory(<category>) AND via getStandalone(name), and every retrieved
+// definition's `.category` matches the helper's category.
+//
+// Adding a new register*Library helper? Add a row to LIBRARY_HELPERS below.
+// ---------------------------------------------------------------------------
+
+interface LibraryHelperCase {
+  readonly helperName: string;
+  readonly category: ComponentCategory;
+  readonly register: (registry: ComponentRegistry) => void;
+  readonly manifestNames: readonly string[];
+}
+
+const LIBRARY_HELPERS: readonly LibraryHelperCase[] = [
+  {
+    helperName: "register74xxLibrary",
+    category: ComponentCategory.SEVENTY_FOUR_XX,
+    register: (registry) => register74xxLibrary(registry),
+    manifestNames: LIBRARY_74XX.map((entry) => entry.name),
+  },
+];
+
+describe.each(LIBRARY_HELPERS)(
+  "register*Library round-trip: $helperName",
+  ({ register, category, manifestNames }) => {
+    let registry: ComponentRegistry;
+
+    beforeEach(() => {
+      registry = new ComponentRegistry();
+      register(registry);
+    });
+
+    it("getByCategory length matches the manifest length passed to the helper", () => {
+      expect(registry.getByCategory(category)).toHaveLength(manifestNames.length);
+    });
+
+    it("every name from getByCategory is retrievable via getStandalone(name)", () => {
+      const namesFromCategory = registry.getByCategory(category).map((d) => d.name);
+      for (const name of namesFromCategory) {
+        const def = registry.getStandalone(name);
+        expect(def).toBeDefined();
+        expect(def!.name).toBe(name);
+      }
+    });
+
+    it("every retrieved definition has category equal to the helper's category", () => {
+      for (const def of registry.getByCategory(category)) {
+        expect(def.category).toBe(category);
+      }
+      for (const name of manifestNames) {
+        const def = registry.getStandalone(name);
+        expect(def).toBeDefined();
+        expect(def!.category).toBe(category);
+      }
+    });
+  },
+);

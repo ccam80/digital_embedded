@@ -1,0 +1,69 @@
+{
+  "circuit": {
+    "description": "SPST switch OFF: VCC=5V through R_load=1kΩ into sw:in; sw:out to GND; V_ctrl=0V < vThreshold=1.65V (switch open). Cat 3/5 transient parity vs ngspice.",
+    "elements": [
+      {
+        "id": "sw-spst-off-vcc",
+        "position": { "x": 0, "y": 0 },
+        "properties": { "_modelParams": { "voltage": 5 }, "label": "vcc", "voltage": 5 },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "sw-spst-off-rload",
+        "position": { "x": 8, "y": 0 },
+        "properties": { "_modelParams": { "resistance": 1000 }, "label": "rload", "resistance": 1000 },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "sw-spst-off-sw",
+        "position": { "x": 16, "y": 0 },
+        "properties": {
+          "_modelParams": { "rOn": 1, "rOff": 1000000000, "vThreshold": 1.65, "vHysteresis": 0 },
+          "label": "sw",
+          "model": "behavioral",
+          "rOn": 1,
+          "rOff": 1000000000,
+          "vThreshold": 1.65,
+          "vHysteresis": 0
+        },
+        "rotation": 0,
+        "type": "SwitchSPST"
+      },
+      {
+        "id": "sw-spst-off-vctrl",
+        "position": { "x": 16, "y": 3 },
+        "properties": { "_modelParams": { "voltage": 0 }, "label": "vctrl", "voltage": 0 },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "sw-spst-off-gnd",
+        "position": { "x": 0, "y": 5 },
+        "properties": { "label": "gnd" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "SPST switch OFF",
+    "wires": [
+      { "points": [ { "x": 4, "y": 0 }, { "x": 8, "y": 0 } ] },
+      { "points": [ { "x": 12, "y": 0 }, { "x": 16, "y": 0 } ] },
+      { "points": [ { "x": 20, "y": 0 }, { "x": 22, "y": 0 } ] },
+      { "points": [ { "x": 22, "y": 0 }, { "x": 22, "y": 5 } ] },
+      { "points": [ { "x": 22, "y": 5 }, { "x": 0, "y": 5 } ] },
+      { "points": [ { "x": 0, "y": 0 }, { "x": -1, "y": 0 } ] },
+      { "points": [ { "x": -1, "y": 0 }, { "x": -1, "y": 5 } ] },
+      { "points": [ { "x": -1, "y": 5 }, { "x": 0, "y": 5 } ] },
+      { "points": [ { "x": 18, "y": 1 }, { "x": 18, "y": 2 } ] },
+      { "points": [ { "x": 18, "y": 2 }, { "x": 20, "y": 2 } ] },
+      { "points": [ { "x": 20, "y": 2 }, { "x": 20, "y": 3 } ] },
+      { "points": [ { "x": 20, "y": 3 }, { "x": 22, "y": 3 } ] },
+      { "points": [ { "x": 22, "y": 3 }, { "x": 22, "y": 5 } ] },
+      { "points": [ { "x": 16, "y": 3 }, { "x": 16, "y": 5 } ] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
