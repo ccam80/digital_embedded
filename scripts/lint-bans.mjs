@@ -127,7 +127,12 @@ const RULES = [
     refine: (line) => {
       const matches = [...line.matchAll(/["'](\w+):[AB]["']/g)];
       if (matches.length === 0) return true;          // Map-form constructor- not prefix-aware
-      return !matches.every((m) => /^[DdQqMmJj]\d/.test(m[1]));
+      // SPICE-prefixed labels (D1, Q2, M1, J3) and Diac-shaped labels
+      // (diac, DIAC1, diac1) legitimately use :A / :B pins. Skip the
+      // match when every occurrence on the line carries one of those forms.
+      const isLegitPrefix = (label) =>
+        /^[DdQqMmJj]\d/.test(label) || /^[Dd][Ii][Aa][Cc]\d*$/.test(label);
+      return !matches.every((m) => isLegitPrefix(m[1]));
     },
   },
   {

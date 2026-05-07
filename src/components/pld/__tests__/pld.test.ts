@@ -1,1319 +1,313 @@
-/**
- * Tests for PLD components: Diode, DiodeForward, DiodeBackward, PullUp, PullDown.
- *
- * Covers per the task spec:
- *   - Diode forward conduction
- *   - Pull-up on floating net
- *   - Pull-down on floating net
- *   - Rendering for each component
- *   - Attribute mapping correctness
- *   - ComponentDefinition completeness for all variants
- *   - Registry registration
- */
-
 import { describe, it, expect } from "vitest";
-import {
-  DiodeElement,
-  DiodeForwardElement,
-  DiodeBackwardElement,
-  executeDiode,
-  executeDiodeForward,
-  executeDiodeBackward,
-  PldDiodeDefinition,
-  PldDiodeForwardDefinition,
-  PldDiodeBackwardDefinition,
-  DIODE_ATTRIBUTE_MAPPINGS_EXPORT,
-} from "../diode.js";
-import {
-  PullUpElement,
-  executePullUp,
-  PullUpDefinition,
-  PULL_UP_ATTRIBUTE_MAPPINGS,
-} from "../pull-up.js";
-import {
-  PullDownElement,
-  executePullDown,
-  PullDownDefinition,
-  PULL_DOWN_ATTRIBUTE_MAPPINGS,
-} from "../pull-down.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+
+import { createDefaultRegistry } from "../../register-all.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
-// Helpers- ComponentLayout mock
+// Helpers
 // ---------------------------------------------------------------------------
 
-function makeLayoutSingle(inputOffset: number, outputOffset: number): ComponentLayout {
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-    inputOffset: () => inputOffset,
-    outputCount: () => 1,
-    outputOffset: () => outputOffset,
-    stateOffset: () => 0,
-    getProperty: () => undefined,
-  };
-}
-
-function makeState(size: number, fill: number = 0): Uint32Array {
-  return new Uint32Array(size).fill(fill);
+function digital(value: number): SignalValue {
+  return { type: "digital", value };
 }
 
 // ---------------------------------------------------------------------------
-// Helpers- RenderContext mock
+// Programmatic circuit factories (T1) — one per PLD digital component variant
 // ---------------------------------------------------------------------------
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
+// PullUp: pullup:out → Out("DOUT"). No drivers other than pullup → DOUT=1.
+function buildPullUpCircuit(facade: DefaultSimulatorFacade, props: { bitWidth?: number } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "pu",   type: "PullUp", props: { label: "PU", bitWidth: props.bitWidth ?? 1 } },
+      { id: "dout", type: "Out",   props: { label: "DOUT", bitWidth: props.bitWidth ?? 1 } },
+    ],
+    connections: [
+      ["pu:out", "dout:in"],
+    ],
+  });
 }
 
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
+// PullDown: pulldown:out → Out("DOUT"). No drivers other than pulldown → DOUT=0.
+function buildPullDownCircuit(facade: DefaultSimulatorFacade, props: { bitWidth?: number } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "pd",   type: "PullDown", props: { label: "PD", bitWidth: props.bitWidth ?? 1 } },
+      { id: "dout", type: "Out",     props: { label: "DOUT", bitWidth: props.bitWidth ?? 1 } },
+    ],
+    connections: [
+      ["pd:out", "dout:in"],
+    ],
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Factory helpers
-// ---------------------------------------------------------------------------
-
-function makeDiode(overrides?: { blown?: boolean; label?: string }): DiodeElement {
-  const props = new PropertyBag();
-  props.set("blown", overrides?.blown ?? false);
-  if (overrides?.label !== undefined) props.set("label", overrides.label);
-  return new DiodeElement("test-diode-001", { x: 0, y: 0 }, 0, false, props);
+// PldDiodeBackward: In("DIN") → db:in; db:out → Out("DOUT").
+// Backward diode actively drives DOUT to whatever DIN is (in=1 → 1, in=0 → 0).
+function buildDiodeBackwardCircuit(facade: DefaultSimulatorFacade, props: { blown?: boolean } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "din",  type: "In",               props: { label: "DIN",  bitWidth: 1 } },
+      { id: "db",   type: "PldDiodeBackward", props: { label: "DB",   blown: props.blown ?? false } },
+      { id: "dout", type: "Out",              props: { label: "DOUT", bitWidth: 1 } },
+    ],
+    connections: [
+      ["din:out", "db:in"],
+      ["db:out",  "dout:in"],
+    ],
+  });
 }
 
-function makeDiodeForward(overrides?: { blown?: boolean; label?: string }): DiodeForwardElement {
-  const props = new PropertyBag();
-  props.set("blown", overrides?.blown ?? false);
-  if (overrides?.label !== undefined) props.set("label", overrides.label);
-  return new DiodeForwardElement("test-df-001", { x: 0, y: 0 }, 0, false, props);
+// PldDiodeForward + PullDown wired-OR sink:
+// In("DIN") → df:in; df:out joined with pulldown net → Out("DOUT").
+// Forward diode drives 1 when in=1; goes high-Z when in=0 → pull-down resolves DOUT=0.
+function buildDiodeForwardCircuit(facade: DefaultSimulatorFacade, props: { blown?: boolean } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "din",  type: "In",              props: { label: "DIN",  bitWidth: 1 } },
+      { id: "df",   type: "PldDiodeForward", props: { label: "DF",   blown: props.blown ?? false } },
+      { id: "pd",   type: "PullDown",        props: { label: "PD",   bitWidth: 1 } },
+      { id: "dout", type: "Out",             props: { label: "DOUT", bitWidth: 1 } },
+    ],
+    connections: [
+      ["din:out", "df:in"],
+      ["df:out",  "dout:in"],
+      ["df:out",  "pd:out"],
+    ],
+  });
 }
 
-function makeDiodeBackward(overrides?: { blown?: boolean; label?: string }): DiodeBackwardElement {
-  const props = new PropertyBag();
-  props.set("blown", overrides?.blown ?? false);
-  if (overrides?.label !== undefined) props.set("label", overrides.label);
-  return new DiodeBackwardElement("test-db-001", { x: 0, y: 0 }, 0, false, props);
+// PldDiode (bidirectional, wired-OR via pull-down on cathode side):
+// Anode side (out2) driven by In("ANODE"); cathode side (out1) joined to PullDown
+// sink and Out("CATHODE") observer.
+// Forward conduction: anode high (driven, not high-Z) → diode pulls cathode to 1.
+// Anode low / high-Z → diode does not drive cathode → pull-down resolves cathode to 0.
+function buildDiodeBidirectionalCircuit(facade: DefaultSimulatorFacade, props: { blown?: boolean } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "ain",   type: "In",       props: { label: "ANODE",   bitWidth: 1 } },
+      { id: "diode", type: "PldDiode", props: { label: "D",       blown: props.blown ?? false } },
+      { id: "pd",    type: "PullDown", props: { label: "PD",      bitWidth: 1 } },
+      { id: "cout",  type: "Out",      props: { label: "CATHODE", bitWidth: 1 } },
+    ],
+    connections: [
+      // Anode side (out2): driven by In so ANODE drives the diode.
+      ["ain:out",     "diode:out2"],
+      // Cathode side (out1): observed by Out, with PullDown providing the floor.
+      ["diode:out1",  "cout:in"],
+      ["diode:out1",  "pd:out"],
+    ],
+  });
 }
 
-function makePullUp(overrides?: { bitWidth?: number; label?: string }): PullUpElement {
-  const props = new PropertyBag();
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  if (overrides?.label !== undefined) props.set("label", overrides.label);
-  return new PullUpElement("test-pu-001", { x: 0, y: 0 }, 0, false, props);
-}
-
-function makePullDown(overrides?: { bitWidth?: number; label?: string }): PullDownElement {
-  const props = new PropertyBag();
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  if (overrides?.label !== undefined) props.set("label", overrides.label);
-  return new PullDownElement("test-pd-001", { x: 0, y: 0 }, 0, false, props);
+// PldDiode (bidirectional, INVERTED topology — cathode-driven, anode-observed):
+// Cathode side (out1) driven by In("CATHODE"); anode side (out2) joined to PullUp
+// floor and Out("ANODE") observer.
+// Reverse-direction conduction: cathode driven low → diode actively pulls the
+// anode-side net low against the PullUp floor (the canonical reverse-direction
+// observable for the bidirectional component).
+function buildDiodeBidirectionalReverseCircuit(facade: DefaultSimulatorFacade, props: { blown?: boolean } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "cin",   type: "In",       props: { label: "CATHODE", bitWidth: 1 } },
+      { id: "diode", type: "PldDiode", props: { label: "D",       blown: props.blown ?? false } },
+      { id: "pu",    type: "PullUp",   props: { label: "PU",      bitWidth: 1 } },
+      { id: "aout",  type: "Out",      props: { label: "ANODE",   bitWidth: 1 } },
+    ],
+    connections: [
+      // Cathode side (out1): driven by In so CATHODE drives the diode in reverse.
+      ["cin:out",     "diode:out1"],
+      // Anode side (out2): observed by Out, with PullUp providing the high floor.
+      ["diode:out2",  "aout:in"],
+      ["diode:out2",  "pu:out"],
+    ],
+  });
 }
 
 // ===========================================================================
-// Diode tests
+// Category 9 — Bridge / digital interaction (T1)
 // ===========================================================================
 
-describe("Diode", () => {
-  // -------------------------------------------------------------------------
-  // Pin layout
-  // -------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("Diode has 2 pins", () => {
-      const d = makeDiode();
-      expect(d.getPins()).toHaveLength(2);
-    });
-
-    it("Diode pins are labeled 'out1' and 'out2'", () => {
-      const d = makeDiode();
-      const labels = d.getPins().map((p) => p.label);
-      expect(labels).toContain("out1");
-      expect(labels).toContain("out2");
-    });
-
-    it("Diode pins are BIDIRECTIONAL", () => {
-      const d = makeDiode();
-      for (const pin of d.getPins()) {
-        expect(pin.direction).toBe(PinDirection.BIDIRECTIONAL);
-      }
-    });
-
-    it("PldDiodeDefinition.pinLayout has 2 entries", () => {
-      expect(PldDiodeDefinition.pinLayout).toHaveLength(2);
-    });
+describe("PullUp digital bridge (T1) — Cat 9", () => {
+  it("pullup_drives_floating_net_to_one", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildPullUpCircuit(facade));
+    coordinator.step();
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 1 });
   });
 
-  // -------------------------------------------------------------------------
-  // Forward conduction- anode drives cathode high
-  // -------------------------------------------------------------------------
+  it("pullup_4bit_drives_all_ones_mask", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildPullUpCircuit(facade, { bitWidth: 4 }));
+    coordinator.step();
+    // 4-bit pull-up: every bit pulled high → 0b1111 = 15.
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0xF });
+  });
+});
 
-  describe("forwardConduction", () => {
-    it("anode high (not highZ) → cathode driven to 1", () => {
-      // inputStart=0: cathodeIn=state[0], anodeIn=state[1]
-      // outputStart=2: cathodeOut=state[2], cathodeHighZ=state[3], anodeOut=state[4] (blown), ...
-      // Use 8-slot layout to avoid overlap
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-        inputOffset: () => 0,
-        outputCount: () => 5,
-        outputOffset: () => 2,
-        stateOffset: () => 7,
-        getProperty: () => undefined,
-      };
-      const state = makeState(10);
-      const highZs = new Uint32Array(state.length);
-      // cathodeIn = highZ (slot 0): value=0, highZ=1 → encode as (1 << 16) | 0
-      state[0] = (1 << 16) | 0;
-      // anodeIn = driven high: value=1, highZ=0 → encode as 0 | 1
-      state[1] = 1;
-      // blown flag at outputStart+4 = state[6] = 0 (not blown)
-      state[6] = 0;
-
-      executeDiode(0, state, highZs, layout);
-
-      // cathode output slot (outputStart=2): state[2]=driven value, state[3]=highZ
-      expect(state[2]).toBe(1);
-      expect(state[3]).toBe(0); // not highZ- actively driven
-    });
-
-    it("anode low (not highZ) → cathode is high-Z (not driven)", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-        inputOffset: () => 0,
-        outputCount: () => 5,
-        outputOffset: () => 2,
-        stateOffset: () => 7,
-        getProperty: () => undefined,
-      };
-      const state = makeState(10);
-      const highZs = new Uint32Array(state.length);
-      state[0] = (1 << 16) | 0; // cathodeIn = highZ
-      state[1] = 0;             // anodeIn = 0, not highZ
-      state[6] = 0;             // not blown
-
-      executeDiode(0, state, highZs, layout);
-
-      expect(state[3]).toBe(1); // cathode is high-Z (diode not conducting forward)
-    });
-
-    it("cathode low (not highZ) → anode is driven to 0 (pulling down)", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-        inputOffset: () => 0,
-        outputCount: () => 5,
-        outputOffset: () => 2,
-        stateOffset: () => 7,
-        getProperty: () => undefined,
-      };
-      const state = makeState(10);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0;             // cathodeIn = 0, not highZ (driven low)
-      state[1] = (1 << 16) | 0; // anodeIn = highZ
-      state[6] = 0;             // not blown
-
-      executeDiode(0, state, highZs, layout);
-
-      expect(state[4]).toBe(0); // anode driven to 0
-      expect(state[5]).toBe(0); // not highZ- actively pulling anode low
-    });
-
-    it("cathode highZ → anode is high-Z (not pulling)", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-        inputOffset: () => 0,
-        outputCount: () => 5,
-        outputOffset: () => 2,
-        stateOffset: () => 7,
-        getProperty: () => undefined,
-      };
-      const state = makeState(10);
-      const highZs = new Uint32Array(state.length);
-      state[0] = (1 << 16) | 0; // cathodeIn = highZ
-      state[1] = (1 << 16) | 0; // anodeIn = highZ
-      state[6] = 0;              // not blown
-
-      executeDiode(0, state, highZs, layout);
-
-      expect(state[5]).toBe(1); // anode is high-Z
-    });
-
-    it("blown diode- both outputs are high-Z", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-        inputOffset: () => 0,
-        outputCount: () => 5,
-        outputOffset: () => 2,
-        stateOffset: () => 7,
-        getProperty: () => undefined,
-      };
-      const state = makeState(10);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0;  // cathodeIn = 0 (driven low)
-      state[1] = 1;  // anodeIn = 1 (driven high)
-      state[6] = 1;  // blown flag set
-
-      executeDiode(0, state, highZs, layout);
-
-      expect(state[3]).toBe(1); // cathode high-Z
-      expect(state[5]).toBe(1); // anode high-Z
-    });
+describe("PullDown digital bridge (T1) — Cat 9", () => {
+  it("pulldown_drives_floating_net_to_zero", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildPullDownCircuit(facade));
+    coordinator.step();
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
+  it("pulldown_8bit_drives_all_zero_mask", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildPullDownCircuit(facade, { bitWidth: 8 }));
+    coordinator.step();
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
 
-  describe("rendering", () => {
-    it("draw() calls drawPath for the diode triangle", () => {
-      const d = makeDiode();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
-    });
+describe("PldDiodeBackward digital bridge (T1) — Cat 9", () => {
+  it("diode_backward_drives_dout_to_din", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDiodeBackwardCircuit(facade));
+    coordinator.writeByLabel("DIN", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 1 });
 
-    it("draw() calls drawPath for triangle and drawLine for cathode bar", () => {
-      const d = makeDiode();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
-    });
+    coordinator.writeByLabel("DIN", digital(0));
+    coordinator.step();
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
 
-    it("draw() with label calls drawText", () => {
-      const d = makeDiode({ label: "D1" });
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "D1")).toBe(true);
-    });
-
-    it("draw() without label does not call drawText", () => {
-      const d = makeDiode();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText")).toHaveLength(0);
-    });
-
-    it("blown diode draw() calls setColor WIRE_ERROR for the blow mark", () => {
-      const d = makeDiode({ blown: true });
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      const errorColor = calls.filter(
-        (c) => c.method === "setColor" && c.args[0] === "WIRE_ERROR",
-      );
-      expect(errorColor.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("non-blown diode draw() does not call setColor WIRE_ERROR", () => {
-      const d = makeDiode({ blown: false });
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      const errorColor = calls.filter(
-        (c) => c.method === "setColor" && c.args[0] === "ERROR",
-      );
-      expect(errorColor).toHaveLength(0);
-    });
-
-    it("draw() saves and restores context", () => {
-      const d = makeDiode();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "save")).toHaveLength(1);
-      expect(calls.filter((c) => c.method === "restore")).toHaveLength(1);
-    });
+describe("PldDiodeForward digital bridge (T1) — Cat 9", () => {
+  it("diode_forward_drives_dout_high_when_din_high", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDiodeForwardCircuit(facade));
+    coordinator.writeByLabel("DIN", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 1 });
   });
 
-  // -------------------------------------------------------------------------
-  // Blown flag
-  // -------------------------------------------------------------------------
+  it("diode_forward_yields_to_pulldown_when_din_low", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDiodeForwardCircuit(facade));
+    coordinator.writeByLabel("DIN", digital(0));
+    coordinator.step();
+    // Forward diode high-Z when in=0 → pull-down resolves DOUT to 0.
+    expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
 
-  describe("blownFlag", () => {
-    it("default Diode is not blown", () => {
-      const d = makeDiode();
-      expect(d.isBlown()).toBe(false);
-    });
-
-    it("Diode with blown=true reports isBlown()=true", () => {
-      const d = makeDiode({ blown: true });
-      expect(d.isBlown()).toBe(true);
-    });
+describe("PldDiode bidirectional digital bridge (T1) — Cat 9", () => {
+  it("diode_anode_high_pulls_cathode_to_one", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDiodeBidirectionalCircuit(facade));
+    coordinator.writeByLabel("ANODE", digital(1));
+    coordinator.step();
+    // Forward conduction: anode driven high → cathode driven to 1 (overrides pull-down).
+    expect(coordinator.readByLabel("CATHODE")).toMatchObject({ type: "digital", value: 1 });
   });
 
-  // -------------------------------------------------------------------------
-  // Bounding box
-  // -------------------------------------------------------------------------
-
-  describe("boundingBox", () => {
-    it("getBoundingBox returns correct dimensions", () => {
-      const d = makeDiode();
-      const bb = d.getBoundingBox();
-      expect(bb.x).toBe(-0.5);
-      expect(bb.y).toBe(-0.95);
-      expect(bb.width).toBeGreaterThanOrEqual(0.5);
-      expect(bb.height).toBeGreaterThanOrEqual(0.5);
-    });
+  it("diode_anode_low_yields_cathode_to_pulldown_zero", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDiodeBidirectionalCircuit(facade));
+    coordinator.writeByLabel("ANODE", digital(0));
+    coordinator.step();
+    // Anode low → diode does not drive cathode high → pull-down resolves cathode to 0.
+    expect(coordinator.readByLabel("CATHODE")).toMatchObject({ type: "digital", value: 0 });
   });
+});
 
-  // -------------------------------------------------------------------------
-  // Attribute mapping
-  // -------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("blown=true maps to boolean true", () => {
-      const mapping = DIODE_ATTRIBUTE_MAPPINGS_EXPORT.find((m) => m.xmlName === "blown");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("true")).toBe(true);
-    });
-
-    it("blown=false maps to boolean false", () => {
-      const mapping = DIODE_ATTRIBUTE_MAPPINGS_EXPORT.find((m) => m.xmlName === "blown");
-      expect(mapping!.convert("false")).toBe(false);
-    });
-
-    it("Label maps to label property", () => {
-      const mapping = DIODE_ATTRIBUTE_MAPPINGS_EXPORT.find((m) => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("label");
-      expect(mapping!.convert("D1")).toBe("D1");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("PldDiodeDefinition has name='PldDiode'", () => {
-      expect(PldDiodeDefinition.name).toBe("PldDiode");
-    });
-
-    it("PldDiodeDefinition has typeId=-1", () => {
-      expect(PldDiodeDefinition.typeId).toBe(-1);
-    });
-
-    it("PldDiodeDefinition has a factory function", () => {
-      expect(typeof PldDiodeDefinition.factory).toBe("function");
-    });
-
-    it("PldDiodeDefinition factory produces a DiodeElement", () => {
-      const props = new PropertyBag();
-      props.set("blown", false);
-      const el = PldDiodeDefinition.factory(props);
-      expect(el.typeId).toBe("PldDiode");
-    });
-
-    it("PldDiodeDefinition has executeFn=executeDiode", () => {
-      expect(PldDiodeDefinition.models.digital!.executeFn).toBe(executeDiode);
-    });
-
-    it("PldDiodeDefinition category is PLD", () => {
-      expect(PldDiodeDefinition.category).toBe(ComponentCategory.PLD);
-    });
-
-    it("PldDiodeDefinition has non-empty helpText", () => {
-      expect(typeof PldDiodeDefinition.helpText).toBe("string");
-      expect(typeof PldDiodeDefinition.helpText).toBe("string"); expect(PldDiodeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("PldDiodeDefinition has non-empty propertyDefs", () => {
-      expect(PldDiodeDefinition.propertyDefs.length).toBeGreaterThan(0);
-    });
-
-    it("PldDiodeDefinition propertyDefs include 'blown'", () => {
-      const keys = PldDiodeDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("blown");
-    });
-
-    it("PldDiodeDefinition can be registered without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PldDiodeDefinition)).not.toThrow();
-    });
-
-    it("After registration PldDiodeDefinition typeId is non-negative", () => {
-      const registry = new ComponentRegistry();
-      registry.register(PldDiodeDefinition);
-      const registered = registry.get("PldDiode");
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
-
-    it("PldDiodeDefinition defaultDelay is 0", () => {
-      expect(PldDiodeDefinition.models.digital!.defaultDelay).toBe(0);
-    });
+describe("PldDiode bidirectional digital bridge — reverse direction (T1) — Cat 9", () => {
+  it("diode_cathode_low_pulls_anode_to_zero", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDiodeBidirectionalReverseCircuit(facade));
+    coordinator.writeByLabel("CATHODE", digital(0));
+    coordinator.step();
+    // Reverse-direction conduction: cathode driven low → diode pulls anode-side
+    // net to 0, overriding the PullUp floor (which would otherwise resolve to 1).
+    expect(coordinator.readByLabel("ANODE")).toMatchObject({ type: "digital", value: 0 });
   });
 });
 
 // ===========================================================================
-// DiodeForward tests
+// Category 4 — Compile-time-seeded structural properties (T1)
 // ===========================================================================
+//
+// `blown` is a structural PropertyBag entry consumed at compile() to seed the
+// diode's output sentinel slot. It is not hot-loadable post-compile; the
+// canonical Cat 4 it() builds the same circuit twice — once with the property
+// at default, once with it set — and asserts the documented post-compile
+// observable differs.
 
-describe("DiodeForward", () => {
-  // -------------------------------------------------------------------------
-  // Pin layout
-  // -------------------------------------------------------------------------
+describe("PldDiodeBackward blown structural prop (T1) — Cat 4 compile-seeded", () => {
+  it("blown_property_disables_active_drive_observable_at_dout", () => {
+    const registryDefault = createDefaultRegistry();
+    const facadeDefault = new DefaultSimulatorFacade(registryDefault);
+    const coordDefault = facadeDefault.compile(buildDiodeBackwardCircuit(facadeDefault, { blown: false }));
+    coordDefault.writeByLabel("DIN", digital(1));
+    coordDefault.step();
+    // Not blown: backward diode actively drives DOUT to DIN value.
+    expect(coordDefault.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 1 });
 
-  describe("pinLayout", () => {
-    it("DiodeForward has 2 pins", () => {
-      const d = makeDiodeForward();
-      expect(d.getPins()).toHaveLength(2);
-    });
-
-    it("DiodeForward pins are labeled 'in' and 'out'", () => {
-      const d = makeDiodeForward();
-      const labels = d.getPins().map((p) => p.label);
-      expect(labels).toContain("in");
-      expect(labels).toContain("out");
-    });
-
-    it("'in' pin is INPUT direction", () => {
-      const d = makeDiodeForward();
-      const inPin = d.getPins().find((p) => p.label === "in");
-      expect(inPin!.direction).toBe(PinDirection.INPUT);
-    });
-
-    it("'out' pin is OUTPUT direction", () => {
-      const d = makeDiodeForward();
-      const outPin = d.getPins().find((p) => p.label === "out");
-      expect(outPin!.direction).toBe(PinDirection.OUTPUT);
-    });
-
-    it("PldDiodeForwardDefinition.pinLayout has 2 entries", () => {
-      expect(PldDiodeForwardDefinition.pinLayout).toHaveLength(2);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Forward conduction- in=1 → out=1; in=0 → out=highZ
-  // -------------------------------------------------------------------------
-
-  describe("forwardConduction", () => {
-    it("in=1 → output driven to 1 (highZ=0)", () => {
-      // inputOffset=0, outputOffset=1; blown flag at output+2=state[3]
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const state = makeState(6);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 1; // in=1
-      state[3] = 0; // not blown
-
-      executeDiodeForward(0, state, highZs, layout);
-
-      expect(state[1]).toBe(1); // out=1
-      expect(state[2]).toBe(0); // highZ=0 (actively driven)
-    });
-
-    it("in=0 → output is high-Z", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const state = makeState(6);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0; // in=0
-      state[3] = 0; // not blown
-
-      executeDiodeForward(0, state, highZs, layout);
-
-      expect(state[2]).toBe(1); // highZ=1 (high-Z)
-    });
-
-    it("blown=true → output always high-Z regardless of input", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const state = makeState(6);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 1; // in=1 (would normally drive output)
-      state[3] = 1; // blown
-
-      executeDiodeForward(0, state, highZs, layout);
-
-      expect(state[2]).toBe(1); // high-Z regardless
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-
-  describe("rendering", () => {
-    it("draw() calls drawPath for the diode triangle body", () => {
-      const d = makeDiodeForward();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() calls drawLine for the cathode bar", () => {
-      const d = makeDiodeForward();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      // drawDiodeBodyForward draws: drawPath (triangle) + drawLine (cathode bar at y=0.95)
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() with label calls drawText", () => {
-      const d = makeDiodeForward({ label: "DF1" });
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "DF1")).toBe(true);
-    });
-
-    it("blown DiodeForward draw() shows ERROR color marker", () => {
-      const d = makeDiodeForward({ blown: true });
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "setColor" && c.args[0] === "WIRE_ERROR").length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Attribute mapping
-  // -------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("blown=true maps to boolean true", () => {
-      const mapping = PldDiodeForwardDefinition.attributeMap.find((m) => m.xmlName === "blown");
-      expect(mapping!.convert("true")).toBe(true);
-    });
-
-    it("Label maps to label property key", () => {
-      const mapping = PldDiodeForwardDefinition.attributeMap.find((m) => m.xmlName === "Label");
-      expect(mapping!.propertyKey).toBe("label");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("PldDiodeForwardDefinition has name='PldDiodeForward'", () => {
-      expect(PldDiodeForwardDefinition.name).toBe("PldDiodeForward");
-    });
-
-    it("PldDiodeForwardDefinition has typeId=-1", () => {
-      expect(PldDiodeForwardDefinition.typeId).toBe(-1);
-    });
-
-    it("PldDiodeForwardDefinition executeFn is executeDiodeForward", () => {
-      expect(PldDiodeForwardDefinition.models.digital!.executeFn).toBe(executeDiodeForward);
-    });
-
-    it("PldDiodeForwardDefinition category is PLD", () => {
-      expect(PldDiodeForwardDefinition.category).toBe(ComponentCategory.PLD);
-    });
-
-    it("PldDiodeForwardDefinition factory produces a DiodeForwardElement", () => {
-      const props = new PropertyBag();
-      props.set("blown", false);
-      const el = PldDiodeForwardDefinition.factory(props);
-      expect(el.typeId).toBe("PldDiodeForward");
-    });
-
-    it("PldDiodeForwardDefinition can be registered without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PldDiodeForwardDefinition)).not.toThrow();
-    });
-
-    it("PldDiodeForwardDefinition has non-empty helpText", () => {
-      expect(typeof PldDiodeForwardDefinition.helpText).toBe("string"); expect(PldDiodeForwardDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("PldDiodeForwardDefinition defaultDelay is 0", () => {
-      expect(PldDiodeForwardDefinition.models.digital!.defaultDelay).toBe(0);
-    });
+    const registryBlown = createDefaultRegistry();
+    const facadeBlown = new DefaultSimulatorFacade(registryBlown);
+    const coordBlown = facadeBlown.compile(buildDiodeBackwardCircuit(facadeBlown, { blown: true }));
+    coordBlown.writeByLabel("DIN", digital(1));
+    coordBlown.step();
+    // Blown: documented contract is open-circuit / high-Z (no active drive).
+    // The observable: DOUT no longer reads DIN's high value; it reads 0
+    // (default for an undriven net) instead of the 1 the unblown variant produced.
+    expect(coordBlown.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
   });
 });
 
-// ===========================================================================
-// DiodeBackward tests
-// ===========================================================================
+describe("PldDiodeForward blown structural prop (T1) — Cat 4 compile-seeded", () => {
+  it("blown_property_keeps_dout_at_pulldown_default_with_din_high", () => {
+    const registryDefault = createDefaultRegistry();
+    const facadeDefault = new DefaultSimulatorFacade(registryDefault);
+    const coordDefault = facadeDefault.compile(buildDiodeForwardCircuit(facadeDefault, { blown: false }));
+    coordDefault.writeByLabel("DIN", digital(1));
+    coordDefault.step();
+    // Not blown: forward diode drives DOUT high when in=1.
+    expect(coordDefault.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 1 });
 
-describe("DiodeBackward", () => {
-  // -------------------------------------------------------------------------
-  // Pin layout
-  // -------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("DiodeBackward has 2 pins", () => {
-      const d = makeDiodeBackward();
-      expect(d.getPins()).toHaveLength(2);
-    });
-
-    it("DiodeBackward has 'in' and 'out' pins", () => {
-      const d = makeDiodeBackward();
-      const labels = d.getPins().map((p) => p.label);
-      expect(labels).toContain("in");
-      expect(labels).toContain("out");
-    });
-
-    it("PldDiodeBackwardDefinition.pinLayout has 2 entries", () => {
-      expect(PldDiodeBackwardDefinition.pinLayout).toHaveLength(2);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Backward conduction- in=1 → out=1; in=0 → out=0
-  // -------------------------------------------------------------------------
-
-  describe("backwardConduction", () => {
-    it("in=1 → output driven to 1 (contributes to pull-up net)", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const state = makeState(6);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 1; // in=1
-      state[3] = 0; // not blown
-
-      executeDiodeBackward(0, state, highZs, layout);
-
-      expect(state[1]).toBe(1); // out=1
-      expect(state[2]).toBe(0); // not high-Z
-    });
-
-    it("in=0 → output driven to 0 (pulls down the pull-up net)", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const state = makeState(6);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0; // in=0
-      state[3] = 0; // not blown
-
-      executeDiodeBackward(0, state, highZs, layout);
-
-      expect(state[1]).toBe(0); // out=0 (actively pulling down)
-      expect(state[2]).toBe(0); // not high-Z- actively driven
-    });
-
-    it("blown=true → output always high-Z", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const state = makeState(6);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 1; // in=1 (would normally drive output)
-      state[3] = 1; // blown
-
-      executeDiodeBackward(0, state, highZs, layout);
-
-      expect(state[2]).toBe(1); // high-Z (blown)
-    });
-
-    it("DiodeBackward vs DiodeForward: backward drives 0 when in=0, forward does not", () => {
-      const layout: ComponentLayout = {
-        wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-        inputOffset: () => 0,
-        outputCount: () => 3,
-        outputOffset: () => 1,
-        stateOffset: () => 4,
-        getProperty: () => undefined,
-      };
-      const stateBackward = makeState(6);
-      stateBackward[0] = 0;
-      stateBackward[3] = 0;
-      executeDiodeBackward(0, stateBackward, new Uint32Array(stateBackward.length), layout);
-
-      const stateForward = makeState(6);
-      stateForward[0] = 0;
-      stateForward[3] = 0;
-      executeDiodeForward(0, stateForward, new Uint32Array(stateForward.length), layout);
-
-      // Backward: drives 0 actively
-      expect(stateBackward[2]).toBe(0); // not high-Z
-      // Forward: goes high-Z
-      expect(stateForward[2]).toBe(1); // high-Z
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-
-  describe("rendering", () => {
-    it("draw() calls drawPath for backward-oriented diode triangle", () => {
-      const d = makeDiodeBackward();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() calls drawLine for the cathode bar", () => {
-      const d = makeDiodeBackward();
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      // drawDiodeBodyBackward draws: drawPath (triangle) + drawLine (cathode bar at y=-0.05)
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() with label calls drawText", () => {
-      const d = makeDiodeBackward({ label: "DB1" });
-      const { ctx, calls } = makeStubCtx();
-      d.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "DB1")).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("PldDiodeBackwardDefinition has name='PldDiodeBackward'", () => {
-      expect(PldDiodeBackwardDefinition.name).toBe("PldDiodeBackward");
-    });
-
-    it("PldDiodeBackwardDefinition has typeId=-1", () => {
-      expect(PldDiodeBackwardDefinition.typeId).toBe(-1);
-    });
-
-    it("PldDiodeBackwardDefinition executeFn is executeDiodeBackward", () => {
-      expect(PldDiodeBackwardDefinition.models.digital!.executeFn).toBe(executeDiodeBackward);
-    });
-
-    it("PldDiodeBackwardDefinition category is PLD", () => {
-      expect(PldDiodeBackwardDefinition.category).toBe(ComponentCategory.PLD);
-    });
-
-    it("PldDiodeBackwardDefinition factory produces a DiodeBackwardElement", () => {
-      const props = new PropertyBag();
-      props.set("blown", false);
-      const el = PldDiodeBackwardDefinition.factory(props);
-      expect(el.typeId).toBe("PldDiodeBackward");
-    });
-
-    it("PldDiodeBackwardDefinition can be registered without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PldDiodeBackwardDefinition)).not.toThrow();
-    });
-
-    it("PldDiodeBackwardDefinition defaultDelay is 0", () => {
-      expect(PldDiodeBackwardDefinition.models.digital!.defaultDelay).toBe(0);
-    });
+    const registryBlown = createDefaultRegistry();
+    const facadeBlown = new DefaultSimulatorFacade(registryBlown);
+    const coordBlown = facadeBlown.compile(buildDiodeForwardCircuit(facadeBlown, { blown: true }));
+    coordBlown.writeByLabel("DIN", digital(1));
+    coordBlown.step();
+    // Blown: forward diode permanently high-Z → pull-down resolves DOUT to 0
+    // even with DIN high (the diode no longer contributes a 1 to the wired-OR net).
+    expect(coordBlown.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
   });
 });
 
-// ===========================================================================
-// PullUp tests
-// ===========================================================================
-
-describe("PullUp", () => {
-  // -------------------------------------------------------------------------
-  // Pin layout
-  // -------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("PullUp has 1 pin", () => {
-      const pu = makePullUp();
-      expect(pu.getPins()).toHaveLength(1);
-    });
-
-    it("PullUp pin is labeled 'out'", () => {
-      const pu = makePullUp();
-      expect(pu.getPins()[0].label).toBe("out");
-    });
-
-    it("PullUp 'out' pin is OUTPUT direction", () => {
-      const pu = makePullUp();
-      expect(pu.getPins()[0].direction).toBe(PinDirection.OUTPUT);
-    });
-
-    it("PullUpDefinition.pinLayout has 1 entry", () => {
-      expect(PullUpDefinition.pinLayout).toHaveLength(1);
-    });
-
-    it("1-bit PullUp output pin has bitWidth=1", () => {
-      const pu = makePullUp({ bitWidth: 1 });
-      expect(pu.getPins()[0].bitWidth).toBe(1);
-    });
-
-    it("4-bit PullUp output pin has bitWidth=4", () => {
-      const pu = makePullUp({ bitWidth: 4 });
-      expect(pu.getPins()[0].bitWidth).toBe(4);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // executePullUp- pulls floating net to 1
-  // -------------------------------------------------------------------------
-
-  describe("pullUpOnFloatingNet", () => {
-    it("executePullUp writes 0xFFFFFFFF to output slot", () => {
-      const layout = makeLayoutSingle(0, 0);
-      const state = makeState(2);
-      const highZs = new Uint32Array(state.length);
-      executePullUp(0, state, highZs, layout);
-      expect(state[0]).toBe(0xFFFFFFFF);
-    });
-
-    it("executePullUp can be called 1000 times without error", () => {
-      const layout = makeLayoutSingle(0, 0);
-      const state = makeState(2);
-      const highZs = new Uint32Array(state.length);
-      for (let i = 0; i < 1000; i++) {
-        executePullUp(0, state, highZs, layout);
-      }
-      expect(state[0]).toBe(0xFFFFFFFF);
-    });
-
-    it("executePullUp always writes all-ones regardless of prior state", () => {
-      const layout = makeLayoutSingle(0, 0);
-      const state = makeState(2);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0;
-      executePullUp(0, state, highZs, layout);
-      expect(state[0]).toBe(0xFFFFFFFF);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-
-  describe("rendering", () => {
-    it("draw() calls drawLine for VDD rail", () => {
-      const pu = makePullUp();
-      const { ctx, calls } = makeStubCtx();
-      pu.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() calls drawPath for the resistor zigzag body", () => {
-      const pu = makePullUp();
-      const { ctx, calls } = makeStubCtx();
-      pu.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPath").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() with label calls drawText", () => {
-      const pu = makePullUp({ label: "R1" });
-      const { ctx, calls } = makeStubCtx();
-      pu.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "R1")).toBe(true);
-    });
-
-    it("draw() without label does not call drawText", () => {
-      const pu = makePullUp();
-      const { ctx, calls } = makeStubCtx();
-      pu.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText")).toHaveLength(0);
-    });
-
-    it("draw() saves and restores context", () => {
-      const pu = makePullUp();
-      const { ctx, calls } = makeStubCtx();
-      pu.draw(ctx);
-      expect(calls.filter((c) => c.method === "save")).toHaveLength(1);
-      expect(calls.filter((c) => c.method === "restore")).toHaveLength(1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Bounding box
-  // -------------------------------------------------------------------------
-
-  describe("boundingBox", () => {
-    it("getBoundingBox returns non-zero dimensions", () => {
-      const pu = makePullUp();
-      const bb = pu.getBoundingBox();
-      expect(bb.width).toBeGreaterThanOrEqual(1);
-      expect(bb.height).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Attribute mapping
-  // -------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Bits=8 maps to bitWidth=8", () => {
-      const mapping = PULL_UP_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("8")).toBe(8);
-    });
-
-    it("Bits=1 maps to bitWidth=1", () => {
-      const mapping = PULL_UP_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping!.convert("1")).toBe(1);
-    });
-
-    it("Label maps to label property", () => {
-      const mapping = PULL_UP_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("label");
-      expect(mapping!.convert("R1")).toBe("R1");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("PullUpDefinition has name='PullUp'", () => {
-      expect(PullUpDefinition.name).toBe("PullUp");
-    });
-
-    it("PullUpDefinition has typeId=-1", () => {
-      expect(PullUpDefinition.typeId).toBe(-1);
-    });
-
-    it("PullUpDefinition has a factory function", () => {
-      expect(typeof PullUpDefinition.factory).toBe("function");
-    });
-
-    it("PullUpDefinition factory produces a PullUpElement", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 1);
-      const el = PullUpDefinition.factory(props);
-      expect(el.typeId).toBe("PullUp");
-    });
-
-    it("PullUpDefinition has executeFn=executePullUp", () => {
-      expect(PullUpDefinition.models.digital!.executeFn).toBe(executePullUp);
-    });
-
-    it("PullUpDefinition category is PLD", () => {
-      expect(PullUpDefinition.category).toBe(ComponentCategory.PLD);
-    });
-
-    it("PullUpDefinition has non-empty helpText", () => {
-      expect(typeof PullUpDefinition.helpText).toBe("string"); expect(PullUpDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("PullUpDefinition has non-empty propertyDefs", () => {
-      expect(PullUpDefinition.propertyDefs.length).toBeGreaterThan(0);
-    });
-
-    it("PullUpDefinition propertyDefs include 'bitWidth'", () => {
-      const keys = PullUpDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("bitWidth");
-    });
-
-    it("PullUpDefinition can be registered without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PullUpDefinition)).not.toThrow();
-    });
-
-    it("After registration PullUp typeId is non-negative", () => {
-      const registry = new ComponentRegistry();
-      registry.register(PullUpDefinition);
-      const registered = registry.get("PullUp");
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
-
-    it("PullUpDefinition defaultDelay is 0", () => {
-      expect(PullUpDefinition.models.digital!.defaultDelay).toBe(0);
-    });
-
-    it("PullUpDefinition helpText mentions 'logic 1' or 'VDD'", () => {
-      const text = PullUpDefinition.helpText;
-      expect(text.includes("logic 1") || text.includes("VDD")).toBe(true);
-    });
-  });
-});
-
-// ===========================================================================
-// PullDown tests
-// ===========================================================================
-
-describe("PullDown", () => {
-  // -------------------------------------------------------------------------
-  // Pin layout
-  // -------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("PullDown has 1 pin", () => {
-      const pd = makePullDown();
-      expect(pd.getPins()).toHaveLength(1);
-    });
-
-    it("PullDown pin is labeled 'out'", () => {
-      const pd = makePullDown();
-      expect(pd.getPins()[0].label).toBe("out");
-    });
-
-    it("PullDown 'out' pin is OUTPUT direction", () => {
-      const pd = makePullDown();
-      expect(pd.getPins()[0].direction).toBe(PinDirection.OUTPUT);
-    });
-
-    it("PullDownDefinition.pinLayout has 1 entry", () => {
-      expect(PullDownDefinition.pinLayout).toHaveLength(1);
-    });
-
-    it("8-bit PullDown output pin has bitWidth=8", () => {
-      const pd = makePullDown({ bitWidth: 8 });
-      expect(pd.getPins()[0].bitWidth).toBe(8);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // executePullDown- pulls floating net to 0
-  // -------------------------------------------------------------------------
-
-  describe("pullDownOnFloatingNet", () => {
-    it("executePullDown writes 0 to output slot", () => {
-      const layout = makeLayoutSingle(0, 0);
-      const state = makeState(2);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0xFFFFFFFF; // pre-fill with all-ones
-      executePullDown(0, state, highZs, layout);
-      expect(state[0]).toBe(0);
-    });
-
-    it("executePullDown always writes 0 regardless of prior state", () => {
-      const layout = makeLayoutSingle(0, 0);
-      const state = makeState(2);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 42;
-      executePullDown(0, state, highZs, layout);
-      expect(state[0]).toBe(0);
-    });
-
-    it("executePullDown can be called 1000 times without error", () => {
-      const layout = makeLayoutSingle(0, 0);
-      const state = makeState(2);
-      const highZs = new Uint32Array(state.length);
-      for (let i = 0; i < 1000; i++) {
-        executePullDown(0, state, highZs, layout);
-      }
-      expect(state[0]).toBe(0);
-    });
-
-    it("PullUp and PullDown write opposite values", () => {
-      const layout = makeLayoutSingle(0, 0);
-
-      const stateUp = makeState(2);
-      executePullUp(0, stateUp, new Uint32Array(stateUp.length), layout);
-
-      const stateDown = makeState(2);
-      stateDown[0] = 0xFFFFFFFF;
-      executePullDown(0, stateDown, new Uint32Array(stateDown.length), layout);
-
-      expect(stateUp[0]).toBe(0xFFFFFFFF);
-      expect(stateDown[0]).toBe(0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Rendering
-  // -------------------------------------------------------------------------
-
-  describe("rendering", () => {
-    it("draw() calls drawLine for GND rail", () => {
-      const pd = makePullDown();
-      const { ctx, calls } = makeStubCtx();
-      pd.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawLine").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() calls drawRect for the resistor body", () => {
-      const pd = makePullDown();
-      const { ctx, calls } = makeStubCtx();
-      pd.draw(ctx);
-      // PullDown draws resistor body with drawRect, not drawPath
-      expect(calls.filter((c) => c.method === "drawRect").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() with label calls drawText", () => {
-      const pd = makePullDown({ label: "R2" });
-      const { ctx, calls } = makeStubCtx();
-      pd.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText").some((c) => c.args[0] === "R2")).toBe(true);
-    });
-
-    it("draw() without label does not call drawText", () => {
-      const pd = makePullDown();
-      const { ctx, calls } = makeStubCtx();
-      pd.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawText")).toHaveLength(0);
-    });
-
-    it("draw() saves and restores context", () => {
-      const pd = makePullDown();
-      const { ctx, calls } = makeStubCtx();
-      pd.draw(ctx);
-      expect(calls.filter((c) => c.method === "save")).toHaveLength(1);
-      expect(calls.filter((c) => c.method === "restore")).toHaveLength(1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Bounding box
-  // -------------------------------------------------------------------------
-
-  describe("boundingBox", () => {
-    it("getBoundingBox returns non-zero dimensions", () => {
-      const pd = makePullDown();
-      const bb = pd.getBoundingBox();
-      expect(bb.width).toBeGreaterThanOrEqual(1);
-      expect(bb.height).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Attribute mapping
-  // -------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Bits=4 maps to bitWidth=4", () => {
-      const mapping = PULL_DOWN_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("4")).toBe(4);
-    });
-
-    it("Bits=16 maps to bitWidth=16", () => {
-      const mapping = PULL_DOWN_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(mapping!.convert("16")).toBe(16);
-    });
-
-    it("Label maps to label property", () => {
-      const mapping = PULL_DOWN_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("label");
-      expect(mapping!.convert("R2")).toBe("R2");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // -------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("PullDownDefinition has name='PullDown'", () => {
-      expect(PullDownDefinition.name).toBe("PullDown");
-    });
-
-    it("PullDownDefinition has typeId=-1", () => {
-      expect(PullDownDefinition.typeId).toBe(-1);
-    });
-
-    it("PullDownDefinition has a factory function", () => {
-      expect(typeof PullDownDefinition.factory).toBe("function");
-    });
-
-    it("PullDownDefinition factory produces a PullDownElement", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 1);
-      const el = PullDownDefinition.factory(props);
-      expect(el.typeId).toBe("PullDown");
-    });
-
-    it("PullDownDefinition has executeFn=executePullDown", () => {
-      expect(PullDownDefinition.models.digital!.executeFn).toBe(executePullDown);
-    });
-
-    it("PullDownDefinition category is PLD", () => {
-      expect(PullDownDefinition.category).toBe(ComponentCategory.PLD);
-    });
-
-    it("PullDownDefinition has non-empty helpText", () => {
-      expect(typeof PullDownDefinition.helpText).toBe("string"); expect(PullDownDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("PullDownDefinition has non-empty propertyDefs", () => {
-      expect(PullDownDefinition.propertyDefs.length).toBeGreaterThan(0);
-    });
-
-    it("PullDownDefinition propertyDefs include 'bitWidth'", () => {
-      const keys = PullDownDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("bitWidth");
-    });
-
-    it("PullDownDefinition can be registered without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PullDownDefinition)).not.toThrow();
-    });
-
-    it("After registration PullDown typeId is non-negative", () => {
-      const registry = new ComponentRegistry();
-      registry.register(PullDownDefinition);
-      const registered = registry.get("PullDown");
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
-
-    it("PullDownDefinition defaultDelay is 0", () => {
-      expect(PullDownDefinition.models.digital!.defaultDelay).toBe(0);
-    });
-
-    it("PullDownDefinition helpText mentions 'logic 0' or 'GND'", () => {
-      const text = PullDownDefinition.helpText;
-      expect(text.includes("logic 0") || text.includes("GND")).toBe(true);
-    });
+describe("PldDiode (bidirectional) blown structural prop (T1) — Cat 4 compile-seeded", () => {
+  it("blown_property_keeps_cathode_at_pulldown_default_with_anode_high", () => {
+    const registryDefault = createDefaultRegistry();
+    const facadeDefault = new DefaultSimulatorFacade(registryDefault);
+    const coordDefault = facadeDefault.compile(buildDiodeBidirectionalCircuit(facadeDefault, { blown: false }));
+    coordDefault.writeByLabel("ANODE", digital(1));
+    coordDefault.step();
+    // Not blown: anode high pulls cathode to 1.
+    expect(coordDefault.readByLabel("CATHODE")).toMatchObject({ type: "digital", value: 1 });
+
+    const registryBlown = createDefaultRegistry();
+    const facadeBlown = new DefaultSimulatorFacade(registryBlown);
+    const coordBlown = facadeBlown.compile(buildDiodeBidirectionalCircuit(facadeBlown, { blown: true }));
+    coordBlown.writeByLabel("ANODE", digital(1));
+    coordBlown.step();
+    // Blown: diode permanently open → cathode no longer pulled to 1 by the diode;
+    // pull-down resolves cathode to 0 even with anode high.
+    expect(coordBlown.readByLabel("CATHODE")).toMatchObject({ type: "digital", value: 0 });
   });
 });

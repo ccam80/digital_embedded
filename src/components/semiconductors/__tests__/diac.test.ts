@@ -1,73 +1,71 @@
-/**
- * Tests for the Diac (bidirectional trigger diode) component.
- *
- * The Diac is implemented as a netlist subcircuit (DIAC_NETLIST in `diac.ts`)
- * containing two anti-parallel diode sub-elements. It uses DIODE model
- * parameters (BV maps to the breakover voltage). The standalone
- * `createDiacElement(...)` factory was removed when Diac migrated to a netlist
- * subcircuit; the only sanctioned route to a working Diac instance is the
- * compiler, which expands the netlist during `facade.compile(...)`.
- *
- * §4c migration: previously the test file constructed bare AnalogElement
- * instances and called `element.setup(...)` / `element.load(...)` directly via
- * the deleted `test-helpers.ts` (poison §3 / §4 violation). It now goes through
- * the canonical `buildFixture` path: build a real `Vsrc → Diac → R_sense → GND`
- * circuit using registered `DcVoltageSource`, `Diac`, `Resistor`, `Ground`
- * components, warm-start via the coordinator, and read state via the public
- * engine surface (`engine.getNodeVoltage`).
- *
- * Diac current is observed indirectly through the sense-resistor voltage drop:
- *   I_diac = V(diac:B) / R_sense   (since rsense:neg = GND)
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
-import { DiacDefinition, DIAC_NETLIST } from "../diac.js";
-import { TriacDefinition } from "../triac.js";
-import { DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Default Diac parameters- diode-shaped with BV = breakover voltage
+// .dts paths (T3 harness fixtures)
+// ---------------------------------------------------------------------------
+
+const DTS_BLOCKING  = path.resolve("src/components/semiconductors/__tests__/fixtures/diac-canon-blocking.dts");
+const DTS_BREAKOVER = path.resolve("src/components/semiconductors/__tests__/fixtures/diac-canon-breakover.dts");
+
+// ---------------------------------------------------------------------------
+// DIAC parameter profile shared across T1 fixtures
 // ---------------------------------------------------------------------------
 //
-// DIAC-appropriate params: very low IS and high N suppress forward conduction
-// so the device blocks below BV and breaks down above BV (breakover).
-// Standard diode IS=1e-14, N=1 overflows at 20V forward-biased → use:
-//   IS=1e-32: reduces forward current by 18 orders of magnitude
-//   N=40:     stretches the forward knee far above any test voltage
-// Net: at V=20V, I_fwd ≈ 1e-32 * exp(20/1.04) ≈ 1e-24 A (negligible)
-//       at BV=32V, reverse breakdown → significant current → triggers
-const DIAC_TEST_DEFAULTS: Record<string, number> = {
-  ...DIODE_PARAM_DEFAULTS,
+// DIAC behaviour: block until |V| > BV (breakover voltage); above BV the
+// device conducts. We suppress the forward-Shockley conduction so that
+// the breakdown branch is the only mechanism that puts current through
+// the device:
+//   IS = 1e-32 (forward saturation current, very small)
+//   N  = 40    (stretches the forward knee far above any test voltage)
+//   BV = 32    (breakover voltage)
+//
+// These same numeric defaults seed the Diac netlist's diode sub-elements
+// when a `Diac` component is placed in a programmatic build. Identical
+// values are baked into the .dts fixtures via circuit_build.
+
+const DIAC_PROPS: Record<string, number | string> = {
+  label: "diac",
   IS: 1e-32,
   N: 40,
-  BV: 32, // breakover voltage (V_BO = 32V)
+  BV: 32,
 };
 
 // ---------------------------------------------------------------------------
-// Circuit factory- VS → Diac → R_sense → GND
+// Programmatic circuit factories (T1)
 // ---------------------------------------------------------------------------
 
 interface DiacCircuitParams {
   /** Voltage applied across the diac+sense pair. Sign selects polarity. */
   vSource: number;
   /** Sense resistor (Ω). 1Ω chosen so V_sense ≈ I_diac (in Amps). */
-  rSense?: number;
-  /** Override DIAC params (e.g. BV). Merged on top of `DIAC_TEST_DEFAULTS`. */
-  paramOverrides?: Record<string, number>;
+  rSense: number;
 }
 
+/**
+ * VS:pos → Diac:A → Diac:B → rsense:pos → rsense:neg = GND ; VS:neg = GND.
+ *
+ * The diac is a netlist composite of two anti-parallel diodes, so the
+ * observable is the public node voltage at `diac:B`. With rsense:neg
+ * tied to ground, the rsense voltage drop equals V(diac:B), and current
+ * through the diac equals V(diac:B) / rSense.
+ */
 function buildDiacCircuit(facade: DefaultSimulatorFacade, p: DiacCircuitParams): Circuit {
-  const params = { ...DIAC_TEST_DEFAULTS, ...(p.paramOverrides ?? {}) };
-  const rSense = p.rSense ?? 1.0;
   return facade.build({
     components: [
       { id: "vs",     type: "DcVoltageSource", props: { label: "vs",     voltage: p.vSource } },
-      { id: "diac",   type: "Diac",            props: { label: "diac", ...params } },
-      { id: "rsense", type: "Resistor",        props: { label: "rsense", resistance: rSense } },
+      { id: "diac",   type: "Diac",            props: { ...DIAC_PROPS } },
+      { id: "rsense", type: "Resistor",        props: { label: "rsense", resistance: p.rSense } },
       { id: "gnd",    type: "Ground" },
     ],
     connections: [
@@ -79,163 +77,169 @@ function buildDiacCircuit(facade: DefaultSimulatorFacade, p: DiacCircuitParams):
   });
 }
 
-/**
- * Compute I_diac from the warm-started fixture.
- * Topology: vs:pos → diac:A → diac:B → rsense:pos → rsense:neg = GND.
- * Therefore V(diac:B) = I_diac * R_sense (current flows A→B, then through rsense to GND).
- */
-function diacCurrent(fix: ReturnType<typeof buildFixture>, rSense: number): number {
-  const node = fix.circuit.labelToNodeId.get("diac:B");
-  if (node === undefined) throw new Error("diac:B label not registered");
-  const v = fix.engine.getNodeVoltage(node);
-  return v / rSense;
-}
-
 // ---------------------------------------------------------------------------
-// Diac registry / definition surface tests
+// Category 1 — Initialization (T1)
+// Post-warm-start: node voltages at the diac terminals are produced by
+// _setup() + _transientDcop(). The Diac element is a netlist composite
+// (no own state slots — its sub-element diodes hold the slots), so the
+// canonical Cat 1 observable is the public node-voltage reading at the
+// step-0 boundary.
 // ---------------------------------------------------------------------------
 
-describe("Diac definition", () => {
-  it("definition_has_correct_fields", () => {
-    expect(DiacDefinition.name).toBe("Diac");
-    expect(DiacDefinition.modelRegistry?.["default"]).toBeDefined();
-    expect(DiacDefinition.modelRegistry?.["default"]?.kind).toBe("netlist");
-    expect(DiacDefinition.category).toBe("SEMICONDUCTORS");
-  });
-
-  it("netlist exposes A and B ports", () => {
-    expect(DIAC_NETLIST.ports).toEqual(["A", "B"]);
-  });
-
-  it("netlist contains two anti-parallel Diode sub-elements", () => {
-    expect(DIAC_NETLIST.elements).toHaveLength(2);
-    expect(DIAC_NETLIST.elements[0].typeId).toBe("Diode");
-    expect(DIAC_NETLIST.elements[1].typeId).toBe("Diode");
-    // First sub-element forward-biased A→B, second reverse-biased B→A.
-    // netlist[0] = [0, 1] → D_fwd  pins (A, K) = (port 0 = "A", port 1 = "B")
-    // netlist[1] = [1, 0] → D_rev  pins (A, K) = (port 1 = "B", port 0 = "A")
-    expect(DIAC_NETLIST.netlist[0]).toEqual([0, 1]);
-    expect(DIAC_NETLIST.netlist[1]).toEqual([1, 0]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Diac integration tests- buildFixture warm-start + observable current
-// ---------------------------------------------------------------------------
-
-describe("Diac", () => {
-  it("setup_runs_without_error", () => {
-    // §4c: setup() is engine-internal; we exercise it indirectly through the
-    // canonical buildFixture warm-start, which calls _setup() before DCOP.
-    expect(() => buildFixture({
-      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 5 }),
-    })).not.toThrow();
-  });
-
-  it("load_runs_without_error", () => {
-    // §4c: load() is engine-internal; the warm-started fixture has already
-    // executed several NR iterations of load() during DCOP and the first
-    // transient step. If any of them threw, buildFixture would propagate.
-    expect(() => buildFixture({
-      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 10 }),
-    })).not.toThrow();
-  });
-
-  it("blocks_below_breakover", () => {
-    // |V| = 20V < V_BO = 32V → blocking state → small current.
-    // R_sense = 1Ω so V_sense ≈ I_diac (numerically convenient).
+describe("Diac initialization (T1)", () => {
+  it("init_blocking_node_voltage_near_zero", () => {
+    // |V|=20V < BV=32V → blocking regime → V(diac:B) ≈ 0V (negligible
+    // current through R_sense=1Ω since the diac sinks <1mA in blocking).
     const fix = buildFixture({
       build: (_r, facade) => buildDiacCircuit(facade, { vSource: 20, rSense: 1.0 }),
     });
-    const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
-    expect(dc!.converged).toBe(true);
-
-    const i = diacCurrent(fix, 1.0);
-    expect(Math.abs(i)).toBeLessThan(1e-3); // < 1 mA confirms blocking
+    const vB = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("diac:B")!);
+    // Blocking: V_sense = I_diac * 1Ω with I_diac < 1mA → |V_sense| < 1mV.
+    expect(Math.abs(vB)).toBeLessThan(1e-3);
   });
 
-  it("conducts_above_breakover", () => {
-    // |V| = 40V > V_BO = 32V → breakdown → significant current.
-    // Use R_sense = 10Ω to keep current well-defined under post-breakdown
-    // negative-resistance behaviour: I ≈ (V_source - V_drop) / R_sense.
-    const rSense = 10.0;
+  it("init_blocking_anode_voltage_tracks_source", () => {
+    // |V|=20V < BV=32V → blocking → effectively open circuit between A and B
+    // → V(diac:A) ≈ vSource (negligible IR drop).
     const fix = buildFixture({
-      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 40, rSense }),
+      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 20, rSense: 1.0 }),
     });
-    const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
-    expect(dc!.converged).toBe(true);
-
-    const i = diacCurrent(fix, rSense);
-    // Significant current: with 40V source, BV=32V, R_sense=10Ω, post-breakdown
-    // current is roughly (40 - 32) / 10 = 0.8A; require > 0.1A to confirm
-    // the device is past the blocking knee.
-    expect(Math.abs(i)).toBeGreaterThan(0.1);
-    // Polarity: vs:pos applies +V to diac:A; current flows A→B (positive).
-    expect(i).toBeGreaterThan(0);
-  });
-
-  it("symmetric", () => {
-    // Same |V| in both polarities → |I| approximately equal (symmetric device).
-    const rSense = 10.0;
-    const fixPos = buildFixture({
-      build: (_r, facade) => buildDiacCircuit(facade, { vSource: +40, rSense }),
-    });
-    const fixNeg = buildFixture({
-      build: (_r, facade) => buildDiacCircuit(facade, { vSource: -40, rSense }),
-    });
-
-    const iPos = diacCurrent(fixPos, rSense);
-    const iNeg = diacCurrent(fixNeg, rSense);
-
-    expect(Math.abs(iPos)).toBeGreaterThan(0.01); // forward conducting
-    expect(Math.abs(iNeg)).toBeGreaterThan(0.01); // reverse conducting
-
-    const ratio = Math.abs(iPos) / Math.abs(iNeg);
-    expect(ratio).toBeGreaterThan(0.9);
-    expect(ratio).toBeLessThan(1.1);
-
-    // Signs are opposite (current flips with source polarity).
-    expect(iPos).toBeGreaterThan(0);
-    expect(iNeg).toBeLessThan(0);
-  });
-
-  it("triggers_triac_threshold", () => {
-    // Confirm that under above-BV drive the diac alone produces well above
-    // the triac's gate trigger threshold (~200μA).
-    //
-    // The original test then attempted a full diac+triac latch sequence with
-    // hand-stamped per-iteration gate currents. The triac latch (4-BJT
-    // composite) requires a transient ramp to enter on-state and is exercised
-    // end-to-end in the dedicated triac integration suites; here we keep
-    // the diac's contract pinned (gate-current capability) without depending
-    // on triac latch convergence.
-    const rSense = 10.0;
-    const diacOnly = buildFixture({
-      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 40, rSense }),
-    });
-    const iDiac = diacCurrent(diacOnly, rSense);
-    // Triac gate trigger threshold ~ 200μA (0.2mA); diac must clear that.
-    expect(Math.abs(iDiac)).toBeGreaterThan(200e-6);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("diac:A")!);
+    expect(vA).toBeCloseTo(20, 2);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Triac registry sanity (preserves prior coverage of TriacDefinition surface)
+// Category 2 — DC operating point (T1, analytical)
+// Two regimes: sub-BV (blocking) and post-BV (breakover). Both use the
+// public engine surface (node voltage). The closed-form expectation is
+// derived in a comment beside each assertion.
 // ---------------------------------------------------------------------------
 
-describe("Triac registry surface", () => {
-  it("TriacDefinition has behavioral model entry", () => {
-    const entry = TriacDefinition.modelRegistry?.["behavioral"];
-    expect(entry).toBeDefined();
-    expect(entry?.kind).toBe("netlist");
+describe("Diac DCOP — blocking + breakover (T1)", () => {
+  it("dcop_blocking_current_below_one_milliamp", () => {
+    // |V|=20V < BV=32V → blocking. R_sense=1kΩ.
+    // Closed-form: I_diac = V(diac:B) / R_sense, with V(diac:B) ≈ 0
+    // and I_diac ≪ 1mA (the IS=1e-32, N=40 profile suppresses Shockley
+    // conduction; sub-BV the only current is the leakage from the
+    // reverse-biased anti-parallel diode).
+    const fix = buildFixture({
+      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 20, rSense: 1000 }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+    const vB = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("diac:B")!);
+    const iDiac = vB / 1000;
+    expect(Math.abs(iDiac)).toBeLessThan(1e-3);
   });
 
-  it("TriacDefinition has correct pin layout (MT1, MT2, G)", () => {
-    const labels = TriacDefinition.pinLayout.map((p) => p.label);
-    expect(labels).toContain("MT1");
-    expect(labels).toContain("MT2");
-    expect(labels).toContain("G");
+  it("dcop_breakover_conducts_above_threshold", () => {
+    // |V|=40V > BV=32V → reverse breakdown of the reverse-biased internal
+    // diode → conduction path. R_sense=10Ω.
+    // Closed-form bound: post-breakdown I_diac ≈ (vSource - BV) / rSense
+    // = (40 - 32) / 10 = 0.8A. We require > 0.1A to confirm the device
+    // is past the breakover knee (the exact post-breakdown current depends
+    // on the breakdown emission coefficient and IBV defaults of the
+    // sub-element diodes; the floor is the conservative analytical bound).
+    const fix = buildFixture({
+      build: (_r, facade) => buildDiacCircuit(facade, { vSource: 40, rSense: 10 }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+    const vB = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("diac:B")!);
+    const iDiac = vB / 10;
+    expect(iDiac).toBeGreaterThan(0.1);
+    // Polarity: vs:pos drives +V into diac:A → current flows A→B (positive).
+    expect(iDiac).toBeGreaterThan(0);
+  });
+
+  it("dcop_breakover_symmetric_under_polarity_flip", () => {
+    // Anti-parallel topology → identical |I| for ±vSource.
+    const fixPos = buildFixture({
+      build: (_r, facade) => buildDiacCircuit(facade, { vSource: +40, rSense: 10 }),
+    });
+    const fixNeg = buildFixture({
+      build: (_r, facade) => buildDiacCircuit(facade, { vSource: -40, rSense: 10 }),
+    });
+    expect(fixPos.coordinator.dcOperatingPoint()!.converged).toBe(true);
+    expect(fixNeg.coordinator.dcOperatingPoint()!.converged).toBe(true);
+
+    const iPos = fixPos.engine.getNodeVoltage(fixPos.circuit.labelToNodeId.get("diac:B")!) / 10;
+    const iNeg = fixNeg.engine.getNodeVoltage(fixNeg.circuit.labelToNodeId.get("diac:B")!) / 10;
+
+    // Both above breakover floor; signs opposite (flips with source polarity).
+    expect(iPos).toBeGreaterThan(0.1);
+    expect(iNeg).toBeLessThan(-0.1);
+
+    // Magnitudes match within 10% (anti-parallel symmetry; minor asymmetry
+    // arises only from the engine's NR limiting path which differs for
+    // forward vs reverse traversal, not from the device model).
+    const ratio = Math.abs(iPos) / Math.abs(iNeg);
+    expect(ratio).toBeGreaterThan(0.9);
+    expect(ratio).toBeLessThan(1.1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 — Paired vs ngspice (T3) on blocking regime
+// One ComparisonSession per .dts; the run lives in the first it(), siblings
+// read the recorded session.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Diac blocking vs ngspice — transient + stamp parity (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_BLOCKING, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_blocking", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_blocking", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+  });
+
+  it("full_iteration_paired_blocking", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 — Paired vs ngspice (T3) on breakover regime
+// ---------------------------------------------------------------------------
+
+describeIfDll("Diac breakover vs ngspice — transient + stamp parity (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_BREAKOVER, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_breakover", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_breakover", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+  });
+
+  it("full_iteration_paired_breakover", () => {
+    session.compareAllAttempts();
   });
 });

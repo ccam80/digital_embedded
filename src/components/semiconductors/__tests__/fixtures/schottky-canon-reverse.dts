@@ -1,0 +1,341 @@
+{
+  "circuit": {
+    "description": "Schottky reverse-biased: V1=2V drives Schottky cathode (so anode-cathode is reverse), through R=10kΩ. Tests reverse-blocking regime, leakage IS scaling, junction cap formula in reverse bias.",
+    "elements": [
+      {
+        "id": "20e6fb29-fd89-4f6d-9d68-da88f4dfb7ec",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 2
+          },
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 2
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b7179e94-7b36-4d1b-b3ed-5438c415de93",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BV": 40,
+            "CJO": 1e-12,
+            "EG": 0.69,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IS": 1e-8,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1.05,
+            "RS": 1,
+            "TEMP": 300.15,
+            "TT": 0,
+            "VJ": 0.6,
+            "XTI": 2
+          },
+          "label": "D1",
+          "position": [
+            0,
+            8
+          ]
+        },
+        "rotation": 0,
+        "type": "SchottkyDiode"
+      },
+      {
+        "id": "a04b8620-b972-425a-87b6-9fee6f0a4a46",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "label": "R1",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "9f9bf5a1-635d-46fe-a00a-9a95a8cf3c00",
+        "position": {
+          "x": 12,
+          "y": 4
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "schottky-canon-reverse",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 30,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 0
+          },
+          {
+            "x": 30,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 18,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 3
+          },
+          {
+            "x": 18,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

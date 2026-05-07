@@ -1,374 +1,325 @@
-/**
- * Tests for the Schottky diode component.
- *
- * The Schottky diode delegates entirely to createDiodeElement with
- * Schottky-tuned default parameters (higher IS, lower Vf, RS=1Ω, CJO=1pF).
- *
- * Covers:
- *   - Forward voltage is lower than silicon (~0.2V–0.4V at 1mA)
- *   - RS conditional internal node: RS>0 allocates internal prime node
- *   - TSTALLOC ordering with RS>0 (7 entries with distinct internal node)
- *   - Definition shape
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
-import { SchottkyDiodeDefinition, createSchottkyElement, SCHOTTKY_PARAM_DEFAULTS, SCHOTTKY_PARAM_DEFS } from "../schottky.js";
-import { DIODE_PARAM_DEFAULTS } from "../diode.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElement as AnalogElementCore } from "../../../solver/analog/element.js";
-import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
-import type { AnalogFactory } from "../../../core/registry.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
-import {
-  MODEDCOP,
-  MODEINITFLOAT,
-  MODEINITJCT,
-} from "../../../solver/analog/ckt-mode.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { createDefaultRegistry } from "../../register-all.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import { DIODE_CAP_SCHEMA } from "../diode.js";
+
+const DTS_FORWARD = path.resolve("src/components/semiconductors/__tests__/fixtures/schottky-canon-forward.dts");
+const DTS_REVERSE = path.resolve("src/components/semiconductors/__tests__/fixtures/schottky-canon-reverse.dts");
 
 // ---------------------------------------------------------------------------
-// Helper: run real setup() on an element, allocating all handles.
-// Must be called before load() so that all TSTALLOC handles are valid.
+// Programmatic build helper for T1 fixtures.
+// Schottky default props (CJO=1pF, RS=1Ω) → cap-active path → DIODE_CAP_SCHEMA.
 // ---------------------------------------------------------------------------
 
-function runSetup(core: AnalogElementCore, solver: SparseSolver): void {
-  let stateCount = 0;
-  let nodeCount = 100;
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number {
-      const off = stateCount;
-      stateCount += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  (core as any).setup(ctx);
+function buildSchottkyForward(
+  facade: import("../../../headless/default-facade.js").DefaultSimulatorFacade,
+  overrides: Record<string, number> = {},
+): import("../../../core/circuit.js").Circuit {
+  return facade.build({
+    components: [
+      { id: "v1", type: "DcVoltageSource", props: { label: "V1", voltage: 0.5 } },
+      { id: "d1", type: "SchottkyDiode",   props: { label: "D1", ...overrides } },
+      { id: "r1", type: "Resistor",        props: { label: "R1", resistance: 300 } },
+      { id: "gnd", type: "Ground",         props: { label: "GND" } },
+    ],
+    connections: [
+      ["v1:pos", "d1:A"],
+      ["d1:K",   "r1:pos"],
+      ["r1:neg", "gnd:out"],
+      ["v1:neg", "gnd:out"],
+    ],
+  });
+}
+
+function findD1(fix: ReturnType<typeof buildFixture>) {
+  const idx = fix.circuit.elements.findIndex(
+    (_e, i) => fix.elementLabels.get(i) === "D1",
+  );
+  expect(idx).toBeGreaterThanOrEqual(0);
+  const el = fix.circuit.elements[idx]!;
+  const ce = fix.circuit.elementToCircuitElement.get(idx);
+  expect(ce).toBeDefined();
+  return { idx, el, ce: ce! };
 }
 
 // ---------------------------------------------------------------------------
-// Helper: allocate a StatePool for a single element, run real setup(),
-// and call initState.
+// Category 1 — Initialization (T1)
+// Asserts the warm-started state pool slot reads finite for the Schottky
+// element after compile() + first coordinator.step(). Schottky delegates to
+// createDiodeElement; with default CJO=1pF the element uses DIODE_CAP_SCHEMA
+// (7 slots). VD slot is the pnjlim-limited junction voltage.
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: PoolBackedAnalogElement; pool: StatePool; solver: SparseSolver } {
-  const solver = new SparseSolver();
-  solver._initStructure();
-  runSetup(core, solver);
-  const re = core as PoolBackedAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.initState(pool);
-  return { element: re, pool, solver };
-}
+describe("Schottky initialization (T1)", () => {
+  const SLOT_VD = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
 
-// ---------------------------------------------------------------------------
-// Helper: build a bare LoadContext for unit tests
-// ---------------------------------------------------------------------------
-
-function buildUnitCtx(
-  solver: SparseSolver,
-  rhsOld: Float64Array,
-  overrides: Partial<LoadContext> = {},
-): LoadContext {
-  return {
-    solver,
-    matrix: solver,
-    rhsOld,
-    rhs: new Float64Array(rhsOld.length),
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    time: 0,
-    dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    temp: 300.15,
-    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-    ...overrides,
-  } as LoadContext;
-}
-
-function makeParamBag(params: Record<string, number>): PropertyBag {
-  const bag = new PropertyBag();
-  bag.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, ...SCHOTTKY_PARAM_DEFAULTS, ...params });
-  return bag;
-}
-
-// ---------------------------------------------------------------------------
-// Schottky diode tests
-// ---------------------------------------------------------------------------
-
-describe("Schottky", () => {
-  it("definition_has_correct_fields", () => {
-    expect(SchottkyDiodeDefinition.name).toBe("SchottkyDiode");
-    expect(SchottkyDiodeDefinition.modelRegistry?.["spice"]).toBeDefined();
-    expect(SchottkyDiodeDefinition.modelRegistry?.["spice"]?.kind).toBe("inline");
-    expect((SchottkyDiodeDefinition.modelRegistry?.["spice"] as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBeDefined();
-  });
-
-  // ---------------------------------------------------------------------------
-  // Forward voltage: Schottky at 1mA forward must settle between 0.20V and 0.40V
-  // ---------------------------------------------------------------------------
-
-  it("forward_voltage_at_1mA_is_low", () => {
-    // Schottky junction voltage at 1mA: IS=1e-8, N=1.05, T=300.15K
-    // Vf ≈ N*Vt * ln(If/IS + 1) ≈ 1.05 * 0.02585 * ln(1e-3 / 1e-8)
-    //     ≈ 0.02714 * 11.51 ≈ 0.313V
-    // Tolerance: [0.20V, 0.40V]- covers reasonable Schottky barrier physics
-    const IS = 1e-8;
-    const N = 1.05;
-    const propsObj = makeParamBag({ IS, N, RS: 0, CJO: 0, TT: 0 });
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
-    const { element, pool, solver } = withState(core);
-
-    // Run MODEINITJCT to seed state, then drive to 0.3V operating point
-    const voltages = new Float64Array(3);
-    voltages[1] = 0.3;
-    voltages[2] = 0;
-
-    // Seed with initJct to get a starting VD
-    (solver as any)._resetForAssembly();
-    (element as any).load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT }));
-
-    // Iterate load() to drive toward stable operating point
-    for (let i = 0; i < 30; i++) {
-      (solver as any)._resetForAssembly();
-      (element as any).load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITFLOAT }));
-    }
-
-    // SLOT_VD is index 0 in state0
-    const vd = pool.state0[0];
-    expect(vd).toBeGreaterThan(0.20);
-    expect(vd).toBeLessThan(0.40);
-  });
-
-  // ---------------------------------------------------------------------------
-  // RS conditional internal node
-  // ---------------------------------------------------------------------------
-
-  it("RS_zero_no_internal_node", () => {
-    // When RS=0, posPrimeNode must alias posNode- no makeVolt call
-    let makeVoltCalls = 0;
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), makeParamBag({ RS: 0, CJO: 0 }), () => 0);
-    const solver = new SparseSolver();
-    solver._initStructure();
-    let stateCount = 0;
-    let nodeCount = 100;
-    const ctx: SetupContext = {
-      solver,
-      temp: 300.15,
-      nomTemp: 300.15,
-      copyNodesets: false,
-      makeVolt(_label: string, _suffix: string): number {
-        makeVoltCalls++;
-        return ++nodeCount;
-      },
-      makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-      allocStates(n: number): number {
-        const off = stateCount;
-        stateCount += n;
-        return off;
-      },
-      findBranch(_label: string): number { return 0; },
-      findDevice(_label: string) { return null; },
-    };
-    (core as any).setup(ctx);
-    expect(makeVoltCalls).toBe(0);
-  });
-
-  it("RS_nonzero_allocates_internal_node", () => {
-    // When RS > 0, makeVolt must be called exactly once for the internal prime node
-    let makeVoltCalls = 0;
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), makeParamBag({ RS: 1 }), () => 0);
-    const solver = new SparseSolver();
-    solver._initStructure();
-    let stateCount = 0;
-    let nodeCount = 100;
-    const ctx: SetupContext = {
-      solver,
-      temp: 300.15,
-      nomTemp: 300.15,
-      copyNodesets: false,
-      makeVolt(_label: string, _suffix: string): number {
-        makeVoltCalls++;
-        return ++nodeCount;
-      },
-      makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-      allocStates(n: number): number {
-        const off = stateCount;
-        stateCount += n;
-        return off;
-      },
-      findBranch(_label: string): number { return 0; },
-      findDevice(_label: string) { return null; },
-    };
-    (core as any).setup(ctx);
-    expect(makeVoltCalls).toBe(1);
-  });
-
-  // ---------------------------------------------------------------------------
-  // TSTALLOC ordering: RS>0 case- 7 entries with distinct internal node
-  // ngspice anchor: diosetup.c:232-238
-  // ---------------------------------------------------------------------------
-
-  it("TSTALLOC_ordering_RS_nonzero", async () => {
-    // RS=1 (Schottky default): internal prime node allocated.
-    // Nodes: posNode=A, negNode=K, internal=posPrime.
-    // Expected TSTALLOC order (diosetup.c:232-238):
-    //  1. (posNode, posPrime)
-    //  2. (negNode, posPrime)
-    //  3. (posPrime, posNode)
-    //  4. (posPrime, negNode)
-    //  5. (posNode, posNode)
-    //  6. (negNode, negNode)
-    //  7. (posPrime, posPrime)
-    // Via M1: assert matrix has non-zero entries at the expected positions
-    // (A:A, A:posPrime, K:K, K:posPrime, posPrime:A, posPrime:K, posPrime:posPrime).
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 0.3 } },
-            { id: "sd",  type: "SchottkyDiode",   props: { label: "sd",  RS: 1, CJO: 1e-12, IS: 1e-8, N: 1.05 } },
-            { id: "gnd", type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",  "sd:A"],
-            ["sd:K",    "gnd:out"],
-            ["vs:neg",  "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
-    });
-
-    const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
-
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
-    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
-    const M = lastIter.matrix!;
-    const ms = lastIter.matrixSize;
-
-    // With RS>0 the diode has a posPrime internal node.
-    // The forward-biased Schottky must emit non-zero conductance stamps.
-    // Assert that at least one off-diagonal entry is non-zero (RS path exists).
-    const matrixRowLabels = (session as unknown as {
-      _ourTopology: { matrixRowLabels: Map<number, string> };
-    })._ourTopology.matrixRowLabels;
-
-    // Find the sd:A (anode) and sd:K (cathode) row indices.
-    let sdARow = -1;
-    let sdKRow = -1;
-    matrixRowLabels.forEach((label, row) => {
-      if (label.includes("sd:A")) sdARow = row;
-      if (label.includes("sd:K")) sdKRow = row;
-    });
-
-    expect(sdARow).toBeGreaterThanOrEqual(0);
-    expect(sdKRow).toBeGreaterThanOrEqual(0);
-
-    // Anode-Anode self-conductance must be non-zero (diosetup.c entry 5).
-    expect(Math.abs(M[sdARow * ms + sdARow])).toBeGreaterThan(0);
-    // Cathode-Cathode self-conductance must be non-zero (diosetup.c entry 6).
-    expect(Math.abs(M[sdKRow * ms + sdKRow])).toBeGreaterThan(0);
-    // Off-diagonal stamp (A,K) must be non-zero (RS path stamps conductance).
-    expect(Math.abs(M[sdARow * ms + sdKRow]) + Math.abs(M[sdKRow * ms + sdARow])).toBeGreaterThan(0);
-  });
-
-  it("TSTALLOC_ordering_RS_zero", async () => {
-    // RS=0: posPrimeNode = posNode. All 7 TSTALLOC entries collapse to 4 unique pairs.
-    // Via M1: assert that with RS=0 the Schottky still emits stamps for a
-    // forward-biased junction at the A/K positions only (no additional internal node).
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 0.3 } },
-            { id: "sd",  type: "SchottkyDiode",   props: { label: "sd",  RS: 0, CJO: 0, IS: 1e-8, N: 1.05 } },
-            { id: "gnd", type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",  "sd:A"],
-            ["sd:K",    "gnd:out"],
-            ["vs:neg",  "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
-    });
-
-    const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
-
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
-    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
-    const M = lastIter.matrix!;
-    const ms = lastIter.matrixSize;
-
-    const matrixRowLabels = (session as unknown as {
-      _ourTopology: { matrixRowLabels: Map<number, string> };
-    })._ourTopology.matrixRowLabels;
-
-    let sdARow = -1;
-    let sdKRow = -1;
-    matrixRowLabels.forEach((label, row) => {
-      if (label.includes("sd:A")) sdARow = row;
-      if (label.includes("sd:K")) sdKRow = row;
-    });
-
-    expect(sdARow).toBeGreaterThanOrEqual(0);
-    expect(sdKRow).toBeGreaterThanOrEqual(0);
-
-    // Forward-biased: anode self-conductance must be non-zero.
-    expect(Math.abs(M[sdARow * ms + sdARow])).toBeGreaterThan(0);
-    // Cathode self-conductance must be non-zero.
-    expect(Math.abs(M[sdKRow * ms + sdKRow])).toBeGreaterThan(0);
+  it("init_schottky_vd_seeded", () => {
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const { el } = findD1(fix);
+    const vd = fix.pool.state0[el._stateBase + SLOT_VD];
+    expect(Number.isFinite(vd)).toBe(true);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+    expect(Number.isFinite(vA)).toBe(true);
+    expect(Number.isFinite(vK)).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// SCHOTTKY_PARAM_DEFS partition layout
+// Category 2 — DC operating point (T1, analytical)
+// Forward bias closed-form sanity: V=0.5V drives the Schottky through 300Ω.
+// Schottky defaults (IS=1e-8, N=1.05, T=300.15K) → Vf ≈ 1.05·0.02585·ln(I/IS)
+// ≈ 0.27V at I≈0.75mA. The collector-side resistor drop V_R = V_in - Vf ≈ 0.23V
+// gives I = V_R/R ≈ 0.77mA. Closed-form bound: anode-cathode forward voltage
+// stays below the silicon-diode 0.6V baseline and above 0.15V (Schottky barrier).
 // ---------------------------------------------------------------------------
 
-describe("SCHOTTKY_PARAM_DEFS partition layout", () => {
-  it("primary params have partition 'model'", () => {
-    for (const key of ["IS", "N"]) {
-      const def = SCHOTTKY_PARAM_DEFS.find((d) => d.key === key);
-      expect(def).toBeDefined();
-      expect(def!.partition).toBe("model");
+describe("Schottky DCOP analytical (T1)", () => {
+  it("dcop_schottky_forward_vf_in_band", () => {
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+    const vf = vA - vK;
+    // Schottky forward-conduction band: well below 0.6V silicon Vf and above
+    // 0.15V depletion onset. Closed-form ≈ 0.27V at I≈0.75mA with Schottky defaults.
+    expect(vf).toBeGreaterThan(0.15);
+    expect(vf).toBeLessThan(0.50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 4 — Parameter hot-load (T1)
+// One it() per representative model parameter group. Schottky exposes the
+// diode-shared param surface: structural (IS, N, RS), depletion-cap (CJO),
+// derived-state-recompute (TEMP — universal). Asserts the simulator output
+// changed after setComponentProperty + step.
+// ---------------------------------------------------------------------------
+
+describe("Schottky parameter hot-load (T1)", () => {
+  it("hotload_IS_changes_vf", () => {
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const { ce } = findD1(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
+    const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "IS", 1e-6);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    // Larger IS → lower Vf at the same current → forward voltage drops.
+    expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeLessThan(before);
+  });
+
+  it("hotload_N_changes_vf", () => {
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const { ce } = findD1(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
+    const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "N", 2.0);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    // Larger N → larger thermal voltage scale → higher Vf at the same current.
+    expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it("hotload_RS_changes_anode_voltage", () => {
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const { ce } = findD1(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnode);
+    fix.coordinator.setComponentProperty(ce, "RS", 50);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode);
+    // Larger RS → additional series voltage drop appears across the device →
+    // anode-side node voltage shifts observably.
+    expect(after).not.toBeCloseTo(before, 6);
+  });
+
+  it("hotload_CJO_changes_dynamic_response", () => {
+    // CJO is a depletion-cap parameter; at DCOP it is dormant (capGate is
+    // false outside MODETRAN/MODEAC/MODEINITSMSIG). Drive a transient step
+    // before and after to expose the cap path's recompute.
+    const fix = buildFixture({
+      build: (_r, f) => buildSchottkyForward(f),
+      params: { tStop: 1e-6, maxTimeStep: 1e-8 },
+    });
+    const { ce } = findD1(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(vAnode);
+    fix.coordinator.setComponentProperty(ce, "CJO", 100e-12);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode);
+    // Larger CJO loads the junction more heavily under transient excitation.
+    // The cap-block stamp scales with Ctotal; observable shifts at the anode.
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_TEMP_changes_vf", () => {
+    // TEMP is the derived-state-recompute parameter (universal). setParam
+    // triggers recomputeTemp() which re-derives tIS / tVJ / tCJO / tVcrit / tBV.
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const { ce } = findD1(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
+    const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "TEMP", 400);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    // Raising T raises tIS exponentially → at the same current Vf drops.
+    expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeLessThan(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 6 — Limiting events (T1, own engine)
+// pnjlim fires on the diode AK junction during DCOP NR. Drive a forward-biased
+// Schottky and read fix.coordinator.getLimitingEvents().
+// ---------------------------------------------------------------------------
+
+describe("Schottky limiting events own-engine (T1)", () => {
+  it("limiting_pnjlim_fires_schottky_forward", () => {
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    fix.coordinator.setLimitingCapture(true);
+    fix.coordinator.dcOperatingPoint();
+    const events = fix.coordinator.getLimitingEvents();
+    const ak = events.find(e => e.label === "D1" && e.junction === "AK");
+    expect(ak).toBeDefined();
+    expect(ak!.limitType).toBe("pnjlim");
+    expect(Number.isFinite(ak!.vBefore)).toBe(true);
+    expect(Number.isFinite(ak!.vAfter)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 7 — LTE rollback (T1)
+// Schottky implements getLteTimestep when hasCapacitance (CJO=1pF default).
+// The proposal reads cktTerr() over Q / CCAP rollable slots. The rollback
+// invariant is that after warm-start + a few transient steps, state0 and
+// state1 both carry finite values for the rollable charge slot (rotation
+// occurred, no NaN poisoning).
+// ---------------------------------------------------------------------------
+
+describe("Schottky LTE rollback (T1)", () => {
+  it("lte_rollback_state_invariant", () => {
+    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const fix = buildFixture({
+      build: (_r, f) => buildSchottkyForward(f),
+      params: { tStop: 1e-6, maxTimeStep: 1e-7 },
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    for (let i = 0; i < 10; i++) fix.coordinator.step();
+    const { el } = findD1(fix);
+    expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
+    expect(Number.isFinite(fix.pool.state1[el._stateBase + SLOT_Q])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 / 6-paired — Harness sessions (T3)
+// One describe()/session per .dts. Each opens once in beforeAll, runs the
+// transient inside the FIRST it() (so a hard throw shows as a failed test
+// rather than a silent suite-skip), reuses across categories that share that
+// circuit, disposes in afterAll. Gated on canonical dllAvailable() via
+// describeIfDll.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Schottky forward-conduction paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_FORWARD,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  // First it() owns the run. Hard throws here surface as failed tests
+  // (not silent suite-level skips).
+  it("transient_step_end_paired_forward", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_forward", () => {
+    // Step 0 of a transient is the first-time DCOP solve. getStepEnd(0)
+    // exposes converged DC node and component slot values.
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
     }
   });
 
-  it("secondary params have partition 'model'", () => {
-    for (const key of ["RS", "CJO", "VJ", "M", "TT", "FC", "BV", "IBV", "EG", "XTI", "KF", "AF"]) {
-      const def = SCHOTTKY_PARAM_DEFS.find((d) => d.key === key);
-      expect(def).toBeDefined();
-      expect(def!.partition).toBe("model");
+  it("full_iteration_paired_forward", () => {
+    session.compareAllAttempts();
+  });
+
+  it("limiting_paired_forward", () => {
+    // Pair pnjlim limiting events on D1 AK junction across the first attempt
+    // of step 0. wasLimited and {vBefore, vAfter} must agree bit-exact.
+    const cmp = session.getLimitingComparison("D1", 0, 0);
+    for (const j of cmp.junctions) {
+      expect(j.limitingDiff).toBe(0);
     }
+  });
+});
+
+describeIfDll("Schottky reverse-blocking paired vs ngspice (T3)", () => {
+  // Reverse-bias regime exercises the smooth-reverse cubic and the cap formula
+  // in reverse bias (Cj = CJO/(1-Vd/VJ)^M). Distinct code path from forward
+  // conduction.
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_REVERSE,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_reverse", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_reverse", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
+    }
+  });
+
+  it("full_iteration_paired_reverse", () => {
+    session.compareAllAttempts();
   });
 });

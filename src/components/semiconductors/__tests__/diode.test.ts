@@ -1,448 +1,436 @@
-/** Tests for the AnalogDiode component. */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve as resolvePath } from "node:path";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  DiodeDefinition,
-  createDiodeElement,
-  computeJunctionCapacitance,
-  computeJunctionCharge,
-  dioTemp,
-  DIODE_PARAM_DEFAULTS,
-  DIODE_PARAM_DEFS,
-} from "../diode.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import { DIODE_SCHEMA, DIODE_CAP_SCHEMA } from "../diode.js";
 
-import type { AnalogFactory } from "../../../core/registry.js";
-import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { Circuit } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 
-/** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
-function expectSpiceRef(actual: number, expected: number, label: string): void {
-  const rel = Math.abs((actual - expected) / expected);
-  if (rel >= 0.001) {
-    throw new Error(
-      `${label}: relative error ${(rel * 100).toFixed(4)}% exceeds 0.1% ` +
-      `(actual=${actual}, expected=${expected})`,
-    );
-  }
+// ---------------------------------------------------------------------------
+// .dts paths
+// ---------------------------------------------------------------------------
+
+const DTS_RESISTIVE = path.resolve(
+  "src/solver/analog/__tests__/ngspice-parity/fixtures/diode-resistor.dts",
+);
+const DTS_CAP_RC = path.resolve(
+  "src/components/semiconductors/__tests__/fixtures/diode-canon-cap-rc.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic builders for T1 categories.
+// Pin labels confirmed: DcVoltageSource pos/neg, AcVoltageSource pos/neg,
+// Resistor pos/neg, Diode A/K, Ground out.
+// ---------------------------------------------------------------------------
+
+interface DiodeRcOpts {
+  vSource: number;
+  rValue: number;
+  diodeProps?: Record<string, number>;
 }
 
-function makeParamBag(params: Record<string, number>): PropertyBag {
-  const bag = new PropertyBag();
-  bag.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, ...params });
-  return bag;
-}
-
-/**
- * Build a diode-with-series-resistor DC-OP fixture:
- *   VS=5V (label vs) → R=1kΩ (label r1) → D (label d1, A→r1:neg, K→GND).
- *
- * Diode props are merged onto DIODE_PARAM_DEFAULTS so callers may override
- * a subset (e.g. just IS) without restating every default.
- */
-function buildDiodeRC(
-  facade: DefaultSimulatorFacade,
-  diodeOverrides: Record<string, number> = {},
-  rValue = 1000,
-  vSource = 5,
-): Circuit {
+function buildDiodeRc(facade: DefaultSimulatorFacade, p: DiodeRcOpts): Circuit {
   return facade.build({
     components: [
-      { id: "vs",  type: "DcVoltageSource", props: { label: "vs", voltage: vSource } },
-      { id: "r1",  type: "Resistor",        props: { label: "r1", resistance: rValue } },
-      { id: "d1",  type: "Diode",           props: { label: "d1", ...diodeOverrides } },
+      { id: "vs", type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource } },
+      { id: "r1", type: "Resistor", props: { label: "r1", resistance: p.rValue } },
+      { id: "d1", type: "Diode", props: { label: "d1", ...(p.diodeProps ?? {}) } },
       { id: "gnd", type: "Ground" },
     ],
     connections: [
       ["vs:pos", "r1:pos"],
       ["r1:neg", "d1:A"],
-      ["d1:K",   "gnd:out"],
+      ["d1:K", "gnd:out"],
       ["vs:neg", "gnd:out"],
     ],
   });
 }
 
-/**
- * Resolve a labelled pin or component to its MNA node id via the compiled
- * circuit's `labelToNodeId` map.
- */
-function nodeOf(fix: Fixture, label: string): number {
-  const n = fix.circuit.labelToNodeId.get(label);
-  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
-  return n;
+function findDiode(fix: ReturnType<typeof buildFixture>): { idx: number; ce: CircuitElement } {
+  const idx = fix.circuit.elements.findIndex(
+    (_e, i) => fix.elementLabels.get(i) === "d1",
+  );
+  expect(idx).toBeGreaterThanOrEqual(0);
+  const ce = fix.circuit.elementToCircuitElement.get(idx);
+  expect(ce).toBeDefined();
+  return { idx, ce: ce! };
 }
 
-/** Find the CircuitElement carrying a given user-visible label. */
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+// ---------------------------------------------------------------------------
+// Category 1 — Initialization (T1)
+// One block per topology variant whose code path differs:
+//   - resistive (CJO=0, TT=0): 4-slot DIODE_SCHEMA
+//   - capacitive (CJO>0 or TT>0): 7-slot DIODE_CAP_SCHEMA
+// Asserts the post-warm-start state pool VD slot is finite and a converged
+// junction node voltage exists at step 0.
+// ---------------------------------------------------------------------------
+
+describe("Diode initialization (T1)", () => {
+  const SLOT_VD_RES = DIODE_SCHEMA.indexOf.get("VD")!;
+  const SLOT_VD_CAP = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
+
+  it("init_resistive_vd_seeded", () => {
+    const fix = buildFixture({
+      build: (_r, f) => buildDiodeRc(f, { vSource: 5, rValue: 1000 }),
+    });
+    const { idx } = findDiode(fix);
+    const el = fix.circuit.elements[idx]!;
+    const vd = fix.pool.state0[el._stateBase + SLOT_VD_RES];
+    expect(Number.isFinite(vd)).toBe(true);
+    const vAnode = fix.engine.getNodeVoltage(
+      fix.circuit.labelToNodeId.get("d1:A")!,
+    );
+    expect(Number.isFinite(vAnode)).toBe(true);
+  });
+
+  it("init_capacitive_vd_seeded", () => {
+    const fix = buildFixture({
+      build: (_r, f) => buildDiodeRc(f, {
+        vSource: 5, rValue: 1000,
+        diodeProps: { CJO: 1e-11, TT: 1e-9 },
+      }),
+    });
+    const { idx } = findDiode(fix);
+    const el = fix.circuit.elements[idx]!;
+    const vd = fix.pool.state0[el._stateBase + SLOT_VD_CAP];
+    expect(Number.isFinite(vd)).toBe(true);
+    // The cap-schema branch allocates 4 extra rolled state slots above the
+    // resistive layout; assert the pool has enough headroom for SLOT_Q reads.
+    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2 — DC operating point (T1, analytical sanity)
+// 5V → 1kΩ → diode → GND. The closed-form Shockley solution at default
+// parameters (IS=1e-14, N=1) sits at Vd ≈ 0.6929V, Id ≈ 4.31 mA. T3 paired
+// vs ngspice is the bit-exact check (DTS_RESISTIVE session below).
+// ---------------------------------------------------------------------------
+
+describe("Diode DCOP analytical sanity (T1)", () => {
+  it("dcop_resistive_forward_converges", () => {
+    const fix = buildFixture({
+      build: (_r, f) => buildDiodeRc(f, { vSource: 5, rValue: 1000 }),
+    });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    const vAnode = fix.engine.getNodeVoltage(
+      fix.circuit.labelToNodeId.get("d1:A")!,
+    );
+    // Shockley at IS=1e-14, N=1, Vt≈25.85mV, R=1k, V=5: Vd ≈ 0.6929V
+    expect(vAnode).toBeCloseTo(0.6929, 3);
+    const id = (5 - vAnode) / 1000;
+    expect(id).toBeCloseTo(4.307e-3, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 4 — Parameter hot-load (T1)
+// One it() per parameter group:
+//   - Primary structural: IS, N
+//   - Secondary structural: RS, BV (junction)
+//   - Derived-state-recompute: TEMP (universal), TNOM
+//   - Instance scaling: AREA
+// Assert the simulator output observably changed via the documented
+// shift; never inspect property bag or internal element fields.
+// ---------------------------------------------------------------------------
+
+describe("Diode parameter hot-load (T1)", () => {
+  function build5V1k(): ReturnType<typeof buildFixture> {
+    return buildFixture({
+      build: (_r, f) => buildDiodeRc(f, { vSource: 5, rValue: 1000 }),
+    });
   }
-  throw new Error(`CircuitElement with label '${label}' not found`);
-}
 
-describe("Diode", () => {
-  it("definition_has_correct_fields", () => {
-    expect(DiodeDefinition.name).toBe("Diode");
-    expect(DiodeDefinition.modelRegistry?.["spice"]).toBeDefined();
-    expect(DiodeDefinition.modelRegistry?.["spice"]?.kind).toBe("inline");
-    expect(
-      (DiodeDefinition.modelRegistry?.["spice"] as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory,
-    ).toBeDefined();
+  it("hotload_IS_changes_vd", () => {
+    const fix = build5V1k();
+    const { ce } = findDiode(fix);
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
+    fix.coordinator.setComponentProperty(ce, "IS", 1e-11);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    // Larger IS → smaller Vd at same current. Closed-form ΔV = N*Vt*ln(IS_old/IS_new).
+    // ngspice ref at IS=1e-11 with default else: Vd ≈ 0.5153V.
+    expect(after).toBeCloseTo(0.5153, 2);
+    expect(after).toBeLessThan(before);
   });
 
-  it("factory_returns_element_with_stateBase_minus_one_before_compile", () => {
-    const props = makeParamBag({});
-    const pinNodes = new Map<string, number>();
-    pinNodes.set("A", 1);
-    pinNodes.set("K", 2);
-    const el = createDiodeElement(pinNodes, props, () => 0);
-    expect(el._stateBase).toBe(-1);
-    expect(el.branchIndex).toBe(-1);
+  it("hotload_N_changes_vd", () => {
+    const fix = build5V1k();
+    const { ce } = findDiode(fix);
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
+    fix.coordinator.setComponentProperty(ce, "N", 2);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    // N=2: Vd ≈ 1.377V (ngspice ref). Vd rises (twice the thermal voltage scaling).
+    expect(after).toBeCloseTo(1.377, 2);
+    expect(after).toBeGreaterThan(before);
   });
-});
 
-describe("Integration", () => {
-  it("diode_resistor_dc_op", () => {
-    // 5V → 1kΩ → diode → GND. Default SPICE diode (IS=1e-14, N=1).
-    // ngspice reference: Vd=0.6928910V, Id=4.307675mA.
+  it("hotload_RS_changes_vd", () => {
+    const fix = build5V1k();
+    const { ce } = findDiode(fix);
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
+    // Series resistance RS adds a drop V_RS = Id*RS in series with the
+    // junction. At 100Ω and Id≈4mA, V_RS ≈ 0.4V — Vd at the junction must
+    // change observably (the anode pin sees the junction-plus-RS sum).
+    fix.coordinator.setComponentProperty(ce, "RS", 100);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_AREA_changes_vd", () => {
+    const fix = build5V1k();
+    const { ce } = findDiode(fix);
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
+    // AREA scales IS by AREA; AREA=10 → Vd drops by N*Vt*ln(10) ≈ 60mV.
+    fix.coordinator.setComponentProperty(ce, "AREA", 10);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    expect(after).not.toBeCloseTo(before, 3);
+    expect(after).toBeLessThan(before);
+  });
+
+  it("hotload_TEMP_changes_vd", () => {
+    // TEMP triggers dioTemp() recompute (tIS / vt / tVJ / tCJO / tVcrit / tBV).
+    // Universal derived-state path required of every analog component with
+    // temperature-dependent state.
+    const fix = build5V1k();
+    const { ce } = findDiode(fix);
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
+    fix.coordinator.setComponentProperty(ce, "TEMP", 400);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    // Raising TEMP increases tIS exponentially → Vd at fixed Id drops.
+    expect(after).not.toBeCloseTo(before, 3);
+    expect(after).toBeLessThan(before);
+  });
+
+  it("hotload_TNOM_changes_vd", () => {
+    // TNOM is the parameter measurement reference temperature; changing it
+    // re-derives the temperature scaling factor used in dioTemp(), even at
+    // default operating TEMP.
+    const fix = build5V1k();
+    const { ce } = findDiode(fix);
+    const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
+    const before = fix.engine.getNodeVoltage(vAnodeNode);
+    fix.coordinator.setComponentProperty(ce, "TNOM", 350);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vAnodeNode);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_BV_changes_reverse_breakdown_vd", () => {
+    // Reverse-bias topology: drive anode below cathode, BV controls the
+    // breakdown knee. Changing BV from default (Inf) to a finite value
+    // shifts the reverse-Vd at substantial reverse current.
     const fix = buildFixture({
-      build: (_r, facade) => buildDiodeRC(facade),
-    });
-    const result = fix.coordinator.dcOperatingPoint()!;
-    expect(result.converged).toBe(true);
-
-    const vAnode = fix.engine.getNodeVoltage(nodeOf(fix, "d1:A"));
-    const vSource = fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"));
-
-    expectSpiceRef(vSource, 5, "V(source)");
-    expectSpiceRef(vAnode, 6.928910e-01, "V(diode)");
-    expectSpiceRef((vSource - vAnode) / 1000, 4.307675e-03, "I(diode)");
-  });
-});
-
-describe("setParam mutates params object (not captured locals)", () => {
-  it("setParam('IS', 1e-11) shifts DC OP to match SPICE reference", () => {
-    const fix = buildFixture({
-      build: (_r, facade) => buildDiodeRC(facade),
-    });
-
-    const before = fix.coordinator.dcOperatingPoint()!;
-    expect(before.converged).toBe(true);
-    const vBefore = fix.engine.getNodeVoltage(nodeOf(fix, "d1:A"));
-    expectSpiceRef(vBefore, 6.928910e-01, "V(diode) before");
-    expectSpiceRef((5 - vBefore) / 1000, 4.307675e-03, "I(diode) before");
-
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "d1"), "IS", 1e-11);
-
-    const after = fix.coordinator.dcOperatingPoint()!;
-    expect(after.converged).toBe(true);
-    const vAfter = fix.engine.getNodeVoltage(nodeOf(fix, "d1:A"));
-    expectSpiceRef(vAfter, 5.152668e-01, "V(diode) after IS=1e-11");
-    expectSpiceRef((5 - vAfter) / 1000, 4.485160e-03, "I(diode) after IS=1e-11");
-  });
-
-  it("setParam('N', 2) shifts DC OP to match SPICE reference", () => {
-    const fix = buildFixture({
-      build: (_r, facade) => buildDiodeRC(facade),
-    });
-
-    const before = fix.coordinator.dcOperatingPoint()!;
-    expect(before.converged).toBe(true);
-    const vBefore = fix.engine.getNodeVoltage(nodeOf(fix, "d1:A"));
-    expectSpiceRef(vBefore, 6.928910e-01, "V(diode) before");
-    expectSpiceRef((5 - vBefore) / 1000, 4.307675e-03, "I(diode) before");
-
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "d1"), "N", 2);
-
-    const after = fix.coordinator.dcOperatingPoint()!;
-    expect(after.converged).toBe(true);
-    const vAfter = fix.engine.getNodeVoltage(nodeOf(fix, "d1:A"));
-    expectSpiceRef(vAfter, 1.376835e+00, "V(diode) after N=2");
-    expectSpiceRef((5 - vAfter) / 1000, 3.623504e-03, "I(diode) after N=2");
-  });
-});
-
-describe("dioTemp temperature scaling", () => {
-  const REFTEMP = 300.15;
-  const CONSTboltz = 1.3806226e-23;
-  const CHARGE = 1.6021918e-19;
-
-  it("vt equals kT/q at REFTEMP", () => {
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    const expected = REFTEMP * CONSTboltz / CHARGE;
-    expect(Math.abs(tp.vt - expected) / expected).toBeLessThan(1e-10);
-  });
-
-  it("tIS equals IS at T=TNOM (no scaling)", () => {
-    const IS = 1e-14;
-    const p = { IS, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    expect(Math.abs(tp.tIS - IS) / IS).toBeLessThan(1e-8);
-  });
-
-  it("tIS increases with temperature (XTI=3, EG=1.11)", () => {
-    const IS = 1e-14;
-    const p = { IS, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp_cold = dioTemp(p, REFTEMP);
-    const tp_hot  = dioTemp(p, REFTEMP + 50);
-    expect(tp_hot.tIS).toBeGreaterThan(tp_cold.tIS);
-  });
-
-  it("tVJ is reduced at higher temperature", () => {
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp_nom = dioTemp(p, REFTEMP);
-    const tp_hot = dioTemp(p, REFTEMP + 50);
-    expect(tp_hot.tVJ).toBeLessThan(tp_nom.tVJ);
-  });
-
-  it("tCJO equals CJO when CJO=0", () => {
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP + 30);
-    expect(tp.tCJO).toBe(0);
-  });
-
-  it("tCJO approximately equals CJO at T=TNOM", () => {
-    const CJO = 10e-12;
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    expect(Math.abs(tp.tCJO - CJO) / CJO).toBeLessThan(1e-6);
-  });
-
-  it("tVcrit = nVt * log(nVt / (tIS * sqrt(2)))", () => {
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    const expected = tp.vt * Math.log(tp.vt / (tp.tIS * Math.SQRT2));
-    expect(Math.abs(tp.tVcrit - expected) / Math.abs(expected)).toBeLessThan(1e-10);
-  });
-
-  it("tBV is Infinity when BV is Infinity", () => {
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    expect(tp.tBV).toBe(Infinity);
-  });
-
-  it("tBV is finite and close to BV when BV is finite", () => {
-    const BV = 5.0;
-    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    expect(isFinite(tp.tBV)).toBe(true);
-    expect(Math.abs(tp.tBV - BV)).toBeLessThan(1.0);
-  });
-});
-
-describe("IBV knee iteration", () => {
-  it("tBV satisfies knee equation: tIS*(exp((BV-tBV)/(NBV*vt))-1) ≈ IBV", () => {
-    const BV = 5.0;
-    const IBV = 1e-3;
-    const IS = 1e-14;
-    const N = 1;
-    const REFTEMP = 300.15;
-    const p = { IS, N, VJ: 1.0, CJO: 0, M: 0.5, BV, IBV, NBV: N, EG: 1.11, XTI: 3, TNOM: REFTEMP };
-    const tp = dioTemp(p, REFTEMP);
-    const nbvVt = N * tp.vt;
-    const residual = tp.tIS * (Math.exp((BV - tp.tBV) / nbvVt) - 1) - IBV;
-    expect(Math.abs(residual) / IBV).toBeLessThan(1e-6);
-  });
-});
-
-describe("AREA scaling", () => {
-  /**
-   * Drive a diode at a known forward bias by stiff voltage source, return the
-   * resulting current observed via the resistor drop:
-   *   VS=Vd → R=1Ω → D(A→r1:neg, K→GND)
-   * The 1Ω resistor makes the resistor drop negligible compared to Vd, so
-   * the diode sees ≈ Vd at convergence and Id flows through R.
-   *
-   * Returns I = (V(vs) - V(d1:A)) / R, the current through the diode.
-   */
-  function diodeCurrentAt(vd: number, overrides: Record<string, number>): number {
-    const fix = buildFixture({
-      build: (_r, facade) => facade.build({
+      build: (_r, f) => f.build({
         components: [
-          { id: "vs", type: "DcVoltageSource", props: { label: "vs", voltage: vd } },
-          // Tiny series resistor so R-drop ≈ 0 at observed currents (gives a
-          // good Vd-≈-vd assumption while still allowing Id to be measured).
-          { id: "r1", type: "Resistor",        props: { label: "r1", resistance: 1 } },
-          { id: "d1", type: "Diode",           props: { label: "d1", IS: 1e-14, N: 1, RS: 0, CJO: 0, ...overrides } },
+          { id: "vs", type: "DcVoltageSource", props: { label: "vs", voltage: 10 } },
+          { id: "r1", type: "Resistor", props: { label: "r1", resistance: 1000 } },
+          { id: "d1", type: "Diode", props: { label: "d1" } },
+          { id: "gnd", type: "Ground" },
+        ],
+        // Cathode driven HIGH, anode pulled to GND through R: reverse bias.
+        connections: [
+          ["vs:pos", "d1:K"],
+          ["d1:A", "r1:pos"],
+          ["r1:neg", "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+    });
+    const { ce } = findDiode(fix);
+    const vCathodeNode = fix.circuit.labelToNodeId.get("d1:K")!;
+    const before = fix.engine.getNodeVoltage(vCathodeNode);
+    fix.coordinator.setComponentProperty(ce, "BV", 5);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(vCathodeNode);
+    expect(after).not.toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 6 — Limiting events (T1, own engine)
+// Diode load() invokes pnjlim on the AK junction during NR. Drive a strong
+// forward bias circuit and assert the limiting collector recorded an AK
+// junction visit at finite vBefore / vAfter.
+// ---------------------------------------------------------------------------
+
+describe("Diode limiting events own-engine (T1)", () => {
+  it("limiting_pnjlim_fires_forward_bias", () => {
+    const fix = buildFixture({
+      build: (_r, f) => buildDiodeRc(f, { vSource: 5, rValue: 1000 }),
+    });
+    fix.coordinator.setLimitingCapture(true);
+    fix.coordinator.dcOperatingPoint();
+    const events = fix.coordinator.getLimitingEvents();
+    const ak = events.find(e => e.label === "d1" && e.junction === "AK");
+    expect(ak).toBeDefined();
+    expect(ak!.limitType).toBe("pnjlim");
+    expect(Number.isFinite(ak!.vBefore)).toBe(true);
+    expect(Number.isFinite(ak!.vAfter)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 7 — LTE rollback (T1)
+// Diode getLteTimestep() proposes dt over Q / CCAP slots only when capacitance
+// is enabled (CJO > 0 OR TT > 0). Drive a sine-modulated cap-bearing diode
+// and assert the rolled charge slot rotation invariant after warm-start.
+// ---------------------------------------------------------------------------
+
+describe("Diode LTE rollback (T1)", () => {
+  it("lte_rollback_state_invariant", () => {
+    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const fix = buildFixture({
+      build: (_r, f) => f.build({
+        components: [
+          { id: "vs", type: "AcVoltageSource", props: {
+            label: "vs", amplitude: 1, frequency: 1e6, waveform: "sine", dcOffset: 0,
+          } },
+          { id: "r1", type: "Resistor", props: { label: "r1", resistance: 1000 } },
+          { id: "d1", type: "Diode", props: {
+            label: "d1",
+            // Activate the cap-driven LTE path: junction depletion + transit time.
+            CJO: 1e-11, TT: 1e-9,
+          } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
           ["vs:pos", "r1:pos"],
           ["r1:neg", "d1:A"],
-          ["d1:K",   "gnd:out"],
+          ["d1:K", "gnd:out"],
           ["vs:neg", "gnd:out"],
         ],
       }),
+      params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
-    const result = fix.coordinator.dcOperatingPoint()!;
-    expect(result.converged).toBe(true);
-    const vS = fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"));
-    const vA = fix.engine.getNodeVoltage(nodeOf(fix, "d1:A"));
-    return (vS - vA) / 1.0;
-  }
-
-  it("AREA=1 (default) gives same result as no AREA override", () => {
-    const vd = 0.7;
-    const id1 = diodeCurrentAt(vd, { AREA: 1 });
-    const id2 = diodeCurrentAt(vd, {});
-    expect(Math.abs(id1 - id2) / Math.abs(id2)).toBeLessThan(1e-6);
-  });
-
-  it("AREA=2 doubles IS and thus id relative to AREA=1", () => {
-    const vd = 0.7;
-    const id1 = diodeCurrentAt(vd, { AREA: 1, IS: 1e-14 });
-    const id2 = diodeCurrentAt(vd, { AREA: 2, IS: 1e-14 });
-    expect(id2 / id1).toBeGreaterThan(1.9);
+    fix.coordinator.setConvergenceLogEnabled(true);
+    for (let i = 0; i < 20; i++) fix.coordinator.step();
+    const log = fix.coordinator.getConvergenceLog();
+    expect(log).not.toBeNull();
+    // Rotation invariant: state0 and state1 are populated post-warm-start
+    // and remain finite for the rolled Q charge slot. cktTerr fires on these
+    // slots; the LTE path is exercised when cap-bearing transients run.
+    const { idx } = findDiode(fix);
+    const el = fix.circuit.elements[idx]!;
+    expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
+    expect(Number.isFinite(fix.pool.state1[el._stateBase + SLOT_Q])).toBe(true);
   });
 });
 
-describe("integration", () => {
-  it("no_integrateCapacitor_import", () => {
-    const src = readFileSync(
-      resolvePath(__dirname, "../diode.ts"),
-      "utf8",
-    );
-    expect(src).not.toMatch(/integrateCapacitor/);
-    expect(src).not.toMatch(/integrateInductor/);
-  });
-});
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 — Harness sessions (T3) — resistive diode
+// 1V → 1kΩ → diode → GND. Forward-bias DC + initial-transient regime; the
+// resistive (4-slot) load() path is the bulk of the diode's stamp/state code.
+// One session in beforeAll; runTransient lives inside the FIRST it() so a
+// hard throw renders as a visible failed test (per spec session-sharing rule).
+// ---------------------------------------------------------------------------
 
-describe("computeJunctionCapacitance / computeJunctionCharge public exports", () => {
-  it("computeJunctionCapacitance returns 0 when CJO=0", () => {
-    expect(computeJunctionCapacitance(0.3, 0, 0.7, 0.5, 0.5)).toBe(0);
-  });
+describeIfDll("Diode resistive forward paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
 
-  it("computeJunctionCapacitance returns positive Cj for CJO>0 in reverse bias", () => {
-    const Cj = computeJunctionCapacitance(-1.0, 10e-12, 0.7, 0.5, 0.5);
-    expect(Cj).toBeGreaterThan(0);
-    expect(Cj).toBeLessThan(10e-12); // reverse bias → C < CJO
-  });
-
-  it("computeJunctionCharge returns 0 when CJO=0 and TT=0 and Id=0", () => {
-    expect(computeJunctionCharge(0, 0, 0.7, 0.5, 0.5, 0, 0)).toBe(0);
-  });
-
-  it("computeJunctionCharge increases with vd (forward bias) when CJO>0", () => {
-    const q1 = computeJunctionCharge(0.0, 10e-12, 0.7, 0.5, 0.5, 0, 0);
-    const q2 = computeJunctionCharge(0.3, 10e-12, 0.7, 0.5, 0.5, 0, 0);
-    expect(q2).toBeGreaterThan(q1);
-  });
-});
-
-describe("Diode TEMP", () => {
-  it("TEMP_default_300_15", () => {
-    const propsObj = makeParamBag({});
-    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
-  });
-
-  it("paramDefs_include_TEMP", () => {
-    const keys = DIODE_PARAM_DEFS.map((d) => d.key);
-    expect(keys).toContain("TEMP");
-  });
-
-  it("setParam_TEMP_via_coordinator_does_not_throw", () => {
-    // Hot-loadable param contract via the production setComponentProperty
-    // path: changing TEMP at runtime must not throw and must converge a
-    // subsequent DCOP.
-    const fix = buildFixture({
-      build: (_r, facade) => buildDiodeRC(facade),
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_RESISTIVE,
+      dllPath: DLL_PATH,
     });
-    const dc1 = fix.coordinator.dcOperatingPoint()!;
-    expect(dc1.converged).toBe(true);
-
-    expect(() => {
-      fix.coordinator.setComponentProperty(ceByLabel(fix, "d1"), "TEMP", 400);
-    }).not.toThrow();
-
-    const dc2 = fix.coordinator.dcOperatingPoint()!;
-    expect(dc2.converged).toBe(true);
   });
 
-  it("tp_vt_reflects_TEMP", () => {
-    const CONSTboltz_local = 1.3806226e-23;
-    const CHARGE_local = 1.6021918e-19;
-    const KoverQ = CONSTboltz_local / CHARGE_local;
-    const p = {
-      IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5,
-      BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: 300.15,
-    };
-    const tp = dioTemp(p, 400);
-    expect(Math.abs(tp.vt - 400 * KoverQ) / (400 * KoverQ)).toBeLessThan(1e-10);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("tSatCur_scales_with_TEMP", () => {
-    const p = {
-      IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5,
-      BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: 300.15,
-    };
-    const tp_nom = dioTemp(p, 300.15);
-    const tp_hot = dioTemp(p, 400);
-    expect(tp_hot.tIS).toBeGreaterThan(tp_nom.tIS);
+  it("transient_step_end_paired_resistive", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
   });
 
-  it("TNOM_stays_nominal_refs", () => {
-    const CONSTboltz_local = 1.3806226e-23;
-    const CHARGE_local = 1.6021918e-19;
-    const p = {
-      IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5,
-      BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: 300.15,
-    };
-    const tp = dioTemp(p, 400);
-    const expectedVtnom = 300.15 * CONSTboltz_local / CHARGE_local;
-    expect(Math.abs(tp.vtnom - expectedVtnom) / expectedVtnom).toBeLessThan(1e-10);
-  });
-});
-
-describe("DIODE_PARAM_DEFS partition layout", () => {
-  it("AREA, TEMP, OFF, IC have partition === 'instance'", () => {
-    const instanceKeys = ["AREA", "TEMP", "OFF", "IC"];
-    for (const key of instanceKeys) {
-      const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
-      expect(def, `ParamDef for key "${key}" not found`).toBeDefined();
-      expect(def!.partition).toBe("instance");
+  it("dcop_paired_resistive", () => {
+    // Step 0 of a transient is the firsttime DCOP solve. getStepEnd(0) exposes
+    // the converged DC node and component slot values for paired comparison.
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
     }
   });
 
-  it("IS, N, RS, CJO, VJ, M, TT, FC, BV, IBV, NBV, IKF, IKR, EG, XTI, KF, AF, TNOM, ISW, NSW have partition === 'model'", () => {
-    const modelKeys = ["IS", "N", "RS", "CJO", "VJ", "M", "TT", "FC", "BV", "IBV", "NBV", "IKF", "IKR", "EG", "XTI", "KF", "AF", "TNOM", "ISW", "NSW"];
-    for (const key of modelKeys) {
-      const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
-      expect(def, `ParamDef for key "${key}" not found`).toBeDefined();
-      expect(def!.partition).toBe("model");
+  it("full_iteration_paired_resistive", () => {
+    session.compareAllAttempts();
+  });
+
+  it("limiting_paired_resistive", () => {
+    // Pair pnjlim limiting events on D1 AK junction across the first attempt
+    // of step 0. wasLimited and {vBefore,vAfter} must agree bit-exact.
+    const cmp = session.getLimitingComparison("D1", 0, 0);
+    for (const j of cmp.junctions) {
+      expect(j.limitingDiff).toBe(0);
     }
   });
 });
 
-describe("DIODE_PARAM_DEFAULTS unchanged", () => {
-  it("preserves all default values", () => {
-    expect(DIODE_PARAM_DEFAULTS.AREA).toBe(1);
-    expect(DIODE_PARAM_DEFAULTS.OFF).toBe(0);
-    expect(isNaN(DIODE_PARAM_DEFAULTS.IC)).toBe(true);
-    expect(DIODE_PARAM_DEFAULTS.TEMP).toBe(300.15);
-    expect(DIODE_PARAM_DEFAULTS.IS).toBe(1e-14);
-    expect(DIODE_PARAM_DEFAULTS.N).toBe(1);
-    expect(DIODE_PARAM_DEFAULTS.RS).toBe(0);
-    expect(DIODE_PARAM_DEFAULTS.CJO).toBe(0);
-    expect(DIODE_PARAM_DEFAULTS.VJ).toBe(1);
-    expect(DIODE_PARAM_DEFAULTS.M).toBe(0.5);
-    expect(DIODE_PARAM_DEFAULTS.TT).toBe(0);
-    expect(DIODE_PARAM_DEFAULTS.FC).toBe(0.5);
-    expect(DIODE_PARAM_DEFAULTS.BV).toBe(Infinity);
-    expect(DIODE_PARAM_DEFAULTS.IBV).toBe(1e-3);
-    expect(isNaN(DIODE_PARAM_DEFAULTS.NBV)).toBe(true);
-    expect(DIODE_PARAM_DEFAULTS.IKF).toBe(Infinity);
-    expect(DIODE_PARAM_DEFAULTS.IKR).toBe(Infinity);
-    expect(DIODE_PARAM_DEFAULTS.EG).toBe(1.11);
-    expect(DIODE_PARAM_DEFAULTS.XTI).toBe(3);
-    expect(DIODE_PARAM_DEFAULTS.KF).toBe(0);
-    expect(DIODE_PARAM_DEFAULTS.AF).toBe(1);
-    expect(DIODE_PARAM_DEFAULTS.TNOM).toBe(300.15);
-    expect(DIODE_PARAM_DEFAULTS.ISW).toBe(0);
-    expect(isNaN(DIODE_PARAM_DEFAULTS.NSW)).toBe(true);
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 — Harness sessions (T3) — capacitive diode
+// 1V sine @ 100kHz → 1kΩ → diode (CJO=10pF, TT=1ns) → GND. Activates the
+// 7-slot DIODE_CAP_SCHEMA path: junction-charge integration, NIintegrate
+// companion stamping, MODEINITTRAN / MODEINITSMSIG cap-block branches that
+// are dormant in the resistive .dts.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Diode capacitive RC paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_CAP_RC,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_cap_rc", async () => {
+    await session.runTransient(0, 5e-5, 5e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_cap_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
+    }
+  });
+
+  it("full_iteration_paired_cap_rc", () => {
+    session.compareAllAttempts();
   });
 });

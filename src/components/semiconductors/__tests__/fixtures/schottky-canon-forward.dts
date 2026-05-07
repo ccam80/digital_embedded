@@ -1,0 +1,365 @@
+{
+  "circuit": {
+    "description": "Schottky forward-biased: V1=0.5V drives Schottky anode through R=300Ω to ground. Forward conduction regime exercises Schottky low-Vf I-V, junction cap (CJO=1pF default), and series RS=1Ω internal node.",
+    "elements": [
+      {
+        "id": "419e81ed-f12d-49a3-a9d6-b5a2b4da5213",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 0.5
+          },
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 0.5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "4ffd8131-ec92-4b5d-a470-af6f3f85ca9d",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BV": 40,
+            "CJO": 1e-12,
+            "EG": 0.69,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IS": 1e-8,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1.05,
+            "RS": 1,
+            "TEMP": 300.15,
+            "TT": 0,
+            "VJ": 0.6,
+            "XTI": 2
+          },
+          "label": "D1",
+          "position": [
+            0,
+            8
+          ]
+        },
+        "rotation": 0,
+        "type": "SchottkyDiode"
+      },
+      {
+        "id": "4aa51a76-e04e-42f0-8cda-d93fa1c4fe6e",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 300
+          },
+          "label": "R1",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 300
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "6f52f0f8-d4d3-4b74-b865-9bcd68313813",
+        "position": {
+          "x": 36,
+          "y": 2
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "schottky-canon-forward",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 24,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 30,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 4
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

@@ -1,62 +1,67 @@
-/** Tests for the TransmissionLine component. */
+/** Tests for the TransmissionLine component (lossy lumped RLCG composite). */
 
-import { describe, it, expect } from "vitest";
-import {
-  TransmissionLineDefinition,
-  TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS,
-} from "../transmission-line.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
+
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import type { PropertyValue } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
-// Circuit factories
+// .dts paths (T3 fixtures)
 // ---------------------------------------------------------------------------
 
-interface TLineCircuitParams {
-  /** Characteristic impedance Z0 (Ω). */
+const DTS_MATCHED_LOAD = path.resolve(
+  "src/components/passives/__tests__/fixtures/transmission-line-canon-matched-load.dts",
+);
+const DTS_LOSSY_OPEN_END = path.resolve(
+  "src/components/passives/__tests__/fixtures/transmission-line-canon-lossy-open-end.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic builders (T1)
+// ---------------------------------------------------------------------------
+
+interface TLineBenchParams {
+  /** Characteristic impedance Z0. */
   Z0: number;
-  /** One-way propagation delay τ (s). */
+  /** One-way propagation delay (s). */
   tau: number;
-  /** Loss per metre in dB/m. */
   lossPerMeter?: number;
-  /** Number of lumped segments. */
   segments?: number;
-  /** Source voltage. */
   vSource?: number;
-  /** Series source resistance (Ω). 0 means ideal source. */
+  /** Series source resistance. 0 = ideal source (no R_SRC component). */
   rSrc?: number;
-  /** Termination resistance at port2 (Ω). Use 1e9 to model an open circuit. */
+  /** Termination resistance at port2. */
   rLoad?: number;
 }
 
-/**
- * Build a transmission-line test bench with optional source impedance.
- *
- *   vs(+) ─ rSrc ─ port1 ─ TLine ─ port2 ─ rLoad ─ GND
- *           (only present if rSrc > 0)
- */
-function buildTLineBench(facade: DefaultSimulatorFacade, p: TLineCircuitParams): Circuit {
+function buildTLineBench(facade: DefaultSimulatorFacade, p: TLineBenchParams): Circuit {
   const components: Array<{ id: string; type: string; props?: Record<string, PropertyValue> }> = [
-    { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: p.vSource ?? 1.0 } },
-    { id: "tl",  type: "TransmissionLine", props: {
-        label:        "tl",
+    { id: "vs", type: "DcVoltageSource", props: { label: "V1", voltage: p.vSource ?? 1.0 } },
+    { id: "tl", type: "TransmissionLine", props: {
+        label:        "TL1",
         impedance:    p.Z0,
         delay:        p.tau,
         lossPerMeter: p.lossPerMeter ?? 0,
         length:       1.0,
         segments:     p.segments ?? 10,
     } },
-    { id: "rload", type: "Resistor", props: { label: "rload", resistance: p.rLoad ?? p.Z0 } },
-    { id: "gnd",   type: "Ground" },
+    { id: "rload", type: "Resistor", props: { label: "R_LOAD", resistance: p.rLoad ?? p.Z0 } },
+    { id: "gnd",   type: "Ground",   props: { label: "GND" } },
   ];
   const connections: Array<[string, string]> = [];
 
   if ((p.rSrc ?? 0) > 0) {
-    components.push({ id: "rsrc", type: "Resistor", props: { label: "rsrc", resistance: p.rSrc! } });
+    components.push({ id: "rsrc", type: "Resistor", props: { label: "R_SRC", resistance: p.rSrc! } });
     connections.push(
       ["vs:pos",   "rsrc:pos"],
       ["rsrc:neg", "tl:P1b"],
@@ -65,11 +70,11 @@ function buildTLineBench(facade: DefaultSimulatorFacade, p: TLineCircuitParams):
     connections.push(["vs:pos", "tl:P1b"]);
   }
 
-  // P1a / P2a are the "below" pins (return path) — tied to ground.
+  // P1a / P2a are the return-path pins; P2b is the far-end signal pin.
   connections.push(
-    ["tl:P1a",   "gnd:out"],
-    ["tl:P2a",   "gnd:out"],
-    ["tl:P2b",   "rload:pos"],
+    ["tl:P1a",    "gnd:out"],
+    ["tl:P2a",    "gnd:out"],
+    ["tl:P2b",    "rload:pos"],
     ["rload:neg", "gnd:out"],
     ["vs:neg",    "gnd:out"],
   );
@@ -77,185 +82,298 @@ function buildTLineBench(facade: DefaultSimulatorFacade, p: TLineCircuitParams):
   return facade.build({ components, connections });
 }
 
-function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
 }
 
-// ---------------------------------------------------------------------------
-// Definition smoke checks
-// ---------------------------------------------------------------------------
+function getTLineCe(fix: Fixture) {
+  const idx = fix.circuit.elements.findIndex(
+    (_e, i) => fix.elementLabels.get(i) === "TL1",
+  );
+  if (idx < 0) throw new Error("TL1 element not found by label");
+  const ce = fix.circuit.elementToCircuitElement.get(idx);
+  if (ce === undefined) throw new Error("TL1 elementToCircuitElement entry missing");
+  return ce;
+}
 
-describe("TransmissionLine", () => {
-  describe("definition", () => {
-    it("name is 'TransmissionLine'", () => {
-      expect(TransmissionLineDefinition.name).toBe("TransmissionLine");
+// ===========================================================================
+// Category 1 — Initialization (T1)
+// Post-warm-start: the netlist composite expands to N segments of series RL
+// + shunt GC. With V1=1V driving through R_SRC=Z0 and the far end terminated
+// in R_LOAD=Z0, the inductors are DC shorts and the line collapses to a
+// resistive divider — V(P1b) = V(P2b) ≈ Vs/2 = 0.5V at DC steady state.
+// ===========================================================================
+
+describe("TransmissionLine initialization — matched-load DC bench (T1)", () => {
+  it("init_matched_load_returns_half_vs_at_both_ports", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 10, lossPerMeter: 0,
+        vSource: 1.0, rSrc: 50, rLoad: 50,
+      }),
     });
 
-    it("category is PASSIVES", () => {
-      expect(TransmissionLineDefinition.category).toBe(ComponentCategory.PASSIVES);
+    // P1a / P2a are tied directly to ground.
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "TL1:P1a"))).toBeCloseTo(0, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "TL1:P2a"))).toBeCloseTo(0, 6);
+
+    // Lossless line: inductors short at DC ⇒ V(P1b) = V(P2b) ≈ Vs/2 with
+    // matched source and load resistors both equal to Z0.
+    const vP1b = fix.engine.getNodeVoltage(nodeOf(fix, "TL1:P1b"));
+    const vP2b = fix.engine.getNodeVoltage(nodeOf(fix, "TL1:P2b"));
+    expect(vP1b).toBeCloseTo(0.5, 4);
+    expect(vP2b).toBeCloseTo(0.5, 4);
+  });
+});
+
+// ===========================================================================
+// Category 2 — DCOP analytical (T1)
+// At DC the lossless line is electrically transparent (inductors short),
+// so the divider becomes Vs across (R_SRC=Z0) in series with (R_LOAD=Z0):
+// V(P2b) = Vs * Z0/(Z0+Z0) = Vs/2 = 0.5V.
+// ===========================================================================
+
+describe("TransmissionLine DCOP analytical — matched-load (T1)", () => {
+  it("dcop_matched_load_lossless_line_is_dc_short", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 5e-9, segments: 10, lossPerMeter: 0,
+        vSource: 1.0, rSrc: 50, rLoad: 50,
+      }),
     });
 
-    it("model registry has a default netlist entry (composite)", () => {
-      const entry = TransmissionLineDefinition.modelRegistry?.["default"];
-      expect(entry).toBeDefined();
-      expect(entry!.kind).toBe("netlist");
-    });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-    it("can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(TransmissionLineDefinition)).not.toThrow();
-    });
-
-    it("pinLayout has 4 pins: P1b, P2b, P1a, P2a", () => {
-      expect(TransmissionLineDefinition.pinLayout).toHaveLength(4);
-      const labels = TransmissionLineDefinition.pinLayout.map((p) => p.label).sort();
-      expect(labels).toEqual(["P1a", "P1b", "P2a", "P2b"]);
-    });
-
-    it("propertyDefs include lossPerMeter, length, segments", () => {
-      const keys = TransmissionLineDefinition.propertyDefs.map((p) => p.key);
-      expect(keys).toContain("lossPerMeter");
-      expect(keys).toContain("length");
-      expect(keys).toContain("segments");
-    });
-
-    it("model param defaults include impedance and delay", () => {
-      const params = TransmissionLineDefinition.modelRegistry?.["default"]?.params;
-      expect(params).toBeDefined();
-      expect(params!["impedance"]).toBeDefined();
-      expect(params!["delay"]).toBeDefined();
-    });
-
-    it("segments property has min=2 and max=100", () => {
-      const segDef = TransmissionLineDefinition.propertyDefs.find((p) => p.key === "segments");
-      expect(segDef).toBeDefined();
-      expect(segDef!.min).toBe(2);
-      expect(segDef!.max).toBe(100);
-    });
-
-    it("impedance attribute mapping exists", () => {
-      const m = TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "impedance");
-      expect(m).toBeDefined();
-    });
-
-    it("segments attribute mapping converts to integer", () => {
-      const m = TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "segments");
-      expect(m).toBeDefined();
-      expect(m!.convert("20")).toBe(20);
-    });
+    const vPort2 = fix.engine.getNodeVoltage(nodeOf(fix, "TL1:P2b"));
+    expect(vPort2).toBeCloseTo(0.5, 4);
   });
 
-  // ---------------------------------------------------------------------------
-  // Matched-load steady state
-  // ---------------------------------------------------------------------------
-
-  describe("matched_load_steady_state", () => {
-    it("source-Z0 + line + load-Z0 → V(port2) ≈ Vs/2 at DC", () => {
-      // At DC the lossless line is electrically transparent; the divider
-      // becomes Vs across (rSrc=Z0) in series with (rLoad=Z0), so V(port2)
-      // = Vs * Z0/(Z0+Z0) = Vs/2 = 0.5 V.
-      const fix = buildFixture({
-        build: (_r, facade) => buildTLineBench(facade, {
-          Z0: 50, tau: 5e-9, segments: 10, lossPerMeter: 0,
-          vSource: 1.0, rSrc: 50, rLoad: 50,
-        }),
-      });
-      const dc = fix.coordinator.dcOperatingPoint()!;
-      expect(dc.converged).toBe(true);
-
-      const vPort2 = fix.engine.getNodeVoltage(nodeOf(fix, "tl:P2b"));
-      expect(vPort2).toBeGreaterThan(0.4);
-      expect(vPort2).toBeLessThan(0.6);
+  it("dcop_lossless_zero_rsrc_high_rload_passes_full_vs_through", () => {
+    // R_SRC=0, R_LOAD=10MΩ: the lossless line is a DC short ⇒ V(P2b) ≈ Vs.
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 5e-9, segments: 20, lossPerMeter: 0,
+        vSource: 1.0, rSrc: 0, rLoad: 1e7,
+      }),
     });
+
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+
+    const vPort2 = fix.engine.getNodeVoltage(nodeOf(fix, "TL1:P2b"));
+    // Lossless line is a DC short; no source drop ⇒ V(P2b) ≈ Vs.
+    expect(vPort2).toBeCloseTo(1.0, 4);
+  });
+});
+
+// ===========================================================================
+// Categories 2-numerical / 3 / 5 — paired vs ngspice (T3)
+// One describe per .dts; first it() owns the run.
+// ===========================================================================
+
+describeIfDll("TransmissionLine matched-load vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_MATCHED_LOAD, dllPath: DLL_PATH });
   });
 
-  // ---------------------------------------------------------------------------
-  // Open-circuit reflection
-  // ---------------------------------------------------------------------------
-
-  describe("open_circuit", () => {
-    it("unterminated line: V(port2) ≈ Vs at DC steady state (open-circuit reflection doubles incident)", () => {
-      // With R_load = 10 MΩ (effectively open) and R_src = Z0, the steady-state
-      // operating point has V(port2) ≈ Vs because the line is a DC short and
-      // the divider becomes Vs * R_load/(R_src + R_load) ≈ Vs.
-      const fix = buildFixture({
-        build: (_r, facade) => buildTLineBench(facade, {
-          Z0: 50, tau: 5e-9, segments: 20, lossPerMeter: 0,
-          vSource: 1.0, rSrc: 50, rLoad: 10e6,
-        }),
-      });
-      const dc = fix.coordinator.dcOperatingPoint()!;
-      expect(dc.converged).toBe(true);
-
-      const vPort2 = fix.engine.getNodeVoltage(nodeOf(fix, "tl:P2b"));
-      expect(vPort2).toBeGreaterThan(0.9);
-    });
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Loss attenuation
-  // ---------------------------------------------------------------------------
-
-  describe("loss_attenuates", () => {
-    it("lossPerMeter=2 reduces V(port2) below the lossless reference at DC", () => {
-      // At DC the lossy line stamps a series resistance N·R_seg between the
-      // ports (in addition to the inductors that vanish at DC). With Z0=50,
-      // delay=10ns, length=1m, lossPerMeter=2 dB/m, R_total ≈ ∑ R_seg ~50 Ω,
-      // so the divider at port2 changes detectably vs the lossless case.
-      const Z0 = 50;
-
-      const buildAt = (loss: number) => buildFixture({
-        build: (_r, facade) => buildTLineBench(facade, {
-          Z0, tau: 10e-9, segments: 10, lossPerMeter: loss,
-          vSource: 1.0, rSrc: 0, rLoad: Z0,
-        }),
-      });
-
-      const fixLossless = buildAt(0);
-      const fixLossy = buildAt(2.0);
-      expect(fixLossless.coordinator.dcOperatingPoint()!.converged).toBe(true);
-      expect(fixLossy.coordinator.dcOperatingPoint()!.converged).toBe(true);
-
-      const vLossless = fixLossless.engine.getNodeVoltage(nodeOf(fixLossless, "tl:P2b"));
-      const vLossy = fixLossy.engine.getNodeVoltage(nodeOf(fixLossy, "tl:P2b"));
-
-      // Lossless line is a DC short → V(port2) = Vs * R_load/R_load = Vs = 1 V.
-      // Lossy line dissipates → V(port2) < 1 V.
-      expect(vLossless).toBeCloseTo(1.0, 3);
-      expect(vLossy).toBeLessThan(vLossless);
-    });
+  it("transient_step_end_paired_matched_load", async () => {
+    // tau = 10ns. Run 50 tau at fine resolution so the lumped RLCG ladder's
+    // propagation behaviour is well-exercised against ngspice.
+    await session.runTransient(0, 5e-7, 5e-10);
+    session.compareAllSteps();
   });
 
-  // ---------------------------------------------------------------------------
-  // Propagation through the lumped network
-  // ---------------------------------------------------------------------------
+  it("dcop_paired_matched_load", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
+    }
+  });
 
-  describe("propagation", () => {
-    it("transient response at port2 is positive and bounded after several τ", () => {
-      // Drive a 1V step (DCOP brings it up immediately under our DC source
-      // model) into a Z0-terminated lossless line. Run several τ and confirm
-      // the port2 voltage settles into the matched-load steady-state range
-      // (~0.5 V) without diverging or going negative — the lumped RLCG
-      // network propagates without instability.
-      const Z0 = 50;
-      const tau = 10e-9;
-      const fix = buildFixture({
-        build: (_r, facade) => buildTLineBench(facade, {
-          Z0, tau, segments: 20, lossPerMeter: 0,
-          vSource: 1.0, rSrc: Z0, rLoad: Z0,
-        }),
-        params: { tStop: 50 * tau, maxTimeStep: tau / 20 },
-      });
+  it("full_iteration_paired_matched_load", () => {
+    session.compareAllAttempts();
+  });
+});
 
-      // Step well past τ.
-      while (fix.engine.simTime < 30 * tau) fix.coordinator.step();
+describeIfDll("TransmissionLine lossy open-end vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
 
-      const vPort2 = fix.engine.getNodeVoltage(nodeOf(fix, "tl:P2b"));
-      // Matched-load DC steady state for V_src=1, R_src=R_load=Z0 is 0.5 V.
-      expect(vPort2).toBeGreaterThan(0.3);
-      expect(vPort2).toBeLessThan(0.7);
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_LOSSY_OPEN_END, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_lossy_open_end", async () => {
+    // Lossy line + 1MΩ termination: long enough to surface reflection +
+    // shunt-G dissipation against ngspice.
+    await session.runTransient(0, 5e-7, 5e-10);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_lossy_open_end", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_lossy_open_end", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ===========================================================================
+// Category 4 — Parameter hot-load (T1)
+// One it() per netlist-consumed parameter. Each asserts that toggling the
+// property shifts the documented post-DCOP V(P2b) — the parameter changes
+// the line's DC behaviour because the netlist composite consumes the param
+// at compile / param-update time.
+//
+//  - lossPerMeter: structural-flavoured but documented as a hot-loadable
+//    model param; raising it adds R_seg series losses and drops V(P2b) under
+//    the asymmetric R_SRC=0 / R_LOAD=Z0 bench.
+//  - impedance: scales L_seg / C_seg / R_seg / G_seg via the netlist
+//    builder formulas; under the asymmetric bench changes V(P2b).
+//  - delay: scales L_seg / C_seg via the netlist builder; under the
+//    asymmetric bench shifts the per-segment R_seg ratio (no closed-form
+//    DC observable when lossless, so use a lossy bench so the DC observable
+//    is sensitive to delay through R_seg = 2·α·Z0·length / N).
+//  - segments: structural property, consumed at compile time. Built twice
+//    (different segment counts) — V(P2b) under lossy drive shifts because
+//    R_seg = 2·α·Z0·length / N scales inversely with N.
+//  - length: scales R_seg and G_seg by length (loss-only path); use lossy
+//    bench so V(P2b) shifts.
+// ===========================================================================
+
+describe("TransmissionLine parameter hot-load (T1)", () => {
+  it("hotload_lossPerMeter_drops_vp2b_under_lossy_bench", () => {
+    // R_SRC=0, R_LOAD=Z0 lossy bench: V(P2b) at DC = Vs * R_LOAD / (R_LOAD + N·R_seg).
+    // R_seg scales with lossPerMeter, so raising it lowers V(P2b).
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 10, lossPerMeter: 1.0,
+        vSource: 1.0, rSrc: 0, rLoad: 50,
+      }),
     });
+    const p2bNode = nodeOf(fix, "TL1:P2b");
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(p2bNode);
+
+    fix.coordinator.setComponentProperty(getTLineCe(fix), "lossPerMeter", 5.0);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(p2bNode);
+
+    // Higher loss ⇒ more series resistance ⇒ V(P2b) drops at DC.
+    expect(after).not.toBeCloseTo(before, 3);
+    expect(Math.sign(after - before)).toBe(-1);
+  });
+
+  it("hotload_impedance_changes_vp2b_under_lossy_bench", () => {
+    // R_seg = 2·α·Z0·length / N scales linearly with Z0; raising Z0 raises
+    // R_seg and shifts the divider at V(P2b).
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 10, lossPerMeter: 2.0,
+        vSource: 1.0, rSrc: 0, rLoad: 50,
+      }),
+    });
+    const p2bNode = nodeOf(fix, "TL1:P2b");
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(p2bNode);
+
+    fix.coordinator.setComponentProperty(getTLineCe(fix), "impedance", 200);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(p2bNode);
+
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_delay_changes_transient_observable", () => {
+    // delay scales L_seg = Z0·tau / N and C_seg = tau / (Z0·N); changing it
+    // shifts the lumped RLCG dynamic response. Under matched-load drive,
+    // V(P2b) at the same simTime moves predictably.
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 10, lossPerMeter: 0,
+        vSource: 1.0, rSrc: 50, rLoad: 50,
+      }),
+      params: { tStop: 5e-7, maxTimeStep: 5e-10 },
+    });
+    const p2bNode = nodeOf(fix, "TL1:P2b");
+
+    while (fix.engine.simTime < 1e-8) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(p2bNode);
+
+    fix.coordinator.setComponentProperty(getTLineCe(fix), "delay", 5e-8);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(p2bNode);
+
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_segments_at_build_time_changes_vp2b", () => {
+    // segments is a structural property consumed at compile time. Build the
+    // same circuit with two different segment counts; V(P2b) under the lossy
+    // R_SRC=0 / R_LOAD=Z0 bench shifts because R_seg = 2·α·Z0·length / N
+    // scales inversely with N.
+    const fixN6 = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 6, lossPerMeter: 2.0,
+        vSource: 1.0, rSrc: 0, rLoad: 50,
+      }),
+    });
+    fixN6.coordinator.dcOperatingPoint();
+    const vN6 = fixN6.engine.getNodeVoltage(nodeOf(fixN6, "TL1:P2b"));
+
+    const fixN20 = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 20, lossPerMeter: 2.0,
+        vSource: 1.0, rSrc: 0, rLoad: 50,
+      }),
+    });
+    fixN20.coordinator.dcOperatingPoint();
+    const vN20 = fixN20.engine.getNodeVoltage(nodeOf(fixN20, "TL1:P2b"));
+
+    // Total series resistance N·R_seg = 2·α·Z0·length is independent of N
+    // (R_seg ∝ 1/N, and there are N of them) — but the per-segment shunt G
+    // path differs between N values, so V(P2b) is segment-count-sensitive.
+    expect(vN20).not.toBeCloseTo(vN6, 4);
+  });
+
+  it("hotload_length_changes_vp2b_under_lossy_bench", () => {
+    // R_seg ∝ length and G_seg ∝ length; raising length raises total loss
+    // and drops V(P2b) under the lossy bench.
+    const fix = buildFixture({
+      build: (_r, facade) => buildTLineBench(facade, {
+        Z0: 50, tau: 1e-8, segments: 10, lossPerMeter: 2.0,
+        vSource: 1.0, rSrc: 0, rLoad: 50,
+      }),
+    });
+    const p2bNode = nodeOf(fix, "TL1:P2b");
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(p2bNode);
+
+    fix.coordinator.setComponentProperty(getTLineCe(fix), "length", 5.0);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(p2bNode);
+
+    expect(after).not.toBeCloseTo(before, 3);
+    expect(Math.sign(after - before)).toBe(-1);
   });
 });
