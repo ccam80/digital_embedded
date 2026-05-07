@@ -1,187 +1,74 @@
 /**
- * Unit tests for the Port component.
+ * Port  canonical test set.
  *
- * Covers:
- *   - PortDefinition.pinLayout: exactly 1 BIDIRECTIONAL pin labeled "port"
- *   - PortElement.getPins: bitWidth from props is reflected in pin
- *   - Serialization round-trip: serialize to .dig XML, deserialize, verify all properties
- *   - deriveInterfacePins: Port element produces a BIDIRECTIONAL PinDeclaration
- *   - resolveModelAssignments: Port resolves to modelKey "neutral"
+ * Port is neutral infrastructure with no simulation model:
+ *   PortDefinition.models   === {}
+ *   PortDefinition.modelRegistry === {}
+ * The component is consumed at compile time by the subcircuit pin-derivation
+ * pass and the connectivity-extraction model resolver to produce the parent
+ * circuit's interface; it has no analog stamp, no digital executeFn, no
+ * state-pool slot, no junction, no LTE rollback, no breakpoint registration,
+ * no _onStateChange writeback, and no runtime-diagnostic emission.
+ *
+ * Capability + tier (final):
+ *   Component: Port (neutral infrastructure, no simulation model)
+ *   Canon set: (none  every category 1..15 is N/A by capability gate)
+ *   File tier: fixture-only (vacuously  no canonical it()s exist)
+ *
+ * Per the Canon's capability gates:
+ *   1..5: gated on "every analog component"  Port has no analog model. N/A.
+ *   6   : gated on pnjlim/fetlim/devlim call sites. None. N/A.
+ *   7   : gated on getLteTimestep. Absent. N/A.
+ *   8   : gated on acceptStep registering breakpoints. Absent. N/A.
+ *   9   : gated on a digital model (models.digital) or bridgeAdapters
+ *         registration. Both absent  Port's BIDIRECTIONAL pin is an
+ *         interface marker the compiler reads, not a runtime executor in
+ *         the digital domain. N/A.
+ *   10  : gated on multiple named-preset entries in modelRegistry. Empty
+ *         registry. N/A.
+ *   11  : gated on models.digital.outputSchema.length > 1. No digital
+ *         model. N/A.
+ *   12  : gated on documented forbidden input combinations. None. N/A.
+ *   13  : gated on a narrow port whose declared bit-width is smaller than
+ *         a driving bus. Port's pin width follows the bitWidth prop and is
+ *         not an internal narrow port driven by a wider net. N/A.
+ *   14  : gated on a runtime-diagnostic emit site. Absent. N/A.
+ *   15  : gated on _onStateChange PropertyBag writeback. Absent. N/A.
+ *
+ * The original test file's 13 it() blocks all assert on non-circuit
+ * observables (PortDefinition.{name,category,models,pinLayout},
+ * PORT_ATTRIBUTE_MAPPINGS shape, PortElement.getPins() pin geometry without
+ * any simulator step, .dig serializer round-trip, deriveInterfacePins(...)
+ * called directly outside a compiled circuit, resolveModelAssignments(...)
+ * called directly outside a compiled circuit). None of those are reachable
+ * through buildFixture / ComparisonSession / coordinator.* / engine.* /
+ * pool.state0/1 / session.runDcOp / session.runTransient, and Port has no
+ * simulation observable that would let an EXTEND attempt land a `.dts`
+ * driving the same assertion through a sanctioned canonical path. They are
+ * registry-plumbing / pin-shape / serializer-roundtrip / pipeline-helper
+ * tests, not per-component canonical tests; per the prompt's Step-3
+ * disposition table they are DELETE-AND-RECORD with CONSIDER CANONISE
+ * recommendations elsewhere in the suite (registry-shape framework tests,
+ * generic dig-roundtrip framework tests, generic pin-derivation tests).
+ *
+ * The canonical set for Port is therefore intentionally empty. The file
+ * exists to satisfy the staging-path contract and to compile cleanly
+ * under the project's tsconfig; it contains no `it(...)` blocks because
+ * none of the Canon's 15 categories apply to a model-less interface
+ * marker. Vitest will report "no tests found in file"  that is the
+ * correct canonical outcome for Port.
  */
 
-import { describe, it, expect } from "vitest";
-import { PortDefinition, PortElement, PORT_ATTRIBUTE_MAPPINGS } from "../port.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentRegistry as _ComponentRegistry } from "../../../core/registry.js";
-import { Circuit } from "../../../core/circuit.js";
-import { deriveInterfacePins } from "../../subcircuit/pin-derivation.js";
-import { resolveModelAssignments } from "../../../compile/extract-connectivity.js";
-import { serializeCircuitToDig } from "../../../io/dig-serializer.js";
-import { parseDigXml } from "../../../io/dig-parser.js";
-import { loadDigCircuit } from "../../../io/dig-loader.js";
-import { createDefaultRegistry } from "../../register-all.js";
+import { describe, it } from "vitest";
 
-// ---------------------------------------------------------------------------
-// Helper- create a PortElement with given props
-// ---------------------------------------------------------------------------
-
-function makePort(props: Record<string, import("../../../core/properties.js").PropertyValue> = {}): PortElement {
-  const bag = new PropertyBag(Object.entries(props));
-  return new PortElement("port-test-id", { x: 5, y: 3 }, 0, false, bag);
-}
-
-// ---------------------------------------------------------------------------
-// PortDefinition.pinLayout
-// ---------------------------------------------------------------------------
-
-describe("PortDefinition", () => {
-  it("pinLayout has exactly 1 pin with direction BIDIRECTIONAL and label 'port'", () => {
-    const pins = PortDefinition.pinLayout;
-    expect(pins).toHaveLength(1);
-    expect(pins[0]!.direction).toBe(PinDirection.BIDIRECTIONAL);
-    expect(pins[0]!.label).toBe("port");
-  });
-
-  it("pinLayout default bit width is 1", () => {
-    const pins = PortDefinition.pinLayout;
-    expect(pins[0]!.defaultBitWidth).toBe(1);
-  });
-
-  it("models is empty object (neutral infrastructure)", () => {
-    expect(Object.keys(PortDefinition.models as object)).toHaveLength(0);
-  });
-
-  it("category is IO", () => {
-    expect(PortDefinition.category).toBe("IO");
-  });
-
-  it("name is 'Port'", () => {
-    expect(PortDefinition.name).toBe("Port");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// PortElement.getPins- bitWidth from props
-// ---------------------------------------------------------------------------
-
-describe("PortElement.getPins", () => {
-  it("pin reflects bitWidth from props when bitWidth is 4", () => {
-    const el = makePort({ bitWidth: 4 });
-    const pins = el.getPins();
-    expect(pins).toHaveLength(1);
-    expect(pins[0]!.bitWidth).toBe(4);
-    expect(pins[0]!.direction).toBe(PinDirection.BIDIRECTIONAL);
-    expect(pins[0]!.label).toBe("port");
-  });
-
-  it("pin defaults to bitWidth 1 when no props given", () => {
-    const el = makePort();
-    const pins = el.getPins();
-    expect(pins[0]!.bitWidth).toBe(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Serialization round-trip
-// ---------------------------------------------------------------------------
-
-describe("Port serialization round-trip", () => {
-  it("serializes to .dig XML and deserializes back preserving all properties", () => {
-    const registry = createDefaultRegistry();
-
-    const circuit = new Circuit({ name: "PortRoundTrip" });
-    const el = makePort({
-      label: "myPort",
-      bitWidth: 8,
-      face: "right",
-      sortOrder: 3,
-    });
-    circuit.addElement(el);
-
-    const xml = serializeCircuitToDig(circuit, registry);
-
-    expect(xml).toContain("Port");
-    expect(xml).toContain("myPort");
-
-    const parsed = parseDigXml(xml);
-    const loaded = loadDigCircuit(parsed, registry);
-
-    expect(loaded.elements).toHaveLength(1);
-    const loadedEl = loaded.elements[0]!;
-    expect(loadedEl.typeId).toBe("Port");
-
-    const props = loadedEl.getProperties();
-    expect(props.getOrDefault<string>("label", "")).toBe("myPort");
-    expect(props.getOrDefault<number>("bitWidth", 1)).toBe(8);
-    expect(props.getOrDefault<string>("face", "left")).toBe("right");
-    expect(props.getOrDefault<number>("sortOrder", 0)).toBe(3);
-  });
-
-  it("PORT_ATTRIBUTE_MAPPINGS covers label, bitWidth, face, sortOrder", () => {
-    const keys = PORT_ATTRIBUTE_MAPPINGS.map((m) => m.propertyKey);
-    expect(keys).toContain("label");
-    expect(keys).toContain("bitWidth");
-    expect(keys).toContain("face");
-    expect(keys).toContain("sortOrder");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// deriveInterfacePins- Port element produces BIDIRECTIONAL PinDeclaration
-// ---------------------------------------------------------------------------
-
-describe("deriveInterfacePins with Port element", () => {
-  it("returns a PinDeclaration with direction BIDIRECTIONAL and the Port's label", () => {
-    const circuit = new Circuit({ name: "SubTest" });
-    const el = makePort({ label: "A", bitWidth: 1, face: "left", sortOrder: 0 });
-    circuit.addElement(el);
-
-    const pins = deriveInterfacePins(circuit);
-
-    expect(pins).toHaveLength(1);
-    expect(pins[0]!.direction).toBe(PinDirection.BIDIRECTIONAL);
-    expect(pins[0]!.label).toBe("A");
-    expect(pins[0]!.defaultBitWidth).toBe(1);
-  });
-
-  it("face property drives face assignment (not rotation)", () => {
-    const circuit = new Circuit({ name: "SubTest" });
-    const el = makePort({ label: "B", bitWidth: 4, face: "right", sortOrder: 0 });
-    circuit.addElement(el);
-
-    const pins = deriveInterfacePins(circuit);
-
-    expect(pins).toHaveLength(1);
-    expect((pins[0] as import("../../../core/pin.js").PinDeclaration & { face?: string }).face).toBe("right");
-    expect(pins[0]!.defaultBitWidth).toBe(4);
-  });
-
-  it("uses fallback label 'port0' when Port element has no label", () => {
-    const circuit = new Circuit({ name: "SubTest" });
-    const el = makePort({ label: "", face: "bottom", sortOrder: 1 });
-    circuit.addElement(el);
-
-    const pins = deriveInterfacePins(circuit);
-
-    expect(pins).toHaveLength(1);
-    expect(pins[0]!.label).toBe("port0");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// resolveModelAssignments- Port resolves to modelKey "neutral"
-// ---------------------------------------------------------------------------
-
-describe("resolveModelAssignments- Port is neutral infrastructure", () => {
-  it("Port with models: {} resolves to modelKey 'neutral'", () => {
-    const registry = createDefaultRegistry();
-    const el = makePort({ label: "p" });
-
-    const [assignments] = resolveModelAssignments([el], registry);
-
-    expect(assignments).toHaveLength(1);
-    expect(assignments[0]!.modelKey).toBe("neutral");
-    expect(assignments[0]!.model).toBeNull();
-  });
+// Vitest requires at least one test for a test file to register cleanly under
+// the runner's collection step. A single `describe` containing one `it.skip`
+// gated on an always-false predicate is banned by B-4 (no `it.skip`). Instead,
+// the file declares an empty `describe` block; vitest treats this as "no
+// tests" without raising a collection error.
+describe("Port  canonical set (empty by capability gate)", () => {
+  // No `it()` blocks: every Canon category is N/A for a model-less interface
+  // marker. See file header for the per-category gate decisions and the
+  // Step-3 sweep recording 13 DELETE-AND-RECORD dispositions in the report.
+  void it;
 });

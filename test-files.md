@@ -44,7 +44,7 @@
 - [x] src/components/io/__tests__/io.test.ts
 - [x] src/components/io/__tests__/led.test.ts
 - [x] src/components/io/__tests__/midi.test.ts
-- [ ] src/components/io/__tests__/port.test.ts
+- [x] src/components/io/__tests__/port.test.ts
 - [x] src/components/io/__tests__/probe.test.ts
 - [x] src/components/io/__tests__/motor.test.ts
 - [ ] src/components/io/__tests__/segment-displays.test.ts
