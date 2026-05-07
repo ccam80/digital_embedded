@@ -2,6 +2,7 @@
 import {
   ComponentRegistry,
   ComponentCategory,
+  isStandalone,
   type ParamDef,
 } from "../registry.js";
 import type {
@@ -638,6 +639,74 @@ describe("AttributeMapping parametric audit (every registered component)", () =>
         it(`xmlName "${mapping.xmlName}" convert("") returns a defined PropertyValue`, () => {
           const result = mapping.convert("");
           expect(result).toBeDefined();
+        });
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// User-facing definition parametric audit (every registered, non-internalOnly
+// component). Closes the per-component coverage gap that wave-3 §3 deletions
+// vacated:
+//
+//   - helpText: every public component must surface user help text.
+//   - category: must be a recognised ComponentCategory enum value.
+//   - factory: factory(new PropertyBag()) must return a defined CircuitElement
+//     without throwing for every public definition (constructor smoke).
+//   - pinLayout: every public component must declare at least one pin.
+//
+// Internal-only definitions are skipped: they are never placed by users, do
+// not appear in palettes, and may have factory contracts that require more
+// than an empty PropertyBag.
+// ---------------------------------------------------------------------------
+
+const VALID_CATEGORY_VALUES: readonly string[] = [
+  "LOGIC", "IO", "FLIP_FLOPS", "MEMORY", "ARITHMETIC", "WIRING",
+  "SWITCHING", "PLD", "MISC", "GRAPHICS", "TERMINAL", "74XX",
+  "SUBCIRCUIT", "PASSIVES", "SEMICONDUCTORS", "SOURCES", "ACTIVE",
+];
+
+describe("Public definition parametric audit (every registered, non-internalOnly component)", () => {
+  const userFacingDefinitions = createDefaultRegistry()
+    .getAll()
+    .filter(isStandalone);
+
+  it("default registry has at least one user-facing definition", () => {
+    expect(userFacingDefinitions.length).toBeGreaterThan(0);
+  });
+
+  for (const def of userFacingDefinitions) {
+    // 74xx stubs are place-holder definitions whose factory + pinLayout
+    // require the corresponding .dig subcircuit to be pre-loaded
+    // (`register74xxLibrary(registry, pinMap74xx)`). The factory throws
+    // a documented "must be loaded from <id>.dig before placement" error
+    // and pinLayout is intentionally empty until the pinMap is supplied.
+    // Coverage for 74xx structural conformance lives in
+    // `src/components/__tests__/library-74xx.test.ts` and
+    // `src/components/__tests__/library-manifests.test.ts`.
+    const isStub74xx = def.category as string === "74XX";
+
+    describe(def.name, () => {
+      it("helpText is a non-empty string", () => {
+        expect(typeof def.helpText).toBe("string");
+        expect(def.helpText.length).toBeGreaterThan(0);
+      });
+
+      it("category is a recognised ComponentCategory value", () => {
+        expect(VALID_CATEGORY_VALUES).toContain(def.category as string);
+      });
+
+      if (!isStub74xx) {
+        it("factory(new PropertyBag()) returns a defined CircuitElement without throwing", () => {
+          const el = def.factory(new PropertyBag());
+          expect(el).toBeDefined();
+          expect(el).not.toBeNull();
+        });
+
+        it("pinLayout declares at least one pin", () => {
+          expect(Array.isArray(def.pinLayout)).toBe(true);
+          expect(def.pinLayout.length).toBeGreaterThan(0);
         });
       }
     });
