@@ -1,0 +1,406 @@
+{
+  "circuit": {
+    "description": "ISRC=1mA charging 1uF capacitor with 10k bleed resistor to ground. V_cap rises with tau=RC=10ms. Exercises ISRC RHS stamp in transient dynamic regime.",
+    "elements": [
+      {
+        "id": "a4f6a1d6-0f42-4f02-961b-8ccc302de7fe",
+        "position": {
+          "x": 0,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "current": 0.001
+          },
+          "current": 0.001,
+          "label": "I1",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "rotation": 0,
+        "type": "CurrentSource"
+      },
+      {
+        "id": "4b8f38d2-c381-41a6-9f9f-8dfc5fe58d76",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "label": "R1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "cfd4dd9a-5e73-4606-9f80-67efa308b932",
+        "position": {
+          "x": 12,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "IC": 0,
+            "M": 1,
+            "SCALE": 1,
+            "TC1": 0,
+            "TC2": 0,
+            "TNOM": 300.15,
+            "capacitance": 0.000001
+          },
+          "capacitance": 0.000001,
+          "label": "C1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "b5a4e996-fd80-4b98-bd1e-1a02ce27e87c",
+        "position": {
+          "x": 24,
+          "y": 4
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "current-source-canon-rc-charge",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 5,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 5,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 3
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 3
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 4
+          },
+          {
+            "x": -1,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 18,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 9
+          },
+          {
+            "x": 18,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 3
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

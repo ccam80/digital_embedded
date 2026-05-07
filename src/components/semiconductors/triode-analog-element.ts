@@ -26,6 +26,7 @@ import {
   PoolBackedAnalogElement,
   type AnalogElement,
 } from "../../solver/analog/element.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -226,19 +227,6 @@ export class TriodeAnalogElement extends PoolBackedAnalogElement {
       this._stateBase = ctx.allocStates(this.stateSize);
     }
 
-    // Seed cached op-point at V_GK=0, V_PK=0 so the first NR iteration's
-    // step-limiter reads a sensible prior value out of the pool.
-    const seed = computeTriodeOp(
-      0, 0, this._p.mu, this._p.kp, this._p.kvb, this._p.kg1, this._p.ex,
-    );
-    const s0 = this._pool.states[0];
-    const base = this._stateBase;
-    s0[base + SLOT_VGK] = seed.vgk;
-    s0[base + SLOT_VPK] = seed.vpk;
-    s0[base + SLOT_IP]  = seed.ip;
-    s0[base + SLOT_GM]  = seed.gm;
-    s0[base + SLOT_GDS] = seed.gds;
-
     // 6-stamp TSTALLOC sequence- 4 transconductance entries (gm, matching
     // VCCS sub-element ordering: pCtP / pCtN / nCtP / nCtN) followed by the
     // 2 composite-owned plate output-conductance entries.
@@ -248,6 +236,23 @@ export class TriodeAnalogElement extends PoolBackedAnalogElement {
     this._hKK     = solver.allocElement(nK, nK);  // (K,K) +gm
     this._hPP_gds = solver.allocElement(nP, nP);  // (P,P) +gds
     this._hKP_gds = solver.allocElement(nK, nP);  // (K,P) -gds
+  }
+
+  override initState(pool: StatePoolRef): void {
+    if (this._stateBase === -1) {
+      throw new Error("TriodeAnalogElement.initState called before setup()");
+    }
+    super.initState(pool);
+    const seed = computeTriodeOp(
+      0, 0, this._p.mu, this._p.kp, this._p.kvb, this._p.kg1, this._p.ex,
+    );
+    const s0 = pool.states[0];
+    const base = this._stateBase;
+    s0[base + SLOT_VGK] = seed.vgk;
+    s0[base + SLOT_VPK] = seed.vpk;
+    s0[base + SLOT_IP]  = seed.ip;
+    s0[base + SLOT_GM]  = seed.gm;
+    s0[base + SLOT_GDS] = seed.gds;
   }
 
   load(ctx: LoadContext): void {

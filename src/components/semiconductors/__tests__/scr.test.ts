@@ -1,194 +1,282 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
+
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+
+// ---------------------------------------------------------------------------
+// .dts paths (T3 harness fixtures)
+// ---------------------------------------------------------------------------
+
+const DTS_BLOCKING  = path.resolve("src/components/semiconductors/__tests__/fixtures/scr-canon-blocking.dts");
+const DTS_TRIGGERED = path.resolve("src/components/semiconductors/__tests__/fixtures/scr-canon-triggered.dts");
+
+// ---------------------------------------------------------------------------
+// Programmatic circuit factories (T1)
+//
+// SCR is a composite of two BJT sub-elements (Q1 NPN + Q2 PNP) wired in a
+// two-transistor latch. Pins on the public composite: A (anode), K (cathode),
+// G (gate). Sub-element leaves are labelled `${parentLabel}:Q1` and
+// `${parentLabel}:Q2` after compile().
+// ---------------------------------------------------------------------------
+
+interface ScrBlockingParams {
+  /** Anode supply voltage (V). */
+  vAnode: number;
+  /** Anode resistor (Ω). */
+  rAnode: number;
+}
+
 /**
- * Tests for the SCR (Silicon Controlled Rectifier) component.
- *
- * The SCR is a netlist-based composite of two BJT sub-elements in a
- * two-transistor latch configuration (Q1 NPN + Q2 PNP). Tests exercise
- * the component definition metadata, parameter declarations, and
- * end-to-end simulation via DefaultSimulatorFacade.
- *
- * Covers:
- *   - definition_has_correct_fields: ScrDefinition exports correct metadata
- *   - partition_layout: SCR_PARAM_DEFS has correct partition assignments
- *   - param_presence: SCR_PARAM_DEFS contains expected parameter keys
- *   - netlist_structure: SCR_NETLIST has correct ports, elements, and internal net count
- *   - facade_compile_does_not_throw: compile() does not throw for a valid SCR circuit
- *   - dcop_converges: DC operating point converges for a resistively-loaded SCR
+ * Blocking topology: VS:pos -> R_a -> SCR:A; SCR:K -> GND; SCR:G -> GND.
+ * Gate tied to ground; SCR remains in the blocking (off) state. Anode current
+ * is limited by R_a; the analytical observable is V(SCR:A) ~ V_supply (open
+ * latch carries negligible current).
  */
+function buildScrBlocking(facade: DefaultSimulatorFacade, p: ScrBlockingParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",  type: "DcVoltageSource", props: { label: "VS",  voltage: p.vAnode } },
+      { id: "ra",  type: "Resistor",        props: { label: "RA",  resistance: p.rAnode } },
+      { id: "scr", type: "SCR",             props: { label: "scr" } },
+      { id: "gnd", type: "Ground",          props: { label: "GND" } },
+    ],
+    connections: [
+      ["vs:pos",  "ra:pos"],
+      ["ra:neg",  "scr:A"],
+      ["scr:K",   "gnd:out"],
+      ["scr:G",   "gnd:out"],
+      ["vs:neg",  "gnd:out"],
+    ],
+  });
+}
 
-import { describe, it, expect } from "vitest";
-import { ScrDefinition, SCR_PARAM_DEFS, SCR_NETLIST, SCR_PARAM_DEFAULTS } from "../scr.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { createDefaultRegistry } from "../../register-all.js";
+interface ScrTriggeredParams {
+  /** Anode supply voltage (V). */
+  vAnode: number;
+  /** Anode resistor (Ω). */
+  rAnode: number;
+  /** Gate drive voltage (V) — biases gate above one V_be to inject Q1 base current. */
+  vGate: number;
+  /** Gate resistor (Ω). */
+  rGate: number;
+}
+
+/**
+ * Triggered topology: VA:pos -> R_a -> SCR:A; SCR:K -> GND; VG:pos -> R_g -> SCR:G;
+ * VG:neg -> GND; VA:neg -> GND. Gate biased ~0.65 V above ground injects Q1
+ * base current; the latch regenerates and the SCR conducts. Anode current is
+ * limited by R_a.
+ */
+function buildScrTriggered(facade: DefaultSimulatorFacade, p: ScrTriggeredParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "va",  type: "DcVoltageSource", props: { label: "VA",  voltage: p.vAnode } },
+      { id: "vg",  type: "DcVoltageSource", props: { label: "VG",  voltage: p.vGate } },
+      { id: "ra",  type: "Resistor",        props: { label: "RA",  resistance: p.rAnode } },
+      { id: "rg",  type: "Resistor",        props: { label: "RG",  resistance: p.rGate } },
+      { id: "scr", type: "SCR",             props: { label: "scr" } },
+      { id: "gnd", type: "Ground",          props: { label: "GND" } },
+    ],
+    connections: [
+      ["va:pos",  "ra:pos"],
+      ["ra:neg",  "scr:A"],
+      ["scr:K",   "gnd:out"],
+      ["vg:pos",  "rg:pos"],
+      ["rg:neg",  "scr:G"],
+      ["vg:neg",  "gnd:out"],
+      ["va:neg",  "gnd:out"],
+    ],
+  });
+}
 
 // ---------------------------------------------------------------------------
-// SCR partition layout tests
+// Category 1 — Initialization (T1)
+// SCR is a netlist composite (no own state slots — its sub-element BJTs hold
+// the slots). The canonical Cat 1 observable is the public node-voltage
+// reading at the step-0 boundary post-warm-start.
 // ---------------------------------------------------------------------------
 
-describe("SCR_PARAM_DEFS partition layout", () => {
-  it("TEMP and AREA have partition='instance'", () => {
-    const tempDef = SCR_PARAM_DEFS.find((d) => d.key === "TEMP");
-    const areaDef = SCR_PARAM_DEFS.find((d) => d.key === "AREA");
-
-    expect(tempDef).toBeDefined();
-    expect(areaDef).toBeDefined();
-
-    expect(tempDef!.partition).toBe("instance");
-    expect(areaDef!.partition).toBe("instance");
+describe("SCR initialization (T1)", () => {
+  it("init_blocking_anode_voltage_tracks_supply", () => {
+    // Gate at GND -> latch off -> negligible anode current -> V(SCR:A) ~ V_supply.
+    const fix = buildFixture({
+      build: (_r, facade) => buildScrBlocking(facade, { vAnode: 5, rAnode: 1000 }),
+    });
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("scr:A")!);
+    expect(vA).toBeCloseTo(5, 2);
   });
 
-  it("BF BR IS are present in SCR_PARAM_DEFS", () => {
-    const bfDef = SCR_PARAM_DEFS.find((d) => d.key === "BF");
-    const brDef = SCR_PARAM_DEFS.find((d) => d.key === "BR");
-    const isDef = SCR_PARAM_DEFS.find((d) => d.key === "IS");
-
-    expect(bfDef).toBeDefined();
-    expect(brDef).toBeDefined();
-    expect(isDef).toBeDefined();
+  it("init_blocking_cathode_voltage_at_ground", () => {
+    // SCR:K is wired straight to ground.
+    const fix = buildFixture({
+      build: (_r, facade) => buildScrBlocking(facade, { vAnode: 5, rAnode: 1000 }),
+    });
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("scr:K")!);
+    expect(vK).toBeCloseTo(0, 6);
   });
 });
 
 // ---------------------------------------------------------------------------
-// SCR netlist structure tests
+// Category 2 — DC operating point (T1, analytical)
+// Two regimes: blocking (gate at GND) and triggered (gate biased above V_be).
+// Both use the public engine surface (node voltage). The closed-form
+// expectation is derived in a comment beside each assertion.
 // ---------------------------------------------------------------------------
 
-describe("SCR_NETLIST structure", () => {
-  it("has three ports: A, K, G", () => {
-    expect(SCR_NETLIST.ports).toEqual(["A", "K", "G"]);
+describe("SCR DCOP — blocking + triggered (T1)", () => {
+  it("dcop_blocking_anode_current_below_one_milliamp", () => {
+    // Gate at GND, V_supply = 5 V, R_a = 1 kΩ. SCR off -> I_anode = (V_supply - V(scr:A)) / R_a.
+    // With V(scr:A) ~ V_supply and the only leakage path being the OFF NPN's
+    // collector saturation current (IS=1e-16, scaled by area=1), I_anode << 1 mA.
+    const fix = buildFixture({
+      build: (_r, facade) => buildScrBlocking(facade, { vAnode: 5, rAnode: 1000 }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("scr:A")!);
+    const iAnode = (5 - vA) / 1000;
+    expect(Math.abs(iAnode)).toBeLessThan(1e-3);
   });
 
-  it("has two sub-elements: Q1 NPN and Q2 PNP", () => {
-    expect(SCR_NETLIST.elements).toHaveLength(2);
-    expect(SCR_NETLIST.elements[0].subElementName).toBe("Q1");
-    expect(SCR_NETLIST.elements[1].subElementName).toBe("Q2");
+  it("dcop_triggered_anode_voltage_drops_when_gate_biased", () => {
+    // V_anode = 10 V, R_a = 100 Ω, V_gate = 0.65 V (above Q1 V_be threshold) via R_g = 100 Ω.
+    // Gate injection latches the regenerative pair; conducting SCR pulls
+    // V(scr:A) far below V_supply. Closed-form: an idealised on-state SCR has
+    // V_AK ~ 1-2 V; with R_a = 100 Ω and V_supply = 10 V the anode node sits
+    // well below 8 V (i.e. > 2 V drop across R_a confirms conduction).
+    const fix = buildFixture({
+      build: (_r, facade) => buildScrTriggered(facade, {
+        vAnode: 10, rAnode: 100, vGate: 0.65, rGate: 100,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("scr:A")!);
+    expect(vA).toBeLessThan(8);
+    expect(vA).toBeGreaterThan(0);
   });
 
-  it("has exactly one internal net (latch node)", () => {
-    expect(SCR_NETLIST.internalNetCount).toBe(1);
-    expect(SCR_NETLIST.internalNetLabels).toContain("latch");
-  });
+  it("dcop_blocking_vs_triggered_anode_current_ordering", () => {
+    // Same V_supply, same R_a; gate-off vs gate-on must have I_off < I_on.
+    const VS = 10;
+    const RA = 100;
+    const fixOff = buildFixture({
+      build: (_r, facade) => buildScrBlocking(facade, { vAnode: VS, rAnode: RA }),
+    });
+    const fixOn = buildFixture({
+      build: (_r, facade) => buildScrTriggered(facade, {
+        vAnode: VS, rAnode: RA, vGate: 0.65, rGate: 100,
+      }),
+    });
+    expect(fixOff.coordinator.dcOperatingPoint()!.converged).toBe(true);
+    expect(fixOn.coordinator.dcOperatingPoint()!.converged).toBe(true);
 
-  it("netlist connectivity has two rows (one per element)", () => {
-    expect(SCR_NETLIST.netlist).toHaveLength(2);
+    const vAoff = fixOff.engine.getNodeVoltage(fixOff.circuit.labelToNodeId.get("scr:A")!);
+    const vAon  = fixOn.engine.getNodeVoltage(fixOn.circuit.labelToNodeId.get("scr:A")!);
+    const iOff = (VS - vAoff) / RA;
+    const iOn  = (VS - vAon)  / RA;
+    // Conduction injects orders-of-magnitude more anode current than the off-state leakage.
+    expect(iOn).toBeGreaterThan(iOff);
+    expect(iOn - iOff).toBeGreaterThan(1e-3);
   });
 });
 
 // ---------------------------------------------------------------------------
-// SCR definition metadata tests
+// Category 6 — Limiting events (T1, own engine)
+// SCR is a netlist composite of two BJT sub-elements; each BJT calls pnjlim
+// on its VBE / VBC junctions. The composite leaves are labelled scr:Q1 and
+// scr:Q2 by the compiler. Drive into the triggered regime so junction
+// limiting fires during NR.
 // ---------------------------------------------------------------------------
 
-describe("ScrDefinition", () => {
-  it("definition_has_correct_fields", () => {
-    expect(ScrDefinition.name).toBe("SCR");
-    expect(ScrDefinition.modelRegistry?.["behavioral"]).toBeDefined();
-    expect(ScrDefinition.modelRegistry?.["behavioral"]?.kind).toBe("netlist");
-    expect(ScrDefinition.category).toBe("SEMICONDUCTORS");
-    expect(ScrDefinition.defaultModel).toBe("behavioral");
-  });
-
-  it("behavioral model entry has paramDefs and params", () => {
-    const entry = ScrDefinition.modelRegistry?.["behavioral"];
-    expect(entry).toBeDefined();
-    expect(entry!.kind).toBe("netlist");
-    if (entry!.kind === "netlist") {
-      expect(entry!.paramDefs).toBeDefined();
-      expect(entry!.params).toBeDefined();
-      expect(entry!.params["BF"]).toBeCloseTo(100);
-      expect(entry!.params["IS"]).toBeLessThan(1e-14);
-    }
-  });
-
-  it("SCR_PARAM_DEFAULTS has expected keys", () => {
-    expect(SCR_PARAM_DEFAULTS).toHaveProperty("BF");
-    expect(SCR_PARAM_DEFAULTS).toHaveProperty("BR");
-    expect(SCR_PARAM_DEFAULTS).toHaveProperty("IS");
-    expect(SCR_PARAM_DEFAULTS).toHaveProperty("TEMP");
-    expect(SCR_PARAM_DEFAULTS).toHaveProperty("AREA");
+describe("SCR limiting (T1, own engine)", () => {
+  it("limiting_pnjlim_fires_on_q1_or_q2_junction_during_dcop", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildScrTriggered(facade, {
+        vAnode: 10, rAnode: 100, vGate: 0.65, rGate: 100,
+      }),
+    });
+    fix.coordinator.setLimitingCapture(true);
+    fix.coordinator.dcOperatingPoint();
+    const events = fix.coordinator.getLimitingEvents();
+    // Filter to BJT-junction events on the SCR's sub-elements (labels scr:Q1 / scr:Q2).
+    const subEvents = events.filter(
+      (e) => e.label === "scr:Q1" || e.label === "scr:Q2",
+    );
+    // At least one sub-element junction must have fired pnjlim during convergence.
+    const anyLimited = subEvents.some((e) => e.wasLimited === true);
+    expect(anyLimited).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// SCR end-to-end simulation tests via DefaultSimulatorFacade
+// Category 2-numerical / 3 / 5 — Paired vs ngspice (T3) on blocking regime
+// One ComparisonSession per .dts; the run lives in the first it(), siblings
+// read the recorded session.
 // ---------------------------------------------------------------------------
 
-describe("SCR simulation", () => {
-  it("facade_compile_does_not_throw for minimal SCR circuit", () => {
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
+describeIfDll("SCR blocking vs ngspice — transient + stamp parity (T3)", () => {
+  let session: ComparisonSession;
 
-    const circuit = facade.build({
-      components: [
-        { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
-        { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 100 } },
-        { id: "scr", type: "SCR",             props: { label: "scr" } },
-        { id: "gnd", type: "Ground" },
-      ],
-      connections: [
-        ["vs:pos",  "r1:pos"],
-        ["r1:neg",  "scr:A"],
-        ["scr:K",   "gnd:out"],
-        ["scr:G",   "gnd:out"],
-        ["vs:neg",  "gnd:out"],
-      ],
-    });
-
-    expect(() => facade.compile(circuit)).not.toThrow();
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_BLOCKING, dllPath: DLL_PATH });
   });
 
-  it("dcop_converges for resistively-loaded SCR in blocking state", async () => {
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
-
-    const circuit = facade.build({
-      components: [
-        { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
-        { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
-        { id: "scr", type: "SCR",             props: { label: "scr" } },
-        { id: "gnd", type: "Ground" },
-      ],
-      connections: [
-        ["vs:pos",  "r1:pos"],
-        ["r1:neg",  "scr:A"],
-        ["scr:K",   "gnd:out"],
-        ["scr:G",   "gnd:out"],
-        ["vs:neg",  "gnd:out"],
-      ],
-    });
-
-    const coordinator = facade.compile(circuit);
-    const result = coordinator.dcOperatingPoint();
-
-    expect(result).not.toBeNull();
-    expect(result!.converged).toBe(true);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("dcop_converges for SCR with gate bias applied", async () => {
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
+  it("transient_step_end_paired_blocking", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
 
-    const circuit = facade.build({
-      components: [
-        { id: "va",  type: "DcVoltageSource", props: { label: "va",  voltage: 10 } },
-        { id: "vg",  type: "DcVoltageSource", props: { label: "vg",  voltage: 0.65 } },
-        { id: "ra",  type: "Resistor",        props: { label: "ra",  resistance: 100 } },
-        { id: "rg",  type: "Resistor",        props: { label: "rg",  resistance: 100 } },
-        { id: "scr", type: "SCR",             props: { label: "scr" } },
-        { id: "gnd", type: "Ground" },
-      ],
-      connections: [
-        ["va:pos",  "ra:pos"],
-        ["ra:neg",  "scr:A"],
-        ["scr:K",   "gnd:out"],
-        ["vg:pos",  "rg:pos"],
-        ["rg:neg",  "scr:G"],
-        ["vg:neg",  "gnd:out"],
-        ["va:neg",  "gnd:out"],
-      ],
-    });
+  it("dcop_paired_blocking", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+  });
 
-    const coordinator = facade.compile(circuit);
-    const result = coordinator.dcOperatingPoint();
+  it("full_iteration_paired_blocking", () => {
+    session.compareAllAttempts();
+  });
+});
 
-    expect(result).not.toBeNull();
-    expect(result!.converged).toBe(true);
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 — Paired vs ngspice (T3) on triggered regime
+// ---------------------------------------------------------------------------
+
+describeIfDll("SCR triggered vs ngspice — transient + stamp parity (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_TRIGGERED, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_triggered", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_triggered", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+  });
+
+  it("full_iteration_paired_triggered", () => {
+    session.compareAllAttempts();
   });
 });

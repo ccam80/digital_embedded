@@ -127,11 +127,15 @@ const RULES = [
     refine: (line) => {
       const matches = [...line.matchAll(/["'](\w+):[AB]["']/g)];
       if (matches.length === 0) return true;          // Map-form constructor- not prefix-aware
-      // SPICE-prefixed labels (D1, Q2, M1, J3) and Diac-shaped labels
-      // (diac, DIAC1, diac1) legitimately use :A / :B pins. Skip the
-      // match when every occurrence on the line carries one of those forms.
+      // SPICE-prefixed labels (D1, Q2, M1, J3), Diac-shaped (diac, DIAC1)
+      // and SCR-shaped (scr, SCR1) legitimately use :A pin (anode). Skip
+      // the match when every occurrence on the line carries one of those
+      // forms — the wave-1 migration was Resistor/Inductor/Crystal/Memristor
+      // /Capacitor only; other components keep their original pin labels.
       const isLegitPrefix = (label) =>
-        /^[DdQqMmJj]\d/.test(label) || /^[Dd][Ii][Aa][Cc]\d*$/.test(label);
+        /^[DdQqMmJj]\d/.test(label) ||
+        /^[Dd][Ii][Aa][Cc]\d*$/.test(label) ||
+        /^[Ss][Cc][Rr]\d*$/.test(label);
       return !matches.every((m) => isLegitPrefix(m[1]));
     },
   },

@@ -1,0 +1,284 @@
+{
+  "circuit": {
+    "description": "Ideal CurrentSource (5 mA) driving 1 kΩ to ground; V_node = I*R = 5.0 V at DCOP",
+    "elements": [
+      {
+        "id": "dbd1f0a3-2b8b-4d92-9fe9-963f6d2c5b85",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "current": 0.005
+          },
+          "current": 0.005,
+          "label": "isrc",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "rotation": 0,
+        "type": "CurrentSource"
+      },
+      {
+        "id": "32ee0c11-62df-42f5-b741-1c8a0d55a358",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "r1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "4ad26169-800f-4985-9c54-b6af3a531495",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "current-source-canon-5ma-1k",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 1
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 1
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

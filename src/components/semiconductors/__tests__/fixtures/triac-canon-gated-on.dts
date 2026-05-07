@@ -1,0 +1,530 @@
+{
+  "circuit": {
+    "description": "Triac with gate forward bias to trigger latch: VA=5V via R1=100, gate biased via VG=1V/RG=100 to G; MT1 to ground.",
+    "elements": [
+      {
+        "id": "cc7cb1be-8feb-40d4-b9be-f3e71fe70544",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "VA",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "a3cec1fe-fddf-4ca2-a184-2eff001a81de",
+        "position": {
+          "x": 0,
+          "y": 6
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 1
+          },
+          "label": "VG",
+          "position": [
+            0,
+            8
+          ],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "80ab7d85-a617-4f3f-8738-a0b44f8b0dff",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          },
+          "label": "RA",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "79999c74-2f09-483b-8a53-1346c6037d2b",
+        "position": {
+          "x": 12,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          },
+          "label": "RG",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "500776ce-3d58-44a9-8822-a58513807dd7",
+        "position": {
+          "x": 24,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "AREA": 1,
+            "BF": 100,
+            "BR": 1,
+            "IS": 1e-16,
+            "RB": 0,
+            "RC": 0,
+            "RE": 0,
+            "TEMP": 300.15
+          },
+          "label": "TR1",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Triac"
+      },
+      {
+        "id": "cf4d62ec-f73c-4ea2-b9bf-f0c3a4008336",
+        "position": {
+          "x": 12,
+          "y": 4
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            40
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "triac-canon-gated-on",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 3
+          },
+          {
+            "x": 23,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 20,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 3
+          },
+          {
+            "x": 23,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 3
+          },
+          {
+            "x": 29,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 29,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 6
+          },
+          {
+            "x": 5,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 11,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 6
+          },
+          {
+            "x": 8,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 6
+          },
+          {
+            "x": 8,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 8
+          },
+          {
+            "x": 11,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 8
+          },
+          {
+            "x": 17,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 8
+          },
+          {
+            "x": 30,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 8
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 6
+          },
+          {
+            "x": -1,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 6
+          },
+          {
+            "x": -2,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 6
+          },
+          {
+            "x": -2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -3,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -3,
+            "y": 1
+          },
+          {
+            "x": -3,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -3,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

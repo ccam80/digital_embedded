@@ -1,0 +1,284 @@
+{
+  "circuit": {
+    "description": "DC voltage source canon: 12V source driving a 470 ohm load. Different operating regime to the 5V/1k divider for second-config coverage.",
+    "elements": [
+      {
+        "id": "97859b04-922a-4a0e-a8f8-22c9bc0417ec",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 12
+          },
+          "label": "VS",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 12
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "86cf5e85-d018-4236-966e-5b11648f9838",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 470
+          },
+          "label": "RL",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 470
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "1d6caa85-8402-4e69-8291-f3a665d4d3cf",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "dcvs-canon-12v-load",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 1
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 1
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

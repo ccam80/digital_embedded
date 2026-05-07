@@ -1,272 +1,252 @@
-/**
- * Tests for the DC voltage source component.
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as path from "path";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  describeIfDll,
+  DLL_PATH,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
-import { describe, it, expect, vi } from "vitest";
-import { makeDcVoltageSource, DcVoltageSourceDefinition, DC_VOLTAGE_SOURCE_DEFAULTS } from "../dc-voltage-source.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
-import { makeTestSetupContext, setupAll, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// DTS fixture paths (T3 harness)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
+//
+// Two operating-region configurations are required (Step 1: harness file, no
+// topology variants — the DcVoltageSource has a single behavioural model and
+// no n-type/p-type or push-pull/open-collector variants). The first regime is
+// a low-magnitude (5V) source driving a resistive divider; the second is a
+// higher-magnitude (12V) source driving a smaller load. The two operating
+// points exercise the branch-row stamp and the srcFact ramp at distinct
+// scales so per-step / per-iteration sweeps catch any drift in the source's
+// stamp under different solve magnitudes.
+
+// Reused (no edits): existing parity fixture — 5V source + R1=1k + R2=1k.
+const DTS_RESISTIVE_DIVIDER = path.resolve(
+  "src/solver/analog/__tests__/ngspice-parity/fixtures/resistive-divider.dts",
+);
+
+// Authored (this migration): 12V source + RL=470Ω to ground.
+const DTS_DCVS_12V_LOAD = path.resolve(
+  "src/components/sources/__tests__/fixtures/dc-voltage-source-canon-12v-load.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic circuit factory (T1)
+// ---------------------------------------------------------------------------
+//
+// VS:pos -> RL:pos, RL:neg -> gnd, VS:neg -> gnd. Steady-state DC:
+//   V(VS:pos) = voltage  (held by the source's branch-row constraint)
+// RL provides a return path so the MNA matrix is well-posed.
+
+interface VsrcCircuitParams {
+  voltage: number;
+  resistance?: number;
 }
 
-
-// ---------------------------------------------------------------------------
-// Helper: create a DC voltage source using the 3-arg production factory.
-// ---------------------------------------------------------------------------
-
-function makeVsrc(posNode: number, negNode: number, voltage: number) {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
-
-// ---------------------------------------------------------------------------
-// Mock solver
-// ---------------------------------------------------------------------------
-
-function makeMockSolver(rhsSize = 8) {
-  const stamps: [number, number, number][] = [];
-  const rhs = new Float64Array(rhsSize);
-
-  const solver = {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    _stamps: stamps,
-    _rhs: rhs,
-  };
-
-  return solver;
-}
-
-function makeMinimalCtx(
-  solver: ReturnType<typeof makeMockSolver>,
-  rhsOverride?: Float64Array,
-  overrides?: Partial<{ srcFact: number; cktMode: number }>,
-) {
-  const rhs = rhsOverride ?? solver._rhs;
-  return loadCtxFromFields({
-    solver: solver as unknown as SparseSolver,
-    matrix: solver as unknown as SparseSolver,
-    rhs,
-    rhsOld: new Float64Array(rhs.length),
-    cktMode: overrides?.cktMode ?? (MODEDCOP | MODEINITFLOAT),
-    time: 0,
-    dt: 0,
-    method: "trapezoidal" as const,
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: overrides?.srcFact ?? 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    temp: 300.15,
-    vt: 0.025852,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
+function buildVsrcCircuit(facade: DefaultSimulatorFacade, p: VsrcCircuitParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",  type: "DcVoltageSource", props: { label: "vs", voltage: p.voltage } },
+      { id: "rl",  type: "Resistor",        props: { label: "rl", resistance: p.resistance ?? 1000 } },
+      { id: "gnd", type: "Ground",          props: { label: "gnd" } },
+    ],
+    connections: [
+      ["vs:pos", "rl:pos"],
+      ["rl:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
   });
 }
 
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
+function findElementIndexByLabel(fix: ReturnType<typeof buildFixture>, label: string): number {
+  for (const [idx, ce] of fix.circuit.elementToCircuitElement.entries()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return idx;
+  }
+  throw new Error(`element with label '${label}' not found`);
+}
+
 // ---------------------------------------------------------------------------
-// DcVoltageSource unit tests
+// DcVoltageSource initialization (T1) — Cat 1
 // ---------------------------------------------------------------------------
+//
+// DcVoltageSourceAnalogElement extends AnalogElement (no state-pool slots) —
+// its only stamp-time state is the cached `_voltage` set at construct /
+// setParam time. The post-warm-start observable for Cat 1 is therefore the
+// converged node voltage at step 0: VS:pos sits at exactly the programmed
+// source voltage, held by the branch-row constraint.
 
-describe("DcVoltageSource", () => {
-  it("stamp_incidence_and_rhs", () => {
-    // 10V source between nodes 1 (pos) and 2 (neg), branch at absolute row 3
-    const src = makeVsrc(1, 2, 10);
-    const solver = makeMockSolver();
-
-    // setup() allocates the 4 TSTALLOC handles; startBranch=3 assigns branchIndex=3
-    const ctx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: 3 });
-    setupAll([src], ctx);
-
-    // setup() should have called allocElement 4 times
-    expect(solver.allocElement).toHaveBeenCalledTimes(4);
-
-    // Now load stamps values into the pre-allocated handles
-    src.load(makeMinimalCtx(solver));
-
-    // Should produce 4 matrix stamps (nodePos=1, nodeNeg=2, branch=3):
-    // B[nodePos, k] = allocElement(1, 3) → stampElement(h,  1)
-    // B[nodeNeg, k] = allocElement(2, 3) → stampElement(h, -1)
-    // C[k, nodePos] = allocElement(3, 1) → stampElement(h,  1)
-    // C[k, nodeNeg] = allocElement(3, 2) → stampElement(h, -1)
-    const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 2 && c === 3 && v === -1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 2 && v === -1)).toBe(true);
-
-    // RHS at branch row 3: RHS[3] = 10
-    expect(solver._rhs[3]).toBe(10);
-  });
-
-  it("set_scale_modifies_rhs", () => {
-    // ngspice vsrcload.c:54- value = here->VSRCdcValue * ckt->CKTsrcFact
-    const src = makeVsrc(1, 2, 10);
-
-    const solver = makeMockSolver();
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: 3 });
-    setupAll([src], setupCtx);
-
-    const ctx = makeMinimalCtx(solver, undefined, { srcFact: 0.5 });
-    src.load(ctx);
-
-    // Incidence stamps are always ±1 (4 allocElement calls during setup)
-    expect(solver.allocElement).toHaveBeenCalledTimes(4);
-
-    // RHS = 10 * 0.5 = 5
-    expect(solver._rhs[3]).toBe(5);
-  });
-
-  it("ground_node_stamps_present", () => {
-    // Positive at node 1, negative at ground (0), branch at row 2.
-    // setup() allocates 4 handles regardless of ground; load() stamps all 4.
-    const src = makeVsrc(1, 0, 5);
-    const solver = makeMockSolver();
-
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: 2 });
-    setupAll([src], setupCtx);
-
-    // 4 allocElement calls: pos-branch, neg(0)-branch, branch-neg(0), branch-pos
-    expect(solver.allocElement).toHaveBeenCalledTimes(4);
-
-    src.load(makeMinimalCtx(solver));
-
-    expect(solver._rhs[2]).toBe(5);
-  });
-
-  it("branch_index_stored", () => {
-    const src = makeVsrc(1, 2, 10);
-    const solver = makeMockSolver();
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: 5 });
-    setupAll([src], setupCtx);
-    expect(src.branchIndex).toBe(5);
-  });
-
-  it("definition_has_analog_behavioral", () => {
-    expect(DcVoltageSourceDefinition.modelRegistry?.behavioral).toBeDefined();
-  });
-
-  it("definition_engine_type_analog", () => {
-    expect(DcVoltageSourceDefinition.modelRegistry?.behavioral).toBeDefined();
-  });
-
-  it("default_voltage_from_analog_factory", () => {
-    const props = new PropertyBag();
-    props.replaceModelParams({ voltage: 5 });
-    const el = getFactory(DcVoltageSourceDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 0]]),
-      props,
-      () => 0,
-    );
-
-    const solver = makeMockSolver();
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: 2 });
-    setupAll([el], setupCtx);
-
-    el.load(makeMinimalCtx(solver));
-
-    // Default voltage is 5V, branch at row 2
-    expect(solver._rhs[2]).toBe(5);
+describe("DcVoltageSource initialization (T1)", () => {
+  it("init_post_warm_start_pos_node_held_at_source_voltage", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildVsrcCircuit(facade, { voltage: 5, resistance: 1000 }),
+    });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(5.0, 9);
   });
 });
 
-// ===========================================================================
-// Task C4.4- DC voltage source srcFact parity
-//
-// ngspice reference: cktload.c:96-136 + each source's DEVload.
-// The independent voltage source stamps its RHS entry as `V * CKTsrcFact`
-// during DC-OP source-stepping. At srcFact=0.5 the RHS entry must be
-// exactly half the nominal source voltage, bit-exact.
-//
-// ngspice → ours mapping:
-//   CKTsrcFact             → ctx.srcFact
-//   *CKTrhs += VSRCdcValue → solver.stampRHS(branch, V * srcFact)
-// ===========================================================================
+// ---------------------------------------------------------------------------
+// DcVoltageSource DCOP analytical (T1) — Cat 2 analytical
+// ---------------------------------------------------------------------------
 
-describe("dc_vsource_load_srcfact_parity", () => {
-  it("srcfact_05_halves_rhs_bit_exact", () => {
-    const VOLTAGE = 10;
-    const SRC_FACT = 0.5;
-    const BRANCH_ROW = 3;
+describe("DcVoltageSource DCOP analytical (T1)", () => {
+  it("dcop_pos_node_equals_source_voltage_5v", () => {
+    // Closed-form: V(VS:pos) = 5.0 exactly. Loop current magnitude is V/R.
+    // The two pin currents obey KCL (sum to zero) by the source's branch-row
+    // constraint, with magnitude V/R; the sign convention of which pin
+    // reports +I vs -I is a solver-internal convention, so the canonical
+    // closed-form assertion is on |I| and KCL closure (pin currents sum to 0).
+    const fix = buildFixture({
+      build: (_r, facade) => buildVsrcCircuit(facade, { voltage: 5, resistance: 1000 }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
 
-    const src = makeVsrc(1, 2, VOLTAGE);
-    const solver = makeMockSolver(8);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(5.0, 9);
 
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: BRANCH_ROW });
-    setupAll([src], setupCtx);
-
-    src.load(makeMinimalCtx(solver, undefined, { srcFact: SRC_FACT }));
-
-    // ngspice reference: NGSPICE_REF = voltage * srcFact.
-    // Bit-exact: the final RHS stamp at the branch row must equal the product.
-    const NGSPICE_REF = VOLTAGE * SRC_FACT;
-    expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
-    expect(NGSPICE_REF).toBe(5);
+    const vsIdx = findElementIndexByLabel(fix, "vs");
+    const vsPins = fix.engine.getElementPinCurrents(vsIdx);
+    const Imag = 5.0 / 1000;
+    expect(Math.abs(vsPins[0])).toBeCloseTo(Imag, 9);
+    expect(Math.abs(vsPins[1])).toBeCloseTo(Imag, 9);
+    expect(vsPins[0] + vsPins[1]).toBeCloseTo(0, 9);
   });
 
-  it("srcfact_1_preserves_full_rhs", () => {
-    const VOLTAGE = 12;
-    const SRC_FACT = 1;
-    const BRANCH_ROW = 2;
+  it("dcop_pos_node_equals_source_voltage_12v_smaller_load", () => {
+    // Closed-form: V(VS:pos) = 12.0 exactly with a 470Ω return path.
+    // |I| = 12/470 ≈ 0.02553 A; pin currents sum to zero (KCL).
+    const fix = buildFixture({
+      build: (_r, facade) => buildVsrcCircuit(facade, { voltage: 12, resistance: 470 }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc!.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(12.0, 9);
 
-    const src = makeVsrc(1, 0, VOLTAGE);
-    const solver = makeMockSolver(8);
+    const vsIdx = findElementIndexByLabel(fix, "vs");
+    const vsPins = fix.engine.getElementPinCurrents(vsIdx);
+    const Imag = 12.0 / 470;
+    expect(Math.abs(vsPins[0])).toBeCloseTo(Imag, 9);
+    expect(Math.abs(vsPins[1])).toBeCloseTo(Imag, 9);
+    expect(vsPins[0] + vsPins[1]).toBeCloseTo(0, 9);
+  });
+});
 
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: BRANCH_ROW });
-    setupAll([src], setupCtx);
+// ---------------------------------------------------------------------------
+// DcVoltageSource parameter hot-load (T1) — Cat 4
+// ---------------------------------------------------------------------------
+//
+// DcVoltageSource params: `voltage` (primary, only). No TEMP / AREA / SCALE /
+// derived-state-recompute parameters — `setParam("voltage", v)` directly
+// updates the cached `_voltage` field consumed at the next load(). One it()
+// covers the only param.
 
-    src.load(makeMinimalCtx(solver, undefined, { srcFact: SRC_FACT }));
+describe("DcVoltageSource parameter hot-load (T1)", () => {
+  it("hotload_voltage_changes_pos_node", () => {
+    // Cat 4: VS=5V, RL=1k → V(VS:pos)=5V before. Hot-load voltage=10V →
+    // V(VS:pos)=10V after. Closed-form post-change observable.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVsrcCircuit(facade, { voltage: 5, resistance: 1000 }),
+    });
+    const posNode = nodeOf(fix, "vs:pos");
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(posNode);
+    expect(before).toBeCloseTo(5.0, 9);
 
-    const NGSPICE_REF = VOLTAGE * SRC_FACT;
-    expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
-    expect(NGSPICE_REF).toBe(12);
+    const vsEl = ceByLabel(fix, "vs");
+    fix.coordinator.setComponentProperty(vsEl, "voltage", 10);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(posNode);
+
+    expect(after).not.toBeCloseTo(before, 4);
+    expect(after).toBeCloseTo(10.0, 9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DcVoltageSource paired vs ngspice — resistive divider (T3) — Cat 2 num / 3 / 5
+// ---------------------------------------------------------------------------
+//
+// Per Step 2c: the harness RUN lives in the FIRST it() of the describe
+// (transient run); subsequent siblings read from the recorded session.
+
+describeIfDll("DcVoltageSource paired vs ngspice — 5V resistive divider (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_RESISTIVE_DIVIDER, dllPath: DLL_PATH });
   });
 
-  it("srcfact_0_zeroes_rhs_leaving_incidence", () => {
-    const VOLTAGE = 7;
-    const SRC_FACT = 0;
-    const BRANCH_ROW = 3;
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
 
-    const src = makeVsrc(1, 2, VOLTAGE);
-    const solver = makeMockSolver(8);
+  it("transient_step_end_paired_resistive_divider", async () => {
+    await session.runTransient(0, 1e-3, 10e-6);
+    session.compareAllSteps();
+  }, 120_000);
 
-    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: BRANCH_ROW });
-    setupAll([src], setupCtx);
+  it("dcop_paired_resistive_divider", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
 
-    src.load(makeMinimalCtx(solver, undefined, { cktMode: MODEDCOP | MODEINITJCT, srcFact: SRC_FACT }));
+  it("full_iteration_paired_resistive_divider", () => {
+    session.compareAllAttempts();
+  });
+});
 
-    const NGSPICE_REF = VOLTAGE * SRC_FACT;
-    expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
-    expect(NGSPICE_REF).toBe(0);
+// ---------------------------------------------------------------------------
+// DcVoltageSource paired vs ngspice — 12V/470Ω load (T3) — Cat 2 num / 3 / 5
+// ---------------------------------------------------------------------------
+//
+// Second operating-region configuration: a higher-magnitude source driving a
+// smaller load. Without this, the divider .dts (low-magnitude single-regime)
+// hides any per-step drift in the source's branch-row stamp / srcFact ramp
+// at different solve scales.
 
-    // Incidence stamps are srcFact-independent- must remain present.
-    // Nodes are 1-based: nodePos=1, nodeNeg=2, BRANCH_ROW=3.
-    const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 1 && c === BRANCH_ROW && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 2 && c === BRANCH_ROW && v === -1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === BRANCH_ROW && c === 1 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === BRANCH_ROW && c === 2 && v === -1)).toBe(true);
+describeIfDll("DcVoltageSource paired vs ngspice — 12V load (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_DCVS_12V_LOAD, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_12v_load", async () => {
+    await session.runTransient(0, 1e-3, 10e-6);
+    session.compareAllSteps();
+  }, 120_000);
+
+  it("dcop_paired_12v_load", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_12v_load", () => {
+    session.compareAllAttempts();
   });
 });

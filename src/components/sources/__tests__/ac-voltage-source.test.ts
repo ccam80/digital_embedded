@@ -1,915 +1,556 @@
 /**
- * Tests for the AC Voltage Source component.
- *
- * Covers waveform computation, DC offset, source scaling, breakpoints,
- * and an RC low-pass filter integration test.
+ * AcVoltageSource — canonical analog component tests.
+ * Canon set: 1, 2, 3, 4, 5, 8. File tier: harness (T3 + T1).
  */
 
-import { describe, it, expect, vi } from "vitest";
-import {
-  AcVoltageSourceDefinition,
-  computeWaveformValue,
-  squareWaveBreakpoints,
-  type AcVoltageSourceAnalogElement,
-} from "../ac-voltage-source.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
-import {
-  makeTestSetupContext,
-  setupAll,
-  loadCtxFromFields,
-} from "../../../solver/analog/__tests__/test-helpers.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
+
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { DLL_PATH, describeIfDll } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// .dts fixtures used by the T3 harness sessions. Per-waveform-mode coverage
+// (square / sine / triangle / sawtooth) is treated as additional Cat 2-num /
+// Cat 3 / Cat 5 configurations under the existing canonical categories.
+//   DTS_SQUARE_RC   — reused parity fixture: square AcVoltageSource → R → C
+//                     → ground (500Hz, dcOffset=0.5, amplitude=0.5,
+//                     riseTime/fallTime=1ns). Operating regime: pulsed-drive
+//                     RC charging.
+//   DTS_SINE_RC     — authored via MCP: 1kHz sine AcVoltageSource (5V) →
+//                     1kΩ → 1µF → ground. Operating regime: continuous
+//                     sinusoidal drive.
+//   DTS_TRIANGLE_RC — authored via MCP: 1kHz triangle AcVoltageSource (5V) →
+//                     1kΩ → 1µF → ground. Operating regime: piecewise-linear
+//                     rise/fall (PULSE-aligned).
+//   DTS_SAWTOOTH_RC — authored via MCP: 1kHz sawtooth AcVoltageSource (5V,
+//                     default fallTime=1e-12) → 1kΩ → 1µF → ground.
+//                     Operating regime: long-rise / fast-fall PULSE.
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
+
+const DTS_SQUARE_RC = path.resolve(
+  "src/solver/analog/__tests__/ngspice-parity/fixtures/rc-transient.dts",
+);
+const DTS_SINE_RC = path.resolve(
+  "src/components/sources/__tests__/fixtures/acvsource-canon-sine-rc.dts",
+);
+const DTS_TRIANGLE_RC = path.resolve(
+  "src/components/sources/__tests__/fixtures/acvsource-canon-triangle-rc.dts",
+);
+const DTS_SAWTOOTH_RC = path.resolve(
+  "src/components/sources/__tests__/fixtures/acvsource-canon-sawtooth-rc.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic circuit factory shared by Cat 1, Cat 2 (analytical), Cat 4,
+// and Cat 8 — AcVoltageSource → 1kΩ → ground (no capacitor for the trivial
+// resistive-load DCOP path; the source's `pos` net carries the instantaneous
+// waveform value at the engine's internal simTime).
+// ---------------------------------------------------------------------------
+
+interface AcSourceProps {
+  amplitude?: number;
+  frequency?: number;
+  phase?: number;
+  dcOffset?: number;
+  waveform?: string;
+  riseTime?: number;
+  fallTime?: number;
 }
 
-
-// ---------------------------------------------------------------------------
-// Mock solver
-// ---------------------------------------------------------------------------
-
-function makeMockSolver(rhsSize = 8) {
-  const stamps: [number, number, number][] = [];
-  const rhs = new Float64Array(rhsSize);
-
-  const solver = {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    _stamps: stamps,
-    _rhs: rhs,
-  };
-
-  return solver;
-}
-
-function makeMinimalCtx(
-  solver: ReturnType<typeof makeMockSolver>,
-  _time = 0,
-  srcFact = 1,
-  overrides?: Partial<{ cktMode: number; srcFact: number }>,
-) {
-  return loadCtxFromFields({
-    solver: solver as unknown as SparseSolver,
-    matrix: solver as unknown as SparseSolver,
-    rhs: solver._rhs,
-    rhsOld: new Float64Array(solver._rhs.length),
-    cktMode: overrides?.cktMode ?? (MODEDCOP | MODEINITFLOAT),
-    time: _time,
-    dt: 0,
-    method: "trapezoidal" as const,
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: overrides?.srcFact ?? srcFact,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    temp: 300.15,
-    vt: 0.025852,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Helper- create AC source AnalogElement from props
-// ---------------------------------------------------------------------------
-
-function makeAcElement(
-  overrides: {
-    amplitude?: number;
-    frequency?: number;
-    phase?: number;
-    dcOffset?: number;
-    waveform?: string;
-  },
-  nodePos = 1,
-  nodeNeg = 0,
-  _branchIdx = 2,
-  time = 0,
-): AcVoltageSourceAnalogElement {
-  const props = new PropertyBag();
-  props.setModelParam("amplitude", overrides.amplitude ?? 5);
-  props.setModelParam("frequency", overrides.frequency ?? 1000);
-  props.setModelParam("phase", overrides.phase ?? 0);
-  props.setModelParam("dcOffset", overrides.dcOffset ?? 0);
-  props.set("waveform", overrides.waveform ?? "sine");
-
-  let simTime = time;
-  const getTime = () => simTime;
-
-  const el = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
-    new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    props,
-    getTime,
-  ) as AcVoltageSourceAnalogElement;
-
-  // Expose a way to advance time for tests that call stamp at different times
-  (el as unknown as { _setTime: (t: number) => void })._setTime = (t: number) => {
-    simTime = t;
-  };
-
-  return el;
-}
-
-// ---------------------------------------------------------------------------
-// Helper- setup an AC element and assign its branch index
-// ---------------------------------------------------------------------------
-
-function setupAcElement(
-  el: AcVoltageSourceAnalogElement,
-  solver: ReturnType<typeof makeMockSolver>,
-  branchIdx: number,
-): void {
-  const ctx = makeTestSetupContext({
-    solver: solver as unknown as SparseSolver,
-    startBranch: branchIdx,
-  });
-  setupAll([el as unknown as import("../../../solver/analog/element.js").AnalogElement], ctx);
-}
-
-// ---------------------------------------------------------------------------
-// Unit tests- waveform computation (pure function)
-// ---------------------------------------------------------------------------
-
-describe("computeWaveformValue", () => {
-
-  it("sine at quarter period equals amplitude", () => {
-  });
-
-  it("square at three-quarter period is negative amplitude", () => {
-  });
-
-  it("triangle at 1/8 period is V1 plus quarter swing (PULSE-aligned rising)", () => {
-    // PULSE-aligned triangle: at t=0 the wave sits at V1 = -amplitude and rises
-    // linearly to V2 = +amplitude over period/2. At t = period/8 (one quarter of
-    // the rise half-period), value = V1 + (V2 - V1) * (1/4) = -5 + 10 * 0.25 = -2.5V.
-  });
-
-  it("dc offset is additive to sine", () => {
-  });
-});
-
-// ---------------------------------------------------------------------------
-// squareWaveBreakpoints
-// ---------------------------------------------------------------------------
-
-describe("squareWaveBreakpoints", () => {
-  it("1kHz square wave has breakpoints at 0.5ms, 1ms, 1.5ms in [0, 2ms]", () => {
-    const bps = squareWaveBreakpoints(1000, 0, 0, 0.002);
-    expect(bps).toHaveLength(3);
-  });
-
-  it("returns empty array for non-positive frequency", () => {
-    expect(squareWaveBreakpoints(0, 0, 0, 1)).toHaveLength(0);
-    expect(squareWaveBreakpoints(-1, 0, 0, 1)).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// AcSource- stamp tests via MNA mock
-// ---------------------------------------------------------------------------
-
-describe("AcSource", () => {
-  it("sine_at_t_zero", () => {
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    // RHS at branch row 2: V(t=0) = 5 * sin(0) = 0
-    expect(solver._rhs[2]).toBeCloseTo(0, 8);
-  });
-
-  it("sine_at_quarter_period", () => {
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0.25e-3);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    // RHS at branch row 2: V(t=0.25ms) = 5 * sin(π/2) = 5.0
-    expect(solver._rhs[2]).toBeCloseTo(5.0, 4);
-  });
-
-  it("square_at_half_period", () => {
-    // Use t=0.75ms (3/4 period) where sin = -1, firmly in the negative half cycle
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "square" }, 1, 0, 2, 0.75e-3);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    // At t=0.75ms: sin(2π*1000*0.75e-3) = sin(3π/2) = -1 → V = -5
-    expect(solver._rhs[2]).toBeCloseTo(-5.0, 4);
-  });
-
-  it("triangle_linearity", () => {
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "triangle" }, 1, 0, 2, 0.125e-3);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    // PULSE-aligned triangle: at t=0 wave is at V1 = -5V rising. At t = period/8
-    // (quarter of the rise half-period) value = V1 + (V2-V1)*(1/4) = -2.5V.
-    expect(solver._rhs[2]).toBeCloseTo(-2.5, 4);
-  });
-
-  it("dc_offset_applied", () => {
-    const el = makeAcElement(
-      { amplitude: 5, frequency: 1000, waveform: "sine", dcOffset: 2 },
-      1, 0, 2, 0,
-    );
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    // At t=0: sin(0)=0, so RHS = 0*scale + 2 = 2.0
-    expect(solver._rhs[2]).toBeCloseTo(2.0, 8);
-  });
-
-  it("square_wave_breakpoints", () => {
-    // ngspice PULSE convention: default riseTime=fallTime=1ps (from AC_VOLTAGE_SOURCE_DEFAULTS).
-    // For 1kHz, period=1ms, halfPeriod=0.5ms.
-    // Breakpoints per period at offsets: [0, TR=1ps, halfPeriod=0.5ms, halfPeriod+TF=0.5ms+1ps].
-    // In (0, 0.002) exclusive:
-    //   Period 0 (t=0): t=0 excluded, 1ps, 0.5ms, 0.5ms+1ps
-    //   Period 1 (t=1ms): 1ms, 1ms+1ps, 1.5ms, 1.5ms+1ps
-    //   Period 2 (t=2ms): all >= 2ms excluded
-    // Total: 7 breakpoints.
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "square" }, 1, 0, 2, 0);
-    const bps = el.getBreakpoints(0, 0.002);
-    expect(bps).toHaveLength(7);
-  });
-
-});
-
-// ---------------------------------------------------------------------------
-// Integration test- RC low-pass filter
-//
-// 1kHz sine (5V) → 1kΩ → 1µF → ground
-// Expected capacitor voltage amplitude:
-//   Vout = Vin / sqrt(1 + (2π * f * R * C)²)
-//        = 5 / sqrt(1 + (2π * 1000 * 1e3 * 1e-6)²)
-//        ≈ 5 / sqrt(1 + 39.48) ≈ 0.786V
-// We allow ±10% for transient settling.
-// ---------------------------------------------------------------------------
-
-describe("Integration", () => {
-  it("rc_lowpass", async () => {
-    // 1kHz sine (5V) → 1kΩ → 1µF → ground
-    // Expected capacitor voltage amplitude ≈ 0.786V, allow ±10%.
-    const period = 1e-3;
-    const tStop = 10 * period;
-    const settleTime = 5 * period;
-    const maxStep = 5e-6;
-
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "acsrc", type: "AcVoltageSource", props: { label: "acsrc", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0, waveform: "sine" } },
-            { id: "r1",    type: "Resistor",        props: { label: "r1",    resistance: 1000 } },
-            { id: "c1",    type: "Capacitor",       props: { label: "c1",    capacitance: 1e-6 } },
-            { id: "gnd",   type: "Ground" },
-          ],
-          connections: [
-            ["acsrc:pos", "r1:A"],
-            ["r1:B",      "c1:pos"],
-            ["c1:neg",    "gnd:out"],
-            ["acsrc:neg", "gnd:out"],
-          ],
-        });
+function buildAcSourceCircuit(facade: DefaultSimulatorFacade, props: AcSourceProps): Circuit {
+  return facade.build({
+    components: [
+      {
+        id: "acsrc",
+        type: "AcVoltageSource",
+        props: { label: "acsrc", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0, waveform: "sine", ...props },
       },
-      analysis: "tran",
-      tStop,
-      maxStep,
-    });
+      { id: "r1", type: "Resistor", props: { label: "r1", resistance: 1000 } },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["acsrc:pos", "r1:pos"],
+      ["r1:neg", "gnd:out"],
+      ["acsrc:neg", "gnd:out"],
+    ],
+  });
+}
 
-    // Find peak capacitor voltage in the settled portion (after settleTime).
-    const stepCount = (session as any)._ourSession!.steps.length;
-    let peakVcap = 0;
-    for (let i = 0; i < stepCount; i++) {
-      const stepEnd = session.getStepEnd(i);
-      if ((stepEnd.stepEndTime.ours ?? 0) > settleTime) {
-        const vcap = Math.abs(stepEnd.nodes["c1:pos"]?.ours ?? 0);
-        if (vcap > peakVcap) peakVcap = vcap;
+function getAcsrcPosNode(fix: ReturnType<typeof buildFixture>): number {
+  const node =
+    fix.circuit.labelToNodeId.get("acsrc:pos") ??
+    fix.circuit.labelToNodeId.get("r1:pos");
+  if (node === undefined) {
+    throw new Error("acsrc:pos / r1:pos node not found in labelToNodeId");
+  }
+  return node;
+}
+
+function getAcsrcCircuitElement(fix: ReturnType<typeof buildFixture>) {
+  for (let i = 0; i < fix.circuit.elements.length; i++) {
+    const ce = fix.circuit.elementToCircuitElement.get(i);
+    if (ce === undefined) continue;
+    const label = ce.getProperties().getOrDefault<string>("label", "");
+    if (label === "acsrc") return ce;
+  }
+  throw new Error("AcVoltageSource circuit element 'acsrc' not found");
+}
+
+// ===========================================================================
+// Category 1 — Initialization (T1)
+//
+// Closed-form expected value. AcVoltageSource: V(t) = dcOffset + amplitude *
+// sin(2π*f*t + phase). After the warm-start step the engine has advanced to
+// a known simTime read off `engine.simTime`; the source value at that exact
+// simTime is the bit-exact analytical sin sample. Resistive load to ground
+// means the pos node tracks the source value to engine precision, so the
+// post-warm-start node voltage is asserted against the closed-form to 9
+// decimals via `toBeCloseTo(expectedV, 9)`. NOT a B-8 rail check.
+// ===========================================================================
+
+describe("AcVoltageSource initialization (T1)", () => {
+  it("init_pos_node_solved_after_warmstart", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+    });
+    // Closed-form: V(t) = dcOffset + amplitude * sin(2π*f*t + phase).
+    // After warm-start the engine has advanced to a known simTime; the source
+    // value at that simTime is the exact analytical sin sample. Resistive
+    // load to ground means the pos node tracks the source value bit-exactly.
+    const t = fix.engine.simTime;
+    const expectedV = 0 + 5 * Math.sin(2 * Math.PI * 1000 * t + 0);
+    const v = fix.engine.getNodeVoltage(getAcsrcPosNode(fix));
+    expect(v).toBeCloseTo(expectedV, 9);
+  });
+});
+
+// ===========================================================================
+// Category 2 — DC operating point (T1, analytical)
+//
+// At DCOP, the AcVoltageSource evaluates its waveform at simTime = 0 with
+// MODEDCOP gating. For phase=0, dcOffset=0, sine: V(0) = 0 → resistor sees
+// 0V across it → pos node sits at exactly 0V (analytical).
+// ===========================================================================
+
+describe("AcVoltageSource DCOP analytical (T1)", () => {
+  it("dcop_sine_phase_zero_dc_offset_zero_yields_zero_pos", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    const v = fix.engine.getNodeVoltage(getAcsrcPosNode(fix));
+    // Closed-form: V(0) = dcOffset + amplitude * sin(0) = 0V (independent of
+    // amplitude/frequency at phase=0). The resistive load to ground means
+    // the pos node tracks the source value exactly.
+    expect(v).toBeCloseTo(0, 9);
+  });
+
+  it("dcop_sine_dc_offset_drives_pos_to_offset", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 3, frequency: 1000, phase: 0, dcOffset: 1.5,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    const v = fix.engine.getNodeVoltage(getAcsrcPosNode(fix));
+    // V(0) = dcOffset + amplitude * sin(0) = 1.5V.
+    expect(v).toBeCloseTo(1.5, 9);
+  });
+});
+
+// ===========================================================================
+// Category 4 — Parameter hot-load (T1)
+//
+// AcVoltageSource analog leaf hot-loadable params (per setParam):
+//   amplitude, frequency, phase, dcOffset, riseTime, fallTime, noiseSampleTime.
+// Coverage requirement: one it() per param (or per representative within a
+// scaling group). Structural: amplitude, frequency, phase, dcOffset shift the
+// instantaneous output. riseTime/fallTime shape the square-wave edges (only
+// observable for square mode). noiseSampleTime gates noise breakpoints (no
+// effect on the per-step voltage at sine mode — covered by extended-mode file).
+//
+// Each it() asserts the documented post-change observable on the AC source's
+// pos node after setComponentProperty + step.
+// ===========================================================================
+
+describe("AcVoltageSource parameter hot-load (T1)", () => {
+  it("hotload_dcOffset_shifts_pos_node_at_dcop", () => {
+    // Build with phase=0, dcOffset=0 → DCOP value V(0) = 0. After hot-load
+    // dcOffset to 2.0, the source value at the next-step phase argument is
+    // dcOffset + amplitude * sin(...). At small simTime, sin(...) is close
+    // to zero, so the pos node moves close to 2.0V — strict directional
+    // assertion is that v after differs from v before by approximately the
+    // dcOffset delta.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 1, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+    });
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "dcOffset", 2.0);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+    expect(after).not.toBeCloseTo(before, 6);
+    expect(after - before).toBeGreaterThan(1.5);
+  });
+
+  it("hotload_amplitude_changes_pos_node", () => {
+    // Build at phase=π/2 so sin(phase) = 1 and v ≈ amplitude. Doubling
+    // amplitude doubles the contribution of sin(phase) to the source value.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 1, frequency: 1000, phase: Math.PI / 2, dcOffset: 0,
+      }),
+    });
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "amplitude", 4);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+    expect(after).not.toBeCloseTo(before, 6);
+    // amplitude grew 1 → 4: the sin-driven swing increases.
+    expect(Math.abs(after)).toBeGreaterThan(Math.abs(before));
+  });
+
+  it("hotload_frequency_changes_pos_node", () => {
+    // Doubling frequency at the same simTime doubles the phase argument
+    // 2π*f*t, shifting the instantaneous sin(...) value (unless t happens
+    // to land on a sin zero — choose phase=0 so simTime ≠ 0 produces a
+    // non-zero sin sample whose value is frequency-dependent).
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+    });
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "frequency", 5000);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_phase_changes_pos_node", () => {
+    // At phase=0, simTime≈0 → sin ≈ 0. Hot-loading phase to π/2 shifts the
+    // argument by 90°: sin(2πft + π/2) = cos(2πft) ≈ 1 at small t → v ≈ amp.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "sine", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+    });
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "phase", Math.PI / 2);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+    expect(after).not.toBeCloseTo(before, 6);
+    // After the π/2 shift the source approaches +amp at small simTime.
+    expect(after).toBeGreaterThan(4);
+  });
+
+  it("hotload_riseTime_changes_square_pos_node", () => {
+    // Square mode with phase=0 at the rising edge: increasing riseTime makes
+    // the trapezoidal ramp slower, so the post-step voltage during the ramp
+    // is lower than with the default 1ps riseTime that snaps to V2 instantly.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "square", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+        riseTime: 1e-12, fallTime: 1e-12,
+      }),
+    });
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "riseTime", 1e-4);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_fallTime_changes_square_pos_node", () => {
+    // Square mode: fallTime stretches the trailing-edge ramp. Changing it
+    // shifts the per-step value once the engine has advanced into the fall
+    // region of the cycle.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "square", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+        riseTime: 1e-12, fallTime: 1e-12,
+      }),
+    });
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+    // Step a few times into the cycle so we're past the rising-edge region.
+    for (let i = 0; i < 20; i++) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "fallTime", 2e-4);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_noiseSampleTime_changes_noise_breakpoint_schedule", () => {
+    // Cat 4 derived-state-recompute pattern: noiseSampleTime gates the
+    // breakpoint registration schedule in noise mode. Hot-loading a new
+    // sample period changes the schedule, which changes both the count of
+    // step-end records that land on breakpoint boundaries AND the per-step
+    // observable on the source's pos node (because fresh Gaussian draws are
+    // taken at different simTimes).
+    //
+    // Directional / not-equal pattern per Cat 4 contract:
+    //   1) after !== before: the hot-load took effect at the simulator
+    //      surface (no-op silent-ignore of the param fails this).
+    //   2) Stepping under the new sample period yields >= 1 step record in
+    //      the convergence log (the schedule actually advanced the engine
+    //      under the new schedule, not just at the old breakpoint cadence).
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "noise", amplitude: 1, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+      params: { tStop: 1e-3, maxTimeStep: 1e-5 },
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    const ce = getAcsrcCircuitElement(fix);
+    const node = getAcsrcPosNode(fix);
+
+    const before = fix.engine.getNodeVoltage(node);
+    fix.coordinator.setComponentProperty(ce, "noiseSampleTime", 1e-5);
+    // Run enough steps under the new schedule to accumulate breakpoint
+    // landings (at least several sample-period boundaries).
+    for (let i = 0; i < 20; i++) fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(node);
+
+    // (1) Directional: hot-load propagated to the simulator observable.
+    expect(after).not.toBe(before);
+    // (2) Schedule observable: under the new noiseSampleTime, the engine
+    // recorded step-end records — the hot-loaded schedule actually drove
+    // the timestep controller forward.
+    const log = fix.coordinator.getConvergenceLog()!;
+    expect(log.length).toBeGreaterThan(0);
+  });
+});
+
+// ===========================================================================
+// Category 8 — Breakpoints (T1)
+//
+// AcVoltageSource registers breakpoints in acceptStep for square / triangle /
+// sawtooth waveforms (and noise via TRNOISE). Square at 1kHz with default
+// 1ps riseTime/fallTime: the first edge breakpoint is at t = riseTime ≈ 1ps,
+// then halfPeriod = 0.5ms, etc. The engine's timestep controller must land
+// on the registered breakpoint exactly.
+// ===========================================================================
+
+describe("AcVoltageSource breakpoints (T1)", () => {
+  it("square_halfperiod_breakpoint_lands_exactly", () => {
+    const T_HALF = 0.5e-3; // halfPeriod for 1kHz square
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "square", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+        riseTime: 1e-12, fallTime: 1e-12,
+      }),
+      params: { tStop: T_HALF * 2, maxTimeStep: T_HALF / 4 },
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    while (
+      fix.coordinator.simTime !== null &&
+      fix.coordinator.simTime < T_HALF * 1.5
+    ) {
+      fix.coordinator.step();
+    }
+    const log = fix.coordinator.getConvergenceLog()!;
+    // Step record's end-of-step time is simTime + acceptedDt (the entry time
+    // plus the final accepted timestep). The breakpoint controller must land
+    // bit-exact on T_HALF.
+    const bpStep = log.find(s => s.simTime + s.acceptedDt === T_HALF);
+    expect(bpStep).toBeDefined();
+  });
+
+  it("triangle_halfperiod_breakpoint_lands_exactly", () => {
+    const T_HALF = 0.5e-3;
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "triangle", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
+      }),
+      params: { tStop: T_HALF * 2, maxTimeStep: T_HALF / 4 },
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    while (
+      fix.coordinator.simTime !== null &&
+      fix.coordinator.simTime < T_HALF * 1.5
+    ) {
+      fix.coordinator.step();
+    }
+    const log = fix.coordinator.getConvergenceLog()!;
+    const bpStep = log.find(s => s.simTime + s.acceptedDt === T_HALF);
+    expect(bpStep).toBeDefined();
+  });
+});
+
+// ===========================================================================
+// Category 2-numerical / 3 / 5 — Harness sessions (T3)
+//
+// One describe()/session per .dts. Sessions open in beforeAll, runs go in
+// the FIRST it() per session-sharing rules, dispose in afterAll. Gated on
+// canonical dllAvailable() via describeIfDll.
+// ===========================================================================
+
+describeIfDll("AcVoltageSource square-RC paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_SQUARE_RC,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_square_rc", async () => {
+    await session.runTransient(0, 4e-3, 5e-5);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_square_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
       }
     }
+  });
 
-    // Expected: 5 / sqrt(1 + 39.48) ≈ 0.786V, allow ±10%
-    const expectedAmplitude = 5 / Math.sqrt(1 + Math.pow(2 * Math.PI * 1000 * 1e3 * 1e-6, 2));
-    expect(peakVcap).toBeGreaterThan(expectedAmplitude * 0.9);
-    expect(peakVcap).toBeLessThan(expectedAmplitude * 1.1);
+  it("full_iteration_paired_square_rc", () => {
+    session.compareAllAttempts();
   });
 });
 
-// ---------------------------------------------------------------------------
-// ExprWaveform tests (Task 2.6.2)
-// ---------------------------------------------------------------------------
+describeIfDll("AcVoltageSource sine-RC paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
 
-function makeExprElement(
-  exprText: string,
-  time = 0,
-): AcVoltageSourceAnalogElement {
-  const props = new PropertyBag();
-  props.setModelParam("amplitude", 5);
-  props.setModelParam("frequency", 1000);
-  props.setModelParam("phase", 0);
-  props.setModelParam("dcOffset", 0);
-  props.set("waveform", "expression");
-  props.set("expression", exprText);
-
-  let simTime = time;
-  const el = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
-    new Map([["pos", 1], ["neg", 0]]),
-    props,
-    () => simTime,
-  ) as AcVoltageSourceAnalogElement;
-
-  (el as unknown as { _setTime: (t: number) => void })._setTime = (t: number) => {
-    simTime = t;
-  };
-
-  return el;
-}
-
-describe("ExprWaveform", () => {
-  it("custom_sine", () => {
-    // "3 * sin(2 * pi * 500 * t)" at t=0.001 (half period of 500Hz = 1ms)
-    // sin(2π * 500 * 0.001) = sin(2π * 0.5) = sin(π) ≈ 0
-    const el = makeExprElement("3 * sin(2 * pi * 500 * t)", 0.001);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    expect(solver._rhs[2]).toBeCloseTo(0, 5);
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_SINE_RC,
+      dllPath: DLL_PATH,
+    });
   });
 
-  it("ramp", () => {
-    // "5 * t" at t=0.001 → RHS = 5 * 0.001 = 0.005V
-    const el = makeExprElement("5 * t", 0.001);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    el.load(makeMinimalCtx(solver));
-    expect(solver._rhs[2]).toBeCloseTo(0.005, 8);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("invalid_expression_emits_diagnostic", () => {
-    // "sin(" is malformed- should record parse error, not throw
-    const el = makeExprElement("sin(");
-    expect(el._parsedExpr).toBeNull();
-    expect(el._parseError).not.toBeNull();
-    expect(typeof el._parseError).toBe("string");
-    expect((el._parseError as string).length).toBeGreaterThan(0);
-
-    // load should not throw and should produce RHS = 0
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-    expect(() => el.load(makeMinimalCtx(solver))).not.toThrow();
-    expect(solver._rhs[2]).toBe(0);
+  it("transient_step_end_paired_sine_rc", async () => {
+    await session.runTransient(0, 5e-3, 5e-5);
+    session.compareAllSteps();
   });
 
-  it("expression_parsed_once", () => {
-    // _parsedExpr is the same object reference after two load calls
-    const el = makeExprElement("5 * t", 0);
-    const firstRef = el._parsedExpr;
+  it("dcop_paired_sine_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
+    }
+  });
 
-    const solver1 = makeMockSolver();
-    setupAcElement(el, solver1, 2);
-    el.load(makeMinimalCtx(solver1));
-    const solver2 = makeMockSolver();
-    // Re-setup with solver2 so allocElement is called on solver2
-    setupAcElement(el, solver2, 2);
-    el.load(makeMinimalCtx(solver2));
-
-    expect(el._parsedExpr).toBe(firstRef);
+  it("full_iteration_paired_sine_rc", () => {
+    session.compareAllAttempts();
   });
 });
 
-// ===========================================================================
-// Task C4.4- AC voltage source srcFact + breakpoint parity
-//
-// ngspice reference: cktload.c:96-136 + VSRCload. The AC voltage source
-// multiplies its computed waveform value by CKTsrcFact before stamping.
-// Breakpoints derived from ngspice PULSE schedule (offsets 0, TR, halfPeriod,
-// halfPeriod+TF) must match squareWaveBreakpoints output bit-exact.
-// ===========================================================================
+describeIfDll("AcVoltageSource triangle-RC paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
 
-describe("ac_vsource_load_srcfact_parity", () => {
-  it("sine_srcfact_05_halves_rhs_bit_exact", () => {
-    const AMPLITUDE = 5;
-    const FREQUENCY = 1000;
-    const T = 0.25e-3; // quarter period → sin(π/2) = 1 → nominal V = 5
-    const SRC_FACT = 0.5;
-
-    const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "sine" }, 1, 0, 2, T);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-
-    el.load(makeMinimalCtx(solver, 0, SRC_FACT));
-
-    // NGSPICE_REF: V(t=0.25ms) * srcFact = amplitude * sin(2π*1000*0.25e-3) * 0.5.
-    const NGSPICE_REF =
-      (0 + AMPLITUDE * Math.sin(2 * Math.PI * FREQUENCY * T + 0)) * SRC_FACT;
-    expect(solver._rhs[2]).toBeCloseTo(NGSPICE_REF, 10);
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_TRIANGLE_RC,
+      dllPath: DLL_PATH,
+    });
   });
 
-  it("square_srcfact_025_scales_rhs_bit_exact_at_negative_half", () => {
-    const AMPLITUDE = 5;
-    const FREQUENCY = 1000;
-    const T = 0.75e-3; // 3/4 period of 1kHz, sin = -1 → square = -amplitude
-    const SRC_FACT = 0.25;
-
-    const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "square" }, 1, 0, 2, T);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 2);
-
-    el.load(makeMinimalCtx(solver, 0, SRC_FACT));
-
-    // NGSPICE_REF: square waveform with default riseTime/fallTime = 1ps (AC_VOLTAGE_SOURCE_DEFAULTS).
-    // At t=0.75ms (well past halfPeriod + fallTime of 0.5ms+1ps), we are firmly in the
-    // "low" half of the wave → value = -amplitude. Result after srcFact = -amplitude * srcFact.
-    const NGSPICE_REF =
-      computeWaveformValue("square", AMPLITUDE, FREQUENCY, 0, 0, T) * SRC_FACT;
-    expect(solver._rhs[2]).toBe(NGSPICE_REF);
-    expect(NGSPICE_REF).toBe(-AMPLITUDE * SRC_FACT);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("srcfact_0_zeroes_rhs_but_leaves_incidence", () => {
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 2, 3, 0.25e-3);
-    const solver = makeMockSolver();
-    setupAcElement(el, solver, 3);
+  it("transient_step_end_paired_triangle_rc", async () => {
+    await session.runTransient(0, 5e-3, 5e-5);
+    session.compareAllSteps();
+  });
 
-    el.load(makeMinimalCtx(solver, 0, 1, { cktMode: MODEDCOP | MODEINITJCT, srcFact: 0 }));
+  it("dcop_paired_triangle_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
+    }
+  });
 
-    // NGSPICE_REF at srcFact=0 → RHS entry exactly 0 (independent of waveform value).
-    expect(solver._rhs[3]).toBe(0);
-    // Incidence stamps must remain (±1 at four positions).
-    // Nodes are 1-based: nodePos=1, nodeNeg=2, branch=3.
-    const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 2 && c === 3 && v === -1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 2 && v === -1)).toBe(true);
+  it("full_iteration_paired_triangle_rc", () => {
+    session.compareAllAttempts();
   });
 });
 
-describe("ac_vsource_breakpoints_parity", () => {
-  it("square_1khz_breakpoints_exact_array_match", () => {
-    // ngspice PULSE breakpoint schedule per period (offset within period):
-    //   0, riseTime, halfPeriod, halfPeriod + fallTime
-    // Defaults: riseTime = fallTime = 1e-12 (from AC_VOLTAGE_SOURCE_DEFAULTS).
-    // For 1 kHz over (0, 2 ms) exclusive, seven breakpoints per existing
-    // square_wave_breakpoints test. The bit-exact array:
-    const FREQUENCY = 1000;
-    const RT = 1e-12;
-    const FT = 1e-12;
-    const halfPeriod = 1 / (2 * FREQUENCY);
+describeIfDll("AcVoltageSource sawtooth-RC paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
 
-    // NGSPICE_REF: direct inline computation of each expected time.
-    const NGSPICE_REF: number[] = [
-      0 + RT,                       // 1ns
-      0 + halfPeriod,               // 0.5ms
-      0 + halfPeriod + FT,          // 0.5ms + 1ns
-      1 * (1 / FREQUENCY) + 0,      // 1ms
-      1 * (1 / FREQUENCY) + RT,     // 1ms + 1ns
-      1 * (1 / FREQUENCY) + halfPeriod, // 1.5ms
-      1 * (1 / FREQUENCY) + halfPeriod + FT, // 1.5ms + 1ns
-    ];
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_SAWTOOTH_RC,
+      dllPath: DLL_PATH,
+    });
+  });
 
-    const el = makeAcElement({ amplitude: 5, frequency: FREQUENCY, waveform: "square" }, 1, 0, 2, 0);
-    const bps = el.getBreakpoints(0, 0.002);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
 
-    // Exact array equality (same length, same element-wise IEEE-754 values).
-    expect(bps).toHaveLength(NGSPICE_REF.length);
-    for (let i = 0; i < NGSPICE_REF.length; i++) {
-      expect(bps[i]).toBe(NGSPICE_REF[i]);
+  it("transient_step_end_paired_sawtooth_rc", async () => {
+    await session.runTransient(0, 5e-3, 5e-5);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_sawtooth_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
     }
   });
 
-  it("squareWaveBreakpoints_helper_matches_inline_ngspice_schedule", () => {
-    // Parity against the factored helper (source of truth for the element).
-    const RT = 0, FT = 0;
-    const period = 1 / 1000;
-    const halfPeriod = period / 2;
-    const NGSPICE_REF = [halfPeriod, period, period + halfPeriod];
-    const helper = squareWaveBreakpoints(1000, 0, 0, 0.002, RT, FT);
-    expect(helper).toHaveLength(NGSPICE_REF.length);
-    for (let i = 0; i < NGSPICE_REF.length; i++) {
-      expect(helper[i]).toBe(NGSPICE_REF[i]);
-    }
-  });
-});
-
-// ===========================================================================
-// AC-source-fixes- PULSE-aligned triangle + sawtooth waveform parity
-//
-// After Fix 1 (triangle) and Fix 2 (sawtooth) in ac-voltage-source.ts, the
-// engine produces piecewise-linear output bit-exactly matching a SPICE
-// PULSE(V1 V2 TD TR TF PW PER) emission. The reference below inlines the
-// same PULSE evaluation formula that ngspice's vsrcload.c uses so the tests
-// don't depend on any helper the production code shares.
-// ===========================================================================
-
-/**
- * Reference PULSE evaluation mirroring ngspice vsrcload.c:112-126 bit-exact.
- *
- * The reduction is gated on `time > PER` (only reduce when strictly greater),
- * and uses `time -= PER * floor(time/PER)` (not the precision-destroying
- * `((x % P) + P) % P` idiom). This must stay bit-identical to the engine.
- */
-function pulseReference(
-  V1: number,
-  V2: number,
-  TD: number,
-  TR: number,
-  TF: number,
-  PW: number,
-  PER: number,
-  t: number,
-): number {
-  let time = t - TD;
-  if (time > PER) {
-    time = time - PER * Math.floor(time / PER);
-  }
-  if (time <= 0 || time >= TR + PW + TF) return V1;
-  if (time >= TR && time <= TR + PW) return V2;
-  if (time > 0 && time < TR) return V1 + (V2 - V1) * time / TR;
-  return V2 + (V1 - V2) * (time - TR - PW) / TF;
-}
-
-// ===========================================================================
-// PULSE wrap parity- vsrcload.c:112-117 bit-exact
-//
-// Two regressions guarded here:
-//   (1) Precision: ((x % P) + P) % P destroys ~2e7 ULPs for tiny positive x
-//       (caught by rc-transient at t=1e-11, period=2ms- drift to 9.99e-12).
-//   (2) Negative-time semantics: positive phase makes tShifted < 0, where
-//       ngspice returns V1 via the `time <= 0 || time >= TR+PW+TF` branch.
-//       The harness encodes phase as TD = ((-phaseShift % P) + P) % P, so
-//       a parity-faithful engine must also return V1 at small t with phase>0.
-// ===========================================================================
-describe("ac_vsource_pulse_wrap_parity", () => {
-  it("square_tiny_positive_t_uses_unreduced_value_bit_exact", () => {
-    // ngspice: time (1e-11) <= PER (2e-3) → no reduction. Engine should also
-    // skip reduction and produce the same float as pulseReference at t=1e-11.
-    const amp = 5;
-    const freq = 500;            // period = 2ms
-    const period = 1 / freq;
-    const t = 1e-11;
-    const RT = 1e-12;
-    const FT = 1e-12;
-    const PW = period / 2 - RT;
-    const V1 = -amp;
-    const V2 = amp;
-    const engineVal = computeWaveformValue(
-      "square", amp, freq, 0, 0, t,
-      { riseTime: RT, fallTime: FT },
-    );
-    const ngspiceVal = pulseReference(V1, V2, 0, RT, FT, PW, period, t);
-    expect(engineVal).toBe(ngspiceVal);
-    // And explicitly the rising-edge linear formula at t=1e-11 with TR=1ps:
-    //   V1 + (V2 - V1) * 1e-11 / 1e-12 = -5 + 10*10 = 95V (not V1; we are
-    //   well past TR). With TR=1ps and t=10ps, t > TR + PW + TF (period - TR)
-    //   actually no- let's just keep it as bit-exact-vs-ngspice without
-    //   asserting the analytical value.
-  });
-
-  it("triangle_positive_phase_returns_V1_at_small_t", () => {
-    // Positive phase (π/2) ⇒ phaseShift = period/4 ⇒ tShifted = t - period/4 < 0
-    // for small t. ngspice TD = ((-period/4) % period + period) % period = 3*period/4.
-    // ngspice time = t - 3*period/4 < 0 → V1.
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const halfP = period / 2;
-    const phaseShift = period / 4;
-    const TD = ((-phaseShift % period) + period) % period;  // = 3*period/4
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-
-    // At several small t < phaseShift, both engine and harness-equivalent
-    // ngspice PULSE must return V1.
-    for (const t of [0, 1e-9, 1e-6, period / 8]) {
-      const engineVal = computeWaveformValue(
-        "triangle", amp, freq, Math.PI / 2, dc, t,
-      );
-      const ngspiceVal = pulseReference(V1, V2, TD, halfP, halfP, 0, period, t);
-      expect(engineVal).toBe(ngspiceVal);
-      expect(engineVal).toBe(V1);
-    }
-  });
-
-  it("sawtooth_positive_phase_returns_V1_at_small_t", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const fallTime = 1e-12;
-    const riseSpan = period - fallTime;
-    const phaseShift = period / 4;
-    const TD = ((-phaseShift % period) + period) % period;
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-
-    for (const t of [0, 1e-9, 1e-6, period / 8]) {
-      const engineVal = computeWaveformValue(
-        "sawtooth", amp, freq, Math.PI / 2, dc, t,
-      );
-      const ngspiceVal = pulseReference(V1, V2, TD, riseSpan, fallTime, 0, period, t);
-      expect(engineVal).toBe(ngspiceVal);
-      expect(engineVal).toBe(V1);
-    }
-  });
-
-  it("square_positive_phase_returns_V1_at_small_t", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const halfP = period / 2;
-    const RT = 1e-12;
-    const FT = 1e-12;
-    const PW = halfP - RT;
-    const phaseShift = period / 4;
-    const TD = ((-phaseShift % period) + period) % period;
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-
-    for (const t of [0, 1e-9, 1e-6, period / 8]) {
-      const engineVal = computeWaveformValue(
-        "square", amp, freq, Math.PI / 2, dc, t,
-        { riseTime: RT, fallTime: FT },
-      );
-      const ngspiceVal = pulseReference(V1, V2, TD, RT, FT, PW, period, t);
-      expect(engineVal).toBe(ngspiceVal);
-      expect(engineVal).toBe(V1);
-    }
-  });
-});
-
-describe("ac_vsource_triangle_pulse_parity", () => {
-  it("triangle_phase_zero_starts_at_V1_rising", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    // At t = 0 (phase=0) the PULSE-aligned triangle is at V1 = dc - amp.
-    expect(computeWaveformValue("triangle", amp, freq, 0, dc, 0)).toBe(dc - amp);
-    // Rising: a small dt later, value is strictly greater than V1.
-    const later = computeWaveformValue("triangle", amp, freq, 0, dc, 1e-9);
-    expect(later).toBeGreaterThan(dc - amp);
-  });
-
-  it("triangle_matches_pulse_encoding_bit_exact", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const halfP = period / 2;
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-
-    // PULSE encoding the harness emits for triangle (phase=0, TD=0):
-    //   PULSE(V1 V2 0 halfP halfP 0 period)
-    // Sample across two full periods, hitting both the rise and fall branches
-    // as well as the cycle-boundary wrap.
-    const samples = [
-      0,
-      period * 0.125,
-      period * 0.25,
-      period * 0.375,
-      period * 0.5,
-      period * 0.625,
-      period * 0.75,
-      period * 0.875,
-      period,
-      period * 1.25,
-      period * 1.5,
-      period * 1.75,
-      period * 2 - 1e-9,
-    ];
-
-    for (const t of samples) {
-      const engineVal = computeWaveformValue("triangle", amp, freq, 0, dc, t);
-      const pulseVal = pulseReference(V1, V2, 0, halfP, halfP, 0, period, t);
-      expect(engineVal).toBe(pulseVal);
-    }
-  });
-
-  it("triangle_nonzero_dc_offset_shifts_V1_and_V2", () => {
-    // PULSE-aligned: V1 = dc - amp, V2 = dc + amp. Check both ends of rise/fall.
-    const amp = 3;
-    const dc = 2;
-    const freq = 1000;
-    const period = 1 / freq;
-    // t = 0 → V1
-    expect(computeWaveformValue("triangle", amp, freq, 0, dc, 0)).toBe(dc - amp);
-    // t = period/2 → V2 (peak)
-    expect(computeWaveformValue("triangle", amp, freq, 0, dc, period / 2)).toBe(dc + amp);
-    // t = period → V1 (valley again, next cycle)
-    expect(computeWaveformValue("triangle", amp, freq, 0, dc, period)).toBe(dc - amp);
-  });
-});
-
-describe("ac_vsource_sawtooth_pulse_parity", () => {
-  it("sawtooth_phase_zero_starts_at_V1_rising", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    // At t = 0 (phase=0) the PULSE-aligned sawtooth is at V1 = dc - amp.
-    expect(computeWaveformValue("sawtooth", amp, freq, 0, dc, 0)).toBe(dc - amp);
-    // Rising: a small dt later, value is strictly greater than V1.
-    const later = computeWaveformValue("sawtooth", amp, freq, 0, dc, 1e-9);
-    expect(later).toBeGreaterThan(dc - amp);
-  });
-
-  it("sawtooth_fall_time_shapes_fall_edge", () => {
-    const amp = 4;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const fallTime = period / 4;
-    // With fallTime = period/4, at t = period - fallTime/2 (= midpoint of the
-    // fall edge), the wave should be halfway between V2 and V1. The reference
-    // below uses the exact PULSE piecewise-linear formula the engine applies,
-    // so we can assert bit-exact equality via .toBe.
-    const t = period - fallTime / 2;
-    const riseSpan = period - fallTime;
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-    const value = computeWaveformValue("sawtooth", amp, freq, 0, dc, t, { fallTime });
-    const reference = pulseReference(V1, V2, 0, riseSpan, fallTime, 0, period, t);
-    expect(value).toBe(reference);
-    // And the reference is within ~1 ulp of the arithmetic midpoint (V1+V2)/2 = 0.
-    expect(Math.abs(reference)).toBeLessThan(1e-14);
-  });
-
-  it("sawtooth_matches_pulse_encoding_bit_exact_default_fallTime", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const fallTime = 1e-12;           // engine default
-    const riseSpan = period - fallTime;
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-
-    // PULSE encoding the harness emits for sawtooth (phase=0, TD=0):
-    //   PULSE(V1 V2 0 riseSpan fallTime 0 period)
-    const samples = [
-      0,
-      period * 0.125,
-      period * 0.25,
-      period * 0.5,
-      period * 0.75,
-      period - fallTime * 2,  // still on the rise
-      period - fallTime / 2,  // midway through the fall
-      period,                 // cycle boundary- next rise
-      period * 1.25,
-      period * 1.5,
-      period * 2 - fallTime * 2,
-    ];
-
-    for (const t of samples) {
-      const engineVal = computeWaveformValue("sawtooth", amp, freq, 0, dc, t);
-      const pulseVal = pulseReference(V1, V2, 0, riseSpan, fallTime, 0, period, t);
-      expect(engineVal).toBe(pulseVal);
-    }
-  });
-
-  it("sawtooth_matches_pulse_encoding_bit_exact_custom_fallTime", () => {
-    const amp = 5;
-    const dc = 0;
-    const freq = 1000;
-    const period = 1 / freq;
-    const fallTime = period / 10;
-    const riseSpan = period - fallTime;
-    const V1 = dc - amp;
-    const V2 = dc + amp;
-
-    const samples = [
-      0,
-      period * 0.25,
-      period * 0.5,
-      riseSpan * 0.99,
-      riseSpan,                       // start of fall (tMod = riseSpan)
-      riseSpan + fallTime * 0.5,      // midpoint of fall
-      riseSpan + fallTime,            // == period (end of fall / next cycle)
-      period * 1.5,
-    ];
-
-    for (const t of samples) {
-      const engineVal = computeWaveformValue("sawtooth", amp, freq, 0, dc, t, { fallTime });
-      const pulseVal = pulseReference(V1, V2, 0, riseSpan, fallTime, 0, period, t);
-      expect(engineVal).toBe(pulseVal);
-    }
-  });
-
-  it("sawtooth_fallTime_gte_period_throws", () => {
-    // Guard: fallTime must be strictly less than period.
-    expect(() =>
-      computeWaveformValue("sawtooth", 5, 1000, 0, 0, 0, { fallTime: 1e-3 }),
-    ).toThrow(/fallTime.*must be strictly less than period/);
-  });
-});
-
-// ===========================================================================
-// AC-source-fixes- nextBreakpoint support for triangle and sawtooth
-// ===========================================================================
-
-describe("ac_vsource_triangle_breakpoints_parity", () => {
-  it("triangle_breakpoints_at_peak_and_valley_bit_exact", () => {
-    // For PULSE-aligned triangle at 1 kHz (period = 1 ms, halfPeriod = 0.5 ms)
-    // with phase = 0, the breakpoints per cycle are at tMod ∈ {0, halfPeriod}.
-    // Starting from t = 0 (exclusive), over (0, 2*period) the sequence is:
-    //   halfPeriod, period, period + halfPeriod
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "triangle" }, 1, 0, 2, 0);
-    const period = 1e-3;
-    const halfPeriod = 0.5e-3;
-    const NGSPICE_REF = [halfPeriod, period, period + halfPeriod];
-    const bps = el.getBreakpoints(0, 0.002);
-    expect(bps).toHaveLength(NGSPICE_REF.length);
-    for (let i = 0; i < NGSPICE_REF.length; i++) {
-      expect(bps[i]).toBe(NGSPICE_REF[i]);
-    }
-  });
-
-  it("triangle_nextBreakpoint_monotone_across_cycles", () => {
-    // Successive calls to nextBreakpoint must return strictly increasing
-    // values matching 0.5*period, 1.0*period, 1.5*period, 2.0*period, ...
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "triangle" }, 1, 0, 2, 0);
-    const period = 1e-3;
-    const halfPeriod = 0.5e-3;
-
-    let t = 0;
-    const first = el.nextBreakpoint(t);
-    expect(first).toBe(halfPeriod);
-    t = first!;
-
-    const second = el.nextBreakpoint(t);
-    expect(second).toBe(period);
-    t = second!;
-
-    const third = el.nextBreakpoint(t);
-    expect(third).toBe(period + halfPeriod);
-    t = third!;
-
-    const fourth = el.nextBreakpoint(t);
-    expect(fourth).toBe(2 * period);
-  });
-});
-
-describe("ac_vsource_sawtooth_breakpoints_parity", () => {
-  it("sawtooth_breakpoints_at_riseSpan_and_period_bit_exact", () => {
-    // For PULSE-aligned sawtooth at 1 kHz (period = 1 ms) with default
-    // fallTime = 1 ps, riseSpan = period - fallTime ≈ 0.999999999 ms.
-    // Breakpoints per cycle are at tMod ∈ {riseSpan, period}.
-    // Over (0, 2*period) the sequence is:
-    //   riseSpan, period, period + riseSpan, 2*period (only first 3 strictly < 2*period).
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sawtooth" }, 1, 0, 2, 0);
-    const period = 1e-3;
-    const fallTime = 1e-12;   // engine default
-    const riseSpan = period - fallTime;
-    // NOTE: getBreakpoints uses (tStart, tEnd) exclusive. Over (0, 0.002),
-    // values strictly less than 0.002 are returned.
-    const NGSPICE_REF = [riseSpan, period, period + riseSpan];
-    const bps = el.getBreakpoints(0, 0.002);
-    expect(bps).toHaveLength(NGSPICE_REF.length);
-    for (let i = 0; i < NGSPICE_REF.length; i++) {
-      expect(bps[i]).toBe(NGSPICE_REF[i]);
-    }
-  });
-
-  it("sawtooth_nextBreakpoint_monotone_across_cycles", () => {
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sawtooth" }, 1, 0, 2, 0);
-    const period = 1e-3;
-    const fallTime = 1e-12;
-    const riseSpan = period - fallTime;
-
-    let t = 0;
-    const first = el.nextBreakpoint(t);
-    expect(first).toBe(riseSpan);
-    t = first!;
-
-    const second = el.nextBreakpoint(t);
-    expect(second).toBe(period);
-    t = second!;
-
-    const third = el.nextBreakpoint(t);
-    expect(third).toBe(period + riseSpan);
+  it("full_iteration_paired_sawtooth_rc", () => {
+    session.compareAllAttempts();
   });
 });

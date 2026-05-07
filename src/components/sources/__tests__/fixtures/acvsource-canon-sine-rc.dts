@@ -1,0 +1,368 @@
+{
+  "circuit": {
+    "description": "1kHz sine AcVoltageSource (5V) → 1kΩ → 1µF → ground. Sine-waveform operating regime for AC source canonical T3 categories.",
+    "elements": [
+      {
+        "id": "9385feb3-8869-4a70-8408-97e008372584",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 5,
+            "dcOffset": 0,
+            "fallTime": 1e-12,
+            "frequency": 1000,
+            "noiseSampleTime": 0,
+            "phase": 0,
+            "riseTime": 1e-12
+          },
+          "amplitude": 5,
+          "dcOffset": 0,
+          "frequency": 1000,
+          "label": "acsrc",
+          "phase": 0,
+          "position": [
+            0,
+            0
+          ],
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "da45a212-bcf9-4718-a12a-1e159464c769",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "r1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c741abfa-c788-40a1-a734-49a466e65f1d",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "IC": 0,
+            "M": 1,
+            "SCALE": 1,
+            "TC1": 0,
+            "TC2": 0,
+            "TNOM": 300.15,
+            "capacitance": 0.000001
+          },
+          "capacitance": 0.000001,
+          "label": "c1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "b01f49fc-f133-42af-9b62-3a263696d696",
+        "position": {
+          "x": 36,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "acvsource-canon-sine-rc",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 24,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
