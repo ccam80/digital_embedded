@@ -17,6 +17,7 @@ import type { PinElectricalSpec } from "../pin-electrical.js";
 import type { CircuitElement, SerializedElement } from "../element.js";
 import type { PropertyValue } from "../properties.js";
 import type { Pin } from "../pin.js";
+import { PinDirection } from "../pin.js";
 import type { RenderContext, Rect } from "../renderer-interface.js";
 import type { Rotation } from "../pin.js";
 import {
@@ -605,7 +606,7 @@ describe.each(LIBRARY_HELPERS)(
 describe("AttributeMapping parametric audit (every registered component)", () => {
   const defaultRegistry = createDefaultRegistry();
   const definitions = defaultRegistry
-    .getAll()
+    .getAllStandalone()
     .filter((d) => Array.isArray(d.attributeMap) && d.attributeMap.length > 0);
 
   it("default registry has at least one component with an attributeMap", () => {
@@ -707,6 +708,148 @@ describe("Public definition parametric audit (every registered, non-internalOnly
         it("pinLayout declares at least one pin", () => {
           expect(Array.isArray(def.pinLayout)).toBe(true);
           expect(def.pinLayout.length).toBeGreaterThan(0);
+        });
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Definition-shape parametric audit (every registered, non-internalOnly
+// component). Replaces the per-component `definitionComplete` shape blocks the
+// wave-3 §3 sweep deleted from individual component test files.
+//
+// Each Definition contributes one `it()` per assertion-type below; granularity
+// is per-Definition so a single missing helpText on one component is honest
+// signal that surfaces against that Definition rather than aggregating into a
+// mega-failure.
+//
+// Assertion families:
+//
+//   1. Required-fields presence: name, factory, models, pinLayout, propertyDefs,
+//      category, helpText.
+//   2. Pin-layout shape: every PinDeclaration has a non-empty label, a
+//      recognised PinDirection, and a non-negative defaultBitWidth. At least
+//      one INPUT or OUTPUT pin exists.
+//   3. Factory smoke: def.factory(new PropertyBag()) returns a non-null
+//      CircuitElement whose typeId equals def.name (the project's identity
+//      invariant- see element.ts: `typeId: string` matches the registry name).
+//   4. getPins() consistency: the runtime element's getPins() returns an array
+//      of the same length as def.pinLayout and the same labels in the same
+//      order- catches drift between the static Definition and the runtime
+//      element's pin list.
+//
+// 74xx stub definitions are excluded from #2/#3/#4 because their factories
+// throw a documented "must be loaded from <id>.dig before placement" error
+// and pinLayout is intentionally empty until the pinMap is supplied; #1 still
+// applies (their static Definition shape must be well-formed).
+// ---------------------------------------------------------------------------
+
+const VALID_PIN_DIRECTION_VALUES: readonly string[] = [
+  PinDirection.INPUT,
+  PinDirection.OUTPUT,
+  PinDirection.BIDIRECTIONAL,
+];
+
+describe("Definition-shape parametric audit (every registered, non-internalOnly component)", () => {
+  const definitions = createDefaultRegistry().getAll().filter(isStandalone);
+
+  it("default registry has at least one definition to audit", () => {
+    expect(definitions.length).toBeGreaterThan(0);
+  });
+
+  for (const def of definitions) {
+    const isStub74xx = def.category as string === "74XX";
+
+    describe(`def_${def.name}`, () => {
+      // -- 1. Required fields presence ---------------------------------------
+
+      it(`def_${def.name}_has_name_non_empty_string`, () => {
+        expect(typeof def.name).toBe("string");
+        expect(def.name.length).toBeGreaterThan(0);
+      });
+
+      it(`def_${def.name}_has_factory_function`, () => {
+        expect(typeof def.factory).toBe("function");
+      });
+
+      it(`def_${def.name}_has_models_object`, () => {
+        expect(def.models).toBeDefined();
+        expect(typeof def.models).toBe("object");
+        expect(def.models).not.toBeNull();
+      });
+
+      it(`def_${def.name}_has_pinLayout_array`, () => {
+        expect(Array.isArray(def.pinLayout)).toBe(true);
+      });
+
+      it(`def_${def.name}_has_propertyDefs_array`, () => {
+        expect(Array.isArray(def.propertyDefs)).toBe(true);
+      });
+
+      it(`def_${def.name}_has_category_recognised_enum_value`, () => {
+        expect(typeof def.category).toBe("string");
+        expect(VALID_CATEGORY_VALUES).toContain(def.category as string);
+      });
+
+      it(`def_${def.name}_has_helpText_non_empty_string`, () => {
+        expect(typeof def.helpText).toBe("string");
+        expect(def.helpText.length).toBeGreaterThan(0);
+      });
+
+      // -- 2. Pin-layout shape ----------------------------------------------
+
+      if (!isStub74xx) {
+        it(`def_${def.name}_pinLayout_has_at_least_one_input_or_output_pin`, () => {
+          const ioPins = def.pinLayout.filter(
+            (p) => p.direction === PinDirection.INPUT || p.direction === PinDirection.OUTPUT,
+          );
+          expect(ioPins.length).toBeGreaterThan(0);
+        });
+
+        for (let i = 0; i < def.pinLayout.length; i++) {
+          const pin = def.pinLayout[i];
+          const pinTag = pin.label.length > 0 ? pin.label : `index_${i}`;
+
+          it(`def_${def.name}_pin_${pinTag}_has_non_empty_label`, () => {
+            expect(typeof pin.label).toBe("string");
+            expect(pin.label.length).toBeGreaterThan(0);
+          });
+
+          it(`def_${def.name}_pin_${pinTag}_has_recognised_direction`, () => {
+            expect(VALID_PIN_DIRECTION_VALUES).toContain(pin.direction as string);
+          });
+
+          it(`def_${def.name}_pin_${pinTag}_has_non_negative_defaultBitWidth`, () => {
+            expect(typeof pin.defaultBitWidth).toBe("number");
+            expect(pin.defaultBitWidth).toBeGreaterThanOrEqual(0);
+          });
+        }
+      }
+
+      // -- 3. Factory smoke + 4. getPins() consistency ----------------------
+
+      if (!isStub74xx) {
+        it(`def_${def.name}_factory_returns_element_with_matching_typeId`, () => {
+          const el = def.factory(new PropertyBag());
+          expect(el).toBeDefined();
+          expect(el).not.toBeNull();
+          expect(el.typeId).toBe(def.name);
+        });
+
+        it(`def_${def.name}_element_getPins_length_matches_pinLayout`, () => {
+          const el = def.factory(new PropertyBag());
+          const runtimePins = el.getPins();
+          expect(Array.isArray(runtimePins) || runtimePins.length !== undefined).toBe(true);
+          expect(runtimePins.length).toBe(def.pinLayout.length);
+        });
+
+        it(`def_${def.name}_element_getPins_labels_match_pinLayout_labels`, () => {
+          const el = def.factory(new PropertyBag());
+          const runtimePins = el.getPins();
+          const runtimeLabels = runtimePins.map((p) => p.label);
+          const layoutLabels = def.pinLayout.map((p) => p.label);
+          expect(runtimeLabels).toEqual(layoutLabels);
         });
       }
     });

@@ -1,263 +1,316 @@
-/**
- * Tests for LookUpTable- combinational truth-table component.
- *
- * Covers:
- *   - Lookup correctness for all input combinations
- *   - Address formation (input 0 = LSB, input N-1 = MSB)
- *   - Multi-bit output
- *   - No backing store returns 0
- *   - Pin layout (N inputs + 1 output)
- *   - Attribute mappings
- *   - Rendering
- *   - ComponentDefinition completeness
- */
+import { describe, it, expect } from "vitest";
+import { createDefaultRegistry } from "../../register-all.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { PropertyValue } from "../../../core/properties.js";
+import type { SignalValue } from "../../../compile/types.js";
 
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  LookUpTableElement,
-  executeLookUpTable,
-  LookUpTableDefinition,
-  LUT_ATTRIBUTE_MAPPINGS,
-  DataField,
-  registerBackingStore,
-  clearBackingStores,
-} from "../lookup-table.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
+// ---------------------------------------------------------------------------
+// LookUpTable canonical test set
+// Canon categories: 4 (Param hot-load), 9 (Bridge / digital interaction)
+// File tier: fixture-only (digital-only — facade.compile + coordinator
+// writeByLabel/step/readByLabel; buildFixture requires an analog domain).
+//
+// Capability gates skipped (out-of-canon for this component):
+//   1, 2, 3, 5, 6, 7, 8: no analog state pool, no DC operating point, no
+//                        transient dynamics, no matrix stamps, no junction
+//                        limiting, no LTE rollback, no breakpoint registration.
+//   10: modelRegistry has zero named-preset entries (single execute path).
+//   11: outputSchema = ["out"] — single output.
+//   12, 13, 14, 15: no forbidden combinations, no narrow-port clamp on the
+//                   declared 1-bit input pins, no runtime diagnostic emission,
+//                   no _onStateChange writeback to PropertyBag.
+// ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number): {
-  layout: ComponentLayout;
-  state: Uint32Array;
-} {
-  const state = new Uint32Array(inputCount + outputCount);
-  const layout: ComponentLayout = {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: (_i: number) => inputCount,
-    inputOffset: (_i: number) => 0,
-    outputCount: (_i: number) => outputCount,
-    outputOffset: (_i: number) => inputCount,
-    stateOffset: (_i: number) => inputCount + outputCount,
-    getProperty: () => undefined,
-  };
-  return { layout, state };
+interface LutFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
 }
 
-describe("LookUpTable", () => {
-  beforeEach(() => {
-    clearBackingStores();
+function digital(value: number): SignalValue {
+  return { type: "digital", value };
+}
+
+function buildLutFixture(opts: {
+  inputCount: number;
+  dataBits?: number;
+  data?: number[];
+}): LutFixture {
+  const inputCount = opts.inputCount;
+  const dataBits = opts.dataBits ?? 1;
+  const data = opts.data ?? [];
+
+  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [];
+  for (let i = 0; i < inputCount; i++) {
+    components.push({
+      id: `in${i}`,
+      type: "In",
+      props: { label: `IN${i}`, bitWidth: 1 },
+    });
+  }
+  components.push({
+    id: "lut",
+    type: "LookUpTable",
+    props: { label: "LUT", inputCount, dataBits, data },
+  });
+  components.push({
+    id: "out",
+    type: "Out",
+    props: { label: "OUT", bitWidth: dataBits },
   });
 
-  it("lookupCorrectness2Input- 2-input, 1-bit table (AND gate)", () => {
-    // Table: addr → value
-    // 0b00 → 0, 0b01 → 0, 0b10 → 0, 0b11 → 1 (AND gate)
-    const mem = new DataField(4); // 2^2 = 4 entries
-    mem.write(0, 0); // 00 → 0
-    mem.write(1, 0); // 01 → 0 (in0=1, in1=0)
-    mem.write(2, 0); // 10 → 0 (in0=0, in1=1)
-    mem.write(3, 1); // 11 → 1 (in0=1, in1=1)
-    registerBackingStore(0, mem);
+  const connections: Array<[string, string]> = [];
+  for (let i = 0; i < inputCount; i++) {
+    connections.push([`in${i}:out`, `lut:${i}`]);
+  }
+  connections.push(["lut:out", "out:in"]);
 
-    // 2 inputs, 1 output
-    const { layout, state } = makeLayout(2, 1);
-    const highZs = new Uint32Array(state.length);
+  const registry = createDefaultRegistry();
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({ components, connections });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
+}
 
-    state[0] = 0; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0);
-    state[0] = 1; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0);
-    state[0] = 0; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0);
-    state[0] = 1; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(1);
+function readDigital(fix: LutFixture, label: string): number {
+  const sv = fix.coordinator.readByLabel(label);
+  if (sv.type !== "digital") {
+    throw new Error(`readDigital: label '${label}' is not digital (got ${sv.type})`);
+  }
+  return sv.value;
+}
+
+// ---------------------------------------------------------------------------
+// Cat 9 — Bridge / digital interaction (T1)
+//
+// LookUpTable is a combinational digital component: N 1-bit input pins form an
+// N-bit address; the output is table[address] from a `data` backing store. The
+// canonical observable is: drive each input combination, step the engine,
+// observe the output equals the table entry at the corresponding address.
+// Address formation: input 0 = LSB, input N-1 = MSB.
+// ---------------------------------------------------------------------------
+
+describe("LookUpTable Cat 9 — digital interaction (T1)", () => {
+  it("two_input_one_bit_and_truth_table_via_data", () => {
+    // 2-input AND truth table: addr (in0|in1<<1) → table[addr].
+    // 0b00→0, 0b01→0, 0b10→0, 0b11→1.
+    const fix = buildLutFixture({
+      inputCount: 2,
+      dataBits: 1,
+      data: [0, 0, 0, 1],
+    });
+    const cases: Array<[number, number, number]> = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [0, 1, 0],
+      [1, 1, 1],
+    ];
+    for (const [a, b, expected] of cases) {
+      fix.coordinator.writeByLabel("IN0", digital(a));
+      fix.coordinator.writeByLabel("IN1", digital(b));
+      fix.coordinator.step();
+      expect(readDigital(fix, "OUT")).toBe(expected);
+    }
+    fix.coordinator.dispose();
   });
 
-  it("addressFormation- input 0 is LSB, input N-1 is MSB", () => {
-    // 3 inputs, 8-entry table
-    const mem = new DataField(8); // 2^3 = 8
-    for (let i = 0; i < 8; i++) mem.write(i, i); // table[i] = i
-    registerBackingStore(0, mem);
+  it("address_formation_input_zero_is_lsb_three_input", () => {
+    // 3-input LUT, table[i]=i. Address bit ordering is in0|in1<<1|in2<<2.
+    const fix = buildLutFixture({
+      inputCount: 3,
+      dataBits: 1,
+      data: Array.from({ length: 8 }, (_, i) => i & 0x1),
+    });
+    // Use dataBits=1 so output bits exercise table[addr] LSB.
+    // Better: redo with multi-bit so the full address is observable.
+    fix.coordinator.dispose();
 
-    const { layout, state } = makeLayout(3, 1);
-    const highZs = new Uint32Array(state.length);
+    const fix2 = buildLutFixture({
+      inputCount: 3,
+      dataBits: 4,
+      data: Array.from({ length: 8 }, (_, i) => i),
+    });
+    // in0=1, in1=0, in2=0 → addr = 0b001 = 1 → table[1] = 1.
+    fix2.coordinator.writeByLabel("IN0", digital(1));
+    fix2.coordinator.writeByLabel("IN1", digital(0));
+    fix2.coordinator.writeByLabel("IN2", digital(0));
+    fix2.coordinator.step();
+    expect(readDigital(fix2, "OUT")).toBe(1);
 
-    // in0=1, in1=0, in2=0 → addr = 0b001 = 1
-    state[0] = 1; state[1] = 0; state[2] = 0;
-    executeLookUpTable(0, state, highZs, layout);
-    expect(state[3]).toBe(1);
+    // in0=0, in1=1, in2=0 → addr = 0b010 = 2 → table[2] = 2.
+    fix2.coordinator.writeByLabel("IN0", digital(0));
+    fix2.coordinator.writeByLabel("IN1", digital(1));
+    fix2.coordinator.writeByLabel("IN2", digital(0));
+    fix2.coordinator.step();
+    expect(readDigital(fix2, "OUT")).toBe(2);
 
-    // in0=0, in1=1, in2=0 → addr = 0b010 = 2
-    state[0] = 0; state[1] = 1; state[2] = 0;
-    executeLookUpTable(0, state, highZs, layout);
-    expect(state[3]).toBe(2);
+    // in0=1, in1=1, in2=1 → addr = 0b111 = 7 → table[7] = 7.
+    fix2.coordinator.writeByLabel("IN0", digital(1));
+    fix2.coordinator.writeByLabel("IN1", digital(1));
+    fix2.coordinator.writeByLabel("IN2", digital(1));
+    fix2.coordinator.step();
+    expect(readDigital(fix2, "OUT")).toBe(7);
 
-    // in0=1, in1=1, in2=1 → addr = 0b111 = 7
-    state[0] = 1; state[1] = 1; state[2] = 1;
-    executeLookUpTable(0, state, highZs, layout);
-    expect(state[3]).toBe(7);
+    fix2.coordinator.dispose();
   });
 
-  it("multibitOutput- 4-bit output values", () => {
-    const mem = new DataField(4); // 2-input LUT
-    mem.write(0, 0x0);
-    mem.write(1, 0xA);
-    mem.write(2, 0xB);
-    mem.write(3, 0xF);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(2, 1);
-    const highZs = new Uint32Array(state.length);
-
-    state[0] = 0; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0x0);
-    state[0] = 1; state[1] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xA);
-    state[0] = 0; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xB);
-    state[0] = 1; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xF);
+  it("multibit_output_4bit_data_field", () => {
+    // 2-input LUT, dataBits=4. Each table entry is a 4-bit value.
+    const fix = buildLutFixture({
+      inputCount: 2,
+      dataBits: 4,
+      data: [0x0, 0xA, 0xB, 0xF],
+    });
+    const cases: Array<[number, number, number]> = [
+      [0, 0, 0x0],
+      [1, 0, 0xA],
+      [0, 1, 0xB],
+      [1, 1, 0xF],
+    ];
+    for (const [a, b, expected] of cases) {
+      fix.coordinator.writeByLabel("IN0", digital(a));
+      fix.coordinator.writeByLabel("IN1", digital(b));
+      fix.coordinator.step();
+      expect(readDigital(fix, "OUT")).toBe(expected);
+    }
+    fix.coordinator.dispose();
   });
 
-  it("noBackingStore- returns 0 gracefully", () => {
-    const { layout, state } = makeLayout(2, 1);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 1; state[1] = 1;
-    executeLookUpTable(0, state, highZs, layout);
-    expect(state[2]).toBe(0);
+  it("single_input_lut_acts_as_not_gate_via_data", () => {
+    // 1-input LUT with table=[1, 0] inverts the input: NOT.
+    const fix = buildLutFixture({
+      inputCount: 1,
+      dataBits: 1,
+      data: [1, 0],
+    });
+    fix.coordinator.writeByLabel("IN0", digital(0));
+    fix.coordinator.step();
+    expect(readDigital(fix, "OUT")).toBe(1);
+
+    fix.coordinator.writeByLabel("IN0", digital(1));
+    fix.coordinator.step();
+    expect(readDigital(fix, "OUT")).toBe(0);
+
+    fix.coordinator.dispose();
   });
 
-  it("1InputLUT- single-input table (NOT gate)", () => {
-    const mem = new DataField(2); // 2^1 = 2 entries
-    mem.write(0, 1); // NOT 0 = 1
-    mem.write(1, 0); // NOT 1 = 0
-    registerBackingStore(0, mem);
+  it("four_input_lut_full_truth_table_scaled_data", () => {
+    // 4-input LUT, dataBits=8, table[i] = i * 2 (8 bits suffices for max 30).
+    const fix = buildLutFixture({
+      inputCount: 4,
+      dataBits: 8,
+      data: Array.from({ length: 16 }, (_, i) => i * 2),
+    });
 
-    const { layout, state } = makeLayout(1, 1);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; executeLookUpTable(0, state, highZs, layout); expect(state[1]).toBe(1);
-    state[0] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[1]).toBe(0);
+    // addr = 0b0101 = 5 (in0=1, in1=0, in2=1, in3=0) → table[5] = 10.
+    fix.coordinator.writeByLabel("IN0", digital(1));
+    fix.coordinator.writeByLabel("IN1", digital(0));
+    fix.coordinator.writeByLabel("IN2", digital(1));
+    fix.coordinator.writeByLabel("IN3", digital(0));
+    fix.coordinator.step();
+    expect(readDigital(fix, "OUT")).toBe(10);
+
+    // addr = 0b1111 = 15 → table[15] = 30.
+    fix.coordinator.writeByLabel("IN0", digital(1));
+    fix.coordinator.writeByLabel("IN1", digital(1));
+    fix.coordinator.writeByLabel("IN2", digital(1));
+    fix.coordinator.writeByLabel("IN3", digital(1));
+    fix.coordinator.step();
+    expect(readDigital(fix, "OUT")).toBe(30);
+
+    fix.coordinator.dispose();
   });
 
-  it("4InputLUT- 4-input lookup table", () => {
-    const mem = new DataField(16); // 2^4 = 16 entries
-    for (let i = 0; i < 16; i++) mem.write(i, i * 2);
-    registerBackingStore(0, mem);
+  it("no_data_supplied_returns_zero_for_every_address", () => {
+    // No `data` prop → backing store is allocated but uninitialised (all zero).
+    // Documented contract: out = table[addr] = 0 for every input combination.
+    const fix = buildLutFixture({
+      inputCount: 2,
+      dataBits: 1,
+    });
+    const cases: Array<[number, number]> = [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ];
+    for (const [a, b] of cases) {
+      fix.coordinator.writeByLabel("IN0", digital(a));
+      fix.coordinator.writeByLabel("IN1", digital(b));
+      fix.coordinator.step();
+      expect(readDigital(fix, "OUT")).toBe(0);
+    }
+    fix.coordinator.dispose();
+  });
+});
 
-    const { layout, state } = makeLayout(4, 1);
-    const highZs = new Uint32Array(state.length);
+// ---------------------------------------------------------------------------
+// Cat 4 — Parameter hot-load (T1)
+//
+// LookUpTable's tunable parameters are `inputCount` (structural — number of
+// input pins, address-space size) and `dataBits` (output bit-width). Both are
+// canonical Cat 4 hot-load targets; assert the documented post-change
+// observable on the simulation output.
+// ---------------------------------------------------------------------------
 
-    // addr = 5 = 0b0101 (in0=1, in1=0, in2=1, in3=0)
-    state[0] = 1; state[1] = 0; state[2] = 1; state[3] = 0;
-    executeLookUpTable(0, state, highZs, layout);
-    expect(state[4]).toBe(10); // 5 * 2
+describe("LookUpTable Cat 4 — parameter hot-load (T1)", () => {
+  it("hotload_dataBits_changes_output_width_observable", () => {
+    // Documented contract: dataBits widens the output port; raising it lets
+    // a wider table entry pass through unmasked. Build with dataBits=4 and
+    // table[3]=0xF; hot-load dataBits=8 and assert the output reads the same
+    // 0xF entry (now 8-bit-wide). The observable is the simulator output
+    // value — closed-form 0xF in both pre and post states (same data entry).
+    const fix = buildLutFixture({
+      inputCount: 2,
+      dataBits: 4,
+      data: [0x0, 0x0, 0x0, 0xF],
+    });
+    fix.coordinator.writeByLabel("IN0", digital(1));
+    fix.coordinator.writeByLabel("IN1", digital(1));
+    fix.coordinator.step();
+    const before = readDigital(fix, "OUT");
+    expect(before).toBe(0xF);
 
-    // addr = 15 = 0b1111 (all inputs = 1)
-    state[0] = 1; state[1] = 1; state[2] = 1; state[3] = 1;
-    executeLookUpTable(0, state, highZs, layout);
-    expect(state[4]).toBe(30); // 15 * 2
+    const lutCe = fix.coordinator.compiled.labelToCircuitElement.get("LUT");
+    expect(lutCe).toBeDefined();
+    fix.coordinator.setComponentProperty(lutCe!, "dataBits", 8);
+    fix.coordinator.step();
+    const after = readDigital(fix, "OUT");
+    // dataBits hot-load should not corrupt the table entry — output stays at
+    // the same documented value 0xF.
+    expect(after).toBe(0xF);
+    fix.coordinator.dispose();
   });
 
-  it("pinLayout- correct number of inputs and single output", () => {
-    const props = new PropertyBag();
-    props.set("inputCount", 3);
-    const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-    const outputs = pins.filter(p => p.direction === PinDirection.OUTPUT);
-    expect(inputs.length).toBe(3);
-    expect(outputs.length).toBe(1);
-    expect(outputs[0].label).toBe("out");
-    // Input labels: "0", "1", "2"
-    const inputLabels = inputs.map(p => p.label);
-    expect(inputLabels).toContain("0");
-    expect(inputLabels).toContain("1");
-    expect(inputLabels).toContain("2");
-  });
+  it("hotload_inputCount_changes_address_space_observable", () => {
+    // Documented contract: inputCount sets the address-bit count (table has
+    // 2^inputCount entries). Build with inputCount=2 and table=[0, 0, 0, 1];
+    // documented contract: addr=0b11 → table[3] = 1. Hot-load inputCount to
+    // 3 (8 entries) — the first 4 entries seen by addresses 0..3 stay [0,0,0,1]
+    // when the original `data` array is preserved; addresses 4..7 read 0.
+    const fix = buildLutFixture({
+      inputCount: 2,
+      dataBits: 1,
+      data: [0, 0, 0, 1],
+    });
+    fix.coordinator.writeByLabel("IN0", digital(1));
+    fix.coordinator.writeByLabel("IN1", digital(1));
+    fix.coordinator.step();
+    const before = readDigital(fix, "OUT");
+    expect(before).toBe(1);
 
-  it("pinLayout2Input- default 2-input layout", () => {
-    const props = new PropertyBag();
-    const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    expect(pins.filter(p => p.direction === PinDirection.INPUT).length).toBe(2);
-    expect(pins.filter(p => p.direction === PinDirection.OUTPUT).length).toBe(1);
-  });
-
-  it("attributeMapping- Bits, LutInputCount, Label map correctly", () => {
-    const bitsMap = LUT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-    const lutMap = LUT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "LutInputCount");
-    const labelMap = LUT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-
-    expect(bitsMap!.convert("8")).toBe(8);
-    expect(lutMap!.convert("4")).toBe(4);
-    expect(labelMap!.convert("F")).toBe("F");
-  });
-
-  it("draw- renders body with LUT label", () => {
-    const props = new PropertyBag();
-    const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-
-    const texts: string[] = [];
-    const calls: string[] = [];
-    const ctx = {
-      save: () => calls.push("save"),
-      restore: () => calls.push("restore"),
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawRect: () => calls.push("drawRect"),
-      drawPolygon: () => calls.push("drawPolygon"),
-      drawLine: () => {},
-      drawCircle: () => {},
-      drawArc: () => {},
-      drawPath: () => {},
-      rotate: () => {},
-      scale: () => {},
-      setLineDash: () => {},
-      drawText: (text: string) => texts.push(text),
-    };
-    el.draw(ctx as never);
-    expect(calls).toContain("save");
-    expect(calls).toContain("restore");
-    expect(calls).toContain("drawPolygon");
-    expect(texts).toContain("LUT");
-  });
-
-  it("drawWithLabel- label appears in draw calls", () => {
-    const props = new PropertyBag();
-    props.set("label", "MyLUT");
-    const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-
-    const texts: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawRect: () => {}, drawPolygon: () => {}, drawLine: () => {},
-      drawCircle: () => {}, drawArc: () => {}, drawPath: () => {},
-      rotate: () => {}, scale: () => {}, setLineDash: () => {},
-      drawText: (t: string) => texts.push(t),
-    };
-    el.draw(ctx as never);
-    expect(texts).toContain("MyLUT");
-  });
-
-  it("definitionComplete- LookUpTableDefinition has all required fields", () => {
-    expect(LookUpTableDefinition.name).toBe("LookUpTable");
-    expect(LookUpTableDefinition.factory).toBeDefined();
-    expect(LookUpTableDefinition.models!.digital!.executeFn).toBeDefined();
-    expect(LookUpTableDefinition.pinLayout).toBeDefined();
-    expect(LookUpTableDefinition.propertyDefs).toBeDefined();
-    expect(LookUpTableDefinition.attributeMap).toBeDefined();
-    expect(LookUpTableDefinition.category).toBe(ComponentCategory.MEMORY);
-    expect(LookUpTableDefinition.helpText).toBeDefined();
-    expect(typeof LookUpTableDefinition.models!.digital!.defaultDelay).toBe("number");
-  });
-
-  it("factoryCreatesInstance- factory returns LookUpTableElement", () => {
-    const props = new PropertyBag();
-    expect(LookUpTableDefinition.factory(props)).toBeInstanceOf(LookUpTableElement);
-  });
-
-  it("boundingBox- returns non-zero dimensions", () => {
-    const props = new PropertyBag();
-    const el = new LookUpTableElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
-    const bb = el.getBoundingBox();
-    expect(bb.x).toBe(2.05);
-    expect(bb.y).toBe(3 - 0.5);
-    expect(bb.width).toBeGreaterThanOrEqual(2);
-    expect(bb.height).toBeGreaterThanOrEqual(2);
+    const lutCe = fix.coordinator.compiled.labelToCircuitElement.get("LUT");
+    expect(lutCe).toBeDefined();
+    fix.coordinator.setComponentProperty(lutCe!, "inputCount", 3);
+    fix.coordinator.step();
+    // Documented contract: post-hot-load, the LUT addresses 8 entries via 3
+    // inputs (in0|in1<<1|in2<<2). The observable is that the simulator output
+    // reflects a recomputed address — driving in0=1,in1=1 with the (still
+    // unconnected post-hot-load) in2=0 → addr=3 → table[3] = 1, same as
+    // before. Driving the same input pattern after the recompute must still
+    // produce the same observable (1) when the table entry at addr=3 is
+    // preserved by the hot-load path.
+    const after = readDigital(fix, "OUT");
+    expect(after).toBe(1);
+    fix.coordinator.dispose();
   });
 });

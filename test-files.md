@@ -47,13 +47,13 @@
 - [x] src/components/io/__tests__/port.test.ts
 - [x] src/components/io/__tests__/probe.test.ts
 - [x] src/components/io/__tests__/motor.test.ts
-- [ ] src/components/io/__tests__/segment-displays.test.ts
-- [ ] src/components/memory/__tests__/counter.test.ts
-- [ ] src/components/memory/__tests__/eeprom.test.ts
-- [ ] src/components/memory/__tests__/lookup-table.test.ts
-- [ ] src/components/memory/__tests__/program-counter.test.ts
-- [ ] src/components/memory/__tests__/program-memory.test.ts
-- [ ] src/components/memory/__tests__/ram.test.ts
+- [x] src/components/io/__tests__/segment-displays.test.ts
+- [x] src/components/memory/__tests__/counter.test.ts
+- [x] src/components/memory/__tests__/eeprom.test.ts
+- [x] src/components/memory/__tests__/lookup-table.test.ts
+- [x] src/components/memory/__tests__/program-counter.test.ts
+- [x] src/components/memory/__tests__/program-memory.test.ts
+- [x] src/components/memory/__tests__/ram.test.ts
 - [ ] src/components/memory/__tests__/register.test.ts
 - [ ] src/components/memory/__tests__/rom.test.ts
 - [ ] src/components/memory/__tests__/two-phase-memory.test.ts

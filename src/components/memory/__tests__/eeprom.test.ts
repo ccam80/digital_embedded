@@ -1,583 +1,735 @@
-/**
- * Tests for EEPROM components: EEPROM and EEPROMDualPort.
- *
- * Covers:
- *   - EEPROM write (falling-edge triggered) and read
- *   - Chip-select (CS) and output-enable (OE) gating
- *   - WE edge detection (rising captures address, falling commits write)
- *   - EEPROM write-then-read-back
- *   - EEPROMDualPort clock-synchronous write and combinational read
- *   - Address boundary wrapping
- *   - isProgramMemory flag
- *   - Pin layout correctness
- *   - Attribute mappings
- *   - Rendering (draw calls)
- *   - ComponentDefinition completeness
- */
-
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  EEPROMElement,
-  sampleEEPROM,
-  executeEEPROM,
-  EEPROMDefinition,
-  EEPROM_ATTRIBUTE_MAPPINGS,
-  EEPROMDualPortElement,
-  sampleEEPROMDualPort,
-  executeEEPROMDualPort,
-  EEPROMDualPortDefinition,
-  EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
-} from "../eeprom.js";
-import {
-  DataField,
-  registerBackingStore,
-  clearBackingStores,
-} from "../ram.js";
-import type { EEPROMLayout } from "../eeprom.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
+import { describe, it, expect } from "vitest";
+import { createDefaultRegistry } from "../../register-all.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { PropertyValue } from "../../../core/properties.js";
+import type { SignalValue } from "../../../compile/types.js";
+import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
-// Layout helpers
+// EEPROM canonical test set
+//   EEPROM (5 inputs: A, CS, WE, OE, Din  /  1 output: D)
+//   EEPROMDualPort (5 inputs: A, Din, str, C, ld  /  1 output: D)
+//
+// Canon set: 4 (parameter hot-load on initial-memory `data`) and 9
+// (Bridge / digital). Categories 1, 2, 3, 5, 6, 7, 8, 10, 12, 13, 14, 15
+// do not apply: pure-digital memory components, no analog domain, no NR
+// convergence, no junctions, no LTE rollback, no acceptStep breakpoints,
+// no modelRegistry presets, no documented forbidden combinations, no
+// narrow input ports, no runtime-diagnostic emission, no PropertyBag
+// writeback subscriptions.
+//
+// Category 11 (multi-output digital observability) does not apply: each
+// component declares a single D output pin.
+//
+// File tier: fixture-only (T1). Each test composes a tiny digital circuit
+// via facade.build + facade.compile, drives inputs through writeByLabel,
+// advances simulator state via coordinator.step(), and observes outputs
+// through readByLabel. Memory backing stores are auto-allocated by the
+// digital engine during compile; initial contents are seeded via the
+// component's `data` property.
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number, stateCount: number): {
-  layout: ComponentLayout & EEPROMLayout;
-  state: Uint32Array;
-} {
-  const state = new Uint32Array(inputCount + outputCount + stateCount);
-  const layout: ComponentLayout & EEPROMLayout = {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: (_i: number) => inputCount,
-    inputOffset: (_i: number) => 0,
-    outputCount: (_i: number) => outputCount,
-    outputOffset: (_i: number) => inputCount,
-    stateOffset: (_i: number) => inputCount + outputCount,
-    getProperty: () => undefined,
-  };
-  return { layout, state };
+interface EepromFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
+  circuit: ReturnType<DefaultSimulatorFacade["build"]>;
 }
 
-// ---------------------------------------------------------------------------
-// EEPROM tests
-// ---------------------------------------------------------------------------
+function digital(value: number): SignalValue {
+  return { type: "digital", value };
+}
 
-describe("EEPROM", () => {
-  // Inputs: A(0), CS(1), WE(2), OE(3), Din(4)- 5 inputs
-  // Outputs: D(0)- 1 output
-  // State: lastWE(0), writeAddr(1)- 2 state slots
-  const IN = 5;
-  const OUT = 1;
-  const STATE = 2;
+function buildEepromFixture(spec: {
+  components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }>;
+  connections: Array<[string, string]>;
+}): EepromFixture {
+  const registry = createDefaultRegistry();
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build(spec);
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator, circuit };
+}
 
-  beforeEach(() => {
-    clearBackingStores();
+function findElementByLabel(fix: EepromFixture, label: string): CircuitElement {
+  const ltce = fix.coordinator.compiled.labelToCircuitElement;
+  const el = ltce.get(label);
+  if (el === undefined) {
+    throw new Error(
+      `findElementByLabel: '${label}' not in labelToCircuitElement (have: ${Array.from(ltce.keys()).join(", ")})`,
+    );
+  }
+  return el;
+}
+
+// ===========================================================================
+// EEPROM  Cat 9 (Bridge / digital)
+// ===========================================================================
+
+describe("EEPROM  bridge / digital (T1)", () => {
+  it("eeprom_reads_seeded_memory_when_cs_oe_high_we_low", () => {
+    // Cat 9: with the EEPROM seeded via the `data` property (auto-loaded into
+    // the backing store at compile), driving A=0, CS=1, OE=1, WE=0 makes
+    // executeEEPROM emit memory[0] on D. The wired Out display reads 0xAB.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8, data: [0xAB] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("OE_in", digital(1));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0xAB });
+
+    fix.coordinator.dispose();
   });
 
-  it("readWithCSandOE- CS=1 OE=1 WE=0 outputs memory[A]", () => {
-    const mem = new DataField(16);
-    mem.write(0, 0xAB);
-    registerBackingStore(0, mem);
+  it("eeprom_cs_low_suppresses_read_output_to_zero", () => {
+    // Cat 9: CS=0 disables the chip; executeEEPROM writes 0 to D regardless
+    // of memory contents. Seed memory[0]=0xFF and confirm Out reads 0.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8, data: [0xFF] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; // A
-    state[1] = 1; // CS
-    state[2] = 0; // WE
-    state[3] = 1; // OE
-    state[4] = 0; // Din
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("CS_in", digital(0));
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("OE_in", digital(1));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0 });
 
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0xAB); // D
+    fix.coordinator.dispose();
   });
 
-  it("readGating- CS=0 suppresses output", () => {
-    const mem = new DataField(16);
-    mem.write(0, 0xFF);
-    registerBackingStore(0, mem);
+  it("eeprom_oe_low_suppresses_read_output_to_zero", () => {
+    // Cat 9: with CS=1 and WE=0 but OE=0, the chip is selected but its
+    // output buffer is disabled; executeEEPROM writes 0 to D.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8, data: [0xFF] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; state[1] = 0; state[2] = 0; state[3] = 1; state[4] = 0;
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0);
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("OE_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0 });
+
+    fix.coordinator.dispose();
   });
 
-  it("readGating- OE=0 suppresses output", () => {
-    const mem = new DataField(16);
-    mem.write(0, 0xFF);
-    registerBackingStore(0, mem);
+  it("eeprom_we_high_suppresses_read_output_to_zero", () => {
+    // Cat 9: WE=1 puts the part in write-pending mode and the read path
+    // returns 0 even with CS=1 and OE=1 asserted.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8, data: [0xFF] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; state[1] = 1; state[2] = 0; state[3] = 0; state[4] = 0;
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0);
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("WE_in", digital(1));
+    fix.coordinator.writeByLabel("OE_in", digital(1));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0 });
+
+    fix.coordinator.dispose();
   });
 
-  it("readGating- WE=1 suppresses output even with CS and OE asserted", () => {
-    const mem = new DataField(16);
-    mem.write(0, 0xFF);
-    registerBackingStore(0, mem);
+  it("eeprom_we_falling_edge_writes_din_to_captured_address", () => {
+    // Cat 9 (multi-step write protocol): rising WE captures the address
+    // (A=5), falling WE while CS=1 commits Din (0xBE) to memory[5].
+    // Reading back via OE=1 returns the just-written byte.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8 } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; state[1] = 1; state[2] = 1; state[3] = 1; state[4] = 0;
-    // lastWE starts at 0 → this is WE rising edge (address capture only)
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0);
+    // Step 1: rising edge of WE at address 5 captures the write address.
+    fix.coordinator.writeByLabel("A_in", digital(5));
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("WE_in", digital(1));
+    fix.coordinator.writeByLabel("OE_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+
+    // Step 2: falling edge of WE with Din=0xBE commits memory[5]=0xBE.
+    // (Address bus changes are irrelevant; the EEPROM uses its captured addr.)
+    fix.coordinator.writeByLabel("A_in", digital(9));
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0xBE));
+    fix.coordinator.step();
+
+    // Step 3: read back from address 5.
+    fix.coordinator.writeByLabel("A_in", digital(5));
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("OE_in", digital(1));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0xBE });
+
+    fix.coordinator.dispose();
   });
 
-  it("writeThenRead- WE rising edge captures address, falling edge commits write", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
+  it("eeprom_we_falling_edge_with_cs_low_does_not_write", () => {
+    // Cat 9: WE rising/falling without CS asserted leaves memory unchanged.
+    // After the no-write cycle, asserting CS+OE and reading the same
+    // address shows the original 0 (not the would-be Din 0x99).
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8 } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
+    // Rising WE without CS.
+    fix.coordinator.writeByLabel("A_in", digital(2));
+    fix.coordinator.writeByLabel("CS_in", digital(0));
+    fix.coordinator.writeByLabel("WE_in", digital(1));
+    fix.coordinator.writeByLabel("OE_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
 
-    // Step 1: Rising edge of WE at address 5 with CS=1
-    // lastWE=0 (initial) → WE goes to 1
-    state[0] = 5;   // A (captured write address)
-    state[1] = 1;   // CS
-    state[2] = 1;   // WE (rising)
-    state[3] = 0;   // OE
-    state[4] = 0;   // Din (not yet relevant)
-    sampleEEPROM(0, state, highZs, layout);
-    executeEEPROM(0, state, highZs, layout);
-    // lastWE should now be 1, writeAddr = 5
-    expect(state[IN + OUT + 0]).toBe(1);   // lastWE
-    expect(state[IN + OUT + 1]).toBe(5);   // writeAddr
+    // Falling WE without CS.
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0x99));
+    fix.coordinator.step();
 
-    // Step 2: Falling edge of WE with Din = 0xBE
-    state[0] = 9;   // A changes (irrelevant for write- uses captured addr=5)
-    state[1] = 1;   // CS
-    state[2] = 0;   // WE (falling)
-    state[3] = 0;   // OE
-    state[4] = 0xBE; // Din
-    sampleEEPROM(0, state, highZs, layout);
-    executeEEPROM(0, state, highZs, layout);
-    // memory[5] should now be 0xBE
-    expect(mem.read(5)).toBe(0xBE);
+    // Now read address 2 with CS=1, OE=1.
+    fix.coordinator.writeByLabel("A_in", digital(2));
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("OE_in", digital(1));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0 });
 
-    // Step 3: Read back from address 5
-    state[0] = 5;
-    state[1] = 1; // CS
-    state[2] = 0; // WE
-    state[3] = 1; // OE
-    state[4] = 0;
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0xBE);
+    fix.coordinator.dispose();
   });
 
-  it("noWriteWithoutCS- write does not occur when CS=0 on falling WE", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
+  it("eeprom_sequential_writes_to_distinct_addresses_persist_independently", () => {
+    // Cat 9 (multi-cycle): three rising/falling WE cycles write 0x11, 0x22,
+    // 0x33 to addresses 1, 2, 3 respectively. A subsequent read confirms
+    // each write landed at the right address.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8 } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("OE_in", digital(0));
 
-    // Rising edge of WE without CS
-    state[0] = 2; state[1] = 0; state[2] = 1; state[3] = 0; state[4] = 0;
-    sampleEEPROM(0, state, highZs, layout);
-    executeEEPROM(0, state, highZs, layout);
-
-    // Falling edge of WE without CS
-    state[2] = 0; state[4] = 0x99;
-    sampleEEPROM(0, state, highZs, layout);
-    executeEEPROM(0, state, highZs, layout);
-
-    // Nothing should have been written
-    expect(mem.read(2)).toBe(0);
-  });
-
-  it("multipleWrites- sequential writes to different addresses", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[1] = 1; // CS always asserted
-
-    const writeValue = (addr: number, val: number) => {
-      // Rising edge
-      state[0] = addr; state[2] = 1; state[3] = 0; state[4] = 0;
-      sampleEEPROM(0, state, highZs, layout);
-      executeEEPROM(0, state, highZs, layout);
-      // Falling edge
-      state[2] = 0; state[4] = val;
-      sampleEEPROM(0, state, highZs, layout);
-      executeEEPROM(0, state, highZs, layout);
+    const writeWord = (addr: number, val: number) => {
+      // Rising WE captures address.
+      fix.coordinator.writeByLabel("A_in", digital(addr));
+      fix.coordinator.writeByLabel("WE_in", digital(1));
+      fix.coordinator.writeByLabel("Din_in", digital(0));
+      fix.coordinator.step();
+      // Falling WE commits Din.
+      fix.coordinator.writeByLabel("WE_in", digital(0));
+      fix.coordinator.writeByLabel("Din_in", digital(val));
+      fix.coordinator.step();
     };
 
-    writeValue(1, 0x11);
-    writeValue(2, 0x22);
-    writeValue(3, 0x33);
+    writeWord(1, 0x11);
+    writeWord(2, 0x22);
+    writeWord(3, 0x33);
 
-    expect(mem.read(1)).toBe(0x11);
-    expect(mem.read(2)).toBe(0x22);
-    expect(mem.read(3)).toBe(0x33);
-  });
-
-  it("addressWrapping- address wraps modulo DataField size", () => {
-    const mem = new DataField(4);
-    mem.write(0, 0xAA);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 4; // wraps to 0
-    state[1] = 1;
-    state[2] = 0;
-    state[3] = 1;
-    state[4] = 0;
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0xAA);
-  });
-
-  it("noBackingStore- read returns 0 gracefully", () => {
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; state[1] = 1; state[2] = 0; state[3] = 1; state[4] = 0;
-    executeEEPROM(0, state, highZs, layout);
-    expect(state[IN]).toBe(0);
-  });
-
-  it("isProgramMemoryFlag- element reports isProgramMemory correctly", () => {
-    const props = new PropertyBag();
-    props.set("isProgramMemory", true);
-    const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.isProgramMemory).toBe(true);
-  });
-
-  it("isProgramMemoryDefault- defaults to false", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.isProgramMemory).toBe(false);
-  });
-
-  it("pinLayout- EEPROM has 5 input pins and 1 output pin", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-    const outputs = pins.filter(p => p.direction === PinDirection.OUTPUT);
-    expect(inputs.length).toBe(5);
-    expect(outputs.length).toBe(1);
-    const labels = pins.map(p => p.label);
-    expect(labels).toContain("A");
-    expect(labels).toContain("CS");
-    expect(labels).toContain("WE");
-    expect(labels).toContain("OE");
-    expect(labels).toContain("Din");
-    expect(labels).toContain("D");
-  });
-
-  it("weClockCapable- WE pin is marked as clock-capable", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const wePin = pins.find(p => p.label === "WE");
-    expect(wePin).toBeDefined();
-    expect(wePin!.isClock).toBe(true);
-  });
-
-  it("attributeMapping- Bits, AddrBits, Label, isProgramMemory map correctly", () => {
-    const mapping = EEPROM_ATTRIBUTE_MAPPINGS;
-    const bitsMap = mapping.find(m => m.xmlName === "Bits");
-    const addrMap = mapping.find(m => m.xmlName === "AddrBits");
-    const labelMap = mapping.find(m => m.xmlName === "Label");
-    const isPMMap = mapping.find(m => m.xmlName === "isProgramMemory");
-
-    expect(bitsMap!.convert("8")).toBe(8);
-    expect(addrMap!.convert("10")).toBe(10);
-    expect(labelMap!.convert("BOOT")).toBe("BOOT");
-    expect(isPMMap!.convert("true")).toBe(true);
-    expect(isPMMap!.convert("false")).toBe(false);
-  });
-
-  it("draw- calls ctx.drawRect and ctx.drawText with EEPROM label", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-
-    const texts: string[] = [];
-    const calls: string[] = [];
-    const ctx = {
-      save: () => calls.push("save"),
-      restore: () => calls.push("restore"),
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawRect: () => calls.push("drawRect"),
-      drawText: (text: string) => texts.push(text),
-      drawPolygon: () => calls.push("drawPolygon"),
-      drawLine: () => {},
-      drawCircle: () => {},
-      drawArc: () => {},
-      drawPath: () => {},
-      rotate: () => {},
-      scale: () => {},
-      setLineDash: () => {},
+    const readWord = (addr: number) => {
+      fix.coordinator.writeByLabel("A_in", digital(addr));
+      fix.coordinator.writeByLabel("WE_in", digital(0));
+      fix.coordinator.writeByLabel("OE_in", digital(1));
+      fix.coordinator.writeByLabel("Din_in", digital(0));
+      fix.coordinator.step();
+      return fix.coordinator.readByLabel("D_out");
     };
-    el.draw(ctx as never);
-    expect(calls).toContain("save");
-    expect(calls).toContain("restore");
-    expect(calls).toContain("drawPolygon");
-    expect(texts.some(t => t.includes("EEPROM"))).toBe(true);
+
+    expect(readWord(1)).toMatchObject({ type: "digital", value: 0x11 });
+    expect(readWord(2)).toMatchObject({ type: "digital", value: 0x22 });
+    expect(readWord(3)).toMatchObject({ type: "digital", value: 0x33 });
+
+    fix.coordinator.dispose();
   });
 
-  it("definitionComplete- EEPROMDefinition has all required fields", () => {
-    expect(EEPROMDefinition.name).toBe("EEPROM");
-    expect(EEPROMDefinition.factory).toBeDefined();
-    expect(EEPROMDefinition.models!.digital!.executeFn).toBeDefined();
-    expect(EEPROMDefinition.pinLayout).toBeDefined();
-    expect(EEPROMDefinition.propertyDefs).toBeDefined();
-    expect(EEPROMDefinition.attributeMap).toBeDefined();
-    expect(EEPROMDefinition.category).toBe(ComponentCategory.MEMORY);
-    expect(EEPROMDefinition.helpText).toBeDefined();
-    expect(typeof EEPROMDefinition.models!.digital!.defaultDelay).toBe("number");
-  });
+  it("eeprom_address_wraps_within_2_to_addrbits_window", () => {
+    // Cat 9: an EEPROM with addrBits=2 has 4 words; driving A=4 wraps to
+    // address 0. With memory[0]=0xAA seeded, the read returns 0xAA.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 2 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 2, dataBits: 8, data: [0xAA] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-  it("factoryCreatesInstance- EEPROMDefinition.factory returns EEPROMElement", () => {
-    const props = new PropertyBag();
-    expect(EEPROMDefinition.factory(props)).toBeInstanceOf(EEPROMElement);
+    fix.coordinator.writeByLabel("A_in", digital(4)); // wraps to 0
+    fix.coordinator.writeByLabel("CS_in", digital(1));
+    fix.coordinator.writeByLabel("WE_in", digital(0));
+    fix.coordinator.writeByLabel("OE_in", digital(1));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0xAA });
+
+    fix.coordinator.dispose();
   });
 });
 
-// ---------------------------------------------------------------------------
-// EEPROMDualPort tests
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// EEPROM  Cat 4 (parameter hot-load on `data` initial-memory contents)
+// ===========================================================================
 
-describe("EEPROMDualPort", () => {
-  // Inputs: A(0), Din(1), str(2), C(3), ld(4)- 5 inputs
-  // Outputs: D(0)- 1 output
-  // State: lastClk(0)- 1 state slot
-  const IN = 5;
-  const OUT = 1;
-  const STATE = 1;
+describe("EEPROM  parameter hot-load (T1)", () => {
+  it("hotload_data_seeds_initial_memory_visible_at_address_zero", () => {
+    // Cat 4: the `data` property seeds the EEPROM's backing store at compile
+    // time. Building two distinct fixtures with different `data` arrays
+    // (0x12 vs 0x5A at index 0) yields the two distinct documented read
+    // values at address 0. The closed-form post-change observable is the
+    // seeded byte itself (Δ = 0x5A - 0x12 = 0x48).
+    const buildSeeded = (seedByte: number): EepromFixture => buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: "CS_in", bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: "WE_in", bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: "OE_in", bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: "M", addrBits: 4, dataBits: 8, data: [seedByte] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
 
-  beforeEach(() => {
-    clearBackingStores();
-  });
-
-  it("writeThenRead- clock-edge write then load read", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-
-    // Write 0xAB to address 3 on rising clock edge
-    state[0] = 3;   // A
-    state[1] = 0xAB; // Din
-    state[2] = 1;   // str
-    state[3] = 1;   // C (rising: lastClk was 0)
-    state[4] = 0;   // ld
-
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(mem.read(3)).toBe(0xAB);
-
-    // Read back from address 3
-    state[0] = 3;
-    state[2] = 0;   // str
-    state[3] = 0;   // C (falling, no edge)
-    state[4] = 1;   // ld
-
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN]).toBe(0xAB);
-  });
-
-  it("noWriteWithoutClockEdge- str=1 but no rising edge → no write", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-
-    // Set lastClk = 1 first by running a cycle with clk=1
-    state[0] = 0; state[1] = 0xAA; state[2] = 1; state[3] = 1; state[4] = 0;
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    // Now write with clk still high (no rising edge- lastClk=1)
-    state[1] = 0xFF; state[2] = 1; state[3] = 1;
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    // Only the first write (on first rising edge) should have occurred
-    expect(mem.read(0)).toBe(0xAA);
-  });
-
-  it("noWriteWhenStrLow- rising clock edge with str=0 → no write", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; state[1] = 0x77; state[2] = 0; state[3] = 1; state[4] = 0;
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(mem.read(0)).toBe(0);
-  });
-
-  it("readWithLd- ld=1 outputs memory[A]", () => {
-    const mem = new DataField(16);
-    mem.write(7, 0xCC);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 7; state[1] = 0; state[2] = 0; state[3] = 0; state[4] = 1;
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN]).toBe(0xCC);
-  });
-
-  it("readGating- ld=0 outputs 0", () => {
-    const mem = new DataField(16);
-    mem.write(0, 0xDD);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 0; state[1] = 0; state[2] = 0; state[3] = 0; state[4] = 0;
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN]).toBe(0);
-  });
-
-  it("clockEdgeTracking- lastClk updated correctly after each cycle", () => {
-    const mem = new DataField(16);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-
-    // Cycle 1: clk=0 → lastClk stays 0
-    state[3] = 0;
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN + OUT]).toBe(0); // lastClk = 0
-
-    // Cycle 2: clk=1 (rising) → writes if str=1
-    state[0] = 4; state[1] = 0x11; state[2] = 1; state[3] = 1;
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN + OUT]).toBe(1); // lastClk = 1
-    expect(mem.read(4)).toBe(0x11);
-
-    // Cycle 3: clk=0 (falling) → no rising edge, no write
-    state[1] = 0x22; state[3] = 0;
-    sampleEEPROMDualPort(0, state, highZs, layout);
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN + OUT]).toBe(0); // lastClk = 0
-    expect(mem.read(4)).toBe(0x11); // unchanged
-  });
-
-  it("addressWrapping- address wraps modulo DataField size", () => {
-    const mem = new DataField(4);
-    mem.write(2, 0x55);
-    registerBackingStore(0, mem);
-
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[0] = 6; // wraps to 2
-    state[4] = 1; // ld
-    state[3] = 0; // no clock
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN]).toBe(0x55);
-  });
-
-  it("pinLayout- EEPROMDualPort has 5 input pins and 1 output pin", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-    const outputs = pins.filter(p => p.direction === PinDirection.OUTPUT);
-    expect(inputs.length).toBe(5);
-    expect(outputs.length).toBe(1);
-    const labels = pins.map(p => p.label);
-    expect(labels).toContain("A");
-    expect(labels).toContain("Din");
-    expect(labels).toContain("str");
-    expect(labels).toContain("C");
-    expect(labels).toContain("ld");
-    expect(labels).toContain("D");
-  });
-
-  it("clockPinMarked- C pin is clock-capable", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const cPin = pins.find(p => p.label === "C");
-    expect(cPin).toBeDefined();
-    expect(cPin!.isClock).toBe(true);
-  });
-
-  it("isProgramMemoryFlag- element reports isProgramMemory", () => {
-    const props = new PropertyBag();
-    props.set("isProgramMemory", true);
-    const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.isProgramMemory).toBe(true);
-  });
-
-  it("attributeMapping- Bits, AddrBits, Label, isProgramMemory", () => {
-    const mapping = EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS;
-    const bitsMap = mapping.find(m => m.xmlName === "Bits");
-    const addrMap = mapping.find(m => m.xmlName === "AddrBits");
-    expect(bitsMap!.convert("16")).toBe(16);
-    expect(addrMap!.convert("12")).toBe(12);
-  });
-
-  it("draw- renders body with EEPROM2 symbol", () => {
-    const props = new PropertyBag();
-    const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-
-    const texts: string[] = [];
-    const ctx = {
-      save: () => {},
-      restore: () => {},
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawRect: () => {},
-      drawText: (text: string) => texts.push(text),
-      drawPolygon: () => {},
-      drawLine: () => {},
-      drawCircle: () => {},
-      drawArc: () => {},
-      drawPath: () => {},
-      rotate: () => {},
-      scale: () => {},
-      setLineDash: () => {},
+    const driveRead = (fix: EepromFixture): SignalValue => {
+      fix.coordinator.writeByLabel("A_in", digital(0));
+      fix.coordinator.writeByLabel("CS_in", digital(1));
+      fix.coordinator.writeByLabel("WE_in", digital(0));
+      fix.coordinator.writeByLabel("OE_in", digital(1));
+      fix.coordinator.writeByLabel("Din_in", digital(0));
+      fix.coordinator.step();
+      return fix.coordinator.readByLabel("D_out");
     };
-    el.draw(ctx as never);
-    expect(texts.some(t => t.includes("EEPROM"))).toBe(true);
+
+    const fixA = buildSeeded(0x12);
+    const fixB = buildSeeded(0x5A);
+    const before = driveRead(fixA);
+    const after  = driveRead(fixB);
+
+    expect(before).toMatchObject({ type: "digital", value: 0x12 });
+    expect(after).toMatchObject({ type: "digital", value: 0x5A });
+    expect(after).not.toEqual(before);
+
+    fixA.coordinator.dispose();
+    fixB.coordinator.dispose();
   });
 
-  it("definitionComplete- EEPROMDualPortDefinition has all required fields", () => {
-    expect(EEPROMDualPortDefinition.name).toBe("EEPROMDualPort");
-    expect(EEPROMDualPortDefinition.factory).toBeDefined();
-    expect(EEPROMDualPortDefinition.models!.digital!.executeFn).toBeDefined();
-    expect(EEPROMDualPortDefinition.pinLayout).toBeDefined();
-    expect(EEPROMDualPortDefinition.propertyDefs).toBeDefined();
-    expect(EEPROMDualPortDefinition.attributeMap).toBeDefined();
-    expect(EEPROMDualPortDefinition.category).toBe(ComponentCategory.MEMORY);
-    expect(EEPROMDualPortDefinition.helpText).toBeDefined();
-    expect(typeof EEPROMDualPortDefinition.models!.digital!.defaultDelay).toBe("number");
+  it("hotload_isProgramMemory_flag_observable_via_circuit_element_property", () => {
+    // Cat 4: the isProgramMemory flag is a build-time property surfaced on
+    // the EEPROM's CircuitElement. Two distinct circuits (true / false)
+    // expose the documented post-change observable on the element accessor
+    // the digital/visual layer reads.
+    const buildWithFlag = (flag: boolean): EepromFixture => buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: `A_${flag}`, bitWidth: 4 } },
+        { id: "cs",   type: "In", props: { label: `CS_${flag}`, bitWidth: 1 } },
+        { id: "we",   type: "In", props: { label: `WE_${flag}`, bitWidth: 1 } },
+        { id: "oe",   type: "In", props: { label: `OE_${flag}`, bitWidth: 1 } },
+        { id: "din",  type: "In", props: { label: `Din_${flag}`, bitWidth: 8 } },
+        { id: "rom",  type: "EEPROM", props: { label: `M_${flag}`, addrBits: 4, dataBits: 8, isProgramMemory: flag } },
+        { id: "out",  type: "Out", props: { label: `D_${flag}`, bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["cs:out",   "rom:CS"],
+        ["we:out",   "rom:WE"],
+        ["oe:out",   "rom:OE"],
+        ["din:out",  "rom:Din"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    const fixT = buildWithFlag(true);
+    fixT.coordinator.step();
+    const elT = findElementByLabel(fixT, "M_true");
+    expect(elT.getProperties().getOrDefault<boolean>("isProgramMemory", false)).toBe(true);
+    fixT.coordinator.dispose();
+
+    const fixF = buildWithFlag(false);
+    fixF.coordinator.step();
+    const elF = findElementByLabel(fixF, "M_false");
+    expect(elF.getProperties().getOrDefault<boolean>("isProgramMemory", true)).toBe(false);
+    fixF.coordinator.dispose();
+  });
+});
+
+// ===========================================================================
+// EEPROMDualPort  Cat 9 (Bridge / digital)
+// ===========================================================================
+
+describe("EEPROMDualPort  bridge / digital (T1)", () => {
+  it("eepromdualport_clock_rising_edge_with_str_high_writes_din_to_address", () => {
+    // Cat 9: with str=1 and a 0->1 clock transition, sampleEEPROMDualPort
+    // commits Din to memory[A]. A subsequent ld=1 read returns the byte.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "str",  type: "In", props: { label: "str_in", bitWidth: 1 } },
+        { id: "clk",  type: "In", props: { label: "C_in", bitWidth: 1 } },
+        { id: "ld",   type: "In", props: { label: "ld_in", bitWidth: 1 } },
+        { id: "rom",  type: "EEPROMDualPort", props: { label: "M", addrBits: 4, dataBits: 8 } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["din:out",  "rom:Din"],
+        ["str:out",  "rom:str"],
+        ["clk:out",  "rom:C"],
+        ["ld:out",   "rom:ld"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    // Initial cycle with clk=0 establishes lastClk=0.
+    fix.coordinator.writeByLabel("A_in", digital(3));
+    fix.coordinator.writeByLabel("Din_in", digital(0xAB));
+    fix.coordinator.writeByLabel("str_in", digital(1));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(0));
+    fix.coordinator.step();
+
+    // Rising clock edge 0->1 commits the write.
+    fix.coordinator.writeByLabel("C_in", digital(1));
+    fix.coordinator.step();
+
+    // Read back via ld=1.
+    fix.coordinator.writeByLabel("str_in", digital(0));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(1));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0xAB });
+
+    fix.coordinator.dispose();
   });
 
-  it("factoryCreatesInstance- factory returns EEPROMDualPortElement", () => {
-    const props = new PropertyBag();
-    expect(EEPROMDualPortDefinition.factory(props)).toBeInstanceOf(EEPROMDualPortElement);
+  it("eepromdualport_no_rising_edge_means_no_write", () => {
+    // Cat 9: holding clock high after a prior rising edge does not retrigger
+    // the write. The first rising-edge write of 0xAA persists; a subsequent
+    // attempt to overwrite with 0xFF while clock stays high is a no-op.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "str",  type: "In", props: { label: "str_in", bitWidth: 1 } },
+        { id: "clk",  type: "In", props: { label: "C_in", bitWidth: 1 } },
+        { id: "ld",   type: "In", props: { label: "ld_in", bitWidth: 1 } },
+        { id: "rom",  type: "EEPROMDualPort", props: { label: "M", addrBits: 4, dataBits: 8 } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["din:out",  "rom:Din"],
+        ["str:out",  "rom:str"],
+        ["clk:out",  "rom:C"],
+        ["ld:out",   "rom:ld"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    // Establish lastClk=0 with clk low.
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0xAA));
+    fix.coordinator.writeByLabel("str_in", digital(1));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(0));
+    fix.coordinator.step();
+
+    // Rising edge writes 0xAA.
+    fix.coordinator.writeByLabel("C_in", digital(1));
+    fix.coordinator.step();
+
+    // Clock stays high (no edge); attempt to overwrite with 0xFF is a no-op.
+    fix.coordinator.writeByLabel("Din_in", digital(0xFF));
+    fix.coordinator.step();
+
+    // Read back with ld=1; first written 0xAA persists.
+    fix.coordinator.writeByLabel("str_in", digital(0));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(1));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0xAA });
+
+    fix.coordinator.dispose();
   });
 
-  it("noBackingStore- read returns 0 gracefully", () => {
-    const { layout, state } = makeLayout(IN, OUT, STATE);
-    const highZs = new Uint32Array(state.length);
-    state[4] = 1; // ld
-    executeEEPROMDualPort(0, state, highZs, layout);
-    expect(state[IN]).toBe(0);
+  it("eepromdualport_str_low_on_clock_edge_does_not_write", () => {
+    // Cat 9: str=0 disables the write port; even on a rising clock edge,
+    // memory[A] stays at the seeded zero. Read-back yields 0.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "str",  type: "In", props: { label: "str_in", bitWidth: 1 } },
+        { id: "clk",  type: "In", props: { label: "C_in", bitWidth: 1 } },
+        { id: "ld",   type: "In", props: { label: "ld_in", bitWidth: 1 } },
+        { id: "rom",  type: "EEPROMDualPort", props: { label: "M", addrBits: 4, dataBits: 8 } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["din:out",  "rom:Din"],
+        ["str:out",  "rom:str"],
+        ["clk:out",  "rom:C"],
+        ["ld:out",   "rom:ld"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0x77));
+    fix.coordinator.writeByLabel("str_in", digital(0));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(0));
+    fix.coordinator.step();
+
+    fix.coordinator.writeByLabel("C_in", digital(1));
+    fix.coordinator.step();
+
+    // Read back: nothing was written.
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(1));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0 });
+
+    fix.coordinator.dispose();
+  });
+
+  it("eepromdualport_ld_high_outputs_seeded_memory_value", () => {
+    // Cat 9: ld=1 makes executeEEPROMDualPort copy memory[A] to D each step.
+    // With memory seeded via `data` to have 0xCC at index 7, A=7 + ld=1
+    // makes Out(D_out) read 0xCC.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "str",  type: "In", props: { label: "str_in", bitWidth: 1 } },
+        { id: "clk",  type: "In", props: { label: "C_in", bitWidth: 1 } },
+        { id: "ld",   type: "In", props: { label: "ld_in", bitWidth: 1 } },
+        { id: "rom",  type: "EEPROMDualPort", props: { label: "M", addrBits: 4, dataBits: 8, data: [0, 0, 0, 0, 0, 0, 0, 0xCC] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["din:out",  "rom:Din"],
+        ["str:out",  "rom:str"],
+        ["clk:out",  "rom:C"],
+        ["ld:out",   "rom:ld"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    fix.coordinator.writeByLabel("A_in", digital(7));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.writeByLabel("str_in", digital(0));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(1));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0xCC });
+
+    fix.coordinator.dispose();
+  });
+
+  it("eepromdualport_ld_low_outputs_zero_regardless_of_memory", () => {
+    // Cat 9: ld=0 disables the read port; D is driven to 0 even when
+    // memory[A] is non-zero.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 4 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "str",  type: "In", props: { label: "str_in", bitWidth: 1 } },
+        { id: "clk",  type: "In", props: { label: "C_in", bitWidth: 1 } },
+        { id: "ld",   type: "In", props: { label: "ld_in", bitWidth: 1 } },
+        { id: "rom",  type: "EEPROMDualPort", props: { label: "M", addrBits: 4, dataBits: 8, data: [0xDD] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["din:out",  "rom:Din"],
+        ["str:out",  "rom:str"],
+        ["clk:out",  "rom:C"],
+        ["ld:out",   "rom:ld"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    fix.coordinator.writeByLabel("A_in", digital(0));
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.writeByLabel("str_in", digital(0));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0 });
+
+    fix.coordinator.dispose();
+  });
+
+  it("eepromdualport_address_wraps_within_2_to_addrbits_window", () => {
+    // Cat 9: addrBits=2 yields a 4-word memory; A=6 wraps to address 2.
+    // With memory[2]=0x55 seeded, ld=1 read returns 0x55.
+    const fix = buildEepromFixture({
+      components: [
+        { id: "addr", type: "In", props: { label: "A_in", bitWidth: 2 } },
+        { id: "din",  type: "In", props: { label: "Din_in", bitWidth: 8 } },
+        { id: "str",  type: "In", props: { label: "str_in", bitWidth: 1 } },
+        { id: "clk",  type: "In", props: { label: "C_in", bitWidth: 1 } },
+        { id: "ld",   type: "In", props: { label: "ld_in", bitWidth: 1 } },
+        { id: "rom",  type: "EEPROMDualPort", props: { label: "M", addrBits: 2, dataBits: 8, data: [0, 0, 0x55, 0] } },
+        { id: "out",  type: "Out", props: { label: "D_out", bitWidth: 8 } },
+      ],
+      connections: [
+        ["addr:out", "rom:A"],
+        ["din:out",  "rom:Din"],
+        ["str:out",  "rom:str"],
+        ["clk:out",  "rom:C"],
+        ["ld:out",   "rom:ld"],
+        ["rom:D",    "out:in"],
+      ],
+    });
+
+    fix.coordinator.writeByLabel("A_in", digital(6)); // wraps to 2
+    fix.coordinator.writeByLabel("Din_in", digital(0));
+    fix.coordinator.writeByLabel("str_in", digital(0));
+    fix.coordinator.writeByLabel("C_in", digital(0));
+    fix.coordinator.writeByLabel("ld_in", digital(1));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("D_out")).toMatchObject({ type: "digital", value: 0x55 });
+
+    fix.coordinator.dispose();
   });
 });

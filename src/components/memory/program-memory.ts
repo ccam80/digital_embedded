@@ -185,10 +185,12 @@ export function sampleProgramMemory(index: number, state: Uint32Array, _highZs: 
   let addrReg = state[stBase] >>> 0;
 
   if (!prevClock && clk) {
+    const mem = getBackingStore(index);
+    const addrMask = mem !== undefined ? (mem.size - 1) >>> 0 : 0xffffffff;
     if (ld) {
-      addrReg = A;
+      addrReg = A & addrMask;
     } else {
-      addrReg = (addrReg + 1) >>> 0;
+      addrReg = (addrReg + 1) & addrMask;
     }
   }
 
@@ -209,18 +211,20 @@ export function executeProgramMemory(index: number, state: Uint32Array, _highZs:
 
   let addrReg = state[stBase] >>> 0;
 
+  const mem = getBackingStore(index);
+  const addrMask = mem !== undefined ? (mem.size - 1) >>> 0 : 0xffffffff;
+
   if (!prevClock && clk) {
     if (ld) {
-      addrReg = A;
+      addrReg = A & addrMask;
     } else {
-      addrReg = (addrReg + 1) >>> 0;
+      addrReg = (addrReg + 1) & addrMask;
     }
   }
 
   state[stBase] = addrReg;
   state[stBase + 1] = clk;
 
-  const mem = getBackingStore(index);
   state[wt[outBase]] = mem !== undefined ? mem.read(addrReg) : 0;
 }
 

@@ -1,554 +1,469 @@
-/**
- * Tests for Counter and CounterPreset components (Task 5.2.7).
- *
- * Covers:
- *   - Count up sequence
- *   - Count down (CounterPreset)
- *   - Overflow/wrap behavior
- *   - Clear (synchronous)
- *   - Preset load (CounterPreset)
- *   - Enable/disable
- *   - ovf flag correctness
- *   - Edge detection (only rising clock edge)
- *   - Pin layout
- *   - Attribute mapping
- *   - ComponentDefinition completeness
- *   - Rendering
- */
-
 import { describe, it, expect } from "vitest";
-import {
-  CounterElement,
-  executeCounter,
-  CounterDefinition,
-  COUNTER_ATTRIBUTE_MAPPINGS,
-} from "../counter.js";
-import {
-  CounterPresetElement,
-  executeCounterPreset,
-  CounterPresetDefinition,
-  COUNTER_PRESET_ATTRIBUTE_MAPPINGS,
-} from "../counter-preset.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
+import type { PropertyValue } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Counter + CounterPreset canonical test set
+// Canon categories: 9 (Bridge / digital interaction), 11 (Multi-output digital)
+// File tier: fixture-only (digital-only — both components expose only
+// `models.digital.executeFn`; no analog domain, no getLteTimestep, no
+// acceptStep, no *lim. Programmatic build via facade.build is the sanctioned
+// surface; signals are driven via facade.setSignal and read via
+// facade.readSignal.)
+//
+// Counter: 3 inputs (en, C, clr), 2 outputs (out, ovf).
+// CounterPreset: 6 inputs (en, C, dir, in, ld, clr), 2 outputs (out, ovf).
+// Both clock pins ("C") are rising-edge triggered.
 // ---------------------------------------------------------------------------
 
-interface LayoutWithState extends ComponentLayout {
-  stateOffset(componentIndex: number): number;
-  getProperty(componentIndex: number, key: string): number;
+const registry = createDefaultRegistry();
+
+interface CounterFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
 }
 
-function makeLayout(
-  inputCount: number,
-  outputCount: number,
-  props: Record<string, number> = {},
-): LayoutWithState {
-  const outputStart = inputCount;
-  const stateStart = inputCount + outputCount;
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => outputStart,
-    stateOffset: () => stateStart,
-    getProperty: (_i: number, key: string) => props[key] ?? 0,
-  };
+function buildCounterFixture(opts: { bitWidth?: number } = {}): CounterFixture {
+  const bitWidth = opts.bitWidth ?? 4;
+  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
+    { id: "in_en",  type: "In",      props: { label: "EN",  bitWidth: 1 } },
+    { id: "in_c",   type: "In",      props: { label: "CLK", bitWidth: 1 } },
+    { id: "in_clr", type: "In",      props: { label: "CLR", bitWidth: 1 } },
+    { id: "cnt",    type: "Counter", props: { label: "CNT", bitWidth } },
+    { id: "out_q",  type: "Out",     props: { label: "Q",   bitWidth } },
+    { id: "out_ov", type: "Out",     props: { label: "OVF", bitWidth: 1 } },
+  ];
+  const connections: Array<[string, string]> = [
+    ["in_en:out",  "cnt:en"],
+    ["in_c:out",   "cnt:C"],
+    ["in_clr:out", "cnt:clr"],
+    ["cnt:out",    "out_q:in"],
+    ["cnt:ovf",    "out_ov:in"],
+  ];
+
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({ components, connections });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
 }
 
-function makeState(totalSlots: number, initial?: Partial<Record<number, number>>): Uint32Array {
-  const arr = new Uint32Array(totalSlots);
-  if (initial) {
-    for (const [idx, val] of Object.entries(initial)) {
-      arr[parseInt(idx, 10)] = val as number;
-    }
-  }
-  return arr;
+interface CounterPresetFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
 }
 
-interface DrawCall { method: string; args: unknown[] }
+function buildCounterPresetFixture(opts: {
+  bitWidth?: number;
+  maxValue?: number;
+} = {}): CounterPresetFixture {
+  const bitWidth = opts.bitWidth ?? 4;
+  const maxValue = opts.maxValue ?? 0;
+  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
+    { id: "in_en",  type: "In",            props: { label: "EN",  bitWidth: 1 } },
+    { id: "in_c",   type: "In",            props: { label: "CLK", bitWidth: 1 } },
+    { id: "in_dir", type: "In",            props: { label: "DIR", bitWidth: 1 } },
+    { id: "in_in",  type: "In",            props: { label: "IN",  bitWidth } },
+    { id: "in_ld",  type: "In",            props: { label: "LD",  bitWidth: 1 } },
+    { id: "in_clr", type: "In",            props: { label: "CLR", bitWidth: 1 } },
+    { id: "cnt",    type: "CounterPreset", props: { label: "CNT", bitWidth, maxValue } },
+    { id: "out_q",  type: "Out",           props: { label: "Q",   bitWidth } },
+    { id: "out_ov", type: "Out",           props: { label: "OVF", bitWidth: 1 } },
+  ];
+  const connections: Array<[string, string]> = [
+    ["in_en:out",  "cnt:en"],
+    ["in_c:out",   "cnt:C"],
+    ["in_dir:out", "cnt:dir"],
+    ["in_in:out",  "cnt:in"],
+    ["in_ld:out",  "cnt:ld"],
+    ["in_clr:out", "cnt:clr"],
+    ["cnt:out",    "out_q:in"],
+    ["cnt:ovf",    "out_ov:in"],
+  ];
 
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record = (method: string) => (...args: unknown[]): void => { calls.push({ method, args }); };
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-  return { ctx, calls };
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({ components, connections });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
 }
 
-// Counter slot map (4-bit, en+C+clr inputs, out+ovf outputs, counter+prevClock state):
-// [en=0, C=1, clr=2, out=3, ovf=4, counter=5, prevClock=6] = 7 slots
+/**
+ * Drive a single rising clock edge: set CLK=0, step, set CLK=1, step.
+ * Returns after the rising edge has been processed.
+ */
+function risingEdge(fix: CounterFixture | CounterPresetFixture): void {
+  fix.facade.setSignal(fix.coordinator, "CLK", 0);
+  fix.facade.step(fix.coordinator);
+  fix.facade.setSignal(fix.coordinator, "CLK", 1);
+  fix.facade.step(fix.coordinator);
+}
 
-// ---------------------------------------------------------------------------
-// Counter tests
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Counter — Cat 9 + Cat 11
+// ===========================================================================
 
-describe("Counter", () => {
-  describe("count up sequence", () => {
-    it("counts from 0 to 1 on first rising clock edge with en=1", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(1);
-    });
-
-    it("counts 0→1→2→3 over three rising edges", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 0, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-
-      for (let expected = 1; expected <= 3; expected++) {
-        state[6] = 0;
-        state[1] = 1;
-        executeCounter(0, state, highZs, layout);
-        expect(state[3]).toBe(expected);
-        state[1] = 0;
-        state[6] = 1;
-        executeCounter(0, state, highZs, layout);
-      }
-    });
+describe("Counter — bridge / digital (T1)", () => {
+  it("count_up_one_edge_with_en_high_drives_out_to_one", () => {
+    // Documented contract: en=1, clr=0 → on rising edge, counter increments
+    // from 0 to 1; OUT pin reflects new counter value.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    fix.coordinator.dispose();
   });
 
-  describe("overflow/wrap", () => {
-    it("wraps from maxValue (15 for 4-bit) back to 0", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 15, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(0);
-    });
-
-    it("wraps from maxValue (255 for 8-bit) back to 0", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 8 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 255, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(0);
-    });
+  it("count_up_three_edges_drives_out_to_three", () => {
+    // Documented contract: three rising edges with en=1 increment counter to 3.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    risingEdge(fix);
+    risingEdge(fix);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(3);
+    fix.coordinator.dispose();
   });
 
-  describe("clear", () => {
-    it("clr=1 resets counter to 0 on clock edge (takes priority over increment)", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 7, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(0);
-    });
-
-    it("clr=1 resets even when counter is at 0", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 1, 5: 0, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(0);
-    });
+  it("wrap_from_max_to_zero_4bit", () => {
+    // Documented contract: counter wraps from maxValue (15 for bitWidth=4)
+    // back to 0 on the next rising edge.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    for (let i = 0; i < 15; i++) risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("enable", () => {
-    it("en=0 holds counter unchanged on clock edge", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 5, 6: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(5);
-    });
+  it("wrap_from_max_to_zero_8bit", () => {
+    // Documented contract: maxValue scales with bitWidth; for bitWidth=8 the
+    // wrap point is 255.
+    const fix = buildCounterFixture({ bitWidth: 8 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    for (let i = 0; i < 255; i++) risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(255);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("ovf flag", () => {
-    it("ovf=1 when counter==maxValue and en=1", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 15, 6: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounter(0, state, highZs, layout);
-      expect(state[4]).toBe(1);
-    });
+  it("clr_resets_counter_to_zero_on_clock_edge", () => {
+    // Documented contract: clr=1 forces counter to 0 on the rising edge,
+    // takes priority over the increment path.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    risingEdge(fix);
+    risingEdge(fix);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(3);
 
-    it("ovf=0 when counter==maxValue but en=0", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 0, 1: 0, 2: 0, 5: 15, 6: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounter(0, state, highZs, layout);
-      expect(state[4]).toBe(0);
-    });
-
-    it("ovf=0 when counter < maxValue", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 0, 2: 0, 5: 7, 6: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounter(0, state, highZs, layout);
-      expect(state[4]).toBe(0);
-    });
+    fix.facade.setSignal(fix.coordinator, "CLR", 1);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("edge detection", () => {
-    it("no count when clock stays high", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 3, 6: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(3);
-    });
+  it("en_low_holds_counter_unchanged_on_clock_edge", () => {
+    // Documented contract: en=0 → counter does not increment on rising edge.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    risingEdge(fix);
+    risingEdge(fix);
+    risingEdge(fix);
+    risingEdge(fix);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(5);
 
-    it("no count on falling edge", () => {
-      const layout = makeLayout(3, 2, { bitWidth: 4 });
-      const state = makeState(7, { 0: 1, 1: 1, 2: 0, 5: 3, 6: 1 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 0;
-      executeCounter(0, state, highZs, layout);
-      expect(state[3]).toBe(3);
-    });
+    fix.facade.setSignal(fix.coordinator, "EN", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(5);
+    fix.coordinator.dispose();
   });
 
-  describe("pin layout", () => {
-    it("Counter has 3 inputs (en, C, clr) and 2 outputs (out, ovf)", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      const el = new CounterElement("id", { x: 0, y: 0 }, 0, false, props);
-      const pins = el.getPins();
-      const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter(p => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(3);
-      expect(outputs).toHaveLength(2);
-      expect(inputs.map(p => p.label)).toEqual(["en", "C", "clr"]);
-      expect(outputs.map(p => p.label)).toEqual(["out", "ovf"]);
-    });
+  it("falling_edge_does_not_increment", () => {
+    // Documented contract: only rising edges advance the counter.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    risingEdge(fix);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(2);
 
-    it("C pin is marked as isClock=true", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      const el = new CounterElement("id", { x: 0, y: 0 }, 0, false, props);
-      const c = el.getPins().find(p => p.label === "C");
-      expect(c?.isClock).toBe(true);
-    });
+    // Falling edge sequence: CLK=1 → CLK=0.
+    fix.facade.setSignal(fix.coordinator, "CLK", 1);
+    fix.facade.step(fix.coordinator);
+    fix.facade.setSignal(fix.coordinator, "CLK", 0);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(2);
+    fix.coordinator.dispose();
   });
 
-  describe("attribute mapping", () => {
-    it("Bits=8 maps to bitWidth=8", () => {
-      const mapping = COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("8")).toBe(8);
-    });
+  // ---- Cat 11 — multi-output digital observability (out + ovf) -----------
 
-    it("Label maps to label key", () => {
-      const mapping = COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("cnt1")).toBe("cnt1");
-    });
+  it("ovf_high_at_max_value_with_en_high_independent_of_out", () => {
+    // Documented contract: ovf=1 when counter==maxValue AND en=1; out=
+    // counter value. Both pins are observed independently after a single
+    // step (not packed into one read).
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    for (let i = 0; i < 15; i++) risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(1);
+    fix.coordinator.dispose();
   });
 
-  describe("definitionComplete", () => {
-    it("CounterDefinition has name='Counter'", () => {
-      expect(CounterDefinition.name).toBe("Counter");
-    });
-
-    it("CounterDefinition has typeId=-1 sentinel", () => {
-      expect(CounterDefinition.typeId).toBe(-1);
-    });
-
-    it("CounterDefinition category is MEMORY", () => {
-      expect(CounterDefinition.category).toBe(ComponentCategory.MEMORY);
-    });
-
-    it("CounterDefinition has executeFn=executeCounter", () => {
-      expect(CounterDefinition.models.digital!.executeFn).toBe(executeCounter);
-    });
-
-    it("CounterDefinition propertyDefs include bitWidth", () => {
-      const keys = CounterDefinition.propertyDefs.map(d => d.key);
-      expect(keys).toContain("bitWidth");
-    });
-
-    it("CounterDefinition has non-empty helpText", () => {
-      expect(typeof CounterDefinition.helpText).toBe("string"); expect(CounterDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("CounterDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(CounterDefinition)).not.toThrow();
-    });
-
-    it("CounterDefinition factory produces a CounterElement", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      const el = CounterDefinition.factory(props);
-      expect(el.typeId).toBe("Counter");
-    });
+  it("ovf_low_below_max_value_independent_of_out", () => {
+    // Documented contract: ovf=0 while counter < maxValue regardless of en.
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    for (let i = 0; i < 7; i++) risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(7);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("rendering", () => {
-    it("draw() calls drawPolygon for body", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      const el = new CounterElement("id", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawPolygon");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
-    });
+  it("ovf_low_at_max_when_en_low_independent_of_out", () => {
+    // Documented contract: ovf gated on en; counter at maxValue with en=0
+    // → ovf=0 (the count would not advance, so no overflow event).
+    const fix = buildCounterFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    for (let i = 0; i < 15; i++) risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(1);
 
-    it("draw() renders en and clr labels", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      const el = new CounterElement("id", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const texts = calls.filter(c => c.method === "drawText").map(c => c.args[0]);
-      expect(texts).toContain("en");
-      expect(texts).toContain("clr");
-    });
+    fix.facade.setSignal(fix.coordinator, "EN", 0);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(0);
+    fix.coordinator.dispose();
   });
 });
 
-// ---------------------------------------------------------------------------
-// CounterPreset tests
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// CounterPreset — Cat 9 + Cat 11
+// ===========================================================================
 
-describe("CounterPreset", () => {
-  // Slot map: [en=0,C=1,dir=2,in=3,ld=4,clr=5, out=6,ovf=7, counter=8,prevClock=9] = 10 slots
-
-  describe("count up sequence (dir=0)", () => {
-    it("counts from 0 to 1 with en=1 dir=0", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 0, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(1);
-    });
-
-    it("wraps from maxValue (15 for 4-bit) to 0 when counting up", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 15, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(0);
-    });
+describe("CounterPreset — bridge / digital (T1)", () => {
+  it("count_up_one_edge_with_en_high_dir_low_drives_out_to_one", () => {
+    // Documented contract: dir=0 → up-counter; en=1 → first rising edge
+    // advances counter from 0 to 1.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "IN", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    fix.coordinator.dispose();
   });
 
-  describe("count down sequence (dir=1)", () => {
-    it("decrements from 5 to 4 with en=1 dir=1", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 5, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(4);
-    });
+  it("count_down_one_edge_with_en_high_dir_high_decrements_from_five_to_four", () => {
+    // Documented contract: dir=1 → down-counter; first load via ld then
+    // a count-down edge yields 5→4.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 5);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(5);
 
-    it("wraps from 0 back to maxValue (15) when counting down", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 0, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(15);
-    });
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "DIR", 1);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(4);
+    fix.coordinator.dispose();
   });
 
-  describe("clear (synchronous)", () => {
-    it("clr=1 resets counter to 0 on clock edge", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 1, 8: 7, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(0);
-    });
+  it("count_up_wraps_from_max_to_zero_4bit", () => {
+    // Documented contract: when counting up, wraps from maxValue back to 0.
+    // For bitWidth=4 with maxValue=0 (defaulting to mask 15), wrap from 15→0.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 15);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
 
-    it("clr=1 takes priority over ld=1", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 9, 4: 1, 5: 1, 8: 7, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(0);
-    });
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("preset load", () => {
-    it("ld=1 loads 'in' value on clock edge when clr=0", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 9, 4: 1, 5: 0, 8: 0, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(9);
-    });
-
-    it("ld loads value after count operation on same edge", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 5, 4: 1, 5: 0, 8: 3, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(5);
-    });
+  it("count_down_wraps_from_zero_to_max_4bit", () => {
+    // Documented contract: when counting down (dir=1), wraps from 0 back to
+    // maxValue (15 for bitWidth=4 with maxValue=0).
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "IN", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
+    fix.coordinator.dispose();
   });
 
-  describe("enable", () => {
-    it("en=0 holds counter unchanged on clock edge", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 7, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(7);
-    });
+  it("clr_resets_counter_to_zero_on_clock_edge", () => {
+    // Documented contract: clr=1 takes priority on rising edge; counter→0.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 7);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(7);
+
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 1);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("ovf flag", () => {
-    it("ovf=1 when counter==maxValue (15) counting up with en=1", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 15, 9: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[7]).toBe(1);
-    });
+  it("clr_takes_priority_over_ld", () => {
+    // Documented contract: clr=1 with ld=1 simultaneously → counter=0 (clr
+    // priority documented in counter-preset.ts header comment).
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 7);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(7);
 
-    it("ovf=1 when counter==0 counting down (dir=1) with en=1", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 0, 9: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[7]).toBe(1);
-    });
-
-    it("ovf=0 when counter is not at overflow position", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 0 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 7, 9: 1 });
-      const highZs = new Uint32Array(state.length);
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[7]).toBe(0);
-    });
+    fix.facade.setSignal(fix.coordinator, "CLR", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 9);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("custom maxValue", () => {
-    it("wraps at custom maxValue=9 when counting up", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 9 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 8: 9, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(0);
-    });
-
-    it("wraps at 9 when counting down from 0", () => {
-      const layout = makeLayout(6, 2, { bitWidth: 4, maxValue: 9 });
-      const state = makeState(10, { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 8: 0, 9: 0 });
-      const highZs = new Uint32Array(state.length);
-      state[1] = 1;
-      executeCounterPreset(0, state, highZs, layout);
-      expect(state[6]).toBe(9);
-    });
+  it("ld_loads_in_value_when_clr_is_zero", () => {
+    // Documented contract: ld=1, clr=0 → counter takes value from 'in' on
+    // rising edge.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 9);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(9);
+    fix.coordinator.dispose();
   });
 
-  describe("pin layout", () => {
-    it("CounterPreset has 6 inputs and 2 outputs", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      props.set("maxValue", 0);
-      const el = new CounterPresetElement("id", { x: 0, y: 0 }, 0, false, props);
-      const pins = el.getPins();
-      const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter(p => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(6);
-      expect(outputs).toHaveLength(2);
-      expect(inputs.map(p => p.label)).toEqual(["en", "C", "dir", "in", "ld", "clr"]);
-    });
+  it("en_low_holds_counter_unchanged_on_clock_edge", () => {
+    // Documented contract: en=0 → counter does not advance on rising edge.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 7);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(7);
+
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "EN", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(7);
+    fix.coordinator.dispose();
   });
 
-  describe("attribute mapping", () => {
-    it("maxValue maps to maxValue key as integer", () => {
-      const mapping = COUNTER_PRESET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "maxValue");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("15")).toBe(15);
-    });
+  it("custom_max_value_wraps_at_nine_when_counting_up", () => {
+    // Documented contract: maxValue property sets the wrap-around value.
+    // With maxValue=9, counter at 9 wraps to 0 on the next up-edge.
+    const fix = buildCounterPresetFixture({ bitWidth: 4, maxValue: 9 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 9);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(9);
 
-    it("Bits maps to bitWidth", () => {
-      const mapping = COUNTER_PRESET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.convert("8")).toBe(8);
-    });
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("definitionComplete", () => {
-    it("CounterPresetDefinition has name='CounterPreset'", () => {
-      expect(CounterPresetDefinition.name).toBe("CounterPreset");
-    });
-
-    it("CounterPresetDefinition category is MEMORY", () => {
-      expect(CounterPresetDefinition.category).toBe(ComponentCategory.MEMORY);
-    });
-
-    it("CounterPresetDefinition has executeFn=executeCounterPreset", () => {
-      expect(CounterPresetDefinition.models.digital!.executeFn).toBe(executeCounterPreset);
-    });
-
-    it("CounterPresetDefinition propertyDefs include maxValue", () => {
-      const keys = CounterPresetDefinition.propertyDefs.map(d => d.key);
-      expect(keys).toContain("maxValue");
-    });
-
-    it("CounterPresetDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(CounterPresetDefinition)).not.toThrow();
-    });
+  it("custom_max_value_wraps_to_max_when_counting_down_from_zero", () => {
+    // Documented contract: down-counting from 0 wraps to maxValue.
+    // With maxValue=9, 0 → 9 on the down-edge.
+    const fix = buildCounterPresetFixture({ bitWidth: 4, maxValue: 9 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "IN", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(9);
+    fix.coordinator.dispose();
   });
 
-  describe("rendering", () => {
-    it("draw() calls drawPolygon for body", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      props.set("maxValue", 0);
-      const el = new CounterPresetElement("id", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const rects = calls.filter(c => c.method === "drawPolygon");
-      expect(rects.length).toBeGreaterThanOrEqual(1);
-    });
+  // ---- Cat 11 — multi-output digital observability (out + ovf) -----------
 
-    it("draw() renders dir and ld labels", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 4);
-      props.set("maxValue", 0);
-      const el = new CounterPresetElement("id", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const texts = calls.filter(c => c.method === "drawText").map(c => c.args[0]);
-      expect(texts).toContain("dir");
-      expect(texts).toContain("ld");
-    });
+  it("ovf_high_at_max_value_when_counting_up_with_en_high_independent_of_out", () => {
+    // Documented contract: when counting up (dir=0), ovf=1 at maxValue.
+    // out and ovf observed independently after a single step.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 15);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(15);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(1);
+    fix.coordinator.dispose();
+  });
+
+  it("ovf_high_at_zero_when_counting_down_with_en_high_independent_of_out", () => {
+    // Documented contract: when counting down (dir=1), ovf=1 at 0 (the
+    // down-direction overflow event).
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 1);
+    fix.facade.setSignal(fix.coordinator, "CLR", 1);
+    fix.facade.setSignal(fix.coordinator, "LD", 0);
+    fix.facade.setSignal(fix.coordinator, "IN", 0);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(1);
+    fix.coordinator.dispose();
+  });
+
+  it("ovf_low_below_overflow_position_independent_of_out", () => {
+    // Documented contract: ovf=0 when counter is not at the overflow
+    // boundary for the active direction.
+    const fix = buildCounterPresetFixture({ bitWidth: 4 });
+    fix.facade.setSignal(fix.coordinator, "EN", 1);
+    fix.facade.setSignal(fix.coordinator, "DIR", 0);
+    fix.facade.setSignal(fix.coordinator, "CLR", 0);
+    fix.facade.setSignal(fix.coordinator, "LD", 1);
+    fix.facade.setSignal(fix.coordinator, "IN", 7);
+    risingEdge(fix);
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(7);
+    expect(fix.facade.readSignal(fix.coordinator, "OVF")).toBe(0);
+    fix.coordinator.dispose();
   });
 });
