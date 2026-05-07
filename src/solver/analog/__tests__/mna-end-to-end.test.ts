@@ -21,6 +21,23 @@
 import { describe, it, expect } from "vitest";
 import { ComparisonSession } from "./harness/comparison-session.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { StepEndReport } from "./harness/types.js";
+
+/**
+ * Look up the "ours" voltage for a node by pin tag (e.g. "r1:neg").
+ * Node keys in StepEndReport.nodes are compound when multiple pins share a node
+ * (e.g. "r2:pos/r1:neg"), so we search for the key that contains the desired tag.
+ * Returns the first match or undefined if none found.
+ */
+function nodeOurs(nodes: StepEndReport["nodes"], ...tags: string[]): number | undefined {
+  for (const tag of tags) {
+    for (const [key, val] of Object.entries(nodes)) {
+      const parts = key.split("/");
+      if (parts.includes(tag)) return val.ours as number | undefined;
+    }
+  }
+  return undefined;
+}
 
 // ===========================================================================
 // 1. Full-pipeline DC operating point (compiler → engine)
@@ -40,9 +57,9 @@ describe("End-to-end: full pipeline", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "r2:A"],
-            ["r2:B",    "gnd:out"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "r2:pos"],
+            ["r2:neg",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
         });
@@ -54,7 +71,7 @@ describe("End-to-end: full pipeline", () => {
     expect(stepEnd.converged.ours).toBe(true);
 
     // Midpoint = 2.5V, top = 5.0V
-    const vMid = stepEnd.nodes["r1:B"]?.ours ?? stepEnd.nodes["r2:A"]?.ours;
+    const vMid = nodeOurs(stepEnd.nodes, "r1:neg", "r2:pos");
     expect(vMid).toBeDefined();
     expect(vMid!).toBeGreaterThan(2.4);
     expect(vMid!).toBeLessThan(2.6);
@@ -73,8 +90,8 @@ describe("End-to-end: full pipeline", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -87,7 +104,7 @@ describe("End-to-end: full pipeline", () => {
     expect(stepEnd.converged.ours).toBe(true);
 
     // Lower voltage = diode anode ≈ 0.6–0.75V
-    const vAnode = stepEnd.nodes["d1:A"]?.ours ?? stepEnd.nodes["r1:B"]?.ours;
+    const vAnode = nodeOurs(stepEnd.nodes, "d1:A", "r1:neg");
     expect(vAnode).toBeDefined();
     expect(vAnode!).toBeGreaterThan(0.55);
     expect(vAnode!).toBeLessThan(0.80);
@@ -115,8 +132,8 @@ describe("End-to-end: tight transient tolerances", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "c1:pos"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "c1:pos"],
             ["c1:neg",  "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -130,7 +147,7 @@ describe("End-to-end: tight transient tolerances", () => {
 
     const lastStep = session.getStepEnd(session.getSessionShape().stepCount.ours - 1);
     // Capacitor top node voltage must remain at 5V with <0.1% drift
-    const vCap = lastStep.nodes["c1:pos"]?.ours ?? lastStep.nodes["r1:B"]?.ours;
+    const vCap = nodeOurs(lastStep.nodes, "c1:pos", "r1:neg");
     expect(vCap).toBeDefined();
     const driftPct = Math.abs(vCap! - 5.0) / 5.0 * 100;
     expect(driftPct).toBeLessThan(0.1);
@@ -149,8 +166,8 @@ describe("End-to-end: tight transient tolerances", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "c1:pos"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "c1:pos"],
             ["c1:neg",  "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -166,7 +183,7 @@ describe("End-to-end: tight transient tolerances", () => {
     const stepCount = session.getSessionShape().stepCount.ours;
     const lastStep = session.getStepEnd(stepCount - 1);
     // Steady-state accuracy: <0.01% voltage deviation
-    const vNode = lastStep.nodes["c1:pos"]?.ours ?? lastStep.nodes["r1:B"]?.ours;
+    const vNode = nodeOurs(lastStep.nodes, "c1:pos", "r1:neg");
     expect(vNode).toBeDefined();
     const errorPct = Math.abs(vNode! - 5.0) / 5.0 * 100;
     expect(errorPct).toBeLessThan(0.01);
@@ -186,9 +203,9 @@ describe("End-to-end: tight transient tolerances", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "l1:A"],
-            ["l1:B",    "gnd:out"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "l1:pos"],
+            ["l1:neg",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
         });
@@ -230,8 +247,8 @@ describe("End-to-end: multi-nonlinear convergence", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "d2:A"],
             ["d2:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
@@ -245,13 +262,13 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     expect(stepEnd.converged.ours).toBe(true);
 
     // D2 anode = single diode drop ≈ 0.6–0.75V
-    const vD2A = stepEnd.nodes["d2:A"]?.ours ?? stepEnd.nodes["d1:K"]?.ours;
+    const vD2A = nodeOurs(stepEnd.nodes, "d2:A", "d1:K");
     expect(vD2A).toBeDefined();
     expect(vD2A!).toBeGreaterThan(0.55);
     expect(vD2A!).toBeLessThan(0.80);
 
     // D1 anode = two diode drops ≈ 1.2–1.5V
-    const vD1A = stepEnd.nodes["d1:A"]?.ours ?? stepEnd.nodes["r1:B"]?.ours;
+    const vD1A = nodeOurs(stepEnd.nodes, "d1:A", "r1:neg");
     expect(vD1A).toBeDefined();
     expect(vD1A!).toBeGreaterThan(1.1);
     expect(vD1A!).toBeLessThan(1.6);
@@ -276,9 +293,9 @@ describe("End-to-end: multi-nonlinear convergence", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
-            ["r1:B",    "d2:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
+            ["r1:neg",    "d2:A"],
             ["d1:K",    "gnd:out"],
             ["d2:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
@@ -292,7 +309,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     expect(stepEnd.converged.ours).toBe(true);
 
     // Diode forward voltage ≈ 0.6–0.75V
-    const vAnode = stepEnd.nodes["d1:A"]?.ours ?? stepEnd.nodes["r1:B"]?.ours;
+    const vAnode = nodeOurs(stepEnd.nodes, "d1:A", "r1:neg");
     expect(vAnode).toBeDefined();
     expect(vAnode!).toBeGreaterThan(0.55);
     expect(vAnode!).toBeLessThan(0.80);
@@ -314,10 +331,10 @@ describe("End-to-end: multi-nonlinear convergence", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "r2:A"],
-            ["r1:B",    "d1:A"],
-            ["r2:B",    "gnd:out"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "r2:pos"],
+            ["r1:neg",    "d1:A"],
+            ["r2:neg",    "gnd:out"],
             ["d1:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -329,7 +346,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const stepEnd = session.getStepEnd(0);
     expect(stepEnd.converged.ours).toBe(true);
 
-    const vMid = stepEnd.nodes["d1:A"]?.ours ?? stepEnd.nodes["r1:B"]?.ours;
+    const vMid = nodeOurs(stepEnd.nodes, "d1:A", "r1:neg");
     expect(vMid).toBeDefined();
     expect(vMid!).toBeGreaterThan(0.55);
     expect(vMid!).toBeLessThan(0.80);
@@ -352,11 +369,11 @@ describe("End-to-end: multi-nonlinear convergence", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "gnd:out"],
             ["gnd:out", "d2:A"],
-            ["d2:K",    "r1:B"],
+            ["d2:K",    "r1:neg"],
             ["vs:neg",  "gnd:out"],
           ],
         });
@@ -367,7 +384,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const stepEnd = session.getStepEnd(0);
     expect(stepEnd.converged.ours).toBe(true);
 
-    const vNode = stepEnd.nodes["d1:A"]?.ours ?? stepEnd.nodes["r1:B"]?.ours;
+    const vNode = nodeOurs(stepEnd.nodes, "d1:A", "r1:neg");
     expect(vNode).toBeDefined();
     expect(vNode!).toBeGreaterThan(0.55);
     expect(vNode!).toBeLessThan(0.80);
@@ -392,9 +409,9 @@ describe("End-to-end: analytical verification", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "r2:A"],
-            ["r2:B",    "gnd:out"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "r2:pos"],
+            ["r2:neg",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
         });
@@ -428,8 +445,8 @@ describe("End-to-end: analytical verification", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["vs:pos",  "r1:A"],
-            ["r1:B",    "d1:A"],
+            ["vs:pos",  "r1:pos"],
+            ["r1:neg",    "d1:A"],
             ["d1:K",    "gnd:out"],
             ["vs:neg",  "gnd:out"],
           ],
@@ -441,7 +458,7 @@ describe("End-to-end: analytical verification", () => {
     const stepEnd = session.getStepEnd(0);
     expect(stepEnd.converged.ours).toBe(true);
 
-    const vd = stepEnd.nodes["d1:A"]?.ours ?? stepEnd.nodes["r1:B"]?.ours;
+    const vd = nodeOurs(stepEnd.nodes, "d1:A", "r1:neg");
     expect(vd).toBeDefined();
 
     const iOhm = (Vs - vd!) / R;
@@ -474,11 +491,11 @@ describe("End-to-end: analytical verification", () => {
             { id: "gnd", type: "Ground" },
           ],
           connections: [
-            ["v1:pos",  "r1:A"],
-            ["v2:pos",  "r2:A"],
-            ["r1:B",    "r2:B"],
-            ["r1:B",    "r3:A"],
-            ["r3:B",    "gnd:out"],
+            ["v1:pos",  "r1:pos"],
+            ["v2:pos",  "r2:pos"],
+            ["r1:neg",    "r2:neg"],
+            ["r1:neg",    "r3:pos"],
+            ["r3:neg",    "gnd:out"],
             ["v1:neg",  "gnd:out"],
             ["v2:neg",  "gnd:out"],
           ],
@@ -517,8 +534,8 @@ describe("MOSFET through compiler", () => {
             { id: "gnd2", type: "Ground" },
           ],
           connections: [
-            ["vdd:pos",  "rd:A"],
-            ["rd:B",     "m1:D"],
+            ["vdd:pos",  "rd:pos"],
+            ["rd:neg",     "m1:D"],
             ["vg:pos",   "m1:G"],
             ["m1:S",     "gnd1:out"],
             ["vdd:neg",  "gnd1:out"],
@@ -533,7 +550,7 @@ describe("MOSFET through compiler", () => {
     expect(stepEnd.converged.ours).toBe(true);
 
     // Drain node: pulled below VDD by ≈0.1014mA through 10kΩ
-    const vDrain = stepEnd.nodes["m1:D"]?.ours ?? stepEnd.nodes["rd:B"]?.ours;
+    const vDrain = nodeOurs(stepEnd.nodes, "m1:D", "rd:neg");
     expect(vDrain).toBeDefined();
     expect(vDrain!).toBeGreaterThan(1.3);   // saturation condition
     expect(vDrain!).toBeLessThan(5.0);      // drain pulled below supply
@@ -557,8 +574,8 @@ describe("MOSFET through compiler", () => {
             { id: "gnd2", type: "Ground" },
           ],
           connections: [
-            ["vdd:pos",  "rd:A"],
-            ["rd:B",     "m1:D"],
+            ["vdd:pos",  "rd:pos"],
+            ["rd:neg",     "m1:D"],
             ["vg:pos",   "m1:G"],
             ["m1:S",     "gnd1:out"],
             ["vdd:neg",  "gnd1:out"],
@@ -573,7 +590,7 @@ describe("MOSFET through compiler", () => {
     expect(stepEnd.converged.ours).toBe(true);
 
     // Drain node (lowest non-ground voltage): must be in triode → Vds < Vgs-Vth = 2.3V
-    const vDrain = stepEnd.nodes["m1:D"]?.ours ?? stepEnd.nodes["rd:B"]?.ours;
+    const vDrain = nodeOurs(stepEnd.nodes, "m1:D", "rd:neg");
     expect(vDrain).toBeDefined();
     expect(vDrain!).toBeLessThan(2.3);   // triode condition
     expect(vDrain!).toBeGreaterThan(0.0); // conducting (above ground)
@@ -600,8 +617,8 @@ describe("MOSFET through compiler", () => {
           ],
           connections: [
             ["vs:pos",   "m1:S"],
-            ["m1:D",     "rd:A"],
-            ["rd:B",     "gnd1:out"],
+            ["m1:D",     "rd:pos"],
+            ["rd:neg",     "gnd1:out"],
             ["vg:pos",   "m1:G"],
             ["vs:neg",   "gnd1:out"],
             ["vg:neg",   "gnd2:out"],
@@ -616,7 +633,7 @@ describe("MOSFET through compiler", () => {
 
     // Drain node: pulled up from ground by PMOS current through Rd
     // Expected ≈ 0.5V, must be above ground and confirm saturation: |Vds|>1.3V → Vdrain<3.7V
-    const vDrain = stepEnd.nodes["m1:D"]?.ours ?? stepEnd.nodes["rd:A"]?.ours;
+    const vDrain = nodeOurs(stepEnd.nodes, "m1:D", "rd:pos");
     expect(vDrain).toBeDefined();
     expect(vDrain!).toBeGreaterThan(0.0);   // PMOS conducting (above ground)
     expect(vDrain!).toBeLessThan(3.7);      // saturation: |Vds|=5-Vdrain > 1.3V

@@ -15,7 +15,7 @@ import type { Viewport } from '../editor/viewport.js';
 import type { ComponentPalette } from '../editor/palette.js';
 import type { ComponentRegistry } from '../core/registry.js';
 
-import type { SimulationCoordinator } from '../solver/coordinator-types.js';
+import type { TestBridgeDataSource } from '../solver/coordinator-types.js';
 import type { ScopePanel } from '../runtime/analog-scope-panel.js';
 import { pinWorldPosition, rotatePoint } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
@@ -133,7 +133,7 @@ export function createTestBridge(
   canvas: HTMLCanvasElement,
   _palette: ComponentPalette,
   registry: ComponentRegistry,
-  coordinatorGetter: () => SimulationCoordinator,
+  coordinatorGetter: () => TestBridgeDataSource,
   placementGetter: () => { isActive(): boolean } = () => ({ isActive: () => false }),
   scopeGetter: () => ScopePanel[] = () => [],
 ): TestBridge {

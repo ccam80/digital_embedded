@@ -1,239 +1,331 @@
-/**
- * Optocoupler tests — A1 post-composition survivors.
- *
- * All hand-computed expected-value tests from the pre-composition PWL
- * implementation deleted per A1 §Test handling rule: those tests encoded
- * the inline PWL LED model (vForward/rLed params) and the cross-port Jacobian
- * of the shortcut implementation. The composition now delegates to diode.ts
- * (dioload.c) and bjt.ts (bjtload.c); the expected values must come from
- * the ngspice harness, not hand computation.
- *
- * What survives (per §A1 "Test handling during A1 execution"):
- *   1. Parameter plumbing — ctr, Is, n params accepted and stored.
- *   2. Engine-agnostic interface contracts — poolBacked, stateSize, initState.
- *   3. Salvaged behavioural tests — migrated to DefaultSimulatorFacade.
- *      PWL-derived expected voltages removed; convergence and qualitative
- *      assertions are valid for both the old and new model.
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
-import { OptocouplerDefinition } from "../optocoupler.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { createDefaultRegistry } from "../../../components/register-all.js";
+import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-function makeOptocouplerCore(
-  nAnode: number,
-  nCathode: number,
-  nCollector: number,
-  nEmitter: number,
-  _nBase: number,
-  opts: { ctr?: number; Is?: number; n?: number } = {},
-) {
-  const ctr = opts.ctr ?? 1.0;
-  const Is  = opts.Is  ?? 1e-14;
-  const n   = opts.n   ?? 1.0;
-  const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
-    ["vceSat",    0.3],
-    ["bandwidth", 50000],
-    ["label",     ""],
-  ]).entries());
-  props.replaceModelParams({ ctr, Is, n });
-  return getFactory(OptocouplerDefinition.modelRegistry!["behavioral"]!)(
-    new Map([
-      ["anode", nAnode], ["cathode", nCathode],
-      ["collector", nCollector], ["emitter", nEmitter],
-    ]),
-    props,
-    () => 0,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Parameter plumbing
-// ---------------------------------------------------------------------------
-
-describe("Optocoupler parameter plumbing", () => {
-  it("accepts ctr, Is, n params without throwing", () => {
-    expect(() =>
-      makeOptocouplerCore(1, 2, 3, 4, 5, { ctr: 0.5, Is: 2e-14, n: 1.5 }),
-    ).not.toThrow();
-  });
-
-  it("default params produce a valid element", () => {
-    const el = makeOptocouplerCore(1, 2, 3, 4, 5);
-    expect(el).toBeDefined();
-    expect(el.branchIndex).toBe(-1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Engine-agnostic interface contracts
-// ---------------------------------------------------------------------------
-
-describe("Optocoupler composite interface (PB-OPTO)", () => {
-  it("is pool-backed (extends CompositeElement; state delegated to sub-elements via initState)", () => {
-    const el = makeOptocouplerCore(1, 2, 3, 4, 5);
-    // The composite extends CompositeElement which has poolBacked = true.
-    // initState is overridden to forward to pool-backed sub-elements (_dLed, _bjtPhoto)
-    // using the _stateBase values they set themselves via ctx.allocStates() in setup().
-    expect((el as any).poolBacked).toBe(true);
-  });
-
-  it("branchIndex is -1 (no extra MNA row at composite level)", () => {
-    const el = makeOptocouplerCore(1, 2, 3, 4, 5);
-    expect(el.branchIndex).toBe(-1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Salvaged behavioural tests — migrated to DefaultSimulatorFacade
+// .dts paths (T3 harness fixtures)
 //
-// These scenarios originally validated the inline PWL LED model. The
-// composition now delegates to ngspice diode (Is/n) + BJT (NPN) + CCCS
-// coupler. PWL-derived expected voltages have been removed; assertions are
-// restricted to convergence and qualitative physics that hold for both models.
+// Two regimes share the same canonical bench topology:
+//   - active: vLed=5V, rLed=1k, vCC=5V, rCol=1k - LED forward-biased, CCCS
+//     injects ~mA-scale photocurrent into the phototransistor base.
+//   - low:    vLed=1.5V (other components identical) - LED in soft turn-on
+//     region, photocurrent in the sub-mA band.
 // ---------------------------------------------------------------------------
 
+const DTS_ACTIVE = path.resolve(
+  "src/components/active/__tests__/fixtures/optocoupler-cccs-canon-active.dts",
+);
+const DTS_LOW = path.resolve(
+  "src/components/active/__tests__/fixtures/optocoupler-cccs-canon-low.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function nodeOf(fix: Fixture, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+function ceByLabel(fix: Fixture, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
 /**
- * Build a basic optocoupler circuit via facade:
- *   DcVoltageSource → Resistor → Optocoupler(anode→cathode) → GND (input side)
- *   Optocoupler(collector) → R_load → GND (output side, emitter tied to GND)
+ * Optocoupler bench used by every programmatic build below:
+ *
+ *   vLed(+) - rLed - tx:anode      tx:cathode - GND
+ *   vCC (+) - rCol - tx:collector  tx:emitter - GND
+ *
+ * The LED is forward-biased by vLed through rLed. The phototransistor's
+ * collector is pulled up to vCC through rCol. With CTR=1.0 the collector
+ * current mirrors the LED current; the collector node V drops below vCC
+ * by approximately I_C * rCol = I_LED * rCol.
  */
-function buildOptoCircuit(opts: {
-  vIn: number;
-  rSeries: number;
-  rLoad: number;
-  ctr?: number;
-  Is?: number;
-  n?: number;
-}): { facade: DefaultSimulatorFacade; coordinator: import("../../../solver/coordinator-types.js").SimulationCoordinator } {
-  const registry = createDefaultRegistry();
-  const facade = new DefaultSimulatorFacade(registry);
-  const circuit = facade.build({
+function buildOptocouplerBench(
+  facade: DefaultSimulatorFacade,
+  opts: { vLed: number; rLed: number; vCC: number; rCol: number; ctr?: number; Is?: number; n?: number },
+): Circuit {
+  const txProps: Record<string, string | number> = { label: "tx" };
+  if (opts.ctr !== undefined) txProps.ctr = opts.ctr;
+  if (opts.Is !== undefined)  txProps.Is  = opts.Is;
+  if (opts.n !== undefined)   txProps.n   = opts.n;
+  return facade.build({
     components: [
-      { id: "vs",   type: "DcVoltageSource", props: { voltage: opts.vIn } },
-      { id: "rs",   type: "Resistor",        props: { resistance: opts.rSeries } },
-      { id: "opto", type: "Optocoupler",     props: {
-          ctr: opts.ctr ?? 1.0,
-          Is:  opts.Is  ?? 1e-14,
-          n:   opts.n   ?? 1.0,
-        },
-      },
-      { id: "rl",   type: "Resistor",        props: { resistance: opts.rLoad } },
+      { id: "vLed", type: "DcVoltageSource", props: { label: "vLed", voltage: opts.vLed } },
+      { id: "rLed", type: "Resistor",       props: { label: "rLed", resistance: opts.rLed } },
+      { id: "vCC",  type: "DcVoltageSource", props: { label: "vCC",  voltage: opts.vCC } },
+      { id: "rCol", type: "Resistor",       props: { label: "rCol", resistance: opts.rCol } },
+      { id: "tx",   type: "Optocoupler",    props: txProps },
       { id: "gnd",  type: "Ground" },
     ],
     connections: [
-      ["vs:pos",        "rs:A"],
-      ["rs:B",          "opto:anode"],
-      ["opto:cathode",  "gnd:out"],
-      ["opto:collector","rl:A"],
-      ["rl:B",          "gnd:out"],
-      ["opto:emitter",  "gnd:out"],
-      ["vs:neg",        "gnd:out"],
+      ["vLed:pos",   "rLed:pos"],
+      ["rLed:neg",   "tx:anode"],
+      ["tx:cathode", "gnd:out"],
+      ["vLed:neg",   "gnd:out"],
+      ["vCC:pos",    "rCol:pos"],
+      ["rCol:neg",   "tx:collector"],
+      ["tx:emitter", "gnd:out"],
+      ["vCC:neg",    "gnd:out"],
     ],
   });
-  const coordinator = facade.compile(circuit);
-  return { facade, coordinator };
 }
 
-describe("Optocoupler (salvaged behavioural tests — post-composition facade)", () => {
-  it("current_transfer", () => {
-    // Input: V_in = 1.3V, R_series = 10Ω → LED conducts → I_C > 0.
-    // CTR = 1.0. Assert convergence only — expected V(collector) is
-    // ngspice-model-derived and not computable by hand for the diode law.
-    const { facade } = buildOptoCircuit({ vIn: 1.3, rSeries: 10, rLoad: 1000, ctr: 1.0 });
-    const result = facade.getDcOpResult();
-    expect(result?.converged).toBe(true);
-  });
+// ---------------------------------------------------------------------------
+// Category 1 - Initialization (T1)
+//
+// Post-warm-start: the optocoupler bench produces finite node voltages on
+// the LED-side anode and the phototransistor collector. With vLed=5V/rLed=1k
+// and CTR=1.0 the LED is forward-biased and the collector node sits below
+// the +5V rail by I_C * rCol.
+// ---------------------------------------------------------------------------
 
-  it("galvanic_isolation", () => {
-    // Same CTR regardless of output-side ground potential.
-    // Case 1: emitter grounded (covered by buildOptoCircuit).
-    // Case 2: separate supply rail on emitter via second voltage source.
-    // Both must converge — confirms MNA isolation between input and output.
-    const registry1 = createDefaultRegistry();
-    const facade1 = new DefaultSimulatorFacade(registry1);
-    const circuit1 = facade1.build({
-      components: [
-        { id: "vs",   type: "DcVoltageSource", props: { voltage: 1.3 } },
-        { id: "rs",   type: "Resistor",        props: { resistance: 10 } },
-        { id: "opto", type: "Optocoupler",     props: { ctr: 1.0 } },
-        { id: "rl",   type: "Resistor",        props: { resistance: 1000 } },
-        { id: "gnd",  type: "Ground" },
-      ],
-      connections: [
-        ["vs:pos",        "rs:A"],
-        ["rs:B",          "opto:anode"],
-        ["opto:cathode",  "gnd:out"],
-        ["opto:collector","rl:A"],
-        ["rl:B",          "gnd:out"],
-        ["opto:emitter",  "gnd:out"],
-        ["vs:neg",        "gnd:out"],
-      ],
+describe("Optocoupler initialization (T1)", () => {
+  it("init_active_anode_below_rail_collector_below_rail", () => {
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        buildOptocouplerBench(facade, { vLed: 5, rLed: 1000, vCC: 5, rCol: 1000 }),
     });
-    facade1.compile(circuit1);
-    const result1 = facade1.getDcOpResult();
-    expect(result1?.converged).toBe(true);
 
-    // Case 2: emitter driven to 5V via voltage source (isolated output rail)
-    const registry2 = createDefaultRegistry();
-    const facade2 = new DefaultSimulatorFacade(registry2);
-    const circuit2 = facade2.build({
-      components: [
-        { id: "vsIn",     type: "DcVoltageSource", props: { voltage: 1.3 } },
-        { id: "vsEmit",   type: "DcVoltageSource", props: { voltage: 5.0 } },
-        { id: "rs",       type: "Resistor",        props: { resistance: 10 } },
-        { id: "opto",     type: "Optocoupler",     props: { ctr: 1.0 } },
-        { id: "rl",       type: "Resistor",        props: { resistance: 1000 } },
-        { id: "gnd",      type: "Ground" },
-      ],
-      connections: [
-        ["vsIn:pos",      "rs:A"],
-        ["rs:B",          "opto:anode"],
-        ["opto:cathode",  "gnd:out"],
-        ["opto:collector","rl:A"],
-        ["rl:B",          "vsEmit:pos"],
-        ["opto:emitter",  "vsEmit:pos"],
-        ["vsEmit:neg",    "gnd:out"],
-        ["vsIn:neg",      "gnd:out"],
-      ],
+    const vAnode     = fix.engine.getNodeVoltage(nodeOf(fix, "tx:anode"));
+    const vCollector = fix.engine.getNodeVoltage(nodeOf(fix, "tx:collector"));
+
+    // LED is forward-biased: anode sits well below the 5V rail
+    // (the diode drop + rLed*I_LED leaves vAnode in the 0.5..1.5V band).
+    expect(vAnode).toBeGreaterThan(0);
+    expect(vAnode).toBeLessThan(5);
+    // With CTR=1.0 and a 1k collector pull-up, the collector node is
+    // pulled below +5V by I_C * rCol.
+    expect(vCollector).toBeGreaterThanOrEqual(0);
+    expect(vCollector).toBeLessThan(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2 - DC operating point analytical (T1)
+//
+// CCCS coupling: with CTR=1.0 the phototransistor collector current mirrors
+// the LED current. I_LED is set by the LED-side closed-form
+// (vLed - vAnode) / rLed; I_C is observed at the collector pull-up. The
+// wide CTR ratio band (0.1x..10x) accommodates the BJT model's
+// beta-dependent dynamics on top of the CCCS algebraic injection.
+// ---------------------------------------------------------------------------
+
+describe("Optocoupler DCOP analytical (T1)", () => {
+  it("dcop_photocurrent_couples_through_phototransistor_collector", () => {
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        buildOptocouplerBench(facade, { vLed: 5, rLed: 1000, vCC: 5, rCol: 1000 }),
     });
-    facade2.compile(circuit2);
-    const result2 = facade2.getDcOpResult();
-    expect(result2?.converged).toBe(true);
+
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    // Closed-form on the LED side: vLed = 5V, rLed = 1k, V_diode ~ 0.7V.
+    // I_LED = (vLed - vAnode) / rLed must exceed 1 mA.
+    const vAnode = fix.engine.getNodeVoltage(nodeOf(fix, "tx:anode"));
+    const iLed = (5.0 - vAnode) / 1000;
+    expect(iLed).toBeGreaterThan(1e-3);
+
+    // Closed-form on the collector side: I_C = (vCC - vCollector) / rCol.
+    // With CTR=1.0 the photocurrent flows; expect I_C above 0.1 mA.
+    const vCollector = fix.engine.getNodeVoltage(nodeOf(fix, "tx:collector"));
+    const iCollector = (5.0 - vCollector) / 1000;
+    expect(iCollector).toBeGreaterThan(1e-4);
+
+    // CTR=1.0 contract: I_C tracks I_LED within the BJT-beta band.
+    expect(iCollector / iLed).toBeGreaterThan(0.1);
+    expect(iCollector / iLed).toBeLessThan(10.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 3 + 5 - Transient step-end paired + full-iteration paired (T3)
+// Category 2 numerical paired - same session, step 0 (DCOP).
+//
+// Two .dts circuits cover two operating regimes (active LED drive at 5V
+// and a low-drive bench at 1.5V). One ComparisonSession per .dts; the
+// transient runs in the FIRST it() of each describe and the per-step /
+// per-iteration sweeps read from the recorded session.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Optocoupler active vs ngspice - transient + stamp parity (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_ACTIVE, dllPath: DLL_PATH });
   });
 
-  it("led_forward_voltage", () => {
-    // V_in = 0.5V — well below LED forward voltage → LED off → I_C ≈ 0.
-    // Qualitative assertion: convergence confirmed.
-    const { facade } = buildOptoCircuit({ vIn: 0.5, rSeries: 10, rLoad: 1000 });
-    const result = facade.getDcOpResult();
-    expect(result?.converged).toBe(true);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("zero_input_zero_output", () => {
-    // V_in = 0V → I_LED = 0 → I_C = 0.
-    const { facade } = buildOptoCircuit({ vIn: 0.0, rSeries: 10, rLoad: 1000 });
-    const result = facade.getDcOpResult();
-    expect(result?.converged).toBe(true);
+  it("transient_step_end_paired_active", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
   });
 
-  it("ctr_scaling", () => {
-    // CTR = 0.5; input drives LED, output collector current ≈ 0.5 × I_LED.
-    // Assert convergence only — expected V(collector) is model-derived.
-    const { facade } = buildOptoCircuit({ vIn: 1.4, rSeries: 10, rLoad: 1000, ctr: 0.5 });
-    const result = facade.getDcOpResult();
-    expect(result?.converged).toBe(true);
+  it("dcop_paired_active", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+  });
+
+  it("full_iteration_paired_active", () => {
+    session.compareAllAttempts();
+  });
+});
+
+describeIfDll("Optocoupler low-drive vs ngspice - transient + stamp parity (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_LOW, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_low", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_low", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+  });
+
+  it("full_iteration_paired_low", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 4 - Parameter hot-load (T1)
+//
+// Three parameters carried by the Optocoupler model: ctr (primary scaling),
+// Is (LED diode saturation current - structural), n (LED emission
+// coefficient - structural). One it() per parameter asserts the documented
+// post-change observable on the collector or anode node voltage.
+// ---------------------------------------------------------------------------
+
+describe("Optocoupler parameter hot-load (T1)", () => {
+  it("hotload_ctr_lowers_collector_voltage", () => {
+    // Documented contract: raising CTR multiplies the algebraic photocurrent
+    // injected into the phototransistor base, which raises I_C, which
+    // increases the I*R drop across rCol, which lowers V(collector).
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        buildOptocouplerBench(facade, { vLed: 5, rLed: 1000, vCC: 5, rCol: 1000, ctr: 1.0 }),
+    });
+
+    const colNode = nodeOf(fix, "tx:collector");
+    const before = fix.engine.getNodeVoltage(colNode);
+
+    const tx = ceByLabel(fix, "tx");
+    fix.coordinator.setComponentProperty(tx, "ctr", 5.0);
+    fix.coordinator.step();
+
+    const after = fix.engine.getNodeVoltage(colNode);
+    expect(after).not.toBeCloseTo(before);
+    // Raising CTR increases I_C, so V(collector) decreases.
+    expect(Math.sign(after - before)).toBe(-1);
+  });
+
+  it("hotload_Is_raises_led_current_lowers_anode_voltage", () => {
+    // Is is the LED diode saturation current. Raising Is increases the
+    // diode's I-V slope at a given V_diode, which raises I_LED at the
+    // same vLed. With rLed unchanged, I*R rises across rLed and the anode
+    // node voltage falls (vAnode = vLed - I_LED * rLed).
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        buildOptocouplerBench(facade, { vLed: 5, rLed: 1000, vCC: 5, rCol: 1000, Is: 1e-14 }),
+    });
+
+    const aNode = nodeOf(fix, "tx:anode");
+    const before = fix.engine.getNodeVoltage(aNode);
+
+    const tx = ceByLabel(fix, "tx");
+    fix.coordinator.setComponentProperty(tx, "Is", 1e-12);
+    fix.coordinator.step();
+
+    const after = fix.engine.getNodeVoltage(aNode);
+    expect(after).not.toBeCloseTo(before);
+    // Raising Is increases I_LED, so V(anode) decreases.
+    expect(Math.sign(after - before)).toBe(-1);
+  });
+
+  it("hotload_n_changes_led_anode_voltage", () => {
+    // n is the LED diode emission coefficient. n appears in the diode I-V
+    // equation as I = Is*(exp(V/(n*Vt))-1); raising n softens the
+    // exponential turn-on so the diode requires more V_diode to pass the
+    // same current, which raises V(anode) at fixed I_LED. The hot-load
+    // observable is that V(anode) shifts.
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        buildOptocouplerBench(facade, { vLed: 5, rLed: 1000, vCC: 5, rCol: 1000, n: 1.0 }),
+    });
+
+    const aNode = nodeOf(fix, "tx:anode");
+    const before = fix.engine.getNodeVoltage(aNode);
+
+    const tx = ceByLabel(fix, "tx");
+    fix.coordinator.setComponentProperty(tx, "n", 2.0);
+    fix.coordinator.step();
+
+    const after = fix.engine.getNodeVoltage(aNode);
+    expect(after).not.toBeCloseTo(before);
+    // Raising n softens the LED exponential so V_diode increases at fixed
+    // current path - the anode node moves up toward the supply rail.
+    expect(Math.sign(after - before)).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 6 - Limiting events (T1, own engine)
+//
+// The Optocoupler composite contains a Diode (LED) and an NpnBJT
+// (phototransistor); both call pnjlim inside their load() paths. With a
+// strong LED forward bias (5V across the 1k series resistor) the LED
+// junction drives V_diode well past pnjlim's limit threshold during early
+// NR iterations, exercising the limiter. The phototransistor's BE/BC
+// junctions also see large excursions on the warm-start.
+// ---------------------------------------------------------------------------
+
+describe("Optocoupler limiting (T1, own engine)", () => {
+  it("limiting_events_recorded_during_dcop", () => {
+    const fix = buildFixture({
+      build: (_r, facade) =>
+        buildOptocouplerBench(facade, { vLed: 5, rLed: 1000, vCC: 5, rCol: 1000 }),
+    });
+
+    fix.coordinator.setLimitingCapture(true);
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    const events = fix.coordinator.getLimitingEvents();
+    // The composite drives at least one junction (LED diode VD or BJT
+    // VBE/VBC) into pnjlim during NR; at least one limiting event is
+    // captured for the well-driven bench.
+    expect(events.length).toBeGreaterThan(0);
   });
 });

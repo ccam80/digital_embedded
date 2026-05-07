@@ -19,6 +19,9 @@ const DTS_QUIESCENT_LOW = path.resolve(
 const DTS_ASTABLE = path.resolve(
   "src/components/active/__tests__/fixtures/timer555-canon-astable.dts",
 );
+const DTS_MONOSTABLE = path.resolve(
+  "src/components/active/__tests__/fixtures/timer555-canon-monostable.dts",
+);
 
 // ---------------------------------------------------------------------------
 // Helper: locate the Timer555LatchDriver leaf element in a compiled circuit.
@@ -247,6 +250,46 @@ describeIfDll("Timer555 paired vs ngspice — astable (T3)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Categories 2-numerical / 3 / 5 — Monostable paired vs ngspice (T3)
+// One-shot: TRIG fed by a square-wave source (PULSE in ngspice) idling LOW at
+// t=0 to fire the latch, returns HIGH after half-period; THR/DIS connected to
+// RC charging through R from VCC. Pulse width = 1.1·R·C ≈ 220ms with R=20k,
+// C=10µF. Distinct from astable (single-shot vs self-oscillating) and from
+// quiescent-low (TRIG transitions through 1/3 VCC threshold instead of static).
+// ---------------------------------------------------------------------------
+
+describeIfDll("Timer555 paired vs ngspice — monostable (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_MONOSTABLE, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_monostable", async () => {
+    await session.runTransient(0, 4e-1, 1e-3);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_monostable", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_monostable", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category 4 — Parameter hot-load (T1)
 // ---------------------------------------------------------------------------
 // TIMER555_PARAM_DEFS: vDrop, rDischarge, rOut, cOut, vOH, vOL. Documented
@@ -360,6 +403,67 @@ describe("Timer555 parameter hot-load (T1)", () => {
     const after = fix.engine.getNodeVoltage(outNode!);
     // After hot-load, OUT should be closer to 0.5V than 0.0V.
     expect(Math.abs(after - 0.5)).toBeLessThan(Math.abs(after - 0.0));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 9 — Digital interaction / bridge (T1)
+// ---------------------------------------------------------------------------
+// Timer555 has all-analog inputs (VCC, GND, TRIG, THR, CTRL, RST, DIS) and a
+// single digital OUT pin (driven by DigitalOutputPinLoaded with the latch's
+// OUTPUT_LOGIC_LEVEL slot). Cat 9 is one-way: analog input → digital output
+// read via coordinator.readByLabel("t:OUT").value. Drive TRIG/THR to known
+// states that force latch SET vs RESET, step, observe digital output level.
+// ---------------------------------------------------------------------------
+
+function buildBridgeFixture(opts: { vTrig: number; vThr: number }) {
+  const VCC = 5;
+  return buildFixture({
+    build: (_r, facade) =>
+      facade.build({
+        components: [
+          { id: "vcc",   type: "DcVoltageSource", props: { label: "vcc",   voltage: VCC          } },
+          { id: "vtrig", type: "DcVoltageSource", props: { label: "vtrig", voltage: opts.vTrig   } },
+          { id: "vthr",  type: "DcVoltageSource", props: { label: "vthr",  voltage: opts.vThr    } },
+          { id: "t",     type: "Timer555",        props: { label: "t"                            } },
+          { id: "out",   type: "Out",             props: { label: "OUT_DIG", bitWidth: 1         } },
+          { id: "gnd",   type: "Ground" },
+        ],
+        connections: [
+          ["vcc:pos",   "t:VCC"],
+          ["vcc:neg",   "gnd:out"],
+          ["t:GND",     "gnd:out"],
+          ["t:RST",     "vcc:pos"],
+          ["vtrig:pos", "t:TRIG"],
+          ["vtrig:neg", "gnd:out"],
+          ["vthr:pos",  "t:THR"],
+          ["vthr:neg",  "gnd:out"],
+          ["t:DIS",     "gnd:out"],
+          ["t:OUT",     "out:in"],
+        ],
+      }),
+  });
+}
+
+describe("Timer555 digital interaction (Cat 9)", () => {
+  it("bridge_trig_below_third_vcc_drives_out_high_digital", () => {
+    // VCC=5V, TRIG=0.5V (< 1/3 VCC=1.667V) → comp2 fires → latch SET → digital
+    // OUT level = 1. THR=1V (< 2/3 VCC) keeps comp1 inactive.
+    const fix = buildBridgeFixture({ vTrig: 0.5, vThr: 1.0 });
+    fix.coordinator.step();
+    const sig = fix.coordinator.readByLabel("OUT_DIG");
+    expect(sig.type).toBe("digital");
+    expect(sig.value).toBe(1);
+  });
+
+  it("bridge_thr_above_two_thirds_vcc_drives_out_low_digital", () => {
+    // VCC=5V, TRIG=4V (> 1/3 VCC) keeps comp2 inactive; THR=4V (> 2/3 VCC=3.333V)
+    // → comp1 fires → latch RESET → digital OUT level = 0.
+    const fix = buildBridgeFixture({ vTrig: 4.0, vThr: 4.0 });
+    fix.coordinator.step();
+    const sig = fix.coordinator.readByLabel("OUT_DIG");
+    expect(sig.type).toBe("digital");
+    expect(sig.value).toBe(0);
   });
 });
 

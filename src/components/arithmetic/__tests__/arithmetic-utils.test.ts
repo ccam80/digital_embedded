@@ -426,6 +426,32 @@ describe("BarrelShifter param hot-load mode and direction (Cat 4)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// BarrelShifter — Cat 13 (port-width clamping on overrun)
+// bitWidth=8 → shift port is ceil(log2(8))=3 bits wide. The upstream In sized
+// to that 3-bit port masks any wider value to (source & 0b111) before it
+// reaches the BarrelShifter. Documented mask: out-of-range shift amounts wrap
+// to their low-order shiftBits.
+// ---------------------------------------------------------------------------
+
+describe("BarrelShifter port-width clamping on overrun (Cat 13)", () => {
+  it("barrelshifter_shift_overrun_masks_to_zero", () => {
+    // bitWidth=8 → shift port = 3 bits. SHIFT=8 (1000b) masks to 000b = 0,
+    // so logical-left of 0xAB by 0 is 0xAB (no shift).
+    const fix = buildBarrelShifterFixture(8, "logical", "left");
+    drive(fix, { IN: 0xAB, SHIFT: 8 });
+    expect(read(fix, "OUT")).toBe(0xAB);
+  });
+
+  it("barrelshifter_shift_overrun_wraps_to_nonzero_masked_shift", () => {
+    // bitWidth=8 → shift port = 3 bits. SHIFT=10 (1010b) masks to 010b = 2,
+    // so logical-left of 0x01 by 2 is 0x04.
+    const fix = buildBarrelShifterFixture(8, "logical", "left");
+    drive(fix, { IN: 0x01, SHIFT: 10 });
+    expect(read(fix, "OUT")).toBe(0x04);
+  });
+});
+
 // ===========================================================================
 // BIT COUNT — Cat 9 + Cat 4 (bitWidth)
 // Pin schema: in (bitWidth) -> out (outBitsFor(bitWidth))

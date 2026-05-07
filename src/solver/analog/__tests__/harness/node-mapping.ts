@@ -243,7 +243,18 @@ export function reindexNgspiceSession(
       voltages: reindexArray(iter.voltages),
       prevVoltages: reindexArray(iter.prevVoltages),
       preSolveRhs: iter.preSolveRhs.length > 0 ? reindexArray(iter.preSolveRhs) : iter.preSolveRhs,
-      // elementStates and matrix are not reindexed- they use labels
+      // matrix and elementStates are intentionally NOT reindexed. The line-by-
+      // line port of ngspice's allocation order, cktTranslate first-sight
+      // sequence, and NGSPICE_LOAD_ORDER sort guarantees both engines assign
+      // the same internal sparse-matrix indices to the same external-node
+      // pairs. Matrix entries are compared raw (row, col) against ours by
+      // _assertFirstIterationMatrixEntriesMatch, which classifies divergences
+      // as: (a) coordinate-set drift (oursOnly/ngOnly entries), (b) value
+      // permutation (same coord set + same value multiset, values shuffled),
+      // or (c) genuine arithmetic divergence at aligned cells (multisets
+      // differ). Reindexing here would silently absorb (a) and (b)- both
+      // structural porting bugs in load order or internal-node allocation-
+      // and is forbidden.
     };
   }
 

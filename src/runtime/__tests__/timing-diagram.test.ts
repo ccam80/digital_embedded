@@ -6,7 +6,10 @@
 
 import { describe, it, expect } from "vitest";
 import { TimingDiagramPanel } from "../timing-diagram.js";
-import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
+import {
+  buildNonEngineCoordinator,
+  type NonEngineCoordinator,
+} from "@/test-utils/non-engine-coordinator.js";
 import type { SignalAddress } from "@/compile/types.js";
 import { PinDirection } from "@/core/pin.js";
 
@@ -35,32 +38,26 @@ const TWO_CHANNELS = [
   { name: "DATA", addr: DATA_ADDR, width: 8 },
 ];
 
-/**
- * Build a MockCoordinator with call-tracking for saveSnapshot/restoreSnapshot.
- * saveSnapshot() returns an incrementing ID starting from 0.
- */
 function buildCoordinator(): {
-  coordinator: MockCoordinator;
+  coordinator: NonEngineCoordinator;
   setSignal(addr: SignalAddress, value: number): void;
   getRestoreCalls(): Array<{ method: "restoreSnapshot"; id: number }>;
   resetCalls(): void;
 } {
-  const coord = new MockCoordinator();
-  let nextSnapshotId = 0;
-  const restoreCalls: Array<{ method: "restoreSnapshot"; id: number }> = [];
-
-  (coord as unknown as { saveSnapshot(): number }).saveSnapshot = () => nextSnapshotId++;
-  (coord as unknown as { restoreSnapshot(id: number): void }).restoreSnapshot = (id: number) => {
-    restoreCalls.push({ method: "restoreSnapshot", id });
-  };
-
+  const coord = buildNonEngineCoordinator();
   return {
     coordinator: coord,
     setSignal: (addr: SignalAddress, value: number) => {
       coord.setSignal(addr, { type: "digital", value });
     },
-    getRestoreCalls: () => restoreCalls,
-    resetCalls: () => { restoreCalls.length = 0; nextSnapshotId = 0; },
+    getRestoreCalls: () =>
+      coord.snapshotCalls.restores.map((id) => ({
+        method: "restoreSnapshot" as const,
+        id: id as number,
+      })),
+    resetCalls: () => {
+      coord.snapshotCalls.restores.length = 0;
+    },
   };
 }
 

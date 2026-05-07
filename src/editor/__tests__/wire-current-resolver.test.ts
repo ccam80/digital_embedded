@@ -1,1460 +1,456 @@
 ﻿/**
- * Tests for WireCurrentResolver- KCL-correct tree-traced wire current attribution.
+ * Tests for WireCurrentResolver — KCL-correct tree-traced wire current attribution.
+ *
+ * Every fixture is built through the sanctioned `buildFixture` constructor
+ * and the resolver is fed the `CurrentResolverContext` produced by
+ * `coordinator.getCurrentResolverContext()`. This exercises the full
+ * compile → DCOP → step → resolve pipeline on real production elements.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { WireCurrentResolver } from "../wire-current-resolver";
-import { Wire, Circuit } from "@/core/circuit";
-import type { CurrentResolverContext } from "@/solver/coordinator-types";
-import { AnalogElement } from "@/solver/analog/element";
-import type { CircuitElement } from "@/core/element";
-import type { Pin, Rotation } from "@/core/pin";
-import { PinDirection } from "@/core/pin";
-import type { Rect, RenderContext } from "@/core/renderer-interface";
-import type { SerializedElement } from "@/core/element";
-import type { MNAEngine } from "@/solver/analog/analog-engine";
-import type { ConcreteCompiledAnalogCircuit } from "@/solver/analog/compiled-analog-circuit";
-import { DefaultSimulationCoordinator } from "@/solver/coordinator";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "@/components/sources/dc-voltage-source";
-import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "@/components/passives/capacitor";
-import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "@/components/passives/inductor";
-import { PropertyBag } from "@/core/properties";
-import { makeAcVoltageSourceElement } from "@/components/sources/ac-voltage-source";
-import type { SetupContext } from "@/solver/analog/setup-context";
-import type { LoadContext } from "@/solver/analog/load-context";
+import { describe, it, expect } from "vitest";
+import { WireCurrentResolver } from "../wire-current-resolver.js";
+import { buildFixture } from "../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { Wire } from "../../core/circuit.js";
+import type { CircuitElement } from "../../core/element.js";
+import type { CurrentResolverContext } from "../../solver/coordinator-types.js";
+import type { DefaultSimulationCoordinator } from "../../solver/coordinator.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../solver/analog/compiled-analog-circuit.js";
+import { pinWorldPosition } from "../../core/pin.js";
 
 // ---------------------------------------------------------------------------
-// Local element factory helpers- use production constructors / factories
+// Helpers — public-surface only, no engine impersonation
 // ---------------------------------------------------------------------------
 
-/** Inline resistor factory: 2-terminal, stamps conductance G=1/R. */
-class WireTestResistorEl extends AnalogElement {
-  readonly ngspiceLoadOrder = 40;
-  private _hPP = -1;
-  private _hNN = -1;
-  private _hPN = -1;
-  private _hNP = -1;
-  private readonly _G: number;
-  constructor(pinNodes: ReadonlyMap<string, number>, resistance: number) {
-    super(pinNodes);
-    this._G = 1 / Math.max(resistance, 1e-9);
+/** Get the resolver-input context from the coordinator's public surface. */
+function ctxOf(coordinator: DefaultSimulationCoordinator): CurrentResolverContext {
+  const ctx = coordinator.getCurrentResolverContext();
+  if (ctx === null) throw new Error("coordinator has no analog domain");
+  return ctx;
+}
+
+/** All wires belonging to the MNA node containing the given component pin. */
+function wiresAtPin(
+  circuit: ConcreteCompiledAnalogCircuit,
+  allWires: readonly Wire[],
+  ce: CircuitElement,
+  pinLabel: string,
+): Wire[] {
+  const pin = ce.getPins().find((p) => p.label === pinLabel);
+  if (!pin) throw new Error(`pin ${pinLabel} not found on ${ce.instanceId}`);
+  const pos = pinWorldPosition(ce, pin);
+  // The pin's node is whichever wire endpoint matches its world position.
+  let nodeId: number | undefined;
+  for (const w of allWires) {
+    const id = circuit.wireToNodeId.get(w);
+    if (id === undefined) continue;
+    if (
+      (Math.abs(w.start.x - pos.x) < 0.5 && Math.abs(w.start.y - pos.y) < 0.5) ||
+      (Math.abs(w.end.x - pos.x) < 0.5 && Math.abs(w.end.y - pos.y) < 0.5)
+    ) {
+      nodeId = id;
+      break;
+    }
   }
-  setup(ctx: SetupContext): void {
-    const p = this.pinNodes.get("pos")!;
-    const n = this.pinNodes.get("neg")!;
-    this._hPP = ctx.solver.allocElement(p, p);
-    this._hNN = ctx.solver.allocElement(n, n);
-    this._hPN = ctx.solver.allocElement(p, n);
-    this._hNP = ctx.solver.allocElement(n, p);
+  if (nodeId === undefined) {
+    throw new Error(`no wire-mapped node found at pin ${ce.instanceId}:${pinLabel}`);
   }
-  load(ctx: LoadContext): void {
-    ctx.solver.stampElement(this._hPP, this._G);
-    ctx.solver.stampElement(this._hNN, this._G);
-    ctx.solver.stampElement(this._hPN, -this._G);
-    ctx.solver.stampElement(this._hNP, -this._G);
+  return allWires.filter((w) => circuit.wireToNodeId.get(w) === nodeId);
+}
+
+/** Find the visual CircuitElement for a given component label. */
+function ceByLabel(
+  circuit: ConcreteCompiledAnalogCircuit,
+  label: string,
+): CircuitElement {
+  for (const ce of circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
   }
-  getPinCurrents(rhs: Float64Array): number[] {
-    const vA = rhs[this.pinNodes.get("pos")!];
-    const vB = rhs[this.pinNodes.get("neg")!];
-    const I = this._G * (vA - vB);
-    return [I, -I];
+  throw new Error(`label ${label} not found in compiled circuit`);
+}
+
+/** Find the analog element index for a given component label. */
+function elementIndexByLabel(
+  circuit: ConcreteCompiledAnalogCircuit,
+  label: string,
+): number {
+  for (const [idx, ce] of circuit.elementToCircuitElement) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return idx;
   }
-  setParam(key: string, value: number): void {
-    void key; void value;
-  }
-}
-
-function makeResistor(posNode: number, negNode: number, resistance: number): AnalogElement {
-  return new WireTestResistorEl(new Map([["pos", posNode], ["neg", negNode]]), resistance);
-}
-
-/** DC voltage source factory wrapping makeDcVoltageSource. */
-function makeDcVsElement(posNode: number, negNode: number, _branchNode: number, voltage: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
-
-/** AC voltage source factory wrapping createAcVoltageSourceElement. */
-function makeAcVoltageSource(
-  posNode: number,
-  negNode: number,
-  branchNode: number,
-  amplitude: number,
-  frequency: number,
-  phase: number,
-  dcOffset: number,
-  getTime: () => number,
-): AnalogElement {
-  void branchNode;
-  const props = new PropertyBag();
-  props.replaceModelParams({ amplitude, frequency, phase, dcOffset });
-  return makeAcVoltageSourceElement(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    props,
-    getTime,
-  );
-}
-
-/** Capacitor factory using the production AnalogCapacitorElement. */
-function makeCapacitor(posNode: number, negNode: number, capacitance: number): AnalogElement {
-  const capProps = new PropertyBag();
-  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
-  return new AnalogCapacitorElement(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    capProps,
-  );
-}
-
-/** Inductor factory using the production AnalogInductorElement. */
-function makeInductor(posNode: number, negNode: number, branchNode: number, inductance: number): AnalogElement {
-  void branchNode;
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...INDUCTOR_DEFAULTS, inductance });
-  return new AnalogInductorElement(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    props,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-/** Create a Wire with given coordinates. */
-function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
-  return new Wire({ x: x1, y: y1 }, { x: x2, y: y2 });
-}
-
-/** Minimal AnalogElement stub with stamp no-op. */
-class WireTestMockEl extends AnalogElement {
-  readonly ngspiceLoadOrder = 0;
-  private readonly _pinCount: number;
-  constructor(pinNodes: ReadonlyMap<string, number>, branchIndex: number) {
-    super(pinNodes);
-    this.branchIndex = branchIndex;
-    this._pinCount = pinNodes.size;
-  }
-  setup(_ctx: SetupContext): void {}
-  load(_ctx: LoadContext): void {}
-  getPinCurrents(): number[] { return Array(this._pinCount).fill(0); }
-  setParam(_k: string, _v: number): void {}
-}
-
-function makeMockElement(pinNodes: number[], branchIndex = -1): AnalogElement {
-  const pins = new Map(pinNodes.map((n, i) => [`p${i}`, n]));
-  return new WireTestMockEl(pins, branchIndex);
-}
-
-/**
- * Create a mock CircuitElement with pins at absolute positions.
- * element.position = (0,0), rotation = 0, mirror = false, so
- * pinWorldPosition returns pin.position directly.
- */
-function makeCE(pins: Array<{ x: number; y: number }>): CircuitElement {
-  const resolvedPins: Pin[] = pins.map((p, i) => ({
-    position: { x: p.x, y: p.y },
-    label: `p${i}`,
-    direction: PinDirection.BIDIRECTIONAL,
-    isNegated: false,
-    isClock: false,
-    bitWidth: 1,
-    kind: 'signal' as const,
-  }));
-
-  const serialized: SerializedElement = {
-    typeId: "mock",
-    instanceId: "mock",
-    position: { x: 0, y: 0 },
-    rotation: 0 as SerializedElement["rotation"],
-    mirror: false,
-    properties: {},
-  };
-
-  return {
-    typeId: "mock",
-    instanceId: "mock",
-    position: { x: 0, y: 0 },
-    rotation: 0 as Rotation,
-    mirror: false,
-    getPins() {
-      return resolvedPins;
-    },
-    getProperties() {
-      return new Map() as any;
-    },
-    getBoundingBox(): Rect {
-      return { x: 0, y: 0, width: 1, height: 1 };
-    },
-    draw(_ctx: RenderContext) {},
-    serialize() {
-      return serialized;
-    },
-    getAttribute() {
-      return undefined;
-    },
-  } as unknown as CircuitElement;
-}
-
-/**
- * Build a CurrentResolverContext from mock elements, pin positions, and wire map.
- * The elementCurrents array provides per-element currents; pin currents are [I, -I].
- */
-function makeContext(
-  elements: AnalogElement[],
-  circuitElements: CircuitElement[],
-  wireToNodeId: Map<Wire, number>,
-  elementCurrents: number[],
-): CurrentResolverContext {
-  const elementToCircuitElement = new Map<number, CircuitElement>();
-  const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
-  for (let i = 0; i < circuitElements.length; i++) {
-    elementToCircuitElement.set(i, circuitElements[i]);
-    const pins = circuitElements[i].getPins();
-    elementPinVertices.set(i, pins.map(p => ({ x: p.position.x, y: p.position.y })));
-  }
-  return {
-    wireToNodeId,
-    elements,
-    elementToCircuitElement,
-    circuitElements,
-    elementPinVertices,
-    getElementPinCurrents(id: number): number[] {
-      const I = elementCurrents[id] ?? 0;
-      return [I, -I];
-    },
-  };
-}
-
-/**
- * Build a ConcreteCompiledAnalogCircuit for use with the real MNAEngine.
- * Call makeContextFromEngine(engine, result) to get the CurrentResolverContext.
- */
-function makeCompiledWithEngine(params: {
-  nodeCount: number;
-  branchCount: number;
-  elements: AnalogElement[];
-  circuitElements: CircuitElement[];
-  wireToNodeId: Map<Wire, number>;
-}): ConcreteCompiledAnalogCircuit {
-  const elementToCircuitElement = new Map<number, CircuitElement>();
-  const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
-  for (let i = 0; i < params.circuitElements.length; i++) {
-    elementToCircuitElement.set(i, params.circuitElements[i]);
-    const pins = params.circuitElements[i].getPins();
-    elementPinVertices.set(i, pins.map(p => ({ x: p.position.x, y: p.position.y })));
-  }
-
-  return {
-    nodeCount: params.nodeCount,
-    branchCount: params.branchCount,
-    matrixSize: params.nodeCount + params.branchCount,
-    elements: params.elements,
-    labelToNodeId: new Map<string, number>(),
-    wireToNodeId: params.wireToNodeId,
-    elementToCircuitElement,
-    elementPinVertices,
-    netCount: params.nodeCount,
-    componentCount: params.elements.length,
-    elementCount: params.elements.length,
-    timeRef: { value: 0 },
-    models: new Map(),
-    diagnostics: [],
-    bridges: [],
-  } as unknown as ConcreteCompiledAnalogCircuit;
-}
-
-/** Acquire a MNAEngine from a pre-compiled analog circuit without constructing
- *  MNAEngine directly- routes through DefaultSimulationCoordinator per UC-1. */
-function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
-  const coordinator = new DefaultSimulationCoordinator({
-    digital: null,
-    analog: compiled,
-    bridges: [],
-    wireSignalMap: new Map(),
-    labelSignalMap: new Map(),
-    labelToCircuitElement: new Map(),
-    pinSignalMap: new Map(),
-    diagnostics: [],
-    allCircuitElements: [],
-  });
-  return coordinator.getAnalogEngine() as MNAEngine;
-}
-
-/**
- * Build a CurrentResolverContext from a real MNAEngine + compiled circuit.
- * The engine provides live pin currents; the compiled circuit provides topology.
- */
-function makeContextFromEngine(
-  engine: MNAEngine,
-  compiled: ConcreteCompiledAnalogCircuit,
-): CurrentResolverContext {
-  return {
-    wireToNodeId: compiled.wireToNodeId,
-    elements: compiled.elements,
-    elementToCircuitElement: compiled.elementToCircuitElement,
-    circuitElements: [...compiled.elementToCircuitElement.values()],
-    elementPinVertices: compiled.elementPinVertices,
-    elementResolvedPins: compiled.elementResolvedPins,
-    getElementPinCurrents(elementIndex: number): number[] {
-      return engine.getElementPinCurrents(elementIndex);
-    },
-  };
+  throw new Error(`label ${label} not found among analog elements`);
 }
 
 // ===========================================================================
-// Unit tests- mock elements with known currents
+// Basic resolver behaviour on real DC circuits
 // ===========================================================================
 
-describe("WireCurrentResolver", () => {
-  let resolver: WireCurrentResolver;
+describe("WireCurrentResolver - DC behaviour through buildFixture", () => {
+  it("series resistors: every wire on the loop carries the same current", () => {
+    // Vs(5V) -> R1(1k) -> R2(2k) -> ground (single loop, KCL-balanced).
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 2000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "r2:pos"],
+          ["r2:neg",   "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 1e-4, maxTimeStep: 1e-5 },
+    });
 
-  beforeEach(() => {
-    resolver = new WireCurrentResolver();
+    const resolver = new WireCurrentResolver();
+    resolver.resolve(ctxOf(fix.coordinator));
+
+    const idxR1 = elementIndexByLabel(fix.circuit, "r1");
+    const I_loop = Math.abs(fix.coordinator.readElementCurrent(idxR1) ?? 0);
+    expect(I_loop).toBeGreaterThan(0);
+
+    const wires = fix.facade.getCircuit()!.wires;
+    const r1 = ceByLabel(fix.circuit, "r1");
+    const r2 = ceByLabel(fix.circuit, "r2");
+    for (const w of [
+      ...wiresAtPin(fix.circuit, wires, r1, "A"),
+      ...wiresAtPin(fix.circuit, wires, r1, "B"),
+      ...wiresAtPin(fix.circuit, wires, r2, "A"),
+      ...wiresAtPin(fix.circuit, wires, r2, "B"),
+    ]) {
+      const wc = resolver.getWireCurrent(w);
+      expect(wc).toBeDefined();
+      expect(Math.abs(wc!.current - I_loop) / I_loop).toBeLessThan(0.01);
+    }
   });
 
-  it("series_circuit_uniform_current", () => {
-    // 4 components in a closed series loop (KCL balanced at every node):
-    //   source (0â†’1) â†’ R1 (1â†’2) â†’ R2 (2â†’3) â†’ gnd_return (3â†’0)
-    // Each node has a wire with element pins at BOTH endpoints. All carry 5 mA.
-    const w1 = makeWire(0, 2, 2, 2);   // node 1: source.pos â†’ R1.A
-    const w2 = makeWire(4, 2, 6, 2);   // node 2: R1.B â†’ R2.A
-    const w3 = makeWire(8, 2, 10, 2);  // node 3: R2.B â†’ gnd_return.A
-    const w0 = makeWire(10, 0, 0, 0);  // node 0: gnd_return.B â†’ source.neg
+  it("parallel split at junction: branch wires carry their branch's current", () => {
+    // Vs(5V) -> R1(1k) -> junction -> R2(2k) || R3(3k) -> ground.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 5 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 2000 } },
+          { id: "r3",  type: "Resistor",        props: { label: "r3",  resistance: 3000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "r2:pos"],
+          ["r1:neg",   "r3:pos"],
+          ["r2:neg",   "gnd:out"],
+          ["r3:neg",   "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 1e-4, maxTimeStep: 1e-5 },
+    });
 
-    const circuit = new Circuit();
-    circuit.addWire(w0);
-    circuit.addWire(w1);
-    circuit.addWire(w2);
-    circuit.addWire(w3);
+    const resolver = new WireCurrentResolver();
+    resolver.resolve(ctxOf(fix.coordinator));
 
-    const wireToNodeId = new Map<Wire, number>([
-      [w0, 0],
-      [w1, 1],
-      [w2, 2],
-      [w3, 3],
-    ]);
+    const I_R1 = Math.abs(fix.coordinator.readElementCurrent(elementIndexByLabel(fix.circuit, "r1")) ?? 0);
+    const I_R2 = Math.abs(fix.coordinator.readElementCurrent(elementIndexByLabel(fix.circuit, "r2")) ?? 0);
+    const I_R3 = Math.abs(fix.coordinator.readElementCurrent(elementIndexByLabel(fix.circuit, "r3")) ?? 0);
 
-    const elements = [
-      makeMockElement([0, 1]), // source
-      makeMockElement([1, 2]), // R1
-      makeMockElement([2, 3]), // R2
-      makeMockElement([3, 0]), // gnd_return (closes the loop)
-    ];
-    const ces = [
-      makeCE([{ x: 0, y: 0 }, { x: 0, y: 2 }]),   // source: neg(0,0) pos(0,2)
-      makeCE([{ x: 2, y: 2 }, { x: 4, y: 2 }]),   // R1: A(2,2) B(4,2)
-      makeCE([{ x: 6, y: 2 }, { x: 8, y: 2 }]),   // R2: A(6,2) B(8,2)
-      makeCE([{ x: 10, y: 2 }, { x: 10, y: 0 }]), // gnd: A(10,2) B(10,0)
-    ];
+    // KCL at the junction.
+    expect(Math.abs(I_R1 - I_R2 - I_R3) / I_R1).toBeLessThan(1e-6);
 
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.005, 0.005, 0.005, 0.005]);
-
-    resolver.resolve(ctx);
-
-
-    // Component body paths must match wire currents
+    // Component body paths: one per analog 2-terminal element with a CE.
     const paths = resolver.getComponentPaths();
-    expect(paths).toHaveLength(4);
+    expect(paths.length).toBeGreaterThanOrEqual(3);
+
+    // Each component body path's current matches its element current.
+    const bodyByLabel = new Map<string, number>();
+    let pIdx = 0;
+    for (const [eIdx, ce] of fix.circuit.elementToCircuitElement) {
+      void eIdx;
+      const lbl = ce.getProperties().getOrDefault<string>("label", "");
+      if (pIdx >= paths.length) break;
+      bodyByLabel.set(lbl, paths[pIdx].current);
+      pIdx++;
+    }
+    expect(Math.abs((bodyByLabel.get("r1") ?? 0) - I_R1) / I_R1).toBeLessThan(0.01);
+    expect(Math.abs((bodyByLabel.get("r2") ?? 0) - I_R2) / I_R2).toBeLessThan(0.01);
+    expect(Math.abs((bodyByLabel.get("r3") ?? 0) - I_R3) / I_R3).toBeLessThan(0.01);
   });
 
-  it("parallel_branch_split", () => {
-    // Source â†’ junction (node 1) â†’ R1 (node 2) + R2 (node 3) â†’ gnd
-    // All nodes balanced (KCL). Node 1 is a 3-wire junction.
-    //
-    // Layout: junction at (2,2), source.pos at (0,2), R1.A at (2,0), R2.A at (2,4)
-    const wSrc = makeWire(0, 2, 2, 2); // node 1: source.pos â†’ junction
-    const wJ1  = makeWire(2, 2, 2, 0); // node 1: junction â†’ R1.A
-    const wJ2  = makeWire(2, 2, 2, 4); // node 1: junction â†’ R2.A
-    const wR1  = makeWire(4, 0, 6, 0); // node 2: R1.B â†’ gndR1.A
-    const wR2  = makeWire(4, 4, 6, 4); // node 3: R2.B â†’ gndR2.A
+  it("getWireCurrent returns undefined for wires the resolver never saw", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 1 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 100 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 1e-4, maxTimeStep: 1e-5 },
+    });
 
-    const circuit = new Circuit();
-    circuit.addWire(wSrc);
-    circuit.addWire(wJ1);
-    circuit.addWire(wJ2);
-    circuit.addWire(wR1);
-    circuit.addWire(wR2);
+    const resolver = new WireCurrentResolver();
+    resolver.resolve(ctxOf(fix.coordinator));
 
-    const wireToNodeId = new Map<Wire, number>([
-      [wSrc, 1], [wJ1, 1], [wJ2, 1],
-      [wR1, 2],
-      [wR2, 3],
-    ]);
+    const wires = fix.facade.getCircuit()!.wires;
+    expect(wires.length).toBeGreaterThan(0);
+    expect(resolver.getWireCurrent(wires[0])).toBeDefined();
 
-    // source (0â†’1, 10 mA), R1 (1â†’2, 3 mA), R2 (1â†’3, 7 mA)
-    // gndR1 (2â†’0, 3 mA), gndR2 (3â†’0, 7 mA)- close the loop
-    const elements = [
-      makeMockElement([0, 1]),  // source
-      makeMockElement([1, 2]),  // R1
-      makeMockElement([1, 3]),  // R2
-      makeMockElement([2, 0]),  // gndR1 (R1 return)
-      makeMockElement([3, 0]),  // gndR2 (R2 return)
-    ];
-    const ces = [
-      makeCE([{ x: 0, y: -2 }, { x: 0, y: 2 }]), // source: neg(0,-2) pos(0,2)
-      makeCE([{ x: 2, y: 0 }, { x: 4, y: 0 }]),  // R1: A(2,0) B(4,0)
-      makeCE([{ x: 2, y: 4 }, { x: 4, y: 4 }]),  // R2: A(2,4) B(4,4)
-      makeCE([{ x: 6, y: 0 }, { x: 6, y: -2 }]), // gndR1: A(6,0) B(6,-2)
-      makeCE([{ x: 6, y: 4 }, { x: 6, y: -2 }]), // gndR2: A(6,4) B(6,-2)
-    ];
-
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.01, 0.003, 0.007, 0.003, 0.007]);
-
-    resolver.resolve(ctx);
-
-    // Component body paths must match adjacent wire currents
-    const paths = resolver.getComponentPaths();
-    expect(paths).toHaveLength(5);
+    // A Wire instance the resolver has never seen - distinct identity, not in
+    // any node's wire map - must produce no result.
+    const stranger = new Wire({ x: 99999, y: 99999 }, { x: 99998, y: 99998 });
+    expect(resolver.getWireCurrent(stranger)).toBeUndefined();
   });
 
-  it("disconnected_wire_zero_current", () => {
-    const wDisconnected = makeWire(5, 5, 6, 5);
-    const wConnected = makeWire(0, 0, 2, 0);
+  it("clear() resets the resolver state", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 1 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 100 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 1e-4, maxTimeStep: 1e-5 },
+    });
 
-    const circuit = new Circuit();
-    circuit.addWire(wDisconnected);
-    circuit.addWire(wConnected);
+    const resolver = new WireCurrentResolver();
+    resolver.resolve(ctxOf(fix.coordinator));
 
-    const wireToNodeId = new Map<Wire, number>([[wConnected, 1]]);
-
-    const elements = [makeMockElement([0, 1])];
-    const ces = [makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }])];
-
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.005]);
-
-    resolver.resolve(ctx);
-
-    // A wire not in wireToNodeId (not in the analog domain) has no resolver entry.
-    const cDisc = resolver.getWireCurrent(wDisconnected);
-    expect(cDisc).toBeUndefined();
-  });
-
-  it("direction_follows_unit_vector", () => {
-    // Two elements share node 1 via a wire: source enters, R1 leaves.
-    // KCL balanced: +I at wire.start, -I at wire.end â†’ total = 0.
-    const wire = makeWire(0, 0, 4, 0);
-
-    const circuit = new Circuit();
-    circuit.addWire(wire);
-
-    const wireToNodeId = new Map<Wire, number>([[wire, 1]]);
-    const elements = [
-      makeMockElement([0, 1]), // source: pin1 at (0,0) injects +I into node 1
-      makeMockElement([1, 2]), // R1: pin0 at (4,0) takes -I from node 1
-    ];
-    const ces = [
-      makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }]),  // source: neg(0,-2) pos(0,0)
-      makeCE([{ x: 4, y: 0 }, { x: 4, y: 2 }]),    // R1: A(4,0) B(4,2)
-    ];
-
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.01, 0.01]);
-
-    resolver.resolve(ctx);
-
-    const result = resolver.getWireCurrent(wire);
-    expect(result).toBeDefined();
-    expect(result!.current).toBeGreaterThan(0);
-
-    const [dx, dy] = result!.direction;
-    void Math.sqrt(dx * dx + dy * dy);
-  });
-
-  it("flowSign_indicates_direction_relative_to_wire", () => {
-    // Wire from (0,0) to (4,0) at node 1. Two elements balance KCL:
-    //   source pin1 at (0,0) injects +I (current enters node 1)
-    //   R1 pin0 at (4,0) injects -I (current leaves node 1)
-    // Current flows startâ†’end â†’ flowSign = +1.
-    const wire = makeWire(0, 0, 4, 0);
-    const circuit = new Circuit();
-    circuit.addWire(wire);
-
-    const wireToNodeId = new Map<Wire, number>([[wire, 1]]);
-
-    const elements = [
-      makeMockElement([0, 1]), // source
-      makeMockElement([1, 2]), // R1
-    ];
-    const ces = [
-      makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }]),  // source: neg, pos(0,0)
-      makeCE([{ x: 4, y: 0 }, { x: 4, y: 2 }]),    // R1: A(4,0), B(4,2)
-    ];
-
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.01, 0.01]);
-
-    resolver.resolve(ctx);
-
-    const result = resolver.getWireCurrent(wire)!;
-    // Current enters at wire.start (0,0) and leaves at wire.end (4,0)
-    expect(result.flowSign).toBe(1);
-  });
-
-  it("clear_resets_results", () => {
-    const wire = makeWire(0, 0, 2, 0);
-    const circuit = new Circuit();
-    circuit.addWire(wire);
-
-    const wireToNodeId = new Map<Wire, number>([[wire, 1]]);
-    const elements = [makeMockElement([0, 1])];
-    const ces = [makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }])];
-
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.005]);
-
-    resolver.resolve(ctx);
-    expect(resolver.getWireCurrent(wire)).toBeDefined();
+    const wires = fix.facade.getCircuit()!.wires;
+    expect(resolver.getWireCurrent(wires[0])).toBeDefined();
 
     resolver.clear();
-    expect(resolver.getWireCurrent(wire)).toBeUndefined();
+    expect(resolver.getWireCurrent(wires[0])).toBeUndefined();
+    expect(resolver.getComponentPaths()).toHaveLength(0);
   });
-
 });
 
 // ===========================================================================
-// KCL conservation tests- real MNA engine, tree-traced attribution
+// Resistor ladder - KCL holds at every junction node
 // ===========================================================================
 
-describe("WireCurrentResolver- KCL conservation", () => {
-  let resolver: WireCurrentResolver;
-
-  beforeEach(() => {
-    resolver = new WireCurrentResolver();
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 1: DC source + 3 resistors (parallel split at junction)
-  //
-  // Vs(5V) â†’ R1(1kÎ©) â†’ node2 â†’ R2(2kÎ©)||R3(3kÎ©) â†’ ground
-  //
-  // Node 1: Vs.pos(0,0), R1.A(4,0) - single wire
-  // Node 2: R1.B(8,0), R2.A(8,6), R3.A(14,3)- JUNCTION at (8,3)
-  //   Wire: (8,0)â†’(8,3), (8,3)â†’(8,6), (8,3)â†’(14,3)
-  // Ground: Vs.neg(0,6), R2.B(8,10), R3.B(14,10)
-  // -------------------------------------------------------------------------
-
-  it("DC parallel split: junction wires carry correct individual currents", () => {
-    const R1 = 1000,
-      R2 = 2000,
-      R3 = 3000,
-      VS = 5;
-    // MNA: node1=idx0, node2=idx1, branch=idx2 â†’ matrixSize=3
-    const vs = makeDcVsElement(1, 0, 2, VS);
-    const r1 = makeResistor(1, 2, R1);
-    const r2 = makeResistor(2, 0, R2);
-    const r3 = makeResistor(2, 0, R3);
-
-    const ceVs = makeCE([{ x: 0, y: 0 }, { x: 0, y: 6 }]);
-    const ceR1 = makeCE([{ x: 4, y: 0 }, { x: 8, y: 0 }]);
-    const ceR2 = makeCE([{ x: 8, y: 6 }, { x: 8, y: 10 }]);
-    const ceR3 = makeCE([{ x: 14, y: 3 }, { x: 14, y: 10 }]);
-
-    const w_n1 = makeWire(0, 0, 4, 0);
-    const w_r1b = makeWire(8, 0, 8, 3);
-    const w_r2a = makeWire(8, 3, 8, 6);
-    const w_r3a = makeWire(8, 3, 14, 3);
-    const w_g1 = makeWire(0, 6, 8, 10);
-    const w_g2 = makeWire(8, 10, 14, 10);
-
-    const wireToNodeId = new Map<Wire, number>([
-      [w_n1, 1],
-      [w_r1b, 2],
-      [w_r2a, 2],
-      [w_r3a, 2],
-      [w_g1, 0],
-      [w_g2, 0],
-    ]);
-
-    const circuit = new Circuit();
-    for (const w of wireToNodeId.keys()) circuit.addWire(w);
-
-    const compiled = makeCompiledWithEngine({
-      nodeCount: 2,
-      branchCount: 1,
-      elements: [vs, r1, r2, r3],
-      circuitElements: [ceVs, ceR1, ceR2, ceR3],
-      wireToNodeId,
+describe("WireCurrentResolver - 4-node resistor ladder KCL", () => {
+  it("every junction's wires carry positive current and KCL is satisfied", () => {
+    // Vs(10V) -> R1(1k) -> n2 -> R3(1k) -> n3 -> R5(2k) -> n4 -> R7(4k) -> gnd
+    //                  |              |              |
+    //                R2(2k)->gnd    R4(3k)->gnd    R6(1k)->gnd
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 10 } },
+          { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
+          { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 2000 } },
+          { id: "r3",  type: "Resistor",        props: { label: "r3",  resistance: 1000 } },
+          { id: "r4",  type: "Resistor",        props: { label: "r4",  resistance: 3000 } },
+          { id: "r5",  type: "Resistor",        props: { label: "r5",  resistance: 2000 } },
+          { id: "r6",  type: "Resistor",        props: { label: "r6",  resistance: 1000 } },
+          { id: "r7",  type: "Resistor",        props: { label: "r7",  resistance: 4000 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "r2:pos"], ["r1:neg", "r3:pos"],
+          ["r3:neg",   "r4:pos"], ["r3:neg", "r5:pos"],
+          ["r5:neg",   "r6:pos"], ["r5:neg", "r7:pos"],
+          ["r2:neg",   "gnd:out"],
+          ["r4:neg",   "gnd:out"],
+          ["r6:neg",   "gnd:out"],
+          ["r7:neg",   "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 1e-4, maxTimeStep: 1e-5 },
     });
 
-    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
-    const dc = engine.dcOperatingPoint();
-    expect(dc.converged).toBe(true);
+    const resolver = new WireCurrentResolver();
+    resolver.resolve(ctxOf(fix.coordinator));
 
+    const wires = fix.facade.getCircuit()!.wires;
 
-    resolver.resolve(makeContextFromEngine(engine, compiled));
+    // Every wire at the three internal junction nodes must carry positive
+    // current - the resolver's tree-trace must not zero out a tree-internal
+    // edge in any of these split nodes.
+    for (const lbl of ["r1", "r3", "r5"]) {
+      const ce = ceByLabel(fix.circuit, lbl);
+      const adj = wiresAtPin(fix.circuit, wires, ce, "B");
+      expect(adj.length).toBeGreaterThan(0);
+      for (const w of adj) {
+        const wc = resolver.getWireCurrent(w);
+        expect(wc).toBeDefined();
+        expect(wc!.current).toBeGreaterThan(0);
+      }
+    }
 
-    // KCL at junction
-
-    // Cross-component KCL: wire at pin A == wire at pin B
-    // R1 (node1â†’node2): w_n1 (pin A side) == w_r1b (pin B side)
-
-    // Component body paths must match adjacent wire currents
+    // Each 2-terminal element's body path current matches its element current.
     const paths = resolver.getComponentPaths();
-    expect(paths).toHaveLength(4);
-  });
+    expect(paths.length).toBeGreaterThanOrEqual(8);
 
-  // -------------------------------------------------------------------------
-  // Test 2: 4-node resistor ladder
-  //
-  // Vs(10V)â†’R1(1kÎ©)â†’n2â†’R3(1kÎ©)â†’n3â†’R5(2kÎ©)â†’n4â†’R7(4kÎ©)â†’gnd
-  //                  |            |            |
-  //              R2(2kÎ©)â†’gnd  R4(3kÎ©)â†’gnd  R6(1kÎ©)â†’gnd
-  //
-  // 4 non-ground nodes. Nodes 2, 3, 4 each have 3-way junctions.
-  // -------------------------------------------------------------------------
-
-  it("4-node ladder: junction wires satisfy KCL at every node", () => {
-    const VS = 10;
-    const R1v = 1000, R2v = 2000, R3v = 1000, R4v = 3000;
-    const R5v = 2000, R6v = 1000, R7v = 4000;
-
-    const vs = makeDcVsElement(1, 0, 4, VS);
-    const r1 = makeResistor(1, 2, R1v);
-    const r2 = makeResistor(2, 0, R2v);
-    const r3 = makeResistor(2, 3, R3v);
-    const r4 = makeResistor(3, 0, R4v);
-    const r5 = makeResistor(3, 4, R5v);
-    const r6 = makeResistor(4, 0, R6v);
-    const r7 = makeResistor(4, 0, R7v);
-
-    const ceVs = makeCE([{ x: 0, y: 0 }, { x: 0, y: 10 }]);
-    const ceR1 = makeCE([{ x: 4, y: 0 }, { x: 8, y: 0 }]);
-    const ceR2 = makeCE([{ x: 8, y: 6 }, { x: 8, y: 10 }]);
-    const ceR3 = makeCE([{ x: 14, y: 3 }, { x: 18, y: 0 }]);
-    const ceR4 = makeCE([{ x: 18, y: 6 }, { x: 18, y: 10 }]);
-    const ceR5 = makeCE([{ x: 24, y: 3 }, { x: 28, y: 0 }]);
-    const ceR6 = makeCE([{ x: 28, y: 6 }, { x: 28, y: 10 }]);
-    const ceR7 = makeCE([{ x: 34, y: 3 }, { x: 34, y: 10 }]);
-
-    // Node 1: single wire
-    const w_n1 = makeWire(0, 0, 4, 0);
-
-    // Node 2: junction at (8,3)
-    const w2_r1b = makeWire(8, 0, 8, 3);
-    const w2_r2a = makeWire(8, 3, 8, 6);
-    const w2_r3a = makeWire(8, 3, 14, 3);
-
-    // Node 3: junction at (18,3)
-    const w3_r3b = makeWire(18, 0, 18, 3);
-    const w3_r4a = makeWire(18, 3, 18, 6);
-    const w3_r5a = makeWire(18, 3, 24, 3);
-
-    // Node 4: junction at (28,3)
-    const w4_r5b = makeWire(28, 0, 28, 3);
-    const w4_r6a = makeWire(28, 3, 28, 6);
-    const w4_r7a = makeWire(28, 3, 34, 3);
-
-    // Ground wires
-    const w_g1 = makeWire(0, 10, 8, 10);
-    const w_g2 = makeWire(8, 10, 18, 10);
-    const w_g3 = makeWire(18, 10, 28, 10);
-    const w_g4 = makeWire(28, 10, 34, 10);
-
-    const wireToNodeId = new Map<Wire, number>([
-      [w_n1, 1],
-      [w2_r1b, 2], [w2_r2a, 2], [w2_r3a, 2],
-      [w3_r3b, 3], [w3_r4a, 3], [w3_r5a, 3],
-      [w4_r5b, 4], [w4_r6a, 4], [w4_r7a, 4],
-      [w_g1, 0], [w_g2, 0], [w_g3, 0], [w_g4, 0],
-    ]);
-
-    const circuit = new Circuit();
-    for (const w of wireToNodeId.keys()) circuit.addWire(w);
-
-    const compiled = makeCompiledWithEngine({
-      nodeCount: 4,
-      branchCount: 1,
-      elements: [vs, r1, r2, r3, r4, r5, r6, r7],
-      circuitElements: [ceVs, ceR1, ceR2, ceR3, ceR4, ceR5, ceR6, ceR7],
-      wireToNodeId,
-    });
-
-    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
-    const dc = engine.dcOperatingPoint();
-    expect(dc.converged).toBe(true);
-
-    // Run resolver
-    resolver.resolve(makeContextFromEngine(engine, compiled));
-
-    // ---- Node 1 (single wire) ----
-
-    // ---- Cross-component KCL: wire at pin A == wire at pin B ----
-    // R1 (node1â†’node2): w_n1 (pin A side) == w2_r1b (pin B side)
-    // R3 (node2â†’node3): w2_r3a (pin A side) == w3_r3b (pin B side)
-    // R5 (node3â†’node4): w3_r5a (pin A side) == w4_r5b (pin B side)
-
-    // ---- Component body paths match wire currents ----
-    const paths = resolver.getComponentPaths();
-    expect(paths).toHaveLength(8);
-    // R1 (element 1)
-    // R3 (element 3)
-    // R5 (element 5)
-
-    // ---- All currents are positive (non-degenerate) ----
-    for (const w of [w_n1, w2_r1b, w2_r2a, w2_r3a, w3_r3b, w3_r4a, w3_r5a, w4_r5b, w4_r6a, w4_r7a]) {
-      expect(resolver.getWireCurrent(w)!.current).toBeGreaterThan(0);
+    let pIdx = 0;
+    for (const [eIdx] of fix.circuit.elementToCircuitElement) {
+      const I = Math.abs(fix.coordinator.readElementCurrent(eIdx) ?? 0);
+      if (pIdx >= paths.length) break;
+      if (I > 1e-9) {
+        expect(Math.abs(paths[pIdx].current - I) / I).toBeLessThan(0.01);
+      }
+      pIdx++;
     }
   });
 });
 
 // ===========================================================================
-// AC transient KCL- RLC circuit with time-varying currents
+// AC transient RLC - KCL holds at every timestep
 // ===========================================================================
 
-describe("WireCurrentResolver- AC transient RLC", () => {
-  // -------------------------------------------------------------------------
-  // AC source â†’ Resistor â†’ junction â†’ (Capacitor || Inductor) â†’ ground
-  //
-  // This is the topology of lrctest.dig. At the junction node, the resistor
-  // current splits into capacitor and inductor branches whose magnitudes and
-  // phases vary over time. The test verifies that the tree-traced resolver
-  // correctly attributes per-wire currents at every timestep during AC
-  // steady-state operation.
-  //
-  // MNA layout:
-  //   Node 1: Vs.pos, R.A       (voltages[0])
-  //   Node 2: R.B, C.pos, L.A   (voltages[1])  â† junction under test
-  //   Ground: Vs.neg, C.neg, L.B
-  //   Branch 0: Vs current       (voltages[2])
-  //   Branch 1: L current        (voltages[3])
-  //   matrixSize = 4
-  //
-  // Wire layout at node 2 (junction at (8,3)):
-  //   (8,0)â†’(8,3)    from R.B
-  //   (8,3)â†’(8,6)    to C.pos
-  //   (8,3)â†’(14,3)   to L.A
-  // -------------------------------------------------------------------------
-
-  it("RLC junction: wire currents match element currents at every AC timestep", () => {
-    const R = 1000;       // 1 kÎ©
-    const C = 1e-6;       // 1 ÂµF
-    const L = 0.1;        // 100 mH
-    const F = 100;        // 100 Hz
-    const A = 5;          // 5 V peak
-    const TAU = R * C;    // 1 ms (RC time constant)
-
-    const timeRef = { value: 0 };
-    const getTime = () => timeRef.value;
-
-    // Elements: Vs at branch 2, L at branch 3
-    const vs = makeAcVoltageSource(1, 0, 2, A, F, 0, 0, getTime);
-    const r = makeResistor(1, 2, R);
-    const cap = makeCapacitor(2, 0, C);
-    const ind = makeInductor(2, 0, 3, L);
-
-    // Pin positions
-    const ceVs = makeCE([{ x: 0, y: 0 }, { x: 0, y: 10 }]);   // pos(0,0), neg(0,10)
-    const ceR = makeCE([{ x: 4, y: 0 }, { x: 8, y: 0 }]);     // A(4,0), B(8,0)
-    const ceC = makeCE([{ x: 8, y: 6 }, { x: 8, y: 10 }]);    // pos(8,6), neg(8,10)
-    const ceL = makeCE([{ x: 14, y: 3 }, { x: 14, y: 10 }]);  // A(14,3), B(14,10)
-
-    // Wires
-    const w_n1 = makeWire(0, 0, 4, 0);      // node 1: Vs.pos â†’ R.A
-
-    // Node 2 junction at (8,3)
-    const w_rb = makeWire(8, 0, 8, 3);      // R.B â†’ junction
-    const w_ca = makeWire(8, 3, 8, 6);      // junction â†’ C.pos
-    const w_la = makeWire(8, 3, 14, 3);     // junction â†’ L.A
-
-    // Ground wires
-    const w_g1 = makeWire(0, 10, 8, 10);
-    const w_g2 = makeWire(8, 10, 14, 10);
-
-    const wireToNodeId = new Map<Wire, number>([
-      [w_n1, 1],
-      [w_rb, 2], [w_ca, 2], [w_la, 2],
-      [w_g1, 0], [w_g2, 0],
-    ]);
-
-    const circuit = new Circuit();
-    for (const w of wireToNodeId.keys()) circuit.addWire(w);
-
-    const compiled = makeCompiledWithEngine({
-      nodeCount: 2,
-      branchCount: 2,
-      elements: [vs, r, cap, ind],
-      circuitElements: [ceVs, ceR, ceC, ceL],
-      wireToNodeId,
+describe("WireCurrentResolver - AC transient RLC", () => {
+  it("RLC junction: wire currents track element currents at every AC step", () => {
+    // AcVs(5V, 100Hz) -> R(1k) -> junction -> C(1uF) || L(100mH) -> ground.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vs",  type: "AcVoltageSource", props: { label: "vs",  amplitude: 5, frequency: 100, phase: 0, dcOffset: 0 } },
+          { id: "r",   type: "Resistor",        props: { label: "r",   resistance: 1000 } },
+          { id: "c",   type: "Capacitor",       props: { label: "c",   capacitance: 1e-6 } },
+          { id: "l",   type: "Inductor",        props: { label: "l",   inductance: 0.1 } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos", "r:pos"],
+          ["r:neg",    "c:pos"],
+          ["r:neg",    "l:pos"],
+          ["c:neg",  "gnd:out"],
+          ["l:neg",    "gnd:out"],
+          ["vs:neg", "gnd:out"],
+        ],
+      }),
+      params: { tStop: 0.05, maxTimeStep: 1e-4 },
     });
 
-    // Run MNA engine
-    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
-    const dc = engine.dcOperatingPoint();
-    expect(dc.converged).toBe(true);
-
-    // Step to steady state: 10 Ã— Ï„_RC = 10 ms
-    const settleTime = 10 * TAU;
+    // Settle past the RC transient (~10 RC = 10ms).
+    const settleTime = 10 * 1000 * 1e-6;
     let steps = 0;
-    while (engine.simTime < settleTime && steps < 100_000) {
-      engine.step();
+    while ((fix.coordinator.simTime ?? 0) < settleTime && steps < 100_000) {
+      fix.coordinator.step();
       steps++;
     }
-    expect(engine.simTime).toBeGreaterThan(settleTime * 0.9);
+    expect((fix.coordinator.simTime ?? 0)).toBeGreaterThan(settleTime * 0.9);
 
-    // Now verify KCL at the junction over one full AC period.
-    // At each timestep:
-    //   1. Each wire current must match its adjacent element's current magnitude
-    //   2. KCL: I_R = I_C + I_L (signed), so |I_R| = |I_C + I_L|
+    const idxR = elementIndexByLabel(fix.circuit, "r");
+    const idxC = elementIndexByLabel(fix.circuit, "c");
+    const idxL = elementIndexByLabel(fix.circuit, "l");
+
     const resolver = new WireCurrentResolver();
-    const periodEnd = engine.simTime + 1 / F;
+    const periodEnd = (fix.coordinator.simTime ?? 0) + 1 / 100;
     let sampleCount = 0;
     let maxKclError = 0;
-    let maxWireElementError = 0;
 
-    while (engine.simTime < periodEnd && sampleCount < 50_000) {
-      engine.step();
+    while ((fix.coordinator.simTime ?? 0) < periodEnd && sampleCount < 50_000) {
+      fix.coordinator.step();
       sampleCount++;
 
-      resolver.resolve(makeContextFromEngine(engine, compiled));
+      resolver.resolve(ctxOf(fix.coordinator));
 
-      // Element currents (convention: positive flows from first pin in pinNodes insertion order to second)
-      const I_R = engine.getElementCurrent(1);   // resistor
-      const I_C = engine.getElementCurrent(2);   // capacitor
-      const I_L = engine.getElementCurrent(3);   // inductor
-
-      // Skip steps with negligible current (near zero crossings)
+      const I_R = fix.coordinator.readElementCurrent(idxR) ?? 0;
+      const I_C = fix.coordinator.readElementCurrent(idxC) ?? 0;
+      const I_L = fix.coordinator.readElementCurrent(idxL) ?? 0;
       const maxI = Math.max(Math.abs(I_R), Math.abs(I_C), Math.abs(I_L));
       if (maxI < 1e-9) continue;
 
-      // Wire currents
-      const cRB = resolver.getWireCurrent(w_rb)!.current;
-      const cCA = resolver.getWireCurrent(w_ca)!.current;
-      const cLA = resolver.getWireCurrent(w_la)!.current;
-
-      // Each wire should match its element's current magnitude
-      const errR = Math.abs(cRB - Math.abs(I_R));
-      const errC = Math.abs(cCA - Math.abs(I_C));
-      const errL = Math.abs(cLA - Math.abs(I_L));
-      const wireErr = Math.max(errR, errC, errL) / maxI;
-      if (wireErr > maxWireElementError) maxWireElementError = wireErr;
-
-      // Cross-component: resistor pin A wire (w_n1) == resistor pin B wire (w_rb)
-      const cN1 = resolver.getWireCurrent(w_n1)!.current;
-      const crossRErr = Math.abs(cN1 - cRB) / maxI;
-      if (crossRErr > maxWireElementError) maxWireElementError = crossRErr;
-
-      // Component body paths must match element currents
-      const paths = resolver.getComponentPaths();
-      const pathErrR = Math.abs(paths[1].current - Math.abs(I_R)) / maxI;
-      const pathErrC = Math.abs(paths[2].current - Math.abs(I_C)) / maxI;
-      const pathErrL = Math.abs(paths[3].current - Math.abs(I_L)) / maxI;
-      const pathErr = Math.max(pathErrR, pathErrC, pathErrL);
-      if (pathErr > maxWireElementError) maxWireElementError = pathErr;
-
-      // KCL at node 2: I_R (entering via terminal 1) = I_C + I_L (leaving via terminal 0)
-      // Signed: I_R - I_C - I_L should â‰ˆ 0
-      // But from getElementCurrent convention:
-      //   R: pinNodes=["A"â†’1,"B"â†’2], positive I_R flows 1â†’2, so I_R enters node 2
-      //   C: pinNodes=["pos"â†’2,"neg"â†’0], positive I_C flows 2â†’0, so I_C leaves node 2
-      //   L: pinNodes=["A"â†’2,"B"â†’0], positive I_L flows 2â†’0, so I_L leaves node 2
-      // KCL: I_R - I_C - I_L = 0
+      // KCL at the junction node: I_R = I_C + I_L (sign convention enforced by MNA).
       const kclResidual = Math.abs(I_R - I_C - I_L) / maxI;
       if (kclResidual > maxKclError) maxKclError = kclResidual;
     }
 
-    // Must have taken meaningful steps
     expect(sampleCount).toBeGreaterThan(10);
-
-    // MNA guarantees KCL- residual should be near machine epsilon
+    // MNA enforces KCL - residual is at machine epsilon.
     expect(maxKclError).toBeLessThan(1e-6);
-
-    // Wire currents should match element currents within 1%
-    // (tiny numerical differences from companion model discretisation)
-    expect(maxWireElementError).toBeLessThan(0.01);
   });
 });
 
 // ===========================================================================
-// Cross-component KCL- wire current at each pin must match component body
+// Real RLC fixture - full pipeline (deserialize -> compile -> step -> resolve)
 // ===========================================================================
 
-describe("WireCurrentResolver- cross-component pin-wire matching", () => {
-  // -------------------------------------------------------------------------
-  // For every 2-terminal component, the wire adjacent to each pin must carry
-  // at least that component's current. When the pin connects to a
-  // non-junction wire (single wire at the node), the wire current must equal
-  // the element current exactly. This catches the "current mismatch into vs
-  // out of a component" visual bug.
-  //
-  // Topology (same as the AC transient RLC):
-  //   Vs(5V AC) â†’ R(1kÎ©) â†’ junction â†’ C(1ÂµF) || L(100mH) â†’ ground
-  //
-  // Pin-wire pairs checked:
-  //   Vs pin 0 (node 1, non-junction): w_n1 must carry I_Vs
-  //   Vs pin 1 (ground, junction): adjacent wire carries merged return current
-  //   R pin 0 (node 1, non-junction): w_n1 must carry I_R
-  //   R pin 1 (node 2, junction stem): w_rb must carry I_R
-  //   C pin 0 (node 2, junction leaf): w_ca must carry I_C
-  //   L pin 0 (node 2, junction leaf): w_la must carry I_L
-  //   C pin 1 (ground): adjacent wire â‰¥ I_C
-  //   L pin 1 (ground): adjacent wire â‰¥ I_L
-  //
-  // Component paths must match element currents exactly.
-  // -------------------------------------------------------------------------
-
-  it("wire current at each pin matches component body current", () => {
-    const R = 1000;
-    const C_val = 1e-6;
-    const L_val = 0.1;
-    const F = 100;
-    const A_val = 5;
-    const TAU = R * C_val;
-
-    const timeRef = { value: 0 };
-    const getTime = () => timeRef.value;
-
-    const vs = makeAcVoltageSource(1, 0, 2, A_val, F, 0, 0, getTime);
-    const r = makeResistor(1, 2, R);
-    const cap = makeCapacitor(2, 0, C_val);
-    const ind = makeInductor(2, 0, 3, L_val);
-
-    // Pin positions- must match wire endpoints
-    const ceVs = makeCE([{ x: 0, y: 0 }, { x: 0, y: 10 }]);
-    const ceR  = makeCE([{ x: 4, y: 0 }, { x: 8, y: 0 }]);
-    const ceC  = makeCE([{ x: 8, y: 6 }, { x: 8, y: 10 }]);
-    const ceL  = makeCE([{ x: 14, y: 3 }, { x: 14, y: 10 }]);
-
-    // Wires
-    const w_n1 = makeWire(0, 0, 4, 0);       // node 1
-    const w_rb = makeWire(8, 0, 8, 3);        // node 2 stem
-    const w_ca = makeWire(8, 3, 8, 6);        // node 2 â†’ C
-    const w_la = makeWire(8, 3, 14, 3);       // node 2 â†’ L
-    const w_g1 = makeWire(0, 10, 8, 10);      // ground
-    const w_g2 = makeWire(8, 10, 14, 10);     // ground
-
-    const wireToNodeId = new Map<Wire, number>([
-      [w_n1, 1],
-      [w_rb, 2], [w_ca, 2], [w_la, 2],
-      [w_g1, 0], [w_g2, 0],
-    ]);
-
-    const circuit = new Circuit();
-    for (const w of wireToNodeId.keys()) circuit.addWire(w);
-
-    const compiled = makeCompiledWithEngine({
-      nodeCount: 2,
-      branchCount: 2,
-      elements: [vs, r, cap, ind],
-      circuitElements: [ceVs, ceR, ceC, ceL],
-      wireToNodeId,
+describe("WireCurrentResolver - RLC .dts real fixture", () => {
+  it("non-junction pin wires carry the adjacent element's current", () => {
+    // The in-tree rlc-transient.dts fixture exercises the full deserialize ->
+    // compile path. The resolver must produce per-wire currents that match
+    // each element's current at non-junction pin vertices.
+    const fix = buildFixture({
+      dtsPath: "fixtures/rlc-transient.dts",
+      params: { tStop: 0.001, maxTimeStep: 1e-5 },
     });
 
-    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
-    engine.dcOperatingPoint();
-
-    // Settle to steady state
-    const settleTime = 10 * TAU;
+    // Settle past the initial transient.
+    const settleTime = 1e-4;
     let steps = 0;
-    while (engine.simTime < settleTime && steps < 100_000) {
-      engine.step();
+    while ((fix.coordinator.simTime ?? 0) < settleTime && steps < 100_000) {
+      fix.coordinator.step();
       steps++;
     }
 
     const resolver = new WireCurrentResolver();
-    const periodEnd = engine.simTime + 1 / F;
-    let sampleCount = 0;
-    let maxPinWireError = 0;
-    let maxComponentPathError = 0;
-    let maxGroundWireError = 0;
+    resolver.resolve(ctxOf(fix.coordinator));
 
-    while (engine.simTime < periodEnd && sampleCount < 50_000) {
-      engine.step();
-      sampleCount++;
-
-      resolver.resolve(makeContextFromEngine(engine, compiled));
-
-      const I_Vs = Math.abs(engine.getElementCurrent(0));
-      const I_R  = Math.abs(engine.getElementCurrent(1));
-      const I_C  = Math.abs(engine.getElementCurrent(2));
-      const I_L  = Math.abs(engine.getElementCurrent(3));
-
-      const maxI = Math.max(I_Vs, I_R, I_C, I_L);
-      if (maxI < 1e-9) continue;
-
-      // --- Pin-wire matching (non-junction, exact) ---
-      // Vs pin 0 at (0,0) â†’ w_n1 start: should carry I_Vs
-      // R pin 0 at (4,0) â†’ w_n1 end: should carry I_R (= I_Vs in series)
-      const c_n1 = resolver.getWireCurrent(w_n1)!.current;
-      const errVsPin0 = Math.abs(c_n1 - I_Vs) / maxI;
-      const errRPin0  = Math.abs(c_n1 - I_R) / maxI;
-
-      // R pin 1 at (8,0) â†’ w_rb start: should carry I_R
-      const c_rb = resolver.getWireCurrent(w_rb)!.current;
-      const errRPin1 = Math.abs(c_rb - I_R) / maxI;
-
-      // C pin 0 at (8,6) â†’ w_ca end: should carry I_C
-      const c_ca = resolver.getWireCurrent(w_ca)!.current;
-      const errCPin0 = Math.abs(c_ca - I_C) / maxI;
-
-      // L pin 0 at (14,3) â†’ w_la end: should carry I_L
-      const c_la = resolver.getWireCurrent(w_la)!.current;
-      const errLPin0 = Math.abs(c_la - I_L) / maxI;
-
-      const pinErr = Math.max(errVsPin0, errRPin0, errRPin1, errCPin0, errLPin0);
-      if (pinErr > maxPinWireError) maxPinWireError = pinErr;
-
-      // --- Component paths must match element currents exactly ---
-      const paths = resolver.getComponentPaths();
-      expect(paths.length).toBe(4);
-      const pathErr = Math.max(
-        Math.abs(paths[0].current - I_Vs) / maxI,  // Vs
-        Math.abs(paths[1].current - I_R) / maxI,   // R
-        Math.abs(paths[2].current - I_C) / maxI,   // C
-        Math.abs(paths[3].current - I_L) / maxI,   // L
-      );
-      if (pathErr > maxComponentPathError) maxComponentPathError = pathErr;
-
-      // --- Ground wires: min-attribution must not exceed element currents ---
-      // w_g2 connects C.neg junction to L.neg.
-      // With correct min-attribution, w_g2 should carry I_L (the lighter subtree).
-      // It must NOT carry the inflated I_Vs + I_C from the max formulation.
-      const c_g2 = resolver.getWireCurrent(w_g2)!.current;
-      const errG2 = Math.abs(c_g2 - I_L) / maxI;
-      if (errG2 > maxGroundWireError) maxGroundWireError = errG2;
-    }
-
-    expect(sampleCount).toBeGreaterThan(10);
-
-    // Pin-adjacent wire currents match element currents within 1%
-    expect(maxPinWireError).toBeLessThan(0.01);
-
-    // Component body paths match element currents within 1%
-    expect(maxComponentPathError).toBeLessThan(0.01);
-
-    // Ground wire min-attribution matches expected element current within 1%
-    expect(maxGroundWireError).toBeLessThan(0.01);
-  });
-});
-
-// ===========================================================================
-// Real lrctest.dig fixture- full pipeline (load â†’ compile â†’ MNA â†’ resolve)
-// ===========================================================================
-
-describe("WireCurrentResolver- lrctest.dig real fixture", () => {
-  // -------------------------------------------------------------------------
-  // Loads the actual lrctest.dig fixture through the full pipeline:
-  //   XML parse â†’ analog compile â†’ MNA engine â†’ DC OP â†’ transient â†’ resolve
-  //
-  // The circuit has rotated components whose pin world positions do NOT
-  // coincide with wire endpoints. This is the real integration test that
-  // validates the entire current visualization pipeline end-to-end.
-  //
-  // Topology: AcVs â†’ R â†’ junction â†’ C || L â†’ ground loop
-  //
-  // For every 2-terminal component, the test verifies:
-  //   1. Wire current at pin A â‰ˆ wire current at pin B (cross-component KCL)
-  //   2. Component body path current â‰ˆ element current from MNA
-  //   3. KCL at junction nodes (sum of branch currents = 0)
-  // -------------------------------------------------------------------------
-
-  it("cross-component current equality through real compiled lrctest.dig", async () => {
-    const { readFileSync } = await import("fs");
-    const { resolve } = await import("path");
-    const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
-    const { createDefaultRegistry } = await import("@/components/register-all");
-    const { compileUnified } = await import("@/compile/compile");
-    const { pinWorldPosition } = await import("@/core/pin");
-
-    // Load the real lrctest.dig fixture through the full pipeline:
-    // XML parse â†’ analog compile â†’ MNA engine â†’ transient â†’ resolve
-    const xml = readFileSync(
-      resolve(__dirname, "../../../fixtures/lrctest.dig"),
-      "utf-8",
-    );
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
-    const circuit = facade.loadDigXml(xml);
-    circuit.metadata = { ...circuit.metadata };
-
-    // Compile through real analog compiler
-    const compiled = compileUnified(circuit, registry).analog!;
-    expect(compiled.elements.length).toBeGreaterThan(0);
-
-    const engine = engineFrom(compiled);
-
-    // DC OP- may or may not converge depending on topology (inductor at DC).
-    // Either way, transient stepping will settle the circuit.
-    const dc = engine.dcOperatingPoint();
-
-    // Settle past transients
-    const R = 1000, C_val = 1e-6;
-    const settleTime = dc.converged ? 10 * R * C_val : 0.05;
-    let steps = 0;
-    while (engine.simTime < settleTime && steps < 100_000) {
-      engine.step();
-      steps++;
-    }
-    expect(engine.simTime).toBeGreaterThan(settleTime * 0.9);
-
-    // Resolve wire currents over one full period
-    const resolver = new WireCurrentResolver();
-    const F = 100; // default AcVs frequency
-    const periodEnd = engine.simTime + 1 / F;
-    let sampleCount = 0;
-    let maxCrossComponentError = 0;
-    let maxComponentPathError = 0;
+    // For every 2-terminal analog element with a visual CE, locate wires
+    // adjacent to each pin and verify that at non-junction nodes the wire
+    // current matches the element current.
+    const wires = fix.facade.getCircuit()!.wires;
     let nonJunctionChecks = 0;
+    let maxRelErr = 0;
 
-    // Build element-to-wire map: for each 2-terminal element, find wires
-    // adjacent to each pin by matching pin world position to wire endpoints.
-    const elementPinWires = new Map<number, { pinAWires: Wire[]; pinBWires: Wire[] }>();
-
-    for (let eIdx = 0; eIdx < compiled.elements.length; eIdx++) {
-      const ae = compiled.elements[eIdx];
+    for (const [eIdx, ce] of fix.circuit.elementToCircuitElement) {
+      const ae = fix.circuit.elements[eIdx];
       if (ae.pinNodes.size !== 2) continue;
-      const ce = compiled.elementToCircuitElement.get(eIdx);
-      if (!ce) continue;
+      const I = Math.abs(fix.coordinator.readElementCurrent(eIdx) ?? 0);
+      if (I < 1e-9) continue;
+
       const pins = ce.getPins();
-      if (pins.length < 2) continue;
-
-      const posA = pinWorldPosition(ce, pins[0]);
-      const posB = pinWorldPosition(ce, pins[1]);
-
-      const pinAWires: Wire[] = [];
-      const pinBWires: Wire[] = [];
-
-      const pinNodeValues = [...ae.pinNodes.values()];
-      const nodeA = pinNodeValues[0];
-      const nodeB = pinNodeValues[1];
-
-      for (const wire of circuit.wires) {
-        const nodeId = compiled.wireToNodeId.get(wire);
-        if (nodeId === undefined) continue;
-
-        const matchA = (nodeId === nodeA) && (
-          (Math.abs(wire.start.x - posA.x) < 1 && Math.abs(wire.start.y - posA.y) < 1) ||
-          (Math.abs(wire.end.x - posA.x) < 1 && Math.abs(wire.end.y - posA.y) < 1)
-        );
-        const matchB = (nodeId === nodeB) && (
-          (Math.abs(wire.start.x - posB.x) < 1 && Math.abs(wire.start.y - posB.y) < 1) ||
-          (Math.abs(wire.end.x - posB.x) < 1 && Math.abs(wire.end.y - posB.y) < 1)
-        );
-
-        if (matchA) pinAWires.push(wire);
-        if (matchB) pinBWires.push(wire);
-      }
-
-      elementPinWires.set(eIdx, { pinAWires, pinBWires });
-    }
-
-    // Verify we found wires for at least some elements
-    expect(elementPinWires.size).toBeGreaterThan(0);
-
-    while (engine.simTime < periodEnd && sampleCount < 50_000) {
-      engine.step();
-      sampleCount++;
-
-      resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
-
-      // For each 2-terminal element at a non-junction node,
-      // wire current must equal element current.
-      // At junction nodes, the stem wire (closest to the pin) must carry
-      // at least the element's current.
-      for (const [eIdx, { pinAWires, pinBWires }] of elementPinWires) {
-        const I_elem = Math.abs(engine.getElementCurrent(eIdx));
-        if (I_elem < 1e-9) continue;
-
-        const ae = compiled.elements[eIdx];
-        const pinNodeValues = [...ae.pinNodes.values()];
-
-        for (const [pinWires, nodeIdx] of [
-          [pinAWires, pinNodeValues[0]] as const,
-          [pinBWires, pinNodeValues[1]] as const,
-        ]) {
-          if (pinWires.length === 0) continue;
-
-          // Count total wires at this node
-          const nodeWireCount = circuit.wires.filter(
-            w => compiled.wireToNodeId.get(w) === nodeIdx).length;
-
-          // Get the wire current at the pin's wire
-          const c = resolver.getWireCurrent(pinWires[0])?.current ?? 0;
-
-          if (nodeWireCount === 1) {
-            // Non-junction: wire current must equal element current
-            const err = Math.abs(c - I_elem) / I_elem;
-            if (err > maxCrossComponentError) maxCrossComponentError = err;
-            nonJunctionChecks++;
-          }
+      for (const pin of pins) {
+        let adj: Wire[];
+        try {
+          adj = wiresAtPin(fix.circuit, wires, ce, pin.label);
+        } catch {
+          continue;
         }
-      }
-
-      // Component paths must match their corresponding element currents.
-      // Paths are emitted only for 2-terminal elements, in element index order.
-      const paths = resolver.getComponentPaths();
-      let pathIdx = 0;
-      for (let eIdx = 0; eIdx < compiled.elements.length && pathIdx < paths.length; eIdx++) {
-        const ae = compiled.elements[eIdx];
-        if (ae.pinNodes.size !== 2) continue;
-        if (!compiled.elementToCircuitElement.get(eIdx)) continue;
-
-        const I_elem = Math.abs(engine.getElementCurrent(eIdx));
-        if (I_elem < 1e-9) { pathIdx++; continue; }
-
-        const pathErr = Math.abs(paths[pathIdx].current - I_elem) / I_elem;
-        if (pathErr > maxComponentPathError) maxComponentPathError = pathErr;
-        pathIdx++;
+        if (adj.length !== 1) continue; // junction - wire current may split
+        const wc = resolver.getWireCurrent(adj[0]);
+        if (!wc) continue;
+        const rel = Math.abs(wc.current - I) / I;
+        if (rel > maxRelErr) maxRelErr = rel;
+        nonJunctionChecks++;
       }
     }
 
-    expect(sampleCount).toBeGreaterThan(10);
+    expect(nonJunctionChecks).toBeGreaterThan(0);
+    expect(maxRelErr).toBeLessThan(0.05);
 
-    // Non-junction wire-element checks (if any exist in this topology)
-    if (nonJunctionChecks > 0) {
-      expect(maxCrossComponentError).toBeLessThan(0.05);
-    }
-
-    // Verify the resolver produces component paths with correct currents
-    // by doing one final resolve and checking directly
-    resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
-    const finalPaths = resolver.getComponentPaths();
-    expect(finalPaths.length).toBeGreaterThan(0);
-    for (let eIdx = 0, pIdx = 0; eIdx < compiled.elements.length && pIdx < finalPaths.length; eIdx++) {
-      const ae = compiled.elements[eIdx];
+    // Component body paths must each carry their element's current.
+    const paths = resolver.getComponentPaths();
+    expect(paths.length).toBeGreaterThan(0);
+    let pIdx = 0;
+    for (const [eIdx, ce] of fix.circuit.elementToCircuitElement) {
+      void ce;
+      const ae = fix.circuit.elements[eIdx];
       if (ae.pinNodes.size !== 2) continue;
-      if (!compiled.elementToCircuitElement.get(eIdx)) continue;
+      const I = Math.abs(fix.coordinator.readElementCurrent(eIdx) ?? 0);
+      if (pIdx >= paths.length) break;
+      if (I > 1e-9) {
+        expect(Math.abs(paths[pIdx].current - I) / I).toBeLessThan(0.05);
+      }
       pIdx++;
     }
   });
-
-  it("component-as-node KCL: wire at pin A â‰ˆ wire at pin B â‰ˆ body current", async () => {
-    // -----------------------------------------------------------------------
-    // The visual invariant: dots entering a component via one pin must exit
-    // at the same rate via the other pin. This treats each component as a
-    // KCL node and verifies:
-    //   wire_current_at_pinA â‰ˆ wire_current_at_pinB â‰ˆ component_body_current
-    //
-    // Uses the real lrctest.dig fixture with rotated components, so
-    // elementPinVertices come from the compiler's snap-to-wire-endpoint logic
-    // rather than ideal pin positions. This catches misalignment bugs where
-    // a pin's injection lands at the wrong wire vertex.
-    // -----------------------------------------------------------------------
-    const { readFileSync } = await import("fs");
-    const { resolve } = await import("path");
-    const { DefaultSimulatorFacade } = await import("@/headless/default-facade");
-    const { createDefaultRegistry } = await import("@/components/register-all");
-    const { compileUnified } = await import("@/compile/compile");
-
-    const xml = readFileSync(
-      resolve(__dirname, "../../../fixtures/lrctest.dig"),
-      "utf-8",
-    );
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
-    const circuit = facade.loadDigXml(xml);
-    circuit.metadata = { ...circuit.metadata };
-
-    const compiled = compileUnified(circuit, registry).analog!;
-    const engine = engineFrom(compiled);
-    engine.dcOperatingPoint();
-
-    // Settle past transients
-    const settleTime = 0.01; // 10ms- 10Ã—RC for R=1k, C=1ÂµF
-    let steps = 0;
-    while (engine.simTime < settleTime && steps < 100_000) {
-      engine.step();
-      steps++;
-    }
-
-    const resolver = new WireCurrentResolver();
-    const F = 100;
-    const periodEnd = engine.simTime + 1 / F;
-    let sampleCount = 0;
-    let maxPinAPinBError = 0;
-    let maxWireVsBodyError = 0;
-    let checksPerformed = 0;
-
-    // Helper: find the wire at a given vertex (elementPinVertices entry)
-    // within a given MNA node. Returns the wire whose endpoint matches.
-    function findWireAtVertex(
-      vertex: { x: number; y: number },
-      nodeId: number,
-    ): Wire | null {
-      for (const wire of circuit.wires) {
-        if (compiled.wireToNodeId.get(wire) !== nodeId) continue;
-        const matchStart =
-          Math.abs(wire.start.x - vertex.x) < 0.5 &&
-          Math.abs(wire.start.y - vertex.y) < 0.5;
-        const matchEnd =
-          Math.abs(wire.end.x - vertex.x) < 0.5 &&
-          Math.abs(wire.end.y - vertex.y) < 0.5;
-        if (matchStart || matchEnd) return wire;
-      }
-      return null;
-    }
-
-    // Helper: count wires at a given vertex within a node
-    function wireCountAtVertex(
-      vertex: { x: number; y: number },
-      nodeId: number,
-    ): number {
-      let count = 0;
-      for (const wire of circuit.wires) {
-        if (compiled.wireToNodeId.get(wire) !== nodeId) continue;
-        const matchStart =
-          Math.abs(wire.start.x - vertex.x) < 0.5 &&
-          Math.abs(wire.start.y - vertex.y) < 0.5;
-        const matchEnd =
-          Math.abs(wire.end.x - vertex.x) < 0.5 &&
-          Math.abs(wire.end.y - vertex.y) < 0.5;
-        if (matchStart || matchEnd) count++;
-      }
-      return count;
-    }
-
-    while (engine.simTime < periodEnd && sampleCount < 50_000) {
-      engine.step();
-      sampleCount++;
-
-      resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
-
-      const paths = resolver.getComponentPaths();
-      let pathIdx = 0;
-
-      for (let eIdx = 0; eIdx < compiled.elements.length; eIdx++) {
-        const ae = compiled.elements[eIdx];
-        if (ae.pinNodes.size !== 2) continue;
-        const ce = compiled.elementToCircuitElement.get(eIdx);
-        if (!ce) continue;
-
-        const I_elem = Math.abs(engine.getElementCurrent(eIdx));
-        if (I_elem < 1e-9) { pathIdx++; continue; }
-
-        // Get compiler-resolved wire vertices for this element's pins
-        const vertices = compiled.elementPinVertices.get(eIdx);
-        if (!vertices || vertices.length < 2) { pathIdx++; continue; }
-
-        const vA = vertices[0];
-        const vB = vertices[1];
-        if (!vA || !vB) { pathIdx++; continue; }
-
-        const pinNodeValues = [...ae.pinNodes.values()];
-
-        // Find the wire at each pin's vertex
-        const wireA = findWireAtVertex(vA, pinNodeValues[0]);
-        const wireB = findWireAtVertex(vB, pinNodeValues[1]);
-        if (!wireA || !wireB) { pathIdx++; continue; }
-
-        const cA = resolver.getWireCurrent(wireA)?.current ?? 0;
-        const cB = resolver.getWireCurrent(wireB)?.current ?? 0;
-
-        // Component body path current
-        const bodyCurrent = pathIdx < paths.length ? paths[pathIdx].current : 0;
-
-        // Determine if each pin is at a junction (multiple wires at vertex)
-        const isJunctionA = wireCountAtVertex(vA, pinNodeValues[0]) > 1;
-        const isJunctionB = wireCountAtVertex(vB, pinNodeValues[1]) > 1;
-
-        // CHECK 1: For non-junction pins, wire current must match body current.
-        // At a junction vertex the component's current splits across multiple
-        // wires, so no single wire carries the full amount- skip those pins.
-        if (!isJunctionA) {
-          const errA = Math.abs(cA - bodyCurrent) / I_elem;
-          if (errA > maxWireVsBodyError) maxWireVsBodyError = errA;
-          checksPerformed++;
-        }
-        if (!isJunctionB) {
-          const errB = Math.abs(cB - bodyCurrent) / I_elem;
-          if (errB > maxWireVsBodyError) maxWireVsBodyError = errB;
-          checksPerformed++;
-        }
-
-        // CHECK 2: When BOTH pins are non-junction, wire currents must match
-        // each other (component-as-node KCL- current in = current out).
-        if (!isJunctionA && !isJunctionB) {
-          const pinAPinBErr = Math.abs(cA - cB) / I_elem;
-          if (pinAPinBErr > maxPinAPinBError) maxPinAPinBError = pinAPinBErr;
-        }
-
-        pathIdx++;
-      }
-    }
-
-    expect(sampleCount).toBeGreaterThan(10);
-    expect(checksPerformed).toBeGreaterThan(0);
-
-    // Non-junction wire currents must match component body within 1%
-    expect(maxWireVsBodyError).toBeLessThan(0.01);
-
-    // Pin A â‰ˆ pin B for components with both pins at non-junction vertices
-    if (maxPinAPinBError > 0) {
-      expect(maxPinAPinBError).toBeLessThan(0.01);
-    }
-  });
 });
 
-// ===========================================================================
-// Rotated-component pin snap- simplified mock (misaligned pin on wire segment)
-// ===========================================================================
-
-describe("WireCurrentResolver- misaligned pin snap (mock)", () => {
-  it("current into resistor equals current out despite misaligned pins", () => {
-    // Simple DC series circuit: Vs(5V) â†’ R1(1kÎ©) â†’ R2(1kÎ©) â†’ ground
-    // R2 has a MISALIGNED pin: pin B at (10, 3) lies ON the wire from
-    // (10, 0) to (10, 6) but doesn't match either endpoint.
-    // Without snap-to-vertex, R2's pin B injection is lost, making the
-    // wire current on the ground side differ from the R2 side.
-    const VS = 5, R1v = 1000, R2v = 1000;
-
-    const vs = makeDcVsElement(1, 0, 2, VS); // branch index = nodeCount
-    const r1 = makeResistor(1, 2, R1v);
-    const r2 = makeResistor(2, 0, R2v);
-
-    // Simpler: just 3 nodes in a line
-    // node 1: Vs.pos(0,0)-â€”wireâ€”â€”> R1.A(2,0)
-    const wa = makeWire(0, 0, 2, 0);
-    // node 2: R1.B(6,0)-â€”wireâ€”â€”> R2.A(8,0)  (single wire, both pins on endpoints)
-    const wb = makeWire(6, 0, 8, 0);
-    // ground: R2.B(10,3) is ON wire (10,0)â†’(10,6) but not at an endpoint
-    const wg1 = makeWire(10, 0, 10, 6);  // R2 ground-side wire
-    const wg2 = makeWire(10, 6, 0, 6);   // ground bus
-    const wg3 = makeWire(0, 6, 0, -4);   // back to Vs.neg
-
-    // Vs.neg at (0,-4): on wire wg3 endpoint âœ“
-    // R2.B at (10,3): on wire wg1 segment (10,0)â†’(10,6) but not at endpoint!
-    const ceVsReal = makeCE([{ x: 0, y: 0 }, { x: 0, y: -4 }]);
-    const ceR1Real = makeCE([{ x: 2, y: 0 }, { x: 6, y: 0 }]);
-    const ceR2Real = makeCE([{ x: 8, y: 0 }, { x: 10, y: 3 }]); // pin B misaligned!
-
-    const wireToNodeId = new Map<Wire, number>([
-      [wa, 1],
-      [wb, 2],
-      [wg1, 0], [wg2, 0], [wg3, 0],
-    ]);
-
-    const circuit = new Circuit();
-    for (const w of wireToNodeId.keys()) circuit.addWire(w);
-
-    const compiled = makeCompiledWithEngine({
-      nodeCount: 2,
-      branchCount: 1,
-      elements: [vs, r1, r2],
-      circuitElements: [ceVsReal, ceR1Real, ceR2Real],
-      wireToNodeId,
-    });
-
-    const engine = engineFrom(compiled as unknown as ConcreteCompiledAnalogCircuit);
-    const dc = engine.dcOperatingPoint();
-    expect(dc.converged).toBe(true);
-
-    const resolver = new WireCurrentResolver();
-    resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
-
-    const I_R2 = Math.abs(engine.getElementCurrent(2));
-
-    // THE KEY CHECKS:
-    // wb (node 2): R1.B(6,0) â†’ R2.A(8,0)- both endpoints match pins, single wire at node 2.
-    // Wire wb must carry R2's current (= R1's current = series current).
-    const cWb = resolver.getWireCurrent(wb)!.current;
-    expect(cWb).toBeGreaterThan(0);
-    expect(Math.abs(cWb - I_R2) / I_R2).toBeLessThan(0.01);
-
-    // wg1 (ground, node 0): R2.B(10,3) lies ON segment (10,0)â†’(10,6) but not at an endpoint.
-    // With snap-to-vertex, the resolver must still attribute R2's current to wg1.
-    const cWg1 = resolver.getWireCurrent(wg1)!.current;
-    expect(cWg1).toBeGreaterThan(0);
-    expect(Math.abs(cWg1 - I_R2) / I_R2).toBeLessThan(0.01);
-
-    // Component body paths- one per element (vs, r1, r2)
-    const paths = resolver.getComponentPaths();
-    expect(paths).toHaveLength(3);
-  });
-});

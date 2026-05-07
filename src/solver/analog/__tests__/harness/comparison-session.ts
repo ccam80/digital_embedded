@@ -82,7 +82,6 @@ import type {
 } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
 import type { IntegrationMethod } from "../../integration.js";
-import { expect } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -2805,17 +2804,46 @@ export class ComparisonSession {
 
     const fmt = (e: Entry) => `(row=${e.row}, col=${e.col}, val=${e.value})`;
 
-    // Classify: structural = different shape (extra/missing coords, implies
-    // node-swap or MNA-layout drift). value-only = same coords on both sides
-    // but different summed value, implies arithmetic divergence (operand
-    // order, transcendental precision, or parameter mismatch)- NOT a
-    // load-order bug.
-    const isStructural = oursOnly.length > 0 || ngOnly.length > 0;
+    // Classification:
+    //   coordSetDiffers  = (row, col) coordinate sets differ across sides.
+    //                      Implies node-swap or MNA-layout drift.
+    //   valuePermutation = coordinate sets identical AND value multisets
+    //                      identical AND ≥1 cell holds a different value.
+    //                      Same numbers landed at different cells: load-order
+    //                      drift inside cktTranslate or a single device's
+    //                      setup()/makeVolt order (e.g. BJT B'/C'/E' rotated).
+    //                      Catches 2-swaps, 3-cycles, and longer permutations.
+    //   valueOnly        = coordinate sets identical AND value multisets
+    //                      DIFFER. Real arithmetic divergence at genuinely-
+    //                      aligned cells: operand order in a multi-term stamp,
+    //                      transcendental LSB, or a parameter mismatch.
+    //
+    // Permutation is a STRUCTURAL deficit, not a numerical drift- it points
+    // at a porting bug in load order or internal-node allocation. Bit-exact
+    // multiset equality keeps the project's no-tolerance bar: a single LSB
+    // drift breaks the multiset match and falls through to valueOnly where
+    // it belongs.
+    const coordSetDiffers = oursOnly.length > 0 || ngOnly.length > 0;
+
+    let valuePermutation = false;
+    if (!coordSetDiffers && valueMismatches.length > 0) {
+      const ourValues = ourIt.matrix.map(e => e.value).sort((a, b) => a - b);
+      const ngValues = ngIt.matrix.map(e => e.value).sort((a, b) => a - b);
+      if (ourValues.length === ngValues.length) {
+        let multisetMatches = true;
+        for (let i = 0; i < ourValues.length; i++) {
+          if (ourValues[i] !== ngValues[i]) { multisetMatches = false; break; }
+        }
+        valuePermutation = multisetMatches;
+      }
+    }
+
+    const isStructural = coordSetDiffers || valuePermutation;
     const isValueOnly = !isStructural && valueMismatches.length > 0;
 
     const lines: string[] = [];
 
-    if (isStructural) {
+    if (coordSetDiffers) {
       lines.push("Matrix-entry structural divergence at step=0 attempt=0 iter=0:");
       lines.push(`  ours has ${ourMap.size} entries; ngspice has ${ngMap.size} entries.`);
       if (oursOnly.length > 0) {
@@ -2843,18 +2871,18 @@ export class ComparisonSession {
         );
       }
       lines.push(
-        "Structural mismatch means the (row, col) coordinate sets differ- " +
-          "most likely a node-swap, internal-node allocation drift, or " +
-          "per-device-type load order out of sync with ngspice's DEVices[] " +
-          "iteration order (see compileAnalogPartition's ngspiceLoadOrder " +
-          "sort and core/analog-types.ts NGSPICE_LOAD_ORDER). Do NOT " +
-          "reconcile at the harness level.",
+        "(row, col) coordinate sets differ- node-swap, internal-node " +
+          "allocation drift, or per-device-type load order out of sync with " +
+          "ngspice's DEVices[] iteration order (see compileAnalogPartition's " +
+          "ngspiceLoadOrder sort and core/analog-types.ts NGSPICE_LOAD_ORDER). " +
+          "Do NOT reconcile at the harness level.",
       );
-    } else if (isValueOnly) {
-      lines.push("Matrix-entry value divergence at step=0 attempt=0 iter=0:");
-      lines.push(`  ours and ngspice have identical (row, col) layout (${ourMap.size} entries each).`);
+    } else if (valuePermutation) {
+      lines.push("Matrix-entry value-permutation at step=0 attempt=0 iter=0:");
+      lines.push(`  ours and ngspice have identical (row, col) layout (${ourMap.size} entries each)`);
+      lines.push(`  AND identical value multisets, but ${valueMismatches.length} cell(s) hold different values:`);
       lines.push(
-        `  ${valueMismatches.length} entries with same (row,col) but different values: ` +
+        `  ` +
           valueMismatches
             .slice(0, 8)
             .map((m) => `${m.pos} ours=${m.ours} ngspice=${m.ng}`)
@@ -2862,14 +2890,36 @@ export class ComparisonSession {
           (valueMismatches.length > 8 ? ", ..." : ""),
       );
       lines.push(
-        "Layout matches, so this is NOT a load-order or MNA-structural issue. " +
-          "Same (row, col) cells received different summed values. Likely causes: " +
-          "(a) operand order differs in a multi-term stamp, (b) a model parameter " +
-          "is computed differently between engines, (c) a transcendental call " +
-          "(exp/log/sqrt/pow) returned a different LSB. Inspect the per-element " +
-          "stamps that contribute to the listed cells.",
+        "Same numbers landed at different cells- a permutation, not a numerical " +
+          "drift. The line-by-line ngspice port has shifted either across " +
+          "devices (NGSPICE_LOAD_ORDER) or within a single device's internal-" +
+          "node allocation (e.g. a BJT with non-zero RB/RC/RE that calls " +
+          "makeVolt for B'/C'/E' in a different order than ngspice's BJTsetup). " +
+          "Permutation is structural, not numerical- do NOT close as 'arithmetic " +
+          "drift'.",
+      );
+    } else if (isValueOnly) {
+      lines.push("Matrix-entry value divergence at step=0 attempt=0 iter=0:");
+      lines.push(`  ours and ngspice have identical (row, col) layout (${ourMap.size} entries each).`);
+      lines.push(
+        `  ${valueMismatches.length} entries with same (row,col) and different values, AND value multisets DIFFER (so this is NOT a permutation): ` +
+          valueMismatches
+            .slice(0, 8)
+            .map((m) => `${m.pos} ours=${m.ours} ngspice=${m.ng}`)
+            .join(", ") +
+          (valueMismatches.length > 8 ? ", ..." : ""),
+      );
+      lines.push(
+        "Layout matches and value multisets differ, so this is genuine " +
+          "arithmetic divergence at aligned cells- NOT a load-order or " +
+          "permutation bug. Likely causes: (a) operand order differs in a " +
+          "multi-term stamp, (b) a model parameter is computed differently " +
+          "between engines, (c) a transcendental call (exp/log/sqrt/pow) " +
+          "returned a different LSB. Inspect the per-element stamps that " +
+          "contribute to the listed cells.",
       );
     }
+    void isStructural;  // tracked above; retained for future logging hooks
     throw new Error(lines.join("\n"));
   }
 
@@ -3050,73 +3100,6 @@ export class ComparisonSession {
     if (phase === "tranInit") return "tranInit";
     if (phase === "tranFloat") return "tranFloat";
     return "dcop";
-  }
-
-  // -------------------------------------------------------------------------
-  // Canonical full-sweep parity assertions (Cat 3 / Cat 5)
-  // -------------------------------------------------------------------------
-
-  /**
-   * Assert every step end (nodes, branches, component slots, pin currents, dt)
-   * matches ngspice bit-exact across all steps. Sole canonical assertion for
-   * Category 3 (transient response). Failure-stack hint identifies the step
-   * index, observable label, and paired ours/ngspice values.
-   */
-  compareAllSteps(): void {
-    const { stepCount } = this.getSummary();
-    for (let s = 0; s < stepCount.ours; s++) {
-      const stepEnd = this.getStepEnd(s);
-      expect(
-        stepEnd.dt.withinTol,
-        `step ${s} dt: ours=${stepEnd.dt.ours} ngspice=${stepEnd.dt.ngspice} absDelta=${stepEnd.dt.absDelta}`,
-      ).toBe(true);
-      for (const [label, cv] of Object.entries(stepEnd.nodes)) {
-        expect(
-          cv.withinTol,
-          `step ${s} node ${label}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
-        ).toBe(true);
-      }
-      for (const [label, cv] of Object.entries(stepEnd.branches)) {
-        expect(
-          cv.withinTol,
-          `step ${s} branch ${label}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
-        ).toBe(true);
-      }
-      for (const [compLabel, comp] of Object.entries(stepEnd.components)) {
-        for (const [slot, cv] of Object.entries(comp.slots ?? {})) {
-          expect(
-            cv.withinTol,
-            `step ${s} ${compLabel}.${slot}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
-          ).toBe(true);
-        }
-        for (const [pin, cv] of Object.entries(comp.pinCurrents ?? {})) {
-          expect(
-            cv.withinTol,
-            `step ${s} ${compLabel} pin ${pin}: ours=${cv.ours} ngspice=${cv.ngspice} absDelta=${cv.absDelta}`,
-          ).toBe(true);
-        }
-      }
-    }
-  }
-
-  /**
-   * Assert every per-iteration paired comparison (matrix entries, RHS entries,
-   * element state slots) at every iteration of every attempt of every step
-   * matches ngspice bit-exact. Sole canonical assertion for Category 5
-   * (full-iteration parity). Covers all cktMode-gated branches (MODEINITPRED,
-   * MODEINITJCT, NOBYPASS, MODEINITSMSIG, MODEINITTRAN, XTF-conditional cap
-   * formulas, excess-phase IIR, substrate aggregation) without naming them.
-   */
-  compareAllAttempts(): void {
-    const { entries } = this.getDivergences({ limit: Number.MAX_SAFE_INTEGER });
-    if (entries.length === 0) return;
-    const first = entries[0];
-    const msg =
-      `${entries.length} per-iteration divergence(s); first: ${first.category} ` +
-      `step ${first.stepIndex}/iter ${first.iteration} ` +
-      `${first.componentLabel ? `${first.componentLabel}.` : ""}${first.label} ` +
-      `ours=${first.ours} ngspice=${first.ngspice} absDelta=${first.absDelta}`;
-    expect(entries.length, msg).toBe(0);
   }
 }
 

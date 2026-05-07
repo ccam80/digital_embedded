@@ -15,7 +15,7 @@ import type { Wire, Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { BitVector } from "@/core/signal";
 import type { SignalAddress, SignalValue } from "@/compile/types";
-import type { SimulationCoordinator } from "@/solver/coordinator-types";
+import type { EditorBindingDataSource } from "@/solver/coordinator-types";
 
 // ---------------------------------------------------------------------------
 // Helper: extract a raw number from a SignalValue
@@ -40,7 +40,7 @@ export interface EditorBinding {
    */
   bind(
     _circuit: Circuit,
-    coordinator: SimulationCoordinator,
+    coordinator: EditorBindingDataSource,
     wireSignalMap: ReadonlyMap<Wire, SignalAddress>,
     pinSignalMap: ReadonlyMap<string, SignalAddress>,
   ): void;
@@ -78,7 +78,7 @@ export interface EditorBinding {
   readonly isBound: boolean;
 
   /** The bound coordinator, or null when unbound. */
-  readonly coordinator: SimulationCoordinator | null;
+  readonly coordinator: EditorBindingDataSource | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,13 +86,13 @@ export interface EditorBinding {
 // ---------------------------------------------------------------------------
 
 class EditorBindingImpl implements EditorBinding {
-  private _coordinator: SimulationCoordinator | null = null;
+  private _coordinator: EditorBindingDataSource | null = null;
   private _wireSignalMap: ReadonlyMap<Wire, SignalAddress> = new Map();
   private _pinSignalMap: ReadonlyMap<string, SignalAddress> = new Map();
 
   bind(
     _circuit: Circuit,
-    coordinator: SimulationCoordinator,
+    coordinator: EditorBindingDataSource,
     wireSignalMap: ReadonlyMap<Wire, SignalAddress>,
     pinSignalMap: ReadonlyMap<string, SignalAddress>,
   ): void {
@@ -161,7 +161,7 @@ class EditorBindingImpl implements EditorBinding {
     return this._coordinator !== null;
   }
 
-  get coordinator(): SimulationCoordinator | null {
+  get coordinator(): EditorBindingDataSource | null {
     return this._coordinator;
   }
 }

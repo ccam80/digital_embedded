@@ -13,7 +13,7 @@
  */
 
 import type { MeasurementObserver } from "@/core/engine-interface.js";
-import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
+import type { ScopeDataSource } from "@/solver/coordinator-types.js";
 import type { SignalAddress } from "@/compile/types.js";
 import { AnalogScopeBuffer } from "./analog-scope-buffer.js";
 import {
@@ -106,7 +106,7 @@ const ENVELOPE_THRESHOLD = 1000;
  */
 export class ScopePanel implements MeasurementObserver {
   private readonly _canvas: HTMLCanvasElement | null;
-  private readonly _coordinator: SimulationCoordinator;
+  private readonly _coordinator: ScopeDataSource;
   private readonly _channels: ScopeChannel[] = [];
 
   // Time-axis viewport
@@ -123,7 +123,7 @@ export class ScopePanel implements MeasurementObserver {
 
   private _wheelHandler: ((e: WheelEvent) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement | null, coordinator: SimulationCoordinator) {
+  constructor(canvas: HTMLCanvasElement | null, coordinator: ScopeDataSource) {
     this._canvas = canvas;
     this._coordinator = coordinator;
     coordinator.addMeasurementObserver(this);

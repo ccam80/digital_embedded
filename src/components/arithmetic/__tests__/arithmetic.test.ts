@@ -311,6 +311,53 @@ describe("Mul signed digital interaction (Cat 9)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Mul multi-output topology: separate Out wires for the low-word and high-word
+// halves of the 2N-bit product. Used by Cat 11 multi-output observability tests.
+// ---------------------------------------------------------------------------
+
+function buildMulMultiOutFixture(bitWidth: number, signed: boolean): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "a",      type: "In",  props: { label: "A",      bitWidth } },
+      { id: "b",      type: "In",  props: { label: "B",      bitWidth } },
+      { id: "mul",    type: "Mul", props: { bitWidth, signed } },
+      { id: "outLo",  type: "Out", props: { label: "OUT_LO", bitWidth: Math.min(bitWidth, 32) } },
+      { id: "outHi",  type: "Out", props: { label: "OUT_HI", bitWidth: Math.min(bitWidth, 32) } },
+    ],
+    connections: [
+      ["a:out",   "mul:a"],
+      ["b:out",   "mul:b"],
+      ["mul:lo",  "outLo:in"],
+      ["mul:hi",  "outHi:in"],
+    ],
+  });
+}
+
+describe("Mul multi-output (Cat 11)", () => {
+  // Original test (Wave-3 Batch 1, deleted CONSIDER CANONISE): "Mul > unsigned multiplication >
+  // 16-bit unsigned large product uses output slot". Cat 11 multi-output observability:
+  // wire a labelled Out per declared output pin and assert each independently after one step().
+  it("16-bit unsigned 0xFFFF*0xFFFF: low word 0x0001, high word 0xFFFE on independent output pins", () => {
+    // 0xFFFF * 0xFFFF = 0xFFFE_0001; with bitWidth=16, lo word = 0x0001, hi word = 0xFFFE.
+    const fix = buildMulMultiOutFixture(16, false);
+    drive(fix, { A: 0xFFFF, B: 0xFFFF });
+    expect(read(fix, "OUT_LO")).toBe(0x0001);
+    expect(read(fix, "OUT_HI")).toBe(0xFFFE);
+  });
+
+  // Original test (Wave-3 Batch 1, deleted CONSIDER CANONISE): "Mul > unsigned multiplication >
+  // 32-bit unsigned: large overflow goes into high slot". Cat 11 multi-output observability:
+  // each output pin is observed independently; do NOT collapse into a concatenated value.
+  it("32-bit unsigned 0x80000000*2: low word 0, high word 1 on independent output pins", () => {
+    // 0x80000000 * 2 = 0x1_00000000; with bitWidth=32, lo word = 0x00000000, hi word = 0x00000001.
+    const fix = buildMulMultiOutFixture(32, false);
+    drive(fix, { A: 0x80000000, B: 2 });
+    expect(read(fix, "OUT_LO")).toBe(0);
+    expect(read(fix, "OUT_HI")).toBe(1);
+  });
+});
+
 describe("Mul param hot-load bitWidth and signed (Cat 4)", () => {
   it("bitWidth=4 unsigned vs bitWidth=8 unsigned: same logical inputs, different product width", () => {
     // 4-bit: 0xF*0xF = 225 (8-bit product)

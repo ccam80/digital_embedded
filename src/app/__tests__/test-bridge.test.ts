@@ -9,7 +9,7 @@ import { createTestBridge } from "../test-bridge.js";
 import type { TestBridge } from "../test-bridge.js";
 import { Circuit } from "@/core/circuit";
 import type { SignalValue } from "@/compile/types";
-import { MockCoordinator } from "@/test-utils/mock-coordinator";
+import { buildNonEngineCoordinator } from "@/test-utils/non-engine-coordinator";
 import { NullSimulationCoordinator } from "@/solver/null-coordinator";
 import type { ComponentRegistry } from "@/core/registry";
 import type { ComponentPalette } from "@/editor/palette";
@@ -61,7 +61,7 @@ describe("createTestBridge", () => {
 
     it("returns null when coordinator.simTime is null (discrete/digital circuit)", () => {
       const circuit = new Circuit();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const bridge: TestBridge = createTestBridge(
         circuit,
@@ -78,23 +78,13 @@ describe("createTestBridge", () => {
     it("returns state with simTime and nodeVoltages from coordinator when simTime is not null", () => {
       const circuit = new Circuit();
 
-      class AnalogCoordinator extends MockCoordinator {
-        private _simTime = 0.001;
-        private _analogSignals = new Map<string, SignalValue>([
+      const coordinator = buildNonEngineCoordinator({
+        simTime: 0.001,
+        signalsByLabel: new Map<string, SignalValue>([
           ['V_out', { type: 'analog', voltage: 5.0 }],
           ['V_in', { type: 'analog', voltage: 3.3 }],
-        ]);
-
-        override get simTime(): number | null {
-          return this._simTime;
-        }
-
-        override readAllSignals(): Map<string, SignalValue> {
-          return this._analogSignals;
-        }
-      }
-
-      const coordinator = new AnalogCoordinator();
+        ]),
+      });
 
       const bridge: TestBridge = createTestBridge(
         circuit,
@@ -116,21 +106,12 @@ describe("createTestBridge", () => {
     it("maps digital signal values to nodeVoltages using raw value", () => {
       const circuit = new Circuit();
 
-      class MixedCoordinator extends MockCoordinator {
-        private _mixedSignals = new Map<string, SignalValue>([
+      const coordinator = buildNonEngineCoordinator({
+        simTime: 0.01,
+        signalsByLabel: new Map<string, SignalValue>([
           ['clk', { type: 'digital', value: 1 }],
-        ]);
-
-        override get simTime(): number | null {
-          return 0.01;
-        }
-
-        override readAllSignals(): Map<string, SignalValue> {
-          return this._mixedSignals;
-        }
-      }
-
-      const coordinator = new MixedCoordinator();
+        ]),
+      });
 
       const bridge: TestBridge = createTestBridge(
         circuit,

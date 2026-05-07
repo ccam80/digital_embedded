@@ -231,7 +231,7 @@ describe("no_method_switching", () => {
     expect(ctrl.currentMethod).toBe("trapezoidal");
 
     for (let i = 1; i <= 100; i++) {
-      ctrl.accept(i * 1e-7);
+      ctrl.markAccepted(i * 1e-7);
       expect(ctrl.currentMethod).toBe("trapezoidal");
     }
 
@@ -254,14 +254,14 @@ describe("post_breakpoint_order1_trap_preserved", () => {
 
     // Run to step 5 at trapezoidal.
     for (let i = 1; i <= 5; i++) {
-      ctrl.accept(i * 1e-6);
+      ctrl.markAccepted(i * 1e-6);
     }
     expect(ctrl.currentMethod).toBe("trapezoidal");
 
     // Add a breakpoint slightly ahead, then consume it.
     const bpTime = 6e-6;
     ctrl.addBreakpoint(bpTime);
-    ctrl.accept(bpTime);
+    ctrl.markAccepted(bpTime);
 
     // Post-breakpoint: method must be order-1 trapezoidal.
     expect(ctrl.currentMethod === "trapezoidal" && ctrl.currentOrder === 1).toBe(true);
@@ -277,7 +277,7 @@ describe("post_breakpoint_order1_trap_preserved", () => {
     // Direct behaviour check: accept one more step (still order-1 trap due to breakpoint reset).
     // tryOrderPromotion with no reactive elements won't change anything, but the
     // method must remain order-1 trapezoidal until promoted by tryOrderPromotion on next step.
-    ctrl.accept(7e-6);
+    ctrl.markAccepted(7e-6);
     // After one step past the breakpoint, method stays order-1 trap until tryOrderPromotion
     // succeeds (requires _acceptedSteps > 1 from the breakpoint's perspective).
     // Since _acceptedSteps is cumulative (7 now), promotion guard passes.
@@ -347,7 +347,7 @@ describe("breakpoint_ulps_comparison", () => {
     const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, tStop: 1e-3 };
     const ctrl1 = new TimestepController(params);
     ctrl1.addBreakpoint(bp);
-    ctrl1.accept(simTimeClose);
+    ctrl1.markAccepted(simTimeClose);
     // After accept, breakpoint at bp should have been consumed (queue empty).
     // Verify by checking there is no more clamping to bp in computeNewDt.
     ctrl1.currentDt = 1e-6;
@@ -359,7 +359,7 @@ describe("breakpoint_ulps_comparison", () => {
     // Test: far (200 ULPs)- breakpoint NOT consumed.
     const ctrl2 = new TimestepController(params);
     ctrl2.addBreakpoint(bp);
-    ctrl2.accept(simTimeFar);
+    ctrl2.markAccepted(simTimeFar);
     // 200 ULPs > 100 ULP threshold and bp - simTimeFar < 0 (simTimeFar > bp),
     // so this actually passes simTime > bp. In this case the simple `bp - simTime <= delmin`
     // branch: bp - simTimeFar is negative so <= delmin is true. That means the breakpoint
@@ -384,7 +384,7 @@ describe("breakpoint_ulps_comparison", () => {
     const ctrl4 = new TimestepController(paramsLargeTStop);
     ctrl4.addBreakpoint(bp);
     // simTimeClose (bp + 50 ULPs)- consumed via almostEqualUlps(simTimeClose, bp, 100)
-    ctrl4.accept(simTimeClose);
+    ctrl4.markAccepted(simTimeClose);
     ctrl4.currentDt = 1e-6;
     const { newDt: dtC } = ctrl4.computeNewDt([], history, simTimeClose);
     expect(dtC).toBeGreaterThan(0);
@@ -394,7 +394,7 @@ describe("breakpoint_ulps_comparison", () => {
     // Use bp = 0.1 and simTime = 0 (large gap)- definitely not consumed.
     const ctrl5 = new TimestepController(params);
     ctrl5.addBreakpoint(0.1);
-    ctrl5.accept(1e-9);  // simTime = 1ns, bp = 0.1s- gap = 0.1 >> delmin=1e-14
+    ctrl5.markAccepted(1e-9);  // simTime = 1ns, bp = 0.1s- gap = 0.1 >> delmin=1e-14
     // Breakpoint at 0.1s should NOT have been consumed.
     ctrl5.currentDt = 1e-6;
     const { newDt: dtFar } = ctrl5.computeNewDt([], history, 1e-9);
@@ -419,7 +419,7 @@ describe("breakpoint_ulps_comparison", () => {
     const delmin = 1e-3 * 1e-11; // = 1e-14
     const simTimeNearBp = bp - delmin / 2;
 
-    ctrl.accept(simTimeNearBp);
+    ctrl.markAccepted(simTimeNearBp);
 
     // Breakpoint should have been consumed (within delmin band).
     ctrl.currentDt = 1e-7;
@@ -553,7 +553,7 @@ describe("Breakpoints", () => {
     // counter only; getClampedDt is the sole pop site.
     const ctrl = new TimestepController(DEFAULT_PARAMS);
     ctrl.addBreakpoint(100e-6);
-    ctrl.accept(100e-6);
+    ctrl.markAccepted(100e-6);
     ctrl.currentDt = 5e-6;
 
     // Top-of-next-step pop drains bp at 100e-6 (almostEqualUlps match).

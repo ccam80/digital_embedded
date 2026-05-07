@@ -19,7 +19,7 @@
  */
 
 import type { MeasurementObserver, SnapshotId } from "@/core/engine-interface";
-import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
+import type { TimingDiagramDataSource } from "@/solver/coordinator-types.js";
 import type { SignalAddress } from "@/compile/types.js";
 import { WaveformChannel } from "./waveform-data.js";
 import type { WaveformSample } from "./waveform-data.js";
@@ -103,7 +103,7 @@ export interface TimingDiagramOptions {
  *   panel.dispose();
  */
 export class TimingDiagramPanel implements MeasurementObserver {
-  private readonly _coordinator: SimulationCoordinator;
+  private readonly _coordinator: TimingDiagramDataSource;
   private readonly _channels: WaveformChannel[];
   private readonly _canvas: HTMLCanvasElement | null;
   private readonly _snapshotInterval: number;
@@ -140,7 +140,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
 
   constructor(
     canvas: HTMLCanvasElement | null,
-    coordinator: SimulationCoordinator,
+    coordinator: TimingDiagramDataSource,
     channels: readonly { name: string; addr: SignalAddress; width: number }[],
     options: TimingDiagramOptions = {},
   ) {

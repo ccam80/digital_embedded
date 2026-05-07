@@ -1,7 +1,7 @@
 ﻿import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { stampRHS } from "../stamp-helpers.js";
-import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -345,175 +345,19 @@ describe("SparseSolver", () => {
 // Real MNA circuit benchmark- full engine pipeline
 // ---------------------------------------------------------------------------
 
-import {
-  makeTestSetupContext,
-  setupAll,
-  loadCtxFromFields,
-} from "./test-helpers.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
-import { PropertyBag } from "../../../core/properties.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { AnalogElement } from "../element.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
 import { ComparisonSession } from "./harness/comparison-session.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
+import type { PropertyValue } from "../../../core/properties.js";
 
-// ---------------------------------------------------------------------------
-// Local benchmark element factories- ssA-compliant shape (pinNodes, label:"")
-// ssA-compliant shape: pinNodes Map, label:"", no dead flag fields.
-// setup() allocates TSTALLOC handles on the provided solver.
-// load() stamps via the pre-allocated handles.
-// ---------------------------------------------------------------------------
-
-function benchMakeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  class BenchResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: import("../setup-context.js").SetupContext): void {
-      const s = ctx.solver;
-      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        this._hPN = s.allocElement(nodeA, nodeB);
-        this._hNP = s.allocElement(nodeB, nodeA);
-      }
-    }
-    load(ctx: import("../load-context.js").LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
-      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
-      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
-    }
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA] ?? 0;
-      const vB = rhs[nodeB] ?? 0;
-      const I = G * (vA - vB);
-      return [I, -I];
-    }
-    setParam(key: string, value: number): void {
-      if (key === "resistance") {
-        const newG = 1 / Math.max(value, 1e-12);
-        (this as unknown as { _G: number })._G = newG;
-      }
-    }
-  }
-  return new BenchResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
-}
-
-function benchMakeCapacitor(nodeA: number, nodeB: number, _C: number): AnalogElement {
-  class BenchCapacitor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: import("../setup-context.js").SetupContext): void {
-      const s = ctx.solver;
-      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        this._hPN = s.allocElement(nodeA, nodeB);
-        this._hNP = s.allocElement(nodeB, nodeA);
-      }
-    }
-    load(ctx: import("../load-context.js").LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  0);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  0);
-      if (this._hPN !== -1) s.stampElement(this._hPN,  0);
-      if (this._hNP !== -1) s.stampElement(this._hNP,  0);
-    }
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new BenchCapacitor(new Map([["pos", nodeA], ["neg", nodeB]]));
-}
-
-function benchMakeDiode(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
-  const VT = 0.025852;
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const pinNodes = new Map<string, number>();
-  pinNodes.set("A", nodeA);
-  pinNodes.set("K", nodeK);
-  class BenchDiode extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
-    setup(ctx: import("../setup-context.js").SetupContext) {
-      const s = ctx.solver;
-      if (nodeA !== 0) _hAA = s.allocElement(nodeA, nodeA);
-      if (nodeK !== 0) _hKK = s.allocElement(nodeK, nodeK);
-      if (nodeA !== 0 && nodeK !== 0) {
-        _hAK = s.allocElement(nodeA, nodeK);
-        _hKA = s.allocElement(nodeK, nodeA);
-      }
-    }
-    load(ctx: import("../load-context.js").LoadContext) {
-      const vA = ctx.rhs[nodeA] ?? 0;
-      const vK = ctx.rhs[nodeK] ?? 0;
-      const vD = Math.min(vA - vK, 0.7);
-      const Id = IS * (Math.exp(vD / (N * VT)) - 1);
-      const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
-      const Ieq = Id - Gd * vD;
-      const s = ctx.solver;
-      if (_hAA !== -1) s.stampElement(_hAA,  Gd);
-      if (_hKK !== -1) s.stampElement(_hKK,  Gd);
-      if (_hAK !== -1) s.stampElement(_hAK, -Gd);
-      if (_hKA !== -1) s.stampElement(_hKA, -Gd);
-      if (nodeA !== 0) ctx.rhs[nodeA] -= Ieq;
-      if (nodeK !== 0) ctx.rhs[nodeK] += Ieq;
-    }
-    getPinCurrents(_rhs: Float64Array) { return [0, 0]; }
-    setParam(_key: string, _value: number) {}
-  }
-  return new BenchDiode(pinNodes);
-}
-
-function benchMakeInductor(nodeA: number, nodeB: number, branchRow: number, _L: number): AnalogElement {
-  let _hPIbr = -1, _hNIbr = -1, _hIbrP = -1, _hIbrN = -1, _hIbrIbr = -1;
-  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class BenchInductor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-    constructor(pins: ReadonlyMap<string, number>) {
-      super(pins);
-      this.branchIndex = branchRow;
-    }
-    setup(ctx: import("../setup-context.js").SetupContext) {
-      const s = ctx.solver;
-      const b = this.branchIndex;
-      if (nodeA !== 0) _hPIbr = s.allocElement(nodeA, b);
-      if (nodeB !== 0) _hNIbr = s.allocElement(nodeB, b);
-      _hIbrP = s.allocElement(b, nodeA);
-      if (nodeB !== 0) _hIbrN = s.allocElement(b, nodeB);
-      _hIbrIbr = s.allocElement(b, b);
-    }
-    load(ctx: import("../load-context.js").LoadContext) {
-      const s = ctx.solver;
-      if (_hPIbr  !== -1) s.stampElement(_hPIbr,   1);
-      if (_hNIbr  !== -1) s.stampElement(_hNIbr,  -1);
-      if (_hIbrP  !== -1) s.stampElement(_hIbrP,   1);
-      if (_hIbrN  !== -1) s.stampElement(_hIbrN,  -1);
-      if (_hIbrIbr !== -1) s.stampElement(_hIbrIbr, 0);
-    }
-    getPinCurrents(rhs: Float64Array) {
-      const I = rhs[this.branchIndex];
-      return [I, -I];
-    }
-    setParam(_key: string, _value: number) {}
-  }
-  return new BenchInductor(pinNodes);
-}
-
-function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
+// makeTestSetupContext / setupAll / loadCtxFromFields (from deleted test-helpers.js) and
+// benchMakeResistor / benchMakeCapacitor / benchMakeDiode / benchMakeInductor / makeVsrc
+// (inline engine-impersonator factories) are all removed.
+// Coverage: The ComparisonSession-based DCOP + transient path below exercises the full pipeline.
+// Reason: direct element.setup()/element.load() calls are §3 POISON; observable correctness
+//   (solver factor returns 0, DCOP converges) is covered by the engine path.
 
 // ---------------------------------------------------------------------------
 // 50-node benchmark circuit expressed via facade.build for M1 migration
@@ -523,7 +367,7 @@ function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {
   const facade = new DefaultSimulatorFacade(registry);
 
   // Component ids for chain resistors: r_{i}_{i-1} connects node i (pos) to node i-1 (neg)
-  const components: Array<{ id: string; type: string; props: Record<string, unknown> }> = [
+  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
     { id: "gnd", type: "Ground", props: {} },
     { id: "vs",  type: "DcVoltageSource", props: { voltage: 10.0 } },
   ];
@@ -625,9 +469,6 @@ describe("SparseSolver real MNA circuit", () => {
     // Matrix: 50 nodes + 2 branches = 52ÃƒÆ’Ã¢â‚¬â€52
     // ~70 elements, ~150 nonzeros, ~5.5% density (realistic MNA)
 
-    const nodeCount = 50;
-    const matrixSize = nodeCount + 2;
-
     const session = await ComparisonSession.createSelfCompare({
       buildCircuit: build50NodeBenchmarkCircuit,
       analysis: "dcop",
@@ -657,90 +498,11 @@ describe("SparseSolver real MNA circuit", () => {
     expect(engine.getState()).not.toBe(EngineState.ERROR);
     expect(transientSteps).toBe(100);
 
-    // --- Isolated solver timing (apples-to-apples with performance_50_node) ---
-    // Build a fresh element set and setup on rawSolver so handles target rawSolver.
-    const rawElements: AnalogElement[] = [];
-    const rawVs = makeVsrc(50, 0, 10.0);
-    rawVs.branchIndex = 50;
-    rawElements.push(rawVs);
-    for (let i = 50; i >= 2; i--) rawElements.push(benchMakeResistor(i, i - 1, 1000 + i * 10));
-    rawElements.push(benchMakeResistor(1, 0, 1000));
-    for (let i = 5; i <= 50; i += 5) rawElements.push(benchMakeCapacitor(i, 0, 100e-9));
-    for (let i = 7; i <= 49; i += 7) rawElements.push(benchMakeDiode(i, 0, 1e-14, 1.0));
-    rawElements.push(benchMakeInductor(25, 0, 51, 1e-3));
-    rawElements.push(benchMakeResistor(10, 40, 10000));
-    rawElements.push(benchMakeResistor(15, 35, 10000));
-    rawElements.push(benchMakeResistor(20, 30, 10000));
-    rawElements.push(benchMakeResistor(5, 45, 10000));
-    rawElements.push(benchMakeResistor(12, 38, 10000));
-
-    const rawSolver = new SparseSolver();
-    const rawVoltages = new Float64Array(matrixSize);
-    const rawAg = new Float64Array(7);
-    const rawCtx = loadCtxFromFields({
-      solver: rawSolver,
-      matrix: rawSolver,
-      rhs: rawVoltages,
-      rhsOld: rawVoltages,
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      time: 0,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: rawAg,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      convergenceCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      temp: 300.15,
-      vt: 0.025852,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
-
-    rawSolver._initStructure();
-    const rawSetupCtx = makeTestSetupContext({ solver: rawSolver, startBranch: nodeCount + 1 });
-    setupAll(rawElements, rawSetupCtx);
-    for (const el of rawElements) {
-      el.load(rawCtx);
-    }
-
-    performance.now();
-    performance.now();
-
-    performance.now();
-    const fResult = rawSolver.factor();
-    performance.now();
-    expect(fResult).toBe(0);
-
-    performance.now();
-    const xRaw = new Float64Array(matrixSize);
-    rawSolver.solve(rawVoltages, xRaw);
-    performance.now();
-
-    // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
-    rawVoltages.fill(0);
-    rawSolver._initStructure();
-    const rawSetupCtx2 = makeTestSetupContext({ solver: rawSolver, startBranch: nodeCount + 1 });
-    setupAll(rawElements, rawSetupCtx2);
-    for (const el of rawElements) {
-      el.load(rawCtx);
-    }
-
-    performance.now();
-    rawSolver.factor();
-    performance.now();
-
-    performance.now();
-    rawSolver.solve(rawVoltages, xRaw);
-    performance.now();
-
+    // Isolated-solver-timing benchmark deleted (§3 POISON eradication).
+    // Used loadCtxFromFields/makeTestSetupContext/setupAll from deleted test-helpers.js
+    // and inline benchMakeResistor/benchMakeCapacitor/benchMakeDiode/benchMakeInductor/makeVsrc
+    // engine-impersonator factories. Coverage: the ComparisonSession-based DCOP + transient
+    // path above already asserts tDcOp < 20 and tPerStep < 2 for the 52×52 matrix.
     // Performance targets for a 52ÃƒÆ’Ã¢â‚¬â€52 real MNA matrix:
     // DC OP: < 20ms (multiple NR iterations with 7 nonlinear diodes)
     // Per transient step: < 2ms

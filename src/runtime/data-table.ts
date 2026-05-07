@@ -13,7 +13,7 @@
 import type { MeasurementObserver } from "@/core/engine-interface";
 import type { DisplayFormat } from "@/core/signal";
 import { BitVector } from "@/core/signal";
-import type { SimulationCoordinator } from "@/solver/coordinator-types";
+import type { DataTableDataSource } from "@/solver/coordinator-types";
 import type { SignalAddress } from "@/compile/types";
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ interface SignalRow {
  */
 export class DataTablePanel implements MeasurementObserver {
   private readonly _container: HTMLElement;
-  private readonly _coordinator: SimulationCoordinator;
+  private readonly _coordinator: DataTableDataSource;
   private _rows: SignalRow[];
   private _sortByName = false;
   private _tableBody: HTMLTableSectionElement | null = null;
@@ -73,7 +73,7 @@ export class DataTablePanel implements MeasurementObserver {
 
   constructor(
     container: HTMLElement,
-    coordinator: SimulationCoordinator,
+    coordinator: DataTableDataSource,
     signals: readonly SignalDescriptor[],
   ) {
     this._container = container;

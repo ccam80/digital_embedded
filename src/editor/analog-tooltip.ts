@@ -10,7 +10,7 @@
  * to the left of the cursor; similarly for the bottom edge.
  */
 
-import type { SimulationCoordinator } from "@/solver/coordinator-types";
+import type { TooltipDataSource } from "@/solver/coordinator-types";
 import type { RenderContext } from "@/core/renderer-interface";
 import type { HitResult } from "@/editor/hit-test";
 import type { CircuitElement } from "@/core/element";
@@ -22,7 +22,7 @@ import type { WireCurrentResolver } from "@/editor/wire-current-resolver";
 // ---------------------------------------------------------------------------
 
 export class AnalogTooltip {
-  private readonly _coordinator: SimulationCoordinator;
+  private readonly _coordinator: TooltipDataSource;
 
   /**
    * Cached inverted map: CircuitElement → element index.
@@ -30,7 +30,7 @@ export class AnalogTooltip {
    */
   private _elementIndexCache: Map<CircuitElement, number> | null = null;
   /** The resolver context whose entries populate `_elementIndexCache`. */
-  private _cachedResolverCtx: ReturnType<SimulationCoordinator["getCurrentResolverContext"]> = null;
+  private _cachedResolverCtx: ReturnType<TooltipDataSource["getCurrentResolverContext"]> = null;
 
   /** The pending or active tooltip text (empty = not visible). */
   private _text: string = "";
@@ -52,7 +52,7 @@ export class AnalogTooltip {
   private _timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    coordinator: SimulationCoordinator,
+    coordinator: TooltipDataSource,
     _resolver: WireCurrentResolver,
   ) {
     this._coordinator = coordinator;

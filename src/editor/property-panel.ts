@@ -11,6 +11,15 @@ import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
 import type { StandaloneComponentDefinition, ModelEntry, ParamDef } from "@/core/registry";
+
+type RenderableParamDef = ParamDef & {
+  label: string;
+  rank: "primary" | "secondary";
+};
+
+function isRenderableParamDef(p: ParamDef): p is RenderableParamDef {
+  return p.label !== undefined && (p.rank === "primary" || p.rank === "secondary");
+}
 import { paramDefDefaults } from "@/core/model-params";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
@@ -393,8 +402,9 @@ export class PropertyPanel {
 
     const bag = element.getProperties();
 
-    const primary = paramDefs.filter(p => p.rank === "primary");
-    const secondary = paramDefs.filter(p => p.rank === "secondary");
+    const renderable = paramDefs.filter(isRenderableParamDef);
+    const primary = renderable.filter(p => p.rank === "primary");
+    const secondary = renderable.filter(p => p.rank === "secondary");
 
     // Render primary params above the model dropdown, with show-value checkbox
     for (const pd of primary) {
@@ -455,7 +465,7 @@ export class PropertyPanel {
   private _buildModelParamRow(
     _element: CircuitElement,
     _def: StandaloneComponentDefinition,
-    pd: ParamDef,
+    pd: RenderableParamDef,
     entry: ModelEntry,
     bag: ReturnType<CircuitElement["getProperties"]>,
     _modelKey: string,

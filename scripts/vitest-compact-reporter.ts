@@ -150,10 +150,35 @@ export default class CompactReporter implements Reporter {
     }
   }
 
-  private collectFailures(tasks: any[], filePath: string) {
+  private collectFailures(tasks: any[], filePath: string, parentSuiteFailed: boolean = false) {
     for (const task of tasks) {
       if (task.type === 'suite' && task.tasks) {
-        this.collectFailures(task.tasks, filePath);
+        const suiteFailed = task.result?.state === 'fail';
+        // Suites carry beforeAll/afterAll errors on their own result.errors.
+        // Without this, a thrown beforeAll renders all child it()s as "skipped"
+        // and the suite-level error itself is silently dropped.
+        if (suiteFailed) {
+          const errors = task.result?.errors ?? [];
+          for (const err of errors) {
+            const rawMsg = err.message ?? err.toString?.() ?? 'Unknown suite-level error';
+            const key = normalizeMessage(rawMsg);
+            const loc = extractLocation(err.stack ?? err.stackStr, this.cwd);
+            const location: FailureLocation = {
+              file: loc.file ? relative(this.cwd, loc.file) : filePath,
+              test: `[suite-setup] ${task.name ?? 'unknown'}`,
+              line: loc.line,
+              column: loc.column,
+            };
+            const existing = this.failureGroups.get(key);
+            if (existing) {
+              existing.count++;
+              existing.locations.push(location);
+            } else {
+              this.failureGroups.set(key, { message: key, count: 1, locations: [location] });
+            }
+          }
+        }
+        this.collectFailures(task.tasks, filePath, suiteFailed || parentSuiteFailed);
         continue;
       }
       if (task.result?.state !== 'fail') continue;
@@ -182,16 +207,23 @@ export default class CompactReporter implements Reporter {
     }
   }
 
-  private countLeafResults(tasks: any[]) {
+  private countLeafResults(tasks: any[], parentSuiteFailed: boolean = false) {
     for (const task of tasks) {
       if (task.type === 'suite' && task.tasks) {
-        this.countLeafResults(task.tasks);
+        const suiteFailed = task.result?.state === 'fail';
+        this.countLeafResults(task.tasks, suiteFailed || parentSuiteFailed);
         continue;
       }
       const state = task.result?.state;
       if (state === 'pass') this.passed++;
       else if (state === 'fail') this.failed++;
-      else if (task.mode === 'skip' || state === 'skip') this.skipped++;
+      else if (task.mode === 'skip' || state === 'skip') {
+        // Children of a failed suite are marked skipped by Vitest after the
+        // beforeAll throw. They didn't choose to skip — count them as failures
+        // so the summary reflects the real state of the file.
+        if (parentSuiteFailed) this.failed++;
+        else this.skipped++;
+      }
     }
   }
 }

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { createEditorBinding } from "../editor-binding";
 import type { EditorBinding } from "../editor-binding";
-import { MockCoordinator } from "@/test-utils/mock-coordinator";
+import { buildNonEngineCoordinator, type NonEngineCoordinator } from "@/test-utils/non-engine-coordinator";
 import { Wire, Circuit } from "@/core/circuit";
 import { BitVector } from "@/core/signal";
 import type { CircuitElement } from "@/core/element";
@@ -48,7 +48,7 @@ class StubElement implements CircuitElement {
 describe("EditorBinding", () => {
   let binding: EditorBinding;
   let circuit: Circuit;
-  let coordinator: MockCoordinator;
+  let coordinator: NonEngineCoordinator;
   let wire: Wire;
   let element: StubElement;
   let wireSignalMap: Map<Wire, SignalAddress>;
@@ -59,7 +59,7 @@ describe("EditorBinding", () => {
   beforeEach(() => {
     binding = createEditorBinding();
     circuit = new Circuit();
-    coordinator = new MockCoordinator();
+    coordinator = buildNonEngineCoordinator();
 
     wire = new Wire({ x: 0, y: 0 }, { x: 10, y: 0 });
     element = new StubElement("elem-1");

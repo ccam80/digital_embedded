@@ -1,5 +1,5 @@
 /**
- * SliderEngineBridge- connects SliderPanel to the SimulationCoordinator.
+ * SliderEngineBridge- connects SliderPanel to the SliderBridgeDataSource.
  *
  * When a slider value changes, the bridge:
  *   1. Resolves the analog element from the coordinator's current resolver context.
@@ -8,22 +8,22 @@
  *
  */
 
-import type { SimulationCoordinator } from "@/solver/coordinator-types.js";
+import type { SliderBridgeDataSource } from "@/solver/coordinator-types.js";
 import { SliderPanel } from "./slider-panel.js";
 
 /**
- * Bridges a SliderPanel to a SimulationCoordinator so that slider changes
+ * Bridges a SliderPanel to a SliderBridgeDataSource so that slider changes
  * propagate to element parameters in real time.
  */
 export class SliderEngineBridge {
   private readonly _panel: SliderPanel;
-  private readonly _coordinator: SimulationCoordinator;
+  private readonly _coordinator: SliderBridgeDataSource;
 
   /**
    * @param panel       - The SliderPanel whose changes drive the coordinator.
-   * @param coordinator - The active SimulationCoordinator.
+   * @param coordinator - The active SliderBridgeDataSource.
    */
-  constructor(panel: SliderPanel, coordinator: SimulationCoordinator) {
+  constructor(panel: SliderPanel, coordinator: SliderBridgeDataSource) {
     this._panel = panel;
     this._coordinator = coordinator;
 

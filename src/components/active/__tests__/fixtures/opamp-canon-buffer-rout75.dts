@@ -1,0 +1,390 @@
+{
+  "circuit": {
+    "description": "Voltage-follower buffer: Vin=2V drives in+, out fed back to in-, rOut=75 (composite VCVS+RES path), R_load=1k to GND. Expected V(out) ~= Vin = 2V.",
+    "elements": [
+      {
+        "id": "e89129c8-523d-4a38-bb0f-4115b720e811",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 2
+          },
+          "label": "vin",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 2
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "aa05844b-a98a-4274-9e8f-97d880511ac0",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "rload",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "5ea1e096-e3f7-4f3e-8d67-ea061eb08e47",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "gain": 100000,
+            "rOut": 75
+          },
+          "gain": 100000,
+          "label": "opamp",
+          "position": [
+            0,
+            16
+          ],
+          "rOut": 75
+        },
+        "rotation": 0,
+        "type": "OpAmp"
+      },
+      {
+        "id": "27cbe659-050b-491c-9383-1504f11d5b5c",
+        "position": {
+          "x": 36,
+          "y": 3
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "opamp-canon-buffer-rout75",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 6
+          },
+          {
+            "x": 24,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 6
+          },
+          {
+            "x": 30,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 6
+          },
+          {
+            "x": 30,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 20,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": -1
+          },
+          {
+            "x": 16,
+            "y": 0
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

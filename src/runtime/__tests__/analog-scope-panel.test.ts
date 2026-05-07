@@ -6,7 +6,10 @@
 import { describe, it, expect } from "vitest";
 import { ScopePanel } from "../analog-scope-panel.js";
 import { AnalogScopeBuffer } from "../analog-scope-buffer.js";
-import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
+import {
+  buildNonEngineCoordinator,
+  type NonEngineCoordinator,
+} from "@/test-utils/non-engine-coordinator.js";
 import type { SignalAddress } from "@/compile/types.js";
 import { PinDirection } from "@/core/pin.js";
 
@@ -32,41 +35,31 @@ function buildCoordinator(opts: {
   branchCurrent?: number;
   elementCurrent?: number;
 } = {}): {
-  coordinator: MockCoordinator;
+  coordinator: NonEngineCoordinator;
   setSimTime(t: number): void;
   setVoltage(addr: SignalAddress, v: number): void;
 } {
-  const coord = new MockCoordinator();
+  const coord = buildNonEngineCoordinator({ simTime: opts.simTime ?? 0 });
   if (opts.voltage !== undefined) {
     coord.setSignal(VOLTAGE_ADDR, { type: "analog", voltage: opts.voltage });
     coord.setSignal(VOLTAGE_ADDR2, { type: "analog", voltage: opts.voltage });
   }
-
-  let currentSimTime = opts.simTime ?? 0;
-  Object.defineProperty(coord, "simTime", {
-    get: () => currentSimTime,
-    configurable: true,
-  });
-
   if (opts.branchCurrent !== undefined) {
-    const bc = opts.branchCurrent;
-    (coord as unknown as { readBranchCurrent(i: number): number | null }).readBranchCurrent = (_i: number) => bc;
+    coord.setBranchCurrent(0, opts.branchCurrent);
   }
   if (opts.elementCurrent !== undefined) {
-    const ec = opts.elementCurrent;
-    (coord as unknown as { readElementCurrent(i: number): number | null }).readElementCurrent = (_i: number) => ec;
+    coord.setElementCurrent(0, opts.elementCurrent);
   }
-
   return {
     coordinator: coord,
-    setSimTime: (t: number) => { currentSimTime = t; },
+    setSimTime: (t: number) => coord.setSimTime(t),
     setVoltage: (addr: SignalAddress, v: number) => {
       coord.setSignal(addr, { type: "analog", voltage: v });
     },
   };
 }
 
-function makePanel(coordinator: MockCoordinator): ScopePanel {
+function makePanel(coordinator: NonEngineCoordinator): ScopePanel {
   return new ScopePanel(null, coordinator);
 }
 
@@ -286,10 +279,9 @@ describe("ScopePanel", () => {
   });
 
   it("digital_channel_maps_high_to_vdd", () => {
-    const coord = new MockCoordinator();
+    const coord = buildNonEngineCoordinator();
     coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
-    let currentSimTime: number | null = 1e-6;
-    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+    coord.setSimTime(1e-6);
 
     const panel = makePanel(coord);
     panel.addDigitalChannel(DIGITAL_ADDR, "CLK");
@@ -302,10 +294,9 @@ describe("ScopePanel", () => {
   });
 
   it("digital_channel_maps_low_to_zero", () => {
-    const coord = new MockCoordinator();
+    const coord = buildNonEngineCoordinator();
     coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 0 });
-    let currentSimTime: number | null = 1e-6;
-    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+    coord.setSimTime(1e-6);
 
     const panel = makePanel(coord);
     panel.addDigitalChannel(DIGITAL_ADDR, "CLK");
@@ -317,10 +308,9 @@ describe("ScopePanel", () => {
   });
 
   it("digital_channel_custom_vdd", () => {
-    const coord = new MockCoordinator();
+    const coord = buildNonEngineCoordinator();
     coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
-    let currentSimTime: number | null = 1e-6;
-    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+    coord.setSimTime(1e-6);
 
     const panel = makePanel(coord);
     panel.addDigitalChannel(DIGITAL_ADDR, "CLK", { vdd: 3.3 });
@@ -332,8 +322,8 @@ describe("ScopePanel", () => {
   });
 
   it("discrete_mode_uses_stepcount_as_time", () => {
-    const coord = new MockCoordinator();
-    // simTime is null by default in MockCoordinator- pure digital
+    const coord = buildNonEngineCoordinator();
+    // simTime defaults to null- pure digital
     coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
 
     const panel = makePanel(coord);
@@ -349,11 +339,10 @@ describe("ScopePanel", () => {
   it("voltage_channel_maps_digital_signal_to_vdd", () => {
     // When a voltage channel reads a digital signal (mixed circuits),
     // it should map nonzero → VDD instead of 0
-    const coord = new MockCoordinator();
+    const coord = buildNonEngineCoordinator();
     const mixedAddr: SignalAddress = { domain: "analog", nodeId: 10 };
     coord.setSignal(mixedAddr, { type: "digital", value: 1 });
-    let currentSimTime: number | null = 1e-6;
-    Object.defineProperty(coord, "simTime", { get: () => currentSimTime, configurable: true });
+    coord.setSimTime(1e-6);
 
     const panel = makePanel(coord);
     panel.addVoltageChannel(mixedAddr, "Vmixed");

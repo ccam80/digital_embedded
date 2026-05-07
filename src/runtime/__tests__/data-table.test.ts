@@ -7,10 +7,12 @@
 import { describe, it, expect } from "vitest";
 import { DataTablePanel } from "../data-table.js";
 import type { SignalDescriptor } from "../data-table.js";
-import type { SignalAddress, SignalValue } from "@/compile/types";
+import type { SignalAddress } from "@/compile/types";
 import { PinDirection } from "@/core/pin";
-import type { SimulationCoordinator } from "@/solver/coordinator-types";
-import type { MeasurementObserver } from "@/core/engine-interface";
+import {
+  buildNonEngineCoordinator,
+  type NonEngineCoordinator,
+} from "@/test-utils/non-engine-coordinator.js";
 
 // ---------------------------------------------------------------------------
 // JSDOM helpers
@@ -27,31 +29,16 @@ function teardown(el: HTMLElement): void {
 }
 
 // ---------------------------------------------------------------------------
-// Mock coordinator- minimal implementation for DataTablePanel tests
+// Per-test seed helpers- thin wrappers over `coord.setSignal` so tests stay
+// terse without inventing a netId-keyed mock surface.
 // ---------------------------------------------------------------------------
 
-class MockCoordinator implements Pick<SimulationCoordinator, 'readSignal' | 'addMeasurementObserver' | 'removeMeasurementObserver'> {
-  private _signals: Map<number, SignalValue> = new Map();
+function seedDigital(coord: NonEngineCoordinator, addr: SignalAddress, value: number): void {
+  coord.setSignal(addr, { type: "digital", value });
+}
 
-  /** Set a digital signal value by netId for test setup. */
-  setDigitalSignal(netId: number, value: number): void {
-    this._signals.set(netId, { type: 'digital', value });
-  }
-
-  /** Set an analog signal value by nodeId for test setup. */
-  setAnalogSignal(nodeId: number, voltage: number): void {
-    this._signals.set(nodeId + 1000, { type: 'analog', voltage });
-  }
-
-  readSignal(addr: SignalAddress): SignalValue {
-    if (addr.domain === 'digital') {
-      return this._signals.get(addr.netId) ?? { type: 'digital', value: 0 };
-    }
-    return this._signals.get(addr.nodeId + 1000) ?? { type: 'analog', voltage: 0 };
-  }
-
-  addMeasurementObserver(_observer: MeasurementObserver): void {}
-  removeMeasurementObserver(_observer: MeasurementObserver): void {}
+function seedAnalog(coord: NonEngineCoordinator, addr: SignalAddress, voltage: number): void {
+  coord.setSignal(addr, { type: "analog", voltage });
 }
 
 // ---------------------------------------------------------------------------
@@ -76,9 +63,9 @@ describe("DataTablePanel", () => {
   describe("rendersSignals", () => {
     it("renders 3 rows with correct signal names", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, THREE_SIGNALS);
+      const panel = new DataTablePanel(container, coordinator, THREE_SIGNALS);
 
       // There should be 3 data rows (excluding group separator rows)
       const dataRows = container.querySelectorAll(".data-table-row");
@@ -97,9 +84,9 @@ describe("DataTablePanel", () => {
 
     it("getSignalNames returns all signal names", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, THREE_SIGNALS);
+      const panel = new DataTablePanel(container, coordinator, THREE_SIGNALS);
       const names = panel.getSignalNames();
 
       expect(names).toContain("A");
@@ -113,9 +100,9 @@ describe("DataTablePanel", () => {
 
     it("registers as observer and table has header row", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, THREE_SIGNALS);
+      const panel = new DataTablePanel(container, coordinator, THREE_SIGNALS);
 
       // Header row should contain Signal and Value columns
       const headers = container.querySelectorAll("th");
@@ -135,7 +122,7 @@ describe("DataTablePanel", () => {
   describe("updatesOnStep", () => {
     it("reads digital signal values from the coordinator after onStep()", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -143,11 +130,11 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 7);
-      coordinator.setDigitalSignal(1, 42);
-      coordinator.setDigitalSignal(2, 255);
+      seedDigital(coordinator, signals[0]!.addr, 7);
+      seedDigital(coordinator, signals[1]!.addr, 42);
+      seedDigital(coordinator, signals[2]!.addr, 255);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
 
       // Before step, values should be empty
       expect(panel.getDisplayValueByName("A")).toBe("");
@@ -169,15 +156,15 @@ describe("DataTablePanel", () => {
 
     it("reads analog voltage values from the coordinator after onStep()", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "V_node0", addr: { domain: 'analog', nodeId: 0 }, width: 1, group: "probe" },
       ];
 
-      coordinator.setAnalogSignal(0, 3.3);
+      seedAnalog(coordinator, signals[0]!.addr, 3.3);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
 
       expect(panel.getDisplayValueByName("V_node0")).toBe("");
 
@@ -192,7 +179,7 @@ describe("DataTablePanel", () => {
 
     it("value cells in DOM are updated after onStep()", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -200,11 +187,11 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 5);
-      coordinator.setDigitalSignal(1, 10);
-      coordinator.setDigitalSignal(2, 15);
+      seedDigital(coordinator, signals[0]!.addr, 5);
+      seedDigital(coordinator, signals[1]!.addr, 10);
+      seedDigital(coordinator, signals[2]!.addr, 15);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
 
       const valueCells = container.querySelectorAll(".data-table-cell-value");
@@ -225,7 +212,7 @@ describe("DataTablePanel", () => {
   describe("radixSwitch", () => {
     it("switches from decimal to hex display format", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -233,9 +220,9 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 255);
+      seedDigital(coordinator, signals[0]!.addr, 255);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
 
       // Default radix is decimal
@@ -253,7 +240,7 @@ describe("DataTablePanel", () => {
 
     it("switches from decimal to binary display format", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -261,9 +248,9 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 10);
+      seedDigital(coordinator, signals[0]!.addr, 10);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
 
       panel.setRadixByName("A", "bin");
@@ -275,7 +262,7 @@ describe("DataTablePanel", () => {
 
     it("setRadix by index changes the correct signal", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -283,10 +270,10 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 16);
-      coordinator.setDigitalSignal(1, 32);
+      seedDigital(coordinator, signals[0]!.addr, 16);
+      seedDigital(coordinator, signals[1]!.addr, 32);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
 
       // Index 0 in grouped order is "A" (first input)
@@ -301,7 +288,7 @@ describe("DataTablePanel", () => {
 
     it("DOM reflects radix change", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -309,9 +296,9 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 255);
+      seedDigital(coordinator, signals[0]!.addr, 255);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
       panel.setRadixByName("A", "hex");
 
@@ -340,7 +327,7 @@ describe("DataTablePanel", () => {
   describe("onReset", () => {
     it("clears all values on reset", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -348,11 +335,11 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 42);
-      coordinator.setDigitalSignal(1, 100);
-      coordinator.setDigitalSignal(2, 7);
+      seedDigital(coordinator, signals[0]!.addr, 42);
+      seedDigital(coordinator, signals[1]!.addr, 100);
+      seedDigital(coordinator, signals[2]!.addr, 7);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
 
       // Step to populate values
       panel.onStep(1);
@@ -372,7 +359,7 @@ describe("DataTablePanel", () => {
 
     it("DOM value cells are empty strings after reset", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -380,9 +367,9 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 5);
+      seedDigital(coordinator, signals[0]!.addr, 5);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
 
       // Verify some value shown
@@ -405,7 +392,7 @@ describe("DataTablePanel", () => {
 
     it("can step again after reset to repopulate values", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
       const signals: SignalDescriptor[] = [
         { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
@@ -413,14 +400,14 @@ describe("DataTablePanel", () => {
         { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
-      coordinator.setDigitalSignal(0, 99);
+      seedDigital(coordinator, signals[0]!.addr, 99);
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.onStep(1);
       panel.onReset();
 
       // Step again- should repopulate from coordinator
-      coordinator.setDigitalSignal(0, 77);
+      seedDigital(coordinator, signals[0]!.addr, 77);
       panel.onStep(2);
       expect(panel.getDisplayValueByName("A")).toBe("77");
 
@@ -443,9 +430,9 @@ describe("DataTablePanel", () => {
       ];
 
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       const names = panel.getSignalNames();
 
       // inputs first, then outputs, then probes
@@ -484,9 +471,9 @@ describe("DataTablePanel", () => {
       ];
 
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, signals);
+      const panel = new DataTablePanel(container, coordinator, signals);
       panel.setSortByName(true);
 
       const names = panel.getSignalNames();
@@ -504,9 +491,9 @@ describe("DataTablePanel", () => {
   describe("edge cases", () => {
     it("throws on out-of-range signal index", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, THREE_SIGNALS);
+      const panel = new DataTablePanel(container, coordinator, THREE_SIGNALS);
 
       expect(() => panel.setRadix(99, "hex")).toThrow();
       expect(() => panel.getDisplayValue(99)).toThrow();
@@ -517,9 +504,9 @@ describe("DataTablePanel", () => {
 
     it("throws when signal name not found", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, THREE_SIGNALS);
+      const panel = new DataTablePanel(container, coordinator, THREE_SIGNALS);
 
       expect(() => panel.setRadixByName("MISSING", "hex")).toThrow();
       expect(() => panel.getDisplayValueByName("MISSING")).toThrow();
@@ -530,9 +517,9 @@ describe("DataTablePanel", () => {
 
     it("handles empty signals list", () => {
       const container = makeContainer();
-      const coordinator = new MockCoordinator();
+      const coordinator = buildNonEngineCoordinator();
 
-      const panel = new DataTablePanel(container, coordinator as unknown as SimulationCoordinator, []);
+      const panel = new DataTablePanel(container, coordinator, []);
       expect(panel.getSignalCount()).toBe(0);
       expect(panel.getSignalNames()).toEqual([]);
 

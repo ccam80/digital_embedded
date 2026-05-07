@@ -1,0 +1,488 @@
+{
+  "circuit": {
+    "description": "Unity-gain follower in linear region with Vin=2V, ±15V supplies; exercises Cat 2/3/5 unsaturated regime",
+    "elements": [
+      {
+        "id": "2a379f69-fadb-46f9-9b55-0fd3aab1f150",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 2
+          },
+          "label": "vin",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 2
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "036023a0-53f1-4800-9ff7-ab07362a3c4e",
+        "position": {
+          "x": 0,
+          "y": 5
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 15
+          },
+          "label": "vccp",
+          "position": [
+            0,
+            8
+          ],
+          "voltage": 15
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "43156092-73f3-4549-9d28-3769890d4bf7",
+        "position": {
+          "x": 0,
+          "y": 10
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": -15
+          },
+          "label": "vccn",
+          "position": [
+            0,
+            16
+          ],
+          "voltage": -15
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "82856063-3a40-40d2-9983-31c99b595dd3",
+        "position": {
+          "x": 12,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "aol": 100000,
+            "gbw": 1000000,
+            "iBias": 8e-8,
+            "iMax": 0.025,
+            "rIn": 2000000,
+            "rOut": 75,
+            "slewRate": 500000,
+            "vSatNeg": 1.5,
+            "vSatPos": 1.5,
+            "vos": 0.001
+          },
+          "label": "opamp",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "RealOpAmp"
+      },
+      {
+        "id": "d6cc3078-301a-43ec-9208-ff5d362c86f5",
+        "position": {
+          "x": 12,
+          "y": 9
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "real-opamp-canon-unity-follower",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 0
+          },
+          {
+            "x": 5,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 0
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 5
+          },
+          {
+            "x": 5,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 0
+          },
+          {
+            "x": 14,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 5
+          },
+          {
+            "x": 10,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 5
+          },
+          {
+            "x": 10,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": -1
+          },
+          {
+            "x": 14,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 10
+          },
+          {
+            "x": 5,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 4
+          },
+          {
+            "x": 14,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 10
+          },
+          {
+            "x": 9,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 10
+          },
+          {
+            "x": 9,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 5
+          },
+          {
+            "x": 14,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 0
+          },
+          {
+            "x": -2,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 0
+          },
+          {
+            "x": -2,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 5
+          },
+          {
+            "x": -1,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 5
+          },
+          {
+            "x": -3,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -3,
+            "y": 5
+          },
+          {
+            "x": -3,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -3,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 10
+          },
+          {
+            "x": -1,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 10
+          },
+          {
+            "x": -4,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -4,
+            "y": 10
+          },
+          {
+            "x": -4,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -4,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 2
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
