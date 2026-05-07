@@ -1,0 +1,366 @@
+{
+  "circuit": {
+    "description": "AC voltage source near series resonance (1 MHz) drives crystal in series with a 1k load resistor to ground. Exercises motional RLC dynamics.",
+    "elements": [
+      {
+        "id": "7db37e8d-e97f-4831-b96d-400064a59c6b",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 0.1,
+            "dcOffset": 0,
+            "fallTime": 1e-12,
+            "frequency": 1000000,
+            "noiseSampleTime": 0,
+            "phase": 0,
+            "riseTime": 1e-12
+          },
+          "amplitude": 0.1,
+          "frequency": 1000000,
+          "label": "vac",
+          "position": [
+            0,
+            0
+          ],
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "0162d5d8-1dd9-4f52-8723-f3301ce99471",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "frequency": 1000000,
+            "motionalCapacitance": 2e-14,
+            "qualityFactor": 1000,
+            "shuntCapacitance": 5e-12
+          },
+          "frequency": 1000000,
+          "label": "xtal",
+          "motionalCapacitance": 2e-14,
+          "position": [
+            0,
+            8
+          ],
+          "qualityFactor": 1000,
+          "shuntCapacitance": 5e-12
+        },
+        "rotation": 0,
+        "type": "QuartzCrystal"
+      },
+      {
+        "id": "83ad3ed4-f1f4-4601-8a45-a70d7d32bce8",
+        "position": {
+          "x": 22,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "rload",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "d38f0dcc-3ca6-43d8-8171-29e3b2aee6a9",
+        "position": {
+          "x": 34,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "crystal-canon-resonator",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 0
+          },
+          {
+            "x": 15,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 0
+          },
+          {
+            "x": 27,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

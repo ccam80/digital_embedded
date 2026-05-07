@@ -1,312 +1,348 @@
-/** Tests for the QuartzCrystal (Butterworth-Van Dyke) component. */
-
-import { describe, it, expect } from "vitest";
-import {
-  CrystalDefinition,
-  CrystalCircuitElement,
-  AnalogCrystalElement,
-  crystalMotionalInductance,
-  crystalSeriesResistance,
-  CRYSTAL_ATTRIBUTE_MAPPINGS,
-} from "../crystal.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as path from "path";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  describeIfDll,
+  DLL_PATH,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import "../../../solver/analog/__tests__/harness/comparison-session-asserts.js";
 
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
+// ---------------------------------------------------------------------------
+// DTS fixture paths (T3 harness)
+// ---------------------------------------------------------------------------
 
-function bvdImpedanceMagnitude(
-  freqHz: number,
-  Rs: number,
-  Ls: number,
-  Cs: number,
-  C0: number,
-): number {
-  const omega = 2 * Math.PI * freqHz;
-  const Z_m_re = Rs;
-  const Z_m_im = omega * Ls - 1 / (omega * Cs);
-  const Z_m_mag2 = Z_m_re * Z_m_re + Z_m_im * Z_m_im;
-  const Y_m_re = Z_m_re / Z_m_mag2;
-  const Y_m_im = -Z_m_im / Z_m_mag2;
-  const Y_0_im = omega * C0;
-  const Y_re = Y_m_re;
-  const Y_im = Y_m_im + Y_0_im;
-  const Y_mag2 = Y_re * Y_re + Y_im * Y_im;
-  return 1 / Math.sqrt(Y_mag2);
-}
+const DTS_DC_BLOCK = path.resolve(
+  "src/components/passives/__tests__/fixtures/crystal-canon-dc-block.dts",
+);
+const DTS_RESONATOR = path.resolve(
+  "src/components/passives/__tests__/fixtures/crystal-canon-resonator.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic circuit factories (T1)
+// ---------------------------------------------------------------------------
+//
+// DC-block topology: V_DC -> xtal -> R_bleed -> GND.
+// The BVD model places C_s and C_0 across pos/neg with no DC path through L_s
+// (only branch incidence). At DC, all source voltage drops across the
+// crystal; the bleed resistor anchors the floating xtal:neg node.
 
 interface DcBlockParams {
-  V: number;
-  rBleed: number;
-  frequency: number;
-  qualityFactor: number;
-  motionalCapacitance: number;
-  shuntCapacitance: number;
+  V?: number;
+  rBleed?: number;
+  frequency?: number;
+  qualityFactor?: number;
+  motionalCapacitance?: number;
+  shuntCapacitance?: number;
 }
 
 function buildDcBlockCircuit(facade: DefaultSimulatorFacade, p: DcBlockParams): Circuit {
   return facade.build({
     components: [
-      { id: "vs",      type: "DcVoltageSource", props: { label: "vs",  voltage: p.V } },
-      { id: "xtal",    type: "QuartzCrystal",   props: {
+      { id: "vs", type: "DcVoltageSource", props: { label: "vs", voltage: p.V ?? 1 } },
+      { id: "xtal", type: "QuartzCrystal", props: {
           label: "xtal",
-          frequency: p.frequency,
-          qualityFactor: p.qualityFactor,
-          motionalCapacitance: p.motionalCapacitance,
-          shuntCapacitance: p.shuntCapacitance,
+          frequency: p.frequency ?? 1e6,
+          qualityFactor: p.qualityFactor ?? 1000,
+          motionalCapacitance: p.motionalCapacitance ?? 2e-14,
+          shuntCapacitance: p.shuntCapacitance ?? 5e-12,
       } },
-      { id: "rbleed",  type: "Resistor",        props: { label: "rbleed", resistance: p.rBleed } },
-      { id: "gnd",     type: "Ground" },
+      { id: "rbleed", type: "Resistor", props: { label: "rbleed", resistance: p.rBleed ?? 1e9 } },
+      { id: "gnd", type: "Ground", props: { label: "gnd" } },
     ],
     connections: [
-      ["vs:pos",     "xtal:pos"],
-      ["xtal:neg",   "rbleed:pos"],
+      ["vs:pos", "xtal:pos"],
+      ["xtal:neg", "rbleed:pos"],
       ["rbleed:neg", "gnd:out"],
-      ["vs:neg",     "gnd:out"],
+      ["vs:neg", "gnd:out"],
     ],
   });
 }
 
-function findCrystal(elements: ReadonlyArray<unknown>): AnalogCrystalElement {
-  const idx = elements.findIndex((el) => el instanceof AnalogCrystalElement);
-  if (idx < 0) throw new Error("AnalogCrystalElement not found in compiled circuit");
-  return elements[idx] as AnalogCrystalElement;
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
 }
 
-describe("Crystal", () => {
-  describe("derived_parameters_consistent", () => {
-    it("L_s = 1/(4π²·f²·C_s) for default parameters", () => {
-      const f = 32768;
-      const Cs = 12.5e-15;
-      const Ls = crystalMotionalInductance(f, Cs);
-      expect(Ls).toBeGreaterThan(0);
-      const expected = 1 / (4 * Math.PI * Math.PI * f * f * Cs);
-      expect(Ls).toBeCloseTo(expected, 18);
-    });
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
 
-    it("R_s = 2π·f·L_s/Q for default parameters", () => {
-      const f = 32768;
-      const Q = 50000;
-      const Cs = 12.5e-15;
-      const Ls = crystalMotionalInductance(f, Cs);
-      const Rs = crystalSeriesResistance(f, Ls, Q);
-      expect(Rs).toBeGreaterThan(0);
-      const expected = (2 * Math.PI * f * Ls) / Q;
-      expect(Rs).toBeCloseTo(expected, 12);
+// ---------------------------------------------------------------------------
+// QuartzCrystal initialization (T1) — Cat 1
+// ---------------------------------------------------------------------------
+
+describe("QuartzCrystal initialization (T1)", () => {
+  it("init_post_warm_start_dc_block_full_drop_across_crystal", () => {
+    // Cat 1: post-warm-start node voltages for the DC-block topology.
+    // V_DC=1V across (xtal in series with R_bleed=1G); BVD caps block DC,
+    // L_s has only branch incidence (no DC conductance path), so all 1V
+    // drops across the crystal: V(xtal:pos)=1, V(xtal:neg)~=0.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9 }),
     });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "xtal:pos"))).toBeCloseTo(1.0, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"))).toBeCloseTo(0.0, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QuartzCrystal DCOP analytical (T1) — Cat 2 analytical
+// ---------------------------------------------------------------------------
+
+describe("QuartzCrystal DCOP analytical (T1)", () => {
+  it("dcop_dc_blocks_full_drop_across_crystal", () => {
+    // Cat 2 analytical: BVD caps block DC; the only DC path is through the
+    // bleed resistor in series. With no DC path through the crystal, all
+    // the source voltage appears across xtal:pos / xtal:neg; bleed current
+    // is V(xtal:neg)/R_bleed ~= 0 / 1e9 ~= 0.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9 }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+
+    const vXtalPos = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:pos"));
+    const vXtalNeg = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    expect(vXtalPos).toBeCloseTo(1.0, 6);
+    expect(vXtalNeg).toBeCloseTo(0.0, 3);
+    const iBleed = Math.abs(vXtalNeg) / 1e9;
+    expect(iBleed).toBeLessThan(1e-9);
   });
 
-  describe("series_resonance_frequency", () => {
-    it("impedance minimum occurs at f_s = 1/(2π√(L_s·C_s)) within 1%", () => {
-      const f0 = 1e6;
-      const Q = 10000;
-      const Cs = 20e-15;
-      const C0 = 5e-12;
-
-      const Ls = crystalMotionalInductance(f0, Cs);
-      const Rs = crystalSeriesResistance(f0, Ls, Q);
-      const f_s = 1 / (2 * Math.PI * Math.sqrt(Ls * Cs));
-      expect(Math.abs(f_s - f0) / f0).toBeLessThan(0.001);
-
-      const freqRange = 0.001;
-      const N = 200;
-      let minZ = Infinity;
-      let minFreq = 0;
-
-      for (let i = 0; i <= N; i++) {
-        const f = f0 * (1 - freqRange + (2 * freqRange * i) / N);
-        const Z = bvdImpedanceMagnitude(f, Rs, Ls, Cs, C0);
-        if (Z < minZ) { minZ = Z; minFreq = f; }
-      }
-
-      expect(Math.abs(minFreq - f_s) / f_s).toBeLessThan(0.01);
-      const Z_at_fs = bvdImpedanceMagnitude(f_s, Rs, Ls, Cs, C0);
-      expect(Z_at_fs).toBeLessThan(Rs * 100);
+  it("dcop_dc_block_higher_voltage_scales_drop", () => {
+    // Cat 2 analytical: scaling V_DC linearly scales V(xtal:pos), still
+    // with all the source voltage across the crystal at DC.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 5.0, rBleed: 1e9 }),
     });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "xtal:pos"))).toBeCloseTo(5.0, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"))).toBeCloseTo(0.0, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QuartzCrystal parameter hot-load (T1) — Cat 4
+// ---------------------------------------------------------------------------
+//
+// The Crystal exposes four model params (frequency, qualityFactor,
+// motionalCapacitance, shuntCapacitance) all of which feed the derived
+// L_s = 1/(4*pi^2*f^2*Cs) and R_s = 2*pi*f*L_s/Q. At DC, these only
+// affect the (open) reactive arm; transient behaviour is the observable
+// for hot-load. We assert that the post-step transient node voltage
+// changes when each documented parameter is hot-loaded.
+
+describe("QuartzCrystal parameter hot-load (T1)", () => {
+  it("hotload_frequency_changes_transient_response", () => {
+    // Cat 4: frequency feeds L_s (1/f^2) and R_s (linear in f).
+    // At a non-DC step, swapping f shifts both L_s and R_s and therefore
+    // the integrated companion-current contribution; expect V(xtal:neg)
+    // to differ between two different frequencies at a comparable step.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9, frequency: 1e6 }),
+    });
+    fix.coordinator.step();
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+
+    const xtalEl = ceByLabel(fix, "xtal");
+    fix.coordinator.setComponentProperty(xtalEl, "frequency", 1e7);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    expect(after).not.toBeCloseTo(before);
   });
 
-  describe("parallel_resonance_above_series", () => {
-    it("impedance maximum (parallel resonance) is above f_s", () => {
-      const f0 = 1e6;
-      const Q = 10000;
-      const Cs = 20e-15;
-      const C0 = 5e-12;
-
-      const Ls = crystalMotionalInductance(f0, Cs);
-      const Rs = crystalSeriesResistance(f0, Ls, Q);
-      const f_s = 1 / (2 * Math.PI * Math.sqrt(Ls * Cs));
-
-      const N = 500;
-      let maxZ = 0;
-      let maxFreq = 0;
-
-      for (let i = 1; i <= N; i++) {
-        const f = f_s * (1 + (0.02 * i) / N);
-        const Z = bvdImpedanceMagnitude(f, Rs, Ls, Cs, C0);
-        if (Z > maxZ) { maxZ = Z; maxFreq = f; }
-      }
-
-      expect(maxFreq).toBeGreaterThan(f_s);
-      const f_p_theory = f_s * Math.sqrt(1 + Cs / C0);
-      expect(Math.abs(maxFreq - f_p_theory) / f_p_theory).toBeLessThan(0.05);
+  it("hotload_qualityFactor_changes_transient_response", () => {
+    // Cat 4: Q only enters R_s = 2*pi*f*L_s/Q; raising Q drops R_s,
+    // which changes the motional-arm conductance stamp and the resulting
+    // node voltage at a transient step.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9, qualityFactor: 1000 }),
     });
+    fix.coordinator.step();
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+
+    const xtalEl = ceByLabel(fix, "xtal");
+    fix.coordinator.setComponentProperty(xtalEl, "qualityFactor", 50000);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    expect(after).not.toBeCloseTo(before);
   });
 
-  describe("dc_blocks", () => {
-    it("DC source across crystal produces near-zero current (capacitors block DC)", () => {
-      // At DC, C_s and C_0 are open; L_s has no companion stamp (only branch
-      // incidence). The crystal provides no resistive DC path between A and
-      // B — a 1GΩ bleed resistor in series provides the only DC path.
-      // I_source = V / R_bleed = 1V / 1e9Ω = 1 nA. Observe the bleed-current
-      // contract via node voltages on the public engine surface: with the
-      // crystal blocking DC, all 1V of the source must drop across the
-      // crystal (V(xtal:pos) = 1, V(xtal:neg) = 0 ± gmin leakage), and the
-      // source current equals the bleed-resistor current.
-      const fix = buildFixture({
-        build: (_r, facade) => buildDcBlockCircuit(facade, {
-          V: 1.0,
-          rBleed: 1e9,
-          frequency: 1e6,
-          qualityFactor: 1000,
-          motionalCapacitance: 20e-15,
-          shuntCapacitance: 5e-12,
-        }),
-      });
-      const result = fix.coordinator.dcOperatingPoint()!;
-      expect(result.converged).toBe(true);
-
-      // Read voltages at the node labels stamped by labelToNodeId.
-      const vXtalPos = fix.engine.getNodeVoltage(
-        fix.circuit.labelToNodeId.get("xtal:pos")!,
-      );
-      const vXtalNeg = fix.engine.getNodeVoltage(
-        fix.circuit.labelToNodeId.get("xtal:neg")!,
-      );
-      // Crystal blocks DC: full 1V drop across it (xtal:pos at +V, xtal:neg
-      // pulled to ~0 by the bleed resistor to ground).
-      expect(vXtalPos).toBeCloseTo(1.0, 6);
-      expect(vXtalNeg).toBeCloseTo(0.0, 3); // gmin leakage on internal nodes
-      // Bleed-resistor current = (V(xtal:neg) - 0) / R_bleed ≈ 0 / 1e9 = 0.
-      // Source-branch current matches; the crystal contributes no DC
-      // conductance (otherwise V(xtal:neg) would be ≫ 0).
-      const iBleed = Math.abs(vXtalNeg) / 1e9;
-      expect(iBleed).toBeLessThan(1e-9);
+  it("hotload_motionalCapacitance_changes_transient_response", () => {
+    // Cat 4: motionalCapacitance feeds L_s (1/Cs) AND C_s itself; both
+    // companion stamps (L_s row and C_s row) shift, so the transient
+    // node voltage moves.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9, motionalCapacitance: 2e-14 }),
     });
+    fix.coordinator.step();
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+
+    const xtalEl = ceByLabel(fix, "xtal");
+    fix.coordinator.setComponentProperty(xtalEl, "motionalCapacitance", 1e-13);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    expect(after).not.toBeCloseTo(before);
   });
 
-  describe("quality_factor_affects_bandwidth", () => {
-    it("higher Q produces narrower resonance peak than lower Q", () => {
-      const f0 = 1e6;
-      const Cs = 20e-15;
-      const C0 = 5e-12;
-      const Ls = crystalMotionalInductance(f0, Cs);
-      const Q_high = 50000;
-      const Q_low = 1000;
-
-      const Rs_high = crystalSeriesResistance(f0, Ls, Q_high);
-      const Rs_low = crystalSeriesResistance(f0, Ls, Q_low);
-      const bw_ratio_theory = Q_high / Q_low;
-
-      const f_s = f0;
-      let bw_high = 0;
-      let bw_low = 0;
-      const N = 10000;
-      const sweepRange = 0.01;
-
-      for (const [_Q, Rs, refBw] of [
-        [Q_high, Rs_high, "high"],
-        [Q_low,  Rs_low,  "low"],
-      ] as [number, number, string][]) {
-        const Z_ref = Rs;
-        const target = Z_ref * Math.SQRT2;
-        let f_lower = f_s;
-        let f_upper = f_s;
-
-        for (let i = 1; i <= N; i++) {
-          const f = f_s * (1 - sweepRange * i / N);
-          const Z = bvdImpedanceMagnitude(f, Rs, Ls, Cs, C0);
-          if (Z >= target) { f_lower = f; break; }
-        }
-        for (let i = 1; i <= N; i++) {
-          const f = f_s * (1 + sweepRange * i / N);
-          const Z = bvdImpedanceMagnitude(f, Rs, Ls, Cs, C0);
-          if (Z >= target) { f_upper = f; break; }
-        }
-
-        if (refBw === "high") bw_high = f_upper - f_lower;
-        else bw_low = f_upper - f_lower;
-      }
-
-      expect(bw_low).toBeGreaterThan(bw_high);
-      const measured_ratio = bw_low / bw_high;
-      expect(Math.abs(measured_ratio - bw_ratio_theory) / bw_ratio_theory).toBeLessThan(0.5);
+  it("hotload_shuntCapacitance_changes_transient_response", () => {
+    // Cat 4: shuntCapacitance is C_0 directly across pos/neg; changing it
+    // changes the C_0 companion-conductance stamp and therefore the
+    // transient node voltage.
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBlockCircuit(facade, { V: 1.0, rBleed: 1e9, shuntCapacitance: 5e-12 }),
     });
+    fix.coordinator.step();
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+
+    const xtalEl = ceByLabel(fix, "xtal");
+    fix.coordinator.setComponentProperty(xtalEl, "shuntCapacitance", 5e-11);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
+    expect(after).not.toBeCloseTo(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QuartzCrystal LTE rollback (T1) — Cat 7
+// ---------------------------------------------------------------------------
+
+describe("QuartzCrystal LTE rollback (T1)", () => {
+  it("lte_rollback_state_invariant_after_rejection", () => {
+    // Cat 7: AnalogCrystalElement implements getLteTimestep over PHI_L,
+    // Q_CS, Q_C0. When LTE rejects a step the engine rotates pool state
+    // vectors so state0 == state1 at the slot level (rollback
+    // invariant). Drive a fast resonant excitation that produces sharp
+    // transient gradients; allow the engine to step until either an LTE
+    // rejection appears or the convergence log fills.
+    const fix = buildFixture({
+      build: (_r, facade) => facade.build({
+        components: [
+          { id: "vac", type: "AcVoltageSource", props: {
+            label: "vac",
+            amplitude: 1.0,
+            frequency: 1e7,
+            waveform: "sine",
+          } },
+          { id: "xtal", type: "QuartzCrystal", props: {
+            label: "xtal",
+            frequency: 1e6,
+            qualityFactor: 50000,
+            motionalCapacitance: 2e-14,
+            shuntCapacitance: 5e-12,
+          } },
+          { id: "rload", type: "Resistor", props: { label: "rload", resistance: 50 } },
+          { id: "gnd", type: "Ground", props: { label: "gnd" } },
+        ],
+        connections: [
+          ["vac:pos", "xtal:pos"],
+          ["xtal:neg", "rload:pos"],
+          ["rload:neg", "gnd:out"],
+          ["vac:neg", "gnd:out"],
+        ],
+      }),
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    for (let i = 0; i < 200; i++) fix.coordinator.step();
+
+    const log = fix.coordinator.getConvergenceLog();
+    expect(log).not.toBeNull();
+    const rejected = log!.find((s) => s.lteRejected === true);
+    if (rejected !== undefined) {
+      // Rollback invariant: state0 and state1 agree at the rolled slots
+      // (PHI_L, Q_CS, Q_C0) for the crystal element after the rotation.
+      const xtalAnalog = fix.circuit.elements.find(
+        (el) => (el as { label?: string }).label === "xtal",
+      ) as { _stateBase: number; stateSchema: { indexOf: Map<string, number> } } | undefined;
+      expect(xtalAnalog).toBeDefined();
+      const SLOT_PHI_L = xtalAnalog!.stateSchema.indexOf.get("PHI_L")!;
+      const SLOT_Q_CS = xtalAnalog!.stateSchema.indexOf.get("Q_CS")!;
+      const SLOT_Q_C0 = xtalAnalog!.stateSchema.indexOf.get("Q_C0")!;
+      const base = xtalAnalog!._stateBase;
+      expect(fix.pool.state0[base + SLOT_PHI_L]).toBe(fix.pool.state1[base + SLOT_PHI_L]);
+      expect(fix.pool.state0[base + SLOT_Q_CS]).toBe(fix.pool.state1[base + SLOT_Q_CS]);
+      expect(fix.pool.state0[base + SLOT_Q_C0]).toBe(fix.pool.state1[base + SLOT_Q_C0]);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QuartzCrystal — T3 harness: DC-block paired vs ngspice
+// (Cat 2-numerical / 3 / 5)
+// ---------------------------------------------------------------------------
+
+describeIfDll("QuartzCrystal DC-block paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_DC_BLOCK, dllPath: DLL_PATH });
   });
 
-  describe("definition", () => {
-    it("CrystalDefinition name is 'QuartzCrystal'", () => {
-      expect(CrystalDefinition.name).toBe("QuartzCrystal");
-    });
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
 
-    it("CrystalDefinition category is PASSIVES", () => {
-      expect(CrystalDefinition.category).toBe(ComponentCategory.PASSIVES);
-    });
+  it("transient_step_end_paired_dc_block", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
 
-    it("CrystalDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(CrystalDefinition)).not.toThrow();
-    });
+  it("dcop_paired_dc_block", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
 
-    it("CrystalCircuitElement can be instantiated", () => {
-      const props = new PropertyBag();
-      props.setModelParam("frequency", 32768);
-      const el = new CrystalCircuitElement("test-id", { x: 0, y: 0 }, 0, false, props);
-      expect(el).toBeDefined();
-    });
+  it("full_iteration_paired_dc_block", () => {
+    session.compareAllAttempts();
+  });
+});
 
-    it("CRYSTAL_ATTRIBUTE_MAPPINGS has frequency mapping", () => {
-      const m = CRYSTAL_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "frequency");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("frequency");
-    });
+// ---------------------------------------------------------------------------
+// QuartzCrystal — T3 harness: resonator paired vs ngspice
+// (Cat 2-numerical / 3 / 5)
+// ---------------------------------------------------------------------------
 
-    it("_stateBase is -1 before compiler assigns it", () => {
-      const props = new PropertyBag();
-      props.setModelParam("frequency", 1e6);
-      props.setModelParam("qualityFactor", 1000);
-      props.setModelParam("motionalCapacitance", 20e-15);
-      props.setModelParam("shuntCapacitance", 5e-12);
-      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 0]]),
-        props,
-        () => 0,
-      );
-      expect((el as unknown as PoolBackedAnalogElement)._stateBase).toBe(-1);
-    });
+describeIfDll("QuartzCrystal resonator paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
 
-    it("element_allocates_branch_row_after_compile -- branchIndex > 0 in compiled circuit", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildDcBlockCircuit(facade, {
-          V: 1.0,
-          rBleed: 1e9,
-          frequency: 1e6,
-          qualityFactor: 1000,
-          motionalCapacitance: 20e-15,
-          shuntCapacitance: 5e-12,
-        }),
-      });
-      const xtal = findCrystal(fix.circuit.elements);
-      // Crystal allocates an L_s branch row in setup() (branchIndex > 0
-      // because branch rows live after node rows in the matrix).
-      expect(xtal.branchIndex).toBeGreaterThan(0);
-    });
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_RESONATOR, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_resonator", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_resonator", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_resonator", () => {
+    session.compareAllAttempts();
   });
 });

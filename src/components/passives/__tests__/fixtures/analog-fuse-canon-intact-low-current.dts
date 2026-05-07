@@ -1,0 +1,357 @@
+{
+  "circuit": {
+    "description": "Low-current intact-regime fuse: 5V/(0.01+9)≈0.555A, sub-rated, exercises rCold-stamp parity over warm-start + steady-state transient.",
+    "elements": [
+      {
+        "id": "14648e66-05d7-43b7-9765-197bcff1694a",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "7e593bba-b759-4614-ad84-beeb524174dc",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "i2tRating": 100,
+            "rBlown": 1000000000,
+            "rCold": 0.01
+          },
+          "i2tRating": 100,
+          "label": "fuse",
+          "model": "behavioral",
+          "position": [
+            0,
+            8
+          ],
+          "rBlown": 1000000000,
+          "rCold": 0.01
+        },
+        "rotation": 0,
+        "type": "Fuse"
+      },
+      {
+        "id": "d1a335fb-c1ca-4370-b86c-2be9df8fbbda",
+        "position": {
+          "x": 22,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 9
+          },
+          "label": "rl",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 9
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "396b79d3-6d1f-4435-9600-2912fabfcc1c",
+        "position": {
+          "x": 34,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "analog-fuse-canon-intact-low-current",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 0
+          },
+          {
+            "x": 14,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 0
+          },
+          {
+            "x": 27,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

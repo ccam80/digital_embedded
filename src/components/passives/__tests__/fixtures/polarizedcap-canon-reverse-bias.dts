@@ -1,0 +1,362 @@
+{
+  "circuit": {
+    "description": "Reverse-bias circuit: 5V DC source with polarity inverted at the cap. cap:pos connects to vs:neg and cap:neg connects to vs:pos. Drives clamp-diode forward conduction (PNJLIM) and reverse-bias diagnostic. Drives Cat 2/3/5/6 paired vs ngspice.",
+    "elements": [
+      {
+        "id": "1bfde3c6-ca9b-4aeb-b8c4-af46f43217fc",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "6585594a-e157-4b46-b1fa-552e0d607f64",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "rs",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "74e42132-04cc-40fb-aeba-c38fb0175b43",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "IC": 0,
+            "M": 1,
+            "capacitance": 0.000001,
+            "esr": 0.1,
+            "leakageCurrent": 0.000001,
+            "reverseMax": 1,
+            "voltageRating": 25
+          },
+          "capacitance": 0.000001,
+          "esr": 0.1,
+          "label": "cap",
+          "leakageCurrent": 0.000001,
+          "position": [
+            0,
+            16
+          ],
+          "reverseMax": 1,
+          "voltageRating": 25
+        },
+        "rotation": 0,
+        "type": "PolarizedCap"
+      },
+      {
+        "id": "299841e0-20ac-4e47-a29d-68bed03c806d",
+        "position": {
+          "x": 36,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "polarizedcap-canon-reverse-bias",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 1
+          },
+          {
+            "x": 38,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": 1
+          },
+          {
+            "x": 38,
+            "y": -2.75
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": -2.75
+          },
+          {
+            "x": 2,
+            "y": -2.75
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": -2.75
+          },
+          {
+            "x": 2,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

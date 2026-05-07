@@ -1,0 +1,357 @@
+{
+  "circuit": {
+    "description": "Overcurrent blow-regime fuse: 30V/(0.01+1)≈29.7A, i2tRating=1 A²s blows at acceptStep-scheduled breakpoint (~1.13ms), exercises Cat 7 LTE-rollback + Cat 8 breakpoint scheduling.",
+    "elements": [
+      {
+        "id": "3ecdc00a-e17c-4084-a6fa-d7b9b8c86213",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 30
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 30
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "146b02df-2a1a-4849-8cad-ff1094fdc529",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "i2tRating": 1,
+            "rBlown": 1000000000,
+            "rCold": 0.01
+          },
+          "i2tRating": 1,
+          "label": "fuse",
+          "model": "behavioral",
+          "position": [
+            0,
+            8
+          ],
+          "rBlown": 1000000000,
+          "rCold": 0.01
+        },
+        "rotation": 0,
+        "type": "Fuse"
+      },
+      {
+        "id": "080fc5a2-95bf-4ae5-b26f-5a2330cbe6df",
+        "position": {
+          "x": 22,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1
+          },
+          "label": "rl",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 1
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "a3116fc5-34ff-44cf-8632-1a56263b851d",
+        "position": {
+          "x": 34,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "analog-fuse-canon-blow-overcurrent",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 0
+          },
+          {
+            "x": 14,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 0
+          },
+          {
+            "x": 27,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

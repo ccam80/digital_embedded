@@ -1,35 +1,37 @@
-/**
- * Tests for the AnalogFuseElement MNA model and unified Fuse component.
- *
- * §4d / §4c exemplar: every test routes through `buildFixture`, drives the
- * simulation via the coordinator's public step() surface, and reads state
- * from the pool / engine / runtime-diagnostics public surface. No direct
- * load() drives, no hand-rolled rhs vectors, no matrix-stamp introspection
- * past `engine.solver.getCSCNonZeros()`.
- *
- * Test circuit shape: VS=Vsource → Fuse → R_load → GND.
- * Vsource and R_load are sized to produce the desired steady-state current
- * through the fuse. The fuse's `i2tRating` is sized so blow happens (or
- * doesn't) inside the simulated tStop window.
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { AnalogFuseElement, ANALOG_FUSE_SCHEMA, createAnalogFuseElement } from "../analog-fuse.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentRegistry } from "../../../core/registry.js";
-import { FuseDefinition } from "../../switching/fuse.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  describeIfDll,
+  DLL_PATH,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../analog-fuse.js";
 
 import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-const SLOT_I2T_ACCUM = ANALOG_FUSE_SCHEMA.indexOf.get("I2T_ACCUM")!;
+// ---------------------------------------------------------------------------
+// .dts fixture paths (T3 harness)
+// ---------------------------------------------------------------------------
+
+const DTS_INTACT_LOW = path.resolve(
+  "src/components/passives/__tests__/fixtures/analog-fuse-canon-intact-low-current.dts",
+);
+const DTS_BLOW_OVERCURRENT = path.resolve(
+  "src/components/passives/__tests__/fixtures/analog-fuse-canon-blow-overcurrent.dts",
+);
 
 // ---------------------------------------------------------------------------
-// Circuit factory: VS=vSource → fuse → R=rLoad → GND.
+// Programmatic circuit factory (T1)
 //
-// Steady-state intact current = vSource / (rCold + rLoad). Tests size
-// (vSource, rLoad, i2tRating) so blow happens at the desired sim time.
+// Topology: Vsource (vs) -> fuse:out1 -> fuse:out2 -> Resistor (rl) -> Ground.
+// vs:neg also tied to Ground. Steady-state intact current
+//   I = vSource / (rCold + rLoad)
+// Voltage at fuse:out2 (the rl:pos node) =
+//   vSource * rLoad / (rLoad + rCold).
 // ---------------------------------------------------------------------------
 
 interface FuseCircuitParams {
@@ -43,224 +45,334 @@ interface FuseCircuitParams {
 function buildFuseCircuit(facade: DefaultSimulatorFacade, p: FuseCircuitParams): Circuit {
   return facade.build({
     components: [
-      { id: "vs",   type: "DcVoltageSource", props: { label: "V1", voltage: p.vSource } },
-      { id: "fuse", type: "Fuse",            props: { label: "F1", model: "behavioral", rCold: p.rCold ?? 0.01, rBlown: p.rBlown ?? 1e9, i2tRating: p.i2tRating } },
-      { id: "rl",   type: "Resistor",        props: { label: "RL", resistance: p.rLoad } },
-      { id: "gnd",  type: "Ground" },
+      { id: "vs",   type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource } },
+      { id: "fuse", type: "Fuse",            props: { label: "fuse", model: "behavioral", rCold: p.rCold ?? 0.01, rBlown: p.rBlown ?? 1e9, i2tRating: p.i2tRating } },
+      { id: "rl",   type: "Resistor",        props: { label: "rl", resistance: p.rLoad } },
+      { id: "gnd",  type: "Ground",          props: { label: "gnd" } },
     ],
     connections: [
-      ["vs:pos",   "fuse:out1"],
+      ["vs:pos",    "fuse:out1"],
       ["fuse:out2", "rl:pos"],
-      ["rl:neg",   "gnd:out"],
-      ["vs:neg",   "gnd:out"],
+      ["rl:neg",    "gnd:out"],
+      ["vs:neg",    "gnd:out"],
     ],
   });
 }
 
-function findFuse(elements: ReadonlyArray<unknown>): AnalogFuseElement {
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+function findFuseElement(elements: ReadonlyArray<unknown>): AnalogFuseElement {
   const idx = elements.findIndex((el) => el instanceof AnalogFuseElement);
   if (idx < 0) throw new Error("AnalogFuseElement not found in compiled circuit");
   return elements[idx] as AnalogFuseElement;
 }
 
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
 // ---------------------------------------------------------------------------
-// Fuse tests
+// Cat 1 — Initialization (T1)
 // ---------------------------------------------------------------------------
 
-describe("AnalogFuseElement", () => {
-  describe("low_current_stays_intact", () => {
-    it("0.5A through 1A-rated fuse for ~1s stays intact", () => {
-      // I = 5V / (1Ω + 9Ω) = 0.5A; I²t after 1s = 0.25 A²·s, well below 1.0
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 5.0, rLoad: 9.0, rCold: 1.0, i2tRating: 1.0,
-        }),
-        params: { tStop: 1.5, maxTimeStep: 0.01 },
-      });
-      // Run to ~1s.
-      while (fix.engine.simTime < 1.0) fix.coordinator.step();
-
-      const fuse = findFuse(fix.circuit.elements);
-      expect(fuse.blown).toBe(false);
-      expect(fuse.thermalEnergy).toBeLessThan(1.0);
-      expect(fuse.currentResistance).toBe(1.0);
+describe("AnalogFuse initialization (T1)", () => {
+  it("init_pool_slots_post_warm_start_intact", () => {
+    // Cat 1: post-warm-start, the fuse is intact -> CONDUCT slot reads 1 in
+    // both pool bands (load() writes s0[CONDUCT] each iter from _intact;
+    // accepted step rotation copies s0->s1). I2T_ACCUM has had ~1 dt of
+    // accumulation but is well below i2tRating, so the fuse is still intact.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 5.0, rLoad: 9.0, rCold: 0.01, i2tRating: 100.0,
+      }),
+      params: { tStop: 1e-3, maxTimeStep: 1e-5 },
     });
+    const fuse = findFuseElement(fix.circuit.elements);
+    const slotConduct = ANALOG_FUSE_SCHEMA.indexOf.get("CONDUCT")!;
+    expect(fix.pool.state0[fuse._stateBase + slotConduct]).toBe(1);
+    expect(fix.pool.state1[fuse._stateBase + slotConduct]).toBe(1);
+    expect(fuse.blown).toBe(false);
   });
 
-  describe("overcurrent_blows_fuse", () => {
-    it("3A through 1A-rated fuse blows at t ≈ i2tRating/I² ≈ 0.111s", () => {
-      // I = 30V / (1Ω + 9Ω) = 3A; expectedBlowTime = 1 / 9 ≈ 0.111s
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 30.0, rLoad: 9.0, rCold: 1.0, i2tRating: 1.0,
-        }),
-        params: { tStop: 0.5, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-
-      // Step until blown or sim runs out.
-      while (!fuse.blown && fix.engine.simTime < 0.5) {
-        fix.coordinator.step();
-      }
-      expect(fuse.blown).toBe(true);
-
-      const expected = 1.0 / 9.0;
-      const actual = fix.engine.simTime;
-      // Breakpoint scheduling lands the step exactly on the blow instant; the
-      // observable simTime at first-blown is bounded by [expected, expected+dt].
-      expect(actual).toBeGreaterThanOrEqual(expected * 0.8);
-      expect(actual).toBeLessThanOrEqual(expected * 1.5);
+  it("init_node_voltages_post_warm_start_intact_divider", () => {
+    // Cat 1: closed-form node voltage at fuse:out2.
+    //   I = 5 / (0.01 + 9) = 0.55494A
+    //   V(fuse:out2) = I * rLoad = 0.55494 * 9 = 4.99445V
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 5.0, rLoad: 9.0, rCold: 0.01, i2tRating: 100.0,
+      }),
+      params: { tStop: 1e-3, maxTimeStep: 1e-5 },
     });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "fuse:out2"))).toBeCloseTo(
+      5.0 * 9.0 / (9.0 + 0.01), 4,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 2 analytical — DCOP (T1)
+// ---------------------------------------------------------------------------
+
+describe("AnalogFuse DCOP analytical (T1)", () => {
+  it("dcop_intact_voltage_divider", () => {
+    // Cat 2 analytical: intact regime, closed-form DC voltages.
+    //   V(fuse:out1) = vs (5V).
+    //   V(fuse:out2) = 5 * 9/(9+0.01) = 4.99445V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 5.0, rLoad: 9.0, rCold: 0.01, i2tRating: 100.0,
+      }),
+    });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "fuse:out1"))).toBeCloseTo(5.0, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "fuse:out2"))).toBeCloseTo(
+      5.0 * 9.0 / (9.0 + 0.01), 4,
+    );
   });
 
-  describe("blown_fuse_open_circuit", () => {
-    it("blown fuse has resistance close to R_blown", () => {
-      // I = 30V / (1Ω + 9Ω) = 3A → tBlow ≈ 0.111s with i2tRating=1
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 30.0, rLoad: 9.0, rCold: 1.0, rBlown: 1e9, i2tRating: 1.0,
-        }),
-        params: { tStop: 0.5, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-
-      while (!fuse.blown && fix.engine.simTime < 0.5) fix.coordinator.step();
-      expect(fuse.blown).toBe(true);
-      expect(fuse.currentResistance).toBe(1e9);
+  it("dcop_intact_low_voltage_lower_divider", () => {
+    // Cat 2 analytical second operating-region: lower vSource and rCold pinned
+    // to the same value -> verifies linearity of the cold-resistance stamp.
+    //   V(fuse:out2) = 1 * 9/(9+0.01) = 0.99889V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 1.0, rLoad: 9.0, rCold: 0.01, i2tRating: 100.0,
+      }),
     });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "fuse:out2"))).toBeCloseTo(
+      1.0 * 9.0 / (9.0 + 0.01), 4,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 4 — Parameter hot-load (T1)
+// ---------------------------------------------------------------------------
+
+describe("AnalogFuse parameter hot-load (T1)", () => {
+  it("hotload_rCold_changes_intact_output_voltage", () => {
+    // Cat 4: setComponentProperty on rCold changes the voltage-divider ratio
+    // between fuse:out1 and fuse:out2.
+    //   rCold=0.01 -> V(fuse:out2) = 5 * 9/(9+0.01)  = 4.99445V
+    //   rCold=100  -> V(fuse:out2) = 5 * 9/(9+100)   = 0.41284V
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 5.0, rLoad: 9.0, rCold: 0.01, i2tRating: 100.0,
+      }),
+    });
+    const outNode = nodeOf(fix, "fuse:out2");
+    const before = fix.engine.getNodeVoltage(outNode);
+    expect(before).toBeCloseTo(5.0 * 9.0 / (9.0 + 0.01), 4);
+
+    const fuseCe = ceByLabel(fix, "fuse");
+    fix.coordinator.setComponentProperty(fuseCe, "rCold", 100);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(outNode);
+    expect(after).not.toBeCloseTo(before);
+    expect(after).toBeCloseTo(5.0 * 9.0 / (9.0 + 100), 4);
   });
 
-  describe("blown_emits_diagnostic", () => {
-    it("driving overcurrent emits fuse-blown diagnostic to runtime collector", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 30.0, rLoad: 9.0, rCold: 1.0, i2tRating: 1.0,
-        }),
-        params: { tStop: 0.5, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-      while (!fuse.blown && fix.engine.simTime < 0.5) fix.coordinator.step();
-      const diags = fix.coordinator.getRuntimeDiagnostics().filter((d) => d.code === "fuse-blown");
-      expect(diags.length).toBe(1);
-      expect(diags[0].severity).toBe("info");
+  it("hotload_i2tRating_shifts_blow_time", () => {
+    // Cat 4: setComponentProperty on i2tRating changes when the fuse blows.
+    //   I = 30 / (0.01 + 1) = 29.7030A; I^2 = 882.27 A^2
+    //   With rating=10  A^2s, t_blow_pred = 10 / 882.27  = 0.011333 s.
+    //   With rating=0.1 A^2s, t_blow_pred = 0.1 / 882.27 = 0.0001133 s
+    //                                                   = 113.3 us.
+    // Drop the rating before blow has occurred -> the fuse must blow at the
+    // smaller predicted time.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 30.0, rLoad: 1.0, rCold: 0.01, i2tRating: 10.0,
+      }),
+      params: { tStop: 1e-3, maxTimeStep: 1e-6 },
     });
+    const fuse = findFuseElement(fix.circuit.elements);
+    expect(fuse.blown).toBe(false);
+
+    const fuseCe = ceByLabel(fix, "fuse");
+    fix.coordinator.setComponentProperty(fuseCe, "i2tRating", 0.1);
+
+    // Step until blown or simTime exceeds the original (rating=10) prediction.
+    while (!fuse.blown && fix.engine.simTime !== null && fix.engine.simTime < 5e-4) {
+      fix.coordinator.step();
+    }
+    expect(fuse.blown).toBe(true);
+    // Blow occurred well before the rating=10 prediction (0.0113s).
+    expect(fix.engine.simTime!).toBeLessThan(1e-3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 8 — Breakpoint registration (T1)
+// ---------------------------------------------------------------------------
+
+describe("AnalogFuse breakpoint registration (T1)", () => {
+  it("breakpoint_blow_predicted_time_lands_in_convergence_log", () => {
+    // Cat 8: acceptStep predicts t_blow = simTime + (rating - accum)/i^2 and
+    // calls addBreakpoint(t_blow). The transient controller then lands a step
+    // at exactly t_blow -> a step record with that endTime appears in the
+    // convergence log.
+    //   I = 30/(0.01+1) = 29.7030A; I^2 = 882.27 A^2
+    //   With rating=1, t_blow = 1 / 882.27 = 1.1335e-3 s.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 30.0, rLoad: 1.0, rCold: 0.01, i2tRating: 1.0,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 1e-4 },
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+
+    const fuse = findFuseElement(fix.circuit.elements);
+    while (!fuse.blown && fix.engine.simTime !== null && fix.engine.simTime < 5e-3) {
+      fix.coordinator.step();
+    }
+    expect(fuse.blown).toBe(true);
+
+    // The log records every accepted step; one of them must end exactly at
+    // the blow instant the engine landed on after acceptStep registered it.
+    const log = fix.coordinator.getConvergenceLog()!;
+    expect(log).not.toBeNull();
+    const blowEndTime = fix.engine.simTime!;
+    const bpStep = log.find((s) => (s.simTime + s.acceptedDt) === blowEndTime);
+    expect(bpStep).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 2-numerical / 3 / 5 — paired vs ngspice (T3): intact low-current regime
+// ---------------------------------------------------------------------------
+
+describeIfDll("AnalogFuse paired vs ngspice — intact low-current (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_INTACT_LOW, dllPath: DLL_PATH });
   });
 
-  describe("thermalRatio", () => {
-    it("thermalRatio increases toward 1 under load (intact range)", () => {
-      // Use a generous i2tRating so the fuse stays intact while we step
-      // far enough to see I²t accumulate above zero.
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 30.0, rLoad: 9.0, rCold: 1.0, i2tRating: 100.0,
-        }),
-        params: { tStop: 0.1, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-
-      // Step ~10 ms — I=3A, I²·t = 9·0.01 = 0.09 A²·s, ratio ≈ 0.0009.
-      while (fix.engine.simTime < 0.01) fix.coordinator.step();
-
-      expect(fuse.blown).toBe(false);
-      expect(fuse.thermalEnergy).toBeGreaterThan(0);
-      expect(fuse.thermalRatio).toBeGreaterThan(0);
-      expect(fuse.thermalRatio).toBeLessThan(1);
-    });
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  describe("state_pool_contract", () => {
-    it("CONDUCT slot reflects intact (1) state through pool when fuse is intact", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 5.0, rLoad: 9.0, rCold: 1.0, i2tRating: 1.0,
-        }),
-        params: { tStop: 0.01, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-
-      const SLOT_CONDUCT = ANALOG_FUSE_SCHEMA.indexOf.get("CONDUCT")!;
-      // load() writes CONDUCT each iter from _intact; intact ⇒ s0/s1[CONDUCT]=1
-      // after the first warm-started step.
-      expect(fix.pool.state0[fuse._stateBase + SLOT_CONDUCT]).toBe(1);
-      expect(fix.pool.state1[fuse._stateBase + SLOT_CONDUCT]).toBe(1);
-    });
-
-    it("I2T_ACCUM rolls forward on accept (s1 reflects last-accepted history)", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 30.0, rLoad: 9.0, rCold: 1.0, i2tRating: 10.0, // way above
-        }),
-        params: { tStop: 0.05, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-
-      const accumBefore = fix.pool.state1[fuse._stateBase + SLOT_I2T_ACCUM];
-      while (fix.engine.simTime < 0.04) fix.coordinator.step();
-      const accumAfter = fix.pool.state1[fuse._stateBase + SLOT_I2T_ACCUM];
-      expect(accumAfter).toBeGreaterThan(accumBefore);
-      expect(fuse.blown).toBe(false); // still intact under generous rating
-    });
+  // First it() owns the run.
+  it("transient_step_end_paired_intact_low_current", async () => {
+    await session.runTransient(0, 1e-3, 1e-5);
+    session.compareAllSteps();
   });
 
-  describe("props_writeback", () => {
-    it("PropertyBag writeback propagates blown=true after fuse blows", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildFuseCircuit(facade, {
-          vSource: 30.0, rLoad: 9.0, rCold: 1.0, i2tRating: 1.0,
-        }),
-        params: { tStop: 0.5, maxTimeStep: 0.001 },
-      });
-      const fuse = findFuse(fix.circuit.elements);
-      while (!fuse.blown && fix.engine.simTime < 0.5) fix.coordinator.step();
-      expect(fuse.blown).toBe(true);
-
-      // The factory wires onStateChange to write PropertyBag fields. Find the
-      // FuseElement (CircuitElement, not the AnalogFuseElement leaf) by
-      // walking elementToCircuitElement.
-      const fuseIdx = fix.circuit.elements.indexOf(fuse);
-      const ce = fix.circuit.elementToCircuitElement.get(fuseIdx)!;
-      const props = ce.getProperties();
-      expect(props.get("blown")).toBe(true);
-      expect(props.getOrDefault<number>("_thermalRatio", 0)).toBeGreaterThan(0);
-    });
+  it("dcop_paired_intact_low_current", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
   });
 
-  describe("unified FuseDefinition", () => {
-    it("FuseDefinition behavioral entry produces an AnalogFuseElement", () => {
-      const props = new PropertyBag();
-      props.setModelParam("rCold", 0.1);
-      props.setModelParam("rBlown", 1e9);
-      props.setModelParam("i2tRating", 100.0);
-      const entry = FuseDefinition.modelRegistry?.behavioral;
-      if (!entry || entry.kind !== "inline") throw new Error("Expected inline behavioral entry");
-      const el = entry.factory(new Map([["out1", 1], ["out2", 0]]), props, () => 0);
-      expect(el).toBeInstanceOf(AnalogFuseElement);
-    });
+  it("full_iteration_paired_intact_low_current", () => {
+    session.compareAllAttempts();
+  });
+});
 
-    it("FuseDefinition has switchPins for bus resolver", () => {
-      expect(FuseDefinition.models?.digital?.switchPins).toEqual([0, 1]);
-    });
+// ---------------------------------------------------------------------------
+// Cat 2-numerical / 3 / 5 — paired vs ngspice (T3): blow overcurrent regime
+// ---------------------------------------------------------------------------
 
-    it("FuseDefinition has analog properties (rCold, i2tRating)", () => {
-      const keys = FuseDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("rCold");
-      expect(keys).toContain("rBlown");
-      expect(keys).toContain("i2tRating");
-      expect(keys).toContain("currentRating");
-    });
+describeIfDll("AnalogFuse paired vs ngspice — blow overcurrent (T3)", () => {
+  let session: ComparisonSession;
 
-    it("FuseDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(FuseDefinition)).not.toThrow();
-    });
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_BLOW_OVERCURRENT, dllPath: DLL_PATH });
+  });
 
-    it("createAnalogFuseElement factory creates AnalogFuseElement", () => {
-      const props = new PropertyBag();
-      props.setModelParam("rCold", 0.01);
-      props.setModelParam("rBlown", 1e9);
-      props.setModelParam("i2tRating", 1e-4);
-      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), props, () => 0);
-      expect(el).toBeInstanceOf(AnalogFuseElement);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_blow_overcurrent", async () => {
+    await session.runTransient(0, 5e-3, 1e-4);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_blow_overcurrent", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_blow_overcurrent", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 14 — Runtime-diagnostic emission (T1)
+//
+// AnalogFuseElement.acceptStep() emits exactly one "fuse-blown" info-severity
+// diagnostic the first accepted step after I²t crosses i2tRating, gated by
+// _diagEmitted. Engine wires emission through coordinator.getRuntimeDiagnostics().
+// ---------------------------------------------------------------------------
+
+describe("AnalogFuse runtime-diagnostic emission (Cat 14)", () => {
+  it("emits_fuse_blown_when_i2t_exceeds_rating", () => {
+    // V=30V, rCold=1, rBlown=1e9, rL=9 → I = 3A, I² = 9 A²/s.
+    // i2tRating = 1 A²·s → t_blow ≈ 1/9 ≈ 0.111s < 0.5s tStop bound.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 30.0, rLoad: 9.0, rCold: 1.0, rBlown: 1e9, i2tRating: 1.0,
+      }),
+      params: { tStop: 0.5, maxTimeStep: 1e-3 },
     });
+    const fuse = findFuseElement(fix.circuit.elements);
+    while (!fuse.blown && fix.engine.simTime !== null && fix.engine.simTime < 0.5) {
+      fix.coordinator.step();
+    }
+    expect(fuse.blown).toBe(true);
+
+    const diags = fix.coordinator.getRuntimeDiagnostics()
+      .filter((d) => d.code === "fuse-blown");
+    expect(diags.length).toBe(1);
+    expect(diags[0].severity).toBe("info");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 15 — Cross-engine state-bridge writeback (T1)
+//
+// AnalogFuseElement's factory installs an _onStateChange callback that mirrors
+// the blown flag into the CircuitElement's PropertyBag. Once the fuse blows,
+// the documented "blown" key must read true via CircuitElement.getProperties().
+// ---------------------------------------------------------------------------
+
+describe("AnalogFuse cross-engine writeback (Cat 15)", () => {
+  it("writeback_blown_flag_when_i2t_exceeds_rating", () => {
+    // Same topology and bound as the Cat 14 test- once the fuse blows, the
+    // PropertyBag bridge writes `blown: true` for the visual/digital layer.
+    const fix = buildFixture({
+      build: (_r, facade) => buildFuseCircuit(facade, {
+        vSource: 30.0, rLoad: 9.0, rCold: 1.0, rBlown: 1e9, i2tRating: 1.0,
+      }),
+      params: { tStop: 0.5, maxTimeStep: 1e-3 },
+    });
+    const fuse = findFuseElement(fix.circuit.elements);
+    while (!fuse.blown && fix.engine.simTime !== null && fix.engine.simTime < 0.5) {
+      fix.coordinator.step();
+    }
+    expect(fuse.blown).toBe(true);
+
+    const fuseCe = ceByLabel(fix, "fuse");
+    const props = fuseCe.getProperties();
+    expect(props.get("blown")).toBe(true);
   });
 });

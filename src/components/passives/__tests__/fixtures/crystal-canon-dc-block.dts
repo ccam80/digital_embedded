@@ -1,0 +1,358 @@
+{
+  "circuit": {
+    "description": "DC source across a crystal in series with a 1G-ohm bleed resistor: caps in BVD model block DC, so all source voltage drops across the crystal.",
+    "elements": [
+      {
+        "id": "be7ab019-5a54-4689-8ba0-3b9e4306e837",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 1
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b72d81dc-5774-4909-b273-6f9af51a0ee9",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "frequency": 1000000,
+            "motionalCapacitance": 2e-14,
+            "qualityFactor": 1000,
+            "shuntCapacitance": 5e-12
+          },
+          "frequency": 1000000,
+          "label": "xtal",
+          "motionalCapacitance": 2e-14,
+          "position": [
+            0,
+            8
+          ],
+          "qualityFactor": 1000,
+          "shuntCapacitance": 5e-12
+        },
+        "rotation": 0,
+        "type": "QuartzCrystal"
+      },
+      {
+        "id": "bcf734a9-b2f2-46f1-ac69-115c527cf5bf",
+        "position": {
+          "x": 22,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000000000
+          },
+          "label": "rbleed",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 1000000000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "a5a47691-220b-4222-86a5-4e8ff699440f",
+        "position": {
+          "x": 34,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "crystal-canon-dc-block",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 0
+          },
+          {
+            "x": 15,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 0
+          },
+          {
+            "x": 27,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 0
+          },
+          {
+            "x": 31,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 4
+          },
+          {
+            "x": 28,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
