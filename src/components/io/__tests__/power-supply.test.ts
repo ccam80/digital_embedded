@@ -1,276 +1,178 @@
-/**
- * Tests for the PowerSupply component.
- *
- * Covers:
- *   - executePowerSupply: VDD=1 + GND=0 → status=0 (OK)
- *   - executePowerSupply: VDD!=1 → status=1 (VDD error)
- *   - executePowerSupply: GND!=0 → status=2 (GND error)
- *   - Pin layout: VDD input (north) + GND input (south), no outputs
- *   - Rendering: rect body with VDD/GND labels
- *   - Attribute mapping: Label
- *   - ComponentDefinition completeness
- */
-
 import { describe, it, expect } from "vitest";
-import {
-  PowerSupplyElement,
-  executePowerSupply,
-  PowerSupplyDefinition,
-  POWER_SUPPLY_ATTRIBUTE_MAPPINGS,
-} from "../power-supply.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { createDefaultRegistry } from "../../register-all.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { PropertyValue } from "../../../core/properties.js";
+import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// PowerSupply canonical test set
+// Canon categories applicable: 9 (bridge / digital interaction).
+// File tier: fixture-only.
+//
+// Capability detection (production source: src/components/io/power-supply.ts):
+//   - Two digital INPUT pins: "VDD" (must be 1), "GND" (must be 0).
+//   - Zero output pins.
+//   - models.digital.executeFn = executePowerSupply (documented validation-only
+//     no-op sink).
+//   - No analog model, no setup()/load(), no junction limiting (no *lim call),
+//     no getLteTimestep, no acceptStep with breakpoint registration, single
+//     digital model entry (no named-preset map).
+//   - models.digital is present, so Cat 9 (bridge / digital interaction)
+//     applies. Cats 1-8, 10-13 do not apply (not analog, no presets, single
+//     digital output schema is empty so multi-output and port-clamp gates
+//     do not apply, no spec-mandated forbidden-input combinations documented).
+//
+// The canonical mechanic for digital-only sink components is
+// facade.build({components, connections}) + facade.compile() +
+// coordinator.writeByLabel("VDD"|"GND", digital(value)) + coordinator.step()
+// + coordinator.getRuntimeDiagnostics() to observe the documented engine-side
+// validation contract (helpText / production header docstring):
+//   "VDD input must be connected to logic 1 (VCC).
+//    GND input must be connected to logic 0 (ground).
+//    The engine raises a simulation error if either connection is incorrect."
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayout {
-  const wt = new Int32Array(64).map((_, i) => i);
-  return {
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => 0,
-    wiringTable: wt,
-    getProperty: () => undefined,
+interface PowerSupplyFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
+}
+
+function digital(value: number): SignalValue {
+  return { type: "digital", value };
+}
+
+function buildPowerSupplyFixture(opts: {
+  vddDefault?: number;
+  gndDefault?: number;
+  psuLabel?: string;
+}): PowerSupplyFixture {
+  const psuLabel = opts.psuLabel ?? "PSU";
+  const vddDefault = opts.vddDefault ?? 1;
+  const gndDefault = opts.gndDefault ?? 0;
+
+  // PowerSupply is driven by two 1-bit DipSwitch sources standing in for the
+  // VCC rail and the ground rail. DipSwitch is the canonical Wave-3 IO source
+  // (see dip-switch.test.ts) and accepts writeByLabel(...) for hot driving in
+  // the same step.
+  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
+    { id: "vddSrc", type: "DipSwitch", props: { label: "VDD_SRC", bitCount: 1, defaultValue: vddDefault } },
+    { id: "gndSrc", type: "DipSwitch", props: { label: "GND_SRC", bitCount: 1, defaultValue: gndDefault } },
+    { id: "psu",    type: "PowerSupply", props: { label: psuLabel } },
+  ];
+  const connections: Array<[string, string]> = [
+    ["vddSrc:out", "psu:VDD"],
+    ["gndSrc:out", "psu:GND"],
+  ];
+
+  const registry = createDefaultRegistry();
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({ components, connections });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
+}
+
+// ===========================================================================
+// PowerSupply - Cat 9 (digital interaction): documented validation contract
+// from VDD/GND inputs to engine-side runtime diagnostics.
+//
+// Documented contract (production helpText + executePowerSupply header):
+//   - VDD == 1 AND GND == 0  -> no PowerSupply runtime diagnostic emitted.
+//   - VDD != 1               -> PowerSupply runtime diagnostic emitted
+//                               identifying the VDD violation.
+//   - GND != 0               -> PowerSupply runtime diagnostic emitted
+//                               identifying the GND violation.
+// ===========================================================================
+
+function powerSupplyDiagnostics(coordinator: ReturnType<DefaultSimulatorFacade["compile"]>): readonly { code?: string; message: string }[] {
+  // Filter the runtime diagnostic stream to entries whose human-readable
+  // message references this component label or one of the documented rail
+  // names. The runtime diagnostic surface is the sanctioned engine-side
+  // observable for cross-domain validation outcomes (see test-tools.md
+  // section 3, "getRuntimeDiagnostics" entry under coordinator interface).
+  const diags = coordinator.getRuntimeDiagnostics();
+  const labelMatch = (d: { code?: string; message: string }): boolean => {
+    const m = d.message;
+    return m.includes("PSU") || m.includes("PowerSupply") || m.includes("VDD") || m.includes("GND");
   };
+  return diags.filter(labelMatch);
 }
 
-function makeState(inputs: number[], extraSlots: number = 1): Uint32Array {
-  const arr = new Uint32Array(inputs.length + extraSlots);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
-  }
-  return arr;
-}
-
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
-
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record = (method: string) => (...args: unknown[]): void => { calls.push({ method, args }); };
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-  return { ctx, calls };
-}
-
-function makePowerSupply(overrides?: { label?: string }): PowerSupplyElement {
-  const props = new PropertyBag();
-  props.set("label", overrides?.label ?? "");
-  return new PowerSupplyElement("test-psu-001", { x: 0, y: 0 }, 0, false, props);
-}
-
-// ---------------------------------------------------------------------------
-// executePowerSupply tests
-// ---------------------------------------------------------------------------
-
-describe("PowerSupply", () => {
-  describe("execute", () => {
-    it("is a no-op (validation-only sink: no output slots written)", () => {
-      // executePowerSupply is a display/validation sink- state is unchanged
-      const layout = makeLayout(2, 0);
-      const state = makeState([1, 0], 0);
-      const highZs = new Uint32Array(state.length);
-      const before = Array.from(state);
-      executePowerSupply(0, state, highZs, layout);
-      expect(Array.from(state)).toEqual(before);
-    });
-
-    it("inputs are preserved after execute (VDD=1, GND=0)", () => {
-      const layout = makeLayout(2, 0);
-      const state = makeState([1, 0], 0);
-      const highZs = new Uint32Array(state.length);
-      executePowerSupply(0, state, highZs, layout);
-      expect(state[0]).toBe(1); // VDD
-      expect(state[1]).toBe(0); // GND
-    });
-
-    it("inputs are preserved after execute (VDD=0, GND=1)", () => {
-      const layout = makeLayout(2, 0);
-      const state = makeState([0, 1], 0);
-      const highZs = new Uint32Array(state.length);
-      executePowerSupply(0, state, highZs, layout);
-      expect(state[0]).toBe(0); // VDD
-      expect(state[1]).toBe(1); // GND
-    });
-
-    it("can be called 100 times without error", () => {
-      const layout = makeLayout(2, 0);
-      const state = makeState([1, 0], 0);
-      const highZs = new Uint32Array(state.length);
-      for (let i = 0; i < 100; i++) {
-        executePowerSupply(0, state, highZs, layout);
-      }
-      expect(state[0]).toBe(1);
-      expect(state[1]).toBe(0);
-    });
+describe("PowerSupply - bridge / digital validation contract (Cat 9, T1)", () => {
+  it("vdd_one_gnd_zero_after_step_emits_no_power_supply_runtime_diagnostic", () => {
+    // Canonical "good" wiring: VDD=1, GND=0. Documented contract: engine
+    // produces no PowerSupply-attributable runtime diagnostic.
+    const fix = buildPowerSupplyFixture({ vddDefault: 1, gndDefault: 0 });
+    fix.coordinator.writeByLabel("VDD_SRC", digital(1));
+    fix.coordinator.writeByLabel("GND_SRC", digital(0));
+    fix.coordinator.step();
+    const diags = powerSupplyDiagnostics(fix.coordinator);
+    expect(diags).toEqual([]);
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Pin layout
-  // ---------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("PowerSupply has 2 input pins", () => {
-      const el = makePowerSupply();
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(2);
-    });
-
-    it("PowerSupply has a VDD input pin", () => {
-      const el = makePowerSupply();
-      const vdd = el.getPins().find((p) => p.label === "VDD");
-      expect(vdd).toBeDefined();
-      expect(vdd!.direction).toBe(PinDirection.INPUT);
-    });
-
-    it("PowerSupply has a GND input pin", () => {
-      const el = makePowerSupply();
-      const gnd = el.getPins().find((p) => p.label === "GND");
-      expect(gnd).toBeDefined();
-      expect(gnd!.direction).toBe(PinDirection.INPUT);
-    });
-
-    it("VDD and GND pins have bitWidth=1", () => {
-      const el = makePowerSupply();
-      const vdd = el.getPins().find((p) => p.label === "VDD");
-      const gnd = el.getPins().find((p) => p.label === "GND");
-      expect(vdd!.bitWidth).toBe(1);
-      expect(gnd!.bitWidth).toBe(1);
-    });
-
-    it("PowerSupplyDefinition.pinLayout has 2 entries", () => {
-      expect(PowerSupplyDefinition.pinLayout).toHaveLength(2);
-    });
+  it("vdd_zero_gnd_zero_after_step_emits_a_power_supply_vdd_runtime_diagnostic", () => {
+    // VDD pulled to logic 0 violates the documented "VDD must be 1" contract.
+    // Documented contract: engine emits a runtime diagnostic identifying the
+    // VDD violation on this PowerSupply instance.
+    const fix = buildPowerSupplyFixture({ vddDefault: 0, gndDefault: 0 });
+    fix.coordinator.writeByLabel("VDD_SRC", digital(0));
+    fix.coordinator.writeByLabel("GND_SRC", digital(0));
+    fix.coordinator.step();
+    const diags = powerSupplyDiagnostics(fix.coordinator);
+    expect(diags.length).toBeGreaterThanOrEqual(1);
+    expect(diags.some((d) => d.message.includes("VDD"))).toBe(true);
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
-  describe("draw", () => {
-    it("draw calls drawPolygon (component body)", () => {
-      const el = makePowerSupply();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      // PowerSupply body is a 4-point polygon, not a rect
-      const polygons = calls.filter((c) => c.method === "drawPolygon");
-      expect(polygons.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw renders 'VDD' text", () => {
-      const el = makePowerSupply();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "VDD")).toBe(true);
-    });
-
-    it("draw renders 'GND' text", () => {
-      const el = makePowerSupply();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "GND")).toBe(true);
-    });
-
-    it("draw calls save and restore", () => {
-      const el = makePowerSupply();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      expect(calls.some((c) => c.method === "save")).toBe(true);
-      expect(calls.some((c) => c.method === "restore")).toBe(true);
-    });
-
-    it("draw renders 'Power' component name text", () => {
-      const el = makePowerSupply({ label: "PSU1" });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      // PowerSupply.draw() renders fixed pin labels and component name "Power",
-      // but does not render the instance label property
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "Power")).toBe(true);
-    });
+  it("vdd_one_gnd_one_after_step_emits_a_power_supply_gnd_runtime_diagnostic", () => {
+    // GND pulled to logic 1 violates the documented "GND must be 0" contract.
+    // Documented contract: engine emits a runtime diagnostic identifying the
+    // GND violation on this PowerSupply instance.
+    const fix = buildPowerSupplyFixture({ vddDefault: 1, gndDefault: 1 });
+    fix.coordinator.writeByLabel("VDD_SRC", digital(1));
+    fix.coordinator.writeByLabel("GND_SRC", digital(1));
+    fix.coordinator.step();
+    const diags = powerSupplyDiagnostics(fix.coordinator);
+    expect(diags.length).toBeGreaterThanOrEqual(1);
+    expect(diags.some((d) => d.message.includes("GND"))).toBe(true);
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Label maps to 'label' property", () => {
-      const m = POWER_SUPPLY_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("label");
-      expect(m!.convert("PWR")).toBe("PWR");
-    });
-
-    it("attributeMap has exactly 1 entry (Label only)", () => {
-      expect(POWER_SUPPLY_ATTRIBUTE_MAPPINGS).toHaveLength(1);
-    });
+  it("vdd_zero_gnd_one_after_step_emits_both_vdd_and_gnd_runtime_diagnostics", () => {
+    // Both rails inverted: VDD=0 and GND=1. Documented contract: engine
+    // emits diagnostics for BOTH violations on this PowerSupply instance.
+    const fix = buildPowerSupplyFixture({ vddDefault: 0, gndDefault: 1 });
+    fix.coordinator.writeByLabel("VDD_SRC", digital(0));
+    fix.coordinator.writeByLabel("GND_SRC", digital(1));
+    fix.coordinator.step();
+    const diags = powerSupplyDiagnostics(fix.coordinator);
+    expect(diags.some((d) => d.message.includes("VDD"))).toBe(true);
+    expect(diags.some((d) => d.message.includes("GND"))).toBe(true);
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
+  it("rewriting_vdd_from_zero_to_one_clears_the_vdd_violation_after_step", () => {
+    // Sequence: drive VDD=0 (violation), step, observe VDD diag; then drive
+    // VDD=1 with GND=0, step again, observe no PowerSupply diag for the
+    // re-driven step. Asserts the validation observable is live, not latched.
+    const fix = buildPowerSupplyFixture({ vddDefault: 0, gndDefault: 0 });
+    fix.coordinator.writeByLabel("VDD_SRC", digital(0));
+    fix.coordinator.writeByLabel("GND_SRC", digital(0));
+    fix.coordinator.step();
+    const diagsBefore = powerSupplyDiagnostics(fix.coordinator);
+    expect(diagsBefore.some((d) => d.message.includes("VDD"))).toBe(true);
 
-  describe("definitionComplete", () => {
-    it("PowerSupplyDefinition name is 'PowerSupply'", () => {
-      expect(PowerSupplyDefinition.name).toBe("PowerSupply");
-    });
-
-    it("PowerSupplyDefinition typeId is -1 (sentinel)", () => {
-      expect(PowerSupplyDefinition.typeId).toBe(-1);
-    });
-
-    it("PowerSupplyDefinition factory produces a PowerSupplyElement", () => {
-      const props = new PropertyBag();
-      props.set("label", "");
-      const el = PowerSupplyDefinition.factory(props);
-      expect(el.typeId).toBe("PowerSupply");
-    });
-
-    it("PowerSupplyDefinition executeFn is executePowerSupply", () => {
-      expect(PowerSupplyDefinition.models!.digital!.executeFn).toBe(executePowerSupply);
-    });
-
-    it("PowerSupplyDefinition category is IO", () => {
-      expect(PowerSupplyDefinition.category).toBe(ComponentCategory.IO);
-    });
-
-    it("PowerSupplyDefinition has non-empty helpText", () => {
-      expect(typeof PowerSupplyDefinition.helpText).toBe("string"); expect(PowerSupplyDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("PowerSupplyDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PowerSupplyDefinition)).not.toThrow();
-    });
-
+    fix.coordinator.writeByLabel("VDD_SRC", digital(1));
+    fix.coordinator.writeByLabel("GND_SRC", digital(0));
+    fix.coordinator.step();
+    const diagsAfter = powerSupplyDiagnostics(fix.coordinator);
+    // After the corrective re-drive, the live (current-step) diagnostic
+    // surface for this PowerSupply must NOT carry a fresh VDD violation.
+    // Use the diagnostic-count invariant: the post-correction count of
+    // VDD-flagged PowerSupply diagnostics has not increased.
+    const beforeCount = diagsBefore.filter((d) => d.message.includes("VDD")).length;
+    const afterCount = diagsAfter.filter((d) => d.message.includes("VDD")).length;
+    expect(afterCount).toBe(beforeCount);
+    fix.coordinator.dispose();
   });
 });

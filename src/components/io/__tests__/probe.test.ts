@@ -1,113 +1,43 @@
-/** Tests for the Probe component. */
-
 import { describe, it, expect } from "vitest";
-import {
-  ProbeElement,
-  executeProbe,
-  ProbeDefinition,
-  PROBE_ATTRIBUTE_MAPPINGS,
-} from "../probe.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-
+import { createDefaultRegistry } from "../../register-all.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { SignalValue } from "../../../compile/types.js";
+import type { PropertyValue } from "../../../core/properties.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
+// ===========================================================================
+// Probe canonical test set
+// Canon categories applicable: 1 (init), 2 (DCOP analytical, T1), 9 (bridge).
+// File tier: fixture-only.
+//
+// Probe is a pure measurement element with two registered model entries:
+//   - models.digital  (executeFn copies the input slot to an internal
+//                      storage slot for the measurement panel)
+//   - modelRegistry.behavioral  (analog factory returning an AnalogProbeElement
+//                                whose load() / setup() are no-ops; the probe
+//                                contributes nothing to the MNA stamp).
+//
+// Because the probe stamps nothing, no dynamic behaviour exists for Cat 3
+// (transient), Cat 5 (matrix parity), Cat 6 (limiting), Cat 7 (LTE),
+// Cat 8 (breakpoints) — those categories are non-applicable. Cat 4 hot-load
+// is non-applicable because AnalogProbeElement.setParam() is a no-op and
+// no probe property scales / shifts a simulation observable. Cat 10 named
+// model preset is non-applicable because modelRegistry has only the single
+// "behavioral" entry. Probe is therefore a fixture-only file with the
+// minimal canonical set { 1, 2-analytical, 9 }.
+// ===========================================================================
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number = 1): ComponentLayout {
-  const wt = new Int32Array(64).map((_, i) => i);
-  return {
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => 0,
-    wiringTable: wt,
-    getProperty: () => undefined,
-  };
-}
-
-function makeState(inputs: number[], extraSlots: number = 1): Uint32Array {
-  const arr = new Uint32Array(inputs.length + extraSlots);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
-  }
-  return arr;
-}
-
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
-
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record = (method: string) => (...args: unknown[]): void => { calls.push({ method, args }); };
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-  return { ctx, calls };
-}
-
-function makeProbe(overrides?: {
-  label?: string;
-  bitWidth?: number;
-  intFormat?: string;
-  probeMode?: string;
-}): ProbeElement {
-  const props = new PropertyBag();
-  props.set("label", overrides?.label ?? "");
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  props.set("intFormat", overrides?.intFormat ?? "hex");
-  props.set("probeMode", overrides?.probeMode ?? "VALUE");
-  return new ProbeElement("test-probe-001", { x: 0, y: 0 }, 0, false, props);
-}
-
-// ---------------------------------------------------------------------------
-// Analog circuit factory: VS=v â†’ Probe:in. Probe is single-pin and a pure
-// voltage-measurement sink, so VS:pos drives probe:in directly and the
-// expected V(probe:in) = v.
-// ---------------------------------------------------------------------------
-
-function buildProbeProbingVsource(facade: DefaultSimulatorFacade, vSource: number): Circuit {
+/** Analog circuit: V_S(volts) → probe:in ; V_S:neg → GND.
+ *  Probe is a single-pin pure measurement sink, so the voltage at probe:in
+ *  equals the source's pos-side voltage (no MNA contribution from the probe). */
+function buildAnalogProbeCircuit(facade: DefaultSimulatorFacade, vSource: number): Circuit {
   return facade.build({
     components: [
-      // The probe registers a "behavioral" analog factory; selecting it
-      // explicitly mirrors what the property panel does when a user routes
-      // the Probe into the analog partition (LED-style hybrid pattern).
       { id: "probe", type: "Probe",            props: { label: "probe", model: "behavioral", bitWidth: 1 } },
       { id: "vs",    type: "DcVoltageSource",  props: { label: "vs",    voltage: vSource } },
       { id: "gnd",   type: "Ground" },
@@ -119,311 +49,199 @@ function buildProbeProbingVsource(facade: DefaultSimulatorFacade, vSource: numbe
   });
 }
 
-// ---------------------------------------------------------------------------
-// executeProbe tests
-// ---------------------------------------------------------------------------
+interface DigitalProbeFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
+}
 
-describe("Probe", () => {
-  describe("execute", () => {
-    it("executeProbe copies input value to output slot", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0xAB], 1);
-      const highZs = new Uint32Array(state.length);
-      executeProbe(0, state, highZs, layout);
-      expect(state[1]).toBe(0xAB);
-    });
+function digital(value: number): SignalValue {
+  return { type: "digital", value };
+}
 
-    it("executeProbe with input=0 stores 0", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0], 1);
-      const highZs = new Uint32Array(state.length);
-      executeProbe(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
+/** Digital circuit: DipSwitch(SW) → probe:in.
+ *  The probe is a digital sink wrapped on a DipSwitch source so we can drive
+ *  a known digital pattern into the probe's input via writeByLabel("SW", ...)
+ *  and read the propagated value at the probe's input pin via readByLabel.
+ *  A bare-label entry for "probe" is also created in labelSignalMap when the
+ *  probe has a single pin, but the canonical mechanic uses the explicit
+ *  pin-form address "probe:in". */
+function buildDigitalProbeFixture(opts: { bitWidth: number; defaultValue?: number }): DigitalProbeFixture {
+  const switchProps: Record<string, PropertyValue> = {
+    label: "SW",
+    bitCount: opts.bitWidth,
+  };
+  if (opts.defaultValue !== undefined) switchProps.defaultValue = opts.defaultValue;
 
-    it("executeProbe with input=0xFFFFFFFF stores 0xFFFFFFFF", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0xFFFFFFFF], 1);
-      const highZs = new Uint32Array(state.length);
-      executeProbe(0, state, highZs, layout);
-      expect(state[1]).toBe(0xFFFFFFFF);
-    });
+  const registry = createDefaultRegistry();
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: [
+      { id: "sw",    type: "DipSwitch", props: switchProps },
+      { id: "probe", type: "Probe",     props: { label: "probe", bitWidth: opts.bitWidth } },
+    ],
+    connections: [
+      ["sw:out", "probe:in"],
+    ],
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
+}
 
-    it("executeProbe can be called 1000 times without error", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0x55], 1);
-      const highZs = new Uint32Array(state.length);
-      for (let i = 0; i < 1000; i++) {
-        state[0] = i & 0xFFFFFFFF;
-        executeProbe(0, state, highZs, layout);
-      }
-      expect(typeof state[1]).toBe("number");
+// ===========================================================================
+// Probe — Cat 1 (initialization, T1)
+// Post-warm-start: the analog probe's input node voltage equals the upstream
+// source's pos-side voltage. The probe contributes no MNA stamp, so the
+// observable at probe:in is exactly V_S at step 0.
+// ===========================================================================
+
+describe("Probe initialization (T1)", () => {
+  it("init_analog_probe_node_voltage_equals_source_voltage_at_step_zero", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogProbeCircuit(facade, 2.5),
     });
+    const probeNodeId = fix.circuit.labelToNodeId.get("probe:in")!;
+    expect(probeNodeId).not.toBeUndefined();
+    const v0 = fix.engine.getNodeVoltage(probeNodeId);
+    expect(v0).toBeCloseTo(2.5, 6);
+  });
+});
+
+// ===========================================================================
+// Probe — Cat 2 (DC operating point, T1 analytical)
+// Closed-form: voltage at probe:in equals V_S exactly because the probe
+// stamps nothing into the MNA matrix. The DCOP converges immediately.
+// ===========================================================================
+
+describe("Probe DCOP analytical (T1)", () => {
+  it("dcop_analog_probe_reads_source_voltage_at_node", () => {
+    // Closed-form expected: V(probe:in) = V_S = 4.72V (probe stamps nothing).
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogProbeCircuit(facade, 4.72),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    const probeNodeId = fix.circuit.labelToNodeId.get("probe:in")!;
+    const vProbe = fix.engine.getNodeVoltage(probeNodeId);
+    expect(vProbe).toBeCloseTo(4.72, 6);
   });
 
-  // ---------------------------------------------------------------------------
-  // Probe value reading concept
-  // ---------------------------------------------------------------------------
-
-  describe("probeValueReading", () => {
-    it("probe stores last seen input in output slot after execute", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([42], 1);
-      const highZs = new Uint32Array(state.length);
-      executeProbe(0, state, highZs, layout);
-      expect(state[1]).toBe(42);
-
-      // Update input and re-execute
-      state[0] = 99;
-      executeProbe(0, state, highZs, layout);
-      expect(state[1]).toBe(99);
+  it("dcop_analog_probe_reads_zero_when_source_is_zero", () => {
+    // Closed-form expected: V(probe:in) = 0V when V_S = 0V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogProbeCircuit(facade, 0),
     });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc!.converged).toBe(true);
+    const probeNodeId = fix.circuit.labelToNodeId.get("probe:in")!;
+    expect(fix.engine.getNodeVoltage(probeNodeId)).toBeCloseTo(0, 6);
   });
 
-  // ---------------------------------------------------------------------------
-  // radix display concept
-  // ---------------------------------------------------------------------------
-
-  describe("radixDisplay", () => {
-    it("Probe stores intFormat='hex' property correctly", () => {
-      const el = makeProbe({ intFormat: "hex" });
-      expect(el.intFormat).toBe("hex");
+  it("dcop_analog_probe_reads_negative_source_voltage", () => {
+    // Closed-form expected: V(probe:in) = -3.3V when V_S = -3.3V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogProbeCircuit(facade, -3.3),
     });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc!.converged).toBe(true);
+    const probeNodeId = fix.circuit.labelToNodeId.get("probe:in")!;
+    expect(fix.engine.getNodeVoltage(probeNodeId)).toBeCloseTo(-3.3, 6);
+  });
+});
 
-    it("Probe stores intFormat='bin' property correctly", () => {
-      const el = makeProbe({ intFormat: "bin" });
-      expect(el.intFormat).toBe("bin");
-    });
+// ===========================================================================
+// Probe — Cat 9 (bridge / digital interaction, T1)
+// Probe has a digital model and a single input pin. Drive a known digital
+// value upstream via DipSwitch.SW, step, then read the value at probe:in
+// via readByLabel. The input pin label is the canonical observable.
+// ===========================================================================
 
-    it("Probe stores intFormat='dec' property correctly", () => {
-      const el = makeProbe({ intFormat: "dec" });
-      expect(el.intFormat).toBe("dec");
+describe("Probe bridge / digital (Cat 9, T1)", () => {
+  it("digital_one_bit_high_propagates_to_probe_input", () => {
+    const fix = buildDigitalProbeFixture({ bitWidth: 1 });
+    fix.coordinator.writeByLabel("SW", digital(1));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 1,
     });
-
-    it("Probe stores intFormat='oct' property correctly", () => {
-      const el = makeProbe({ intFormat: "oct" });
-      expect(el.intFormat).toBe("oct");
-    });
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // probeMode
-  // ---------------------------------------------------------------------------
-
-  describe("probeMode", () => {
-    it("probeMode defaults to VALUE", () => {
-      const el = makeProbe();
-      expect(el.probeMode).toBe("VALUE");
+  it("digital_one_bit_low_propagates_to_probe_input", () => {
+    const fix = buildDigitalProbeFixture({ bitWidth: 1 });
+    fix.coordinator.writeByLabel("SW", digital(0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0,
     });
-
-    it("probeMode=UP stored correctly", () => {
-      const el = makeProbe({ probeMode: "UP" });
-      expect(el.probeMode).toBe("UP");
-    });
-
-    it("probeMode=DOWN stored correctly", () => {
-      const el = makeProbe({ probeMode: "DOWN" });
-      expect(el.probeMode).toBe("DOWN");
-    });
-
-    it("probeMode=BOTH stored correctly", () => {
-      const el = makeProbe({ probeMode: "BOTH" });
-      expect(el.probeMode).toBe("BOTH");
-    });
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Pin layout
-  // ---------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("Probe has 1 input pin labeled 'in'", () => {
-      const el = makeProbe();
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs).toHaveLength(1);
-      expect(inputs[0].label).toBe("in");
+  it("digital_four_bit_pattern_0b1010_propagates_to_probe_input", () => {
+    const fix = buildDigitalProbeFixture({ bitWidth: 4 });
+    fix.coordinator.writeByLabel("SW", digital(0b1010));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0b1010,
     });
-
-    it("Probe bitWidth=8 has input pin with bitWidth=8", () => {
-      const el = makeProbe({ bitWidth: 8 });
-      const input = el.getPins().find((p) => p.direction === PinDirection.INPUT);
-      expect(input!.bitWidth).toBe(8);
-    });
-
-    it("ProbeDefinition.pinLayout has 1 entry", () => {
-      expect(ProbeDefinition.pinLayout).toHaveLength(1);
-    });
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
-  describe("draw", () => {
-    it("draw renders text only, no body rect (matches Java ProbeShape)", () => {
-      const el = makeProbe();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const rects = calls.filter((c) => c.method === "drawRect");
-      expect(rects).toHaveLength(0);
-      const circles = calls.filter((c) => c.method === "drawCircle");
-      expect(circles).toHaveLength(0);
+  it("digital_eight_bit_pattern_0xA5_propagates_to_probe_input", () => {
+    const fix = buildDigitalProbeFixture({ bitWidth: 8 });
+    fix.coordinator.writeByLabel("SW", digital(0xA5));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0xA5,
     });
-
-    it("draw calls save and restore", () => {
-      const el = makeProbe();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      expect(calls.some((c) => c.method === "save")).toBe(true);
-      expect(calls.some((c) => c.method === "restore")).toBe(true);
-    });
-
-    it("draw renders label when set", () => {
-      const el = makeProbe({ label: "P1" });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "P1")).toBe(true);
-    });
-
-    it("draw renders '?' placeholder when label is empty (matches Java ProbeShape)", () => {
-      const el = makeProbe({ label: "" });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.length).toBeGreaterThanOrEqual(1);
-      expect(textCalls.some((c) => c.args[0] === "?")).toBe(true);
-    });
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Label maps to 'label'", () => {
-      const m = PROBE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("label");
-      expect(m!.convert("P1")).toBe("P1");
+  it("digital_eight_bit_pattern_0xFF_propagates_to_probe_input", () => {
+    const fix = buildDigitalProbeFixture({ bitWidth: 8 });
+    fix.coordinator.writeByLabel("SW", digital(0xFF));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0xFF,
     });
-
-    it("Bits maps to 'bitWidth' as integer", () => {
-      const m = PROBE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Bits");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("bitWidth");
-      expect(m!.convert("8")).toBe(8);
-    });
-
-    it("intFormat maps to 'intFormat'", () => {
-      const m = PROBE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "intFormat");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("intFormat");
-      expect(m!.convert("bin")).toBe("bin");
-    });
-
-    it("ProbeMode maps to 'probeMode'", () => {
-      const m = PROBE_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "ProbeMode");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("probeMode");
-      expect(m!.convert("UP")).toBe("UP");
-    });
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("ProbeDefinition name is 'Probe'", () => {
-      expect(ProbeDefinition.name).toBe("Probe");
+  it("digital_rewrite_input_pattern_replaces_previous_value_at_probe_input", () => {
+    // Sequence: write 0xF0, step, read 0xF0; then write 0x0F, step, read 0x0F.
+    // Asserts the probe's input pin tracks the live driver value, not latched.
+    const fix = buildDigitalProbeFixture({ bitWidth: 8 });
+    fix.coordinator.writeByLabel("SW", digital(0xF0));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0xF0,
     });
-
-    it("ProbeDefinition typeId is -1 (sentinel)", () => {
-      expect(ProbeDefinition.typeId).toBe(-1);
+    fix.coordinator.writeByLabel("SW", digital(0x0F));
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0x0F,
     });
-
-    it("ProbeDefinition factory produces a ProbeElement", () => {
-      const props = new PropertyBag();
-      props.set("label", "");
-      props.set("bitWidth", 1);
-      props.set("intFormat", "hex");
-      props.set("probeMode", "VALUE");
-      const el = ProbeDefinition.factory(props);
-      expect(el.typeId).toBe("Probe");
-    });
-
-    it("ProbeDefinition executeFn is executeProbe", () => {
-      expect(ProbeDefinition.models!.digital!.executeFn).toBe(executeProbe);
-    });
-
-    it("ProbeDefinition category is IO", () => {
-      expect(ProbeDefinition.category).toBe(ComponentCategory.IO);
-    });
-
-    it("ProbeDefinition has non-empty helpText", () => {
-      expect(typeof ProbeDefinition.helpText).toBe("string"); expect(ProbeDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("ProbeDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(ProbeDefinition)).not.toThrow();
-    });
-
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // AnalogProbe tests
-  // ---------------------------------------------------------------------------
-
-  describe("AnalogProbe", () => {
-    it("reads_node_voltage returns voltage at the wired-up node (V_source = V_probe_in)", () => {
-      // Circuit: VS(4.72V):pos â†’ Probe:in ; VS:neg â†’ GND.
-      // Probe is a single-pin pure-measurement sink that contributes no MNA
-      // stamp (load() is empty). The voltage at the probe's "in" pin is
-      // therefore exactly the source's pos-side voltage = 4.72V at DC.
-      const fix = buildFixture({
-        build: (_r, facade) => buildProbeProbingVsource(facade, 4.72),
-      });
-      const dc = fix.coordinator.dcOperatingPoint();
-      expect(dc).not.toBeNull();
-      expect(dc!.converged).toBe(true);
-
-      const probeNode = fix.circuit.labelToNodeId.get("probe:in");
-      expect(probeNode).not.toBeUndefined();
-      const vProbe = fix.engine.getNodeVoltage(probeNode!);
-      expect(vProbe).toBeCloseTo(4.72, 6);
+  it("digital_default_value_seed_propagates_to_probe_input_after_step", () => {
+    // DipSwitch.defaultValue seeds the upstream net at digital init; the
+    // probe input observes the seeded value after one step with no
+    // intervening writeByLabel.
+    const fix = buildDigitalProbeFixture({ bitWidth: 4, defaultValue: 0b1100 });
+    fix.coordinator.step();
+    expect(fix.coordinator.readByLabel("probe:in")).toMatchObject({
+      type: "digital",
+      value: 0b1100,
     });
-
-    it("definition_has_engine_type_both", () => {
-      expect(ProbeDefinition.models?.digital).toBeDefined();
-      expect(ProbeDefinition.modelRegistry?.behavioral).toBeDefined();
-    });
-
-    it("appears_in_both_palettes", () => {
-      const registry = new ComponentRegistry();
-      registry.register(ProbeDefinition);
-
-      const digitalComponents = registry.getWithModel("digital");
-      const analogComponents = registry.getWithModel("analog");
-
-      const probeInDigital = digitalComponents.some((c) => c.name === "Probe");
-      const probeInAnalog = analogComponents.some((c) => c.name === "Probe");
-
-      expect(probeInDigital).toBe(true);
-      expect(probeInAnalog).toBe(true);
-    });
-
-    it("analogFactory returns AnalogElement with correct properties", () => {
-      const props = new PropertyBag();
-      const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
-        new Map([["in", 5]]),
-        props,
-        () => 0,
-      );
-
-      expect(analogElement.pinNodes.get("in")).toBe(5);
-      expect(analogElement.branchIndex).toBe(-1);
-    });
+    fix.coordinator.dispose();
   });
 });

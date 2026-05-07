@@ -41,13 +41,13 @@
 - [x] src/components/io/__tests__/button-led.test.ts
 - [x] src/components/io/__tests__/button.test.ts
 - [x] src/components/io/__tests__/dip-switch.test.ts
-- [ ] src/components/io/__tests__/io.test.ts
-- [ ] src/components/io/__tests__/led.test.ts
-- [ ] src/components/io/__tests__/midi.test.ts
+- [x] src/components/io/__tests__/io.test.ts
+- [x] src/components/io/__tests__/led.test.ts
+- [x] src/components/io/__tests__/midi.test.ts
 - [ ] src/components/io/__tests__/port.test.ts
-- [ ] src/components/io/__tests__/power-supply.test.ts
-- [ ] src/components/io/__tests__/probe.test.ts
-- [ ] src/components/io/__tests__/rotary-encoder-motor.test.ts
+- [x] src/components/io/__tests__/power-supply.test.ts
+- [x] src/components/io/__tests__/probe.test.ts
+- [x] src/components/io/__tests__/rotary-encoder-motor.test.ts
 - [ ] src/components/io/__tests__/scope.test.ts
 - [ ] src/components/io/__tests__/segment-displays.test.ts
 - [ ] src/components/memory/__tests__/counter.test.ts
@@ -61,14 +61,14 @@
 - [ ] src/components/memory/__tests__/two-phase-memory.test.ts
 - [ ] src/components/misc/__tests__/testcase.test.ts
 - [ ] src/components/misc/__tests__/text-rectangle.test.ts
-- [ ] src/components/passives/__tests__/analog-fuse-rollback.test.ts
-- [ ] src/components/passives/__tests__/analog-fuse.test.ts
-- [ ] src/components/passives/__tests__/capacitor.test.ts
-- [ ] src/components/passives/__tests__/crystal.test.ts
+- [x] src/components/passives/__tests__/analog-fuse-rollback.test.ts
+- [x] src/components/passives/__tests__/analog-fuse.test.ts
+- [x] src/components/passives/__tests__/capacitor.test.ts
+- [x] src/components/passives/__tests__/crystal.test.ts
 - [ ] src/components/passives/__tests__/inductor.test.ts
-- [ ] src/components/passives/__tests__/memristor-rollback.test.ts
-- [ ] src/components/passives/__tests__/memristor.test.ts
-- [ ] src/components/passives/__tests__/polarized-cap.test.ts
+- [x] src/components/passives/__tests__/memristor-rollback.test.ts
+- [x] src/components/passives/__tests__/memristor.test.ts
+- [x] src/components/passives/__tests__/polarized-cap.test.ts
 - [ ] src/components/passives/__tests__/potentiometer.test.ts
 - [ ] src/components/passives/__tests__/resistor.test.ts
 - [ ] src/components/passives/__tests__/tapped-transformer.test.ts
