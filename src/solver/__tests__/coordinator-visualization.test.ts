@@ -30,7 +30,7 @@ function makeAnalogEl(
   const def = registry?.get(typeId);
   const resolvedPins: Pin[] = pins.map((p, i) => ({
     position: { x: p.x, y: p.y },
-    label: p.label || def?.pinLayout[i]?.label || '',
+    label: p.label || def?.pinLayout?.[i]?.label || '',
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,

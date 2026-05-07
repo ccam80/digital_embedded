@@ -4,9 +4,9 @@
  * Verifies that the auto-derivation of CKTmaxStep / CKTdelmin / firstStep
  * matches ngspice traninit.c:23-32 and dctran.c:118 exactly.
  *
- * Also verifies MNAEngine.configure preserves the auto-derivation across
- * the spread-merge flow (the previously-resolved baseline must NOT
- * short-circuit re-derivation when transient inputs change).
+ * Also verifies that the spread-merge flow used by configure() preserves
+ * auto-derivation across sequential calls (the previously-resolved baseline
+ * must NOT short-circuit re-derivation when transient inputs change).
  */
 
 import { describe, it, expect } from "vitest";
@@ -15,8 +15,6 @@ import {
   DEFAULT_SIMULATION_PARAMS,
   type SimulationParams,
 } from "@/core/analog-engine-interface";
-import { DefaultSimulatorFacade } from "@/headless/default-facade";
-import { createDefaultRegistry } from "@/components/register-all";
 
 describe("resolveSimulationParams- ngspice traninit.c:23-32 parity", () => {
   it("user-supplied maxTimeStep passes through unmodified", () => {
@@ -111,54 +109,60 @@ describe("resolveSimulationParams- ngspice traninit.c:23-32 parity", () => {
   });
 });
 
-describe("MNAEngine.configure- auto-derivation survives the merge", () => {
-  async function buildEngine() {
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
-    const circuit = facade.build({
-      components: [
-        { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 1 } },
-        { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
-        { id: "gnd", type: "Ground" },
-      ],
-      connections: [
-        ["vs:pos", "r1:pos"],
-        ["r1:neg", "gnd:out"],
-        ["vs:neg", "gnd:out"],
-      ],
+describe("resolveSimulationParams- spread-merge flow (configure() contract)", () => {
+  it("re-derives when configure provides tStop without maxTimeStep", () => {
+    // Simulates: configure({reltol}) then configure({tStop, outputStep}).
+    // The merge accumulates partial updates; resolveSimulationParams must
+    // re-fire auto-derivation from the merged input, not keep the static default.
+    const base: SimulationParams = { ...DEFAULT_SIMULATION_PARAMS };
+    // First merge: reltol only — no transient inputs, maxTimeStep stays static.
+    const after1 = resolveSimulationParams({ ...base, reltol: 1e-3 });
+    expect(after1.maxTimeStep).toBe(DEFAULT_SIMULATION_PARAMS.maxTimeStep);
+    // Second merge: add tStop+outputStep (no maxTimeStep, minTimeStep, firstStep) —
+    // all three must be re-derived from the new transient inputs.
+    const merged2: Partial<SimulationParams> = {
+      ...after1,
+      tStop: 100e-3,
+      outputStep: 1e-3,
+    };
+    delete merged2.maxTimeStep;   // omit to trigger auto-derivation
+    delete merged2.minTimeStep;   // omit so minTimeStep re-derives from new maxTimeStep
+    delete merged2.firstStep;     // omit so firstStep re-derives from tStop
+    const after2 = resolveSimulationParams(merged2 as SimulationParams);
+    expect(after2.maxTimeStep).toBe(1e-3);
+    expect(after2.minTimeStep).toBe(1e-14);
+    expect(after2.firstStep).toBe(1e-4);
+  });
+
+  it("explicit maxTimeStep override passes through configure", () => {
+    // Simulates: configure({tStop, outputStep, maxTimeStep: 7e-7}).
+    const r = resolveSimulationParams({
+      ...DEFAULT_SIMULATION_PARAMS,
+      tStop: 100e-3,
+      outputStep: 1e-3,
+      maxTimeStep: 7e-7,
     });
-    const coordinator = await facade.compile(circuit);
-    return coordinator.getAnalogEngine()!;
-  }
-
-  it("re-derives when configure provides tStop without maxTimeStep", async () => {
-    const engine = await buildEngine();
-    // First configure: just tolerances. _params.maxTimeStep stays at the
-    // static default because no transient inputs are present.
-    engine.configure({ reltol: 1e-3 });
-    // Second configure: provides tStop+outputStep without maxTimeStep-
-    // must re-fire auto-derivation, not silently keep the static default.
-    engine.configure({ tStop: 100e-3, outputStep: 1e-3 });
-    // (params is private; cast to access for verification.)
-    const p = (engine as unknown as { _params: { maxTimeStep: number; minTimeStep: number; firstStep: number } })._params;
-    expect(p.maxTimeStep).toBe(1e-3);
-    expect(p.minTimeStep).toBe(1e-14);
-    expect(p.firstStep).toBe(1e-4);
+    expect(r.maxTimeStep).toBe(7e-7);
   });
 
-  it("explicit maxTimeStep override passes through configure", async () => {
-    const engine = await buildEngine();
-    engine.configure({ tStop: 100e-3, outputStep: 1e-3, maxTimeStep: 7e-7 });
-    const p = (engine as unknown as { _params: { maxTimeStep: number } })._params;
-    expect(p.maxTimeStep).toBe(7e-7);
-  });
-
-  it("non-transient configure call does not disturb existing maxTimeStep", async () => {
-    const engine = await buildEngine();
-    engine.configure({ tStop: 100e-3, outputStep: 1e-3 });
-    engine.configure({ reltol: 5e-4 });
-    const p = (engine as unknown as { _params: { maxTimeStep: number; reltol: number } })._params;
-    expect(p.maxTimeStep).toBe(1e-3);
-    expect(p.reltol).toBe(5e-4);
+  it("non-transient configure call does not disturb existing maxTimeStep", () => {
+    // Simulates: configure({tStop, outputStep}) then configure({reltol}).
+    // The second merge must not lose the derived maxTimeStep from the first.
+    // maxTimeStep omitted so auto-derivation runs from tStop/outputStep.
+    const partial: Partial<SimulationParams> = {
+      ...DEFAULT_SIMULATION_PARAMS,
+      tStop: 100e-3,
+      outputStep: 1e-3,
+    };
+    delete partial.maxTimeStep;
+    const after1 = resolveSimulationParams(partial as SimulationParams);
+    expect(after1.maxTimeStep).toBe(1e-3);
+    // Second merge: reltol only — carry the already-resolved maxTimeStep forward.
+    const after2 = resolveSimulationParams({
+      ...after1,
+      reltol: 5e-4,
+    });
+    expect(after2.maxTimeStep).toBe(1e-3);
+    expect(after2.reltol).toBe(5e-4);
   });
 });

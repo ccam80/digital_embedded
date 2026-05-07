@@ -13,9 +13,10 @@ export default defineConfig({
     reporters: process.env.VITEST_VERBOSE
       ? ["default"]
       : ["./scripts/vitest-compact-reporter.ts"],
-    setupFiles: process.env.VITEST_LIVE
-      ? ["./scripts/vitest-live-setup.ts"]
-      : [],
+    setupFiles: [
+      "./src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+      ...(process.env.VITEST_LIVE ? ["./scripts/vitest-live-setup.ts"] : []),
+    ],
   },
   resolve: {
     alias: {

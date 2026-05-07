@@ -39,6 +39,73 @@ export interface FrameStepResult {
   missed: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Narrow consumer-facing capability interfaces.
+//
+// Each captures the slice of the coordinator surface a single non-engine
+// consumer (tooltip, scope panel, slider bridge, ...) actually depends on.
+// Consumers take these instead of the full `SimulationCoordinator` so:
+//   - the consumer signals exactly what it reads/writes;
+//   - tests stand the consumer up via `buildNonEngineCoordinator()` in
+//     `test-utils/non-engine-coordinator.ts` without re-implementing the
+//     50+ engine methods;
+//   - the engine class continues to satisfy each narrow interface
+//     structurally (no formal `extends` is needed).
+//
+// When `SimulationCoordinator` grows or renames a method that one of these
+// narrow contracts already names, both surfaces must move together.
+// ---------------------------------------------------------------------------
+
+export interface TooltipDataSource {
+  readonly compiled: {
+    readonly wireSignalMap: ReadonlyMap<Wire, SignalAddress>;
+  };
+  readSignal(addr: SignalAddress): SignalValue;
+  getPinVoltages(element: CircuitElement): Map<string, number> | null;
+  getCurrentResolverContext(): CurrentResolverContext | null;
+  readElementCurrent(elementIndex: number): number | null;
+  readElementPower(elementIndex: number): number | null;
+}
+
+export interface SliderBridgeDataSource {
+  getCurrentResolverContext(): CurrentResolverContext | null;
+  setComponentProperty(element: CircuitElement, key: string, value: number): void;
+}
+
+export interface TimingDiagramDataSource {
+  readSignal(addr: SignalAddress): SignalValue;
+  saveSnapshot(): SnapshotId;
+  restoreSnapshot(id: SnapshotId): void;
+  addMeasurementObserver(observer: MeasurementObserver): void;
+  removeMeasurementObserver(observer: MeasurementObserver): void;
+}
+
+export interface ScopeDataSource {
+  readonly simTime: number | null;
+  readSignal(addr: SignalAddress): SignalValue;
+  readElementCurrent(elementIndex: number): number | null;
+  readBranchCurrent(branchIndex: number): number | null;
+  addMeasurementObserver(observer: MeasurementObserver): void;
+  removeMeasurementObserver(observer: MeasurementObserver): void;
+}
+
+export interface EditorBindingDataSource {
+  readSignal(addr: SignalAddress): SignalValue;
+  writeSignal(addr: SignalAddress, value: SignalValue): void;
+}
+
+export interface DataTableDataSource {
+  readSignal(addr: SignalAddress): SignalValue;
+  addMeasurementObserver(observer: MeasurementObserver): void;
+  removeMeasurementObserver(observer: MeasurementObserver): void;
+}
+
+export interface TestBridgeDataSource {
+  readonly simTime: number | null;
+  readAllSignals(): Map<string, SignalValue>;
+  readByLabel(label: string): SignalValue;
+}
+
 /**
  * Unified coordinator interface for all simulation modes.
  *

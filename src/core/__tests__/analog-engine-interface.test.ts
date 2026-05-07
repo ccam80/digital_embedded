@@ -12,7 +12,6 @@ import type { Engine, CompiledCircuit, EngineState, EngineChangeListener, Measur
 import type {
   AnalogEngine,
   SimulationParams,
-  ResolvedSimulationParams,
   DcOpResult,
   DiagnosticSuggestion,
   CompiledAnalogCircuit,
@@ -219,7 +218,6 @@ describe("AnalogEngineTypes", () => {
       removeMeasurementObserver(_observer: MeasurementObserver): void {},
       getElementPinCurrents(_elementId: number): number[] { return []; },
       setSimTime(_t: number): void {},
-      getResolvedParams(): ResolvedSimulationParams { return { ...DEFAULT_SIMULATION_PARAMS }; },
     };
 
     // Assignment to Engine base must be valid
