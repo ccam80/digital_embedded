@@ -1,397 +1,287 @@
 /**
- * Tests for the XOr gate component.
+ * Canonical tests for the XOr gate component.
  *
- * Covers:
- *   - executeXOr: logic correctness (2-input, 3-input, multi-bit)
- *   - Rendering: IEC/DIN shape (rect + "=1" text)
- *   - Rendering: IEEE/US shape (OR-like curve + extra input curve)
- *   - Attribute mapping
- *   - ComponentDefinition completeness
+ * Tier: fixture-only (pure-digital combinational; no analog domain).
+ * Driver: facade.build({components, connections}) + facade.compile() + setSignal / step / readSignal.
+ *
+ * Canon coverage:
+ *   - Cat 9 (digital interaction): drive labelled inputs, step, assert labelled output.
+ *   - Cat 4 (param hot-load): BLOCKED. XOr's propertyDefs (buildStandardGatePropertyDefs
+ *     in src/components/gates/gate-shared.ts) declare every behavioral parameter
+ *     (`inputCount`, `bitWidth`, `wideShape`) as `structural: true`. The remaining
+ *     keys (`_inverterLabels`, `label`) are XML-attribute / metadata, not behavioral
+ *     simulation parameters. There is no non-structural behavioral parameter
+ *     documented as hot-loadable on this component, so the canonical Cat 4 worked
+ *     template (single fixture, mutate via setComponentProperty, assert post-change
+ *     observable) has no candidate parameter. See Escalations.
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  XOrElement,
-  executeXOr,
-  XOrDefinition,
-  XOR_ATTRIBUTE_MAPPINGS,
-} from "../xor.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
+import type { SimulationCoordinator } from "../../../solver/coordinator-types.js";
+import type { Circuit } from "../../../core/circuit.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Helpers- ComponentLayout mock
+// Canonical builder for an XOr gate driven by labelled In ports and observed
+// via a labelled Out port.
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number): ComponentLayout {
-  const totalSlots = inputCount + 1;
-  return {
-    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => 1,
-    outputOffset: () => inputCount,
-    stateOffset: () => 0,
-    getProperty: () => undefined,
-  };
+interface DigitalFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: SimulationCoordinator;
+  circuit: Circuit;
 }
 
-function makeState(inputs: number[]): Uint32Array {
-  const arr = new Uint32Array(inputs.length + 1);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
+function buildDigital(spec: {
+  components: ReadonlyArray<{ id: string; type: string; props: Record<string, number | string | boolean> }>;
+  connections: ReadonlyArray<readonly [string, string]>;
+}): DigitalFixture {
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: spec.components.map((c) => ({ id: c.id, type: c.type, props: c.props })),
+    connections: spec.connections.map((c) => [c[0], c[1]] as [string, string]),
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator, circuit };
+}
+
+function drive(fix: DigitalFixture, values: Record<string, number>): void {
+  for (const [label, value] of Object.entries(values)) {
+    fix.facade.setSignal(fix.coordinator, label, value);
   }
-  return arr;
+  fix.facade.step(fix.coordinator);
+}
+
+function read(fix: DigitalFixture, label: string): number {
+  return fix.facade.readSignal(fix.coordinator, label) as number;
 }
 
 // ---------------------------------------------------------------------------
-// Helpers- RenderContext mock
+// 2-input XOr fixture
 // ---------------------------------------------------------------------------
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
-
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
+function buildXor2Fixture(bitWidth: number): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "a",   type: "In",  props: { label: "A", bitWidth } },
+      { id: "b",   type: "In",  props: { label: "B", bitWidth } },
+      { id: "xor", type: "XOr", props: { inputCount: 2, bitWidth } },
+      { id: "y",   type: "Out", props: { label: "Y", bitWidth } },
+    ],
+    connections: [
+      ["a:out",   "xor:In_1"],
+      ["b:out",   "xor:In_2"],
+      ["xor:out", "y:in"],
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Helpers- XOrElement factory
+// 3-input XOr fixture
 // ---------------------------------------------------------------------------
 
-function makeXOr(overrides?: {
-  inputCount?: number;
-  bitWidth?: number;
-  wideShape?: boolean;
-  invertedPins?: string[];
-  label?: string;
-}): XOrElement {
-  const props = new PropertyBag();
-  props.set("inputCount", overrides?.inputCount ?? 2);
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  props.set("wideShape", overrides?.wideShape ?? false);
-  if (overrides?.invertedPins && overrides.invertedPins.length > 0) {
-    props.set("_inverterLabels", overrides.invertedPins.join(","));
-  }
-  if (overrides?.label !== undefined) {
-    props.set("label", overrides.label);
-  }
-  return new XOrElement("test-xor-001", { x: 0, y: 0 }, 0, false, props);
+function buildXor3Fixture(bitWidth: number): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "a",   type: "In",  props: { label: "A", bitWidth } },
+      { id: "b",   type: "In",  props: { label: "B", bitWidth } },
+      { id: "c",   type: "In",  props: { label: "C", bitWidth } },
+      { id: "xor", type: "XOr", props: { inputCount: 3, bitWidth } },
+      { id: "y",   type: "Out", props: { label: "Y", bitWidth } },
+    ],
+    connections: [
+      ["a:out",   "xor:In_1"],
+      ["b:out",   "xor:In_2"],
+      ["c:out",   "xor:In_3"],
+      ["xor:out", "y:in"],
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
-// executeXOr- logic correctness
+// 4-input XOr fixture (covers even-arity chained XOR, where 4 equal values
+// produce 0 — exercises the multi-input loop in the executeFn beyond 3-input
+// arity).
 // ---------------------------------------------------------------------------
 
-describe("XOrGate", () => {
-  describe("execute2Input", () => {
-    it("XOR of 0 and 0 produces 0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0, 0]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
+function buildXor4Fixture(bitWidth: number): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "a",   type: "In",  props: { label: "A", bitWidth } },
+      { id: "b",   type: "In",  props: { label: "B", bitWidth } },
+      { id: "c",   type: "In",  props: { label: "C", bitWidth } },
+      { id: "d",   type: "In",  props: { label: "D", bitWidth } },
+      { id: "xor", type: "XOr", props: { inputCount: 4, bitWidth } },
+      { id: "y",   type: "Out", props: { label: "Y", bitWidth } },
+    ],
+    connections: [
+      ["a:out",   "xor:In_1"],
+      ["b:out",   "xor:In_2"],
+      ["c:out",   "xor:In_3"],
+      ["d:out",   "xor:In_4"],
+      ["xor:out", "y:in"],
+    ],
+  });
+}
 
-    it("XOR of 1 and 0 produces 1", () => {
-      const layout = makeLayout(2);
-      const state = makeState([1, 0]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
-    });
+// ===========================================================================
+// XOr — Cat 9 (digital interaction): two-input truth table
+// ===========================================================================
 
-    it("XOR of 1 and 1 produces 0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([1, 1]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
-
-    it("XOR of 0xFFFFFFFF and 0xFFFFFFFF produces 0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0xFFFFFFFF, 0xFFFFFFFF]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
-
-    it("XOR of 0xAAAAAAAA and 0x55555555 produces 0xFFFFFFFF", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0xAAAAAAAA, 0x55555555]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFF);
-    });
+describe("XOr 2-input digital interaction (Cat 9)", () => {
+  it("1-bit: 0 XOR 0 = 0 (equal inputs produce zero)", () => {
+    const fix = buildXor2Fixture(1);
+    drive(fix, { A: 0, B: 0 });
+    expect(read(fix, "Y")).toBe(0);
   });
 
-  describe("executeMultiInput", () => {
-    it("XOR of 0xFF, 0x0F, 0x03 produces 0xFF ^ 0x0F ^ 0x03", () => {
-      const layout = makeLayout(3);
-      const state = makeState([0xFF, 0x0F, 0x03]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[3]).toBe((0xFF ^ 0x0F ^ 0x03) >>> 0);
-    });
-
-    it("XOR of 4 equal values produces 0 (even number of highs)", () => {
-      const layout = makeLayout(4);
-      const state = makeState([0xFF, 0xFF, 0xFF, 0xFF]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[4]).toBe(0);
-    });
-
-    it("XOR of 3 equal values produces original (odd number of highs)", () => {
-      const layout = makeLayout(3);
-      const state = makeState([0xAB, 0xAB, 0xAB]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[3]).toBe(0xAB);
-    });
+  it("1-bit: 1 XOR 0 = 1 (one-hot input produces one)", () => {
+    const fix = buildXor2Fixture(1);
+    drive(fix, { A: 1, B: 0 });
+    expect(read(fix, "Y")).toBe(1);
   });
 
-  describe("multiBit", () => {
-    it("XOR of 0x0F0F0F0F and 0xF0F0F0F0 produces 0xFFFFFFFF", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0x0F0F0F0F, 0xF0F0F0F0]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFF);
-    });
-
-    it("XOR of identical multi-bit values produces 0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0x12345678, 0x12345678]);
-      const highZs = new Uint32Array(state.length);
-      executeXOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
+  it("1-bit: 0 XOR 1 = 1 (one-hot input produces one)", () => {
+    const fix = buildXor2Fixture(1);
+    drive(fix, { A: 0, B: 1 });
+    expect(read(fix, "Y")).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering- IEC/DIN
-  // ---------------------------------------------------------------------------
-
-  describe("drawNarrowIEEE", () => {
-    it("narrow IEEE shape calls drawPath for the curved body", () => {
-      const el = makeXOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("narrow IEEE shape does not call drawRect", () => {
-      const el = makeXOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls).toHaveLength(0);
-    });
-
-    it("narrow IEEE XOR does not draw output inversion bubble", () => {
-      const el = makeXOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls).toHaveLength(0);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Rendering- IEEE/US
-  // ---------------------------------------------------------------------------
-
-  describe("drawIEEE", () => {
-    it("IEEE shape calls drawPath for the curved body", () => {
-      const el = makeXOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("IEEE shape calls drawPath at least twice (body + extra curve)", () => {
-      const el = makeXOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("IEEE shape path includes curveTo operations", () => {
-      const el = makeXOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      const hasCurve = pathCalls.some((c) => {
-        const path = c.args[0] as PathData;
-        return path.operations.some((op) => op.op === "curveTo");
-      });
-      expect(hasCurve).toBe(true);
-    });
-
-    it("IEEE shape does not call drawRect", () => {
-      const el = makeXOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls).toHaveLength(0);
-    });
-
-    it("IEEE shape does not draw '=1' text", () => {
-      const el = makeXOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "=1")).toBe(false);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Inputs=3, Bits=4, wideShape=true map to correct PropertyBag entries", () => {
-      const entries: Record<string, string> = {
-        Inputs: "3",
-        Bits: "4",
-        wideShape: "true",
-      };
-
-      const bag = new PropertyBag();
-      for (const mapping of XOR_ATTRIBUTE_MAPPINGS) {
-        if (entries[mapping.xmlName] !== undefined) {
-          bag.set(mapping.propertyKey, mapping.convert(entries[mapping.xmlName]));
-        }
-      }
-
-      expect(bag.get<number>("inputCount")).toBe(3);
-      expect(bag.get<number>("bitWidth")).toBe(4);
-      expect(bag.get<boolean>("wideShape")).toBe(true);
-    });
-
-    it("Label attribute maps to label property key", () => {
-      const mapping = XOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("label");
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("XOrDefinition has name='XOr'", () => {
-      expect(XOrDefinition.name).toBe("XOr");
-    });
-
-    it("XOrDefinition has typeId=-1", () => {
-      expect(XOrDefinition.typeId).toBe(-1);
-    });
-
-    it("XOrDefinition has a factory function", () => {
-      expect(typeof XOrDefinition.factory).toBe("function");
-    });
-
-    it("XOrDefinition factory produces a XOrElement", () => {
-      const props = new PropertyBag();
-      props.set("inputCount", 2);
-      props.set("bitWidth", 1);
-      props.set("wideShape", false);
-      const el = XOrDefinition.factory(props);
-      expect(el.typeId).toBe("XOr");
-    });
-
-    it("XOrDefinition has executeFn=executeXOr", () => {
-      expect(XOrDefinition.models!.digital!.executeFn).toBe(executeXOr);
-    });
-
-    it("XOrDefinition has a non-empty pinLayout", () => {
-      expect(XOrDefinition.pinLayout.length).toBeGreaterThan(0);
-    });
-
-    it("XOrDefinition propertyDefs include inputCount, bitWidth, wideShape, label", () => {
-      const keys = XOrDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("inputCount");
-      expect(keys).toContain("bitWidth");
-      expect(keys).toContain("wideShape");
-      expect(keys).toContain("label");
-    });
-
-    it("XOrDefinition attributeMap covers Inputs, Bits, wideShape, inverterConfig, Label", () => {
-      const xmlNames = XOrDefinition.attributeMap.map((m) => m.xmlName);
-      expect(xmlNames).toContain("Inputs");
-      expect(xmlNames).toContain("Bits");
-      expect(xmlNames).toContain("wideShape");
-      expect(xmlNames).toContain("inverterConfig");
-      expect(xmlNames).toContain("Label");
-    });
-
-    it("XOrDefinition category is LOGIC", () => {
-      expect(XOrDefinition.category).toBe(ComponentCategory.LOGIC);
-    });
-
-    it("XOrDefinition has a non-empty helpText", () => {
-      expect(typeof XOrDefinition.helpText).toBe("string");
-      expect(typeof XOrDefinition.helpText).toBe("string"); expect(XOrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("XOrDefinition can be registered in ComponentRegistry without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(XOrDefinition)).not.toThrow();
-    });
-
-    it("After registration, XOrDefinition typeId is overwritten with a non-negative integer", () => {
-      const registry = new ComponentRegistry();
-      registry.register(XOrDefinition);
-      const registered = registry.get("XOr");
-      expect(registered).not.toBeUndefined();
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
+  it("1-bit: 1 XOR 1 = 0 (equal inputs produce zero)", () => {
+    const fix = buildXor2Fixture(1);
+    drive(fix, { A: 1, B: 1 });
+    expect(read(fix, "Y")).toBe(0);
   });
 });
+
+// ===========================================================================
+// XOr — Cat 9 (digital interaction): multi-bit truth table
+// ===========================================================================
+
+describe("XOr 2-input multi-bit digital interaction (Cat 9)", () => {
+  it("8-bit: 0xFF XOR 0xFF = 0x00 (identical pattern cancels)", () => {
+    const fix = buildXor2Fixture(8);
+    drive(fix, { A: 0xFF, B: 0xFF });
+    expect(read(fix, "Y")).toBe(0x00);
+  });
+
+  it("8-bit: 0xAA XOR 0x55 = 0xFF (alternating opposite bits)", () => {
+    const fix = buildXor2Fixture(8);
+    drive(fix, { A: 0xAA, B: 0x55 });
+    expect(read(fix, "Y")).toBe(0xFF);
+  });
+
+  it("8-bit: 0xF0 XOR 0x0F = 0xFF (high vs low nibbles)", () => {
+    const fix = buildXor2Fixture(8);
+    drive(fix, { A: 0xF0, B: 0x0F });
+    expect(read(fix, "Y")).toBe(0xFF);
+  });
+
+  it("8-bit: 0xC3 XOR 0x3C = 0xFF (mixed-bit complement)", () => {
+    const fix = buildXor2Fixture(8);
+    drive(fix, { A: 0xC3, B: 0x3C });
+    expect(read(fix, "Y")).toBe(0xFF);
+  });
+
+  it("8-bit: 0xC3 XOR 0xC3 = 0x00 (identical pattern cancels)", () => {
+    const fix = buildXor2Fixture(8);
+    drive(fix, { A: 0xC3, B: 0xC3 });
+    expect(read(fix, "Y")).toBe(0x00);
+  });
+
+  it("8-bit: 0xF0 XOR 0xF3 = 0x03 (mismatch in low two bits only)", () => {
+    const fix = buildXor2Fixture(8);
+    drive(fix, { A: 0xF0, B: 0xF3 });
+    expect(read(fix, "Y")).toBe(0x03);
+  });
+
+  it("16-bit: 0xABCD XOR 0xABCD = 0x0000 (identical pattern cancels)", () => {
+    const fix = buildXor2Fixture(16);
+    drive(fix, { A: 0xABCD, B: 0xABCD });
+    expect(read(fix, "Y")).toBe(0x0000);
+  });
+
+  it("32-bit: 0x12345678 XOR 0x12345678 = 0x00000000 (identical 32-bit pattern cancels)", () => {
+    const fix = buildXor2Fixture(32);
+    drive(fix, { A: 0x12345678, B: 0x12345678 });
+    expect(read(fix, "Y")).toBe(0x00000000);
+  });
+
+  it("32-bit: 0x0F0F0F0F XOR 0xF0F0F0F0 = 0xFFFFFFFF (full bitwise complement)", () => {
+    const fix = buildXor2Fixture(32);
+    drive(fix, { A: 0x0F0F0F0F, B: 0xF0F0F0F0 });
+    expect(read(fix, "Y")).toBe(0xFFFFFFFF);
+  });
+});
+
+// ===========================================================================
+// XOr — Cat 9 (digital interaction): 3-input chained XOR
+// ===========================================================================
+
+describe("XOr 3-input digital interaction (Cat 9)", () => {
+  it("8-bit: 0xFF XOR 0x0F XOR 0x03 = 0xF3 (cumulative XOR)", () => {
+    // 0xFF ^ 0x0F = 0xF0; 0xF0 ^ 0x03 = 0xF3.
+    const fix = buildXor3Fixture(8);
+    drive(fix, { A: 0xFF, B: 0x0F, C: 0x03 });
+    expect(read(fix, "Y")).toBe((0xFF ^ 0x0F ^ 0x03) >>> 0);
+  });
+
+  it("1-bit: 1 XOR 1 XOR 1 = 1 (odd number of highs)", () => {
+    const fix = buildXor3Fixture(1);
+    drive(fix, { A: 1, B: 1, C: 1 });
+    expect(read(fix, "Y")).toBe(1);
+  });
+
+  it("1-bit: 0 XOR 0 XOR 0 = 0 (no highs)", () => {
+    const fix = buildXor3Fixture(1);
+    drive(fix, { A: 0, B: 0, C: 0 });
+    expect(read(fix, "Y")).toBe(0);
+  });
+
+  it("1-bit: 1 XOR 0 XOR 1 = 0 (even number of highs)", () => {
+    const fix = buildXor3Fixture(1);
+    drive(fix, { A: 1, B: 0, C: 1 });
+    expect(read(fix, "Y")).toBe(0);
+  });
+
+  it("8-bit: 0xAB XOR 0xAB XOR 0xAB = 0xAB (3 equal values: odd number of highs preserves original)", () => {
+    const fix = buildXor3Fixture(8);
+    drive(fix, { A: 0xAB, B: 0xAB, C: 0xAB });
+    expect(read(fix, "Y")).toBe(0xAB);
+  });
+});
+
+// ===========================================================================
+// XOr — Cat 9 (digital interaction): 4-input chained XOR
+// ===========================================================================
+
+describe("XOr 4-input digital interaction (Cat 9)", () => {
+  it("8-bit: 0xFF XOR 0xFF XOR 0xFF XOR 0xFF = 0x00 (4 equal values: even number of highs cancels)", () => {
+    const fix = buildXor4Fixture(8);
+    drive(fix, { A: 0xFF, B: 0xFF, C: 0xFF, D: 0xFF });
+    expect(read(fix, "Y")).toBe(0x00);
+  });
+});
+
+// ===========================================================================
+// XOr — Cat 4 (param hot-load): BLOCKED.
+//
+// Per buildStandardGatePropertyDefs (src/components/gates/gate-shared.ts) all
+// behavioral parameters of the XOr gate are declared `structural: true`:
+//   - inputCount   (structural: true)
+//   - bitWidth     (structural: true)
+//   - wideShape    (structural: true; render-only)
+// The remaining propertyDefs entries are non-behavioral metadata:
+//   - _inverterLabels (XML attribute round-trip; not a simulation parameter)
+//   - label           (LABEL_PROPERTY_DEF; identifier metadata)
+//
+// The Cat 4 worked template (build ONE fixture, capture `before`, call
+// coordinator.setComponentProperty(element, paramName, newValue), step,
+// capture `after`, assert the documented post-change observable) requires a
+// non-structural behavioral parameter. None exists on this component, so no
+// canonical Cat 4 it() can be authored. Recorded as a BLOCKED row in the
+// canonical-set table; surfaced in Escalations of the final report.
+// ===========================================================================

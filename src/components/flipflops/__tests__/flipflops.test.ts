@@ -542,6 +542,21 @@ describe("RS_FF_AS (Cat 9 bridge / digital)", () => {
     facade.step(coord);
     expect(facade.readSignal(coord, "Q")).toBe(0);
   });
+
+  // Category 12 — Forbidden / undefined input combinations.
+  // Original test name: `FlipflopRSAsync > truth table (level-sensitive) >
+  //   S=1 R=1 → forbidden state: Q=0, ~Q=0`.
+  // S=1 R=1 is the documented forbidden combination for the level-sensitive
+  // SR latch; the spec mandates Q=0 AND ~Q=0 (both outputs low).
+  it("S=1 R=1 drives forbidden state Q=0, ~Q=0 (Cat 12)", () => {
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(buildRSAsync(facade));
+    facade.setSignal(coord, "S", 1);
+    facade.setSignal(coord, "R", 1);
+    facade.step(coord);
+    expect(facade.readSignal(coord, "Q")).toBe(0);
+    expect(facade.readSignal(coord, "QB")).toBe(0);
+  });
 });
 
 // ===========================================================================

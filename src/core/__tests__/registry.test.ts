@@ -22,6 +22,7 @@ import {
   register74xxLibrary,
   LIBRARY_74XX,
 } from "../../components/library-74xx.js";
+import { createDefaultRegistry } from "../../components/register-all.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -584,3 +585,61 @@ describe.each(LIBRARY_HELPERS)(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// Parametric AttributeMapping audit across the default registry. Replaces the
+// per-component `definitionComplete > attributeMap covers X, Y, Z` blocks the
+// wave-3 §3 sweep deleted from individual component test files.
+//
+// For every registered ComponentDefinition that declares an attributeMap:
+//  - well-formedness: each entry has a non-empty xmlName, a non-empty
+//    propertyKey, and a callable convert function.
+//  - xmlName uniqueness within each component's attributeMap.
+//  - convert is a pure mapping that produces a defined PropertyValue for an
+//    empty XML string (never throws, never returns undefined). Per-component
+//    semantic round-trips (e.g. "8" -> 8) live with the component's tests when
+//    they observe a simulator effect; structural correctness audits live here.
+// ---------------------------------------------------------------------------
+
+describe("AttributeMapping parametric audit (every registered component)", () => {
+  const defaultRegistry = createDefaultRegistry();
+  const definitions = defaultRegistry
+    .getAll()
+    .filter((d) => Array.isArray(d.attributeMap) && d.attributeMap.length > 0);
+
+  it("default registry has at least one component with an attributeMap", () => {
+    expect(definitions.length).toBeGreaterThan(0);
+  });
+
+  for (const def of definitions) {
+    describe(def.name, () => {
+      const seenXmlNames = new Map<string, number>();
+      for (const mapping of def.attributeMap) {
+        const count = seenXmlNames.get(mapping.xmlName) ?? 0;
+        seenXmlNames.set(mapping.xmlName, count + 1);
+      }
+
+      it("attributeMap xmlNames are unique within the component", () => {
+        const duplicates = [...seenXmlNames.entries()]
+          .filter(([, n]) => n > 1)
+          .map(([name]) => name);
+        expect(duplicates).toEqual([]);
+      });
+
+      for (const mapping of def.attributeMap) {
+        it(`xmlName "${mapping.xmlName}" entry is well-formed`, () => {
+          expect(typeof mapping.xmlName).toBe("string");
+          expect(mapping.xmlName.length).toBeGreaterThan(0);
+          expect(typeof mapping.propertyKey).toBe("string");
+          expect(mapping.propertyKey.length).toBeGreaterThan(0);
+          expect(typeof mapping.convert).toBe("function");
+        });
+
+        it(`xmlName "${mapping.xmlName}" convert("") returns a defined PropertyValue`, () => {
+          const result = mapping.convert("");
+          expect(result).toBeDefined();
+        });
+      }
+    });
+  }
+});

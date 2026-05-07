@@ -25,22 +25,22 @@
 - [x] src/components/basic/__tests__/function.test.ts
 - [x] src/components/flipflops/__tests__/flipflops.test.ts
 - [x] src/components/flipflops/__tests__/monoflop.test.ts
-- [ ] src/components/flipflops/__tests__/two-phase-flipflops.test.ts
-- [ ] src/components/gates/__tests__/analog-gates.test.ts
-- [ ] src/components/gates/__tests__/and.test.ts
-- [ ] src/components/gates/__tests__/nand.test.ts
-- [ ] src/components/gates/__tests__/nor.test.ts
-- [ ] src/components/gates/__tests__/not.test.ts
-- [ ] src/components/gates/__tests__/or.test.ts
-- [ ] src/components/gates/__tests__/xnor.test.ts
-- [ ] src/components/gates/__tests__/xor.test.ts
-- [ ] src/components/graphics/__tests__/graphic-card.test.ts
-- [ ] src/components/graphics/__tests__/led-matrix.test.ts
-- [ ] src/components/graphics/__tests__/vga.test.ts
-- [ ] src/components/io/__tests__/analog-clock.test.ts
-- [ ] src/components/io/__tests__/button-led.test.ts
-- [ ] src/components/io/__tests__/button.test.ts
-- [ ] src/components/io/__tests__/dip-switch.test.ts
+- [x] src/components/flipflops/__tests__/two-phase-flipflops.test.ts
+- [x] src/components/gates/__tests__/analog-gates.test.ts
+- [x] src/components/gates/__tests__/and.test.ts
+- [x] src/components/gates/__tests__/nand.test.ts
+- [x] src/components/gates/__tests__/nor.test.ts
+- [x] src/components/gates/__tests__/not.test.ts
+- [x] src/components/gates/__tests__/or.test.ts
+- [x] src/components/gates/__tests__/xnor.test.ts
+- [x] src/components/gates/__tests__/xor.test.ts
+- [x] src/components/graphics/__tests__/graphic-card.test.ts
+- [x] src/components/graphics/__tests__/led-matrix.test.ts
+- [x] src/components/graphics/__tests__/vga.test.ts
+- [x] src/components/io/__tests__/analog-clock.test.ts
+- [x] src/components/io/__tests__/button-led.test.ts
+- [x] src/components/io/__tests__/button.test.ts
+- [x] src/components/io/__tests__/dip-switch.test.ts
 - [ ] src/components/io/__tests__/io.test.ts
 - [ ] src/components/io/__tests__/led.test.ts
 - [ ] src/components/io/__tests__/midi.test.ts

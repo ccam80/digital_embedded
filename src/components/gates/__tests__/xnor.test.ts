@@ -1,383 +1,245 @@
 /**
- * Tests for the XNOr gate component.
+ * Canonical tests for the XNOr gate component.
  *
- * Covers:
- *   - executeXNOr: logic correctness (2-input, 3-input, multi-bit)
- *   - Rendering: IEC/DIN shape (rect + "=1" text + output bubble)
- *   - Rendering: IEEE/US shape (XOR-like curve + output bubble)
- *   - Attribute mapping
- *   - ComponentDefinition completeness
+ * Tier: fixture-only (pure-digital combinational; no analog domain).
+ * Driver: facade.build({components, connections}) + facade.compile() + setSignal / step / readSignal.
+ *
+ * Canon coverage:
+ *   - Cat 9 (digital interaction): drive labelled inputs, step, assert labelled output.
+ *   - Cat 4 (param hot-load): BLOCKED. XNOr's propertyDefs (buildStandardGatePropertyDefs
+ *     in src/components/gates/gate-shared.ts) declare every behavioral parameter
+ *     (`inputCount`, `bitWidth`, `wideShape`) as `structural: true`. The remaining
+ *     keys (`_inverterLabels`, `label`) are XML-attribute / metadata, not behavioral
+ *     simulation parameters. There is no non-structural behavioral parameter
+ *     documented as hot-loadable on this component, so the canonical Cat 4
+ *     worked template (single fixture, mutate via setComponentProperty, assert
+ *     post-change observable) has no candidate parameter. See Escalations.
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  XNOrElement,
-  executeXNOr,
-  XNOrDefinition,
-  XNOR_ATTRIBUTE_MAPPINGS,
-} from "../xnor.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
+import type { SimulationCoordinator } from "../../../solver/coordinator-types.js";
+import type { Circuit } from "../../../core/circuit.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Helpers- ComponentLayout mock
+// Canonical builder for an XNOr gate driven by labelled In ports and observed
+// via a labelled Out port.
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, bitWidth = 32): ComponentLayout {
-  const totalSlots = inputCount + 1;
-  return {
-    wiringTable: Int32Array.from({ length: totalSlots }, (_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => 1,
-    outputOffset: () => inputCount,
-    stateOffset: () => 0,
-    getProperty: (_index: number, key: string) => key === "bitWidth" ? bitWidth : undefined,
-  };
+interface DigitalFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: SimulationCoordinator;
+  circuit: Circuit;
 }
 
-function makeState(inputs: number[]): Uint32Array {
-  const arr = new Uint32Array(inputs.length + 1);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
+function buildDigital(spec: {
+  components: ReadonlyArray<{ id: string; type: string; props: Record<string, number | string | boolean> }>;
+  connections: ReadonlyArray<readonly [string, string]>;
+}): DigitalFixture {
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: spec.components.map((c) => ({ id: c.id, type: c.type, props: c.props })),
+    connections: spec.connections.map((c) => [c[0], c[1]] as [string, string]),
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator, circuit };
+}
+
+function drive(fix: DigitalFixture, values: Record<string, number>): void {
+  for (const [label, value] of Object.entries(values)) {
+    fix.facade.setSignal(fix.coordinator, label, value);
   }
-  return arr;
+  fix.facade.step(fix.coordinator);
+}
+
+function read(fix: DigitalFixture, label: string): number {
+  return fix.facade.readSignal(fix.coordinator, label) as number;
 }
 
 // ---------------------------------------------------------------------------
-// Helpers- RenderContext mock
+// 2-input XNOr fixture
 // ---------------------------------------------------------------------------
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
-
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
+function buildXnor2Fixture(bitWidth: number): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "a",    type: "In",   props: { label: "A",  bitWidth } },
+      { id: "b",    type: "In",   props: { label: "B",  bitWidth } },
+      { id: "xnor", type: "XNOr", props: { inputCount: 2, bitWidth } },
+      { id: "y",    type: "Out",  props: { label: "Y",  bitWidth } },
+    ],
+    connections: [
+      ["a:out",    "xnor:In_1"],
+      ["b:out",    "xnor:In_2"],
+      ["xnor:out", "y:in"],
+    ],
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Helpers- XNOrElement factory
+// 3-input XNOr fixture
 // ---------------------------------------------------------------------------
 
-function makeXNOr(overrides?: {
-  inputCount?: number;
-  bitWidth?: number;
-  wideShape?: boolean;
-  invertedPins?: string[];
-  label?: string;
-}): XNOrElement {
-  const props = new PropertyBag();
-  props.set("inputCount", overrides?.inputCount ?? 2);
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  props.set("wideShape", overrides?.wideShape ?? false);
-  if (overrides?.invertedPins && overrides.invertedPins.length > 0) {
-    props.set("_inverterLabels", overrides.invertedPins.join(","));
-  }
-  if (overrides?.label !== undefined) {
-    props.set("label", overrides.label);
-  }
-  return new XNOrElement("test-xnor-001", { x: 0, y: 0 }, 0, false, props);
+function buildXnor3Fixture(bitWidth: number): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "a",    type: "In",   props: { label: "A",  bitWidth } },
+      { id: "b",    type: "In",   props: { label: "B",  bitWidth } },
+      { id: "c",    type: "In",   props: { label: "C",  bitWidth } },
+      { id: "xnor", type: "XNOr", props: { inputCount: 3, bitWidth } },
+      { id: "y",    type: "Out",  props: { label: "Y",  bitWidth } },
+    ],
+    connections: [
+      ["a:out",    "xnor:In_1"],
+      ["b:out",    "xnor:In_2"],
+      ["c:out",    "xnor:In_3"],
+      ["xnor:out", "y:in"],
+    ],
+  });
 }
 
-// ---------------------------------------------------------------------------
-// executeXNOr- logic correctness
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// XNOr — Cat 9 (digital interaction): two-input truth table
+// ===========================================================================
 
-describe("XNOrGate", () => {
-  describe("execute2Input", () => {
-    it("XNOR of 0 and 0 produces 0xFFFFFFFF (all bits set)", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0, 0]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFF);
-    });
-
-    it("XNOR of 1 and 1 produces 0xFFFFFFFF (equal, so XOR=0, NOT=all-ones)", () => {
-      const layout = makeLayout(2);
-      const state = makeState([1, 1]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFF);
-    });
-
-    it("XNOR of 1 and 0 produces 0xFFFFFFFE (XOR=1, NOT=all-but-lsb)", () => {
-      const layout = makeLayout(2);
-      const state = makeState([1, 0]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFE);
-    });
-
-    it("XNOR of 0xFFFFFFFF and 0xFFFFFFFF produces 0xFFFFFFFF", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0xFFFFFFFF, 0xFFFFFFFF]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFF);
-    });
-
-    it("XNOR of 0xAAAAAAAA and 0x55555555 produces 0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0xAAAAAAAA, 0x55555555]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
+describe("XNOr 2-input digital interaction (Cat 9)", () => {
+  it("1-bit: 0 XNOR 0 = 1 (equal inputs produce all-ones output)", () => {
+    const fix = buildXnor2Fixture(1);
+    drive(fix, { A: 0, B: 0 });
+    expect(read(fix, "Y")).toBe(1);
   });
 
-  describe("executeMultiInput", () => {
-    it("XNOR of 0xFF, 0x0F, 0x03 produces NOT(0xFF ^ 0x0F ^ 0x03)", () => {
-      const layout = makeLayout(3);
-      const state = makeState([0xFF, 0x0F, 0x03]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[3]).toBe((~(0xFF ^ 0x0F ^ 0x03)) >>> 0);
-    });
+  it("1-bit: 1 XNOR 1 = 1 (equal inputs produce all-ones output)", () => {
+    const fix = buildXnor2Fixture(1);
+    drive(fix, { A: 1, B: 1 });
+    expect(read(fix, "Y")).toBe(1);
   });
 
-  describe("multiBit", () => {
-    it("XNOR of identical 32-bit values produces 0xFFFFFFFF", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0x12345678, 0x12345678]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0xFFFFFFFF);
-    });
-
-    it("XNOR of 0x0F0F0F0F and 0xF0F0F0F0 produces 0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0x0F0F0F0F, 0xF0F0F0F0]);
-      const highZs = new Uint32Array(state.length);
-      executeXNOr(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
+  it("1-bit: 1 XNOR 0 = 0 (unequal inputs produce zero)", () => {
+    const fix = buildXnor2Fixture(1);
+    drive(fix, { A: 1, B: 0 });
+    expect(read(fix, "Y")).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering- IEC/DIN
-  // ---------------------------------------------------------------------------
-
-  describe("drawNarrowIEEE", () => {
-    it("narrow IEEE shape calls drawPath for the curved body", () => {
-      const el = makeXNOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("narrow IEEE shape calls drawCircle for output inversion bubble", () => {
-      const el = makeXNOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("narrow IEEE shape does not call drawRect", () => {
-      const el = makeXNOr({ wideShape: false });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls).toHaveLength(0);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Rendering- IEEE/US
-  // ---------------------------------------------------------------------------
-
-  describe("drawIEEE", () => {
-    it("IEEE shape calls drawPath for the curved body", () => {
-      const el = makeXNOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("IEEE shape calls drawPath at least twice (body + extra input curve)", () => {
-      const el = makeXNOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const pathCalls = calls.filter((c) => c.method === "drawPath");
-      expect(pathCalls.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("IEEE shape calls drawCircle for output inversion bubble", () => {
-      const el = makeXNOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("IEEE shape does not call drawRect", () => {
-      const el = makeXNOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls).toHaveLength(0);
-    });
-
-    it("IEEE shape does not draw '=1' text", () => {
-      const el = makeXNOr({ wideShape: true });
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "=1")).toBe(false);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Inputs=3, Bits=8, wideShape=true map to correct PropertyBag entries", () => {
-      const entries: Record<string, string> = {
-        Inputs: "3",
-        Bits: "8",
-        wideShape: "true",
-      };
-
-      const bag = new PropertyBag();
-      for (const mapping of XNOR_ATTRIBUTE_MAPPINGS) {
-        if (entries[mapping.xmlName] !== undefined) {
-          bag.set(mapping.propertyKey, mapping.convert(entries[mapping.xmlName]));
-        }
-      }
-
-      expect(bag.get<number>("inputCount")).toBe(3);
-      expect(bag.get<number>("bitWidth")).toBe(8);
-      expect(bag.get<boolean>("wideShape")).toBe(true);
-    });
-
-    it("Label attribute maps to label property key", () => {
-      const mapping = XNOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("label");
-    });
-
-    it("inverterConfig attribute maps to _inverterLabels", () => {
-      const mapping = XNOR_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "inverterConfig");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("_inverterLabels");
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
-
-  describe("definitionComplete", () => {
-    it("XNOrDefinition has name='XNOr'", () => {
-      expect(XNOrDefinition.name).toBe("XNOr");
-    });
-
-    it("XNOrDefinition has typeId=-1", () => {
-      expect(XNOrDefinition.typeId).toBe(-1);
-    });
-
-    it("XNOrDefinition has a factory function", () => {
-      expect(typeof XNOrDefinition.factory).toBe("function");
-    });
-
-    it("XNOrDefinition factory produces a XNOrElement", () => {
-      const props = new PropertyBag();
-      props.set("inputCount", 2);
-      props.set("bitWidth", 1);
-      props.set("wideShape", false);
-      const el = XNOrDefinition.factory(props);
-      expect(el.typeId).toBe("XNOr");
-    });
-
-    it("XNOrDefinition has executeFn=executeXNOr", () => {
-      expect(XNOrDefinition.models!.digital!.executeFn).toBe(executeXNOr);
-    });
-
-    it("XNOrDefinition has a non-empty pinLayout", () => {
-      expect(XNOrDefinition.pinLayout.length).toBeGreaterThan(0);
-    });
-
-    it("XNOrDefinition propertyDefs include inputCount, bitWidth, wideShape, label", () => {
-      const keys = XNOrDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("inputCount");
-      expect(keys).toContain("bitWidth");
-      expect(keys).toContain("wideShape");
-      expect(keys).toContain("label");
-    });
-
-    it("XNOrDefinition attributeMap covers Inputs, Bits, wideShape, inverterConfig, Label", () => {
-      const xmlNames = XNOrDefinition.attributeMap.map((m) => m.xmlName);
-      expect(xmlNames).toContain("Inputs");
-      expect(xmlNames).toContain("Bits");
-      expect(xmlNames).toContain("wideShape");
-      expect(xmlNames).toContain("inverterConfig");
-      expect(xmlNames).toContain("Label");
-    });
-
-    it("XNOrDefinition category is LOGIC", () => {
-      expect(XNOrDefinition.category).toBe(ComponentCategory.LOGIC);
-    });
-
-    it("XNOrDefinition has a non-empty helpText", () => {
-      expect(typeof XNOrDefinition.helpText).toBe("string");
-      expect(typeof XNOrDefinition.helpText).toBe("string"); expect(XNOrDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("XNOrDefinition can be registered in ComponentRegistry without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(XNOrDefinition)).not.toThrow();
-    });
-
-    it("After registration, XNOrDefinition typeId is overwritten with a non-negative integer", () => {
-      const registry = new ComponentRegistry();
-      registry.register(XNOrDefinition);
-      const registered = registry.get("XNOr");
-      expect(registered).not.toBeUndefined();
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
+  it("1-bit: 0 XNOR 1 = 0 (unequal inputs produce zero)", () => {
+    const fix = buildXnor2Fixture(1);
+    drive(fix, { A: 0, B: 1 });
+    expect(read(fix, "Y")).toBe(0);
   });
 });
+
+// ===========================================================================
+// XNOr — Cat 9 (digital interaction): multi-bit truth table
+// ===========================================================================
+
+describe("XNOr 2-input multi-bit digital interaction (Cat 9)", () => {
+  it("8-bit: 0xFF XNOR 0xFF = 0xFF (equal across all bits)", () => {
+    const fix = buildXnor2Fixture(8);
+    drive(fix, { A: 0xFF, B: 0xFF });
+    expect(read(fix, "Y")).toBe(0xFF);
+  });
+
+  it("8-bit: 0xAA XNOR 0x55 = 0x00 (alternating opposite bits)", () => {
+    const fix = buildXnor2Fixture(8);
+    drive(fix, { A: 0xAA, B: 0x55 });
+    expect(read(fix, "Y")).toBe(0x00);
+  });
+
+  it("8-bit: 0xF0 XNOR 0x0F = 0x00 (high vs low nibbles)", () => {
+    const fix = buildXnor2Fixture(8);
+    drive(fix, { A: 0xF0, B: 0x0F });
+    expect(read(fix, "Y")).toBe(0x00);
+  });
+
+  it("8-bit: 0xC3 XNOR 0x3C = 0x00 (mixed-bit complement)", () => {
+    const fix = buildXnor2Fixture(8);
+    drive(fix, { A: 0xC3, B: 0x3C });
+    expect(read(fix, "Y")).toBe(0x00);
+  });
+
+  it("8-bit: 0xC3 XNOR 0xC3 = 0xFF (identical pattern)", () => {
+    const fix = buildXnor2Fixture(8);
+    drive(fix, { A: 0xC3, B: 0xC3 });
+    expect(read(fix, "Y")).toBe(0xFF);
+  });
+
+  it("8-bit: 0xF0 XNOR 0xF3 = 0xFC (mismatch in low two bits only)", () => {
+    // bitwise XOR = 0x03; NOT(0x03) masked to 8 bits = 0xFC.
+    const fix = buildXnor2Fixture(8);
+    drive(fix, { A: 0xF0, B: 0xF3 });
+    expect(read(fix, "Y")).toBe(0xFC);
+  });
+
+  it("16-bit: 0xABCD XNOR 0xABCD = 0xFFFF (identical pattern)", () => {
+    const fix = buildXnor2Fixture(16);
+    drive(fix, { A: 0xABCD, B: 0xABCD });
+    expect(read(fix, "Y")).toBe(0xFFFF);
+  });
+
+  it("32-bit: 0x12345678 XNOR 0x12345678 = 0xFFFFFFFF (identical 32-bit pattern)", () => {
+    const fix = buildXnor2Fixture(32);
+    drive(fix, { A: 0x12345678, B: 0x12345678 });
+    expect(read(fix, "Y")).toBe(0xFFFFFFFF);
+  });
+
+  it("32-bit: 0x0F0F0F0F XNOR 0xF0F0F0F0 = 0x00000000 (full bitwise complement)", () => {
+    const fix = buildXnor2Fixture(32);
+    drive(fix, { A: 0x0F0F0F0F, B: 0xF0F0F0F0 });
+    expect(read(fix, "Y")).toBe(0x00000000);
+  });
+});
+
+// ===========================================================================
+// XNOr — Cat 9 (digital interaction): 3-input chained XNOR == NOT(XOR of all inputs)
+// ===========================================================================
+
+describe("XNOr 3-input digital interaction (Cat 9)", () => {
+  it("8-bit: NOT(0xFF ^ 0x0F ^ 0x03) = 0x0C (cumulative XOR then invert)", () => {
+    // 0xFF ^ 0x0F = 0xF0; 0xF0 ^ 0x03 = 0xF3; ~0xF3 & 0xFF = 0x0C.
+    const fix = buildXnor3Fixture(8);
+    drive(fix, { A: 0xFF, B: 0x0F, C: 0x03 });
+    expect(read(fix, "Y")).toBe(0x0C);
+  });
+
+  it("1-bit: 1 XNOR 1 XNOR 1 = 0 (cumulative XOR=1, invert=0)", () => {
+    // 1 ^ 1 = 0; 0 ^ 1 = 1; ~1 & 1 = 0.
+    const fix = buildXnor3Fixture(1);
+    drive(fix, { A: 1, B: 1, C: 1 });
+    expect(read(fix, "Y")).toBe(0);
+  });
+
+  it("1-bit: 0 XNOR 0 XNOR 0 = 1 (cumulative XOR=0, invert=1)", () => {
+    const fix = buildXnor3Fixture(1);
+    drive(fix, { A: 0, B: 0, C: 0 });
+    expect(read(fix, "Y")).toBe(1);
+  });
+
+  it("1-bit: 1 XNOR 0 XNOR 1 = 1 (cumulative XOR=0, invert=1)", () => {
+    const fix = buildXnor3Fixture(1);
+    drive(fix, { A: 1, B: 0, C: 1 });
+    expect(read(fix, "Y")).toBe(1);
+  });
+});
+
+// ===========================================================================
+// XNOr — Cat 4 (param hot-load): BLOCKED.
+//
+// Per buildStandardGatePropertyDefs (src/components/gates/gate-shared.ts) all
+// behavioral parameters of the XNOr gate are declared `structural: true`:
+//   - inputCount   (structural: true)
+//   - bitWidth     (structural: true)
+//   - wideShape    (structural: true; render-only)
+// The remaining propertyDefs entries are non-behavioral metadata:
+//   - _inverterLabels (XML attribute round-trip; not a simulation parameter)
+//   - label           (LABEL_PROPERTY_DEF; identifier metadata)
+//
+// The Cat 4 worked template (build ONE fixture, capture `before`, call
+// coordinator.setComponentProperty(element, paramName, newValue), step,
+// capture `after`, assert the documented post-change observable) requires a
+// non-structural behavioral parameter. None exists on this component, so no
+// canonical Cat 4 it() can be authored. Recorded as a BLOCKED row in the
+// canonical-set table; surfaced in Escalations of the final report.
+// ===========================================================================

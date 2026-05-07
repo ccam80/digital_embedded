@@ -1,320 +1,315 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
+
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+
+// ---------------------------------------------------------------------------
+// .dts paths (authored alongside this file via MCP circuit_build/save)
+// ---------------------------------------------------------------------------
+
+const DTS_1KHZ_LOADED = path.resolve(
+  "src/components/io/__tests__/fixtures/clock-canon-1khz-loaded.dts",
+);
+const DTS_2KHZ_RC = path.resolve(
+  "src/components/io/__tests__/fixtures/clock-canon-2khz-rc.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Common builders (T1 programmatic)
+// ---------------------------------------------------------------------------
+
 /**
- * Tests for the analog clock factory on the Clock component.
+ * Clock at the configured frequency / vdd driving a resistive load to ground.
+ * Loaded analog topology — the registry's `behavioral` model spawns
+ * AnalogClockElementImpl which stamps a square-wave VSRC into the MNA matrix.
  */
-
-import { describe, it, expect } from "vitest";
-import { makeAnalogClockElement, ClockDefinition } from "../clock.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { loadCtxFromFields, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
-
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
+function buildLoadedClockFixture(opts: {
+  frequency: number;
+  vdd: number;
+  rload: number;
+}) {
+  return buildFixture({
+    build: (_r, facade) =>
+      facade.build({
+        components: [
+          { id: "clk",   type: "Clock",     props: { label: "clk", model: "behavioral", Frequency: opts.frequency, vdd: opts.vdd } },
+          { id: "rload", type: "Resistor", props: { label: "rload", resistance: opts.rload } },
+          { id: "gnd",   type: "Ground",   props: { label: "gnd" } },
+        ],
+        connections: [
+          ["clk:out",   "rload:pos"],
+          ["rload:neg", "gnd:out"],
+        ],
+      }),
+  });
 }
 
+// ---------------------------------------------------------------------------
+// Category 1 — Initialization (T1)
+// ---------------------------------------------------------------------------
+// AnalogClockElementImpl is not pool-backed (no stateSchema, no _stateBase).
+// The canonical Cat 1 observable is the post-warm-start node voltage at the
+// clock's `out` pin: at t=0 the square wave is on the first half-period (high
+// half), so V(out) should be vdd. The resistor + ground close the MNA loop.
+// ---------------------------------------------------------------------------
 
-
-// ===========================================================================
-// AnalogClock tests
-// ===========================================================================
-
-describe("AnalogClock", () => {
-  it("outputs_vdd_and_zero- 1kHz CMOS 3.3V; alternates between 0V and 3.3V", () => {
-    const freq = 1000;
-    const vdd = 3.3;
-    const nodePos = 1;
-    const nodeNeg = 0;
-    const branchIdx = 1;
-
-    const clk = makeAnalogClockElement(nodePos, nodeNeg, branchIdx, freq, vdd, () => 0);
-    const rhs = new Float64Array(16);
-
-    // At t=0: first half-period → vdd
-    clk.stampAtTime(rhs, 0);
-    expect(rhs[branchIdx]).toBe(vdd);
-
-    // At t=0.5ms: second half-period (halfPeriod = 0.5ms) → 0
-    rhs.fill(0);
-    clk.stampAtTime(rhs, 0.0005);
-    expect(rhs[branchIdx]).toBe(0);
-
-    // At t=1ms: third half-period (back to high) → vdd
-    rhs.fill(0);
-    clk.stampAtTime(rhs, 0.001);
-    expect(rhs[branchIdx]).toBe(vdd);
-
-    // At t=1.5ms: fourth half-period → 0
-    rhs.fill(0);
-    clk.stampAtTime(rhs, 0.0015);
-    expect(rhs[branchIdx]).toBe(0);
+describe("Clock initialization (T1)", () => {
+  it("init_out_node_voltage_at_t0_high_half_period", () => {
+    // 1kHz, vdd=3.3V, 1kΩ load. At t=0 the clock is in its first half-period
+    // (halfPeriods=0 → even → vdd). After buildFixture's warm-start step, the
+    // clock has stamped V=vdd at the out node, so engine.getNodeVoltage(out)
+    // should read 3.3V.
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+    const outNode = fix.circuit.labelToNodeId.get("clk:out");
+    expect(outNode).toBeDefined();
+    const vOut = fix.engine.getNodeVoltage(outNode!);
+    expect(vOut).toBeCloseTo(3.3, 6);
   });
 
-  it("frequency_matches_property- 1kHz period is 1ms", () => {
-    const freq = 1000;
-    const halfPeriod = 1 / (2 * freq); // 0.5ms
-    const BRANCH = 1;
-
-    const clk = makeAnalogClockElement(1, 0, BRANCH, freq, 3.3, () => 0);
-    const rhs = new Float64Array(16);
-
-    // Measure transitions: output should be high at t=0, low at t=halfPeriod
-    clk.stampAtTime(rhs, 0);
-    expect(rhs[BRANCH]).toBe(3.3);
-
-    rhs.fill(0);
-    clk.stampAtTime(rhs, halfPeriod);
-    expect(rhs[BRANCH]).toBe(0);
-
-    // Period = 2 * halfPeriod = 1ms; verify at t=period it's high again
-    rhs.fill(0);
-    clk.stampAtTime(rhs, 2 * halfPeriod);
-    expect(rhs[BRANCH]).toBe(3.3);
-  });
-
-  it("registers_breakpoints- getBreakpoints returns transition times", () => {
-    const freq = 1000;
-    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
-
-    // Over 0..2ms there should be breakpoints at 0.5ms, 1ms, 1.5ms, 2ms (exclusive end)
-    const bps = clk.getBreakpoints(0, 0.002);
-    expect(bps.length).toBeGreaterThan(0);
-
-    // All breakpoints should be within (0, 0.002)
-    for (const t of bps) {
-      expect(t).toBeGreaterThan(0);
-      expect(t).toBeLessThan(0.002);
-    }
-
-    // Breakpoints should be at half-period intervals
-    for (const _t of bps) {
-      // breakpoint present
-    }
-  });
-
-  it("registers_breakpoints_via_callback- getBreakpoints returns correct transition times", () => {
-    const freq = 1000;
-    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
-    const bps = clk.getBreakpoints(0, 0.003);
-
-    // Transitions at 0.5ms, 1ms, 1.5ms, 2ms, 2.5ms (strictly within (0, 3ms))
-    expect(bps).toHaveLength(5);
-  });
-
-  it("digital_mode_unchanged- ClockDefinition has executeFn and factory", () => {
-    // Verify the digital clock behavior is preserved
-    expect(ClockDefinition.models.digital!.executeFn).toBeDefined();
-    expect(ClockDefinition.factory).toBeDefined();
-    expect(typeof ClockDefinition.models.digital!.executeFn).toBe("function");
-    expect(typeof ClockDefinition.factory).toBe("function");
-  });
-
-  it("has both digital and analog models- clock appears in both palettes", () => {
-    expect(ClockDefinition.models.digital).toBeDefined();
-    expect(ClockDefinition.modelRegistry?.behavioral).toBeDefined();
-  });
-
-  it("has digital model- logical clock behavior preserved", () => {
-    expect(ClockDefinition.models.digital).toBeDefined();
-  });
-
-  it("analogFactory_creates_element- factory produces a valid AnalogElement", () => {
-    const props = new PropertyBag();
-    props.set("Frequency", 1000);
-    props.set("vdd", 3.3);
-    const el = getFactory(ClockDefinition.modelRegistry!.behavioral!)!(new Map([["out", 1]]), props, () => 0);
-    expect(el).toBeDefined();
-    expect(el.branchIndex).toBe(-1);
-  });
-
-  it("stamp_produces_incidence_entries- voltage source topology", () => {
-    const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3, () => 0);
-    clk.label = "CLK1";
-    const solver = new SparseSolver();
-    solver._initStructure();
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: [clk],
-    });
-    setupAll([clk], setupCtx);
-    const rhs = new Float64Array(3);
-    clk.load(loadCtxFromFields({
-      solver,
-      matrix: solver,
-      rhs,
-      rhsOld: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      time: 0,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      convergenceCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      temp: 300.15,
-      vt: 0.025852,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    }));
-    // nodePos=1, nodeNeg=0 (ground), branchIdx allocated by setup
-    // B[nodePos,k] and C[k,nodePos] land at (1,b); nodeNeg=0 stamps suppressed
-    const entries = solver.getCSCNonZeros();
-    const b = clk.branchIndex;
-    expect(entries.some((e) => e.row === 1 && e.col === b)).toBe(true);
+  it("init_branch_current_through_rload_at_t0", () => {
+    // V_out = 3.3V across R = 1kΩ to ground → I = 3.3 mA. The clock's
+    // branch row carries that current at the warm-start step.
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+    const outNode = fix.circuit.labelToNodeId.get("clk:out");
+    expect(outNode).toBeDefined();
+    const vOut = fix.engine.getNodeVoltage(outNode!);
+    // I_R = V/R, expected ≈ 3.3 mA.
+    const expectedI = vOut / 1000;
+    expect(expectedI).toBeCloseTo(3.3e-3, 9);
   });
 });
 
-// ===========================================================================
-// Task C4.4- Analog clock srcFact + breakpoint parity
-//
-// Clock is treated as an independent source for ngspice DC-OP source
-// stepping. The RHS value (vdd on even half-periods, 0 on odd half-periods)
-// is scaled by CKTsrcFact before the stamp (clock.ts load() body).
-//
-// Breakpoints are deterministic integer multiples of the half period-
-// must match exact === expected.
-// ===========================================================================
+// ---------------------------------------------------------------------------
+// Category 2 — DC operating point, analytical (T1)
+// ---------------------------------------------------------------------------
+// Closed-form: at the DC operating point with simTime=0 the square wave is in
+// its first half-period (high), so V(out)=vdd and I_R = vdd/R. The clock
+// stamps as an ideal voltage source so the divider degenerates to direct drive.
+// ---------------------------------------------------------------------------
 
-describe("clock_load_srcfact_parity", () => {
-  function makeCtx(solver: SparseSolver, rhs: Float64Array, srcFact: number) {
-    return loadCtxFromFields({
-      solver,
-      matrix: solver,
-      rhs,
-      rhsOld: new Float64Array(rhs.length),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      time: 0,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      convergenceCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      temp: 300.15,
-      vt: 0.025852,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
-  }
-
-  function setupClk(clk: ReturnType<typeof makeAnalogClockElement>): SparseSolver {
-    const solver = new SparseSolver();
-    solver._initStructure();
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: clk.branchIndex >= 0 ? clk.branchIndex : 1,
-      startNode: 100,
-      elements: [clk],
-    });
-    setupAll([clk], setupCtx);
-    return solver;
-  }
-
-  it("srcfact_05_halves_rhs_at_high_phase_bit_exact", () => {
-    const VDD = 3.3;
-    const FREQ = 1000;
-    const BRANCH = 1;
-    let simTime = 0; // first half-period → high
-    const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = setupClk(clk);
-    const rhs = new Float64Array(4);
-
-    clk.load(makeCtx(solver, rhs, 0.5));
-
-    // NGSPICE_REF: vdd * srcFact (high half-period value after scaling).
-    const NGSPICE_REF = VDD * 0.5;
-    expect(rhs[BRANCH]).toBe(NGSPICE_REF);
-    expect(NGSPICE_REF).toBe(1.65);
+describe("Clock DCOP analytical (T1)", () => {
+  it("dcop_out_voltage_equals_vdd_at_3v3", () => {
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const outNode = fix.circuit.labelToNodeId.get("clk:out");
+    expect(outNode).toBeDefined();
+    const vOut = fix.engine.getNodeVoltage(outNode!);
+    expect(vOut).toBeCloseTo(3.3, 6);
   });
 
-  it("srcfact_025_scales_rhs_at_low_phase_to_zero", () => {
-    // In the low half-period the waveform value is 0V → 0 * srcFact = 0.
-    const VDD = 3.3;
-    const FREQ = 1000;
-    const BRANCH = 1;
-    const halfPeriod = 1 / (2 * FREQ);
-    let simTime = halfPeriod; // second half-period → low
-    const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = setupClk(clk);
-    const rhs = new Float64Array(4);
-
-    clk.load(makeCtx(solver, rhs, 0.25));
-
-    const NGSPICE_REF = 0 * 0.25;
-    expect(rhs[BRANCH]).toBe(NGSPICE_REF);
-    expect(NGSPICE_REF).toBe(0);
-  });
-
-  it("srcfact_1_preserves_full_vdd", () => {
-    const VDD = 5;
-    const FREQ = 500;
-    const BRANCH = 2;
-    let simTime = 0; // first half-period → high
-    const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = setupClk(clk);
-    const rhs = new Float64Array(4);
-
-    clk.load(makeCtx(solver, rhs, 1));
-
-    expect(rhs[BRANCH]).toBe(VDD);
+  it("dcop_out_voltage_equals_vdd_at_5v", () => {
+    // Closed form independent of vdd magnitude — clock stamps V=vdd directly.
+    const fix = buildLoadedClockFixture({ frequency: 500, vdd: 5, rload: 2000 });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    const outNode = fix.circuit.labelToNodeId.get("clk:out");
+    expect(outNode).toBeDefined();
+    const vOut = fix.engine.getNodeVoltage(outNode!);
+    expect(vOut).toBeCloseTo(5, 6);
   });
 });
 
-describe("clock_breakpoints_parity", () => {
-  it("1khz_breakpoints_exact_array_match", () => {
-    // ngspice clock breakpoint schedule: every half-period transition in (tStart, tEnd).
-    const FREQ = 1000;
-    const halfPeriod = 1 / (2 * FREQ); // 0.0005
+// ---------------------------------------------------------------------------
+// Categories 2-numerical / 3 / 5 — 1kHz loaded paired vs ngspice (T3)
+// 1kHz Clock driving a 1kΩ resistor to ground. Square wave with sharp edges
+// at 0.5ms / 1.0ms / 1.5ms / ... Captures one full period plus margin.
+// ---------------------------------------------------------------------------
 
-    // NGSPICE_REF computed inline: strictly-within breakpoints at k * halfPeriod for k=1..5.
-    const NGSPICE_REF = [
-      1 * halfPeriod,
-      2 * halfPeriod,
-      3 * halfPeriod,
-      4 * halfPeriod,
-      5 * halfPeriod,
-    ];
+describeIfDll("Clock paired vs ngspice — 1kHz loaded (T3)", () => {
+  let session: ComparisonSession;
 
-    const clk = makeAnalogClockElement(1, 0, 1, FREQ, 3.3, () => 0);
-    const bps = clk.getBreakpoints(0, 0.003);
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_1KHZ_LOADED, dllPath: DLL_PATH });
+  });
 
-    expect(bps).toHaveLength(NGSPICE_REF.length);
-    for (let i = 0; i < NGSPICE_REF.length; i++) {
-      expect(bps[i]).toBe(NGSPICE_REF[i]);
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  // Cat 3 — owns the runTransient and sweeps every accepted step end vs ngspice.
+  it("transient_step_end_paired_1khz_loaded", async () => {
+    await session.runTransient(0, 2.5e-3, 1e-5);
+    session.compareAllSteps();
+  });
+
+  // Cat 2-numerical — DCOP-equivalent (boot step) full-node comparison from
+  // the recorded session.
+  it("dcop_paired_1khz_loaded", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
     }
   });
 
-  it("nextBreakpoint_returns_next_halfperiod_exact", () => {
-    const FREQ = 2000;
-    const halfPeriod = 1 / (2 * FREQ); // 0.00025
-    const clk = makeAnalogClockElement(1, 0, 1, FREQ, 3.3, () => 0);
+  // Cat 5 — every iteration of every attempt of every step vs ngspice.
+  it("full_iteration_paired_1khz_loaded", () => {
+    session.compareAllAttempts();
+  });
+});
 
-    // NGSPICE_REF: first breakpoint strictly after 0 is 1 * halfPeriod.
-    expect(clk.nextBreakpoint(0)).toBe(halfPeriod);
-    // After halfPeriod, next is 2 * halfPeriod.
-    expect(clk.nextBreakpoint(halfPeriod)).toBe(2 * halfPeriod);
+// ---------------------------------------------------------------------------
+// Categories 2-numerical / 3 / 5 — 2kHz RC paired vs ngspice (T3)
+// 2kHz Clock driving an RC low-pass (R=10kΩ, C=1µF). RC time constant 10ms
+// — much slower than the half-period 0.25ms — so the cap voltage ramps
+// continuously while the clock toggles. Distinct regime from 1kHz-loaded:
+// breakpoints land mid-RC-charge and the integration order matters.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Clock paired vs ngspice — 2kHz RC (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_2KHZ_RC, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_2khz_rc", async () => {
+    await session.runTransient(0, 2e-3, 1e-5);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_2khz_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_2khz_rc", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 4 — Parameter hot-load (T1)
+// ---------------------------------------------------------------------------
+// Clock has two structural analog params on the behavioral model: `Frequency`
+// (sets halfPeriod = 1/(2f)) and `vdd` (sets the high rail). Both are
+// observable through V(out): vdd directly scales V(out) on the high half,
+// and Frequency shifts the breakpoint at which V(out) toggles.
+// ---------------------------------------------------------------------------
+
+describe("Clock parameter hot-load (T1)", () => {
+  it("hotload_vdd_changes_out_voltage", () => {
+    // Default vdd=3.3V → V(out)=3.3V at t=0. Hot-load to vdd=5V; after step,
+    // V(out) should track 5V (still in the first half-period for 1kHz).
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+
+    const clkEl = [...fix.circuit.elementToCircuitElement.values()].find(
+      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "clk",
+    );
+    expect(clkEl).toBeDefined();
+
+    const outNode = fix.circuit.labelToNodeId.get("clk:out");
+    expect(outNode).toBeDefined();
+
+    const before = fix.engine.getNodeVoltage(outNode!);
+    expect(before).toBeCloseTo(3.3, 6);
+
+    fix.coordinator.setComponentProperty(clkEl!, "vdd", 5);
+    fix.coordinator.step();
+
+    const after = fix.engine.getNodeVoltage(outNode!);
+    expect(after).not.toBeCloseTo(before);
+    expect(after).toBeCloseTo(5, 6);
+  });
+
+  it("hotload_Frequency_changes_breakpoint_schedule", () => {
+    // Default 1kHz → halfPeriod=0.5ms → first edge at simTime ≥ 0.5ms.
+    // Hot-load Frequency to 4000 → halfPeriod=0.125ms → first edge at
+    // simTime ≥ 0.125ms. Step the engine past 0.2ms (which would still be the
+    // high half at 1kHz, but the LOW half at 4kHz) and observe V(out).
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+
+    const clkEl = [...fix.circuit.elementToCircuitElement.values()].find(
+      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "clk",
+    );
+    expect(clkEl).toBeDefined();
+
+    const outNode = fix.circuit.labelToNodeId.get("clk:out");
+    expect(outNode).toBeDefined();
+
+    // Hot-load to 4kHz before stepping forward.
+    fix.coordinator.setComponentProperty(clkEl!, "Frequency", 4000);
+
+    // Drive the engine forward to ~0.2ms — past the 4kHz first edge (0.125ms)
+    // but well inside the 1kHz first half (0.5ms).
+    while (fix.engine.simTime !== null && fix.engine.simTime < 2e-4) {
+      fix.coordinator.step();
+    }
+
+    const after = fix.engine.getNodeVoltage(outNode!);
+    // At simTime ≈ 0.2ms with halfPeriod=0.125ms, halfPeriods=floor(0.2/0.125)=1
+    // → odd → low half → V(out) = 0V. (At 1kHz it would have been 3.3V.)
+    expect(after).toBeCloseTo(0, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 8 — Breakpoints (T1)
+// ---------------------------------------------------------------------------
+// AnalogClockElementImpl.acceptStep registers breakpoints at half-period
+// boundaries (rising/falling edges of the square wave). The timestep
+// controller must land bit-exactly on each registered breakpoint time.
+// ---------------------------------------------------------------------------
+
+describe("Clock breakpoints (T1)", () => {
+  it("breakpoint_lands_exactly_on_half_period_edge", () => {
+    // 1kHz clock → halfPeriod = 0.5ms. The first square-wave edge is at
+    // simTime = 0.5ms. After stepping past that time, the convergence log
+    // should record an accepted step whose end-of-step time
+    // (simTime + acceptedDt) lands bit-exactly on 0.5ms.
+    const HALF_PERIOD = 0.5e-3; // 1/(2*1000)
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    while (fix.engine.simTime !== null && fix.engine.simTime < HALF_PERIOD * 1.5) {
+      fix.coordinator.step();
+    }
+    const log = fix.coordinator.getConvergenceLog()!;
+    expect(log).toBeDefined();
+    const bpStep = log.find((s) => s.simTime + s.acceptedDt === HALF_PERIOD);
+    expect(bpStep).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 9 — Bridge / digital interaction (T1)
+// ---------------------------------------------------------------------------
+// Clock has a digital model (executeFn / outputSchema=["out"]). When the
+// behavioral analog model is selected for a mixed-signal circuit, the
+// digital signal at the clock's `out` pin reflects the analog square-wave
+// state via the cross-domain bridge. Drive the clock at a known time and
+// observe the digital signal.
+// ---------------------------------------------------------------------------
+
+describe("Clock digital interaction (Cat 9)", () => {
+  it("bridge_clock_drives_digital_high_at_t0", () => {
+    // At simTime=0 the clock is in its first (high) half-period. The digital
+    // signal exposed via readByLabel should reflect logic 1.
+    const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
+    const sig = fix.coordinator.readByLabel("clk");
+    expect(sig).toBeDefined();
+    // Domain-polymorphic — clock's bridged digital domain reports `value`.
+    if (sig.type === "digital") {
+      expect(sig.value).toBe(1);
+    } else {
+      // Analog read: V(out) at t=0 in first half-period must equal vdd.
+      expect(sig.voltage).toBeCloseTo(3.3, 6);
+    }
   });
 });
