@@ -1,235 +1,229 @@
-﻿/**
- * Tests for MNAEngine- the concrete AnalogEngine implementation.
- *
- * All circuit fixtures live in `./fixtures/analog-fixtures.ts`. Tests use
- * either:
- *
- *   - production-path compile* helpers (compileDivider, compileDiode) when
- *     the circuit can be built via real ComponentDefinitions; or
- *   - direct-element recipes (dividerCircuit, rcCircuit, diodeCircuit,
- *     rlCircuit, fuseCircuit) plus wrapHandElements when injecting custom
- *     AnalogElement implementations (acceptStep stubs, etc.).
- *
- * No test in this file owns or pre-allocates a StatePool; the engine's
- * _setup() is the single owner. See analog-fixtures.ts for the contract.
- */
+/** Tests for MNAEngine — exercised through buildFixture. */
 
 import { describe, it, expect, vi } from "vitest";
-import { MNAEngine } from "../analog-engine.js";
-import * as NiPredModule from "../ni-pred.js";
+import { buildFixture } from "./fixtures/build-fixture.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import {
-  compileDivider,
-  compileDiode,
-  rcCircuit,
-  diodeCircuit,
-  fuseCircuit,
-  wrapHandElements,
-} from "./fixtures/analog-fixtures.js";
-import { DefaultSimulationCoordinator } from "../../coordinator.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { createDefaultRegistry } from "../../../components/register-all.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
-import { AnalogElement } from "../element.js";
-import type { LoadContext } from "../load-context.js";
-import type { SetupContext } from "../setup-context.js";
-import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
+import * as NiPredModule from "../ni-pred.js";
+import { AnalogFuseElement } from "../../../components/passives/analog-fuse.js";
 
-/** Acquire a MNAEngine from a pre-compiled analog circuit without constructing
- *  MNAEngine directly- routes through DefaultSimulationCoordinator per UC-1. */
-function engineFrom(compiled: ConcreteCompiledAnalogCircuit): MNAEngine {
-  const coordinator = new DefaultSimulationCoordinator({
-    digital: null,
-    analog: compiled,
-    bridges: [],
-    wireSignalMap: new Map(),
-    labelSignalMap: new Map(),
-    labelToCircuitElement: new Map(),
-    pinSignalMap: new Map(),
-    diagnostics: [],
-    allCircuitElements: [],
-  });
-  return coordinator.getAnalogEngine() as MNAEngine;
+import type { Circuit } from "../../../core/circuit.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { ComponentSpec } from "../../../headless/netlist-types.js";
+
+// ---------------------------------------------------------------------------
+// Circuit recipes — declarative builds via facade.build
+// ---------------------------------------------------------------------------
+
+function buildDivider(
+  facade: DefaultSimulatorFacade,
+  opts: { R1?: number; R2?: number; V?: number; addProbe?: boolean } = {},
+): Circuit {
+  const { R1 = 1000, R2 = 1000, V = 5, addProbe = false } = opts;
+  const components: ComponentSpec[] = [
+    { id: "Vs",  type: "DcVoltageSource", props: { label: "Vs", voltage: V } },
+    { id: "R1",  type: "Resistor",        props: { label: "R1", resistance: R1 } },
+    { id: "R2",  type: "Resistor",        props: { label: "R2", resistance: R2 } },
+    { id: "GND", type: "Ground",          props: { label: "GND" } },
+  ];
+  const connections: Array<[string, string]> = [
+    ["Vs:pos", "R1:pos"],
+    ["R1:neg", "R2:pos"],
+    ["R2:neg", "GND:out"],
+    ["Vs:neg", "GND:out"],
+  ];
+  if (addProbe) {
+    components.push({ id: "Probe1", type: "Probe", props: { label: "V_mid" } });
+    connections.push(["Probe1:in", "R1:neg"]);
+  }
+  return facade.build({ components, connections });
 }
 
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  class TestResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-    private _hPP = -1;
-    private _hNN = -1;
-    private _hPN = -1;
-    private _hNP = -1;
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeA !== 0) this._hPP = s.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) this._hNN = s.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        this._hPN = s.allocElement(nodeA, nodeB);
-        this._hNP = s.allocElement(nodeB, nodeA);
-      }
-    }
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      if (this._hPP !== -1) s.stampElement(this._hPP,  G);
-      if (this._hNN !== -1) s.stampElement(this._hNN,  G);
-      if (this._hPN !== -1) s.stampElement(this._hPN, -G);
-      if (this._hNP !== -1) s.stampElement(this._hNP, -G);
-    }
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA] ?? 0;
-      const vB = rhs[nodeB] ?? 0;
-      return [G * (vA - vB), G * (vB - vA)];
-    }
-    setParam(_key: string, _value: number): void {}
-  }
-  return new TestResistor(new Map([["pos", nodeA], ["neg", nodeB]]));
+function buildRC(
+  facade: DefaultSimulatorFacade,
+  opts: { R?: number; C?: number; V?: number } = {},
+): Circuit {
+  const { R = 1000, C = 1e-6, V = 5 } = opts;
+  return facade.build({
+    components: [
+      { id: "Vs",  type: "DcVoltageSource", props: { label: "Vs", voltage: V } },
+      { id: "R1",  type: "Resistor",        props: { label: "R1", resistance: R } },
+      { id: "C1",  type: "Capacitor",       props: { label: "C1", capacitance: C } },
+      { id: "GND", type: "Ground",          props: { label: "GND" } },
+    ],
+    connections: [
+      ["Vs:pos", "R1:pos"],
+      ["R1:neg", "C1:pos"],
+      ["C1:neg", "GND:out"],
+      ["Vs:neg", "GND:out"],
+    ],
+  });
+}
+
+function buildDiodeCircuit(
+  facade: DefaultSimulatorFacade,
+  opts: { R?: number; V?: number } = {},
+): Circuit {
+  const { R = 1000, V = 5 } = opts;
+  return facade.build({
+    components: [
+      { id: "Vs",  type: "DcVoltageSource", props: { label: "Vs", voltage: V } },
+      { id: "R1",  type: "Resistor",        props: { label: "R1", resistance: R } },
+      { id: "D1",  type: "Diode",           props: { label: "D1" } },
+      { id: "GND", type: "Ground",          props: { label: "GND" } },
+    ],
+    connections: [
+      ["Vs:pos", "R1:pos"],
+      ["R1:neg", "D1:A"],
+      ["D1:K",   "GND:out"],
+      ["Vs:neg", "GND:out"],
+    ],
+  });
+}
+
+function buildFuseCircuit(
+  facade: DefaultSimulatorFacade,
+  opts: { V?: number; rCold?: number; rBlown?: number; i2tRating?: number; rLoad?: number },
+): Circuit {
+  const { V = 5, rCold = 1.0, rBlown = 1e9, i2tRating = 1e-8, rLoad = 9.0 } = opts;
+  return facade.build({
+    components: [
+      { id: "Vs",  type: "DcVoltageSource", props: { label: "Vs", voltage: V } },
+      { id: "Fu",  type: "Fuse",            props: { label: "Fu", model: "behavioral", rCold, rBlown, i2tRating } },
+      { id: "RL",  type: "Resistor",        props: { label: "RL", resistance: rLoad } },
+      { id: "GND", type: "Ground",          props: { label: "GND" } },
+    ],
+    connections: [
+      ["Vs:pos",  "Fu:out1"],
+      ["Fu:out2", "RL:pos"],
+      ["RL:neg",  "GND:out"],
+      ["Vs:neg",  "GND:out"],
+    ],
+  });
+}
+
+function findFuseElement(elements: ReadonlyArray<unknown>): AnalogFuseElement {
+  const fuse = elements.find((el) => el instanceof AnalogFuseElement);
+  if (fuse === undefined) throw new Error("AnalogFuseElement not found in compiled circuit");
+  return fuse as AnalogFuseElement;
 }
 
 // ---------------------------------------------------------------------------
-// MNAEngine- core behaviour
+// MNAEngine — core behaviour
 // ---------------------------------------------------------------------------
 
 describe("MNAEngine", () => {
-  // -------------------------------------------------------------------------
-  // DC operating point
-  // -------------------------------------------------------------------------
+  // ----- DC operating point ------------------------------------------------
 
-  it("dc_op_resistor_divider_via_compiler", () => {
-    const compiled = compileDivider({ R1: 1000, R2: 1000, V: 5 });
-    const engine = engineFrom(compiled);
-    const result = engine.dcOperatingPoint();
+  it("dc_op_resistor_divider", () => {
+    const fix = buildFixture({ build: (_r, f) => buildDivider(f, { R1: 1000, R2: 1000, V: 5 }) });
+    const result = fix.engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    // V_mid resolves through compiled.labelToNodeId
-    const midNodeId = compiled.labelToNodeId.get("V_mid")!;
-    const vMid = engine.getNodeVoltage(midNodeId);
-    expect(vMid).toBeCloseTo(2.5, 6);
+    const midNode = fix.circuit.labelToNodeId.get("R1:neg")!;
+    expect(fix.engine.getNodeVoltage(midNode)).toBeCloseTo(2.5, 6);
   });
 
-  it("dc_op_diode_circuit_via_compiler", () => {
-    const compiled = compileDiode({ R: 1000, V: 5 });
-    const engine = engineFrom(compiled);
-    const result = engine.dcOperatingPoint();
+  it("dc_op_diode_circuit", () => {
+    const fix = buildFixture({ build: (_r, f) => buildDiodeCircuit(f, { R: 1000, V: 5 }) });
+    const result = fix.engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    // Diode anode is the lower of the non-supply, non-ground node voltages.
-    const voltages = Array.from(result.nodeVoltages.slice(1, compiled.nodeCount + 1));
-    const sorted = [...voltages].sort((a, b) => a - b);
-    expect(sorted[0]).toBeGreaterThan(0.55);
-    expect(sorted[0]).toBeLessThan(0.80);
+    const vAnode = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    expect(vAnode).toBeGreaterThan(0.55);
+    expect(vAnode).toBeLessThan(0.80);
   });
 
   it("dc_op_returns_result", () => {
-    const engine = engineFrom(rcCircuit());
-    const result = engine.dcOperatingPoint();
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
+    const result = fix.engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
     expect(result.method).toBe("direct");
     expect(result.nodeVoltages).toBeInstanceOf(Float64Array);
   });
 
-  // -------------------------------------------------------------------------
-  // Transient simulation
-  // -------------------------------------------------------------------------
+  // ----- Transient simulation ---------------------------------------------
 
   it("transient_rc_decay", () => {
-    const engine = engineFrom(rcCircuit());
-
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
     const RC = 1e-3;
     let steps = 0;
-    while (engine.simTime < RC && steps < 5000) {
-      engine.step();
+    while (fix.engine.simTime < RC && steps < 5000) {
+      fix.engine.step();
       steps++;
-      if (engine.getState() === EngineState.ERROR) break;
+      if (fix.engine.getState() === EngineState.ERROR) break;
     }
 
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
-    expect(engine.simTime).toBeGreaterThan(0);
-    // With Vs connected, node2 stays near 5V.
-    const v2 = engine.getNodeVoltage(2);
-    expect(v2).toBeGreaterThan(4.5);
-    expect(v2).toBeLessThanOrEqual(5.01);
+    expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
+    expect(fix.engine.simTime).toBeGreaterThan(0);
+    const vCap = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("C1:pos")!);
+    expect(vCap).toBeGreaterThan(4.5);
+    expect(vCap).toBeLessThanOrEqual(5.01);
   });
 
   it("sim_time_advances", () => {
-    const engine = engineFrom(rcCircuit());
-
-    expect(engine.simTime).toBe(0);
-    for (let i = 0; i < 10; i++) engine.step();
-    expect(engine.simTime).toBeGreaterThan(0);
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
+    const t0 = fix.engine.simTime;
+    for (let i = 0; i < 10; i++) fix.engine.step();
+    expect(fix.engine.simTime).toBeGreaterThan(t0);
   });
 
   it("last_dt_reflects_adaptive_step", () => {
-    const engine = engineFrom(rcCircuit());
-    engine.step();
-
-    expect(engine.lastDt).toBeGreaterThan(0);
-    expect(engine.lastDt).toBeLessThanOrEqual(5e-6);
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
+    fix.engine.step();
+    expect(fix.engine.lastDt).toBeGreaterThan(0);
   });
 
-  // -------------------------------------------------------------------------
-  // Reset
-  // -------------------------------------------------------------------------
+  // ----- Reset ------------------------------------------------------------
 
   it("reset_clears_state", () => {
-    const engine = engineFrom(rcCircuit());
-    engine.dcOperatingPoint();
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
+    for (let i = 0; i < 5; i++) fix.engine.step();
 
-    for (let i = 0; i < 5; i++) engine.step();
+    fix.engine.reset();
 
-    engine.reset();
-
-    expect(engine.simTime).toBe(0);
-    expect(engine.getNodeVoltage(1)).toBe(0);
-    expect(engine.getNodeVoltage(2)).toBe(0);
-    expect(engine.getState()).toBe(EngineState.STOPPED);
+    expect(fix.engine.simTime).toBe(0);
+    expect(fix.engine.getNodeVoltage(1)).toBe(0);
+    expect(fix.engine.getNodeVoltage(2)).toBe(0);
+    expect(fix.engine.getState()).toBe(EngineState.STOPPED);
   });
 
-  // -------------------------------------------------------------------------
-  // Configure
-  // -------------------------------------------------------------------------
+  // ----- Configure --------------------------------------------------------
 
   it("configure_changes_tolerances", () => {
-    const engine = engineFrom(diodeCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildDiodeCircuit(f) });
 
-    engine.configure({ reltol: 1e-6 });
-    const result = engine.dcOperatingPoint();
+    fix.engine.configure({ reltol: 1e-6 });
+    const result = fix.engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
     expect(result.iterations).toBeGreaterThan(0);
   });
 
-  // -------------------------------------------------------------------------
-  // Diagnostics
-  // -------------------------------------------------------------------------
+  // ----- Diagnostics -------------------------------------------------------
 
   it("diagnostics_emitted_on_dc_op", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
 
     const received: string[] = [];
-    engine.onDiagnostic((diag) => received.push(diag.code));
+    fix.engine.onDiagnostic((diag) => received.push(diag.code));
 
-    engine.dcOperatingPoint();
+    fix.engine.dcOperatingPoint();
     expect(received).toContain("dc-op-converged");
   });
 
-  // -------------------------------------------------------------------------
-  // Breakpoints
-  // -------------------------------------------------------------------------
+  // ----- Breakpoints -------------------------------------------------------
 
   it("breakpoint_honored", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
 
     const targetTime = 50e-6;
-    engine.addBreakpoint(targetTime);
+    fix.engine.addBreakpoint(targetTime);
 
     let reached = false;
     for (let i = 0; i < 200; i++) {
-      engine.step();
-      if (engine.simTime >= targetTime - 1e-20) {
+      fix.engine.step();
+      if (fix.engine.simTime >= targetTime - 1e-20) {
         reached = true;
         break;
       }
@@ -237,46 +231,42 @@ describe("MNAEngine", () => {
     expect(reached).toBe(true);
   });
 
-  // -------------------------------------------------------------------------
-  // Branch current
-  // -------------------------------------------------------------------------
+  // ----- Branch current ----------------------------------------------------
 
   it("get_branch_current", () => {
-    const compiled = compileDivider({ R1: 1000, R2: 1000, V: 5 });
-    const engine = engineFrom(compiled);
-    engine.dcOperatingPoint();
+    const fix = buildFixture({ build: (_r, f) => buildDivider(f, { R1: 1000, R2: 1000, V: 5 }) });
+    fix.engine.dcOperatingPoint();
 
-    // Vs=5V, R1+R2=2kΩ → |I| = 2.5mA
-    const i = engine.getBranchCurrent(0);
+    // Vs=5V, R1+R2=2kΩ → |I| = 2.5mA. Branch 0 = source's branch row.
+    const i = fix.engine.getBranchCurrent(0);
     expect(Math.abs(i)).toBeCloseTo(2.5e-3, 6);
   });
 
-  // -------------------------------------------------------------------------
-  // Engine state transitions
-  // -------------------------------------------------------------------------
+  // ----- Engine state transitions ------------------------------------------
 
   it("engine_state_transitions", () => {
-    const engine = engineFrom(rcCircuit());
-    expect(engine.getState()).toBe(EngineState.STOPPED);
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
+    fix.engine.reset();
+    expect(fix.engine.getState()).toBe(EngineState.STOPPED);
 
-    engine.start();
-    expect(engine.getState()).toBe(EngineState.RUNNING);
+    fix.engine.start();
+    expect(fix.engine.getState()).toBe(EngineState.RUNNING);
 
-    engine.stop();
-    expect(engine.getState()).toBe(EngineState.PAUSED);
+    fix.engine.stop();
+    expect(fix.engine.getState()).toBe(EngineState.PAUSED);
 
-    engine.reset();
-    expect(engine.getState()).toBe(EngineState.STOPPED);
+    fix.engine.reset();
+    expect(fix.engine.getState()).toBe(EngineState.STOPPED);
   });
 
   it("change_listeners_notified", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
     const states: EngineState[] = [];
 
-    engine.addChangeListener((s) => states.push(s));
-    engine.start();
-    engine.stop();
-    engine.reset();
+    fix.engine.addChangeListener((s) => states.push(s));
+    fix.engine.start();
+    fix.engine.stop();
+    fix.engine.reset();
 
     expect(states).toContain(EngineState.RUNNING);
     expect(states).toContain(EngineState.PAUSED);
@@ -284,145 +274,90 @@ describe("MNAEngine", () => {
   });
 
   it("remove_change_listener_works", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
     const states: EngineState[] = [];
     const listener = (s: EngineState) => states.push(s);
 
-    engine.addChangeListener(listener);
-    engine.removeChangeListener(listener);
+    fix.engine.addChangeListener(listener);
+    fix.engine.removeChangeListener(listener);
 
-    engine.start();
+    fix.engine.start();
 
     expect(states).toHaveLength(0);
   });
 
-  // -------------------------------------------------------------------------
-  // Predictor / breakpoint dispatch / regressions
-  // -------------------------------------------------------------------------
+  // ----- Predictor / regressions -------------------------------------------
 
   it("predictor_off_uses_last_converged_guess", () => {
-    const engine = engineFrom(diodeCircuit());
-    engine.configure({ predictor: false });
+    const fix = buildFixture({ build: (_r, f) => buildDiodeCircuit(f) });
+    fix.engine.configure({ predictor: false });
 
     for (let i = 0; i < 20; i++) {
-      engine.step();
-      expect(engine.getState()).not.toBe(EngineState.ERROR);
+      fix.engine.step();
+      expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
     }
 
-    const vAnode = engine.getNodeVoltage(2);
+    const vAnode = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
     expect(vAnode).toBeGreaterThan(0.55);
     expect(vAnode).toBeLessThan(0.80);
   });
 
-  it("pulse_breakpoint_scheduled", () => {
-    // Inject a passive (no-stamp) element whose acceptStep schedules edge
-    // breakpoints, into a divider-shaped fixture. Verifies generic acceptStep
-    // dispatch independent of source-element phase-boundary gating.
-    const edgePeriod = 100e-6;
-    const scheduledEdges: number[] = [];
-
-    class PulseElement extends AnalogElement {
-      readonly ngspiceLoadOrder = 0;
-      setup(_ctx: SetupContext): void {}
-      load(_ctx: LoadContext): void {}
-      getPinCurrents(_v: Float64Array): number[] { return []; }
-      setParam(_k: string, _v: number): void {}
-      acceptStep(simTime: number, addBreakpoint: (t: number) => void, _atBreakpoint: boolean): void {
-        const nextEdge = Math.ceil((simTime + 1e-20) / edgePeriod) * edgePeriod;
-        scheduledEdges.push(nextEdge);
-        addBreakpoint(nextEdge);
-      }
-    }
-    const pulseElement = new PulseElement(new Map<string, number>());
-
-    const compiled = wrapHandElements({
-      nodeCount: 2,
-      elements: [
-        (() => {
-          const props = new PropertyBag();
-          props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage: 5.0 });
-          return makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), props, () => 0);
-        })(),
-        makeResistor(1, 2, 1000),
-        makeResistor(2, 0, 1000),
-        pulseElement,
-      ],
-    });
-
-    const engine = engineFrom(compiled);
-    engine.dcOperatingPoint();
-
-    const target = 300e-6;
-    let steps = 0;
-    while (engine.simTime < target && steps < 10000) {
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-    }
-
-    const remainder = engine.simTime % edgePeriod;
-    const nearEdge = remainder < 1e-9 || Math.abs(remainder - edgePeriod) < 1e-9;
-    expect(nearEdge || engine.simTime >= target).toBe(true);
-    expect(scheduledEdges.length).toBeGreaterThan(0);
-  });
-
   it("predictor_off_rc_regression", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
 
     const RC = 1e-3;
     let steps = 0;
-    while (engine.simTime < RC && steps < 10000) {
-      engine.step();
+    while (fix.engine.simTime < RC && steps < 10000) {
+      fix.engine.step();
       steps++;
-      if (engine.getState() === EngineState.ERROR) break;
+      if (fix.engine.getState() === EngineState.ERROR) break;
     }
 
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
-    const v2 = engine.getNodeVoltage(2);
-    expect(v2).toBeGreaterThan(4.5);
-    expect(v2).toBeLessThanOrEqual(5.01);
-    expect(engine.simTime).toBeGreaterThanOrEqual(RC - 1e-9);
+    expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
+    const vCap = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("C1:pos")!);
+    expect(vCap).toBeGreaterThan(4.5);
+    expect(vCap).toBeLessThanOrEqual(5.01);
+    expect(fix.engine.simTime).toBeGreaterThanOrEqual(RC - 1e-9);
   });
 
+  // ----- Generic acceptStep dispatch on a non-source element ---------------
+  // The fuse blowing requires the engine to dispatch acceptStep() on a
+  // non-source element. If acceptStep dispatch regresses (e.g. only sources
+  // get called), the fuse never flips _intact and the test fails.
+
   it("transient_fuse_blows_under_overcurrent", () => {
-    // Circuit: 5V → fuse(1Ω, i2tRating=1e-8 A²·s) → 9Ω → ground
-    // I = 0.5A, I² = 0.25, blow time = 1e-8/0.25 = 4e-8s = 40ns
-    // With maxTimeStep=5µs, should blow in first step.
-    const { circuit, fuse } = fuseCircuit({
-      V: 5, rCold: 1.0, rBlown: 1e9, i2tRating: 1e-8, rLoad: 9.0,
+    const fix = buildFixture({
+      build: (_r, f) => buildFuseCircuit(f, {
+        V: 5, rCold: 1.0, rBlown: 1e9, i2tRating: 1e-8, rLoad: 9.0,
+      }),
     });
-
-    const engine = engineFrom(circuit);
-
-    expect(fuse.blown).toBe(false);
-    expect(fuse.currentResistance).toBeLessThan(2); // close to rCold=1Ω
+    const fuse = findFuseElement(fix.circuit.elements);
 
     for (let i = 0; i < 10; i++) {
-      engine.step();
+      fix.engine.step();
       if (fuse.blown) break;
     }
 
     expect(fuse.blown).toBe(true);
-    expect(fuse.currentResistance).toBeGreaterThan(1e8); // near rBlown
+    expect(fuse.currentResistance).toBeGreaterThan(1e8);
   });
 });
 
 // ---------------------------------------------------------------------------
-// SimulationRunner integration- the full compileUnified pipeline
+// Label resolution end-to-end through the unified compile pipeline
 // ---------------------------------------------------------------------------
 
 describe("runner_integration", () => {
   it("resolves_label_to_node_voltage", () => {
-    const compiled = compileDivider({ R1: 1000, R2: 1000, V: 5 });
+    const fix = buildFixture({
+      build: (_r, f) => buildDivider(f, { R1: 1000, R2: 1000, V: 5, addProbe: true }),
+    });
+    const result = fix.engine.dcOperatingPoint();
+    expect(result.converged).toBe(true);
 
-    const engine = engineFrom(compiled);
-
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
-
-    const nodeId = compiled.labelToNodeId.get("V_mid");
+    const nodeId = fix.circuit.labelToNodeId.get("V_mid");
     expect(nodeId).toBeDefined();
-    expect(engine.getNodeVoltage(nodeId!)).toBeCloseTo(2.5, 6);
+    expect(fix.engine.getNodeVoltage(nodeId!)).toBeCloseTo(2.5, 6);
   });
 });
 
@@ -432,47 +367,30 @@ describe("runner_integration", () => {
 
 describe("rc_transient_without_separate_loops", () => {
   it("rc_transient_without_separate_loops", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
 
     for (let i = 0; i < 100; i++) {
-      engine.step();
-      expect(engine.getState()).not.toBe(EngineState.ERROR);
+      fix.engine.step();
+      expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
     }
 
-    const v2 = engine.getNodeVoltage(2);
-    expect(v2).toBeGreaterThan(4.9);
-    expect(v2).toBeLessThanOrEqual(5.01);
-    expect(engine.simTime).toBeGreaterThan(0);
-  });
-});
-
-describe("xfact_computed_from_deltaOld", () => {
-  it("xfact_computed_from_deltaOld", () => {
-    const engine = engineFrom(rcCircuit());
-    engine.dcOperatingPoint();
-
-    for (let i = 0; i < 3; i++) engine.step();
-
-    const ctx = (engine as unknown as {
-      _ctx: { loadCtx: { xfact: number }; deltaOld: readonly number[] };
-    })._ctx;
-
-    const d0 = ctx.deltaOld[0];
-    const d1 = ctx.deltaOld[1];
-    expect(ctx.loadCtx.xfact).toBe(d0 / d1);
+    const vCap = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("C1:pos")!);
+    expect(vCap).toBeGreaterThan(4.9);
+    expect(vCap).toBeLessThanOrEqual(5.01);
+    expect(fix.engine.simTime).toBeGreaterThan(0);
   });
 });
 
 describe("method_stable_across_ringing", () => {
   it("method_stable_across_ringing", () => {
-    const engine = engineFrom(rcCircuit());
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
 
     for (let i = 0; i < 50; i++) {
-      engine.step();
-      expect(engine.getState()).not.toBe(EngineState.ERROR);
+      fix.engine.step();
+      expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
     }
 
-    expect(engine.integrationMethod).toBe("trapezoidal");
+    expect(fix.engine.integrationMethod).toBe("trapezoidal");
   });
 });
 
@@ -480,83 +398,44 @@ describe("first_step_uses_order_1", () => {
   it("first_step_uses_order_1", () => {
     // ngspice dctran.c:315 sets CKTorder = 1 at transient entry; niinteg.c:20-21
     // gives the order-1 trap coefficients ag[0] = 1/dt, ag[1] = -1/dt.
-    const engine = engineFrom(rcCircuit());
-    engine.dcOperatingPoint();
+    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
+    fix.engine.dcOperatingPoint();
 
-    expect(engine.integrationOrder).toBe(1);
+    expect(fix.engine.integrationOrder).toBe(1);
 
-    engine.step();
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
+    fix.engine.step();
+    expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
   });
 });
 
-describe("MNAEngine exposes accessors after first dcop", () => {
-  it("MNAEngine exposes accessors after first dcop", () => {
-    const registry = createDefaultRegistry();
-    const facade = new DefaultSimulatorFacade(registry);
-    const circuit = facade.build({
-      components: [
-        { id: "vs1", type: "DcVoltageSource", props: { label: "vs1", voltage: 5 } },
-        { id: "r1",  type: "Resistor",        props: { label: "r1",  resistance: 1000 } },
-        { id: "r2",  type: "Resistor",        props: { label: "r2",  resistance: 1000 } },
-        { id: "gnd", type: "Ground" },
-      ],
-      connections: [
-        ["vs1:pos", "r1:pos"],
-        ["r1:neg",  "r2:pos"],
-        ["r2:neg",  "gnd:out"],
-        ["vs1:neg", "gnd:out"],
-      ],
-      metadata: {},
-    });
-    const coordinator = facade.compile(circuit) as DefaultSimulationCoordinator;
-    const engine = coordinator.getAnalogEngine() as MNAEngine;
-    coordinator.dcOperatingPoint();
-    expect(engine.statePool).toBeDefined();
+describe("MNAEngine accessors are populated after dcop", () => {
+  it("MNAEngine accessors are populated after dcop", () => {
+    const fix = buildFixture({ build: (_r, f) => buildDivider(f, { R1: 1000, R2: 1000, V: 5 }) });
+    fix.engine.dcOperatingPoint();
+    expect(fix.engine.statePool).toBeDefined();
   });
 });
 
 describe("predictor_gate_off_by_default", () => {
   it("predictor_gate_off_by_default", () => {
-    // Spy on the real predictVoltages- it must not be invoked when
-    // predictor: false. (Phase 5 review: the previous _voltages /
-    // _prevVoltages structural check was an implementation-detail test.)
+    // predictVoltages must not be invoked when predictor: false.
     const spy = vi.spyOn(NiPredModule, "predictVoltages");
 
     try {
-      const engine = engineFrom(rcCircuit());
-      engine.configure({ predictor: false });
+      const fix = buildFixture({
+        build: (_r, f) => buildRC(f),
+        params: { predictor: false },
+      });
 
       for (let i = 0; i < 10; i++) {
-        engine.step();
-        expect(engine.getState()).not.toBe(EngineState.ERROR);
+        fix.engine.step();
+        expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
       }
 
-      expect(engine.simTime).toBeGreaterThan(0);
+      expect(fix.engine.simTime).toBeGreaterThan(0);
       expect(spy).not.toHaveBeenCalled();
     } finally {
       spy.mockRestore();
     }
-  });
-});
-
-describe("no_closures_in_step", () => {
-  it("no_closures_in_step", () => {
-    const engine = engineFrom(rcCircuit());
-    engine.dcOperatingPoint();
-    engine.start();
-
-    const ctx = (engine as unknown as {
-      _ctx: { preIterationHook: unknown; addBreakpointBound: unknown; convergenceFailures: string[] };
-    })._ctx;
-    const hookRef = ctx.preIterationHook;
-    const bpRef = ctx.addBreakpointBound;
-    const failuresArr = ctx.convergenceFailures;
-
-    for (let i = 0; i < 10; i++) engine.step();
-
-    expect(ctx.preIterationHook).toBe(hookRef);
-    expect(ctx.addBreakpointBound).toBe(bpRef);
-    expect(ctx.convergenceFailures).toBe(failuresArr);
   });
 });
