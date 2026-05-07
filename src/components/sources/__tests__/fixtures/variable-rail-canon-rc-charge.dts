@@ -1,0 +1,226 @@
+{
+  "circuit": {
+    "description": "VariableRail 5V charging 1uF cap through 1k R to ground. tau=RC=1ms. Exercises VSRC stamp under transient dynamics: predictor / dt-selection / per-iter capacitor companion-model parity vs ngspice.",
+    "elements": [
+      {
+        "id": "0f1e02b5-33df-43df-b20b-7d9e231652f4",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "vrail",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "VariableRail"
+      },
+      {
+        "id": "2e79d29e-4906-465b-91f7-f04b1f47eea2",
+        "position": {
+          "x": 11,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "r1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "01ea8c7c-6a13-4ea1-a30c-52a7d174833a",
+        "position": {
+          "x": 23,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "IC": 0,
+            "M": 1,
+            "SCALE": 1,
+            "TC1": 0,
+            "TC2": 0,
+            "TNOM": 300.15,
+            "capacitance": 0.000001
+          },
+          "capacitance": 0.000001,
+          "label": "c1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "448e5350-dd1b-418d-9cf8-92ceac1cf9dd",
+        "position": {
+          "x": 35,
+          "y": 0
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "variable-rail-canon-rc-charge",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 0
+          },
+          {
+            "x": 10,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 0
+          },
+          {
+            "x": 10,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 0
+          },
+          {
+            "x": 16,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 0
+          },
+          {
+            "x": 22,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 22,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 0
+          },
+          {
+            "x": 28,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 35,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 32,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 0
+          },
+          {
+            "x": 32,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": -1
+          },
+          {
+            "x": 35,
+            "y": -1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

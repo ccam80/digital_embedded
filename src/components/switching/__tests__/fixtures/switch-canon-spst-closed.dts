@@ -1,0 +1,400 @@
+{
+  "circuit": {
+    "description": "Switch (SPST manual) closed: vs=10V -> sw(A1->B1) -> rload=1k -> gnd. Closed conducts via Ron=1, V(B1)=10*1k/(1+1k)~9.99V.",
+    "elements": [
+      {
+        "id": "bf5c72c4-9ad3-4653-85ed-9d5834c0ab89",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 10
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 10
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "5087a366-6f44-410d-89e9-8745ba7ba099",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "Roff": 1000000000,
+          "Ron": 1,
+          "closed": true,
+          "label": "sw1",
+          "model": "behavioral",
+          "position": [
+            0,
+            8
+          ]
+        },
+        "rotation": 0,
+        "type": "Switch"
+      },
+      {
+        "id": "cfb1c6ed-1c13-4d0d-bf43-f4e513b2c659",
+        "position": {
+          "x": 22,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "rload",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "6cd0141a-8b97-446e-839a-15fd07bd7412",
+        "position": {
+          "x": 34,
+          "y": 3
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "switch-canon-spst-closed",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 0
+          },
+          {
+            "x": 15,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 1
+          },
+          {
+            "x": 21,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 0
+          },
+          {
+            "x": 18,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 0
+          },
+          {
+            "x": 18,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 1
+          },
+          {
+            "x": 21,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 1
+          },
+          {
+            "x": 27,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 3
+          },
+          {
+            "x": 34,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 1
+          },
+          {
+            "x": 31,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 1
+          },
+          {
+            "x": 31,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 3
+          },
+          {
+            "x": 34,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 6
+          },
+          {
+            "x": 17,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 5
+          },
+          {
+            "x": 22,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 5
+          },
+          {
+            "x": 28,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 5
+          },
+          {
+            "x": 28,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 2
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

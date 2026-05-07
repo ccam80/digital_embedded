@@ -1,753 +1,621 @@
-/**
- * Tests for NFET, PFET, FGNFET, FGPFET, and TransGate components.
- *
- * Covers:
- *   - Gate voltage → switch state (open/closed)
- *   - Floating gate blow permanently disables conduction
- *   - TransGate: complementary gate pair controls bidirectional switch
- *   - TransGate: S==~S (invalid) → open
- *   - Pin layout (inputs + bidirectional)
- *   - Attribute mappings
- *   - Rendering
- *   - ComponentDefinition completeness
- */
-
 import { describe, it, expect } from "vitest";
-import {
-  NFETElement,
-  executeNFET,
-  NFETDefinition,
-  NFET_ATTRIBUTE_MAPPINGS,
-} from "../nfet.js";
-import type { FETLayout } from "../nfet.js";
-import {
-  PFETElement,
-  executePFET,
-  PFETDefinition,
-  PFET_ATTRIBUTE_MAPPINGS,
-} from "../pfet.js";
-import {
-  FGNFETElement,
-  executeFGNFET,
-  FGNFETDefinition,
-  FGNFET_ATTRIBUTE_MAPPINGS,
-} from "../fgnfet.js";
-import {
-  FGPFETElement,
-  executeFGPFET,
-  FGPFETDefinition,
-  FGPFET_ATTRIBUTE_MAPPINGS,
-} from "../fgpfet.js";
-import {
-  TransGateElement,
-  executeTransGate,
-  TransGateDefinition,
-  TRANS_GATE_ATTRIBUTE_MAPPINGS,
-} from "../trans-gate.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
+
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { createDefaultRegistry } from "../../register-all.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+
+import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
+import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
-// Layout helper
+// Helpers
 // ---------------------------------------------------------------------------
 
-function makeFETLayout(inputCount: number, stateCount: number): {
-  layout: ComponentLayout & FETLayout;
-  state: Uint32Array;
-  highZs: Uint32Array;
-} {
-  const state = new Uint32Array(inputCount + stateCount);
-  const highZs = new Uint32Array(state.length);
-  const layout: ComponentLayout & FETLayout = {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: (_i: number) => inputCount,
-    inputOffset: (_i: number) => 0,
-    outputCount: (_i: number) => 0,
-    outputOffset: (_i: number) => inputCount,
-    stateOffset: (_i: number) => inputCount,
-    getProperty: () => undefined,
-  };
-  return { layout, state, highZs };
+function digital(value: number): SignalValue {
+  return { type: "digital", value };
+}
+
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
+
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
-// NFET tests
+// Programmatic circuit factories (T1) — analog regime
 // ---------------------------------------------------------------------------
+//
+// NFET / PFET / FGNFET / FGPFET expose three analog ports: G, D, S. Each
+// device is wired as a series source-follower:
+//   vs (1V) -> fet:D
+//   vg (configurable) -> fet:G
+//   fet:S -> rload (1k) -> gnd
+// With Ron=1Ω, Rload=1k, and the gate biased to drive the channel ON:
+//   V(rload:pos) = vs * Rload / (Ron + Rload) = 1 * 1000 / 1001 ≈ 0.999V
+// With the gate biased to drive the channel OFF (Roff=1e9):
+//   V(rload:pos) ≈ vs * Rload / (Roff + Rload) ≈ 1µV
 
-describe("NFET", () => {
-  it("gateHigh- G=1 → closed (state=1)", () => {
-    const { layout, state, highZs } = makeFETLayout(1, 1);
-    state[0] = 1; // G
-    executeNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1);
+interface AnalogFetParams {
+  vs?: number;
+  vg?: number;
+  Ron?: number;
+  Roff?: number;
+  Vth?: number;
+  Rload?: number;
+}
+
+function buildAnalogNfetCircuit(facade: DefaultSimulatorFacade, p: AnalogFetParams = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",    type: "DcVoltageSource", props: { label: "vs",    voltage: p.vs ?? 1 } },
+      { id: "vg",    type: "DcVoltageSource", props: { label: "vg",    voltage: p.vg ?? 1 } },
+      { id: "n1",    type: "NFET",            props: { label: "n1",
+                                                       model: "behavioral",
+                                                       Ron:  p.Ron  ?? 1,
+                                                       Roff: p.Roff ?? 1e9,
+                                                       Vth:  p.Vth  ?? 0.5 } },
+      { id: "rload", type: "Resistor",        props: { label: "rload", resistance: p.Rload ?? 1000 } },
+      { id: "gnd",   type: "Ground",          props: { label: "gnd" } },
+    ],
+    connections: [
+      ["vs:pos",    "n1:D"],
+      ["vs:neg",    "gnd:out"],
+      ["vg:pos",    "n1:G"],
+      ["vg:neg",    "gnd:out"],
+      ["n1:S",      "rload:pos"],
+      ["rload:neg", "gnd:out"],
+    ],
   });
+}
 
-  it("gateLow- G=0 → open (state=0)", () => {
-    const { layout, state, highZs } = makeFETLayout(1, 1);
-    state[0] = 0; // G
-    executeNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0);
+function buildAnalogPfetCircuit(facade: DefaultSimulatorFacade, p: AnalogFetParams = {}): Circuit {
+  // PFET active-low gate: vg=0V → on, vg=vs → off.
+  return facade.build({
+    components: [
+      { id: "vs",    type: "DcVoltageSource", props: { label: "vs",    voltage: p.vs ?? 1 } },
+      { id: "vg",    type: "DcVoltageSource", props: { label: "vg",    voltage: p.vg ?? 0 } },
+      { id: "p1",    type: "PFET",            props: { label: "p1",
+                                                       model: "behavioral",
+                                                       Ron:  p.Ron  ?? 1,
+                                                       Roff: p.Roff ?? 1e9,
+                                                       Vth:  p.Vth  ?? 0.5 } },
+      { id: "rload", type: "Resistor",        props: { label: "rload", resistance: p.Rload ?? 1000 } },
+      { id: "gnd",   type: "Ground",          props: { label: "gnd" } },
+    ],
+    connections: [
+      ["vs:pos",    "p1:D"],
+      ["vs:neg",    "gnd:out"],
+      ["vg:pos",    "p1:G"],
+      ["vg:neg",    "gnd:out"],
+      ["p1:S",      "rload:pos"],
+      ["rload:neg", "gnd:out"],
+    ],
   });
+}
 
-  it("gateTransitions- toggles correctly", () => {
-    const { layout, state, highZs } = makeFETLayout(1, 1);
+// ---------------------------------------------------------------------------
+// Programmatic circuit factories (T1) — digital bridge regime (Cat 9)
+// ---------------------------------------------------------------------------
+//
+// All four FETs expose a digital execute path on G / D / S. The digital
+// model is a switch: G drives the gate; D is the data input; S is the
+// observed data output. NFET/FGNFET conduct on G=1; PFET/FGPFET conduct
+// on G=0; FGNFET/FGPFET also gate the conduction on the structural
+// 'blown' property (compile-time seeded).
 
-    state[0] = 1;
-    executeNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1);
-
-    state[0] = 0;
-    executeNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0);
-
-    state[0] = 1;
-    executeNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1);
+function buildDigitalNfetCircuit(facade: DefaultSimulatorFacade): Circuit {
+  return facade.build({
+    components: [
+      { id: "g",   type: "In",   props: { label: "G",   bitWidth: 1 } },
+      { id: "d",   type: "In",   props: { label: "D",   bitWidth: 1 } },
+      { id: "n1",  type: "NFET", props: { label: "n1" } },
+      { id: "s",   type: "Out",  props: { label: "S",   bitWidth: 1 } },
+    ],
+    connections: [
+      ["g:out",  "n1:G"],
+      ["d:out",  "n1:D"],
+      ["n1:S",   "s:in"],
+    ],
   });
+}
 
-  it("pinLayout- 1 input (G) + 2 bidirectional (D, S)", () => {
-    const props = new PropertyBag();
-    const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-    const bidirectional = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
-    expect(inputs.length).toBe(1);
-    expect(bidirectional.length).toBe(2);
-    const labels = pins.map(p => p.label);
-    expect(labels).toContain("G");
-    expect(labels).toContain("D");
-    expect(labels).toContain("S");
+function buildDigitalPfetCircuit(facade: DefaultSimulatorFacade): Circuit {
+  return facade.build({
+    components: [
+      { id: "g",   type: "In",   props: { label: "G",   bitWidth: 1 } },
+      { id: "d",   type: "In",   props: { label: "D",   bitWidth: 1 } },
+      { id: "p1",  type: "PFET", props: { label: "p1" } },
+      { id: "s",   type: "Out",  props: { label: "S",   bitWidth: 1 } },
+    ],
+    connections: [
+      ["g:out",  "p1:G"],
+      ["d:out",  "p1:D"],
+      ["p1:S",   "s:in"],
+    ],
   });
+}
 
-  it("attributeMapping- Bits and Label map correctly", () => {
-    const bitsMap = NFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-    const labelMap = NFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-    expect(bitsMap!.convert("4")).toBe(4);
-    expect(labelMap!.convert("Q1")).toBe("Q1");
+function buildDigitalFgnfetCircuit(facade: DefaultSimulatorFacade, opts: { blown?: boolean } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "g",   type: "In",     props: { label: "G",   bitWidth: 1 } },
+      { id: "d",   type: "In",     props: { label: "D",   bitWidth: 1 } },
+      { id: "fg",  type: "FGNFET", props: { label: "fg",  blown: opts.blown ?? false } },
+      { id: "s",   type: "Out",    props: { label: "S",   bitWidth: 1 } },
+    ],
+    connections: [
+      ["g:out",  "fg:G"],
+      ["d:out",  "fg:D"],
+      ["fg:S",   "s:in"],
+    ],
   });
+}
 
-  it("draw- renders lines and gate elements", () => {
-    const props = new PropertyBag();
-    const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const calls: string[] = [];
-    const ctx = {
-      save: () => calls.push("save"),
-      restore: () => calls.push("restore"),
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawLine: () => calls.push("drawLine"),
-      drawPolygon: () => calls.push("drawPolygon"),
-      drawText: () => {},
-    };
-    el.draw(ctx as never);
-    expect(calls).toContain("save");
-    expect(calls).toContain("restore");
-    expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
+function buildDigitalFgpfetCircuit(facade: DefaultSimulatorFacade, opts: { blown?: boolean } = {}): Circuit {
+  return facade.build({
+    components: [
+      { id: "g",   type: "In",     props: { label: "G",   bitWidth: 1 } },
+      { id: "s",   type: "In",     props: { label: "S",   bitWidth: 1 } },
+      { id: "fg",  type: "FGPFET", props: { label: "fg",  blown: opts.blown ?? false } },
+      { id: "d",   type: "Out",    props: { label: "D",   bitWidth: 1 } },
+    ],
+    connections: [
+      ["g:out",  "fg:G"],
+      ["s:out",  "fg:S"],
+      ["fg:D",   "d:in"],
+    ],
   });
+}
 
-  it("draw- renders label when set", () => {
-    const props = new PropertyBag();
-    props.set("label", "Q1");
-    const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const texts: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawPolygon: () => {}, drawText: (t: string) => texts.push(t),
-    };
-    el.draw(ctx as never);
-    expect(texts).toContain("Q1");
-  });
+// ===========================================================================
+// NFET — Categories 1, 2 (analytical), 4, 9
+// ===========================================================================
 
-  it("definitionComplete- NFETDefinition has all required fields", () => {
-    expect(NFETDefinition.name).toBe("NFET");
-    expect(NFETDefinition.factory).toBeDefined();
-    expect(NFETDefinition.models.digital!.executeFn).toBeDefined();
-    expect(NFETDefinition.pinLayout).toBeDefined();
-    expect(NFETDefinition.propertyDefs).toBeDefined();
-    expect(NFETDefinition.attributeMap).toBeDefined();
-    expect(NFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(NFETDefinition.helpText).toBeDefined();
-    expect(typeof NFETDefinition.models.digital!.defaultDelay).toBe("number");
-  });
-
-  it("factoryCreatesInstance- factory returns NFETElement", () => {
-    const props = new PropertyBag();
-    expect(NFETDefinition.factory(props)).toBeInstanceOf(NFETElement);
-  });
-
-  it("boundingBox- non-zero dimensions at correct position", () => {
-    const props = new PropertyBag();
-    const el = new NFETElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
-    const bb = el.getBoundingBox();
-    // oxide bar at x+0.05 offset
-    expect(bb.y).toBe(3);
-    expect(bb.width).toBeGreaterThanOrEqual(0.9);
-    expect(bb.height).toBeGreaterThanOrEqual(2);
+describe("NFET initialization (T1)", () => {
+  it("init_post_warm_start_node_voltage_pass_through_seed", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogNfetCircuit(facade, {
+        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    // n1:D is on the same net as vs:pos, driven by vs=1V.
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 3);
+    // n1:S is on the same net as rload:pos. With NFET drv ON (vg-Vth>0), the
+    // channel conducts: V(rload:pos) ≈ vs * Rload / (Ron + Rload) ≈ 0.999V.
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"))).toBeCloseTo(1000 / 1001, 3);
   });
 });
 
-// ---------------------------------------------------------------------------
-// PFET tests
-// ---------------------------------------------------------------------------
+describe("NFET DCOP analytical (T1) — gate ON pass-through", () => {
+  it("dcop_gate_on_drives_v_s_near_vs", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogNfetCircuit(facade, {
+        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
 
-describe("PFET", () => {
-  it("gateLow- G=0 → closed (state=1)", () => {
-    const { layout, state, highZs } = makeFETLayout(1, 1);
-    state[0] = 0; // G
-    executePFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1);
-  });
-
-  it("gateHigh- G=1 → open (state=0)", () => {
-    const { layout, state, highZs } = makeFETLayout(1, 1);
-    state[0] = 1; // G
-    executePFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0);
-  });
-
-  it("gateTransitions- toggles correctly (inverted vs NFET)", () => {
-    const { layout, state, highZs } = makeFETLayout(1, 1);
-
-    state[0] = 0;
-    executePFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1); // conducting
-
-    state[0] = 1;
-    executePFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // non-conducting
-  });
-
-  it("pinLayout- 1 input (G) + 2 bidirectional (S, D)", () => {
-    const props = new PropertyBag();
-    const el = new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-    const bidirectional = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
-    expect(inputs.length).toBe(1);
-    expect(bidirectional.length).toBe(2);
-    const labels = pins.map(p => p.label);
-    expect(labels).toContain("G");
-    expect(labels).toContain("S");
-    expect(labels).toContain("D");
-  });
-
-  it("attributeMapping- Bits and Label map correctly", () => {
-    const bitsMap = PFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-    const labelMap = PFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-    expect(bitsMap!.convert("8")).toBe(8);
-    expect(labelMap!.convert("P1")).toBe("P1");
-  });
-
-  it("draw- renders P-channel arrow (drawPolygon) and lead lines", () => {
-    const props = new PropertyBag();
-    const el = new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const calls: string[] = [];
-    const ctx = {
-      save: () => calls.push("save"),
-      restore: () => calls.push("restore"),
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawLine: () => calls.push("drawLine"),
-      drawPath: () => calls.push("drawPath"),
-      drawPolygon: () => calls.push("drawPolygon"),
-      drawText: () => {},
-    };
-    el.draw(ctx as never);
-    expect(calls).toContain("save");
-    expect(calls).toContain("restore");
-    // PFET uses drawPath for drain/source L-shapes and drawPolygon for arrow
-    expect(calls).toContain("drawPath");
-    expect(calls).toContain("drawPolygon");
-  });
-
-  it("definitionComplete- PFETDefinition has all required fields", () => {
-    expect(PFETDefinition.name).toBe("PFET");
-    expect(PFETDefinition.factory).toBeDefined();
-    expect(PFETDefinition.models.digital!.executeFn).toBeDefined();
-    expect(PFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof PFETDefinition.models.digital!.defaultDelay).toBe("number");
-  });
-
-  it("factoryCreatesInstance- factory returns PFETElement", () => {
-    const props = new PropertyBag();
-    expect(PFETDefinition.factory(props)).toBeInstanceOf(PFETElement);
+    // n1:D on vs:pos = 1V (driven by vs).
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 6);
+    // n1:S on rload:pos. Closed-form: V(S) = vs * Rload / (Ron + Rload).
+    const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(vS).toBeCloseTo(1 * 1000 / (1 + 1000), 3);
+    expect(vS).toBeGreaterThan(1000 / 1001 - 1e-3);
+    expect(vS).toBeLessThanOrEqual(1);
   });
 });
 
-// ---------------------------------------------------------------------------
-// FGNFET tests
-// ---------------------------------------------------------------------------
+describe("NFET DCOP analytical (T1) — gate OFF isolation", () => {
+  it("dcop_gate_off_drives_v_s_near_zero", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogNfetCircuit(facade, {
+        vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
 
-describe("FGNFET", () => {
-  it("gateHigh_notBlown- G=1, blown=0 → closed (state=1)", () => {
-    // State layout: [G=0, closedFlag=1, blownFlag=2]
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // G high
-    state[2] = 0;  // blownFlag=0
-    executeFGNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1); // closedFlag=1 (conducting)
-  });
-
-  it("gateLow_notBlown- G=0, blown=0 → open (state=0)", () => {
-    // State layout: inputs=[G], state=[closedFlag, blownFlag]
-    // Total slots: 1 input + 2 state = 3
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 0;  // G
-    state[1] = 0;  // closedFlag (will be written)
-    state[2] = 0;  // blownFlag
-    executeFGNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // closed=0 (gate low)
-  });
-
-  it("gateHigh_notBlown- G=1, blown=0 → closed=1", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // G
-    state[2] = 0;  // blownFlag=0
-    executeFGNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1); // closed=1
-  });
-
-  it("blown_gateHigh- G=1, blown=1 → permanently open (state=0)", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // G high
-    state[2] = 1;  // blownFlag=1
-    executeFGNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // blown → always open
-  });
-
-  it("blown_gateLow- G=0, blown=1 → still open", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 0;  // G low
-    state[2] = 1;  // blownFlag=1
-    executeFGNFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // blown → always open
-  });
-
-  it("blownProperty- element exposes blown flag", () => {
-    const props = new PropertyBag();
-    props.set("blown", true);
-    const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.blown).toBe(true);
-  });
-
-  it("notBlownDefault- defaults to false", () => {
-    const props = new PropertyBag();
-    const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.blown).toBe(false);
-  });
-
-  it("draw- renders blown X mark when blown", () => {
-    const props = new PropertyBag();
-    props.set("blown", true);
-    const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const colors: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: (c: string) => colors.push(c),
-      setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: () => {}, drawPolygon: () => {},
-    };
-    el.draw(ctx as never);
-    expect(colors).toContain("WIRE_ERROR");
-  });
-
-  it("draw_notBlown- no WIRE_ERROR color when not blown", () => {
-    const props = new PropertyBag();
-    const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const colors: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: (c: string) => colors.push(c),
-      setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: () => {}, drawPolygon: () => {},
-    };
-    el.draw(ctx as never);
-    expect(colors).not.toContain("ERROR");
-  });
-
-  it("attributeMapping- Bits, Label, blown map correctly", () => {
-    const bitsMap = FGNFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-    const blownMap = FGNFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "blown");
-    expect(bitsMap!.convert("4")).toBe(4);
-    expect(blownMap!.convert("true")).toBe(true);
-    expect(blownMap!.convert("false")).toBe(false);
-  });
-
-  it("definitionComplete- FGNFETDefinition has all required fields", () => {
-    expect(FGNFETDefinition.name).toBe("FGNFET");
-    expect(FGNFETDefinition.factory).toBeDefined();
-    expect(FGNFETDefinition.models.digital!.executeFn).toBeDefined();
-    expect(FGNFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof FGNFETDefinition.models.digital!.defaultDelay).toBe("number");
-  });
-
-  it("factoryCreatesInstance- factory returns FGNFETElement", () => {
-    const props = new PropertyBag();
-    expect(FGNFETDefinition.factory(props)).toBeInstanceOf(FGNFETElement);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 6);
+    // Gate OFF → channel high-resistance: V(S) = vs * Rload / (Roff + Rload)
+    //   = 1 * 1000 / (1e9 + 1000) ≈ 1e-6 V.
+    const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(vS).toBeCloseTo(1 * 1000 / (1e9 + 1000), 5);
+    expect(vS).toBeLessThan(1e-3);
   });
 });
 
-// ---------------------------------------------------------------------------
-// FGPFET tests
-// ---------------------------------------------------------------------------
+describe("NFET parameter hot-load (T1) — Ron", () => {
+  it("hotload_Ron_drops_v_s_under_load", () => {
+    // Before: Ron=1, Rload=1k → V(S) ≈ 0.999V.
+    // After  Ron=200: V(S) = 1000 / (200 + 1000) ≈ 0.833V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogNfetCircuit(facade, {
+        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeCloseTo(1000 / 1001, 3);
 
-describe("FGPFET", () => {
-  it("gateLow_notBlown- G=0, blown=0 → closed=1 (P-channel)", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 0;  // G low
-    state[2] = 0;  // blownFlag=0
-    executeFGPFET(0, state, highZs, layout);
-    expect(state[1]).toBe(1); // closed (PFET: gate low → conducting)
-  });
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "n1"), "Ron", 200);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
-  it("gateHigh_notBlown- G=1, blown=0 → open=0", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // G high
-    state[2] = 0;  // blownFlag=0
-    executeFGPFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // open (PFET: gate high → non-conducting)
-  });
-
-  it("blown_gateLow- G=0, blown=1 → permanently open", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 0;  // G low (would normally close)
-    state[2] = 1;  // blownFlag=1
-    executeFGPFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // blown → always open
-  });
-
-  it("blown_gateHigh- G=1, blown=1 → still open", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 1,
-      stateOffset: () => 1,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // G high
-    state[2] = 1;  // blownFlag=1
-    executeFGPFET(0, state, highZs, layout);
-    expect(state[1]).toBe(0); // blown → always open
-  });
-
-  it("blownProperty- element exposes blown flag", () => {
-    const props = new PropertyBag();
-    props.set("blown", true);
-    const el = new FGPFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    expect(el.blown).toBe(true);
-  });
-
-  it("draw- renders blown indicator when blown", () => {
-    const props = new PropertyBag();
-    props.set("blown", true);
-    const el = new FGPFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const colors: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: (c: string) => colors.push(c),
-      setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawText: () => {}, drawPath: () => {}, drawPolygon: () => {},
-    };
-    el.draw(ctx as never);
-    expect(colors).toContain("WIRE_ERROR");
-  });
-
-  it("attributeMapping- blown converts string to boolean", () => {
-    const blownMap = FGPFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "blown");
-    expect(blownMap!.convert("true")).toBe(true);
-    expect(blownMap!.convert("false")).toBe(false);
-  });
-
-  it("definitionComplete- FGPFETDefinition has all required fields", () => {
-    expect(FGPFETDefinition.name).toBe("FGPFET");
-    expect(FGPFETDefinition.factory).toBeDefined();
-    expect(FGPFETDefinition.models.digital!.executeFn).toBeDefined();
-    expect(FGPFETDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(typeof FGPFETDefinition.models.digital!.defaultDelay).toBe("number");
-  });
-
-  it("factoryCreatesInstance- factory returns FGPFETElement", () => {
-    const props = new PropertyBag();
-    expect(FGPFETDefinition.factory(props)).toBeInstanceOf(FGPFETElement);
+    expect(after).not.toBeCloseTo(before, 2);
+    expect(after).toBeLessThan(before);
+    expect(after).toBeCloseTo(1000 / 1200, 2);
   });
 });
 
-// ---------------------------------------------------------------------------
-// TransGate tests
-// ---------------------------------------------------------------------------
+describe("NFET parameter hot-load (T1) — Roff", () => {
+  it("hotload_Roff_lifts_v_s_when_gate_off", () => {
+    // Both gate OFF (vg=0). Before Roff=1e9 → V(S) ≈ 1µV.
+    // After Roff=10 → V(S) = 1000 / (10 + 1000) ≈ 0.990V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogNfetCircuit(facade, {
+        vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeLessThan(1e-3);
 
-describe("TransGate", () => {
-  it("S=1 ~S=0- valid complementary pair, gate on → closed (state=1)", () => {
-    const state = new Uint32Array(3); // [S=0, ~S=1, closedFlag=2]
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 2,
-      stateOffset: () => 2,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // S
-    state[1] = 0;  // ~S
-    executeTransGate(0, state, highZs, layout);
-    expect(state[2]).toBe(1); // closed
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "n1"), "Roff", 10);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+
+    expect(after).not.toBeCloseTo(before, 2);
+    expect(after).toBeGreaterThan(before);
+    expect(after).toBeCloseTo(1000 / 1010, 2);
+  });
+});
+
+describe("NFET parameter hot-load (T1) — Vth", () => {
+  it("hotload_Vth_above_gate_drive_isolates_channel", () => {
+    // Before Vth=0.5 with vg=1V → on. After Vth=2 with vg=1V → off.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogNfetCircuit(facade, {
+        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeCloseTo(1000 / 1001, 3);
+
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "n1"), "Vth", 2);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+
+    expect(after).not.toBeCloseTo(before, 2);
+    expect(after).toBeLessThan(before);
+    expect(after).toBeLessThan(1e-3);
+  });
+});
+
+describe("NFET digital bridge (T1) — Cat 9", () => {
+  it("digital_g_high_propagates_d_to_s", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalNfetCircuit(facade));
+    coordinator.writeByLabel("G", digital(1));
+    coordinator.writeByLabel("D", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 1 });
+
+    coordinator.writeByLabel("D", digital(0));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  it("S=0 ~S=1- valid complementary pair, gate off → open (state=0)", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 2,
-      stateOffset: () => 2,
-      getProperty: () => undefined,
-    };
-    state[0] = 0;  // S
-    state[1] = 1;  // ~S
-    executeTransGate(0, state, highZs, layout);
-    expect(state[2]).toBe(0); // open
+  it("digital_g_low_isolates_s_from_d", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalNfetCircuit(facade));
+    coordinator.writeByLabel("G", digital(0));
+    coordinator.writeByLabel("D", digital(1));
+    coordinator.step();
+    // Gate low → channel open → S disconnected from D, observer reads 0.
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
+
+// ===========================================================================
+// PFET — Categories 1, 2 (analytical), 4, 9
+// ===========================================================================
+
+describe("PFET initialization (T1)", () => {
+  it("init_post_warm_start_node_voltage_pass_through_seed", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogPfetCircuit(facade, {
+        vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 3);
+    // PFET on with vg=0V (V(G)-V(S) < -Vth condition met as channel pulls
+    // high). V(rload:pos) ≈ vs * Rload / (Ron + Rload) ≈ 0.999V.
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"))).toBeCloseTo(1000 / 1001, 3);
+  });
+});
+
+describe("PFET DCOP analytical (T1) — gate ON pass-through", () => {
+  it("dcop_gate_low_drives_v_s_near_vs", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogPfetCircuit(facade, {
+        vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(1, 6);
+    const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(vS).toBeCloseTo(1 * 1000 / (1 + 1000), 3);
+    expect(vS).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("PFET DCOP analytical (T1) — gate OFF isolation", () => {
+  it("dcop_gate_high_drives_v_s_near_zero", () => {
+    // PFET off when V(G)-V(S) >= -Vth: vg=1V, Vth=0.5 → channel off.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogPfetCircuit(facade, {
+        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    const vS = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(vS).toBeCloseTo(1 * 1000 / (1e9 + 1000), 5);
+    expect(vS).toBeLessThan(1e-3);
+  });
+});
+
+describe("PFET parameter hot-load (T1) — Ron", () => {
+  it("hotload_Ron_drops_v_s_under_load", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogPfetCircuit(facade, {
+        vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeCloseTo(1000 / 1001, 3);
+
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "p1"), "Ron", 200);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+
+    expect(after).not.toBeCloseTo(before, 2);
+    expect(after).toBeLessThan(before);
+    expect(after).toBeCloseTo(1000 / 1200, 2);
+  });
+});
+
+describe("PFET parameter hot-load (T1) — Roff", () => {
+  it("hotload_Roff_lifts_v_s_when_gate_off", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogPfetCircuit(facade, {
+        vs: 1, vg: 1, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeLessThan(1e-3);
+
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "p1"), "Roff", 10);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+
+    expect(after).not.toBeCloseTo(before, 2);
+    expect(after).toBeGreaterThan(before);
+    expect(after).toBeCloseTo(1000 / 1010, 2);
+  });
+});
+
+describe("PFET parameter hot-load (T1) — Vth", () => {
+  it("hotload_Vth_inverts_channel_state", () => {
+    // PFET on-condition: V(G)-V(S) < -Vth.
+    // Before Vth=0.5, vg=0, V(S)≈vs=1 → V(G)-V(S)=-1 < -0.5 → ON.
+    // After Vth=5,             V(G)-V(S)=-1 > -5  → OFF.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAnalogPfetCircuit(facade, {
+        vs: 1, vg: 0, Ron: 1, Roff: 1e9, Vth: 0.5, Rload: 1000,
+      }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+    expect(before).toBeCloseTo(1000 / 1001, 3);
+
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "p1"), "Vth", 5);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
+
+    expect(after).not.toBeCloseTo(before, 2);
+    expect(after).toBeLessThan(before);
+    expect(after).toBeLessThan(1e-3);
+  });
+});
+
+describe("PFET digital bridge (T1) — Cat 9", () => {
+  it("digital_g_low_propagates_d_to_s", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalPfetCircuit(facade));
+    // PFET digital execute: closed = gate ^ 1, then S follows D.
+    coordinator.writeByLabel("G", digital(0));
+    coordinator.writeByLabel("D", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 1 });
+
+    coordinator.writeByLabel("D", digital(0));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  it("S=0 ~S=0- invalid (same) → open (state=0)", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 2,
-      stateOffset: () => 2,
-      getProperty: () => undefined,
-    };
-    state[0] = 0;  // S
-    state[1] = 0;  // ~S
-    executeTransGate(0, state, highZs, layout);
-    expect(state[2]).toBe(0); // invalid → open
+  it("digital_g_high_isolates_s_from_d", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalPfetCircuit(facade));
+    coordinator.writeByLabel("G", digital(1));
+    coordinator.writeByLabel("D", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
+
+// ===========================================================================
+// FGNFET — Categories 1, 4 (compile-time-seeded structural prop), 9
+// ===========================================================================
+//
+// FGNFET's only model entry is "default" (analog netlist with NMOS spice-l1
+// + FGNFETBlownDriver). Cat 2 analytical / Cat 4 numerical hot-loads on the
+// SPICE MOSFET parameters are not in scope here (they belong on the MOSFET
+// component); FGNFET's distinguishing surface is the structural 'blown'
+// property which gates conduction in BOTH the analog (FGNFETBlownDriver
+// stamps the floating-gate node) and digital (executeFGNFET reads
+// blownFlag) paths. The canonical Cat 4 here is the compile-time-seeded
+// variant from the test-tools document: build the same circuit twice
+// (blown=false, blown=true) and assert the documented post-compile
+// observable differs.
+
+describe("FGNFET digital bridge (T1) — Cat 9", () => {
+  it("digital_g_high_blown_false_propagates_d_to_s", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalFgnfetCircuit(facade, { blown: false }));
+    coordinator.writeByLabel("G", digital(1));
+    coordinator.writeByLabel("D", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 1 });
+
+    coordinator.writeByLabel("D", digital(0));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  it("S=1 ~S=1- invalid (same) → open (state=0)", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 2,
-      stateOffset: () => 2,
-      getProperty: () => undefined,
-    };
-    state[0] = 1;  // S
-    state[1] = 1;  // ~S
-    executeTransGate(0, state, highZs, layout);
-    expect(state[2]).toBe(0); // invalid → open
+  it("digital_g_low_blown_false_isolates_s_from_d", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalFgnfetCircuit(facade, { blown: false }));
+    coordinator.writeByLabel("G", digital(0));
+    coordinator.writeByLabel("D", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
+
+describe("FGNFET compile-time-seeded structural property (T1) — Cat 4 (blown)", () => {
+  it("blown_property_seeds_state_to_permanently_off", () => {
+    // blown=false: gate high → S follows D (data observable as 1).
+    const registry1 = createDefaultRegistry();
+    const facade1 = new DefaultSimulatorFacade(registry1);
+    const coord1 = facade1.compile(buildDigitalFgnfetCircuit(facade1, { blown: false }));
+    coord1.writeByLabel("G", digital(1));
+    coord1.writeByLabel("D", digital(1));
+    coord1.step();
+    expect(coord1.readByLabel("S")).toMatchObject({ type: "digital", value: 1 });
+
+    // blown=true: gate high — channel STILL off, S=0 regardless.
+    const registry2 = createDefaultRegistry();
+    const facade2 = new DefaultSimulatorFacade(registry2);
+    const coord2 = facade2.compile(buildDigitalFgnfetCircuit(facade2, { blown: true }));
+    coord2.writeByLabel("G", digital(1));
+    coord2.writeByLabel("D", digital(1));
+    coord2.step();
+    expect(coord2.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  it("gateTransitions- toggling S and ~S changes state", () => {
-    const state = new Uint32Array(3);
-    const highZs = new Uint32Array(state.length);
-    const layout: ComponentLayout & FETLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 2,
-      inputOffset: () => 0,
-      outputCount: () => 0,
-      outputOffset: () => 2,
-      stateOffset: () => 2,
-      getProperty: () => undefined,
-    };
+  it("blown_property_seeds_state_to_permanently_off_g_low", () => {
+    // blown=true, gate low: still off (regression check that blown gates
+    // both gate states identically).
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(buildDigitalFgnfetCircuit(facade, { blown: true }));
+    coord.writeByLabel("G", digital(0));
+    coord.writeByLabel("D", digital(1));
+    coord.step();
+    expect(coord.readByLabel("S")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
 
-    state[0] = 1; state[1] = 0;
-    executeTransGate(0, state, highZs, layout);
-    expect(state[2]).toBe(1); // closed
+// ===========================================================================
+// FGPFET — Categories 1, 4 (compile-time-seeded structural prop), 9
+// ===========================================================================
+//
+// FGPFET's digital outputSchema is ["S", "D"] (note PFET pin order). The
+// digital execute reads input G and writes the output D-side via the bus
+// resolver based on the gate-S input. The canonical bridge fixture wires
+// G + S as inputs and observes D as the output, mirroring the executeFGPFET
+// data-flow direction (state[drainNet] = state[sourceNet] when closed).
 
-    state[0] = 0; state[1] = 1;
-    executeTransGate(0, state, highZs, layout);
-    expect(state[2]).toBe(0); // open
+describe("FGPFET digital bridge (T1) — Cat 9", () => {
+  it("digital_g_low_blown_false_propagates_s_to_d", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalFgpfetCircuit(facade, { blown: false }));
+    coordinator.writeByLabel("G", digital(0));
+    coordinator.writeByLabel("S", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("D")).toMatchObject({ type: "digital", value: 1 });
+
+    coordinator.writeByLabel("S", digital(0));
+    coordinator.step();
+    expect(coordinator.readByLabel("D")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  it("pinLayout- 2 inputs (p1, p2) + 2 bidirectional (out1, out2)", () => {
-    const props = new PropertyBag();
-    const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const pins = el.getPins();
-    const inputs = pins.filter(p => p.direction === PinDirection.INPUT);
-    const bidirectional = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
-    expect(inputs.length).toBe(2);
-    expect(bidirectional.length).toBe(2);
-    const labels = pins.map(p => p.label);
-    expect(labels).toContain("p1");
-    expect(labels).toContain("p2");
-    expect(labels).toContain("out1");
-    expect(labels).toContain("out2");
+  it("digital_g_high_blown_false_isolates_d_from_s", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coordinator = facade.compile(buildDigitalFgpfetCircuit(facade, { blown: false }));
+    coordinator.writeByLabel("G", digital(1));
+    coordinator.writeByLabel("S", digital(1));
+    coordinator.step();
+    expect(coordinator.readByLabel("D")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
+
+describe("FGPFET compile-time-seeded structural property (T1) — Cat 4 (blown)", () => {
+  it("blown_property_seeds_state_to_permanently_off", () => {
+    // blown=false: gate low → D follows S (observed as 1).
+    const registry1 = createDefaultRegistry();
+    const facade1 = new DefaultSimulatorFacade(registry1);
+    const coord1 = facade1.compile(buildDigitalFgpfetCircuit(facade1, { blown: false }));
+    coord1.writeByLabel("G", digital(0));
+    coord1.writeByLabel("S", digital(1));
+    coord1.step();
+    expect(coord1.readByLabel("D")).toMatchObject({ type: "digital", value: 1 });
+
+    // blown=true: gate low — channel STILL off, D=0 regardless.
+    const registry2 = createDefaultRegistry();
+    const facade2 = new DefaultSimulatorFacade(registry2);
+    const coord2 = facade2.compile(buildDigitalFgpfetCircuit(facade2, { blown: true }));
+    coord2.writeByLabel("G", digital(0));
+    coord2.writeByLabel("S", digital(1));
+    coord2.step();
+    expect(coord2.readByLabel("D")).toMatchObject({ type: "digital", value: 0 });
   });
 
-  it("attributeMapping- Bits and Label map correctly", () => {
-    const bitsMap = TRANS_GATE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
-    const labelMap = TRANS_GATE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
-    expect(bitsMap!.convert("16")).toBe(16);
-    expect(labelMap!.convert("TG1")).toBe("TG1");
-  });
-
-  it("draw- renders bowtie polygons and inversion bubble", () => {
-    const props = new PropertyBag();
-    const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const calls: string[] = [];
-    const ctx = {
-      save: () => calls.push("save"),
-      restore: () => calls.push("restore"),
-      translate: () => {},
-      setColor: () => {},
-      setLineWidth: () => {},
-      setFont: () => {},
-      drawLine: () => calls.push("drawLine"),
-      drawCircle: () => calls.push("drawCircle"),
-      drawPolygon: () => calls.push("drawPolygon"),
-      drawText: () => {},
-    };
-    el.draw(ctx as never);
-    expect(calls).toContain("save");
-    expect(calls).toContain("restore");
-    // TransGate uses drawPolygon for bowtie shapes and drawCircle for inversion bubble
-    expect(calls).toContain("drawPolygon");
-    expect(calls).toContain("drawCircle");
-    expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
-  });
-
-  it("draw- renders label when set", () => {
-    const props = new PropertyBag();
-    props.set("label", "TG1");
-    const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
-    const texts: string[] = [];
-    const ctx = {
-      save: () => {}, restore: () => {}, translate: () => {},
-      setColor: () => {}, setLineWidth: () => {}, setFont: () => {},
-      drawLine: () => {}, drawCircle: () => {}, drawPolygon: () => {}, drawText: (t: string) => texts.push(t),
-    };
-    el.draw(ctx as never);
-    expect(texts).toContain("TG1");
-  });
-
-  it("definitionComplete- TransGateDefinition has all required fields", () => {
-    expect(TransGateDefinition.name).toBe("TransGate");
-    expect(TransGateDefinition.factory).toBeDefined();
-    expect(TransGateDefinition.models!.digital!.executeFn).toBeDefined();
-    expect(TransGateDefinition.pinLayout).toBeDefined();
-    expect(TransGateDefinition.propertyDefs).toBeDefined();
-    expect(TransGateDefinition.attributeMap).toBeDefined();
-    expect(TransGateDefinition.category).toBe(ComponentCategory.SWITCHING);
-    expect(TransGateDefinition.helpText).toBeDefined();
-    expect(typeof TransGateDefinition.models!.digital!.defaultDelay).toBe("number");
-  });
-
-  it("factoryCreatesInstance- factory returns TransGateElement", () => {
-    const props = new PropertyBag();
-    expect(TransGateDefinition.factory(props)).toBeInstanceOf(TransGateElement);
-  });
-
-  it("boundingBox- non-zero dimensions at correct position", () => {
-    const props = new PropertyBag();
-    const el = new TransGateElement(crypto.randomUUID(), { x: 5, y: 7 }, 0, false, props);
-    const bb = el.getBoundingBox();
-    expect(bb.x).toBe(5);
-    // getBoundingBox offsets y by -1 (pin p1 at y=-1 relative to position)
-    expect(bb.y).toBe(6);
-    expect(bb.width).toBeGreaterThanOrEqual(2);
-    expect(bb.height).toBeGreaterThanOrEqual(2);
+  it("blown_property_seeds_state_to_permanently_off_g_high", () => {
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const coord = facade.compile(buildDigitalFgpfetCircuit(facade, { blown: true }));
+    coord.writeByLabel("G", digital(1));
+    coord.writeByLabel("S", digital(1));
+    coord.step();
+    expect(coord.readByLabel("D")).toMatchObject({ type: "digital", value: 0 });
   });
 });

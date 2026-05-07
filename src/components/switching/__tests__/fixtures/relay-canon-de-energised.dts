@@ -1,0 +1,493 @@
+{
+  "circuit": {
+    "description": "Relay de-energised regime: both coil terminals tied to ground, I_coil=0A < dropOutI=0.02A; contact stays OPEN. vTest=1V probes the contact loop through rLoad=100Ohm; with contact OPEN (Roff=1e9) the A1/B1 net sits near 0V (rLoad/Roff divider).",
+    "elements": [
+      {
+        "id": "4eb71755-ce8c-45fa-b9bd-364728f587df",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 1
+          },
+          "label": "vTest",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "d1f71190-737a-4fda-ab8d-66d0ae0f7a0b",
+        "position": {
+          "x": 32,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          },
+          "label": "rLoad",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "6186d834-8103-4345-abad-13d098490273",
+        "position": {
+          "x": 22,
+          "y": 4
+        },
+        "properties": {
+          "label": "relay",
+          "model": "behavioral",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Relay"
+      },
+      {
+        "id": "83b47d9f-2552-4089-b1b2-f7ac8a67ac3a",
+        "position": {
+          "x": 12,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "relay-canon-de-energised",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 2
+          },
+          {
+            "x": 21,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 2
+          },
+          {
+            "x": 21,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 25,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 19,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 1
+          },
+          {
+            "x": 19,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 2
+          },
+          {
+            "x": 25,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 21,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 3
+          },
+          {
+            "x": 31,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 3
+          },
+          {
+            "x": 31,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 3
+          },
+          {
+            "x": 37,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 3
+          },
+          {
+            "x": 38,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": 3
+          },
+          {
+            "x": 38,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": 6
+          },
+          {
+            "x": 10,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 6
+          },
+          {
+            "x": 10,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 1
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 25,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 4
+          },
+          {
+            "x": 26,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": -1
+          },
+          {
+            "x": 2,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": -1
+          },
+          {
+            "x": 2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": 12,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

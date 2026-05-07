@@ -1,0 +1,164 @@
+{
+  "circuit": {
+    "description": "VariableRail 12V driving 1k to ground. DC operating regime - validates VSRC-shape stamp + RHS branch row at a higher operating magnitude.",
+    "elements": [
+      {
+        "id": "185b5c39-30d9-4ab9-9da8-8d6d487b3ab8",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 12
+          },
+          "label": "vrail",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 12
+        },
+        "rotation": 0,
+        "type": "VariableRail"
+      },
+      {
+        "id": "abd5c143-12bb-46e5-83d3-1894dd3605a7",
+        "position": {
+          "x": 11,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "rl",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "7a8fd364-b3ca-463a-853e-404aef96a44b",
+        "position": {
+          "x": 23,
+          "y": 0
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "variable-rail-canon-12v-1k",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 0
+          },
+          {
+            "x": 10,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 0
+          },
+          {
+            "x": 10,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 0
+          },
+          {
+            "x": 16,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 20,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": -1
+          },
+          {
+            "x": 23,
+            "y": -1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

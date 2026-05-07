@@ -80,32 +80,32 @@
 - [x] src/components/semiconductors/__tests__/mosfet.test.ts
 - [x] src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts
 - [x] src/components/semiconductors/__tests__/schottky.test.ts
-- [ ] src/components/semiconductors/__tests__/scr.test.ts
-- [ ] src/components/semiconductors/__tests__/spice-model-overrides-prop.test.ts
-- [ ] src/components/semiconductors/__tests__/triac.test.ts
-- [ ] src/components/semiconductors/__tests__/triode.test.ts
+- [x] src/components/semiconductors/__tests__/scr.test.ts
+- [x] src/components/semiconductors/__tests__/spice-model-overrides-prop.test.ts
+- [x] src/components/semiconductors/__tests__/triac.test.ts
+- [x] src/components/semiconductors/__tests__/triode.test.ts
 - [x] src/components/semiconductors/__tests__/varactor.test.ts
 - [x] src/components/semiconductors/__tests__/zener.test.ts
 - [x] src/components/sensors/__tests__/ldr.test.ts
 - [x] src/components/sensors/__tests__/ntc-thermistor-rollback.test.ts
-- [ ] src/components/sensors/__tests__/ntc-thermistor.test.ts
+- [x] src/components/sensors/__tests__/ntc-thermistor.test.ts
 - [x] src/components/sensors/__tests__/spark-gap-rollback.test.ts
 - [x] src/components/sensors/__tests__/spark-gap.test.ts
 - [x] src/components/sources/__tests__/ac-voltage-extended.test.ts
-- [ ] src/components/sources/__tests__/ac-voltage-source.test.ts
-- [ ] src/components/sources/__tests__/current-source-kcl.test.ts
-- [ ] src/components/sources/__tests__/current-source.test.ts
-- [ ] src/components/sources/__tests__/dc-voltage-source.test.ts
+- [x] src/components/sources/__tests__/ac-voltage-source.test.ts
+- [x] src/components/sources/__tests__/current-source-kcl.test.ts
+- [x] src/components/sources/__tests__/current-source.test.ts
+- [x] src/components/sources/__tests__/dc-voltage-source.test.ts
 - [x] src/components/sources/__tests__/ground.test.ts
-- [ ] src/components/sources/__tests__/variable-rail.test.ts
-- [ ] src/components/subcircuit/__tests__/subcircuit.test.ts
-- [ ] src/components/switching/__tests__/fets.test.ts
-- [ ] src/components/switching/__tests__/fuse.test.ts
-- [ ] src/components/switching/__tests__/relay-actuation.test.ts
-- [ ] src/components/switching/__tests__/relay.test.ts
-- [ ] src/components/switching/__tests__/switches.test.ts
+- [x] src/components/sources/__tests__/variable-rail.test.ts
+- [x] src/components/subcircuit/__tests__/subcircuit.test.ts
+- [x] src/components/switching/__tests__/fets.test.ts
+- [x] src/components/switching/__tests__/fuse.test.ts
+- [x] src/components/switching/__tests__/relay-actuation.test.ts
+- [x] src/components/switching/__tests__/relay.test.ts
+- [x] src/components/switching/__tests__/switches.test.ts
 - [x] src/components/switching/__tests__/trans-gate.test.ts
-- [ ] src/components/terminal/__tests__/terminal.test.ts
+- [x] src/components/terminal/__tests__/terminal.test.ts
 - [ ] src/components/wiring/__tests__/bit-selector.test.ts
 - [ ] src/components/wiring/__tests__/decoder.test.ts
 - [ ] src/components/wiring/__tests__/demux.test.ts

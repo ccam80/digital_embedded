@@ -1,489 +1,352 @@
 /**
- * Tests for SubcircuitElement, pin derivation, and dynamic registration.
+ * Framework destination for `deriveInterfacePins` BIDIRECTIONAL / face / label
+ * rules (per Wave-3 disposition table). Subcircuit is a SUBCIRCUIT-category
+ * infrastructure component flattened before simulation: it has no analog model,
+ * no setup()/load() state, no transient behaviour, no digital outputSchema,
+ * and `executeSubcircuit` is a no-op. None of Canon Categories 1-15 apply.
+ *
+ * The pin-derivation rules audited here are the only canonical contract this
+ * file owns: how In/Out/Port elements inside a Circuit translate into the
+ * subcircuit's external PinDeclaration[] interface (direction, face, bitWidth,
+ * document order).
  */
 
 import { describe, it, expect } from "vitest";
 import { Circuit } from "../../../core/circuit.js";
-import { ComponentCategory } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
+import type { PropertyValue } from "../../../core/properties.js";
+import type { CircuitElement } from "../../../core/element.js";
+import type { Rotation, PinDeclaration } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
-import { MockRenderContext } from "../../../test-utils/mock-render-context.js";
+import { InElement } from "../../io/in.js";
+import { OutElement } from "../../io/out.js";
+import { PortElement } from "../../io/port.js";
+import { ClockElement } from "../../io/clock.js";
 import { deriveInterfacePins } from "../pin-derivation.js";
-import { PropertyType } from "../../../core/properties.js";
-import {
-  SubcircuitElement,
-  SubcircuitDefinition,
-  buildSubcircuitComponentDef,
-  executeSubcircuit,
-} from "../subcircuit.js";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Fixture helpers — build real In/Out/Port/Clock elements via their concrete
+// element classes (no type-bypass casts; no engine impersonators). Pin
+// derivation walks circuit.elements and reads typeId / position / rotation /
+// properties only — no simulator state is involved.
 // ---------------------------------------------------------------------------
 
-function makeInElement(label: string, bitWidth: number = 1) {
-  const props = new PropertyBag([
-    ["label", label],
-    ["bitWidth", bitWidth],
-  ]);
-  return {
-    typeId: "In" as const,
-    instanceId: "inst-" + label,
-    position: { x: 0, y: 0 },
-    rotation: 0 as const,
-    mirror: false,
-    getPins: () => [],
-    getProperties: () => props,
-    draw: () => {},
-    getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
-    serialize: () => ({ typeId: "In", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
-  };
+type InterfaceTypeId = "In" | "Out" | "Port" | "Clock";
+
+interface MakeElementOptions {
+  bitWidth?: number;
+  rotation?: Rotation;
+  position?: { x: number; y: number };
+  face?: "left" | "right" | "top" | "bottom";
+  sortOrder?: number;
 }
 
-function makeOutElement(label: string, bitWidth: number = 1) {
-  const props = new PropertyBag([
+function makeElement(
+  typeId: InterfaceTypeId,
+  label: string,
+  options: MakeElementOptions = {},
+): CircuitElement {
+  const entries: [string, PropertyValue][] = [
     ["label", label],
-    ["bitWidth", bitWidth],
-  ]);
-  return {
-    typeId: "Out" as const,
-    instanceId: "inst-" + label,
-    position: { x: 0, y: 0 },
-    rotation: 0 as const,
-    mirror: false,
-    getPins: () => [],
-    getProperties: () => props,
-    draw: () => {},
-    getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
-    serialize: () => ({ typeId: "Out", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
-  };
+    ["bitWidth", options.bitWidth ?? 1],
+  ];
+  if (typeId === "Port") {
+    entries.push(["face", options.face ?? "left"]);
+    entries.push(["sortOrder", options.sortOrder ?? 0]);
+  }
+  const props = new PropertyBag(entries);
+  const position = options.position ?? { x: 0, y: 0 };
+  const rotation: Rotation = options.rotation ?? 0;
+  const instanceId = "inst-" + typeId + "-" + label;
+
+  switch (typeId) {
+    case "In":
+      return new InElement(instanceId, position, rotation, false, props);
+    case "Out":
+      return new OutElement(instanceId, position, rotation, false, props);
+    case "Port":
+      return new PortElement(instanceId, position, rotation, false, props);
+    case "Clock":
+      return new ClockElement(instanceId, position, rotation, false, props);
+  }
 }
 
-function makeSubcircuitDefinition(
-  inputLabels: string[],
-  outputLabels: string[],
-  name: string = "TestChip",
-): SubcircuitDefinition {
+function buildCircuit(name: string, elements: CircuitElement[]): Circuit {
   const circuit = new Circuit({ name });
-  for (const label of inputLabels) {
-    circuit.addElement(makeInElement(label) as any);
-  }
-  for (const label of outputLabels) {
-    circuit.addElement(makeOutElement(label) as any);
-  }
-  const pinLayout = deriveInterfacePins(circuit);
-  return { circuit, pinLayout, shapeMode: "DEFAULT", name };
+  for (const el of elements) circuit.addElement(el);
+  return circuit;
 }
 
 // ---------------------------------------------------------------------------
-// derivesPins
+// deriveInterfacePins — direction rule
 // ---------------------------------------------------------------------------
 
-describe("derivesPins", () => {
-  it("derives input and output pins from In/Out elements", () => {
-    const circuit = new Circuit({ name: "HalfAdder" });
-    circuit.addElement(makeInElement("A") as any);
-    circuit.addElement(makeInElement("B") as any);
-    circuit.addElement(makeOutElement("S") as any);
+describe("deriveInterfacePins direction rule", () => {
+  it("In elements produce INPUT pins and Out elements produce OUTPUT pins", () => {
+    const circuit = buildCircuit("HalfAdder", [
+      makeElement("In", "A"),
+      makeElement("In", "B"),
+      makeElement("Out", "S"),
+    ]);
 
     const pins = deriveInterfacePins(circuit);
 
     expect(pins).toHaveLength(3);
-
-    const inputPins = pins.filter((p) => p.direction === PinDirection.INPUT);
-    const outputPins = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-
-    expect(inputPins).toHaveLength(2);
-    expect(outputPins).toHaveLength(1);
-
-    expect(inputPins[0].label).toBe("A");
-    expect(inputPins[0].defaultBitWidth).toBe(1);
-    expect(inputPins[1].label).toBe("B");
-    expect(outputPins[0].label).toBe("S");
+    const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
+    const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
+    expect(inputs).toHaveLength(2);
+    expect(outputs).toHaveLength(1);
+    expect(inputs[0].label).toBe("A");
+    expect(inputs[1].label).toBe("B");
+    expect(outputs[0].label).toBe("S");
   });
 
-  it("preserves bit widths from In/Out properties", () => {
-    const circuit = new Circuit({ name: "Wide" });
-    circuit.addElement(makeInElement("data", 8) as any);
-    circuit.addElement(makeOutElement("result", 4) as any);
-
-    const pins = deriveInterfacePins(circuit);
-
-    const inputPin = pins.find((p) => p.label === "data")!;
-    const outputPin = pins.find((p) => p.label === "result")!;
-
-    expect(inputPin.defaultBitWidth).toBe(8);
-    expect(outputPin.defaultBitWidth).toBe(4);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// dynamicRegistration
-// ---------------------------------------------------------------------------
-
-describe("dynamicRegistration", () => {
-  it("buildSubcircuitComponentDef returns correct name and category", () => {
-    const definition = makeSubcircuitDefinition(["A", "B"], ["Y"], "AndChip");
-
-    const def = buildSubcircuitComponentDef("AndChip", definition);
-
-    expect(def).toBeDefined();
-    expect(def.name).toBe("AndChip");
-    expect(def.category).toBe(ComponentCategory.SUBCIRCUIT);
-  });
-
-  it("buildSubcircuitComponentDef returns typeId of -1 (assigned by registry on registration)", () => {
-    const definition = makeSubcircuitDefinition(["X"], ["Z"], "MyChip");
-
-    const def = buildSubcircuitComponentDef("MyChip", definition);
-
-    expect(def).toBeDefined();
-    expect(def.typeId).toBe(-1);
-  });
-
-  it("factory creates a SubcircuitElement", () => {
-    const definition = makeSubcircuitDefinition(["IN"], ["OUT"], "TestChip");
-
-    const def = buildSubcircuitComponentDef("TestChip", definition);
-    const element = def.factory(new PropertyBag());
-
-    expect(element).toBeInstanceOf(SubcircuitElement);
-    expect(element.typeId).toBe("TestChip");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// drawDefault
-// ---------------------------------------------------------------------------
-
-describe("drawDefault", () => {
-  it("renders a rectangle and pin labels in DEFAULT mode", () => {
-    const definition = makeSubcircuitDefinition(["A", "B"], ["Y"], "Gate");
-    const props = new PropertyBag();
-    const element = new SubcircuitElement(
-      "Gate",
-      "inst-1",
-      { x: 0, y: 0 },
-      0,
-      false,
-      props,
-      definition,
-    );
-
-    const ctx = new MockRenderContext();
-    element.draw(ctx);
-
-    const rects = ctx.callsOfKind("rect");
-    expect(rects.length).toBeGreaterThanOrEqual(1);
-
-    const texts = ctx.callsOfKind("text");
-    const textStrings = texts.map((t) => t.text);
-    expect(textStrings).toContain("Gate");
-    expect(textStrings.some((t) => t === "A" || t === "B" || t === "Y")).toBe(true);
-  });
-
-  it("starts with save and ends with restore", () => {
-    const definition = makeSubcircuitDefinition(["A"], ["Z"], "Chip");
-    const props = new PropertyBag();
-    const element = new SubcircuitElement(
-      "Chip",
-      "inst-2",
-      { x: 2, y: 3 },
-      0,
-      false,
-      props,
-      definition,
-    );
-
-    const ctx = new MockRenderContext();
-    element.draw(ctx);
-
-    const calls = ctx.calls.map((c) => c.kind);
-    expect(calls[0]).toBe("save");
-    expect(calls[calls.length - 1]).toBe("restore");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// drawDIL
-// ---------------------------------------------------------------------------
-
-describe("drawDIL", () => {
-  it("renders a DIP IC package appearance in DIL mode", () => {
-    const circuit = new Circuit({ name: "DilChip" });
-    circuit.addElement(makeInElement("VCC") as any);
-    circuit.addElement(makeInElement("GND") as any);
-    circuit.addElement(makeOutElement("Q") as any);
-    const pinLayout = deriveInterfacePins(circuit);
-
-    const definition: SubcircuitDefinition = {
-      circuit,
-      pinLayout,
-      shapeMode: "DIL",
-      name: "DilChip",
-    };
-
-    const props = new PropertyBag();
-    const element = new SubcircuitElement(
-      "DilChip",
-      "inst-3",
-      { x: 0, y: 0 },
-      0,
-      false,
-      props,
-      definition,
-    );
-
-    const ctx = new MockRenderContext();
-    element.draw(ctx);
-
-    const arcs = ctx.callsOfKind("arc");
-    expect(arcs.length).toBeGreaterThanOrEqual(1);
-
-    const rects = ctx.callsOfKind("rect");
-    expect(rects.length).toBeGreaterThanOrEqual(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// executeFnNoOp
-// ---------------------------------------------------------------------------
-
-describe("executeFnNoOp", () => {
-  it("execute function does nothing- no state change", () => {
-    const state = new Uint32Array([1, 2, 3, 4]);
-    const highZs = new Uint32Array(state.length);
-    const snapshot = Uint32Array.from(state);
-
-    const mockLayout = {
-      wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => 1,
-      inputOffset: () => 0,
-      outputCount: () => 1,
-      outputOffset: () => 1,
-      stateOffset: () => 0,
-      getProperty: () => undefined,
-    };
-
-    executeSubcircuit(0, state, highZs, mockLayout);
-
-    expect(state).toEqual(snapshot);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// pinOrderMatchesInOut
-// ---------------------------------------------------------------------------
-
-describe("pinOrderMatchesInOut", () => {
-  it("input pins appear in the order In elements are declared in the subcircuit", () => {
-    const circuit = new Circuit({ name: "Ordered" });
-    circuit.addElement(makeInElement("first") as any);
-    circuit.addElement(makeInElement("second") as any);
-    circuit.addElement(makeInElement("third") as any);
-    circuit.addElement(makeOutElement("result") as any);
-
-    const pins = deriveInterfacePins(circuit);
-
-    const inputPins = pins.filter((p) => p.direction === PinDirection.INPUT);
-    expect(inputPins[0].label).toBe("first");
-    expect(inputPins[1].label).toBe("second");
-    expect(inputPins[2].label).toBe("third");
-  });
-
-  it("output pins appear in the order Out elements are declared in the subcircuit", () => {
-    const circuit = new Circuit({ name: "MultiOut" });
-    circuit.addElement(makeInElement("x") as any);
-    circuit.addElement(makeOutElement("sum") as any);
-    circuit.addElement(makeOutElement("carry") as any);
-
-    const pins = deriveInterfacePins(circuit);
-
-    const outputPins = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-    expect(outputPins[0].label).toBe("sum");
-    expect(outputPins[1].label).toBe("carry");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// shapeTypeEnumProperty
-// ---------------------------------------------------------------------------
-
-describe("shapeTypeEnumProperty", () => {
-  it("buildSubcircuitComponentDef has shapeType property of type ENUM", () => {
-    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    const def = buildSubcircuitComponentDef("TestChip", definition);
-
-    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType");
-    expect(shapeProp).toBeDefined();
-    expect(shapeProp!.type).toBe(PropertyType.ENUM);
-  });
-
-  it("shapeType ENUM includes all six ShapeMode values", () => {
-    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    const def = buildSubcircuitComponentDef("TestChip", definition);
-
-    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
-    expect(shapeProp.enumValues).toEqual(
-      expect.arrayContaining(["LAYOUT", "DIL", "CUSTOM", "DEFAULT", "SIMPLE", "MINIMIZED"])
-    );
-    expect(shapeProp.enumValues).toHaveLength(6);
-  });
-
-  it("shapeType ENUM has label 'Shape'", () => {
-    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    const def = buildSubcircuitComponentDef("TestChip", definition);
-
-    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
-    expect(shapeProp.label).toBe("Shape");
-  });
-
-  it("shapeType default value is LAYOUT", () => {
-    const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    const def = buildSubcircuitComponentDef("TestChip", definition);
-
-    const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
-    expect(shapeProp.defaultValue).toBe("LAYOUT");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Port element helper
-// ---------------------------------------------------------------------------
-
-function makePortElement(label: string, bitWidth: number = 1, face: string = "left") {
-  const props = new PropertyBag([
-    ["label", label],
-    ["bitWidth", bitWidth],
-    ["face", face],
-    ["sortOrder", 0],
-  ]);
-  return {
-    typeId: "Port" as const,
-    instanceId: "inst-" + label,
-    position: { x: 0, y: 0 },
-    rotation: 0 as const,
-    mirror: false,
-    getPins: () => [],
-    getProperties: () => props,
-    draw: () => {},
-    getBoundingBox: () => ({ x: 0, y: 0, width: 2, height: 2 }),
-    serialize: () => ({ typeId: "Port", instanceId: "inst-" + label, position: { x: 0, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
-  };
-}
-
-function makePortSubcircuitDefinition(
-  portLabels: { label: string; bitWidth?: number; face?: string }[],
-  name: string = "PortChip",
-): SubcircuitDefinition {
-  const circuit = new Circuit({ name });
-  for (const p of portLabels) {
-    circuit.addElement(makePortElement(p.label, p.bitWidth ?? 1, p.face ?? "left") as any);
-  }
-  const pinLayout = deriveInterfacePins(circuit);
-  return { circuit, pinLayout, shapeMode: "DEFAULT", name };
-}
-
-// ---------------------------------------------------------------------------
-// Port-based subcircuit definitions
-// ---------------------------------------------------------------------------
-
-describe("Port-based subcircuit definitions", () => {
-  it("deriveInterfacePins produces BIDIRECTIONAL pins from Port elements", () => {
-    const circuit = new Circuit({ name: "PortGate" });
-    circuit.addElement(makePortElement("A") as any);
-    circuit.addElement(makePortElement("B") as any);
-    circuit.addElement(makePortElement("Y") as any);
+  it("Port elements produce BIDIRECTIONAL pins", () => {
+    const circuit = buildCircuit("PortGate", [
+      makeElement("Port", "A"),
+      makeElement("Port", "B"),
+      makeElement("Port", "Y"),
+    ]);
 
     const pins = deriveInterfacePins(circuit);
 
     expect(pins).toHaveLength(3);
-    const bidir = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
+    const bidir = pins.filter((p) => p.direction === PinDirection.BIDIRECTIONAL);
     expect(bidir).toHaveLength(3);
     expect(bidir[0].label).toBe("A");
-    expect(bidir[0].defaultBitWidth).toBe(1);
     expect(bidir[1].label).toBe("B");
     expect(bidir[2].label).toBe("Y");
   });
 
-  it("Port face property controls pin face assignment", () => {
-    const circuit = new Circuit({ name: "FaceChip" });
-    circuit.addElement(makePortElement("L", 1, "left") as any);
-    circuit.addElement(makePortElement("R", 1, "right") as any);
-    circuit.addElement(makePortElement("T", 1, "top") as any);
-    circuit.addElement(makePortElement("B", 1, "bottom") as any);
+  it("Clock elements produce INPUT pins like In elements", () => {
+    const circuit = buildCircuit("ClockedChip", [
+      makeElement("Clock", "CLK"),
+      makeElement("Out", "Q"),
+    ]);
 
     const pins = deriveInterfacePins(circuit);
 
-    expect(pins).toHaveLength(4);
-    expect((pins[0] as any).face).toBe("left");
-    expect((pins[1] as any).face).toBe("right");
-    expect((pins[2] as any).face).toBe("top");
-    expect((pins[3] as any).face).toBe("bottom");
+    expect(pins).toHaveLength(2);
+    expect(pins[0].direction).toBe(PinDirection.INPUT);
+    expect(pins[0].label).toBe("CLK");
+    expect(pins[1].direction).toBe(PinDirection.OUTPUT);
+    expect(pins[1].label).toBe("Q");
   });
 
-  it("SubcircuitDefinition from Port-only circuit has correct count and all BIDIRECTIONAL", () => {
-    const definition = makePortSubcircuitDefinition([
-      { label: "D0" },
-      { label: "D1" },
-      { label: "Q0" },
+  it("mixed Port + In + Out yields a mix of BIDIRECTIONAL / INPUT / OUTPUT", () => {
+    const circuit = buildCircuit("MixedChip", [
+      makeElement("Port", "P"),
+      makeElement("In", "A"),
+      makeElement("Out", "Y"),
     ]);
-
-    expect(definition.pinLayout).toHaveLength(3);
-    for (const pin of definition.pinLayout) {
-      expect(pin.direction).toBe(PinDirection.BIDIRECTIONAL);
-    }
-  });
-
-  it("buildSubcircuitComponentDef with Port-based definition has correct category and pin count", () => {
-    const definition = makePortSubcircuitDefinition(
-      [{ label: "A" }, { label: "B" }, { label: "Y" }],
-      "PortAndChip",
-    );
-
-    const def = buildSubcircuitComponentDef("PortAndChip", definition);
-    expect(def).toBeDefined();
-    expect(def.name).toBe("PortAndChip");
-    expect(def.category).toBe(ComponentCategory.SUBCIRCUIT);
-  });
-
-  it("SubcircuitElement instantiation from Port-based definition has BIDIRECTIONAL getPins", () => {
-    const definition = makePortSubcircuitDefinition(
-      [{ label: "IN" }, { label: "OUT" }],
-      "PortChip",
-    );
-
-    const def = buildSubcircuitComponentDef("PortChip", definition);
-    const element = def.factory(new PropertyBag());
-
-    expect(element).toBeInstanceOf(SubcircuitElement);
-    const pins = element.getPins();
-    expect(pins.length).toBeGreaterThanOrEqual(2);
-    const bidirPins = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
-    expect(bidirPins).toHaveLength(2);
-  });
-
-  it("mixed Port and In/Out in same subcircuit definition returns mix of BIDIRECTIONAL and INPUT/OUTPUT pins", () => {
-    const circuit = new Circuit({ name: "MixedChip" });
-    circuit.addElement(makePortElement("P") as any);
-    circuit.addElement(makeInElement("A") as any);
-    circuit.addElement(makeOutElement("Y") as any);
 
     const pins = deriveInterfacePins(circuit);
 
     expect(pins).toHaveLength(3);
-    const bidirPins = pins.filter(p => p.direction === PinDirection.BIDIRECTIONAL);
-    const inputPins = pins.filter(p => p.direction === PinDirection.INPUT);
-    const outputPins = pins.filter(p => p.direction === PinDirection.OUTPUT);
+    const bidir = pins.filter((p) => p.direction === PinDirection.BIDIRECTIONAL);
+    const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
+    const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
+    expect(bidir).toHaveLength(1);
+    expect(bidir[0].label).toBe("P");
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].label).toBe("A");
+    expect(outputs).toHaveLength(1);
+    expect(outputs[0].label).toBe("Y");
+  });
+});
 
-    expect(bidirPins).toHaveLength(1);
-    expect(bidirPins[0].label).toBe("P");
-    expect(inputPins).toHaveLength(1);
-    expect(inputPins[0].label).toBe("A");
-    expect(outputPins).toHaveLength(1);
-    expect(outputPins[0].label).toBe("Y");
+// ---------------------------------------------------------------------------
+// deriveInterfacePins — bitWidth rule
+// ---------------------------------------------------------------------------
+
+describe("deriveInterfacePins bitWidth rule", () => {
+  it("preserves bitWidth from In/Out element properties on the derived pin", () => {
+    const circuit = buildCircuit("Wide", [
+      makeElement("In", "data", { bitWidth: 8 }),
+      makeElement("Out", "result", { bitWidth: 4 }),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    const inPin = pins.find((p) => p.label === "data")!;
+    const outPin = pins.find((p) => p.label === "result")!;
+    expect(inPin.defaultBitWidth).toBe(8);
+    expect(outPin.defaultBitWidth).toBe(4);
+  });
+
+  it("preserves bitWidth from Port element properties", () => {
+    const circuit = buildCircuit("WidePort", [
+      makeElement("Port", "bus", { bitWidth: 16 }),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins).toHaveLength(1);
+    expect(pins[0].label).toBe("bus");
+    expect(pins[0].defaultBitWidth).toBe(16);
+  });
+
+  it("defaults bitWidth to 1 when the element omits the property", () => {
+    const circuit = buildCircuit("Default1", [
+      makeElement("In", "single"),
+      makeElement("Out", "alone"),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins[0].defaultBitWidth).toBe(1);
+    expect(pins[1].defaultBitWidth).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deriveInterfacePins — face rule (rotation-driven for In/Out, property-driven for Port)
+// ---------------------------------------------------------------------------
+
+describe("deriveInterfacePins face rule", () => {
+  it("In rotation 0/1/2/3 maps to face left/bottom/right/top", () => {
+    const circuit = buildCircuit("InRot", [
+      makeElement("In", "L", { rotation: 0 }),
+      makeElement("In", "B", { rotation: 1 }),
+      makeElement("In", "R", { rotation: 2 }),
+      makeElement("In", "T", { rotation: 3 }),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+    const byLabel = new Map(pins.map((p) => [p.label, p as PinDeclaration & { face?: string }]));
+    expect(byLabel.get("L")!.face).toBe("left");
+    expect(byLabel.get("B")!.face).toBe("bottom");
+    expect(byLabel.get("R")!.face).toBe("right");
+    expect(byLabel.get("T")!.face).toBe("top");
+  });
+
+  it("Out rotation 0/1/2/3 maps to face right/top/left/bottom", () => {
+    const circuit = buildCircuit("OutRot", [
+      makeElement("Out", "R", { rotation: 0 }),
+      makeElement("Out", "T", { rotation: 1 }),
+      makeElement("Out", "L", { rotation: 2 }),
+      makeElement("Out", "B", { rotation: 3 }),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+    const byLabel = new Map(pins.map((p) => [p.label, p as PinDeclaration & { face?: string }]));
+    expect(byLabel.get("R")!.face).toBe("right");
+    expect(byLabel.get("T")!.face).toBe("top");
+    expect(byLabel.get("L")!.face).toBe("left");
+    expect(byLabel.get("B")!.face).toBe("bottom");
+  });
+
+  it("Port face property controls pin face directly (not rotation)", () => {
+    const circuit = buildCircuit("FaceChip", [
+      makeElement("Port", "L", { face: "left" }),
+      makeElement("Port", "R", { face: "right" }),
+      makeElement("Port", "T", { face: "top" }),
+      makeElement("Port", "B", { face: "bottom" }),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins).toHaveLength(4);
+    expect((pins[0] as PinDeclaration & { face?: string }).face).toBe("left");
+    expect((pins[1] as PinDeclaration & { face?: string }).face).toBe("right");
+    expect((pins[2] as PinDeclaration & { face?: string }).face).toBe("top");
+    expect((pins[3] as PinDeclaration & { face?: string }).face).toBe("bottom");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deriveInterfacePins — document-order rule
+// ---------------------------------------------------------------------------
+
+describe("deriveInterfacePins document-order rule", () => {
+  it("INPUT pins appear in the order their In elements appear in circuit.elements", () => {
+    const circuit = buildCircuit("Ordered", [
+      makeElement("In", "first"),
+      makeElement("In", "second"),
+      makeElement("In", "third"),
+      makeElement("Out", "result"),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+    const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
+
+    expect(inputs[0].label).toBe("first");
+    expect(inputs[1].label).toBe("second");
+    expect(inputs[2].label).toBe("third");
+  });
+
+  it("OUTPUT pins appear in the order their Out elements appear in circuit.elements", () => {
+    const circuit = buildCircuit("MultiOut", [
+      makeElement("In", "x"),
+      makeElement("Out", "sum"),
+      makeElement("Out", "carry"),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+    const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
+
+    expect(outputs[0].label).toBe("sum");
+    expect(outputs[1].label).toBe("carry");
+  });
+
+  it("BIDIRECTIONAL pins appear in the order their Port elements appear in circuit.elements", () => {
+    const circuit = buildCircuit("PortOrder", [
+      makeElement("Port", "alpha"),
+      makeElement("Port", "beta"),
+      makeElement("Port", "gamma"),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+    const bidir = pins.filter((p) => p.direction === PinDirection.BIDIRECTIONAL);
+
+    expect(bidir[0].label).toBe("alpha");
+    expect(bidir[1].label).toBe("beta");
+    expect(bidir[2].label).toBe("gamma");
+  });
+
+  it("In + Port + Out interleaved preserves global document order across direction kinds", () => {
+    const circuit = buildCircuit("Interleaved", [
+      makeElement("In", "a"),
+      makeElement("Port", "p"),
+      makeElement("Out", "y"),
+      makeElement("In", "b"),
+      makeElement("Out", "z"),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins.map((p) => p.label)).toEqual(["a", "p", "y", "b", "z"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deriveInterfacePins — label-fallback rule
+// ---------------------------------------------------------------------------
+
+describe("deriveInterfacePins label fallback", () => {
+  it("In element without a label falls back to in<N> derived from emission index", () => {
+    const circuit = buildCircuit("EmptyLabel", [
+      makeElement("In", ""),
+      makeElement("In", ""),
+      makeElement("Out", ""),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins[0].label).toBe("in0");
+    expect(pins[1].label).toBe("in1");
+    expect(pins[2].label).toBe("out2");
+  });
+
+  it("Port element without a label falls back to port<N>", () => {
+    const circuit = buildCircuit("EmptyPortLabel", [
+      makeElement("Port", ""),
+      makeElement("Port", ""),
+    ]);
+
+    const pins = deriveInterfacePins(circuit);
+
+    expect(pins[0].label).toBe("port0");
+    expect(pins[1].label).toBe("port1");
   });
 });

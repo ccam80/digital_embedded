@@ -751,6 +751,26 @@ const VALID_PIN_DIRECTION_VALUES: readonly string[] = [
   PinDirection.BIDIRECTIONAL,
 ];
 
+// ---------------------------------------------------------------------------
+// Framework-supported ModelEntry kind tags. The literal-type union for
+// ModelEntry.kind in src/core/registry.ts is `"inline" | "netlist"`; this
+// const mirrors that union as a runtime set so the parametric audit can
+// surface unrecognised tags as failing it()s rather than as a TypeScript
+// compile-time narrowing error.
+// ---------------------------------------------------------------------------
+const FRAMEWORK_KINDS: ReadonlySet<string> = new Set<string>([
+  "inline",
+  "netlist",
+]);
+
+// ---------------------------------------------------------------------------
+// Property keys whose presence on any Definition's propertyDefs is a
+// regression of a completed migration. Future migrations append entries.
+// ---------------------------------------------------------------------------
+const REMOVED_PROPERTY_KEYS: ReadonlySet<string> = new Set<string>([
+  "_spiceModelOverrides",
+]);
+
 describe("Definition-shape parametric audit (every registered, non-internalOnly component)", () => {
   const definitions = createDefaultRegistry().getAll().filter(isStandalone);
 
@@ -852,6 +872,250 @@ describe("Definition-shape parametric audit (every registered, non-internalOnly 
           expect(runtimeLabels).toEqual(layoutLabels);
         });
       }
+
+      // -- 5. ParamDef.partition validity (every modelRegistry entry's paramDefs)
+      //
+      // Replaces the per-component `expect(paramDef.partition).toBe("model")`
+      // assertions wave-3 §3 deleted from zener / varactor / ... test files.
+      // ParamDef.partition is typed `"instance" | "model" | undefined`; anything
+      // else is a registration bug. Surfaces `<def.name>.<modelKey>.<paramKey>`
+      // on failure so the offending component is identifiable.
+      it(`every_paramDef_partition_is_a_recognised_value_${def.name}`, () => {
+        const RECOGNISED: ReadonlySet<string | undefined> = new Set<string | undefined>([
+          "instance",
+          "model",
+          undefined,
+        ]);
+        const offenders: string[] = [];
+        const modelRegistry = def.modelRegistry;
+        if (modelRegistry !== undefined) {
+          for (const [modelKey, modelEntry] of Object.entries(modelRegistry)) {
+            for (const paramDef of modelEntry.paramDefs) {
+              if (!RECOGNISED.has(paramDef.partition)) {
+                offenders.push(
+                  `${def.name}.${modelKey}.${paramDef.key}=${String(paramDef.partition)}`,
+                );
+              }
+            }
+          }
+        }
+        expect(offenders).toEqual([]);
+      });
+
+      // -- 6. modelRegistry default-entry kind tag is framework-supported -----
+      //
+      // Replaces per-component `expect(entry.kind).toBe("inline" | "netlist")`
+      // assertions wave-3 §3 deleted from spice-model-overrides-prop.test.ts.
+      // Skips definitions with no modelRegistry or an empty modelRegistry-
+      // pure digital components have no analog ModelEntry to audit. Surfaces
+      // a missing default entry, an unrecognised kind, or a non-string kind
+      // as a per-definition it() failure.
+      if (def.modelRegistry !== undefined && Object.keys(def.modelRegistry).length > 0) {
+        it(`def_${def.name}_default_modelRegistry_entry_kind_is_framework_supported`, () => {
+          const defaultModel = def.defaultModel;
+          expect(typeof defaultModel).toBe("string");
+          const entry = def.modelRegistry![defaultModel as string];
+          expect(entry).toBeDefined();
+          expect(typeof entry.kind).toBe("string");
+          expect(FRAMEWORK_KINDS.has(entry.kind as string)).toBe(true);
+        });
+      }
+
+      // -- 7. junction-bearing ModelEntry default params carry positive TEMP --
+      //
+      // Replaces per-component `expect(params.TEMP).toBeGreaterThan(0)`
+      // assertions wave-3 §3 deleted from spice-model-overrides-prop.test.ts.
+      // Junction-bearing predicate is programmatic via the existing
+      // ComponentCategory.SEMICONDUCTORS gate (BJT, FET, Diode, Schottky,
+      // Zener, SCR, Triac, Diac, Triode); no hard-coded definition list and
+      // no new field on any model. A definition under SEMICONDUCTORS whose
+      // modelRegistry has no default entry is skipped silently- the entry
+      // shape is the subject under test and audit #6 above already surfaces
+      // missing default entries.
+      if (def.category === ComponentCategory.SEMICONDUCTORS) {
+        const entryForTemp = def.modelRegistry?.[def.defaultModel ?? ""];
+        if (entryForTemp !== undefined) {
+          it(`def_${def.name}_default_modelRegistry_params_carry_positive_TEMP`, () => {
+            const params = (entryForTemp as { params?: Record<string, number> }).params;
+            expect(params).toBeDefined();
+            expect(typeof params!.TEMP).toBe("number");
+            expect(Number.isFinite(params!.TEMP)).toBe(true);
+            expect(params!.TEMP).toBeGreaterThan(0);
+          });
+        }
+      }
+
+      // -- 8. propertyDefs omits removed legacy keys -------------------------
+      //
+      // Replaces per-component `expect(propertyDefs.find(p => p.key ===
+      // "_spiceModelOverrides")).toBeUndefined()` assertions wave-3 §3
+      // deleted from spice-model-overrides-prop.test.ts. Initial population
+      // of REMOVED_PROPERTY_KEYS is `_spiceModelOverrides`; future
+      // migrations append to the set at the top of this file.
+      it(`def_${def.name}_propertyDefs_omits_removed_legacy_keys`, () => {
+        const offenders: string[] = [];
+        for (const pd of def.propertyDefs) {
+          if (REMOVED_PROPERTY_KEYS.has(pd.key)) {
+            offenders.push(`${def.name}.${pd.key}`);
+          }
+        }
+        expect(offenders).toEqual([]);
+      });
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// PropertyDef shape integrity audit. Walks every Definition's propertyDefs and
+// asserts:
+//   - label is a non-empty string;
+//   - ENUM: enumValues is a non-empty array containing defaultValue;
+//   - NUMBER (INT/FLOAT/BIT_WIDTH/LONG): defaultValue is a finite number and,
+//     when both min and max are declared, min <= defaultValue <= max;
+//   - BOOLEAN: defaultValue is a JS boolean.
+//
+// Failure messages name `<def.name>.<pd.key>` so the offending Definition +
+// propertyDef is identifiable. Replaces the per-component propertyDef-shape
+// snapshots wave-3 §3 deletions vacated.
+// ---------------------------------------------------------------------------
+
+const NUMERIC_PROPERTY_TYPES: ReadonlySet<string> = new Set<string>([
+  PropertyType.INT,
+  PropertyType.FLOAT,
+  PropertyType.BIT_WIDTH,
+  PropertyType.LONG,
+]);
+
+describe("PropertyDef shape integrity audit (every registered, non-internalOnly component)", () => {
+  const definitions = createDefaultRegistry().getAll().filter(isStandalone);
+
+  it("every_propertyDef_has_non_empty_label_and_type_consistent_default", () => {
+    const offenders: string[] = [];
+    for (const def of definitions) {
+      const propertyDefs = def.propertyDefs ?? [];
+      for (const pd of propertyDefs) {
+        const tag = `${def.name}.${pd.key}`;
+
+        // label: non-empty string.
+        if (typeof pd.label !== "string" || pd.label.length === 0) {
+          offenders.push(`${tag}: label is empty or non-string (got ${String(pd.label)})`);
+        }
+
+        // ENUM-specific shape.
+        if (pd.type === PropertyType.ENUM) {
+          if (!Array.isArray(pd.enumValues) || pd.enumValues.length < 1) {
+            offenders.push(
+              `${tag}: ENUM with empty/missing enumValues (got ${String(pd.enumValues)})`,
+            );
+          } else if (!pd.enumValues.includes(pd.defaultValue as string)) {
+            offenders.push(
+              `${tag}: ENUM defaultValue=${String(pd.defaultValue)} not in enumValues=[${pd.enumValues.join(",")}]`,
+            );
+          }
+        }
+
+        // NUMBER-family shape.
+        if (NUMERIC_PROPERTY_TYPES.has(pd.type)) {
+          if (typeof pd.defaultValue !== "number" || !Number.isFinite(pd.defaultValue)) {
+            offenders.push(
+              `${tag}: NUMBER defaultValue is not finite (got ${String(pd.defaultValue)})`,
+            );
+          } else if (pd.min !== undefined && pd.max !== undefined) {
+            if (!(pd.min <= pd.defaultValue && pd.defaultValue <= pd.max)) {
+              offenders.push(
+                `${tag}: NUMBER defaultValue=${pd.defaultValue} out of [${pd.min}, ${pd.max}]`,
+              );
+            }
+          }
+        }
+
+        // BOOLEAN-specific shape.
+        if (pd.type === PropertyType.BOOLEAN) {
+          if (typeof pd.defaultValue !== "boolean") {
+            offenders.push(
+              `${tag}: BOOLEAN defaultValue is not a boolean (got ${typeof pd.defaultValue})`,
+            );
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pin-layout consistency audit for `poles`-derived components. For every
+// Definition that declares a `poles` propertyDef (Switch, SwitchDT, Relay,
+// RelayDT, ...), build the runtime element at poles=1 and poles=2 and assert:
+//
+//   - The BIDIRECTIONAL pin count at poles=2 is exactly 2x the BIDIRECTIONAL
+//     pin count at poles=1 (i.e. each pole replicates the per-pole contact
+//     pin set; INPUT-direction pins like a relay's coil terminals stay fixed).
+//   - For each pole index 1..N, every BIDIRECTIONAL pin label ends with the
+//     pole index (the per-pole numbering convention: A1/B1/.../An/Bn). The
+//     set of pole-suffixes observed in BIDIRECTIONAL labels at poles=2 spans
+//     the full {1, 2} range.
+//
+// Failure messages name `def.name` and the observed pin-count / label-set so
+// the offending Definition is identifiable. Replaces the per-component
+// pole-replication snapshots wave-3 §3 deletions vacated for switching
+// components.
+// ---------------------------------------------------------------------------
+
+describe("Pin-layout consistency audit for poles-derived components", () => {
+  const polesDefinitions = createDefaultRegistry()
+    .getAll()
+    .filter(isStandalone)
+    .filter((def) => (def.propertyDefs ?? []).some((pd) => pd.key === "poles"));
+
+  it("default registry has at least one poles-derived definition", () => {
+    expect(polesDefinitions.length).toBeGreaterThan(0);
+  });
+
+  it("poles_property_replicates_bidirectional_pin_set_per_pole", () => {
+    const offenders: string[] = [];
+    for (const def of polesDefinitions) {
+      const make = (poles: number): readonly Pin[] => {
+        const propertyBag = new PropertyBag([["poles", poles]]);
+        const el = def.factory(propertyBag);
+        return el.getPins();
+      };
+
+      const pins1 = make(1);
+      const pins2 = make(2);
+
+      const bidi1 = pins1.filter((p) => p.direction === PinDirection.BIDIRECTIONAL);
+      const bidi2 = pins2.filter((p) => p.direction === PinDirection.BIDIRECTIONAL);
+
+      if (bidi2.length !== 2 * bidi1.length) {
+        offenders.push(
+          `${def.name}: BIDIRECTIONAL count at poles=2 (${bidi2.length}) != 2 * poles=1 (${bidi1.length}); ` +
+          `pins1=[${pins1.map((p) => p.label).join(",")}] pins2=[${pins2.map((p) => p.label).join(",")}]`,
+        );
+      }
+
+      // Pole-suffix coverage check: every BIDIRECTIONAL label at poles=2 must
+      // end in "1" or "2", and both suffixes must be observed.
+      const observedSuffixes = new Set<string>();
+      for (const pin of bidi2) {
+        const lastChar = pin.label.slice(-1);
+        if (lastChar !== "1" && lastChar !== "2") {
+          offenders.push(
+            `${def.name}: BIDIRECTIONAL pin label "${pin.label}" does not end with pole index 1 or 2`,
+          );
+        } else {
+          observedSuffixes.add(lastChar);
+        }
+      }
+      for (const expected of ["1", "2"]) {
+        if (!observedSuffixes.has(expected)) {
+          offenders.push(
+            `${def.name}: pole-suffix "${expected}" missing from BIDIRECTIONAL labels at poles=2 ` +
+            `(observed=[${[...observedSuffixes].join(",")}], labels=[${bidi2.map((p) => p.label).join(",")}])`,
+          );
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

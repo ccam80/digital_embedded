@@ -1,34 +1,59 @@
-/** Tests for the Variable Rail source component. */
-
-import { describe, it, expect } from "vitest";
-import { VariableRailDefinition } from "../variable-rail.js";
-import { PropertyBag } from "../../../core/properties.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as path from "path";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  describeIfDll,
+  DLL_PATH,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
+// ---------------------------------------------------------------------------
+// DTS fixture paths (T3 harness)
+// ---------------------------------------------------------------------------
+//
+// Two operating-region configurations (Step 1: harness file, no topology
+// variants — VariableRail has a single behavioral model and a single VSRC-shape
+// stamp). The first regime is a 12V rail with a 1kΩ resistive load (DC-only;
+// branch-row stamp + RHS at a higher-magnitude operating point). The second is
+// a 5V rail charging 1uF through 1kΩ to ground (RC transient; exercises the
+// rail's branch-row stamp under predictor / dt-selection while the cap's
+// companion model evolves).
+
+const DTS_VRAIL_12V_1K = path.resolve(
+  "src/components/sources/__tests__/fixtures/variable-rail-canon-12v-1k.dts",
+);
+
+const DTS_VRAIL_RC_CHARGE = path.resolve(
+  "src/components/sources/__tests__/fixtures/variable-rail-canon-rc-charge.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic circuit factory (T1)
+// ---------------------------------------------------------------------------
+//
+// VariableRail has a single pin "pos"; "neg" is internally tied to ground (0)
+// inside VariableRailAnalogImpl.setup(). The load resistor provides a return
+// path so the MNA matrix is well-posed.
 
 interface VRailCircuitParams {
   voltage: number;
-  rBleed?: number;
+  resistance?: number;
 }
 
 function buildVRailCircuit(facade: DefaultSimulatorFacade, p: VRailCircuitParams): Circuit {
   return facade.build({
     components: [
       { id: "vrail", type: "VariableRail", props: { label: "vrail", voltage: p.voltage } },
-      { id: "rb",    type: "Resistor",     props: { label: "rb", resistance: p.rBleed ?? 1e6 } },
-      { id: "gnd",   type: "Ground" },
+      { id: "rl",    type: "Resistor",     props: { label: "rl", resistance: p.resistance ?? 1000 } },
+      { id: "gnd",   type: "Ground",       props: { label: "gnd" } },
     ],
     connections: [
-      ["vrail:pos", "rb:pos"],
-      ["rb:neg",    "gnd:out"],
+      ["vrail:pos", "rl:pos"],
+      ["rl:neg",    "gnd:out"],
     ],
   });
 }
@@ -39,75 +64,191 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   return n;
 }
 
-describe("VariableRail", () => {
-  it("dc_node_voltage_matches_set_voltage -- 12V rail settles to 12V at the pos node", () => {
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
+function findElementIndexByLabel(fix: ReturnType<typeof buildFixture>, label: string): number {
+  for (const [idx, ce] of fix.circuit.elementToCircuitElement.entries()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return idx;
+  }
+  throw new Error(`element with label '${label}' not found`);
+}
+
+// ---------------------------------------------------------------------------
+// VariableRail initialization (T1) — Cat 1
+// ---------------------------------------------------------------------------
+//
+// VariableRailAnalogImpl extends AnalogElement with no state-pool slots — its
+// only stamp-time state is the cached `_voltage`. The post-warm-start
+// observable for Cat 1 is therefore the converged node voltage at step 0:
+// vrail:pos held at exactly the programmed rail voltage by the branch-row
+// constraint stamped in load().
+
+describe("VariableRail initialization (T1)", () => {
+  it("init_post_warm_start_pos_node_held_at_rail_voltage", () => {
     const fix = buildFixture({
-      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 12 }),
+      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 5, resistance: 1000 }),
     });
-    const result = fix.coordinator.dcOperatingPoint()!;
-    expect(result.converged).toBe(true);
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(12, 6);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(5.0, 9);
   });
+});
 
-  it("zero_voltage_settles_to_zero -- 0V rail settles to 0V", () => {
-    // Source stepping at srcFact=0 would kill an ordinary DC voltage source's
-    // RHS during the inner DCOP sweep, but variable-rail.ts load() ignores
-    // srcFact (vsrcload.c:416 path is replaced by an unconditional
-    // `rhs[branch] += voltage`). Driving voltage=0 is the strongest external
-    // proof of that contract: the converged solution is bit-exact 0V.
+// ---------------------------------------------------------------------------
+// VariableRail DCOP analytical (T1) — Cat 2 analytical
+// ---------------------------------------------------------------------------
+
+describe("VariableRail DCOP analytical (T1)", () => {
+  it("dcop_pos_node_equals_rail_voltage_5v", () => {
+    // Closed-form: V(vrail:pos) = 5.0. Loop current |I| = 5/1000 = 5 mA.
+    // The single declared pin is "pos"; getElementPinCurrents returns a
+    // length-1 array (the branch current into pos). Sign convention is
+    // solver-internal — assert magnitude.
     const fix = buildFixture({
-      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 0 }),
+      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 5, resistance: 1000 }),
     });
-    const result = fix.coordinator.dcOperatingPoint()!;
-    expect(result.converged).toBe(true);
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(0, 6);
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(5.0, 9);
+
+    const vrIdx = findElementIndexByLabel(fix, "vrail");
+    const vrPins = fix.engine.getElementPinCurrents(vrIdx);
+    expect(Math.abs(vrPins[0])).toBeCloseTo(5.0 / 1000, 9);
   });
 
-  it("voltage_change_via_setComponentProperty_takes_effect -- 5V then 10V", () => {
-    // Hot-loadable param contract: the rail's `voltage` model param must be
-    // mutable through coordinator.setComponentProperty (production slider
-    // path) without recompiling. After the patch + a fresh DCOP, the rail
-    // node must read the new voltage.
+  it("dcop_pos_node_equals_rail_voltage_12v_smaller_load", () => {
+    // Higher-magnitude operating regime (12V into 470Ω). Closed-form:
+    // V(vrail:pos) = 12.0; |I| = 12/470 ≈ 0.025532 A.
     const fix = buildFixture({
-      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 5 }),
+      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 12, resistance: 470 }),
     });
-    const dc1 = fix.coordinator.dcOperatingPoint()!;
-    expect(dc1.converged).toBe(true);
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(5, 6);
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc!.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(12.0, 9);
 
-    const railEl = fix.circuit.elements.find((el) => el.label === "vrail")!;
-    expect(railEl).toBeDefined();
-    const rce = fix.circuit.elementToCircuitElement.get(
-      fix.circuit.elements.indexOf(railEl),
-    )!;
-    fix.coordinator.setComponentProperty(rce, "voltage", 10);
-
-    const dc2 = fix.coordinator.dcOperatingPoint()!;
-    expect(dc2.converged).toBe(true);
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(10, 6);
+    const vrIdx = findElementIndexByLabel(fix, "vrail");
+    const vrPins = fix.engine.getElementPinCurrents(vrIdx);
+    expect(Math.abs(vrPins[0])).toBeCloseTo(12.0 / 470, 9);
   });
 
-  it("definition_engine_type_analog -- behavioral model is registered", () => {
-    expect(VariableRailDefinition.modelRegistry?.behavioral).toBeDefined();
-  });
-
-  it("analogFactory_creates_element -- factory returns a non-null element", () => {
-    const props = new PropertyBag();
-    props.replaceModelParams({ voltage: 7 });
-    const el = getFactory(VariableRailDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1]]),
-      props,
-      () => 0,
-    );
-    expect(el).toBeDefined();
-  });
-
-  it("element_allocates_branch_row_after_compile -- branchIndex > 0 in compiled circuit", () => {
+  it("dcop_pos_node_settles_to_zero_when_voltage_is_zero", () => {
+    // FOLDED from original `zero_voltage_settles_to_zero`: voltage=0 is the
+    // strongest external proof of the unconditional `rhs[branch] += voltage`
+    // path in load() (no srcFact gating that would zero the RHS during the
+    // DCOP source-stepping sweep). Closed-form: V(vrail:pos) = 0.0.
     const fix = buildFixture({
-      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 5 }),
+      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 0, resistance: 1000 }),
     });
-    const railEl = fix.circuit.elements.find((el) => el.label === "vrail")!;
-    expect(railEl).toBeDefined();
-    expect(railEl.branchIndex).toBeGreaterThan(0);
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc!.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "vrail:pos"))).toBeCloseTo(0.0, 9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VariableRail parameter hot-load (T1) — Cat 4
+// ---------------------------------------------------------------------------
+//
+// VariableRail params: `voltage` (primary, only). No TEMP / AREA / SCALE /
+// derived-state-recompute parameters — `setParam("voltage", v)` directly
+// updates the cached `_voltage` field consumed at the next load(). One it()
+// covers the only param.
+
+describe("VariableRail parameter hot-load (T1)", () => {
+  it("hotload_voltage_changes_pos_node", () => {
+    // Cat 4: vrail=5V, rl=1k → V(vrail:pos)=5V before. Hot-load voltage=10V →
+    // V(vrail:pos)=10V after. Closed-form post-change observable.
+    const fix = buildFixture({
+      build: (_r, facade) => buildVRailCircuit(facade, { voltage: 5, resistance: 1000 }),
+    });
+    const posNode = nodeOf(fix, "vrail:pos");
+    fix.coordinator.dcOperatingPoint();
+    const before = fix.engine.getNodeVoltage(posNode);
+    expect(before).toBeCloseTo(5.0, 9);
+
+    const vrEl = ceByLabel(fix, "vrail");
+    fix.coordinator.setComponentProperty(vrEl, "voltage", 10);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(posNode);
+
+    expect(after).not.toBeCloseTo(before, 4);
+    expect(after).toBeCloseTo(10.0, 9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VariableRail paired vs ngspice — 12V/1k load (T3) — Cat 2 num / 3 / 5
+// ---------------------------------------------------------------------------
+//
+// Per Step 2c: the harness RUN lives in the FIRST it() of the describe
+// (transient run); subsequent siblings read from the recorded session.
+
+describeIfDll("VariableRail paired vs ngspice — 12V/1k load (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_VRAIL_12V_1K, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_12v_1k", async () => {
+    await session.runTransient(0, 1e-3, 10e-6);
+    session.compareAllSteps();
+  }, 120_000);
+
+  it("dcop_paired_12v_1k", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_12v_1k", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// VariableRail paired vs ngspice — 5V RC charge (T3) — Cat 2 num / 3 / 5
+// ---------------------------------------------------------------------------
+//
+// Second operating-region configuration: a transient regime where the rail
+// drives an RC charging network (tau = RC = 1ms). The capacitor's companion
+// model evolves with predictor / dt-selection while the rail's branch-row
+// stamp must remain bit-exact against ngspice across every iteration.
+
+describeIfDll("VariableRail paired vs ngspice — 5V RC charge (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_VRAIL_RC_CHARGE, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_rc_charge", async () => {
+    await session.runTransient(0, 5e-3, 50e-6);
+    session.compareAllSteps();
+  }, 120_000);
+
+  it("dcop_paired_rc_charge", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_rc_charge", () => {
+    session.compareAllAttempts();
   });
 });
