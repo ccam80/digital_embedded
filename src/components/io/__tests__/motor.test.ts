@@ -6,7 +6,7 @@ import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // Canon set: 9 (Bridge / digital interaction)
-// File tier: fixture-only (digital-only — RotEncoder, StepperMotorBipolar,
+// File tier: fixture-only (digital-only — StepperMotorBipolar and
 // StepperMotorUnipolar are pure-digital IO components with only
 // models.digital.executeFn; no analog stamping, no setup()/load(), no
 // junction limiting, no LTE, no breakpoint registration. buildFixture()
@@ -22,35 +22,6 @@ interface DigitalFixture {
 
 function digital(value: number): SignalValue {
   return { type: "digital", value };
-}
-
-// ---------------------------------------------------------------------------
-// RotaryEncoder fixture: stand-alone encoder whose A and B outputs are
-// observed via labelled Out components downstream. RotEncoder has zero
-// input pins (its position is an internal scratch state slot only mutated
-// by user-interaction events; not label-addressable). The canonical
-// observable is the power-on output pattern produced by executeRotaryEncoder
-// reading the default-zero position scratch slot.
-// ---------------------------------------------------------------------------
-
-function buildRotaryEncoderFixture(opts?: { encoderLabel?: string }): DigitalFixture {
-  const encoderLabel = opts?.encoderLabel ?? "RE1";
-
-  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
-    { id: "re1", type: "RotEncoder", props: { label: encoderLabel } },
-    { id: "outA", type: "Out", props: { label: "OUT_A", bitWidth: 1 } },
-    { id: "outB", type: "Out", props: { label: "OUT_B", bitWidth: 1 } },
-  ];
-  const connections: Array<[string, string]> = [
-    ["re1:A", "outA:in"],
-    ["re1:B", "outB:in"],
-  ];
-
-  const registry = createDefaultRegistry();
-  const facade = new DefaultSimulatorFacade(registry);
-  const circuit = facade.build({ components, connections });
-  const coordinator = facade.compile(circuit);
-  return { facade, coordinator };
 }
 
 // ---------------------------------------------------------------------------
@@ -120,49 +91,6 @@ function buildUnipolarFixture(opts?: { motorLabel?: string }): DigitalFixture {
   const coordinator = facade.compile(circuit);
   return { facade, coordinator };
 }
-
-// ===========================================================================
-// RotEncoder — bridge / digital (Cat 9, T1)
-// ===========================================================================
-
-describe("RotEncoder — bridge / digital (Cat 9, T1)", () => {
-  it("power_on_position_zero_drives_A_low_and_B_low", () => {
-    // Documented contract: position 0 maps to QUADRATURE_TABLE[0] = [0, 0].
-    // RotEncoder has no input pins; the position scratch slot defaults to 0
-    // at construction, so executeRotaryEncoder publishes [A=0, B=0] on the
-    // first coordinator.step().
-    const fix = buildRotaryEncoderFixture();
-    fix.coordinator.step();
-    expect(fix.coordinator.readByLabel("OUT_A")).toMatchObject({
-      type: "digital",
-      value: 0,
-    });
-    expect(fix.coordinator.readByLabel("OUT_B")).toMatchObject({
-      type: "digital",
-      value: 0,
-    });
-    fix.coordinator.dispose();
-  });
-
-  it("default_outputs_are_stable_across_repeated_steps", () => {
-    // Documented contract: with no interaction (position scratch slot
-    // unchanged), repeated coordinator.step() calls keep both outputs at
-    // the QUADRATURE_TABLE[0] pattern.
-    const fix = buildRotaryEncoderFixture();
-    for (let i = 0; i < 4; i++) {
-      fix.coordinator.step();
-      expect(fix.coordinator.readByLabel("OUT_A")).toMatchObject({
-        type: "digital",
-        value: 0,
-      });
-      expect(fix.coordinator.readByLabel("OUT_B")).toMatchObject({
-        type: "digital",
-        value: 0,
-      });
-    }
-    fix.coordinator.dispose();
-  });
-});
 
 // ===========================================================================
 // StepperMotorBipolar — bridge / digital (Cat 9, T1)

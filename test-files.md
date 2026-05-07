@@ -45,10 +45,8 @@
 - [x] src/components/io/__tests__/led.test.ts
 - [x] src/components/io/__tests__/midi.test.ts
 - [ ] src/components/io/__tests__/port.test.ts
-- [x] src/components/io/__tests__/power-supply.test.ts
 - [x] src/components/io/__tests__/probe.test.ts
-- [x] src/components/io/__tests__/rotary-encoder-motor.test.ts
-- [ ] src/components/io/__tests__/scope.test.ts
+- [x] src/components/io/__tests__/motor.test.ts
 - [ ] src/components/io/__tests__/segment-displays.test.ts
 - [ ] src/components/memory/__tests__/counter.test.ts
 - [ ] src/components/memory/__tests__/eeprom.test.ts
@@ -65,7 +63,7 @@
 - [x] src/components/passives/__tests__/analog-fuse.test.ts
 - [x] src/components/passives/__tests__/capacitor.test.ts
 - [x] src/components/passives/__tests__/crystal.test.ts
-- [ ] src/components/passives/__tests__/inductor.test.ts
+- [x] src/components/passives/__tests__/inductor.test.ts
 - [x] src/components/passives/__tests__/memristor-rollback.test.ts
 - [x] src/components/passives/__tests__/memristor.test.ts
 - [x] src/components/passives/__tests__/polarized-cap.test.ts
@@ -75,7 +73,6 @@
 - [ ] src/components/passives/__tests__/transformer.test.ts
 - [ ] src/components/passives/__tests__/transmission-line.test.ts
 - [ ] src/components/pld/__tests__/pld.test.ts
-- [ ] src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts
 - [x] src/components/semiconductors/__tests__/bjt.test.ts
 - [ ] src/components/semiconductors/__tests__/diac.test.ts
 - [ ] src/components/semiconductors/__tests__/diode.test.ts

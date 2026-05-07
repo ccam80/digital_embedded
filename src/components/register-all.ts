@@ -32,15 +32,11 @@ import { ButtonDefinition } from "./io/button.js";
 import { ButtonLEDDefinition } from "./io/button-led.js";
 import { DipSwitchDefinition } from "./io/dip-switch.js";
 import { ProbeDefinition } from "./io/probe.js";
-import { ScopeDefinition } from "./io/scope.js";
-import { ScopeTriggerDefinition } from "./io/scope-trigger.js";
 import { SevenSegDefinition } from "./io/seven-seg.js";
 import { SevenSegHexDefinition } from "./io/seven-seg-hex.js";
 import { SixteenSegDefinition } from "./io/sixteen-seg.js";
 import { MidiDefinition } from "./io/midi.js";
-import { RotaryEncoderDefinition } from "./io/rotary-encoder.js";
 import { StepperMotorBipolarDefinition, StepperMotorUnipolarDefinition } from "./io/stepper-motor.js";
-import { PowerSupplyDefinition } from "./io/power-supply.js";
 import { PortDefinition } from "./io/port.js";
 
 // Flip-flops
@@ -318,16 +314,12 @@ export function createDefaultRegistry(
   registry.register(ButtonLEDDefinition);
   registry.register(DipSwitchDefinition);
   registry.register(ProbeDefinition);
-  registry.register(ScopeDefinition);
-  registry.register(ScopeTriggerDefinition);
   registry.register(SevenSegDefinition);
   registry.register(SevenSegHexDefinition);
   registry.register(SixteenSegDefinition);
   registry.register(MidiDefinition);
-  registry.register(RotaryEncoderDefinition);
   registry.register(StepperMotorBipolarDefinition);
   registry.register(StepperMotorUnipolarDefinition);
-  registry.register(PowerSupplyDefinition);
   registry.register(PortDefinition);
 
   // Flip-flops

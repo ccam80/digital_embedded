@@ -19,7 +19,7 @@ import type { Diagnostic } from './types.js';
 
 export const INFRASTRUCTURE_TYPES = new Set([
   'Wire', 'Tunnel', 'Ground', 'Probe',
-  'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port',
+  'Splitter', 'Driver', 'NotConnected', 'Port',
 ]);
 
 // ---------------------------------------------------------------------------

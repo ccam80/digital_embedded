@@ -22,8 +22,7 @@ const LOGIC = ['And', 'Or', 'Not', 'NAnd', 'NOr', 'XOr', 'XNOr'];
 const IO = [
   'In', 'Out', 'Clock', 'Const', 'Button', 'ButtonLED', 'DipSwitch',
   'Ground', 'VDD', 'NotConnected', 'LED', 'PolarityAwareLED', 'LightBulb',
-  'RGBLED', 'Probe', 'Scope', 'ScopeTrigger', 'SevenSeg', 'SevenSegHex',
-  'SixteenSeg', 'PowerSupply', 'MIDI', 'RotEncoder',
+  'RGBLED', 'Probe', 'SevenSeg', 'SevenSegHex', 'SixteenSeg', 'MIDI',
   'StepperMotorBipolar', 'StepperMotorUnipolar',
 ];
 
