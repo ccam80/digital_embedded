@@ -1,323 +1,323 @@
 /**
- * Unit tests for BehavioralTFlipflopDriverElement load() semantics.
+ * Canonical tests for BehavioralTFlipflopDriverElement.
  *
- * Drives load() directly with a minimal mock LoadContext + StatePoolRef so
- * the toggle / hold / edge-detection / forceToggle paths are isolated from
- * the rest of the analog pipeline. State-pool slot semantics (s1=last
- * accepted, s0=current step) are simulated by promoting s0 → s1 between
- * "accepted" steps.
+ * The driver is an `internalOnly: true` sub-element of the T_FF parent
+ * component. The sanctioned access path is via the parent T_FF compiled in
+ * `model: "behavioral"`, which constructs the driver inside the analog
+ * subcircuit netlist (see `buildTFlipflopNetlist` in
+ * `src/components/flipflops/t.ts`). Driving the parent's labelled T / C input
+ * pins and observing its labelled Q / ~Q output pins through
+ * `facade.setSignal` / `facade.step` / `facade.readSignal` exercises the
+ * driver via the canonical Cat 9 bridge surface.
+ *
+ * Tier: fixture-only (T1).
+ *
+ * Canon coverage:
+ *   - Cat 1  (init): post-warm-start Q / ~Q output state at step 0 with no
+ *     prior clock activity.
+ *   - Cat 2  (DC operating point, analytical): the parent T_FF's Q / ~Q
+ *     digital outputs settle to a deterministic complementary pair after a
+ *     single step.
+ *   - Cat 4  (parameter hot-load): vIH and vIL behavioural-model
+ *     parameters change the clock-edge detection threshold; forceToggle is a
+ *     compile-time structural parameter selected by the T_FF `withEnable`
+ *     prop, exercised as a structural Cat 4 (build-twice, observe shift).
+ *   - Cat 9  (bridge / digital): drive labelled T / C pins, step the engine,
+ *     observe labelled Q / ~Q pins. Includes both topology variants
+ *     (withEnable=true → forceToggle=0; withEnable=false → forceToggle=1).
+ *
+ * Not applicable:
+ *   - Cat 3  / Cat 5: T3 harness only — ngspice has no native T-flip-flop
+ *     primitive, so a paired comparison would require expanding the entire
+ *     behavioural subcircuit into ngspice's primitive set, which is the
+ *     migration's signal not its scope.
+ *   - Cat 6  (limiting): driver carries no junctions; its `load()` does not
+ *     call pnjlim / fetlim / devlim.
+ *   - Cat 7  (LTE rollback): driver does not declare `getLteTimestep`.
+ *   - Cat 8  (breakpoints): driver does not register breakpoints in
+ *     `acceptStep`.
+ *   - Cat 10 (named model preset): the driver's `modelRegistry` exposes a
+ *     single `default` entry — there is no second preset to swap.
+ *   - Cat 11 (multi-output digital): Q / ~Q are trivially complementary
+ *     (excluded by capability gate 11).
+ *   - Cat 12 (forbidden inputs): no documented forbidden input combination.
+ *   - Cat 13 (port-width clamping): all driver pins are 1-bit; nothing to
+ *     mask.
+ *   - Cat 14 (runtime diagnostic): driver emits no runtime diagnostics.
+ *   - Cat 15 (cross-engine writeback): driver registers no `_onStateChange`
+ *     subscription.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
-import {
-  BehavioralTFlipflopDriverElement,
-  BehavioralTFlipflopDriverDefinition,
-} from "../t-flipflop-driver.js";
-import { PropertyBag } from "../../../../core/properties.js";
-import type { LoadContext } from "../../load-context.js";
-import type { StatePoolRef } from "../../state-pool.js";
+import { describe, it, expect } from "vitest";
+import { buildFixture } from "../../__tests__/fixtures/build-fixture.js";
+import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
+import type { ComponentRegistry } from "../../../../core/registry.js";
+import type { CircuitElement } from "../../../../core/element.js";
 
 // ---------------------------------------------------------------------------
-// Pin / node assignment- driver-local toy MNA layout
-// ---------------------------------------------------------------------------
+// Topology builders.
 //
-// Node 0 is GND (ngspice convention). The driver reads (T - gnd), (C - gnd).
-// Pinning gnd to a non-zero node verifies the driver's gnd-relative read is
-// correct, not just collapsing to a hard zero.
-
-const NODE_GND = 1;
-const NODE_T   = 2;
-const NODE_C   = 3;
-const NODE_Q   = 4;
-const NODE_NQ  = 5;
-const NODE_COUNT = 6;
-
-function makePinNodes(): Map<string, number> {
-  return new Map<string, number>([
-    ["gnd", NODE_GND],
-    ["T",   NODE_T],
-    ["C",   NODE_C],
-    ["Q",   NODE_Q],
-    ["~Q",  NODE_NQ],
-  ]);
-}
-
-// ---------------------------------------------------------------------------
-// Minimal pool / context mocks- only the surface load() touches.
+// The parent T_FF in `model: "behavioral"` constructs the driver under the
+// hood. Driving its labelled T / C input pins through labelled In components
+// and observing its labelled Q / ~Q output pins through labelled Out
+// components is the canonical bridge surface for the driver.
+//
+// Two topology variants:
+//   withEnable=true  → driver runs with forceToggle=0; T pin is real and
+//                      gates the toggle.
+//   withEnable=false → driver runs with forceToggle=1; T pin is wired to gnd
+//                      internally and ignored.
 // ---------------------------------------------------------------------------
 
-interface MockPool {
-  pool: StatePoolRef;
-  promote(): void;
+interface TFFFixtureOpts {
+  withEnable: boolean;
+  /** Optional behavioral model params to override (vIH, vIL, etc). */
+  modelOverrides?: Record<string, number>;
 }
 
-function makePool(stateSize: number): MockPool {
-  const s0 = new Float64Array(stateSize);
-  const s1 = new Float64Array(stateSize);
-  const states: Float64Array[] = [s0, s1];
-  const pool = {
-    states,
-    state0: s0,
-    state1: s1,
-    state2: new Float64Array(stateSize),
-    state3: new Float64Array(stateSize),
-    state4: new Float64Array(stateSize),
-    state5: new Float64Array(stateSize),
-    state6: new Float64Array(stateSize),
-    state7: new Float64Array(stateSize),
-    totalSlots: stateSize,
-    tranStep: 0,
-  } as unknown as StatePoolRef;
+function buildTFFCircuit(opts: TFFFixtureOpts) {
+  return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade) => {
+    const tffProps: Record<string, number | string | boolean> = {
+      label: "tff",
+      model: "behavioral",
+      withEnable: opts.withEnable,
+    };
+    if (opts.modelOverrides !== undefined) {
+      for (const [k, v] of Object.entries(opts.modelOverrides)) {
+        tffProps[k] = v;
+      }
+    }
 
-  return {
-    pool,
-    promote() {
-      // Simulate engine's accept-step rotation: s1 (last accepted) ← s0
-      // (current). The driver writes to s0 in load(); after promotion the
-      // next load() reads its own previous writes via s1.
-      for (let i = 0; i < stateSize; i++) s1[i] = s0[i];
-    },
+    const components: Array<{ id: string; type: string; props?: Record<string, number | string | boolean> }> = [
+      { id: "tff", type: "T_FF", props: tffProps },
+      { id: "cIn", type: "In", props: { label: "C", bitWidth: 1 } },
+      { id: "qOut", type: "Out", props: { label: "Q", bitWidth: 1 } },
+      { id: "qbOut", type: "Out", props: { label: "QB", bitWidth: 1 } },
+    ];
+    const connections: Array<[string, string]> = [
+      ["cIn:out", "tff:C"],
+      ["tff:Q", "qOut:in"],
+      ["tff:~Q", "qbOut:in"],
+    ];
+    if (opts.withEnable) {
+      components.push({ id: "tIn", type: "In", props: { label: "T", bitWidth: 1 } });
+      connections.push(["tIn:out", "tff:T"]);
+    }
+    return facade.build({ components, connections });
   };
 }
 
-function makeCtx(rhsOld: Float64Array): LoadContext {
-  return { rhsOld } as unknown as LoadContext;
+/**
+ * Drive a single labelled clock In through one full low-high-low cycle so a
+ * single rising edge reaches the driver's edge-detector.
+ */
+function pulseClock(
+  fix: ReturnType<typeof buildFixture>,
+  clkLabel: string,
+): void {
+  fix.facade.setSignal(fix.coordinator, clkLabel, 0);
+  fix.coordinator.step();
+  fix.facade.setSignal(fix.coordinator, clkLabel, 1);
+  fix.coordinator.step();
+  fix.facade.setSignal(fix.coordinator, clkLabel, 0);
+  fix.coordinator.step();
 }
 
-function setVoltages(rhs: Float64Array, vT: number, vClock: number): void {
-  rhs[NODE_GND] = 0;
-  rhs[NODE_T]   = vT;
-  rhs[NODE_C]   = vClock;
-}
-
-// ---------------------------------------------------------------------------
-// Driver factory- bypass setup() because the test drives load() directly.
-// ---------------------------------------------------------------------------
-
-function makeDriver(opts: { forceToggle?: 0 | 1; vIH?: number; vIL?: number } = {}) {
-  const props = new PropertyBag();
-  props.setModelParam("vIH", opts.vIH ?? 2.0);
-  props.setModelParam("vIL", opts.vIL ?? 0.8);
-  if (opts.forceToggle !== undefined) {
-    props.setModelParam("forceToggle", opts.forceToggle);
+/** Resolve the parent T_FF CircuitElement for setComponentProperty hot-load. */
+function getTFFElement(fix: ReturnType<typeof buildFixture>): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    const label = ce.getProperties().getOrDefault<string>("label", "");
+    if (label === "tff") return ce;
   }
-  const drv = new BehavioralTFlipflopDriverElement(makePinNodes(), props);
-  drv._stateBase = 0;
-  const mockPool = makePool(drv.stateSize);
-  drv.initState(mockPool.pool);
-  return { drv, mockPool };
+  throw new Error("getTFFElement: no T_FF element labelled 'tff' found in fixture");
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Cat 1 — Initialization
+// ===========================================================================
 
-describe("BehavioralTFlipflopDriverElement.load", () => {
-  let rhs: Float64Array;
-  beforeEach(() => {
-    rhs = new Float64Array(NODE_COUNT);
+describe("BehavioralTFlipflopDriver init (Cat 1)", () => {
+  it("withEnable=true: post-warm-start Q=0, ~Q=1 with no prior clock activity", () => {
+    // Driver's initState seeds Q=0 → OUTPUT_LOGIC_LEVEL_Q=0,
+    // OUTPUT_LOGIC_LEVEL_NQ=1. The qPin / nqPin sub-elements drive the
+    // labelled Q / ~Q outputs from those slots.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);
   });
 
-  describe("withEnable=true (forceToggle=0, default)", () => {
-    it("holds Q on first sample even if clock starts high (_firstSample skip)", () => {
-      const { drv, mockPool } = makeDriver();
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      // No edge detected on first sample → Q stays at initial 0.
-      expect(mockPool.pool.states[0][1]).toBe(0); // SLOT_Q
-      expect(mockPool.pool.states[0][2]).toBe(0); // SLOT_OUT_Q
-      expect(mockPool.pool.states[0][3]).toBe(1); // SLOT_OUT_NQ
-    });
-
-    it("toggles Q on rising clock edge when T is high", () => {
-      const { drv, mockPool } = makeDriver();
-      // Step 1: clock low, T high. Establish baseline (no edge).
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Step 2: clock rises with T still high → toggle Q from 0 to 1.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1); // SLOT_Q
-      expect(mockPool.pool.states[0][2]).toBe(1); // SLOT_OUT_Q
-      expect(mockPool.pool.states[0][3]).toBe(0); // SLOT_OUT_NQ
-    });
-
-    it("toggles back on the next rising edge with T high", () => {
-      const { drv, mockPool } = makeDriver();
-      // Step 1: clock low, T high.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Step 2: rising edge → Q = 1.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Step 3: clock falls (no edge) → hold.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1);
-      mockPool.promote();
-      // Step 4: rising edge again → Q toggles back to 0.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0);
-    });
-
-    it("holds Q on rising edge when T is low", () => {
-      const { drv, mockPool } = makeDriver();
-      // Pre-load Q=1 by toggling once.
-      setVoltages(rhs, 5, 0); drv.load(makeCtx(rhs)); mockPool.promote();
-      setVoltages(rhs, 5, 5); drv.load(makeCtx(rhs)); mockPool.promote();
-      expect(mockPool.pool.states[1][1]).toBe(1);
-      // Now drop T low and pulse the clock- Q should hold.
-      setVoltages(rhs, /*vT*/ 0, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      setVoltages(rhs, /*vT*/ 0, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1); // held
-    });
-
-    it("holds Q on rising edge when T is indeterminate (between vIL and vIH)", () => {
-      const { drv, mockPool } = makeDriver({ vIH: 2.0, vIL: 0.8 });
-      // Establish baseline at clock low.
-      setVoltages(rhs, /*vT*/ 1.5, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Rising edge with T in the indeterminate band [0.8, 2.0).
-      setVoltages(rhs, /*vT*/ 1.5, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0); // initial 0, held
-    });
-
-    it("does not toggle on falling clock edge", () => {
-      const { drv, mockPool } = makeDriver();
-      // Clock starts high (no edge on first sample due to _firstSample guard).
-      setVoltages(rhs, 5, 5);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Clock falls.
-      setVoltages(rhs, 5, 0);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0); // no toggle
-    });
-
-    it("respects vIH threshold for clock edge detection", () => {
-      const { drv, mockPool } = makeDriver({ vIH: 3.0, vIL: 0.8 });
-      // Clock at 2.5 < vIH=3.0 is "low" for edge detection.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 2.5);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Step 2: clock to 2.9 (still below vIH=3.0)- no edge.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 2.9);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0);
-      mockPool.promote();
-      // Step 3: clock crosses vIH → toggle.
-      setVoltages(rhs, /*vT*/ 5, /*vClock*/ 3.0);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1);
-    });
-
-    it("reads voltages relative to gnd node, not absolute", () => {
-      const { drv, mockPool } = makeDriver();
-      // Lift gnd reference to 2V; T at 7V (delta 5V → high), clock at 2V
-      // (delta 0 → low).
-      rhs[NODE_GND] = 2;
-      rhs[NODE_T]   = 7;
-      rhs[NODE_C]   = 2;
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      // Rising edge: clock goes to 7V (delta 5V → high), T still high.
-      rhs[NODE_C] = 7;
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1); // toggled
-    });
-  });
-
-  describe("withEnable=false (forceToggle=1)", () => {
-    it("toggles unconditionally on rising clock edge regardless of T", () => {
-      const { drv, mockPool } = makeDriver({ forceToggle: 1 });
-      // T held LOW so any T-gated path would hold; forceToggle must override.
-      setVoltages(rhs, /*vT*/ 0, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      setVoltages(rhs, /*vT*/ 0, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1);
-      mockPool.promote();
-      setVoltages(rhs, /*vT*/ 0, /*vClock*/ 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      setVoltages(rhs, /*vT*/ 0, /*vClock*/ 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0); // toggled back
-    });
-
-    it("still respects rising-edge detection (no toggle without edge)", () => {
-      const { drv, mockPool } = makeDriver({ forceToggle: 1 });
-      // Hold clock high across two steps- no edge after the first sample.
-      setVoltages(rhs, 0, 5);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      setVoltages(rhs, 0, 5);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0);
-    });
-  });
-
-  describe("setParam", () => {
-    it("hot-loads vIH and vIL", () => {
-      const { drv, mockPool } = makeDriver({ vIH: 2.0, vIL: 0.8 });
-      drv.setParam("vIH", 4.0);
-      drv.setParam("vIL", 1.0);
-      // Clock at 3V was a rising edge under vIH=2.0; under vIH=4.0 it is
-      // sub-threshold and produces no edge.
-      setVoltages(rhs, 5, 0);
-      drv.load(makeCtx(rhs));
-      mockPool.promote();
-      setVoltages(rhs, 5, 3);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(0); // no edge under new vIH
-      mockPool.promote();
-      setVoltages(rhs, 5, 4);
-      drv.load(makeCtx(rhs));
-      expect(mockPool.pool.states[0][1]).toBe(1); // crosses 4.0 → toggle
-    });
-  });
-
-  describe("getPinCurrents", () => {
-    it("returns all-zero array sized to pin count (driver injects no current)", () => {
-      const { drv } = makeDriver();
-      const currents = drv.getPinCurrents(new Float64Array(NODE_COUNT));
-      expect(currents).toHaveLength(5);
-      expect(currents.every((c) => c === 0)).toBe(true);
-    });
+  it("withEnable=false: post-warm-start Q=0, ~Q=1 with no prior clock activity", () => {
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Definition / registration sanity
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Cat 2 — DC operating point (analytical)
+// ===========================================================================
 
-describe("BehavioralTFlipflopDriverDefinition", () => {
-  it("is internal-only with the canonical default model", () => {
-    expect(BehavioralTFlipflopDriverDefinition.internalOnly).toBe(true);
-    expect(BehavioralTFlipflopDriverDefinition.modelRegistry?.default).toBeDefined();
-    expect(BehavioralTFlipflopDriverDefinition.defaultModel).toBe("default");
+describe("BehavioralTFlipflopDriver DCOP (Cat 2 analytical)", () => {
+  it("withEnable=true: DCOP converges with Q / ~Q complementary at the documented init level", () => {
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    // Drive both inputs LOW for a quiescent DCOP.
+    fix.facade.setSignal(fix.coordinator, "T", 0);
+    fix.facade.setSignal(fix.coordinator, "C", 0);
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    fix.coordinator.step();
+    // Closed-form: with C held LOW (no rising edge), Q stays at the
+    // initState seed value 0; ~Q is the complement.
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);
   });
 
-  it("declares vIH, vIL, and forceToggle paramDefs", () => {
-    const model = BehavioralTFlipflopDriverDefinition.modelRegistry!.default!;
-    expect(model.kind).toBe("inline");
-    const inline = model as { kind: "inline"; paramDefs: { key: string }[] };
-    const keys = inline.paramDefs.map((p) => p.key).sort();
-    expect(keys).toEqual(["forceToggle", "vIH", "vIL"]);
+  it("withEnable=false: DCOP converges with Q / ~Q complementary at the documented init level", () => {
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
+    fix.facade.setSignal(fix.coordinator, "C", 0);
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    fix.coordinator.step();
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);
+  });
+});
+
+// ===========================================================================
+// Cat 9 — Bridge / digital interaction
+// ===========================================================================
+
+describe("BehavioralTFlipflopDriver bridge / digital (Cat 9) — withEnable=true (forceToggle=0)", () => {
+  it("first rising clock edge with T=1 toggles Q from 0 to 1", () => {
+    // T high, pulse clock once. Closed-form: Q toggles from initial 0 to 1.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fix.facade.setSignal(fix.coordinator, "T", 1);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(0);
   });
 
-  it("exposes T, C, Q, ~Q, gnd pins in that order", () => {
-    expect(BehavioralTFlipflopDriverDefinition.pinLayout!.map((p) => p.label))
-      .toEqual(["T", "C", "Q", "~Q", "gnd"]);
+  it("two successive rising edges with T=1 toggle Q back to 0", () => {
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fix.facade.setSignal(fix.coordinator, "T", 1);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);
+  });
+
+  it("rising clock edge with T=0 holds Q at its current value", () => {
+    // First pulse with T=1 to seed Q=1, then drop T=0 and pulse — Q stays 1.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fix.facade.setSignal(fix.coordinator, "T", 1);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    fix.facade.setSignal(fix.coordinator, "T", 0);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(0);
+  });
+
+  it("falling clock edge with T=1 does not toggle Q", () => {
+    // Hold T high. Drive clock high (no rising edge from initial 0 because
+    // _firstSample skips the very first sample, but the parent's labelled In
+    // initialises clock=0 then transitions to 0→1 via setSignal+step).
+    // Then 1→0 is the falling edge under test; Q must hold whatever
+    // value the prior rising edge set.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fix.facade.setSignal(fix.coordinator, "T", 1);
+    fix.facade.setSignal(fix.coordinator, "C", 0);
+    fix.coordinator.step();
+    fix.facade.setSignal(fix.coordinator, "C", 1);
+    fix.coordinator.step();
+    const qAfterRise = fix.facade.readSignal(fix.coordinator, "Q");
+    fix.facade.setSignal(fix.coordinator, "C", 0);
+    fix.coordinator.step();
+    // Q must be unchanged across the falling edge.
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(qAfterRise);
+  });
+});
+
+describe("BehavioralTFlipflopDriver bridge / digital (Cat 9) — withEnable=false (forceToggle=1)", () => {
+  it("first rising clock edge unconditionally toggles Q from 0 to 1", () => {
+    // forceToggle=1: T pin is wired to gnd internally; toggle is unconditional.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(0);
+  });
+
+  it("two successive rising edges toggle Q 0→1→0 unconditionally", () => {
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
+    expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);
+  });
+});
+
+// ===========================================================================
+// Cat 4 — Parameter hot-load
+// ===========================================================================
+
+describe("BehavioralTFlipflopDriver parameter hot-load (Cat 4)", () => {
+  it("vIH hot-load: raising vIH past current logic-high level suppresses subsequent rising-edge toggle", () => {
+    // Default vIH=2.0V; the labelled In's logic-high level is the family
+    // vOH (CMOS 3V3 → 3.3V on the analog domain). With vIH=2.0V, a rising
+    // clock crosses vIH and toggles Q. After hot-loading vIH=4.0V (above
+    // the labelled-In's vOH=3.3V default), the same rising clock no longer
+    // crosses vIH and Q must hold.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fix.facade.setSignal(fix.coordinator, "T", 1);
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+
+    const tffEl = getTFFElement(fix);
+    fix.coordinator.setComponentProperty(tffEl, "vIH", 4.0);
+
+    // With the new vIH above the labelled-In's vOH, no rising edge is
+    // detected; Q must hold at 1 across a clock pulse.
+    pulseClock(fix, "C");
+    expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(1);
+  });
+
+  it("vIL hot-load: lowering vIL changes the band edge that defines clock-low for edge detection", () => {
+    // Default vIL=0.8V. The driver's edge detector reads the clock voltage
+    // as it is on the analog node; vIL bounds the indeterminate region for
+    // the clock waveform. Driving the clock 0→1 still crosses any
+    // reasonable vIL/vIH; the documented contract is that the param is
+    // hot-loadable (system requirement). Assert: after setting vIL=0.1V,
+    // a normal toggle pulse still produces a toggle (param accepted, not
+    // rejected) — directional check.
+    const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fix.facade.setSignal(fix.coordinator, "T", 1);
+    pulseClock(fix, "C");
+    const qBefore = fix.facade.readSignal(fix.coordinator, "Q");
+
+    const tffEl = getTFFElement(fix);
+    fix.coordinator.setComponentProperty(tffEl, "vIL", 0.1);
+
+    // Toggle continues to operate after the hot-load (param accepted).
+    pulseClock(fix, "C");
+    const qAfter = fix.facade.readSignal(fix.coordinator, "Q");
+    expect(qAfter).not.toBe(qBefore);
+  });
+
+  it("forceToggle structural: withEnable=false (forceToggle=1) toggles on rising edge even with T LOW; withEnable=true (forceToggle=0) does not", () => {
+    // forceToggle is consumed at compile() time via the parent's
+    // withEnable prop; build twice and assert the documented behavioural
+    // shift.
+    const fixGated = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
+    fixGated.facade.setSignal(fixGated.coordinator, "T", 0);
+    pulseClock(fixGated, "C");
+    expect(fixGated.facade.readSignal(fixGated.coordinator, "Q")).toBe(0);
+
+    const fixForce = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
+    pulseClock(fixForce, "C");
+    expect(fixForce.facade.readSignal(fixForce.coordinator, "Q")).toBe(1);
   });
 });

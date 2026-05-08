@@ -114,13 +114,13 @@
 - [ ] src/components/wiring/__tests__/sim-control.test.ts
 - [ ] src/components/wiring/__tests__/wiring.test.ts
 - [ ] src/solver/analog/__tests__/behavioral-flipflop.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-gate.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-integration.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-remaining.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-sequential.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-combinational.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-flipflop-variants.test.ts
-- [ ] src/solver/analog/behavioral-drivers/__tests__/t-flipflop-driver.test.ts
+- [x] src/solver/analog/__tests__/behavioral-gate.test.ts
+- [x] src/solver/analog/__tests__/behavioral-integration.test.ts
+- [x] src/solver/analog/__tests__/behavioral-remaining.test.ts
+- [x] src/solver/analog/__tests__/behavioral-sequential.test.ts
+- [x] src/solver/analog/__tests__/behavioral-combinational.test.ts
+- [x] src/solver/analog/__tests__/behavioral-flipflop-variants.test.ts
+- [x] src/solver/analog/behavioral-drivers/__tests__/t-flipflop-driver.test.ts
 
 ## Engine
 - [ ] src/analysis/__tests__/cycle-detector.test.ts
