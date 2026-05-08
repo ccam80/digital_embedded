@@ -51,7 +51,7 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
 
   it("both engines produce steps", () => {
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      (session.ngspiceSessionAligned ?? session.ngspiceSession)!;
 
     expect(session.ourSession!.steps.length).toBeGreaterThan(0);
     expect(ngSession.steps.length).toBeGreaterThan(0);
@@ -73,7 +73,7 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
 
   it("first step of both engines has stepStartTime === 0", () => {
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      (session.ngspiceSessionAligned ?? session.ngspiceSession)!;
 
     expect(session.ourSession!.steps[0].stepStartTime).toBe(0);
     expect(ngSession.steps[0].stepStartTime).toBe(0);
@@ -82,7 +82,7 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
   it("index-paired steps report stepStartTimeDelta = ours.stepStartTime - ng.stepStartTime", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      (session.ngspiceSessionAligned ?? session.ngspiceSession)!;
     for (let i = 0; i < ourSteps.length; i++) {
       const stepShape = session.getStepShape(i);
       if (stepShape.presence !== "both") continue;
@@ -94,7 +94,7 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
 
   it("stepStartTime values are monotonically non-decreasing in both engines", () => {
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      (session.ngspiceSessionAligned ?? session.ngspiceSession)!;
 
     const ourSteps = session.ourSession!.steps;
     for (let i = 1; i < ourSteps.length; i++) {
@@ -108,7 +108,7 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
   it("timeAlign=true pairs a mid-run step by time when step counts differ", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      (session.ngspiceSessionAligned ?? session.ngspiceSession)!;
 
     if (ourSteps.length === ngSession.steps.length) return;
     if (ourSteps.length < 4 || ngSession.steps.length < 2) return;
@@ -296,8 +296,8 @@ describe("matrix semantic join: _buildMatrixMaps routes BJT internal nodes via n
       };
 
       sAny._nodeMap = [
-        { ourIndex: 0, ngspiceIndex: 1, label: "R1:A", ngspiceName: "1" },
-        { ourIndex: 1, ngspiceIndex: 2, label: "R1:B", ngspiceName: "2" },
+        { ourIndex: 0, ngspiceIndex: 1, label: "R1:pos", ngspiceName: "1" },
+        { ourIndex: 1, ngspiceIndex: 2, label: "R1:neg", ngspiceName: "2" },
       ];
 
       sAny._opts.selfCompare = false;

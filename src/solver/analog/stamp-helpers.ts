@@ -5,7 +5,11 @@
  * 1..matrixSize are non-ground MNA rows. The solver itself routes
  * row==0 / col==0 to the TrashCan element (allocElement spbuild.c:272-273
  * + amendment A2). The RHS buffer is caller-owned (`ctx.rhs`, ngspice
- * CKTrhs); stamps with row == 0 hit the ground sentinel and are dropped.
+ * CKTrhs); ground-row writes land in `rhs[0]`, which is consumed by no
+ * one (spsolve reads only RHS[1..Size], spsolve.c:149-151) and is then
+ * cleared post-solve in newton-raphson.ts (mirrors niiter.c:946-948).
+ * Callers MUST NOT guard ground rows — match ngspice's unconditional
+ * `*(ckt->CKTrhs+XxxNode) += val` (e.g., capload.c:78-79).
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
@@ -17,10 +21,11 @@ export function stampG(solver: SparseSolver, row: number, col: number, val: numb
 
 /**
  * Additive RHS stamp- `*pCKTrhsPtr += val` analogue. ngspice device
- * code does `*(here->XxxNode) += val` directly into ckt->CKTrhs;
- * digiTS callers pass `ctx.rhs` as the buffer. Drops stamps targeting
- * the ground row (row == 0) so callers don't need to guard.
+ * code does `*(here->XxxNode) += val` directly into ckt->CKTrhs without
+ * a ground guard (capload.c:78-79); we mirror that exactly. row == 0
+ * lands in the ground sentinel rhs[0], which the post-SMPsolve clear in
+ * newton-raphson.ts zeroes (niiter.c:946-948).
  */
 export function stampRHS(rhs: Float64Array, row: number, val: number): void {
-  if (row !== 0) rhs[row] += val;
+  rhs[row] += val;
 }

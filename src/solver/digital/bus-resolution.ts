@@ -5,7 +5,7 @@
  * bidirectional lines, switches). When a net has multiple output drivers, the
  * bus resolver determines the net's value by combining all driver outputs.
  *
- * Resolution logic (per bus net, on every change):
+ * Resolution logic (per group, on every change):
  *   1. For each driver, get its value and highZ mask.
  *   2. A bit is high-Z only if ALL drivers assert high-Z on that bit (AND of
  *      all highZ masks).
@@ -13,13 +13,19 @@
  *   4. Burn detection: two non-high-Z drivers that disagree on a bit are a
  *      bus conflict. Detection is deferred to post-step- transient conflicts
  *      are normal during propagation.
- *   5. Pull resistors: if the net has a pull-up, floating bits resolve to 1.
+ *   5. Pull resistors: if the group has a pull-up, floating bits resolve to 1.
  *      Pull-down: floating bits resolve to 0.
  *
- * Switch-driven net merging: when a switch closes, two bus nets merge into one
- * logical net. When it opens, they separate. This reconfigures which driver
- * net IDs contribute to the output net.
+ * Switch-driven net merging: when a switch closes, the bus nets on either
+ * side are unioned into one logical BusGroup whose driver list is the union
+ * of both sides' shadow drivers. Resolution writes the same value to every
+ * member output net. When a switch opens, groups are rebuilt from scratch
+ * (singletons per BusNet, then unioned for every still-closed switch).
  *
+ * The merge approach intentionally avoids treating a resolved bus output net
+ * as a driver of the opposite side- doing so creates a self-feedback path
+ * that lets the previous step's value of one side survive into the current
+ * step's resolution of the other.
  */
 
 import { BurnException } from "@/core/errors.js";
@@ -31,28 +37,93 @@ import { BurnException } from "@/core/errors.js";
 export type PullResistor = "up" | "down" | "none";
 
 // ---------------------------------------------------------------------------
-// BusNet- one multi-driver net
+// resolveBusDrivers- pure resolution math used by both BusNet and BusGroup
+// ---------------------------------------------------------------------------
+
+interface ResolutionResult {
+  value: number;
+  highZ: number;
+  burnMask: number;
+}
+
+function resolveBusDrivers(
+  driverNetIds: readonly number[],
+  pull: PullResistor,
+  state: Uint32Array,
+  highZState: Uint32Array,
+): ResolutionResult {
+  if (driverNetIds.length === 0) {
+    return { value: 0, highZ: 0xffffffff, burnMask: 0 };
+  }
+
+  let combinedHighZ = 0xffffffff;
+  let combinedValue = 0;
+  let burnMask = 0;
+  let committedValue = 0;
+  let committedMask = 0;
+
+  for (const driverId of driverNetIds) {
+    const driverValue = state[driverId] ?? 0;
+    const driverHighZ = highZState[driverId] ?? 0xffffffff;
+    const driverNonHighZ = ~driverHighZ;
+
+    combinedHighZ &= driverHighZ;
+    combinedValue |= driverValue & driverNonHighZ;
+
+    const newNonHighZ = driverNonHighZ & ~burnMask;
+    const alreadyDriven = committedMask & newNonHighZ;
+    const conflict = alreadyDriven & (committedValue ^ (driverValue & driverNonHighZ));
+    burnMask |= conflict;
+
+    committedValue |= driverValue & newNonHighZ;
+    committedMask |= newNonHighZ;
+  }
+
+  if (combinedHighZ !== 0) {
+    if (pull === "up") {
+      combinedValue |= combinedHighZ;
+      combinedHighZ = 0;
+    } else if (pull === "down") {
+      combinedHighZ = 0;
+    }
+  }
+
+  burnMask &= ~combinedHighZ;
+  return {
+    value: combinedValue >>> 0,
+    highZ: combinedHighZ >>> 0,
+    burnMask,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// BusNet- registration record for one multi-driver net
 // ---------------------------------------------------------------------------
 
 /**
- * Manages a single net that has multiple output drivers.
+ * Holds the driver list, pull resistor, and output net ID for a single
+ * registered multi-driver net.
  *
- * Holds the set of driver net IDs, a pull-resistor configuration, and the
- * output net ID to which the resolved value is written.
+ * BusNets are immutable configuration records owned by the resolver. Active
+ * resolution happens in BusGroup objects that are rebuilt on every switch
+ * state change (each BusNet starts as its own singleton group; closed
+ * switches union groups together).
  *
- * All driver net IDs are indices into the engine's state/highZ Uint32Arrays.
- * The output net ID is the index of the net whose value this BusNet controls.
+ * The recalculate/checkBurn methods on BusNet operate on the bus's own
+ * driver list and write to its own output, treating the BusNet as a
+ * standalone single-net resolver. The resolver routes through BusGroups
+ * when switches are involved.
  */
 export class BusNet {
   private readonly _outputNetId: number;
-  private _driverNetIds: number[];
+  private readonly _driverNetIds: readonly number[];
   private readonly _pull: PullResistor;
   private _burnDetected = false;
   private _conflictingValues: number[] = [];
 
   constructor(
     outputNetId: number,
-    driverNetIds: number[],
+    driverNetIds: readonly number[],
     pull: PullResistor,
   ) {
     this._outputNetId = outputNetId;
@@ -68,106 +139,22 @@ export class BusNet {
     return this._driverNetIds;
   }
 
-  /**
-   * Add an extra driver net to this bus (used when a switch closes and
-   * two buses merge).
-   */
-  addDriverNet(netId: number): void {
-    if (!this._driverNetIds.includes(netId)) {
-      this._driverNetIds.push(netId);
-    }
-  }
-
-  /**
-   * Remove a driver net from this bus (used when a switch opens).
-   */
-  removeDriverNet(netId: number): void {
-    this._driverNetIds = this._driverNetIds.filter((id) => id !== netId);
+  get pull(): PullResistor {
+    return this._pull;
   }
 
   /**
    * Recombine all driver values and write the resolved result to the output
-   * net slot in the state arrays.
-   *
-   * Resolution rules:
-   *   - highZ mask for output bit i = AND of all driver highZ masks at bit i
-   *     (a bit is floating only when ALL drivers float it)
-   *   - value for non-floating bit i = OR of all non-high-Z driver values at bit i
-   *   - pull resistor: floating bits become 1 (pull-up) or 0 (pull-down)
-   *   - burn: two drivers both non-high-Z but with different bit values
+   * net slot in the state arrays. Treats this BusNet as a standalone group
+   * of one output net.
    */
   recalculate(state: Uint32Array, highZState: Uint32Array): void {
-    if (this._driverNetIds.length === 0) {
-      // No drivers: full high-Z
-      state[this._outputNetId] = 0;
-      highZState[this._outputNetId] = 0xffffffff;
-      this._burnDetected = false;
-      this._conflictingValues = [];
-      return;
-    }
-
-    // Start: assume all bits are high-Z (AND identity is all-ones)
-    let combinedHighZ = 0xffffffff;
-    let combinedValue = 0;
-    let burnMask = 0; // bits where two non-high-Z drivers disagree
-
-    // Collect each driver's contribution
-    // We track the "committed value" built so far bit-by-bit so we can detect
-    // conflicts when a second non-high-Z driver drives the same bit differently.
-    let committedValue = 0; // value contributed by the first non-high-Z driver per bit
-    let committedMask = 0;  // bits that have at least one non-high-Z driver
-
-    for (const driverId of this._driverNetIds) {
-      const driverValue = state[driverId] ?? 0;
-      const driverHighZ = highZState[driverId] ?? 0xffffffff;
-
-      // A bit is high-Z from this driver when its highZ mask bit is set
-      const driverNonHighZ = ~driverHighZ; // bits this driver is actively driving
-
-      // Combined high-Z: only bits where ALL drivers are high-Z remain high-Z
-      combinedHighZ &= driverHighZ;
-
-      // For non-high-Z bits from this driver: OR into combined value
-      combinedValue |= driverValue & driverNonHighZ;
-
-      // Burn detection: a bit already committed (non-high-Z from a prior
-      // driver) that this driver also drives but to a different value
-      const newNonHighZ = driverNonHighZ & ~burnMask; // skip bits already burning
-      const alreadyDriven = committedMask & newNonHighZ;
-      // Conflict: both drive the bit, values differ
-      const conflict = alreadyDriven & (committedValue ^ (driverValue & driverNonHighZ));
-      burnMask |= conflict;
-
-      // Add new non-high-Z bits from this driver to the committed set
-      committedValue |= driverValue & newNonHighZ;
-      committedMask |= newNonHighZ;
-    }
-
-    // Apply pull resistors to floating (still-high-Z after combining) bits
-    const floatingBits = combinedHighZ;
-    if (floatingBits !== 0) {
-      if (this._pull === "up") {
-        // Pull-up: floating bits become 1, no longer high-Z
-        combinedValue |= floatingBits;
-        combinedHighZ = 0;
-      } else if (this._pull === "down") {
-        // Pull-down: floating bits become 0, no longer high-Z
-        // (combinedValue bits are already 0 for floating positions)
-        combinedHighZ = 0;
-      }
-      // 'none': floating bits remain high-Z- combinedHighZ unchanged
-    }
-
-    // Mask burn to only non-high-Z bits in the final output (burns on
-    // otherwise-floating bits are irrelevant)
-    burnMask &= ~combinedHighZ;
-
-    state[this._outputNetId] = combinedValue >>> 0;
-    highZState[this._outputNetId] = combinedHighZ >>> 0;
-
-    if (burnMask !== 0) {
+    const r = resolveBusDrivers(this._driverNetIds, this._pull, state, highZState);
+    state[this._outputNetId] = r.value;
+    highZState[this._outputNetId] = r.highZ;
+    if (r.burnMask !== 0) {
       this._burnDetected = true;
-      this._conflictingValues = [combinedValue, burnMask];
+      this._conflictingValues = [r.value, r.burnMask];
     } else {
       this._burnDetected = false;
       this._conflictingValues = [];
@@ -176,10 +163,6 @@ export class BusNet {
 
   /**
    * Check whether a burn persists after the propagation step has settled.
-   * Returns a BurnException if burn is detected, undefined otherwise.
-   *
-   * Per the spec, burn detection is deferred to post-step. Transient conflicts
-   * during propagation are normal; only persistent conflicts are errors.
    */
   checkBurn(): BurnException | undefined {
     if (!this._burnDetected) return undefined;
@@ -194,12 +177,71 @@ export class BusNet {
 }
 
 // ---------------------------------------------------------------------------
+// BusGroup- one or more BusNets unioned via closed switches
+// ---------------------------------------------------------------------------
+
+/**
+ * Active resolution unit. A BusGroup is the union of one or more BusNets
+ * that are currently joined by closed switches. Holds the union of all
+ * member shadow driver net IDs and writes the resolved value to every
+ * member output net.
+ *
+ * BusGroups are rebuilt from BusNets and the current switch closure set
+ * on every reconfigureForSwitch call. They are never mutated outside of
+ * rebuild.
+ */
+class BusGroup {
+  outputNetIds: number[];
+  driverNetIds: number[];
+  pull: PullResistor;
+  private _burnDetected = false;
+  private _conflictingValues: number[] = [];
+
+  constructor(
+    outputNetIds: number[],
+    driverNetIds: number[],
+    pull: PullResistor,
+  ) {
+    this.outputNetIds = outputNetIds;
+    this.driverNetIds = driverNetIds;
+    this.pull = pull;
+  }
+
+  recalculate(state: Uint32Array, highZState: Uint32Array): void {
+    const r = resolveBusDrivers(this.driverNetIds, this.pull, state, highZState);
+    for (let i = 0; i < this.outputNetIds.length; i++) {
+      const id = this.outputNetIds[i]!;
+      state[id] = r.value;
+      highZState[id] = r.highZ;
+    }
+    if (r.burnMask !== 0) {
+      this._burnDetected = true;
+      this._conflictingValues = [r.value, r.burnMask];
+    } else {
+      this._burnDetected = false;
+      this._conflictingValues = [];
+    }
+  }
+
+  checkBurn(): BurnException | undefined {
+    if (!this._burnDetected) return undefined;
+    const reportedNetId = this.outputNetIds[0]!;
+    return new BurnException(
+      `Bus conflict on net ${reportedNetId}: conflicting drivers`,
+      {
+        netId: reportedNetId,
+        conflictingValues: this._conflictingValues,
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // SwitchRecord- tracks a registered switch and its current state
 // ---------------------------------------------------------------------------
 
 interface SwitchRecord {
   readonly switchId: number;
-  /** Net IDs that are joined when this switch is closed. */
   readonly netA: number;
   readonly netB: number;
   closed: boolean;
@@ -212,111 +254,88 @@ interface SwitchRecord {
 /**
  * Manages all multi-driver nets in a circuit.
  *
- * Each bus net is registered with `addBusNet()`. When a driver net changes,
- * `onNetChanged()` triggers recalculation of affected bus nets. After a full
- * propagation step, `checkAllBurns()` returns any persistent conflicts.
+ * Each bus net is registered with `addBusNet()`. Each switch is registered
+ * with `registerSwitch()` and toggled via `reconfigureForSwitch()`. Active
+ * resolution happens through BusGroups, which are rebuilt whenever any
+ * switch changes state.
  *
- * Switch-driven merging: `reconfigureForSwitch()` adds/removes driver nets
- * from the affected bus when a switch opens or closes.
+ * `onNetChanged(driverNetId)` recalculates exactly the groups whose driver
+ * list contains that net. `checkAllBurns()` returns persistent conflicts
+ * after a full propagation step has settled.
  */
 export class BusResolver {
   private readonly _busNets: Map<number, BusNet> = new Map();
-  // Map from driver net ID → set of output net IDs it contributes to
-  private readonly _driverToOutputs: Map<number, Set<number>> = new Map();
   private readonly _switches: Map<number, SwitchRecord> = new Map();
+
+  // Active grouping- rebuilt lazily before the first read after any
+  // configuration change.
+  private _groups: BusGroup[] = [];
+  private readonly _busNetToGroup: Map<number, BusGroup> = new Map();
+  private readonly _driverToGroups: Map<number, Set<BusGroup>> = new Map();
+  private _groupsDirty = true;
 
   /**
    * Register a bus net.
-   *
-   * @param outputNetId   The net ID whose value this bus resolves.
-   * @param driverNetIds  The net IDs of all drivers on this bus.
-   * @param pullResistor  Pull-up, pull-down, or none.
    */
   addBusNet(
     outputNetId: number,
     driverNetIds: number[],
     pullResistor: PullResistor,
   ): void {
-    const busNet = new BusNet(outputNetId, driverNetIds, pullResistor);
-    this._busNets.set(outputNetId, busNet);
-
-    for (const driverId of driverNetIds) {
-      this._registerDriverToOutput(driverId, outputNetId);
-    }
+    this._busNets.set(outputNetId, new BusNet(outputNetId, driverNetIds, pullResistor));
+    this._groupsDirty = true;
   }
 
   /**
-   * Called when a driver net changes value. Recalculates all bus nets that
-   * include this driver.
+   * Register a switch component so its open/close state can merge or split
+   * bus nets.
+   */
+  registerSwitch(switchId: number, netA: number, netB: number): void {
+    this._switches.set(switchId, { switchId, netA, netB, closed: false });
+    this._groupsDirty = true;
+  }
+
+  /**
+   * Update the bus topology when a switch opens or closes. Triggers a group
+   * rebuild on the next read.
+   */
+  reconfigureForSwitch(switchId: number, closed: boolean): void {
+    const sw = this._switches.get(switchId);
+    if (sw === undefined) return;
+    if (sw.closed === closed) return;
+    sw.closed = closed;
+    this._groupsDirty = true;
+  }
+
+  /**
+   * Called when a driver net changes value. Recalculates every group whose
+   * driver list contains this net.
    */
   onNetChanged(
     netId: number,
     state: Uint32Array,
     highZState: Uint32Array,
   ): void {
-    const outputs = this._driverToOutputs.get(netId);
-    if (outputs === undefined) return;
-
-    for (const outputNetId of outputs) {
-      const busNet = this._busNets.get(outputNetId);
-      if (busNet !== undefined) {
-        busNet.recalculate(state, highZState);
-      }
+    this._ensureGroupsBuilt();
+    const groups = this._driverToGroups.get(netId);
+    if (groups === undefined) return;
+    for (const group of groups) {
+      group.recalculate(state, highZState);
     }
   }
 
   /**
-   * Check all registered bus nets for persistent burn conditions.
-   * Call this after a full propagation step has settled.
-   *
-   * Returns an array of BurnExceptions for any nets still in conflict.
+   * Check every active group for persistent burn conditions. Call this
+   * after a full propagation step has settled.
    */
   checkAllBurns(): BurnException[] {
+    this._ensureGroupsBuilt();
     const errors: BurnException[] = [];
-    for (const busNet of this._busNets.values()) {
-      const err = busNet.checkBurn();
-      if (err !== undefined) {
-        errors.push(err);
-      }
+    for (const group of this._groups) {
+      const err = group.checkBurn();
+      if (err !== undefined) errors.push(err);
     }
     return errors;
-  }
-
-  /**
-   * Register a switch component so its open/close state can merge or split
-   * bus nets.
-   *
-   * @param switchId  The component index of the switch.
-   * @param netA      Net ID on one side of the switch.
-   * @param netB      Net ID on the other side of the switch.
-   */
-  registerSwitch(switchId: number, netA: number, netB: number): void {
-    this._switches.set(switchId, { switchId, netA, netB, closed: false });
-  }
-
-  /**
-   * Update the bus topology when a switch opens or closes.
-   *
-   * When the switch closes, netB is added as a driver to the bus net that
-   * drives netA (and vice versa, if both are bus outputs). When it opens,
-   * the added driver is removed.
-   */
-  reconfigureForSwitch(switchId: number, closed: boolean): void {
-    const sw = this._switches.get(switchId);
-    if (sw === undefined) return;
-    if (sw.closed === closed) return; // no change
-
-    sw.closed = closed;
-
-    if (closed) {
-      // Merge: add each net as a driver of the other's bus
-      this._addCrossDriver(sw.netA, sw.netB);
-      this._addCrossDriver(sw.netB, sw.netA);
-    } else {
-      // Split: remove the cross-drivers
-      this._removeCrossDriver(sw.netA, sw.netB);
-      this._removeCrossDriver(sw.netB, sw.netA);
-    }
   }
 
   /**
@@ -328,32 +347,71 @@ export class BusResolver {
   }
 
   // -------------------------------------------------------------------------
-  // Private helpers
+  // Group rebuild
   // -------------------------------------------------------------------------
 
-  private _registerDriverToOutput(driverId: number, outputNetId: number): void {
-    let set = this._driverToOutputs.get(driverId);
-    if (set === undefined) {
-      set = new Set();
-      this._driverToOutputs.set(driverId, set);
-    }
-    set.add(outputNetId);
+  private _ensureGroupsBuilt(): void {
+    if (!this._groupsDirty) return;
+    this._rebuildGroups();
+    this._groupsDirty = false;
   }
 
-  private _addCrossDriver(busOutputNetId: number, newDriverNetId: number): void {
-    const busNet = this._busNets.get(busOutputNetId);
-    if (busNet === undefined) return;
-    busNet.addDriverNet(newDriverNetId);
-    this._registerDriverToOutput(newDriverNetId, busOutputNetId);
+  private _rebuildGroups(): void {
+    this._groups = [];
+    this._busNetToGroup.clear();
+    this._driverToGroups.clear();
+
+    // Each BusNet starts as its own singleton group.
+    for (const [outputNetId, busNet] of this._busNets) {
+      const group = new BusGroup(
+        [outputNetId],
+        [...busNet.driverNetIds],
+        busNet.pull,
+      );
+      this._busNetToGroup.set(outputNetId, group);
+      this._groups.push(group);
+    }
+
+    // For each closed switch, union the groups containing its endpoint nets.
+    // Chained switches transitively merge their groups into one logical net.
+    for (const sw of this._switches.values()) {
+      if (!sw.closed) continue;
+      const groupA = this._busNetToGroup.get(sw.netA);
+      const groupB = this._busNetToGroup.get(sw.netB);
+      if (groupA === undefined || groupB === undefined) continue;
+      if (groupA === groupB) continue;
+      this._unionGroups(groupA, groupB);
+    }
+
+    // Build the driver-net → groups index used by onNetChanged.
+    for (const group of this._groups) {
+      for (const driverId of group.driverNetIds) {
+        let set = this._driverToGroups.get(driverId);
+        if (set === undefined) {
+          set = new Set();
+          this._driverToGroups.set(driverId, set);
+        }
+        set.add(group);
+      }
+    }
   }
 
-  private _removeCrossDriver(busOutputNetId: number, driverNetId: number): void {
-    const busNet = this._busNets.get(busOutputNetId);
-    if (busNet === undefined) return;
-    busNet.removeDriverNet(driverNetId);
-    const set = this._driverToOutputs.get(driverNetId);
-    if (set !== undefined) {
-      set.delete(busOutputNetId);
+  private _unionGroups(target: BusGroup, source: BusGroup): void {
+    for (const id of source.outputNetIds) target.outputNetIds.push(id);
+    for (const id of source.driverNetIds) target.driverNetIds.push(id);
+
+    // Combine pull resistors: pull-up dominates pull-down dominates none.
+    if (target.pull === "none") {
+      target.pull = source.pull;
+    } else if (target.pull === "down" && source.pull === "up") {
+      target.pull = "up";
     }
+
+    for (const id of source.outputNetIds) {
+      this._busNetToGroup.set(id, target);
+    }
+
+    const idx = this._groups.indexOf(source);
+    if (idx >= 0) this._groups.splice(idx, 1);
   }
 }

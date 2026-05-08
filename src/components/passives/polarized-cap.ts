@@ -527,8 +527,10 @@ export class AnalogPolarizedCapElement extends PoolBackedAnalogElement {
       solver.stampElement(this._hCAP_NN,  m * geq);
       solver.stampElement(this._hCAP_PN, -m * geq);
       solver.stampElement(this._hCAP_NP, -m * geq);
-      if (nCap !== 0) stampRHS(ctx.rhs, nCap, -m * ceq);
-      if (nNeg !== 0) stampRHS(ctx.rhs, nNeg,  m * ceq);
+      // Unconditional RHS stamps; ground rows land in rhs[0] which the
+      // post-SMPsolve clear in newton-raphson.ts zeroes (niiter.c:946-948).
+      stampRHS(ctx.rhs, nCap, -m * ceq);
+      stampRHS(ctx.rhs, nNeg,  m * ceq);
     } else {
       // DC operating point.
       // cite: capload.c:81 state0[CAPqcap] = here->CAPcapac * vcap

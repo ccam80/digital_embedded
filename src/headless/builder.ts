@@ -403,7 +403,7 @@ export class CircuitBuilder {
     for (const comp of spec.components) {
       const element = this.addComponent(circuit, comp.type, comp.props);
       idMap.set(comp.id, element);
-      // Use spec id as label fallback so netlist shows readable names instead of UUIDs
+      // Use spec id as default label so netlist shows readable names instead of UUIDs
       const bag = element.getProperties();
       if (!bag.has('label') || !bag.get('label')) {
         bag.set('label', comp.id);
@@ -848,7 +848,7 @@ export class CircuitBuilder {
       }
     }
 
-    // Empty circuit fallback
+    // Empty circuit default bounds
     if (minX === Infinity) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
     return { minX, minY, maxX, maxY };

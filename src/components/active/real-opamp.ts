@@ -379,18 +379,16 @@ export class RealOpAmpAnalogElement extends PoolBackedAnalogElement {
     const nOut = this.pinNodes.get("out")!;
 
     // Input resistance stamp: conductance between nInp and nInn.
-    if (nInp > 0) this._hInpInp = solver.allocElement(nInp, nInp);
-    if (nInn > 0) this._hInnInn = solver.allocElement(nInn, nInn);
-    if (nInp > 0 && nInn > 0) {
-      this._hInpInn = solver.allocElement(nInp, nInn);
-      this._hInnInp = solver.allocElement(nInn, nInp);
-    }
+    // Unconditional - ground rows/cols route to TrashCan handle 0
+    // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273).
+    this._hInpInp = solver.allocElement(nInp, nInp);
+    this._hInnInn = solver.allocElement(nInn, nInn);
+    this._hInpInn = solver.allocElement(nInp, nInn);
+    this._hInnInp = solver.allocElement(nInn, nInp);
     // Output conductance and gain-stage Jacobian coupling.
-    if (nOut > 0) {
-      this._hOutOut = solver.allocElement(nOut, nOut);
-      if (nInp > 0) this._hOutInp = solver.allocElement(nOut, nInp);
-      if (nInn > 0) this._hOutInn = solver.allocElement(nOut, nInn);
-    }
+    this._hOutOut = solver.allocElement(nOut, nOut);
+    this._hOutInp = solver.allocElement(nOut, nInp);
+    this._hOutInn = solver.allocElement(nOut, nInn);
   }
 
   load(ctx: LoadContext): void {
@@ -526,35 +524,34 @@ export class RealOpAmpAnalogElement extends PoolBackedAnalogElement {
     }
 
     // Linear topology stamps using cached handles.
-    if (this._hInpInp >= 0) solver.stampElement(this._hInpInp,  G_in);
-    if (this._hInnInn >= 0) solver.stampElement(this._hInnInn,  G_in);
-    if (this._hInpInn >= 0) solver.stampElement(this._hInpInn, -G_in);
-    if (this._hInnInp >= 0) solver.stampElement(this._hInnInp, -G_in);
-    if (this._hOutOut >= 0) solver.stampElement(this._hOutOut, G_out);
+    // Unconditional - ground rows route to TrashCan handle 0.
+    solver.stampElement(this._hInpInp,  G_in);
+    solver.stampElement(this._hInnInn,  G_in);
+    solver.stampElement(this._hInpInn, -G_in);
+    solver.stampElement(this._hInnInp, -G_in);
+    solver.stampElement(this._hOutOut,  G_out);
 
-    // Input bias currents
+    // Input bias currents. Unconditional - rhs[0] cleared post-solve.
     const iBiasScaled = Math.abs(p.iBias) * scale;
-    if (nInp > 0) stampRHS(ctx.rhs, nInp, -iBiasScaled);
-    if (nInn > 0) stampRHS(ctx.rhs, nInn, -iBiasScaled);
+    stampRHS(ctx.rhs, nInp, -iBiasScaled);
+    stampRHS(ctx.rhs, nInn, -iBiasScaled);
 
-    if (nOut > 0) {
-      // Gain-stage output
-      if (outputSaturated) {
-        stampRHS(ctx.rhs, nOut, outputClampLevel * G_out);
-      } else if (currentLimited) {
-        stampRHS(ctx.rhs, nOut, iOutLimited);
-      } else if (slewLimited) {
-        stampRHS(ctx.rhs, nOut, vInt * G_out);
-      } else {
-        // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
-        const aEffScaled = aEff * scale;
-        const ieq = geq_int > 0
-          ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
-          : 0;
-        if (this._hOutInp >= 0) solver.stampElement(this._hOutInp, -aEffScaled * G_out);
-        if (this._hOutInn >= 0) solver.stampElement(this._hOutInn,  aEffScaled * G_out);
-        stampRHS(ctx.rhs, nOut, ieq + aEffScaled * G_out * p.vos * scale);
-      }
+    // Gain-stage output
+    if (outputSaturated) {
+      stampRHS(ctx.rhs, nOut, outputClampLevel * G_out);
+    } else if (currentLimited) {
+      stampRHS(ctx.rhs, nOut, iOutLimited);
+    } else if (slewLimited) {
+      stampRHS(ctx.rhs, nOut, vInt * G_out);
+    } else {
+      // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
+      const aEffScaled = aEff * scale;
+      const ieq = geq_int > 0
+        ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
+        : 0;
+      solver.stampElement(this._hOutInp, -aEffScaled * G_out);
+      solver.stampElement(this._hOutInn,  aEffScaled * G_out);
+      stampRHS(ctx.rhs, nOut, ieq + aEffScaled * G_out * p.vos * scale);
     }
 
     // ngspice CKTstate0 idiom- bottom-of-load history writes (bjtload.c:744-746,

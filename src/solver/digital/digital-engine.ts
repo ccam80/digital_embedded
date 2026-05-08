@@ -686,17 +686,35 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     state: Uint32Array,
   ): void {
     const indices = group.componentIndices;
+    const busResolver = this._compiled!.busResolver;
+
+    // Snapshot the group's output net values so we only trigger bus
+    // resolution for drivers that actually changed. Firing onNetChanged
+    // for unchanged drivers would still recalc the bus from current state,
+    // which can clobber pending user writes to the bus output net before
+    // a later component in the same step has had a chance to copy them
+    // into the driver shadow.
+    const outputNets = busResolver !== null ? this._collectOutputNets(indices, layout) : [];
+    const beforeValues = new Uint32Array(outputNets.length);
+    const beforeHighZ = new Uint32Array(outputNets.length);
+    for (let n = 0; n < outputNets.length; n++) {
+      const netId = outputNets[n]!;
+      beforeValues[n] = state[netId]!;
+      beforeHighZ[n] = this._highZs[netId]!;
+    }
+
     for (let i = 0; i < indices.length; i++) {
       const idx = indices[i]!;
       const typeId = typeIds[idx]!;
       executeFns[typeId]!(idx, state, this._highZs, layout);
     }
 
-    const busResolver = this._compiled!.busResolver;
     if (busResolver !== null) {
-      const outputNets = this._collectOutputNets(indices, layout);
       for (let n = 0; n < outputNets.length; n++) {
-        busResolver.onNetChanged(outputNets[n]!, state, this._highZs);
+        const netId = outputNets[n]!;
+        if (state[netId] !== beforeValues[n] || this._highZs[netId] !== beforeHighZ[n]) {
+          busResolver.onNetChanged(netId, state, this._highZs);
+        }
       }
     }
   }

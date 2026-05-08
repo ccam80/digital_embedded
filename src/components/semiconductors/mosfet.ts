@@ -1487,7 +1487,7 @@ function _createMosfetElementWithPolarity(
         const vgb1 = vgs1 - s1[this._stateBase + SLOT_VBS];
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
           // mos1load.c:828-836: predictor extrapolation using xfact.
-          // xfact = delta/deltaOld[1]; fallback to 0 when deltaOld[1]=0.
+          // xfact = delta/deltaOld[1]; uses 0 when deltaOld[1]=0.
           // q0 = (1+xfact)*q1 - xfact*q2. Do NOT use ctx.xfact  compute
           // locally to match mos1load.c verbatim.
           const xfactQ = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;

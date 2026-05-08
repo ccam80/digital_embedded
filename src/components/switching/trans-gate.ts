@@ -348,7 +348,7 @@ export const TransGateDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeTransGate,
-      inputSchema: ["p1", "p2"],
+      inputSchema: ["p1", "p2", "out1", "out2"],
       outputSchema: ["out1", "out2"],
       stateSlotCount: 1,
       switchPins: [2, 3],

@@ -304,7 +304,7 @@ export const PFETDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executePFET,
-      inputSchema: ["G"],
+      inputSchema: ["G", "D", "S"],
       outputSchema: ["D", "S"],
       stateSlotCount: 1,
       switchPins: [1, 2],

@@ -54,8 +54,9 @@ export class TransmissionSegmentGElement extends AnalogElement {
 
   private _G: number;
 
-  // Single diagonal handle- the GND-side entries (negNode === 0) are not
-  // stamped because GND is the implicit reference row.
+  // Diagonal handle. juncNode==0 (ground) routes to TrashCan handle 0
+  // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273); the elVal[0]
+  // slot is zeroed every NR iteration.
   private _hJJ = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
@@ -65,9 +66,7 @@ export class TransmissionSegmentGElement extends AnalogElement {
 
   setup(ctx: SetupContext): void {
     const juncNode = this.pinNodes.get("junc")!;
-    if (juncNode !== 0) {
-      this._hJJ = ctx.solver.allocElement(juncNode, juncNode);
-    }
+    this._hJJ = ctx.solver.allocElement(juncNode, juncNode);
   }
 
   setParam(key: string, value: number): void {
@@ -77,9 +76,7 @@ export class TransmissionSegmentGElement extends AnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    if (this._hJJ !== -1) {
-      ctx.solver.stampElement(this._hJJ, this._G);
-    }
+    ctx.solver.stampElement(this._hJJ, this._G);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

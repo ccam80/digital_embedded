@@ -300,7 +300,7 @@ export const NFETDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeNFET,
-      inputSchema: ["G"],
+      inputSchema: ["G", "D", "S"],
       outputSchema: ["D", "S"],
       stateSlotCount: 1,
       switchPins: [1, 2],

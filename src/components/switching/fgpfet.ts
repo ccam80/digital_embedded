@@ -321,7 +321,7 @@ export const FGPFETDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeFGPFET,
-      inputSchema: ["G"],
+      inputSchema: ["G", "S", "D"],
       outputSchema: ["S", "D"],
       stateSlotCount: 2,
       switchPins: [1, 2],

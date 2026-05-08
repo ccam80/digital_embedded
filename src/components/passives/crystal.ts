@@ -325,24 +325,26 @@ export class AnalogCrystalElement extends PoolBackedAnalogElement {
     this._hRs_PN = solver.allocElement(aNode, n1Node);
     this._hRs_NP = solver.allocElement(n1Node, aNode);
 
-    // Ls- indsetup.c:96-100 (n1Node=pos, n2Node=neg, b=branch)
-    if (n1Node !== 0) this._hLs_PIbr = solver.allocElement(n1Node, b);
-    if (n2Node !== 0) this._hLs_NIbr = solver.allocElement(n2Node, b);
-    if (n2Node !== 0) this._hLs_IbrN = solver.allocElement(b, n2Node);
-    if (n1Node !== 0) this._hLs_IbrP = solver.allocElement(b, n1Node);
+    // Ls- indsetup.c:96-100 (n1Node=pos, n2Node=neg, b=branch).
+    // Unconditional alloc - ground rows/cols route to TrashCan handle 0
+    // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273).
+    this._hLs_PIbr   = solver.allocElement(n1Node, b);
+    this._hLs_NIbr   = solver.allocElement(n2Node, b);
+    this._hLs_IbrN   = solver.allocElement(b, n2Node);
+    this._hLs_IbrP   = solver.allocElement(b, n1Node);
     this._hLs_IbrIbr = solver.allocElement(b, b);
 
-    // Cs- capsetup.c:114-117 (n2Node=pos, bNode=neg)
-    if (n2Node !== 0) this._hCs_PP = solver.allocElement(n2Node, n2Node);
-    if (bNode !== 0)  this._hCs_NN = solver.allocElement(bNode, bNode);
-    if (n2Node !== 0 && bNode !== 0) this._hCs_PN = solver.allocElement(n2Node, bNode);
-    if (bNode !== 0 && n2Node !== 0) this._hCs_NP = solver.allocElement(bNode, n2Node);
+    // Cs- capsetup.c:114-117 (n2Node=pos, bNode=neg).
+    this._hCs_PP = solver.allocElement(n2Node, n2Node);
+    this._hCs_NN = solver.allocElement(bNode,  bNode);
+    this._hCs_PN = solver.allocElement(n2Node, bNode);
+    this._hCs_NP = solver.allocElement(bNode,  n2Node);
 
-    // C0- capsetup.c:114-117 (aNode=pos, bNode=neg)
-    if (aNode !== 0) this._hC0_PP = solver.allocElement(aNode, aNode);
-    if (bNode !== 0) this._hC0_NN = solver.allocElement(bNode, bNode);
-    if (aNode !== 0 && bNode !== 0) this._hC0_PN = solver.allocElement(aNode, bNode);
-    if (bNode !== 0 && aNode !== 0) this._hC0_NP = solver.allocElement(bNode, aNode);
+    // C0- capsetup.c:114-117 (aNode=pos, bNode=neg).
+    this._hC0_PP = solver.allocElement(aNode, aNode);
+    this._hC0_NN = solver.allocElement(bNode, bNode);
+    this._hC0_PN = solver.allocElement(aNode, bNode);
+    this._hC0_NP = solver.allocElement(bNode, aNode);
   }
 
   findBranchFor(_name: string, ctx: SetupContext): number {
@@ -378,7 +380,6 @@ export class AnalogCrystalElement extends PoolBackedAnalogElement {
     const mode = ctx.cktMode;
     const nA = this.pinNodes.get("pos")!;
     const nB = this.pinNodes.get("neg")!;
-    const n1 = this._n1Node;
     const n2 = this._n2Node;
     const b = this.branchIndex;
     const base = this._stateBase;
@@ -390,11 +391,12 @@ export class AnalogCrystalElement extends PoolBackedAnalogElement {
     solver.stampElement(this._hRs_NN, this.G_s);
 
     // L_s branch incidence (B sub-matrix)- via cached handles.
-    if (n1 !== 0) solver.stampElement(this._hLs_PIbr, 1);
-    if (n2 !== 0) solver.stampElement(this._hLs_NIbr, -1);
+    // Unconditional stamps; ground rows route to TrashCan handle 0.
+    solver.stampElement(this._hLs_PIbr,  1);
+    solver.stampElement(this._hLs_NIbr, -1);
     // L_s KVL incidence (C sub-matrix)- via cached handles.
-    if (n2 !== 0) solver.stampElement(this._hLs_IbrN, -1);
-    if (n1 !== 0) solver.stampElement(this._hLs_IbrP, 1);
+    solver.stampElement(this._hLs_IbrN, -1);
+    solver.stampElement(this._hLs_IbrP,  1);
 
     if (!(mode & (MODETRAN | MODETRANOP))) return;
 
@@ -491,20 +493,21 @@ export class AnalogCrystalElement extends PoolBackedAnalogElement {
       stampRHS(ctx.rhs, b, ceqL);
 
       // C_s companion stamp (n2 â†” nB)- via cached handles.
-      if (n2 !== 0) solver.stampElement(this._hCs_PP, geqCs);
-      if (nB !== 0) solver.stampElement(this._hCs_NN, geqCs);
-      if (n2 !== 0 && nB !== 0) solver.stampElement(this._hCs_PN, -geqCs);
-      if (nB !== 0 && n2 !== 0) solver.stampElement(this._hCs_NP, -geqCs);
-      if (n2 !== 0) stampRHS(ctx.rhs, n2, -ceqCs);
-      if (nB !== 0) stampRHS(ctx.rhs, nB, ceqCs);
+      // Unconditional - ground stamps absorbed by TrashCan / rhs[0] clear.
+      solver.stampElement(this._hCs_PP,  geqCs);
+      solver.stampElement(this._hCs_NN,  geqCs);
+      solver.stampElement(this._hCs_PN, -geqCs);
+      solver.stampElement(this._hCs_NP, -geqCs);
+      stampRHS(ctx.rhs, n2, -ceqCs);
+      stampRHS(ctx.rhs, nB,  ceqCs);
 
       // C_0 companion stamp (nA â†” nB)- via cached handles.
-      if (nA !== 0) solver.stampElement(this._hC0_PP, geqC0);
-      if (nB !== 0) solver.stampElement(this._hC0_NN, geqC0);
-      if (nA !== 0 && nB !== 0) solver.stampElement(this._hC0_PN, -geqC0);
-      if (nB !== 0 && nA !== 0) solver.stampElement(this._hC0_NP, -geqC0);
-      if (nA !== 0) stampRHS(ctx.rhs, nA, -ceqC0);
-      if (nB !== 0) stampRHS(ctx.rhs, nB, ceqC0);
+      solver.stampElement(this._hC0_PP,  geqC0);
+      solver.stampElement(this._hC0_NN,  geqC0);
+      solver.stampElement(this._hC0_PN, -geqC0);
+      solver.stampElement(this._hC0_NP, -geqC0);
+      stampRHS(ctx.rhs, nA, -ceqC0);
+      stampRHS(ctx.rhs, nB,  ceqC0);
 
       // Cache.
       s0[base + SLOT_GEQ_L]  = geqL;

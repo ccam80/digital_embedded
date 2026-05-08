@@ -73,6 +73,13 @@ function bidiPin(x: number, y: number, label: string, bitWidth = 1): PinDeclarat
 // ---------------------------------------------------------------------------
 
 function makeBaseDef(name: string, models: object, defaultModel?: string): StandaloneComponentDefinition {
+  // When defaultModel names a non-digital model, declare a stub modelRegistry
+  // entry so resolveModelAssignments can find it through `def.modelRegistry`.
+  // Tests in this file only inspect model keys; the factory is never called.
+  const modelRegistry =
+    defaultModel !== undefined && defaultModel !== 'digital'
+      ? { [defaultModel]: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } }
+      : undefined;
   return {
     name,
     typeId: -1,
@@ -84,6 +91,7 @@ function makeBaseDef(name: string, models: object, defaultModel?: string): Stand
     helpText: '',
     models: models as ComponentModels,
     ...(defaultModel !== undefined ? { defaultModel } : {}),
+    ...(modelRegistry !== undefined ? { modelRegistry } : {}),
   };
 }
 
@@ -159,7 +167,7 @@ describe('resolveModelAssignments', () => {
     expect(assignments[0]!.modelKey).toBe('behavioral');
   });
 
-  it('falls back to defaultModel when no model property', () => {
+  it('uses digital when no model property and a digital model exists', () => {
     const registry = new ComponentRegistry();
     registry.register(makeBaseDef('Bridge', {
       digital: { executeFn: noopExecFn },

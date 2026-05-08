@@ -215,13 +215,14 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
     // the pool covers every field load() reads/writes.
     this._stateBase = ctx.allocStates(this.stateSize);
 
-    // capsetup.c:114-117  TSTALLOC sequence, line-for-line, with ground guards.
-    if (posNode !== 0) this._hPP = ctx.solver.allocElement(posNode, posNode);
-    if (negNode !== 0) this._hNN = ctx.solver.allocElement(negNode, negNode);
-    if (posNode !== 0 && negNode !== 0) {
-      this._hPN = ctx.solver.allocElement(posNode, negNode);
-      this._hNP = ctx.solver.allocElement(negNode, posNode);
-    }
+    // capsetup.c:114-117  TSTALLOC sequence, line-for-line. ngspice
+    // makes these allocations unconditionally (TSTALLOC has no ground
+    // guard); allocElement(0,X) / allocElement(X,0) returns the
+    // TrashCan handle 0, whose elVal[0] is zeroed every NR iter.
+    this._hPP = ctx.solver.allocElement(posNode, posNode);
+    this._hNN = ctx.solver.allocElement(negNode, negNode);
+    this._hPN = ctx.solver.allocElement(posNode, negNode);
+    this._hNP = ctx.solver.allocElement(negNode, posNode);
   }
 
   setParam(key: string, value: number): void {
@@ -334,14 +335,14 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
       s0[base + SLOT_V] = vcap;
 
       // Stamp companion model (capload.c:74-79  all entries scaled by m = CAPm).
-      if (n0 !== 0) solver.stampElement(this._hPP, m * geq);
-      if (n1 !== 0) solver.stampElement(this._hNN, m * geq);
-      if (n0 !== 0 && n1 !== 0) {
-        solver.stampElement(this._hPN, -m * geq);
-        solver.stampElement(this._hNP, -m * geq);
-      }
-      if (n0 !== 0) stampRHS(ctx.rhs,n0, -m * ceq);
-      if (n1 !== 0) stampRHS(ctx.rhs,n1, m * ceq);
+      // ngspice writes unconditionally; ground rows/cols land in the TrashCan
+      // (matrix) or rhs[0] (post-solve cleared). No caller-side ground guards.
+      solver.stampElement(this._hPP, m * geq);
+      solver.stampElement(this._hNN, m * geq);
+      solver.stampElement(this._hPN, -m * geq);
+      solver.stampElement(this._hNP, -m * geq);
+      stampRHS(ctx.rhs, n0, -m * ceq);
+      stampRHS(ctx.rhs, n1,  m * ceq);
     } else {
       // DC operating point: just store charge, no matrix stamp (capload.c:84).
       s0[base + SLOT_Q] = C * vcap;

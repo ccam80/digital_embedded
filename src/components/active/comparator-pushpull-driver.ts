@@ -109,9 +109,8 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
     const outNode = this.pinNodes.get("out")!;
-    if (outNode !== 0) {
-      this._hOutOut = ctx.solver.allocElement(outNode, outNode);
-    }
+    // Unconditional - ground rows route to TrashCan handle 0.
+    this._hOutOut = ctx.solver.allocElement(outNode, outNode);
   }
 
   setParam(key: string, value: number): void {
@@ -151,12 +150,12 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     // (latch=1, output asserted low). Smoothing uses the prior-step weight
     // (s1) per the StatePool migration convention.
     const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    if (this._hOutOut !== -1 && outNode !== 0) {
-      const G = 1 / this._rSat;
-      const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
-      ctx.solver.stampElement(this._hOutOut, G);
-      stampRHS(ctx.rhs, outNode, G * vTarget);
-    }
+    // Unconditional - handle was unconditionally allocated; ground row
+    // stamps land in the TrashCan / rhs[0] (cleared post-solve).
+    const G = 1 / this._rSat;
+    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
+    ctx.solver.stampElement(this._hOutOut, G);
+    stampRHS(ctx.rhs, outNode, G * vTarget);
 
     // Weight integration- trapezoidal recurrence shared with open-collector.
     const dt = ctx.dt;

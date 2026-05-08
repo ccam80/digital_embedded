@@ -10,7 +10,6 @@
  *  - No tolerance widening beyond the analytical margin (≤ 3 % first-order,
  *    ≤ 5 % Q-based).
  *  - No parameter tuning to find a working regime.
- *  - No skip / todo / fails.
  */
 import { describe, it, expect } from 'vitest';
 import { DefaultSimulatorFacade } from '../default-facade.js';
@@ -131,14 +130,14 @@ describe('LTE/composite-tolerance path- MCP (facade) surface', () => {
 
     // At t = τ: V_R = R·i = 1 - e⁻¹ ≈ 0.6321 V
     await facade.stepToTime(engine, tau);
-    const vrAtTau = facade.readSignal(engine, 'VR:A') - facade.readSignal(engine, 'VR:B');
+    const vrAtTau = facade.readSignal(engine, 'VR:pos') - facade.readSignal(engine, 'VR:neg');
     const expected1 = 1 - Math.exp(-1); // 0.6321
     expect(vrAtTau).toBeGreaterThanOrEqual(expected1 * 0.98);
     expect(vrAtTau).toBeLessThanOrEqual(expected1 * 1.02);
 
     // At t = 5τ: V_R ≈ 1 - e⁻⁵ ≈ 0.9933 V
     await facade.stepToTime(engine, 5 * tau);
-    const vrAt5tau = facade.readSignal(engine, 'VR:A') - facade.readSignal(engine, 'VR:B');
+    const vrAt5tau = facade.readSignal(engine, 'VR:pos') - facade.readSignal(engine, 'VR:neg');
     const expected5 = 1 - Math.exp(-5); // 0.9933
     expect(vrAt5tau).toBeGreaterThanOrEqual(expected5 * 0.99);
     expect(vrAt5tau).toBeLessThanOrEqual(expected5 * 1.01);
@@ -282,7 +281,7 @@ describe('LTE/composite-tolerance path- MCP (facade) surface', () => {
     // Large maxTimeStep so LTE (not the cap) governs step size selection.
     analogLoose.configure({ reltol: 1e-2, maxTimeStep: 1e-3 });
     await facadeLoose.stepToTime(engineLoose, target);
-    const vcLoose = facadeLoose.readSignal(engineLoose, 'Vc:A');
+    const vcLoose = facadeLoose.readSignal(engineLoose, 'Vc:pos');
     const stepCountLoose = (analogLoose as unknown as { _stepCount: number })._stepCount;
 
     // Tight reltol compile
@@ -292,7 +291,7 @@ describe('LTE/composite-tolerance path- MCP (facade) surface', () => {
     const analogTight = coordTight.getAnalogEngine() as MNAEngine;
     analogTight.configure({ reltol: 1e-6, maxTimeStep: 1e-3 });
     await facadeTight.stepToTime(engineTight, target);
-    const vcTight = facadeTight.readSignal(engineTight, 'Vc:A');
+    const vcTight = facadeTight.readSignal(engineTight, 'Vc:pos');
     const stepCountTight = (analogTight as unknown as { _stepCount: number })._stepCount;
 
     // Two different reltol values must produce numerically different results
@@ -450,7 +449,7 @@ describe('LTE/composite-tolerance path- MCP (facade) surface', () => {
     const samples: number[] = [];
     for (let i = 1; i <= sampleCount; i++) {
       await facade.stepToTime(engine, tStart + dt * i);
-      samples.push(facade.readSignal(engine, 'VR:A') - facade.readSignal(engine, 'VR:B'));
+      samples.push(facade.readSignal(engine, 'VR:pos') - facade.readSignal(engine, 'VR:neg'));
     }
 
     // At least 6 zero-crossings (2/period × 4 periods − 2 edge slop)

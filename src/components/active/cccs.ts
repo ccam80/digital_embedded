@@ -202,8 +202,9 @@ export class CCCSAnalogElement extends ControlledSourceElement {
 
     const posNode = this.pinNodes.get("out+")!;
     const negNode = this.pinNodes.get("out-")!;
-    if (posNode !== 0) rhs[posNode] += iNR;
-    if (negNode !== 0) rhs[negNode] -= iNR;
+    // Unconditional - ground rows land in rhs[0], cleared post-solve.
+    rhs[posNode] += iNR;
+    rhs[negNode] -= iNR;
   }
 
   /**

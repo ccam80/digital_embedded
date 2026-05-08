@@ -408,7 +408,7 @@ describe('DefaultSimulatorFacade', () => {
     // Voltage divider: 10 V source, two equal resistors (10 Ω each).
     // Midpoint voltage = Vsrc * R2 / (R1 + R2) = 10 * 10/20 = 5 V.
     // If `resistance` is silently dropped, both resistors default to their
-    // fallback value and the ratio stays 1:1- but the absolute Ohm values
+    // default value and the ratio stays 1:1- but the absolute Ohm values
     // change, which we can detect by confirming the midpoint is 5 V.
     // More directly: use unequal resistors (R1=10, R2=40) so the ratio is
     // 10:40 = 1:4, giving Vmid = 10 * 40/50 = 8 V.  If resistance is dropped

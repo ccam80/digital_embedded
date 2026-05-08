@@ -191,8 +191,10 @@ class CurrentSourceAnalogImpl extends AnalogElement {
     const nodePos = this.pinNodes.get("pos")!;
     const nodeNeg = this.pinNodes.get("neg")!;
     const I = this._p.current * ctx.srcFact;
-    if (nodePos !== 0) stampRHS(ctx.rhs, nodePos, I);
-    if (nodeNeg !== 0) stampRHS(ctx.rhs, nodeNeg, -I);
+    // Unconditional RHS stamp (isrcload.c:33-34); ground rows land in
+    // rhs[0] which the post-SMPsolve clear in newton-raphson zeroes.
+    stampRHS(ctx.rhs, nodePos,  I);
+    stampRHS(ctx.rhs, nodeNeg, -I);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

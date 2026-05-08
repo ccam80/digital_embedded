@@ -134,10 +134,12 @@ export class SchmittTriggerDriverElement extends PoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
     const outNode = this.pinNodes.get("out")!;
     const gndNode = this.pinNodes.get("gnd")!;
-    if (outNode !== 0)                         this._hOutOut = ctx.solver.allocElement(outNode, outNode);
-    if (outNode !== 0 && gndNode !== 0)        this._hOutGnd = ctx.solver.allocElement(outNode, gndNode);
-    if (gndNode !== 0 && outNode !== 0)        this._hGndOut = ctx.solver.allocElement(gndNode, outNode);
-    if (gndNode !== 0)                         this._hGndGnd = ctx.solver.allocElement(gndNode, gndNode);
+    // Unconditional - ground rows route to TrashCan handle 0
+    // (sparse-solver.ts:28-32).
+    this._hOutOut = ctx.solver.allocElement(outNode, outNode);
+    this._hOutGnd = ctx.solver.allocElement(outNode, gndNode);
+    this._hGndOut = ctx.solver.allocElement(gndNode, outNode);
+    this._hGndGnd = ctx.solver.allocElement(gndNode, gndNode);
   }
 
   setParam(key: string, value: number): void {
@@ -181,15 +183,17 @@ export class SchmittTriggerDriverElement extends PoolBackedAnalogElement {
     const vTarget = outputHigh ? this._vOH : this._vOL;
     const iNorton = G_NORTON * vTarget;
 
-    if (this._hOutOut  !== -1) ctx.solver.stampElement(this._hOutOut,   G_NORTON);
-    if (this._hOutGnd  !== -1) ctx.solver.stampElement(this._hOutGnd,  -G_NORTON);
-    if (this._hGndOut  !== -1) ctx.solver.stampElement(this._hGndOut,  -G_NORTON);
-    if (this._hGndGnd  !== -1) ctx.solver.stampElement(this._hGndGnd,   G_NORTON);
+    // Handles unconditionally allocated; ground rows route to TrashCan.
+    ctx.solver.stampElement(this._hOutOut,  G_NORTON);
+    ctx.solver.stampElement(this._hOutGnd, -G_NORTON);
+    ctx.solver.stampElement(this._hGndOut, -G_NORTON);
+    ctx.solver.stampElement(this._hGndGnd,  G_NORTON);
 
     const outNode = this.pinNodes.get("out")!;
     const gndNode = this.pinNodes.get("gnd")!;
-    if (outNode !== 0) ctx.rhs[outNode] += iNorton;
-    if (gndNode !== 0) ctx.rhs[gndNode] -= iNorton;
+    // Unconditional RHS writes; rhs[0] cleared post-solve in newton-raphson.
+    ctx.rhs[outNode] += iNorton;
+    ctx.rhs[gndNode] -= iNorton;
 
     // Bottom-of-load write.
     s0[base + SLOT_OUTPUT_LATCH] = latchNew;

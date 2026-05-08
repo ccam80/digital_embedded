@@ -286,10 +286,12 @@ class AnalogClockElementImpl
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const k = this.branchIndex;
-    if (this._nodePos !== 0) this._hPosBranch = ctx.solver.allocElement(this._nodePos, k);
-    if (this._nodeNeg !== 0) this._hNegBranch = ctx.solver.allocElement(this._nodeNeg, k);
-    if (this._nodePos !== 0) this._hBranchPos = ctx.solver.allocElement(k, this._nodePos);
-    if (this._nodeNeg !== 0) this._hBranchNeg = ctx.solver.allocElement(k, this._nodeNeg);
+    // Unconditional - ground rows route to TrashCan handle 0
+    // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273).
+    this._hPosBranch = ctx.solver.allocElement(this._nodePos, k);
+    this._hNegBranch = ctx.solver.allocElement(this._nodeNeg, k);
+    this._hBranchPos = ctx.solver.allocElement(k, this._nodePos);
+    this._hBranchNeg = ctx.solver.allocElement(k, this._nodeNeg);
   }
 
   findBranchFor(_name: string, ctx: SetupContext): number {
@@ -306,10 +308,11 @@ class AnalogClockElementImpl
     const k = this.branchIndex;
 
     // Branch incidence (B and C sub-matrices)- handles allocated in setup().
-    if (this._nodePos !== 0) solver.stampElement(this._hPosBranch, 1);
-    if (this._nodeNeg !== 0) solver.stampElement(this._hNegBranch, -1);
-    if (this._nodePos !== 0) solver.stampElement(this._hBranchPos, 1);
-    if (this._nodeNeg !== 0) solver.stampElement(this._hBranchNeg, -1);
+    // Unconditional - ground rows route to TrashCan handle 0.
+    solver.stampElement(this._hPosBranch,  1);
+    solver.stampElement(this._hNegBranch, -1);
+    solver.stampElement(this._hBranchPos,  1);
+    solver.stampElement(this._hBranchNeg, -1);
 
     // Square-wave voltage value at current simulation time.
     const t = this._getTime();

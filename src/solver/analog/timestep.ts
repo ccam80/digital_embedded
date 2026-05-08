@@ -284,11 +284,12 @@ export class TimestepController {
    *   - _lteParams (trtol, reltol, abstol, chgtol)- cast past readonly
    *     because the struct is logically immutable per computeNewDt call but
    *     we deliberately refresh it once on configure().
-   *   - currentDt: while no step has been taken (_isFirstGetClampedDt),
-   *     firstStep is re-applied exactly as the constructor does. Once the
-   *     first getClampedDt has run, currentDt reflects accepted-step history
-   *     and is only clamped DOWN to the new maxTimeStep (never raised), so
-   *     hot-loading tolerances mid-run cannot restart the step history.
+   *   - currentDt and _savedDelta: while no step has been taken
+   *     (_isFirstGetClampedDt), both are re-applied exactly as the constructor
+   *     does. Once the first getClampedDt has run, currentDt reflects
+   *     accepted-step history and is only clamped DOWN to the new maxTimeStep
+   *     (never raised), and _savedDelta is left alone (it is mutated by the
+   *     bp-clamp paths and rewinding it would diverge from ngspice).
    */
   updateParams(params: ResolvedSimulationParams): void {
     this._params = params;
@@ -323,6 +324,17 @@ export class TimestepController {
         params.minTimeStep,
         Math.min(params.maxTimeStep, params.firstStep),
       );
+
+      // Re-derive _savedDelta from tStop, exactly as the constructor does
+      // (dctran.c:323: CKTsaveDelta = CKTfinalTime / 50). ngspice runs this
+      // on every .tran job entry; configure() is our .tran job entry. Without
+      // this refresh, _savedDelta keeps the DEFAULT maxTimeStep value baked
+      // in at construction time, which under-estimates the at-breakpoint
+      // clamp `0.1 * MIN(saveDelta, gap)` at getClampedDt() and pulls the
+      // first dt below ngspice's by ~10x (RC: ours 100ns, ngspice 500ns).
+      this._savedDelta = params.tStop != null
+        ? params.tStop / 50
+        : params.maxTimeStep;
     } else if (this.currentDt > params.maxTimeStep) {
       // Mid-run: only clamp currentDt down to the new ceiling; never raise.
       this.currentDt = params.maxTimeStep;

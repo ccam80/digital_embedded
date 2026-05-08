@@ -87,17 +87,15 @@ describe("Invariant 1: pinLayout matches digital schemas", () => {
 
       // Bidirectional pins satisfy either schema slot- a relay contact, MOSFET
       // drain/source, or transmission gate I/O is electrically a port that the
-      // digital model may treat as input or output.  Filter pinLayout in
-      // schema declaration order: a label is a valid input if its pinLayout
-      // direction is INPUT or BIDIRECTIONAL, and a valid output if OUTPUT or
-      // BIDIRECTIONAL.
-      const inputLabels = layout
-        .filter(
-          (p) =>
-            p.direction === PinDirection.INPUT ||
-            p.direction === PinDirection.BIDIRECTIONAL,
-        )
-        .map((p) => p.label);
+      // digital model may treat as input or output.
+      //
+      // inputSchema additionally accepts OUTPUT pins: a component may
+      // legitimately read its own output net to capture values driven onto a
+      // multi-driver bus (e.g. In reads its "out" net so writeByLabel values
+      // flow into the bus-resolver shadow). The pin's topological direction
+      // describes who drives the wire, not whether executeFn may read it.
+      // outputSchema, by contrast, must correspond to a pin that drives.
+      const inputLabels = layout.map((p) => p.label);
       const outputLabels = layout
         .filter(
           (p) =>

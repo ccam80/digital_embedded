@@ -511,6 +511,15 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     //   SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare).
     solver.solve(ctx.rhs, ctx.rhs);
 
+    // niiter.c:946-948 - clear the ground sentinel slots after every
+    // solve. ngspice device load() writes to CKTrhs[0] unconditionally
+    // (no ground guard), and spsolve never consumes RHS[0]; the post-
+    // solve clear restores the rhs[0]==0 invariant for any downstream
+    // consumer (getPinCurrents, NIconvTest, diagnostic readouts).
+    ctx.rhs[0] = 0;
+    ctx.rhsOld[0] = 0;
+    ctx.rhsSpare[0] = 0;
+
     // ---- STEP G: Check iteration limit BEFORE convergence (ngspice niiter.c:944) ----
     // Pre-swap return mirrors niiter.c:944-955- at exit, ctx.rhsOld = iter K's
     // input, ctx.rhs = iter K's output.

@@ -96,8 +96,8 @@ describe('DIAGNOSTIC RL step response R=1k L=1H tau=1ms V=5V', () => {
     for (let i = 1; i <= numSamples; i++) {
       const targetTime = dtStep * i;
       await facade.stepToTime(engine, targetTime);
-      const vA = facade.readSignal(engine, 'VR:A');
-      const vB = facade.readSignal(engine, 'VR:B');
+      const vA = facade.readSignal(engine, 'VR:pos');
+      const vB = facade.readSignal(engine, 'VR:neg');
       const vR = vA - vB;
       const t = engine.simTime ?? targetTime;
       const expected = V * Math.exp(-t / tau);

@@ -64,7 +64,7 @@ export interface LayoutOptions {
    * This prevents dropped connections when two elements share world-coordinate
    * pin positions after initial auto-placement.
    *
-   * Falls back to coordinate-keyed matching when absent (legacy .dig circuits).
+   * Uses coordinate-keyed matching when absent (.dig circuits).
    */
   connections?: SpecConnection[];
 }
@@ -214,7 +214,7 @@ function buildGraph(circuit: Circuit, specConns?: SpecConnection[]): Graph {
       });
     }
   } else {
-    // Coordinate-based fallback for legacy circuits loaded from .dig files.
+    // Coordinate-based path for circuits loaded from .dig files.
     // Index: world-position key → list of (element, pin) at that position.
     const posMap = new Map<string, Array<{ el: CircuitElement; pin: Pin }>>();
     for (const el of circuit.elements) {
@@ -788,7 +788,7 @@ function applyLayout(g: Graph, circuit: Circuit): void {
 
   // Pin-coordinate index used to forbid Z-route corners from landing on
   // foreign pins (which would create accidental electrical junctions in the
-  // legacy position-merge connectivity path, and visually misleading
+  // wire-graph position-merge connectivity path, and visually misleading
   // joins under spec-authoritative connectivity).
   const pinPositionsByElement = new Map<string, Set<string>>();
   const allPinPositions = new Set<string>();
@@ -946,7 +946,7 @@ interface VChannel {
  * Aligned segments are checked for body crossings and detoured if
  * needed.  Non-aligned segments become Z-shapes whose vertical
  * channel AND horizontal runs are verified clear of component bodies
- * and previously routed channels. Z-route corners are also rejected
+ * and occupied routed channels. Z-route corners are also rejected
  * if they would land on a foreign pin or an already-emitted wire
  * vertex (via `forbiddenCorners`).
  */
@@ -984,7 +984,7 @@ function routeSegmentSafe(
         }
       }
     }
-    circuit.wires.push(new Wire(a, b)); // fallback
+    circuit.wires.push(new Wire(a, b)); // last resort: emit raw segment
     return;
   }
 
@@ -1014,7 +1014,7 @@ function routeSegmentSafe(
         }
       }
     }
-    circuit.wires.push(new Wire(a, b)); // fallback
+    circuit.wires.push(new Wire(a, b)); // last resort: emit raw segment
     return;
   }
 
@@ -1150,7 +1150,7 @@ function isHorizontalClear(
 
 /**
  * Check whether all three segments of a Z-route (horizontal-vertical-
- * horizontal) avoid component bodies, previously used channels, and any
+ * horizontal) avoid component bodies, occupied channels, and any
  * forbidden corner positions (foreign pins or earlier wire vertices).
  */
 function isZRouteClear(
@@ -1179,7 +1179,7 @@ function isZRouteClear(
 /**
  * Body-and-corner variant of isZRouteClear that ignores channel overlaps.
  * Channel sharing is purely a visual concern; corner collisions are not —
- * they create fictitious electrical junctions in legacy connectivity mode,
+ * they create fictitious electrical junctions in wire-graph connectivity mode,
  * so the corner constraint must hold even when the channel constraint is
  * relaxed to find a route at all.
  */

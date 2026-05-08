@@ -177,7 +177,7 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
-  predictor: true,
+  predictor: false,
   gshunt: 0,
   diagGmin: 0,
   pivotAbsTol: 0,

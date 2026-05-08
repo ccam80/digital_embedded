@@ -118,9 +118,14 @@ export class InElement extends AbstractCircuitElement {
 // executeIn- pass-through (value is set externally by engine interaction)
 // ---------------------------------------------------------------------------
 
-export function executeIn(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
-  // The output value is set externally via engine.setSignalValue().
-  // No computation needed here.
+export function executeIn(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
+  const wt = layout.wiringTable;
+  const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
+  const srcNet = wt[inBase]!;
+  const dstShadow = wt[outBase]!;
+  state[dstShadow] = state[srcNet]!;
+  highZs[dstShadow] = highZs[srcNet]!;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +214,7 @@ export const InDefinition: StandaloneComponentDefinition = {
     "Click to toggle the output value (1-bit: toggle 0â†”1; multi-bit: opens value editor).\n" +
     "The executeFn is a pass-through; the signal value is set externally by user interaction.",
   models: {
-    digital: { executeFn: executeIn, inputSchema: [], outputSchema: ["out"] },
+    digital: { executeFn: executeIn, inputSchema: ["out"], outputSchema: ["out"] },
   },
   modelRegistry: {},
 };

@@ -218,24 +218,23 @@ class OpampElement extends AnalogElement {
       this._hResAB = solver.allocElement(this._nVint, this._nOut);
       this._hResBA = solver.allocElement(this._nOut,  this._nVint);
 
-      // VCVS sub-element (vcvsset.c:53-58): posNode=vint, negNode=0(gnd)
-      // Entries 2 and 4 (negNode rows/cols) skipped- solver-level gnd suppression.
+      // VCVS sub-element (vcvsset.c:53-58): posNode=vint, negNode=0(gnd).
+      // Unconditional - ground rows/cols route to TrashCan handle 0
+      // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273).
       // Entry 1: (posNode, branch) = (vint, k)
       this._hVcvsPosIbr = solver.allocElement(this._nVint, k);
       // Entry 3: (branch, posNode) = (k, vint)
       this._hVcvsIbrPos = solver.allocElement(k, this._nVint);
       // Entry 5: (branch, contPos) = (k, inP)
-      this._hVcvsIbrCP = this._nInp > 0 ? solver.allocElement(k, this._nInp) : -1;
+      this._hVcvsIbrCP = solver.allocElement(k, this._nInp);
       // Entry 6: (branch, contNeg) = (k, inN)
-      this._hVcvsIbrCN = this._nInn > 0 ? solver.allocElement(k, this._nInn) : -1;
+      this._hVcvsIbrCN = solver.allocElement(k, this._nInn);
     } else {
-      // rOut == 0: VCVS connects directly to nOut (no RES, no internal node)
-      // VCVS sub-element (vcvsset.c:53-58): posNode=nOut, negNode=0(gnd)
-      // Entries 2 and 4 (negNode rows/cols) skipped- solver-level gnd suppression.
+      // rOut == 0: VCVS connects directly to nOut (no RES, no internal node).
       this._hVcvsPosIbr = solver.allocElement(this._nOut, k);
       this._hVcvsIbrPos = solver.allocElement(k, this._nOut);
-      this._hVcvsIbrCP  = this._nInp > 0 ? solver.allocElement(k, this._nInp) : -1;
-      this._hVcvsIbrCN  = this._nInn > 0 ? solver.allocElement(k, this._nInn) : -1;
+      this._hVcvsIbrCP  = solver.allocElement(k, this._nInp);
+      this._hVcvsIbrCN  = solver.allocElement(k, this._nInn);
     }
   }
 
@@ -266,10 +265,11 @@ class OpampElement extends AnalogElement {
       solver.stampElement(this._hVcvsPosIbr, 1);
       // Row (branch, posNode=vint): +1
       solver.stampElement(this._hVcvsIbrPos, 1);
-      // Row (branch, contPos=inP): -gain (if non-ground)
-      if (this._hVcvsIbrCP >= 0) solver.stampElement(this._hVcvsIbrCP, -effectiveGain);
-      // Row (branch, contNeg=inN): +gain (if non-ground)
-      if (this._hVcvsIbrCN >= 0) solver.stampElement(this._hVcvsIbrCN,  effectiveGain);
+      // Row (branch, contPos=inP): -gain. Unconditional - ground rows
+      // route to TrashCan.
+      solver.stampElement(this._hVcvsIbrCP, -effectiveGain);
+      // Row (branch, contNeg=inN): +gain
+      solver.stampElement(this._hVcvsIbrCN,  effectiveGain);
       // RHS for branch row: effectiveGain * vDiff - (vVint - vDiff*gain)
       // NR linearized: RHS[branch] = gain*(vDiff) - gain*vDiff0 + gain*vDiff0 = 0
       // Actually for VCVS: RHS[k] = 0 when gain is linear (no nonlinearity)
@@ -279,8 +279,8 @@ class OpampElement extends AnalogElement {
       // VCVS direct to nOut
       solver.stampElement(this._hVcvsPosIbr, 1);
       solver.stampElement(this._hVcvsIbrPos, 1);
-      if (this._hVcvsIbrCP >= 0) solver.stampElement(this._hVcvsIbrCP, -effectiveGain);
-      if (this._hVcvsIbrCN >= 0) solver.stampElement(this._hVcvsIbrCN,  effectiveGain);
+      solver.stampElement(this._hVcvsIbrCP, -effectiveGain);
+      solver.stampElement(this._hVcvsIbrCN,  effectiveGain);
     }
 
     // Source-step RHS: when gain changes due to srcFact, apply linearized correction

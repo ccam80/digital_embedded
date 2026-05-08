@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build",
-    "testCommand": "npx vitest run src/components/wiring/__tests__/wiring.test.ts --reporter=default 2>&1 | tail -25",
+    "buildCommand": "npx tsc --noEmit 2>&1 | head -40",
+    "testCommand": "npx vitest run src/components/passives/__tests__/inductor.test.ts --reporter=default 2>&1 | tail -8",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -295,20 +295,38 @@
   "hotPaths": [
     {
       "path": "src\\headless\\auto-layout.ts",
-      "accessCount": 15,
-      "lastAccessed": 1778206869594,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\__tests__\\digital-registry.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1778215748757,
+      "accessCount": 24,
+      "lastAccessed": 1778219320243,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 7,
-      "lastAccessed": 1778205915300,
+      "accessCount": 14,
+      "lastAccessed": 1778227090137,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\digital-engine.ts",
+      "accessCount": 12,
+      "lastAccessed": 1778241795563,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\__tests__\\digital-registry.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1778237455394,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 10,
+      "lastAccessed": 1778241672997,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 9,
+      "lastAccessed": 1778241573512,
       "type": "file"
     },
     {
@@ -318,22 +336,34 @@
       "type": "file"
     },
     {
+      "path": "src\\headless\\__tests__\\default-facade.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1778219295882,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1778237862523,
+      "type": "file"
+    },
+    {
       "path": "src\\compile\\__tests__\\partition.test.ts",
       "accessCount": 6,
       "lastAccessed": 1778217653550,
       "type": "file"
     },
     {
-      "path": "src\\compile\\compile.ts",
+      "path": "src\\core\\circuit.ts",
       "accessCount": 5,
-      "lastAccessed": 1778206991069,
+      "lastAccessed": 1778219294611,
       "type": "file"
     },
     {
-      "path": "src\\headless\\__tests__\\default-facade.test.ts",
+      "path": "src/solver/digital/compiler.ts",
       "accessCount": 5,
-      "lastAccessed": 1778215765099,
-      "type": "file"
+      "lastAccessed": 1778230362906,
+      "type": "directory"
     },
     {
       "path": "src\\components\\memory\\__tests__\\register.test.ts",
@@ -348,21 +378,15 @@
       "type": "directory"
     },
     {
-      "path": "src/solver/digital/compiler.ts",
+      "path": "src\\core\\registry.ts",
       "accessCount": 4,
-      "lastAccessed": 1778218749330,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778218765416,
+      "lastAccessed": 1778226640124,
       "type": "file"
     },
     {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778205632937,
+      "path": "src\\components\\wiring\\splitter.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778237861930,
       "type": "file"
     },
     {
@@ -378,16 +402,10 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\wiring\\splitter.ts",
+      "path": "src/solver",
       "accessCount": 3,
-      "lastAccessed": 1778217249240,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778217615001,
-      "type": "file"
+      "lastAccessed": 1778233229284,
+      "type": "directory"
     },
     {
       "path": "src\\headless\\netlist.ts",
@@ -432,22 +450,10 @@
       "type": "directory"
     },
     {
-      "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778216908566,
-      "type": "file"
-    },
-    {
       "path": "src/components/wiring/splitter.ts",
       "accessCount": 2,
       "lastAccessed": 1778216919796,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\digital\\digital-engine.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778218735646,
-      "type": "file"
     },
     {
       "path": "src\\components\\wiring\\__tests__\\priority-encoder-partition-drop-probe.test.ts",
@@ -573,12 +579,6 @@
       "path": "src/solver/digital/digital-engine.ts",
       "accessCount": 1,
       "lastAccessed": 1778217178713,
-      "type": "directory"
-    },
-    {
-      "path": "src/solver",
-      "accessCount": 1,
-      "lastAccessed": 1778217200828,
       "type": "directory"
     },
     {

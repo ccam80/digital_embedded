@@ -327,7 +327,7 @@ export const RelayDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeRelay,
-      inputSchema: ["in1", "in2"],
+      inputSchema: ["in1", "in2", "A1", "B1"],
       outputSchema: ["A1", "B1"],
       stateSlotCount: 1,
       switchPins: [2, 3],

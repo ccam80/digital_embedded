@@ -110,9 +110,8 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
     const outNode = this.pinNodes.get("out")!;
-    if (outNode !== 0) {
-      this._hOutOut = ctx.solver.allocElement(outNode, outNode);
-    }
+    // Unconditional - ground rows route to TrashCan handle 0.
+    this._hOutOut = ctx.solver.allocElement(outNode, outNode);
   }
 
   setParam(key: string, value: number): void {
@@ -154,11 +153,10 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
 
     // Stamp open-collector conductance using prior-step weight (s1).
     // G_eff = w * (1/rSat) at (out, out); no RHS (pulls to GND via rSat).
+    // Unconditional - handle is always valid (ground -> TrashCan handle 0).
     const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    if (this._hOutOut !== -1) {
-      const gEff = wOld / this._rSat;
-      ctx.solver.stampElement(this._hOutOut, gEff);
-    }
+    const gEff = wOld / this._rSat;
+    ctx.solver.stampElement(this._hOutOut, gEff);
 
     // Weight integration- J-021 trapezoidal recurrence.
     // alpha = dt / (tau + dt); wNew = wOld + alpha * (target - wOld).

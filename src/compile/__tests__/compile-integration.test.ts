@@ -914,7 +914,7 @@ describe('compileUnified- model resolution', () => {
     return r;
   }
 
-  it('component with defaultModel="digital" and no model property compiles as digital (no analog domain)', () => {
+  it('component with a digital model and no model property compiles as digital (no analog domain)', () => {
     const r = buildDualModelRegistry();
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 

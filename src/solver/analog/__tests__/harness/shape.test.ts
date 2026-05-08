@@ -88,14 +88,12 @@ describe("getSessionShape", () => {
       maxStep: 1e-6,
     });
 
-    // Reach into internal state to truncate the ourSession steps,
-    // simulating a divergence in step count (ours fewer than ngspice).
-    const ourSteps: unknown[] = (session as any)._ourSession.steps;
+    // Truncate the ourSession steps in place to simulate a divergence in
+    // step count (ours fewer than ngspice). getSessionShape/getStepShape
+    // read the live arrays directly so no cache invalidation is needed.
+    const ourSteps = session.ourSession!.steps;
     expect(ourSteps.length).toBeGreaterThanOrEqual(2);
-    // Remove the last step from ours so ngspice has one more
     ourSteps.pop();
-    // Invalidate cached comparisons so getStepShape re-reads live arrays
-    (session as any)._comparisons = null;
 
     const shape = session.getSessionShape();
     // The final step (only on ngspice side) must be reported as ngspiceOnly

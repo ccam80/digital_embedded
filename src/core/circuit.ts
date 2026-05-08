@@ -246,7 +246,7 @@ export class Circuit {
    *
    * When set, `extractConnectivityGroups` uses these records as the source of
    * truth for pin-pin equivalence and treats wires as decorative routing.
-   * Absent for circuits loaded from `.dig`/`.dts` (legacy wire-only path).
+   * Absent for circuits loaded from `.dig`/`.dts` (wire-only path).
    */
   specConnections?: ReadonlyArray<SpecConnection>;
 

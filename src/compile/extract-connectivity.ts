@@ -80,21 +80,19 @@ export function resolveModelAssignments(
     const staticKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
     const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
-    // The element's "model" property is the source of truth (set at creation).
-    // requestedKey comes from the element's bag.
-    // IMPLEMENTATION FAILURE- does not match ngspice spec.
-    // Original excuse: "Fall back to definition only for legacy circuits that predate model-property-at-creation"
-    // Remedy: re-implement per spec. Do not weaken tests. Do not patch symptoms.
-    // See spec/reviews/ for the finding that identified this.
-    const candidateKey = requestedKey ?? def.defaultModel ?? (hasDigital ? 'digital' : mnaKeys[0] ?? 'neutral');
+    // The element's "model" property is the single source of truth, set at
+    // placement by `createSeededBag` (core/registry.ts). When it's absent the
+    // element was constructed outside the registry factory path (test-only):
+    // pick the digital model when one exists, else the first analog model,
+    // else neutral. defaultModel is intentionally NOT consulted here- per
+    // CLAUDE.md it is placement-time UI state, not a compile-time lookup key.
+    const candidateKey = requestedKey ?? (hasDigital ? 'digital' : mnaKeys[0] ?? 'neutral');
 
     // Validate the candidate key against available models.
-    // Valid keys: "digital" (when digital model exists), any key in mnaKeys,
-    // or the component's own defaultModel (trusted by definition).
+    // Valid keys: "digital" (when a digital model exists) or any key in mnaKeys.
     const isValidKey =
       (candidateKey === 'digital' && hasDigital) ||
-      mnaKeys.includes(candidateKey) ||
-      candidateKey === def.defaultModel;
+      mnaKeys.includes(candidateKey);
 
     let modelKey: string;
     if (requestedKey !== undefined && !isValidKey) {
@@ -157,7 +155,7 @@ function resolveDomainFromModelKey(modelKey: string): string {
  *     corner). Wires are still attached to groups for rendering, via BFS
  *     over wire-endpoint adjacency.
  *
- *   • Legacy position-merge path (when `specConnections` is absent):
+ *   • Wire-graph position-merge path (when `specConnections` is absent):
  *     used for `.dig`/`.dts` circuits where the wire graph is the only
  *     source of truth. Pins and wire endpoints sharing a world position
  *     are union-merged.
@@ -189,7 +187,7 @@ export function extractConnectivityGroups(
     totalPinSlots += allPins[i]!.length;
   }
 
-  // Wire virtual slots are only used in legacy position-merge mode. In
+  // Wire virtual slots are only used in wire-graph position-merge mode. In
   // spec-authoritative mode the wires are decorative and contribute no slots.
   const wireVirtualBase = totalPinSlots;
   const totalSlots = useSpecMode
@@ -201,7 +199,7 @@ export function extractConnectivityGroups(
   // -------------------------------------------------------------------------
   // Step 2: Pin-pair equivalence
   //   Spec mode: union pin slots per spec connection.
-  //   Legacy mode: position-merge (pins + wire endpoints).
+  //   Wire-graph mode: position-merge (pins + wire endpoints).
   // -------------------------------------------------------------------------
 
   if (useSpecMode) {
@@ -351,8 +349,8 @@ export function extractConnectivityGroups(
 
   // Wire-only groups: wires whose both endpoints share no position with any pin,
   // but only when the circuit has elements (wire-only circuits have no groups).
-  // Only meaningful in legacy mode where wires carry virtual slots; spec mode
-  // treats wires as decorative routing (no groups created from wires alone).
+  // Only meaningful in wire-graph mode where wires carry virtual slots; spec
+  // mode treats wires as decorative routing (no groups created from wires alone).
   if (!useSpecMode && totalPinSlots > 0) {
     for (let k = 0; k < wires.length; k++) {
       const startSlot = wireVirtualBase + k * 2;
@@ -477,8 +475,8 @@ export function extractConnectivityGroups(
       // size === 0: stray wire-only component, leave unattached.
     }
   } else {
-    // Legacy: a wire belongs to a group if either of its virtual slots
-    // maps to a group (i.e., it shares position with a pin).
+    // Wire-graph mode: a wire belongs to a group if either of its virtual
+    // slots maps to a group (i.e., it shares position with a pin).
     for (let k = 0; k < wires.length; k++) {
       const startSlot = wireVirtualBase + k * 2;
       const root = uf.find(startSlot);

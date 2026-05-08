@@ -155,13 +155,13 @@ export class MemristorElement extends PoolBackedAnalogElement {
     const posNode = this.pinNodes.get("pos")!;  // pos pin - RESposNode
     const negNode = this.pinNodes.get("neg")!;  // neg pin - RESnegNode
 
-    // ressetup.c:46-49 TSTALLOC sequence, line-for-line.
-    if (posNode !== 0) this._hPP = solver.allocElement(posNode, posNode);
-    if (negNode !== 0) this._hNN = solver.allocElement(negNode, negNode);
-    if (posNode !== 0 && negNode !== 0) {
-      this._hPN = solver.allocElement(posNode, negNode);
-      this._hNP = solver.allocElement(negNode, posNode);
-    }
+    // ressetup.c:46-49 TSTALLOC sequence, line-for-line. ngspice does
+    // not guard ground rows; allocElement(0,X) returns the TrashCan
+    // handle 0 (sparse-solver.ts:28-32).
+    this._hPP = solver.allocElement(posNode, posNode);
+    this._hNN = solver.allocElement(negNode, negNode);
+    this._hPN = solver.allocElement(posNode, negNode);
+    this._hNP = solver.allocElement(negNode, posNode);
   }
 
   setParam(key: string, value: number): void {
@@ -225,10 +225,12 @@ export class MemristorElement extends PoolBackedAnalogElement {
     const wOld = inDc ? s0[base + SLOT_W] : s1[base + SLOT_W];
     const G = this.conductanceAt(wOld);
 
-    if (this._hPP !== -1) solver.stampElement(this._hPP, G);
-    if (this._hNN !== -1) solver.stampElement(this._hNN, G);
-    if (this._hPN !== -1) solver.stampElement(this._hPN, -G);
-    if (this._hNP !== -1) solver.stampElement(this._hNP, -G);
+    // Handles are unconditionally allocated in setup(); ground rows route
+    // to TrashCan handle 0 (zeroed every NR iter).
+    solver.stampElement(this._hPP,  G);
+    solver.stampElement(this._hNN,  G);
+    solver.stampElement(this._hPN, -G);
+    solver.stampElement(this._hNP, -G);
 
     if (inDc) {
       // No state evolution at the DC operating point — preserve the seeded

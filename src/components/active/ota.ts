@@ -186,12 +186,13 @@ class OtaAnalogElement extends AnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    // VCCS TSTALLOC sequence (vccsset.c:43-46): 4 entries
-    // Skip entries where either node is ground (0).
-    if (this.nOutP > 0 && this.nVp > 0) this.hPCP = ctx.solver.allocElement(this.nOutP, this.nVp);
-    if (this.nOutP > 0 && this.nVm > 0) this.hPCN = ctx.solver.allocElement(this.nOutP, this.nVm);
-    if (this.nOutN > 0 && this.nVp > 0) this.hNCP = ctx.solver.allocElement(this.nOutN, this.nVp);
-    if (this.nOutN > 0 && this.nVm > 0) this.hNCN = ctx.solver.allocElement(this.nOutN, this.nVm);
+    // VCCS TSTALLOC sequence (vccsset.c:43-46): 4 entries.
+    // Unconditional - ground rows/cols route to TrashCan handle 0
+    // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273).
+    this.hPCP = ctx.solver.allocElement(this.nOutP, this.nVp);
+    this.hPCN = ctx.solver.allocElement(this.nOutP, this.nVm);
+    this.hNCP = ctx.solver.allocElement(this.nOutN, this.nVp);
+    this.hNCN = ctx.solver.allocElement(this.nOutN, this.nVm);
   }
 
   load(ctx: LoadContext): void {
@@ -224,14 +225,15 @@ class OtaAnalogElement extends AnalogElement {
     const iNR = iOutNow - gmEff * this.vDiff;
 
     // Stamp VCCS using cached handles (vccsset.c:43-46).
-    if (this.hPCP >= 0) solver.stampElement(this.hPCP, -gmEff);
-    if (this.hPCN >= 0) solver.stampElement(this.hPCN,  gmEff);
-    if (this.hNCP >= 0) solver.stampElement(this.hNCP,  gmEff);
-    if (this.hNCN >= 0) solver.stampElement(this.hNCN, -gmEff);
+    // Unconditional - ground rows route to TrashCan handle 0.
+    solver.stampElement(this.hPCP, -gmEff);
+    solver.stampElement(this.hPCN,  gmEff);
+    solver.stampElement(this.hNCP,  gmEff);
+    solver.stampElement(this.hNCN, -gmEff);
 
-    // RHS: Norton constant
-    if (this.nOutP !== 0) stampRHS(ctx.rhs, this.nOutP,  iNR);
-    if (this.nOutN !== 0) stampRHS(ctx.rhs, this.nOutN, -iNR);
+    // RHS: Norton constant. Unconditional - rhs[0] cleared post-solve.
+    stampRHS(ctx.rhs, this.nOutP,  iNR);
+    stampRHS(ctx.rhs, this.nOutN, -iNR);
   }
 
   /**

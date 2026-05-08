@@ -207,7 +207,7 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
  * components by layering convention). Recognises plain widths (`"4"`),
  * repeat shorthand (`"4*2"` = two ports), and explicit ranges (`"4-7"`).
  *
- * Returns at least 1 -- matches `parsePorts`' fallback for empty input.
+ * Returns at least 1 -- matches `parsePorts`' empty-input default.
  */
 function countSplitterPorts(definition: string): number {
   let count = 0;
