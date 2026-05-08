@@ -6,7 +6,7 @@
  * and stamps a Norton-equivalent (current source in parallel with the
  * output conductance) at its (pos, neg) pins. The Norton form absorbs the
  * output resistance into this leaf so the conductance value can be switched
- * between active (1/rOut) and high-Z isolated (1e-9 S = 1 GÎ©) without
+ * between active (1/rOut) and high-Z isolated (1e-9 S = 1 GΩ) without
  * touching a separate Resistor sub-element.
  *
  * Tri-state plumbing: the optional `enableLogic` siblingState ref points
@@ -29,9 +29,9 @@
  * Uint32).
  *
  * Per Composite I7 (phase-composite-architecture.md), J-171
- * (contracts_group_11.md). Replaces the prior ThÃ©venin VSRC + separate
+ * (contracts_group_11.md). Replaces the prior Thévenin VSRC + separate
  * Resistor child with a single Norton stamp; mathematically equivalent at
- * the external port (ThÃ©venin/Norton equivalence preserves I/V at every
+ * the external port (Thévenin/Norton equivalence preserves I/V at every
  * operating point) but eliminates the internal driveNode and branch row,
  * and lets the driver own the conductance value for tri-state switching.
  */
@@ -50,9 +50,9 @@ import { PropertyBag, type PoolSlotRef } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Tri-state isolated conductance- 1 GÎ© per the architectural decision.
+// Tri-state isolated conductance- 1 GΩ per the architectural decision.
 // Picked to be small enough that it never measurably perturbs a real driver
-// elsewhere on the shared net (real driver rOut is 100 Î© â†’ ratio 1e7) but
+// elsewhere on the shared net (real driver rOut is 100 Ω â†’ ratio 1e7) but
 // large enough to keep the MNA matrix non-singular when every driver on a
 // net is disabled (a true float would leave the node unconstrained).
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ export class BehavioralOutputDriverElement extends PoolBackedAnalogElement {
     const target = bit ? this._vOH : this._vOL;
 
     // Tri-state evaluation. When `enableLogic` is wired and the sibling slot
-    // reads disabled, the Norton stamp collapses to a 1 GÎ© shunt with zero
+    // reads disabled, the Norton stamp collapses to a 1 GΩ shunt with zero
     // current injection- the pin effectively disconnects from the external
     // net so other drivers on the shared net take over. When `enableLogic`
     // is absent (the common case), driver is permanently enabled.

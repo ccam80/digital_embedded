@@ -195,7 +195,7 @@ describe("SparseSolver", () => {
   });
 
   it("mna_resistor_divider_3x3", () => {
-    // MNA stamp for: Vs=5V between node 1 and ground, R1=1kÃƒÅ½Ã‚Â© (node1-node2), R2=1kÃƒÅ½Ã‚Â© (node2-ground)
+    // MNA stamp for: Vs=5V between node 1 and ground, R1=1kÃƒÅ½Ã‚© (node1-node2), R2=1kÃƒÅ½Ã‚© (node2-ground)
     // Nodes: 1=V1, 2=V2, branch 3=Ivs (current through voltage source)
     // Matrix size = 3 (2 nodes + 1 branch)
     //
@@ -1939,18 +1939,18 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
   });
 
   it("solve_without_amd_voltage_source_branch", () => {
-    // Circuit with voltage source branch equations (off-diagonal Ãƒâ€šÃ‚Â±1 entries).
+    // Circuit with voltage source branch equations (off-diagonal Ãƒâ€šÃ‚±1 entries).
     // This is the classic MNA stamp for V1=5V between node 1 (ground ref) and node 0:
     //   Node 0: G*v0 + Ivs = 0      => row 0
     //   KVL: v0 - V1 = 0             => row 1 (branch eq)
-    // Concretely: 3-node MNA with a 1ÃƒÅ½Ã‚Â© resistor from node 0 to node 2, and V=5V source.
+    // Concretely: 3-node MNA with a 1ÃƒÅ½Ã‚© resistor from node 0 to node 2, and V=5V source.
     // Nodes: 0=top of resistor, 1=bottom of resistor (gnd ref), 2=branch current
     // Stamp: R from node 0 to gnd:  A[0][0]+=1, A[0][0] already has conductance
     // Simpler: use the standard voltage-divider MNA from test-helpers
     //
     // Manual MNA (2 nodes + 1 branch):
     //   n=3, node0=v_top, node1=v_bot (gnd=0V effectively via source), node2=I_branch
-    //   Resistor 1ÃƒÅ½Ã‚Â© node0ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢gnd: A[0][0]+=1
+    //   Resistor 1ÃƒÅ½Ã‚© node0ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢gnd: A[0][0]+=1
     //   Voltage source V=5 node0ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢gnd via branch: A[0][2]+=1, A[2][0]+=1, A[2][2]=0, rhs[2]=5
     //   Ground: set row/col 1 to identity (or just 2-node system)
     //

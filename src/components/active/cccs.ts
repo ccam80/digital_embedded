@@ -57,7 +57,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: CCCS_PARAM_DEFS, defaults: CCCS_DEFAULTS } = defineModelParams({
   primary: {
-    currentGain: { default: 1.0, description: "Linear current gain Î²" },
+    currentGain: { default: 1.0, description: "Linear current gain β" },
   },
 });
 

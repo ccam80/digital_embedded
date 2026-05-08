@@ -51,8 +51,8 @@ export const { paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS, defaults: TAPPED_TRANSF
     couplingCoefficient: { default: 0.99,  description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)", min: 0, max: 1 },
   },
   secondary: {
-    primaryResistance:   { default: 0.0,   unit: "Î©", description: "Primary winding series resistance in ohms", min: 0 },
-    secondaryResistance: { default: 0.0,   unit: "Î©", description: "Each secondary half winding series resistance in ohms", min: 0 },
+    primaryResistance:   { default: 0.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
+    secondaryResistance: { default: 0.0,   unit: "Ω", description: "Each secondary half winding series resistance in ohms", min: 0 },
   },
 });
 
@@ -284,8 +284,8 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "primaryResistance",
     type: PropertyType.FLOAT,
-    label: "Primary Resistance (Î©)",
-    unit: "Î©",
+    label: "Primary Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 0.0,
     min: 0,
     description: "Primary winding series resistance in ohms",
@@ -293,8 +293,8 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "secondaryResistance",
     type: PropertyType.FLOAT,
-    label: "Secondary Resistance per Half (Î©)",
-    unit: "Î©",
+    label: "Secondary Resistance per Half (Ω)",
+    unit: "Ω",
     defaultValue: 0.0,
     min: 0,
     description: "Each secondary half winding series resistance in ohms",

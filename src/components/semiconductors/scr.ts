@@ -37,9 +37,9 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
     IS: { default: 1e-16, unit: "A", description: "Saturation current (shared)" },
   },
   secondary: {
-    RC: { default: 0,     unit: "Î©", description: "Collector resistance (shared)" },
-    RB: { default: 0,     unit: "Î©", description: "Base resistance (shared)" },
-    RE: { default: 0,     unit: "Î©", description: "Emitter resistance (shared)" },
+    RC: { default: 0,     unit: "Ω", description: "Collector resistance (shared)" },
+    RB: { default: 0,     unit: "Ω", description: "Base resistance (shared)" },
+    RE: { default: 0,     unit: "Ω", description: "Emitter resistance (shared)" },
   },
   instance: {
     AREA: { default: 1,      description: "Device area factor" },

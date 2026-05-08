@@ -18,11 +18,13 @@
  * For 100 components / 8 sweeps this is well under 100 K operations.
  */
 
-import type { Circuit } from '../core/circuit.js';
+import type { Circuit, SpecConnection } from '../core/circuit.js';
 import { Wire } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import { pinWorldPosition, PinDirection } from '../core/pin.js';
 import type { Pin } from '../core/pin.js';
+
+export type { SpecConnection };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Public API
@@ -38,16 +40,6 @@ import type { Pin } from '../core/pin.js';
 export interface LayoutConstraint {
   col?: number;
   row?: number;
-}
-
-/** Authoritative pin-level connection record passed from the circuit builder. */
-export interface SpecConnection {
-  /** instanceId of the source element. */
-  srcId: string;
-  srcPin: string;
-  /** instanceId of the destination element. */
-  dstId: string;
-  dstPin: string;
 }
 
 export interface LayoutOptions {
@@ -794,6 +786,23 @@ function applyLayout(g: Graph, circuit: Circuit): void {
     layoutMaxY = Math.max(layoutMaxY, box.b);
   }
 
+  // Pin-coordinate index used to forbid Z-route corners from landing on
+  // foreign pins (which would create accidental electrical junctions in the
+  // legacy position-merge connectivity path, and visually misleading
+  // joins under spec-authoritative connectivity).
+  const pinPositionsByElement = new Map<string, Set<string>>();
+  const allPinPositions = new Set<string>();
+  for (const el of circuit.elements) {
+    const set = new Set<string>();
+    for (const pin of el.getPins()) {
+      const wp = pinWorldPosition(el, pin);
+      const key = `${wp.x},${wp.y}`;
+      set.add(key);
+      allPinPositions.add(key);
+    }
+    pinPositionsByElement.set(el.instanceId, set);
+  }
+
   // Clear all wires
   circuit.wires.length = 0;
 
@@ -804,6 +813,11 @@ function applyLayout(g: Graph, circuit: Circuit): void {
 
   // Track vertical wire channels so subsequent Z-routes don't overlap
   const usedChannels: VChannel[] = [];
+
+  // Cumulative set of all wire endpoints emitted in this layout pass.
+  // Subsequent connections treat these as forbidden corner positions so
+  // their Z-route bends don't land on earlier connections' wire vertices.
+  const emittedEndpoints = new Set<string>();
 
   // Route each connection
   for (const conn of g.conns) {
@@ -817,6 +831,20 @@ function applyLayout(g: Graph, circuit: Circuit): void {
 
     const from = pinWorldPosition(srcEl, srcPin);
     const to = pinWorldPosition(dstEl, dstPin);
+
+    // Build the per-connection forbidden-corner set: foreign pin positions
+    // plus all wire endpoints emitted so far, minus the current connection's
+    // own src/dst element pin positions (those are legitimate landing spots).
+    const ownPins = new Set<string>();
+    const srcPinSet = pinPositionsByElement.get(conn.srcId);
+    const dstPinSet = pinPositionsByElement.get(conn.dstId);
+    if (srcPinSet) for (const k of srcPinSet) ownPins.add(k);
+    if (dstPinSet) for (const k of dstPinSet) ownPins.add(k);
+    const forbiddenCorners = new Set<string>();
+    for (const k of allPinPositions) if (!ownPins.has(k)) forbiddenCorners.add(k);
+    for (const k of emittedEndpoints) if (!ownPins.has(k)) forbiddenCorners.add(k);
+
+    const wireSnapshot = circuit.wires.length;
 
     // Compute stub points: extend PIN_STUB grid units in the pin's exit
     // direction before any dogleg.  This guarantees that top/bottom pins
@@ -860,23 +888,37 @@ function applyLayout(g: Graph, circuit: Circuit): void {
       pushWire(circuit, { x: exitX, y: routeY }, { x: entryX, y: routeY });
       pushWire(circuit, { x: entryX, y: routeY }, { x: entryX, y: toStub.y });
       pushWire(circuit, { x: entryX, y: toStub.y }, toStub);
-      continue;
-    }
+    } else {
+      // --- Forward path: route through dummy waypoints with body avoidance ---
+      const waypoints: { x: number; y: number }[] = [];
+      const prefix1 = `__d_${conn.srcId}_${conn.dstId}_`;
+      const prefix2 = `__d_${conn.dstId}_${conn.srcId}_`;
+      for (const [id, node] of g.nodes) {
+        if (id.startsWith(prefix1) || id.startsWith(prefix2)) {
+          waypoints.push({ x: node.x, y: node.y });
+        }
+      }
+      waypoints.sort((a, b) => a.x - b.x);
 
-    // --- Forward path: route through dummy waypoints with body avoidance ---
-    const waypoints: { x: number; y: number }[] = [];
-    const prefix1 = `__d_${conn.srcId}_${conn.dstId}_`;
-    const prefix2 = `__d_${conn.dstId}_${conn.srcId}_`;
-    for (const [id, node] of g.nodes) {
-      if (id.startsWith(prefix1) || id.startsWith(prefix2)) {
-        waypoints.push({ x: node.x, y: node.y });
+      const points = [fromStub, ...waypoints, toStub];
+      for (let i = 0; i < points.length - 1; i++) {
+        routeSegmentSafe(
+          circuit,
+          points[i],
+          points[i + 1],
+          boxes,
+          usedChannels,
+          forbiddenCorners,
+        );
       }
     }
-    waypoints.sort((a, b) => a.x - b.x);
 
-    const points = [fromStub, ...waypoints, toStub];
-    for (let i = 0; i < points.length - 1; i++) {
-      routeSegmentSafe(circuit, points[i], points[i + 1], boxes, usedChannels);
+    // Sweep newly-emitted wires into the cumulative endpoint set so the
+    // next connection's forbidden-corner test sees them.
+    for (let i = wireSnapshot; i < circuit.wires.length; i++) {
+      const w = circuit.wires[i]!;
+      emittedEndpoints.add(`${w.start.x},${w.start.y}`);
+      emittedEndpoints.add(`${w.end.x},${w.end.y}`);
     }
   }
 }
@@ -904,7 +946,9 @@ interface VChannel {
  * Aligned segments are checked for body crossings and detoured if
  * needed.  Non-aligned segments become Z-shapes whose vertical
  * channel AND horizontal runs are verified clear of component bodies
- * and previously routed channels.
+ * and previously routed channels. Z-route corners are also rejected
+ * if they would land on a foreign pin or an already-emitted wire
+ * vertex (via `forbiddenCorners`).
  */
 function routeSegmentSafe(
   circuit: Circuit,
@@ -912,6 +956,7 @@ function routeSegmentSafe(
   b: { x: number; y: number },
   boxes: BBox[],
   usedChannels: VChannel[],
+  forbiddenCorners: Set<string>,
 ): void {
   // --- Aligned vertical ---
   if (a.x === b.x) {
@@ -928,7 +973,9 @@ function routeSegmentSafe(
         if (
           isVerticalClear(jx, yMin, yMax, boxes) &&
           isHorizontalClear(a.y, Math.min(a.x, jx), Math.max(a.x, jx), boxes) &&
-          isHorizontalClear(b.y, Math.min(a.x, jx), Math.max(a.x, jx), boxes)
+          isHorizontalClear(b.y, Math.min(a.x, jx), Math.max(a.x, jx), boxes) &&
+          !forbiddenCorners.has(`${jx},${a.y}`) &&
+          !forbiddenCorners.has(`${jx},${b.y}`)
         ) {
           pushWire(circuit, a, { x: jx, y: a.y });
           pushWire(circuit, { x: jx, y: a.y }, { x: jx, y: b.y });
@@ -956,7 +1003,9 @@ function routeSegmentSafe(
         if (
           isHorizontalClear(jy, xMin, xMax, boxes) &&
           isVerticalClear(a.x, Math.min(a.y, jy), Math.max(a.y, jy), boxes) &&
-          isVerticalClear(b.x, Math.min(a.y, jy), Math.max(a.y, jy), boxes)
+          isVerticalClear(b.x, Math.min(a.y, jy), Math.max(a.y, jy), boxes) &&
+          !forbiddenCorners.has(`${a.x},${jy}`) &&
+          !forbiddenCorners.has(`${b.x},${jy}`)
         ) {
           pushWire(circuit, a, { x: a.x, y: jy });
           pushWire(circuit, { x: a.x, y: jy }, { x: b.x, y: jy });
@@ -974,35 +1023,59 @@ function routeSegmentSafe(
   const yMax = Math.max(a.y, b.y);
   let midX = Math.round((a.x + b.x) / 2);
 
-  if (!isZRouteClear(a.x, a.y, b.x, b.y, midX, boxes, usedChannels)) {
+  if (!isZRouteClear(a.x, a.y, b.x, b.y, midX, boxes, usedChannels, forbiddenCorners)) {
     const limit = Math.abs(b.x - a.x) + 5;
     let found = false;
     for (let offset = 1; offset <= limit; offset++) {
       const xp = midX + offset;
-      if (isZRouteClear(a.x, a.y, b.x, b.y, xp, boxes, usedChannels)) {
+      if (isZRouteClear(a.x, a.y, b.x, b.y, xp, boxes, usedChannels, forbiddenCorners)) {
         midX = xp;
         found = true;
         break;
       }
       const xm = midX - offset;
-      if (isZRouteClear(a.x, a.y, b.x, b.y, xm, boxes, usedChannels)) {
+      if (isZRouteClear(a.x, a.y, b.x, b.y, xm, boxes, usedChannels, forbiddenCorners)) {
         midX = xm;
         found = true;
         break;
       }
     }
-    // Fallback: body-only clearance (ignore channel overlaps)
+    // Two-stage relaxation if no fully-clean midX exists:
+    //
+    //   A. Drop the channel constraint but keep body + corner. Channel
+    //      overlap is purely visual; corners protect connectivity.
+    //   B. Drop the body constraint but keep corner. Crossing a body looks
+    //      ugly but does not change the netlist; landing a corner on a
+    //      foreign pin or wire vertex DOES, so the corner constraint is
+    //      the last one we relax.
     if (!found) {
       midX = Math.round((a.x + b.x) / 2);
-      if (!isZRouteBodyClear(a.x, a.y, b.x, b.y, midX, boxes)) {
+      // Stage A: body + corner (no channel)
+      if (!isZRouteBodyClear(a.x, a.y, b.x, b.y, midX, boxes, forbiddenCorners)) {
+        let relaxed = false;
         for (let offset = 1; offset <= limit; offset++) {
-          if (isZRouteBodyClear(a.x, a.y, b.x, b.y, midX + offset, boxes)) {
+          if (isZRouteBodyClear(a.x, a.y, b.x, b.y, midX + offset, boxes, forbiddenCorners)) {
             midX = midX + offset;
+            relaxed = true;
             break;
           }
-          if (isZRouteBodyClear(a.x, a.y, b.x, b.y, midX - offset, boxes)) {
+          if (isZRouteBodyClear(a.x, a.y, b.x, b.y, midX - offset, boxes, forbiddenCorners)) {
             midX = midX - offset;
+            relaxed = true;
             break;
+          }
+        }
+        // Stage B: corner-only (drop body too)
+        if (!relaxed) {
+          midX = Math.round((a.x + b.x) / 2);
+          const cornerClear = (m: number): boolean =>
+            !forbiddenCorners.has(`${m},${a.y}`) &&
+            !forbiddenCorners.has(`${m},${b.y}`);
+          if (!cornerClear(midX)) {
+            for (let offset = 1; offset <= limit; offset++) {
+              if (cornerClear(midX + offset)) { midX = midX + offset; break; }
+              if (cornerClear(midX - offset)) { midX = midX - offset; break; }
+            }
           }
         }
       }
@@ -1077,7 +1150,8 @@ function isHorizontalClear(
 
 /**
  * Check whether all three segments of a Z-route (horizontal-vertical-
- * horizontal) avoid component bodies and previously used channels.
+ * horizontal) avoid component bodies, previously used channels, and any
+ * forbidden corner positions (foreign pins or earlier wire vertices).
  */
 function isZRouteClear(
   ax: number, ay: number,
@@ -1085,11 +1159,14 @@ function isZRouteClear(
   midX: number,
   boxes: BBox[],
   usedChannels: VChannel[],
+  forbiddenCorners: Set<string>,
 ): boolean {
   const yMin = Math.min(ay, by);
   const yMax = Math.max(ay, by);
   if (!isVerticalClear(midX, yMin, yMax, boxes)) return false;
   if (isChannelOccupied(midX, yMin, yMax, usedChannels)) return false;
+  if (forbiddenCorners.has(`${midX},${ay}`)) return false;
+  if (forbiddenCorners.has(`${midX},${by}`)) return false;
   if (ax !== midX) {
     if (!isHorizontalClear(ay, Math.min(ax, midX), Math.max(ax, midX), boxes)) return false;
   }
@@ -1099,16 +1176,25 @@ function isZRouteClear(
   return true;
 }
 
-/** Body-only variant of isZRouteClear (ignores channel overlaps). */
+/**
+ * Body-and-corner variant of isZRouteClear that ignores channel overlaps.
+ * Channel sharing is purely a visual concern; corner collisions are not —
+ * they create fictitious electrical junctions in legacy connectivity mode,
+ * so the corner constraint must hold even when the channel constraint is
+ * relaxed to find a route at all.
+ */
 function isZRouteBodyClear(
   ax: number, ay: number,
   bx: number, by: number,
   midX: number,
   boxes: BBox[],
+  forbiddenCorners: Set<string>,
 ): boolean {
   const yMin = Math.min(ay, by);
   const yMax = Math.max(ay, by);
   if (!isVerticalClear(midX, yMin, yMax, boxes)) return false;
+  if (forbiddenCorners.has(`${midX},${ay}`)) return false;
+  if (forbiddenCorners.has(`${midX},${by}`)) return false;
   if (ax !== midX) {
     if (!isHorizontalClear(ay, Math.min(ax, midX), Math.max(ax, midX), boxes)) return false;
   }

@@ -85,23 +85,44 @@ describe("Invariant 1: pinLayout matches digital schemas", () => {
       const props = createSeededBag(c.definition);
       const layout: readonly PinDeclaration[] = c.definition.pinLayout ?? [];
 
+      // Bidirectional pins satisfy either schema slot- a relay contact, MOSFET
+      // drain/source, or transmission gate I/O is electrically a port that the
+      // digital model may treat as input or output.  Filter pinLayout in
+      // schema declaration order: a label is a valid input if its pinLayout
+      // direction is INPUT or BIDIRECTIONAL, and a valid output if OUTPUT or
+      // BIDIRECTIONAL.
       const inputLabels = layout
-        .filter((p) => p.direction === PinDirection.INPUT)
+        .filter(
+          (p) =>
+            p.direction === PinDirection.INPUT ||
+            p.direction === PinDirection.BIDIRECTIONAL,
+        )
         .map((p) => p.label);
       const outputLabels = layout
-        .filter((p) => p.direction === PinDirection.OUTPUT)
+        .filter(
+          (p) =>
+            p.direction === PinDirection.OUTPUT ||
+            p.direction === PinDirection.BIDIRECTIONAL,
+        )
         .map((p) => p.label);
 
       const expectedInputs = resolveSchema(c.digital.inputSchema, props);
       const expectedOutputs = resolveSchema(c.digital.outputSchema, props);
 
       // A schema may be omitted entirely; only assert when the contract
-      // declares one.  When declared, it must match the pinLayout exactly.
+      // declares one.  Every schema label must appear in the matching-
+      // direction (or BIDIRECTIONAL) pinLayout entries; pinLayout may
+      // legitimately list extra BIDIRECTIONAL pins not in this direction's
+      // schema (they will appear in the other schema instead).
       if (expectedInputs !== undefined) {
-        expect(inputLabels).toEqual(expectedInputs);
+        for (const label of expectedInputs) {
+          expect(inputLabels).toContain(label);
+        }
       }
       if (expectedOutputs !== undefined) {
-        expect(outputLabels).toEqual(expectedOutputs);
+        for (const label of expectedOutputs) {
+          expect(outputLabels).toContain(label);
+        }
       }
     },
   );
@@ -145,14 +166,17 @@ const IDENT_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 // ---------------------------------------------------------------------------
 //
 // Sequential components conventionally name their clock input "C", "CLK", or
-// "CK".  When a pin is flagged `isClockCapable: true` its label must come from
-// this allowlist so the visual convention (drawing the wire to a pin labelled
-// "C") matches the runtime semantics (edge-detection on that pin).  A typo
-// like flagging "DIN" as clock-capable, or naming the clock pin "Clk2" while
-// flagging it, would silently break the wire-drawing convention this audit
-// guards against.
+// "CK".  Memory / strobe-driven components label their write-enable strobe
+// "WE" (EEPROM/SRAM write-strobe convention)- the runtime treats the rising
+// edge of WE as the write-trigger event in the same way it treats C/CLK/CK
+// for flip-flops.  When a pin is flagged `isClockCapable: true` its label
+// must come from this allowlist so the visual convention (drawing the wedge
+// on the labelled pin) matches the runtime semantics (edge-detection on that
+// pin).  A typo like flagging "DIN" as clock-capable, or naming the clock
+// pin "Clk2" while flagging it, would silently break the wire-drawing
+// convention this audit guards against.
 
-const CLOCK_LABELS: ReadonlySet<string> = new Set(["C", "CLK", "CK"]);
+const CLOCK_LABELS: ReadonlySet<string> = new Set(["C", "CLK", "CK", "WE"]);
 
 describe("Invariant 4: isClockCapable pins use a recognised clock label", () => {
   it.each(DIGITAL_CASES.map((c) => [c.name, c] as const))(

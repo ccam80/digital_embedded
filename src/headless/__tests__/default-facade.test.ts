@@ -421,15 +421,15 @@ describe('DefaultSimulatorFacade', () => {
       components: [
         { id: 'vs',  type: 'DcVoltageSource', props: { voltage: Vsrc, label: 'Vs' } },
         { id: 'r1',  type: 'Resistor',        props: { resistance: R1 } },
-        // Label on R2: 2-pin components use label:pinLabel form; 'Vmid:A' resolves
-        // to R2's A-pin node, which is the midpoint node between R1 and R2.
+        // Label on R2: 2-pin components use label:pinLabel form; 'Vmid:pos' resolves
+        // to R2's pos-pin node, which is the midpoint node between R1 and R2.
         { id: 'r2',  type: 'Resistor',        props: { resistance: R2, label: 'Vmid' } },
         { id: 'gnd', type: 'Ground' },
       ],
       connections: [
-        ['vs:pos',  'r1:A'],
-        ['r1:B',    'r2:A'],
-        ['r2:B',    'gnd:out'],
+        ['vs:pos',  'r1:pos'],
+        ['r1:neg',    'r2:pos'],
+        ['r2:neg',    'gnd:out'],
         ['vs:neg',  'gnd:out'],
       ],
     });
@@ -438,9 +438,13 @@ describe('DefaultSimulatorFacade', () => {
     await facade.settle(engine);
 
     const signals = facade.readAllSignals(engine);
-    const vmid = signals['Vmid:A'];
+    const vmid = signals['Vmid:pos'];
     expect(vmid).toBeDefined();
-    // Allow 1% tolerance for solver convergence
+    // R1=10, R2=40 with Vsrc=10 V → Vmid = Vsrc * R2 / (R1+R2) = 8 V.
+    // If `resistance` is silently dropped both resistors collapse to the
+    // same default and Vmid would read 5 V instead of 8 V- the regression
+    // signal this test guards against.
+    expect(vmid).toBeCloseTo((Vsrc * R2) / (R1 + R2), 1);
   });
 
   // -------------------------------------------------------------------------
@@ -541,8 +545,8 @@ describe("DefaultSimulatorFacade auto-mode compilation", () => {
     const gndPins = gnd.getPins();
     const v1Neg = pinWorldPosition(v1, v1Pins.find(p => p.label === "neg")!);
     const v1Pos = pinWorldPosition(v1, v1Pins.find(p => p.label === "pos")!);
-    const r1A = pinWorldPosition(r1, r1Pins.find(p => p.label === "A")!);
-    const r1B = pinWorldPosition(r1, r1Pins.find(p => p.label === "B")!);
+    const r1A = pinWorldPosition(r1, r1Pins.find(p => p.label === "pos")!);
+    const r1B = pinWorldPosition(r1, r1Pins.find(p => p.label === "neg")!);
     const gndPin = pinWorldPosition(gnd, gndPins[0]!);
 
     circuit.addWire(new Wire(v1Pos, r1A));

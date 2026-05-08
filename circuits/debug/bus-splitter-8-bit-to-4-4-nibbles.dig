@@ -8,8 +8,8 @@
           "y": 7
         },
         "properties": {
-          "input splitting": "8",
-          "output splitting": "4,4"
+          "inputSplitting": "8",
+          "outputSplitting": "4,4"
         },
         "rotation": 0,
         "type": "Splitter"

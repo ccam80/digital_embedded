@@ -70,8 +70,8 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const gndOut = pinWorldPosition(gnd, gndPins[0]!);
   const vccPos = pinWorldPosition(vcc, vccPins.find(p => p.label === 'pos')!);
   const vccNeg = pinWorldPosition(vcc, vccPins.find(p => p.label === 'neg')!);
-  const rcA    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'A')!);
-  const rcB    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'B')!);
+  const rcA    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'pos')!);
+  const rcB    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'neg')!);
   const vbPos  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'pos')!);
   const vbNeg  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'neg')!);
   const q1B    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'B')!);

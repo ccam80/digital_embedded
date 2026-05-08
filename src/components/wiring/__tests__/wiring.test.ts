@@ -185,7 +185,7 @@ describe("Splitter — Cat 9 digital interaction (T1)", () => {
     const fix = buildDigital({
       components: [
         { id: "in",   type: "In",       props: { label: "IN", bitWidth: 8 } },
-        { id: "spl",  type: "Splitter", props: { "input splitting": "8", "output splitting": "4,4" } },
+        { id: "spl",  type: "Splitter", props: { "inputSplitting": "8", "outputSplitting": "4,4" } },
         { id: "lo",   type: "Out",      props: { label: "LO", bitWidth: 4 } },
         { id: "hi",   type: "Out",      props: { label: "HI", bitWidth: 4 } },
       ],
@@ -209,7 +209,7 @@ describe("Splitter — Cat 9 digital interaction (T1)", () => {
       components: [
         { id: "lo",  type: "In",       props: { label: "LO", bitWidth: 4 } },
         { id: "hi",  type: "In",       props: { label: "HI", bitWidth: 4 } },
-        { id: "spl", type: "Splitter", props: { "input splitting": "4,4", "output splitting": "8" } },
+        { id: "spl", type: "Splitter", props: { "inputSplitting": "4,4", "outputSplitting": "8" } },
         { id: "out", type: "Out",      props: { label: "OUT", bitWidth: 8 } },
       ],
       connections: [
@@ -236,7 +236,7 @@ describe("Splitter — Cat 9 digital interaction (T1)", () => {
     const fix = buildDigital({
       components: [
         { id: "in",  type: "In",       props: { label: "IN", bitWidth: 8 } },
-        { id: "spl", type: "Splitter", props: { "input splitting": "8", "output splitting": "1,1,1,1,4" } },
+        { id: "spl", type: "Splitter", props: { "inputSplitting": "8", "outputSplitting": "1,1,1,1,4" } },
         { id: "b0",  type: "Out",      props: { label: "B0",  bitWidth: 1 } },
         { id: "b1",  type: "Out",      props: { label: "B1",  bitWidth: 1 } },
         { id: "b2",  type: "Out",      props: { label: "B2",  bitWidth: 1 } },

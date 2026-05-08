@@ -152,7 +152,7 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
     ctx.drawLine(4, 0, 4, 0); // P2a
 
     // 32 iterations: thin vertical rung + thick horizontal top segment
-    const step = 2 / 16; // 0.125 grid units (2px Ã· 16)
+    const step = 2 / 16; // 0.125 grid units (2px ÷ 16)
     for (let i = 0; i <= 31; i++) {
       const x = i * step;
       // Thin vertical rung from bottom rail to top rail

@@ -39,7 +39,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: POTENTIOMETER_PARAM_DEFS, defaults: POTENTIOMETER_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 10000, unit: "Î©", description: "Total resistance in ohms", min: 1e-9 },
+    resistance: { default: 10000, unit: "Ω", description: "Total resistance in ohms", min: 1e-9 },
     position:   { default: 0.5,              description: "Wiper position (0.0 = full bottom, 1.0 = full top)", min: 0, max: 1 },
   },
 });
@@ -121,7 +121,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 
     // Falstad PotElm: total span (0,0)(64,0) px = (0,0)(4,0) gu.
     // Lead wires: 0..16px and 48..64px = 0..1 gu and 3..4 gu.
-    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks Â±8px = Â±0.5 gu.
+    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks ±8px = ±0.5 gu.
     // Wiper pin W at (32,-16) px = (2,-1) gu.
     const PX = 1 / 16;
     const hs = 8 * PX; // 0.5 gu

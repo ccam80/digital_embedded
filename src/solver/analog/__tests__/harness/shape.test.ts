@@ -26,8 +26,8 @@ function buildRcCircuit(registry: ComponentRegistry): Circuit {
       { id: "gnd", type: "Ground" },
     ],
     connections: [
-      ["vs:pos", "r1:A"],
-      ["r1:B",   "c1:pos"],
+      ["vs:pos", "r1:pos"],
+      ["r1:neg",   "c1:pos"],
       ["c1:neg", "gnd:out"],
       ["vs:neg", "gnd:out"],
     ],
@@ -44,8 +44,8 @@ function buildHwrCircuit(registry: ComponentRegistry): Circuit {
       { id: "gnd",  type: "Ground" },
     ],
     connections: [
-      ["vs:pos",  "r1:A"],
-      ["r1:B",    "d1:A"],
+      ["vs:pos",  "r1:pos"],
+      ["r1:neg",    "d1:A"],
       ["d1:K",    "gnd:out"],
       ["vs:neg",  "gnd:out"],
     ],

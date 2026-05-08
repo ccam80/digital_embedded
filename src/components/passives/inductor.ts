@@ -162,7 +162,7 @@ export class InductorElement extends AbstractCircuitElement {
 
 // State schema  exact ngspice INDinstance layout (inddefs.h:68-69).
 // Two slots only:
-//   INDflux = INDstate+0   flux Î¦ = LÂ·i (the qcap fed to NIintegrate)
+//   INDflux = INDstate+0   flux Φ = L·i (the qcap fed to NIintegrate)
 //   INDvolt = INDstate+1   NIintegrate companion-current cache. Despite the
 //                            "INDvolt" name in ngspice, niinteg.c:15
 //                            (`#define ccap qcap+1`) makes this slot the
@@ -170,7 +170,7 @@ export class InductorElement extends AbstractCircuitElement {
 // No GEQ/IEQ/I/VOLT-as-node-voltage slots exist in ngspice  req/veq are
 // indload.c locals; branch current comes from CKTrhsOld[INDbrEq], not state.
 const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
-  { name: "PHI",  doc: "Flux Î¦ = LÂ·i  ngspice INDflux (INDstate+0)" },
+  { name: "PHI",  doc: "Flux Φ = L·i  ngspice INDflux (INDstate+0)" },
   { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
 ]);
 
@@ -287,7 +287,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    *   indload.c:114-117  *(CKTstate1 + INDvolt) = *(CKTstate0 + INDvolt)
    *                        on MODEINITTRAN (= s1[CCAP] = s0[CCAP]; seeds the
    *                        TRAP-order-2 recursion buffer for the next step).
-   *   indload.c:119-123  unconditional 5-stamp sequence: Â±1 incidence,
+   *   indload.c:119-123  unconditional 5-stamp sequence: ±1 incidence,
    *                        -req branch diagonal.
    *
    * `m` (parallel multiplicity) and SCALE / TC1 / TC2 / TNOM are folded into

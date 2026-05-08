@@ -52,8 +52,8 @@ describe('Port + Resistor- pure analog compile', () => {
         // vsrc:pos is INPUT (positive terminal node); port:port→vsrc:pos is
         // BIDIRECTIONAL→INPUT which the builder accepts.
         ['port:port', 'vsrc:pos'],
-        ['port:port', 'r1:A'],
-        ['r1:B',     'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',     'gnd:out'],
         ['vsrc:neg', 'gnd:out'],
       ],
     });
@@ -82,8 +82,8 @@ describe('Port + Resistor- pure analog compile', () => {
       ],
       connections: [
         ['port:port', 'vsrc:pos'],
-        ['port:port', 'r1:A'],
-        ['r1:B',     'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',     'gnd:out'],
         ['vsrc:neg', 'gnd:out'],
       ],
     });
@@ -131,8 +131,8 @@ describe('Port in mixed-mode circuit- And gate + Resistor', () => {
         ['inA:out',  'gate:In_1'],
         ['inB:out',  'gate:In_2'],
         ['gate:out', 'port:port'],
-        ['port:port', 'r1:A'],
-        ['r1:B',     'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',     'gnd:out'],
       ],
     });
 
@@ -157,8 +157,8 @@ describe('Port in mixed-mode circuit- And gate + Resistor', () => {
         ['inA:out',  'gate:In_1'],
         ['inB:out',  'gate:In_2'],
         ['gate:out', 'port:port'],
-        ['port:port', 'r1:A'],
-        ['r1:B',     'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',     'gnd:out'],
       ],
     });
 
@@ -189,8 +189,8 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
       ],
       connections: [
         ['port:port', 'vsrc:pos'],
-        ['port:port', 'r1:A'],
-        ['r1:B',     'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',     'gnd:out'],
         ['vsrc:neg', 'gnd:out'],
       ],
     });
@@ -219,8 +219,8 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
       ],
       connections: [
         ['port:port', 'vsrc:pos'],
-        ['port:port', 'r1:A'],
-        ['r1:B',     'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',     'gnd:out'],
         ['vsrc:neg', 'gnd:out'],
       ],
     });
@@ -289,8 +289,8 @@ describe('Port at cross-domain boundary', () => {
         ['inA:out',   'gate:In_1'],
         ['inB:out',   'gate:In_2'],
         ['gate:out',  'port:port'],
-        ['port:port', 'r1:A'],
-        ['r1:B',      'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',      'gnd:out'],
       ],
     });
 

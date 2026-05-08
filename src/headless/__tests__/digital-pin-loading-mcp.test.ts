@@ -66,8 +66,8 @@ function buildAnalogAndCircuit(
 
   const vsPos  = pinWorldPosition(vs,  vsPins.find(p => p.label === 'pos')!);
   const vsNeg  = pinWorldPosition(vs,  vsPins.find(p => p.label === 'neg')!);
-  const r1A    = pinWorldPosition(r1,  r1Pins.find(p => p.label === 'A')!);
-  const r1B    = pinWorldPosition(r1,  r1Pins.find(p => p.label === 'B')!);
+  const r1A    = pinWorldPosition(r1,  r1Pins.find(p => p.label === 'pos')!);
+  const r1B    = pinWorldPosition(r1,  r1Pins.find(p => p.label === 'neg')!);
   const andIn1 = pinWorldPosition(and, andPins.find(p => p.label === 'In_1')!);
   const andIn2 = pinWorldPosition(and, andPins.find(p => p.label === 'In_2')!);
   const andOut = pinWorldPosition(and, andPins.find(p => p.label === 'out')!);
@@ -243,8 +243,8 @@ describe('digitalPinLoading MCP surface- bridge behavioral verification', () => 
         ['inA:out',   'gate:In_1'],
         ['inB:out',   'gate:In_2'],
         ['gate:out',  'port:port'],
-        ['port:port', 'r1:A'],
-        ['r1:B',      'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',      'gnd:out'],
       ],
     });
 
@@ -285,8 +285,8 @@ describe('digitalPinLoading MCP surface- bridge behavioral verification', () => 
         ['inA:out',   'gate:In_1'],
         ['inB:out',   'gate:In_2'],
         ['gate:out',  'port:port'],
-        ['port:port', 'r1:A'],
-        ['r1:B',      'gnd:out'],
+        ['port:port', 'r1:pos'],
+        ['r1:neg',      'gnd:out'],
       ],
     });
 

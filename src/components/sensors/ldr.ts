@@ -3,16 +3,16 @@
  *
  * Resistance model:
  *   lux = 0:         R = rDark  (no illumination)
- *   lux > 0:         R = rDark Â· (lux / luxRef)^(-gamma)
+ *   lux > 0:         R = rDark · (lux / luxRef)^(-gamma)
  *
- * At lux = luxRef, R = rDark Â· 1 = rDark.
+ * At lux = luxRef, R = rDark · 1 = rDark.
  * The rLight property records the expected resistance at luxRef; for consistency
  * rLight should equal rDark * (luxRef/luxRef)^(-gamma) = rDark, but it is exposed
  * as a separate settable property to allow the user to override the dark resistance
  * via the light reference point.
  *
  * When rLight is provided as a non-zero calibration anchor, the formula becomes:
- *   R(lux) = rLight Â· (lux / luxRef)^(-gamma)   for lux > 0
+ *   R(lux) = rLight · (lux / luxRef)^(-gamma)   for lux > 0
  *
  * This ensures R(luxRef) = rLight exactly, which is the natural calibration point.
  * rDark is used only for lux = 0 (or as default when rLight is not separately
@@ -240,7 +240,7 @@ export class LDRCircuitElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Lead 1: (0,0)(1,0); Zigzag body: (1,0)(3,0); Lead 2: (3,0)(4,0)
-    // Zigzag vertices derived from Falstad pixel coords (absolute px Ã· 16):
+    // Zigzag vertices derived from Falstad pixel coords (absolute px ÷ 16):
     // absolute x = local_x + 16 (because Falstad draws with a +16px x-offset)
     const hs = 6 / 16; // 0.375 grid units perpendicular offset
     const pts: Array<{ x: number; y: number }> = [
@@ -272,7 +272,7 @@ export class LDRCircuitElement extends AbstractCircuitElement {
     }
 
     // Light arrows: shaft lines + two perpendicular bars (T-head arrowhead style)
-    // Coordinates from Falstad pixel reference Ã· 16
+    // Coordinates from Falstad pixel reference ÷ 16
     ctx.setColor("COMPONENT");
 
     // Arrow 1: shaft (0.5,1.625)(1.5,0.75), bar1 (1.125,0.75)(1.5,0.75), bar2 (1.5,0.75)(1.5,1.125)
@@ -363,7 +363,7 @@ export const LDRDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.PASSIVES,
   helpText:
     "LDR (Light Dependent Resistor)  resistance varies with illumination. " +
-    "Power-law model: R = R_dark Ã— (lux / lux_ref)^(-Î³).",
+    "Power-law model: R = R_dark Ã— (lux / lux_ref)^(-γ).",
   models: {},
   modelRegistry: {
     "behavioral": {

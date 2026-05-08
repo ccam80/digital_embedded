@@ -33,7 +33,7 @@
  *        I_Norton = G_drive * vTarget (equivalent Norton current at out node).
  *   4. `rOut` from the parent's param set is NOT a driver param â€” it is wired
  *        to the Resistor sub-element in the netlist. The driver's internal
- *        Norton conductance uses a fixed stiff value (R_NORTON = 1e-3 Î©).
+ *        Norton conductance uses a fixed stiff value (R_NORTON = 1e-3 Ω).
  *   5. Bottom-of-load history write: OUTPUT_LATCH written to s0 exactly once.
  */
 
@@ -96,7 +96,7 @@ const SCHMITT_TRIGGER_DRIVER_DEFAULTS: Record<string, number> = {
   inverting: 0,
 };
 
-// Stiff Norton conductance: drives nDrive to vOH/vOL through 1 mÎ© equivalent.
+// Stiff Norton conductance: drives nDrive to vOH/vOL through 1 mΩ equivalent.
 const G_NORTON = 1 / 1e-3;
 
 // ---------------------------------------------------------------------------

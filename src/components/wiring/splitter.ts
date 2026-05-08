@@ -198,11 +198,11 @@ export class SplitterElement extends AbstractCircuitElement {
 
   /** Re-parse input ports from current property bag on every access. */
   get inputPorts(): SplitterPort[] {
-    return parsePorts(this._properties.getOrDefault<string>("input splitting", "4,4"));
+    return parsePorts(this._properties.getOrDefault<string>("inputSplitting", "4,4"));
   }
   /** Re-parse output ports from current property bag on every access. */
   get outputPorts(): SplitterPort[] {
-    return parsePorts(this._properties.getOrDefault<string>("output splitting", "8"));
+    return parsePorts(this._properties.getOrDefault<string>("outputSplitting", "8"));
   }
   get spreading(): number { return this._properties.getOrDefault<number>("spreading", 1); }
 
@@ -285,7 +285,7 @@ export class SplitterElement extends AbstractCircuitElement {
 
   /**
    * Draw text that stays upright regardless of component rotation.
-   * When rotation is 2 (180Â°), counter-rotates the text and flips alignment.
+   * When rotation is 2 (180°), counter-rotates the text and flips alignment.
    */
   private _drawUprightText(
     ctx: RenderContext,
@@ -333,7 +333,7 @@ export function executeSplitter(
 
   if (inCount === 1 && outCount >= 1) {
     // SPLIT mode: 1 wide input â†’ N narrow outputs
-    const outputProp = layout.getProperty(index, "output splitting");
+    const outputProp = layout.getProperty(index, "outputSplitting");
     const outputStr = typeof outputProp === "string" ? outputProp : undefined;
     const ports = outputStr ? parsePorts(outputStr) : undefined;
     const wideValue = state[wt[inBase]];
@@ -345,7 +345,7 @@ export function executeSplitter(
     }
   } else if (outCount === 1 && inCount >= 1) {
     // MERGE mode: N narrow inputs â†’ 1 wide output
-    const inputProp = layout.getProperty(index, "input splitting");
+    const inputProp = layout.getProperty(index, "inputSplitting");
     const inputStr = typeof inputProp === "string" ? inputProp : undefined;
     const ports = inputStr ? parsePorts(inputStr) : undefined;
     let wideValue = 0;
@@ -414,12 +414,12 @@ export function executeSplitterMergeWithWidths(
 export const SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "Input Splitting",
-    propertyKey: "input splitting",
+    propertyKey: "inputSplitting",
     convert: (v) => v,
   },
   {
     xmlName: "Output Splitting",
-    propertyKey: "output splitting",
+    propertyKey: "outputSplitting",
     convert: (v) => v,
   },
   {
@@ -435,14 +435,14 @@ export const SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 
 const SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "input splitting",
+    key: "inputSplitting",
     type: PropertyType.STRING,
     label: "Input Splitting",
     defaultValue: "4,4",
     description: "Splitting pattern for the left (input) side ports (e.g. '4,4' or '1*8')",
   },
   {
-    key: "output splitting",
+    key: "outputSplitting",
     type: PropertyType.STRING,
     label: "Output Splitting",
     defaultValue: "8",
@@ -485,11 +485,11 @@ export const SplitterDefinition: StandaloneComponentDefinition = {
     digital: {
       executeFn: executeSplitter,
       inputSchema: (props) => {
-        const inputSplitting = props.getOrDefault<string>("input splitting", "4,4");
+        const inputSplitting = props.getOrDefault<string>("inputSplitting", "4,4");
         return parsePorts(inputSplitting).map((p) => p.name);
       },
       outputSchema: (props) => {
-        const outputSplitting = props.getOrDefault<string>("output splitting", "8");
+        const outputSplitting = props.getOrDefault<string>("outputSplitting", "8");
         return parsePorts(outputSplitting).map((p) => p.name);
       },
     },

@@ -4,7 +4,7 @@
  * Digital engine: bidirectional switch controlled by the `blown` property.
  *   state[stBase] = blown ? 0 : 1; the bus resolver merges/splits nets.
  *
- * Analog engine: IÂ²t thermal model (AnalogFuseElement). The analog element
+ * Analog engine: I²t thermal model (AnalogFuseElement). The analog element
  *   writes `_thermalRatio` and `blown` back into the shared PropertyBag
  *   each timestep, so the visual layer shows heat glow and the digital
  *   engine picks up the blown state on the next step.
@@ -361,7 +361,7 @@ const FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "rCold",
     type: PropertyType.FLOAT,
-    label: "Cold Resistance (Î©)",
+    label: "Cold Resistance (Ω)",
     defaultValue: 0.01,
     min: 1e-12,
     description: "Resistance when fuse is intact (analog mode)",
@@ -369,7 +369,7 @@ const FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "rBlown",
     type: PropertyType.FLOAT,
-    label: "Blown Resistance (Î©)",
+    label: "Blown Resistance (Ω)",
     defaultValue: 1e9,
     min: 1,
     description: "Resistance when fuse has blown (analog mode)",
@@ -385,10 +385,10 @@ const FUSE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "i2tRating",
     type: PropertyType.FLOAT,
-    label: "IÂ²t Rating (AÂ²Â·s)",
+    label: "I²t Rating (A²·s)",
     defaultValue: 1e-4,
     min: 1e-12,
-    description: "Energy rating: fuse blows when accumulated IÂ²Â·t exceeds this value (10ms at 100mA)",
+    description: "Energy rating: fuse blows when accumulated I²·t exceeds this value (10ms at 100mA)",
   },
   {
     key: "label",
@@ -416,9 +416,9 @@ export const FuseDefinition: StandaloneComponentDefinition = {
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText:
-    "Fuse- one-time irreversible switch with IÂ²t thermal model.\n" +
+    "Fuse- one-time irreversible switch with I²t thermal model.\n" +
     "Digital: blown property controls open/closed.\n" +
-    "Simplified: blows when accumulated IÂ²t exceeds the rating.",
+    "Simplified: blows when accumulated I²t exceeds the rating.",
   models: {
     digital: {
       executeFn: executeFuse,

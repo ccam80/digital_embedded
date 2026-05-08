@@ -88,7 +88,7 @@ export interface ParameterVariation {
   property: string;
   /** Statistical distribution to use for sampling. */
   distribution: "gaussian" | "uniform";
-  /** Tolerance as a fraction (e.g. 0.05 for Â±5%). */
+  /** Tolerance as a fraction (e.g. 0.05 for ±5%). */
   tolerance: number;
 }
 
@@ -410,7 +410,7 @@ function measureOutput(
  * Each variation specifies:
  *   - which component and property to vary
  *   - a distribution (gaussian or uniform)
- *   - a tolerance fraction (e.g. 0.05 = Â±5%)
+ *   - a tolerance fraction (e.g. 0.05 = ±5%)
  *
  * The sampled multiplier is `1 + tolerance * sample`, where `sample` is drawn
  * from N(0,1) for gaussian or Uniform(-1,1) for uniform.

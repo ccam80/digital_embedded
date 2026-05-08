@@ -36,7 +36,7 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 // ---------------------------------------------------------------------------
 
 const INDUCTOR_SUB_SCHEMA: StateSchema = defineStateSchema("InductorSubElement", [
-  { name: "PHI",  doc: "Flux Î¦ = LÂ·i â€” ngspice INDflux (INDstate+0)" },
+  { name: "PHI",  doc: "Flux Φ = L·i â€” ngspice INDflux (INDstate+0)" },
   { name: "CCAP", doc: "NIintegrate companion current â€” ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
 ]);
 

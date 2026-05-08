@@ -68,7 +68,7 @@ const GMIN = 1e-12;
 export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = defineModelParams({
   primary: {
     VTO:    { default: -2.0,  unit: "V",    description: "Pinch-off (threshold) voltage" },
-    BETA:   { default: 1e-4,  unit: "A/VÂ²", description: "Transconductance coefficient" },
+    BETA:   { default: 1e-4,  unit: "A/V²", description: "Transconductance coefficient" },
     LAMBDA: { default: 0.0,   unit: "1/V",  description: "Channel-length modulation" },
   },
   secondary: {
@@ -933,7 +933,7 @@ export class NJfetElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Channel bar: fillPolygon from Falstad pixels (51,-16),(51,16),(54,16),(54,-16) Ã· 16
+    // Channel bar: fillPolygon from Falstad pixels (51,-16),(51,16),(54,16),(54,-16) ÷ 16
     ctx.drawPolygon(
       [
         { x: 3.1875, y: -1 },
@@ -944,7 +944,7 @@ export class NJfetElement extends AbstractCircuitElement {
       true,
     );
 
-    // Gate arrow: fillPolygon from Falstad pixels (50,0),(42,-3),(42,3) Ã· 16
+    // Gate arrow: fillPolygon from Falstad pixels (50,0),(42,-3),(42,3) ÷ 16
     ctx.drawPolygon(
       [
         { x: 3.125, y: 0 },
@@ -957,11 +957,11 @@ export class NJfetElement extends AbstractCircuitElement {
     // Gate lead
     drawColoredLead(ctx, signals, vG, 0, 0, 3.125, 0);
 
-    // Drain lead (top): Falstad (64,-16)(64,-8)(54,-8) Ã· 16
+    // Drain lead (top): Falstad (64,-16)(64,-8)(54,-8) ÷ 16
     drawColoredLead(ctx, signals, vD, 4, -1, 4, -0.5);
     ctx.drawLine(4, -0.5, 3.375, -0.5);
 
-    // Source lead (bottom): Falstad (64,16)(64,8)(54,8) Ã· 16
+    // Source lead (bottom): Falstad (64,16)(64,8)(54,8) ÷ 16
     drawColoredLead(ctx, signals, vS, 4, 1, 4, 0.5);
     ctx.drawLine(4, 0.5, 3.375, 0.5);
 

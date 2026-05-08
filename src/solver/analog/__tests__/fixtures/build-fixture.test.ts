@@ -1,11 +1,11 @@
 /**
  * `buildFixture` contract tests.
  *
- * Pins down what Â§4c migrations rely on: the fixture returns a fully
+ * Pins down what §4c migrations rely on: the fixture returns a fully
  * warm-started simulation whose public surface (node voltages, pool slots,
  * matrix stamps, element identities) carries correct, consistent values.
  *
- * Test circuit: VS=5V â†’ R=1kÎ© â†’ C=1Î¼F â†’ GND. In DC steady state the
+ * Test circuit: VS=5V â†’ R=1kΩ â†’ C=1μF â†’ GND. In DC steady state the
  * capacitor holds 5V, no current flows. Every assertion below either reads
  * a value that ngspice would compute the same way, or checks a structural
  * invariant of the fixture itself.

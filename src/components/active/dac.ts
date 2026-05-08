@@ -4,8 +4,8 @@
  * Converts an N-bit digital input code to an analog output voltage.
  * Digital inputs are read via DigitalInputPinLoaded sub-elements.
  *
- *   V_out = V_ref Â· code / 2^N          (unipolar)
- *   V_out = V_ref Â· (2Â·code/2^N - 1)   (bipolar, symmetric about 0)
+ *   V_out = V_ref · code / 2^N          (unipolar)
+ *   V_out = V_ref · (2·code/2^N - 1)   (bipolar, symmetric about 0)
  *
  * Pin order (ports):
  *   VREF, OUT, GND, D0..D(N-1)
@@ -34,10 +34,10 @@ export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModel
   primary: {
     vIH: { default: 2.0, unit: "V", description: "Input HIGH threshold voltage" },
     vIL: { default: 0.8, unit: "V", description: "Input LOW threshold voltage" },
-    rOut: { default: 1, unit: "Î©", description: "Output impedance" },
+    rOut: { default: 1, unit: "Ω", description: "Output impedance" },
   },
   secondary: {
-    rIn: { default: 1e7, unit: "Î©", description: "Digital input impedance" },
+    rIn: { default: 1e7, unit: "Ω", description: "Digital input impedance" },
     cIn: { default: 5e-12, unit: "F", description: "Digital input capacitance" },
   },
   instance: {
@@ -258,7 +258,7 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
     type: PropertyType.INT,
     label: "Settling time (s)",
     defaultValue: 1e-6,
-    description: "Settling time to final value after code change. Default 1 Âµs.",
+    description: "Settling time to final value after code change. Default 1 µs.",
   },
   {
     key: "label",

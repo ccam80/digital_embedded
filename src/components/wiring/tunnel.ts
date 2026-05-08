@@ -106,7 +106,7 @@ export class TunnelElement extends AbstractCircuitElement {
       false,
     );
 
-    // Label to the right of the triangle, counter-rotated at 180Â° to stay upright
+    // Label to the right of the triangle, counter-rotated at 180° to stay upright
     if (label.length > 0) {
       ctx.setColor("TEXT");
       ctx.setFont({ family: "sans-serif", size: 0.6 });

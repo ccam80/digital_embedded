@@ -115,10 +115,10 @@ describe("WireCurrentResolver - DC behaviour through buildFixture", () => {
     const r1 = ceByLabel(fix.circuit, "r1");
     const r2 = ceByLabel(fix.circuit, "r2");
     for (const w of [
-      ...wiresAtPin(fix.circuit, wires, r1, "A"),
-      ...wiresAtPin(fix.circuit, wires, r1, "B"),
-      ...wiresAtPin(fix.circuit, wires, r2, "A"),
-      ...wiresAtPin(fix.circuit, wires, r2, "B"),
+      ...wiresAtPin(fix.circuit, wires, r1, "pos"),
+      ...wiresAtPin(fix.circuit, wires, r1, "neg"),
+      ...wiresAtPin(fix.circuit, wires, r2, "pos"),
+      ...wiresAtPin(fix.circuit, wires, r2, "neg"),
     ]) {
       const wc = resolver.getWireCurrent(w);
       expect(wc).toBeDefined();
@@ -284,7 +284,7 @@ describe("WireCurrentResolver - 4-node resistor ladder KCL", () => {
     // edge in any of these split nodes.
     for (const lbl of ["r1", "r3", "r5"]) {
       const ce = ceByLabel(fix.circuit, lbl);
-      const adj = wiresAtPin(fix.circuit, wires, ce, "B");
+      const adj = wiresAtPin(fix.circuit, wires, ce, "neg");
       expect(adj.length).toBeGreaterThan(0);
       for (const w of adj) {
         const wc = resolver.getWireCurrent(w);

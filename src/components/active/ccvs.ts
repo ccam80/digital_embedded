@@ -58,7 +58,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: CCVS_PARAM_DEFS, defaults: CCVS_DEFAULTS } = defineModelParams({
   primary: {
-    transresistance: { default: 1000, unit: "Î©", description: "Linear transresistance" },
+    transresistance: { default: 1000, unit: "Ω", description: "Linear transresistance" },
   },
 });
 
@@ -176,7 +176,7 @@ export class CCVSAnalogElement extends ControlledSourceElement {
 
   protected override _stampLinear(solver: SparseSolver): void {
     // Stamp B/C incidence for the own output voltage source branch.
-    // Values are constant topology entries (Â±1); stamp every load() call.
+    // Values are constant topology entries (±1); stamp every load() call.
     solver.stampElement(this._hPIbr,  1);  // B[posNode, ownBranch]
     solver.stampElement(this._hNIbr, -1);  // B[negNode, ownBranch]
     solver.stampElement(this._hIbrN, -1);  // C[ownBranch, negNode]

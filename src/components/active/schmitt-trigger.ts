@@ -38,7 +38,7 @@ export const { paramDefs: SCHMITT_PARAM_DEFS, defaults: SCHMITT_DEFAULTS } = def
     vTL:  { default: 1.0, unit: "V", description: "Falling input threshold" },
     vOH:  { default: 3.3, unit: "V", description: "Output high voltage" },
     vOL:  { default: 0.0, unit: "V", description: "Output low voltage" },
-    rOut: { default: 50,  unit: "Î©", description: "Output impedance" },
+    rOut: { default: 50,  unit: "Ω", description: "Output impedance" },
   },
 });
 

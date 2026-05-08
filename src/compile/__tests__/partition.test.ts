@@ -4,7 +4,8 @@ import type { ModelAssignment } from "../extract-connectivity.js";
 import type { ConnectivityGroup, ResolvedGroupPin } from "../types.js";
 import { PinDirection } from "@/core/pin.js";
 import type { CircuitElement } from "@/core/element.js";
-import type { StandaloneComponentDefinition, ComponentRegistry, DigitalModel } from "@/core/registry.js";
+import { ComponentCategory, ComponentRegistry } from "@/core/registry.js";
+import type { StandaloneComponentDefinition, DigitalModel } from "@/core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
@@ -34,12 +35,12 @@ const DIGITAL_MODEL: DigitalModel = {
 function makeDigitalDef(name: string): StandaloneComponentDefinition {
   return {
     name,
-    typeId: 0,
+    typeId: -1,
     factory: () => { throw new Error("not used"); },
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
-    category: "LOGIC" as never,
+    category: ComponentCategory.LOGIC,
     helpText: "",
     models: { digital: DIGITAL_MODEL },
   };
@@ -48,12 +49,12 @@ function makeDigitalDef(name: string): StandaloneComponentDefinition {
 function makeAnalogDef(name: string): StandaloneComponentDefinition {
   return {
     name,
-    typeId: 0,
+    typeId: -1,
     factory: () => { throw new Error("not used"); },
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
-    category: "PASSIVES" as never,
+    category: ComponentCategory.PASSIVES,
     helpText: "",
     pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
     models: {},
@@ -63,11 +64,9 @@ function makeAnalogDef(name: string): StandaloneComponentDefinition {
 
 
 function makeRegistry(defs: StandaloneComponentDefinition[]): ComponentRegistry {
-  const map = new Map<string, StandaloneComponentDefinition>();
-  for (const d of defs) map.set(d.name, d);
-  return {
-    get: (name: string) => map.get(name),
-  } as unknown as ComponentRegistry;
+  const reg = new ComponentRegistry();
+  for (const d of defs) reg.register(d);
+  return reg;
 }
 
 function makePin(

@@ -8,7 +8,7 @@
  * Properties:
  *   - text: string- the content to display
  *   - fontSize: number- font size in grid units (default 1.0)
- *   - rotation: Rotation- text rotation (0=horizontal, 1=90Â°CW, etc.)
+ *   - rotation: Rotation- text rotation (0=horizontal, 1=90°CW, etc.)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

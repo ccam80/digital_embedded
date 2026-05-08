@@ -10,7 +10,7 @@
  *   - Slew rate limiting (clamped integrator)
  *   - Output resistance (R_out)
  *   - Output current limiting (|I_out| â‰¤ I_max)
- *   - Rail saturation (output clamps to V_supply Â± V_sat) via railLim
+ *   - Rail saturation (output clamps to V_supply ± V_sat) via railLim
  *
  * State is held entirely in StatePool slots (REAL_OPAMP_SCHEMA, 8 slots) per
  * ss1.1; the class is a PoolBackedAnalogElement. There is no `accept()` method-
@@ -171,8 +171,8 @@ export const { paramDefs: REAL_OPAMP_PARAM_DEFS, defaults: REAL_OPAMP_DEFAULTS }
     iBias:    { default: 80e-9, unit: "A",   description: "Input bias current" },
   },
   secondary: {
-    rIn:      { default: 2e6,   unit: "Î©",   description: "Input resistance" },
-    rOut:     { default: 75,    unit: "Î©",   description: "Output resistance" },
+    rIn:      { default: 2e6,   unit: "Ω",   description: "Input resistance" },
+    rOut:     { default: 75,    unit: "Ω",   description: "Output resistance" },
     iMax:     { default: 25e-3, unit: "A",   description: "Output current limit" },
     vSatPos:  { default: 1.5,   unit: "V",   description: "Positive rail saturation drop" },
     vSatNeg:  { default: 1.5,   unit: "V",   description: "Negative rail saturation drop" },
@@ -334,7 +334,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *   clipping occurs.
  *
  * Current limiting:
- *   When |I_out| > I_max during saturation the RHS clamps to Â±I_max instead of
+ *   When |I_out| > I_max during saturation the RHS clamps to ±I_max instead of
  *   the rail-driven Norton current.
  *
  * Transient:

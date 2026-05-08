@@ -51,7 +51,7 @@ import {
 //   Polygon: (-0.5,-0.95) â†’ (0.5,-0.95) â†’ (0,-0.05), closed
 //   Line:    (-0.5,-0.05) â†’ (0.5,-0.05)
 // Pins: out1 at (0,0), out2 at (0,-1)
-const COMP_WIDTH = 1;  // fits the Â±0.5 x extent
+const COMP_WIDTH = 1;  // fits the ±0.5 x extent
 const COMP_HEIGHT = 1; // fits the -1..0 y extent
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ function buildDiodeForwardPinDeclarations(): PinDeclaration[] {
  *   Line: (-0.5,-0.05) â†’ (0.5,-0.05)   [cathode bar]
  * Pins: out1 at (0,0), out2 at (0,-1).
  * The polygon tip touches pin out1 at (0,-0.05â‰ˆ0), cathode bar at -0.05.
- * The base spans Â±0.5 at y=-0.95, touching pin out2 at (0,-1) from below.
+ * The base spans ±0.5 at y=-0.95, touching pin out2 at (0,-1) from below.
  */
 function drawDiodeBody(ctx: RenderContext, label: string): void {
   ctx.setColor("COMPONENT");

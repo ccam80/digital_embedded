@@ -37,7 +37,7 @@ import {
  * Driver dimensions in grid units.
  *
  * Java SIZE = 20px = 1 grid unit.  SIZE2 = 10px = 0.5 grid units.
- * Pin layout: input at (-1, 0), sel at (0, Â±1), output at (1, 0).
+ * Pin layout: input at (-1, 0), sel at (0, ±1), output at (1, 0).
  * Triangle from roughly (-1, -0.6) â†’ (1, 0) â†’ (-1, 0.6).
  * Component origin is at the center (where the sel pin stem meets the triangle).
  */
@@ -49,8 +49,8 @@ import {
 /**
  * Pin positions match Java DriverShape: origin at centre of component.
  *
- * Java coords (pixels):  input(-20,0), sel(0,Â±20), output(20,0)
- * Grid units (/20):      input(-1,0),  sel(0,Â±1),  output(1,0)
+ * Java coords (pixels):  input(-20,0), sel(0,±20), output(20,0)
+ * Grid units (/20):      input(-1,0),  sel(0,±1),  output(1,0)
  *
  * flipSelPos controls whether sel is above (default, y=-1) or below (y=+1).
  */

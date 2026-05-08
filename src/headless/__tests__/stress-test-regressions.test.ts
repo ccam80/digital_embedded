@@ -50,7 +50,7 @@ function createFullRegistry(): ComponentRegistry {
 
 describe("Splitter executeFn respects port widths", () => {
   it("executeSplitter splits 16-bit value into two 8-bit halves", () => {
-    const layout = makeLayout(1, 2, { props: { "output splitting": "8,8" } });
+    const layout = makeLayout(1, 2, { props: { "outputSplitting": "8,8" } });
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(3);
 

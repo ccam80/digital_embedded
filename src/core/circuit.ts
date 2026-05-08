@@ -16,6 +16,29 @@ import type { ModelEntry } from "./registry.js";
 import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
+// SpecConnection- authoritative pin-pair connection from a programmatic build
+// ---------------------------------------------------------------------------
+
+/**
+ * A pin-level connection between two elements, addressed by instanceId + pin
+ * label. Produced by programmatic builders (e.g. CircuitBuilder.build) and
+ * carried alongside the Circuit so the compiler can derive electrical
+ * connectivity from authoritative records rather than from auto-laid-out
+ * wire coordinates.
+ *
+ * When `Circuit.specConnections` is set, `extractConnectivityGroups` uses
+ * this list as the source of truth for pin-pin equivalence and treats wires
+ * as decorative routing. This makes connectivity immune to auto-layout
+ * corner-collision artifacts.
+ */
+export interface SpecConnection {
+  srcId: string;
+  srcPin: string;
+  dstId: string;
+  dstPin: string;
+}
+
+// ---------------------------------------------------------------------------
 // Wire- visual wire segment
 // ---------------------------------------------------------------------------
 
@@ -217,6 +240,15 @@ export class Circuit {
   readonly elements: CircuitElement[] = [];
   readonly wires: Wire[] = [];
   metadata: CircuitMetadata;
+
+  /**
+   * Authoritative pin-pair connections from a programmatic build.
+   *
+   * When set, `extractConnectivityGroups` uses these records as the source of
+   * truth for pin-pin equivalence and treats wires as decorative routing.
+   * Absent for circuits loaded from `.dig`/`.dts` (legacy wire-only path).
+   */
+  specConnections?: ReadonlyArray<SpecConnection>;
 
   constructor(metadata?: Partial<CircuitMetadata>) {
     this.metadata = { ...defaultCircuitMetadata(), ...metadata };

@@ -48,7 +48,7 @@ import { defineStateSchema } from "../../solver/analog/state-schema.js";
 const CONSTboltz = 1.3806226e-23;
 const CHARGE = 1.6021918e-19;
 const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
-const REFTEMP = 300.15;         // 27 Â°C reference temperature
+const REFTEMP = 300.15;         // 27 °C reference temperature
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -64,7 +64,7 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
     IBV: { default: 1e-3, unit: "A", description: "Current at breakdown voltage" },
-    TCV: { default: 0,    unit: "V/Â°C", description: "Breakdown voltage temperature coefficient" },
+    TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
     TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
   },
   secondary: {
@@ -127,7 +127,7 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
  * @param IS    Temperature-scaled saturation current (DIOtSatCur)
  * @param vt    Thermal voltage at circuit temperature
  * @param TCV   Voltage temperature coefficient (DIOtcv), default 0
- * @param dt    Temperature deviation from TNOM in Â°C (T - TNOM)
+ * @param dt    Temperature deviation from TNOM in °C (T - TNOM)
  */
 function computeTBV(
   BV: number,
@@ -583,7 +583,7 @@ export class ZenerElement extends AbstractCircuitElement {
     // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0cath1
     // interpPointSingle(a,b,f,g): point at fraction f along ab, offset g perpendicular (along x for vertical bar)
     // Perpendicular to cath0cath1 (which is vertical) is horizontal
-    // Wing tips at Â±11/16 = Â±0.6875 grid units (from Falstad pixel coords Â±11 at 16px/unit)
+    // Wing tips at ±11/16 = ±0.6875 grid units (from Falstad pixel coords ±11 at 16px/unit)
     const wing0 = {
       x: cath0.x - hs,
       y: -11 / 16,

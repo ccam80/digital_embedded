@@ -122,13 +122,13 @@ describe('showModelSelector advanced parameters', () => {
   it('Advanced Parameters toggle present', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 100, NF: 1, IS: 1e-14 });
     panel.showModelSelector(el, makeBjtDef());
-    expect(doc.findByText('â–¶ Advanced Parameters')).toBeDefined();
+    expect(doc.findByText('▶ Advanced Parameters')).toBeDefined();
   });
   it('no Advanced Parameters when only primary params', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 100, IS: 1e-14 });
     const entry: ModelEntry = { kind: 'inline', factory: () => { throw new Error('x'); }, paramDefs: [PRIMARY_PARAM, UNIT_PARAM], params: { BF: 100, IS: 1e-14 } };
     panel.showModelSelector(el, { ...makeBjtDef(), modelRegistry: { behavioral: entry } });
-    expect(doc.findByText('â–¶ Advanced Parameters')).toBeUndefined();
+    expect(doc.findByText('▶ Advanced Parameters')).toBeUndefined();
   });
 });
 
@@ -153,14 +153,14 @@ describe('showModelSelector reset to default', () => {
     const ch: Array<{ key: string; newVal: unknown }> = [];
     panel.onPropertyChange((key, _o, v) => ch.push({ key, newVal: v }));
     panel.showModelSelector(el, makeBjtDef());
-    doc.findByTagName('button').filter(b => b.textContent === 'â†º')[0]!.dispatchEvent('click');
+    doc.findByTagName('button').filter(b => b.textContent === '↺')[0]!.dispatchEvent('click');
     const r = ch.find(c => c.key === 'model:BF')!;
     expect(r.newVal).toBe(100);
   });
   it('reset writes default to model partition', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 200, NF: 1, IS: 1e-14 });
     panel.showModelSelector(el, makeBjtDef());
-    doc.findByTagName('button').filter(b => b.textContent === 'â†º')[0]!.dispatchEvent('click');
+    doc.findByTagName('button').filter(b => b.textContent === '↺')[0]!.dispatchEvent('click');
     expect(el.getProperties().getModelParam('BF')).toBe(100);
   });
 });

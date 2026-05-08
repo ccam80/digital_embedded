@@ -450,8 +450,8 @@ interface RegisterFileWithSplitterFixture {
 }
 
 /**
- * Cat 13 fixture: a 3-bit In is routed through a Splitter (input splitting:"3",
- * output splitting:"2") toward the RegisterFile's 2-bit Rw port. A separate
+ * Cat 13 fixture: a 3-bit In is routed through a Splitter (inputSplitting:"3",
+ * outputSplitting:"2") toward the RegisterFile's 2-bit Rw port. A separate
  * 2-bit In (RW) also connects to rf:Rw on the same net. Because the Splitter
  * is an infrastructure component in the digital engine (noop executeFn), the
  * Splitter's output pin acts as a wire terminator on the Rw net rather than a
@@ -470,7 +470,7 @@ function buildRegisterFileWithSplitterFixture(): RegisterFileWithSplitterFixture
   const addrBits = 2;
   const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
     { id: "in3",    type: "In",           props: { label: "IN3", bitWidth: 3 } },
-    { id: "spl",    type: "Splitter",     props: { label: "SPL", "input splitting": "3", "output splitting": "2" } },
+    { id: "spl",    type: "Splitter",     props: { label: "SPL", "inputSplitting": "3", "outputSplitting": "2" } },
     { id: "in_rw",  type: "In",           props: { label: "RW",  bitWidth: addrBits } },
     { id: "in_din", type: "In",           props: { label: "DIN", bitWidth } },
     { id: "in_we",  type: "In",           props: { label: "WE",  bitWidth: 1 } },
@@ -569,7 +569,7 @@ describe("RegisterFile — Cat 13 port-width clamping via Splitter (T1)", () => 
     // Both writes land in register[1]; second write (0xBB) overwrites first (0xAA).
     // DA when Ra=1 must be 0xBB.
     //
-    // The Splitter (input splitting:"3", output splitting:"2") defines the
+    // The Splitter (inputSplitting:"3", outputSplitting:"2") defines the
     // bus-width boundary between the 3-bit IN3 domain and the 2-bit Rw net.
     // The port-width mask is applied by BitVector.fromNumber(sourceValue, 2)
     // inside setSignal("RW", sourceValue): values above 3 wrap to their

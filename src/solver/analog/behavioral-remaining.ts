@@ -229,8 +229,8 @@ function countSplitterPorts(definition: string): number {
  *
  * Port order is dynamic: input pins first (labeled `in_0..in_{N-1}`), then
  * output pins (`out_0..out_{M-1}`), then gnd. Input/output port counts are
- * derived from the parent splitter's `"input splitting"` and
- * `"output splitting"` string properties (parsed with the same convention
+ * derived from the parent splitter's `"inputSplitting"` and
+ * `"outputSplitting"` string properties (parsed with the same convention
  * as `executeSplitter` and `inputSchema`/`outputSchema`).
  *
  * Sub-elements:
@@ -244,8 +244,8 @@ function countSplitterPorts(definition: string): number {
  * spec round's problem.
  */
 export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
-  const inputSplitting  = props.getOrDefault<string>("input splitting", "4,4");
-  const outputSplitting = props.getOrDefault<string>("output splitting", "8");
+  const inputSplitting  = props.getOrDefault<string>("inputSplitting", "4,4");
+  const outputSplitting = props.getOrDefault<string>("outputSplitting", "8");
   const inputCount = countSplitterPorts(inputSplitting);
   const outputCount = countSplitterPorts(outputSplitting);
 

@@ -122,6 +122,7 @@ export function compileUnified(
     circuit.wires,
     registry,
     flatModelAssignments,
+    circuit.specConnections,
   );
   diagnostics.push(...connectivityDiagnostics);
 

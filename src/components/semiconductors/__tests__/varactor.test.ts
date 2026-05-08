@@ -35,13 +35,13 @@ function buildVaractorForward(
   return facade.build({
     components: [
       { id: "v1", type: "DcVoltageSource", props: { label: "V1", voltage: 0.5 } },
-      { id: "vd", type: "VaractorDiode",   props: { label: "VD", ...overrides } },
+      { id: "d1", type: "VaractorDiode",   props: { label: "D1", ...overrides } },
       { id: "r1", type: "Resistor",        props: { label: "R1", resistance: 300 } },
       { id: "gnd", type: "Ground",         props: { label: "GND" } },
     ],
     connections: [
-      ["v1:pos", "vd:A"],
-      ["vd:K",   "r1:pos"],
+      ["v1:pos", "d1:A"],
+      ["d1:K",   "r1:pos"],
       ["r1:neg", "gnd:out"],
       ["v1:neg", "gnd:out"],
     ],
@@ -55,14 +55,14 @@ function buildVaractorReverse(
   return facade.build({
     components: [
       { id: "v1", type: "DcVoltageSource", props: { label: "V1", voltage: 2 } },
-      { id: "vd", type: "VaractorDiode",   props: { label: "VD", ...overrides } },
+      { id: "d1", type: "VaractorDiode",   props: { label: "D1", ...overrides } },
       { id: "r1", type: "Resistor",        props: { label: "R1", resistance: 10000 } },
       { id: "gnd", type: "Ground",         props: { label: "GND" } },
     ],
     connections: [
       ["v1:pos", "r1:pos"],
-      ["r1:neg", "vd:K"],
-      ["vd:A",   "gnd:out"],
+      ["r1:neg", "d1:K"],
+      ["d1:A",   "gnd:out"],
       ["v1:neg", "gnd:out"],
     ],
   });
@@ -70,7 +70,7 @@ function buildVaractorReverse(
 
 function findVD(fix: ReturnType<typeof buildFixture>) {
   const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "VD",
+    (_e, i) => fix.elementLabels.get(i) === "D1",
   );
   expect(idx).toBeGreaterThanOrEqual(0);
   const el = fix.circuit.elements[idx]!;
@@ -95,8 +95,8 @@ describe("Varactor initialization (T1)", () => {
     const { el } = findVD(fix);
     const vd = fix.pool.state0[el._stateBase + SLOT_VD];
     expect(Number.isFinite(vd)).toBe(true);
-    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:A")!);
-    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:K")!);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     expect(Number.isFinite(vA)).toBe(true);
     expect(Number.isFinite(vK)).toBe(true);
   });
@@ -118,8 +118,8 @@ describe("Varactor DCOP analytical (T1)", () => {
     const result = fix.coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
-    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:A")!);
-    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:K")!);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     const vd = vA - vK;
     // Reverse-bias Varactor blocks: V_R drop across R1 is microscopic, so
     // V_K ≈ V1 = 2V, V_A = 0V → Vd ≈ -2V.
@@ -141,8 +141,8 @@ describe("Varactor parameter hot-load (T1)", () => {
   it("hotload_IS_changes_vd_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
     const { ce } = findVD(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("VD:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "IS", 1e-6);
     fix.coordinator.step();
@@ -162,7 +162,7 @@ describe("Varactor parameter hot-load (T1)", () => {
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
     const { ce } = findVD(fix);
-    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "CJO", 200e-12);
@@ -180,7 +180,7 @@ describe("Varactor parameter hot-load (T1)", () => {
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
     const { ce } = findVD(fix);
-    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "VJ", 1.4);
@@ -197,7 +197,7 @@ describe("Varactor parameter hot-load (T1)", () => {
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
     const { ce } = findVD(fix);
-    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "M", 0.95);
@@ -209,7 +209,7 @@ describe("Varactor parameter hot-load (T1)", () => {
   it("hotload_RS_changes_anode_voltage_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
     const { ce } = findVD(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("VD:A")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const before = fix.engine.getNodeVoltage(vAnode);
     fix.coordinator.setComponentProperty(ce, "RS", 50);
     fix.coordinator.step();
@@ -224,8 +224,8 @@ describe("Varactor parameter hot-load (T1)", () => {
     // triggers recomputeTemp() which re-derives tIS / tVJ / tCJO / tVcrit / tBV.
     const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
     const { ce } = findVD(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("VD:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
     fix.coordinator.step();
@@ -248,7 +248,7 @@ describe("Varactor limiting events own-engine (T1)", () => {
     fix.coordinator.setLimitingCapture(true);
     fix.coordinator.dcOperatingPoint();
     const events = fix.coordinator.getLimitingEvents();
-    const ak = events.find(e => e.label === "VD" && e.junction === "AK");
+    const ak = events.find(e => e.label === "D1" && e.junction === "AK");
     expect(ak).toBeDefined();
     expect(ak!.limitType).toBe("pnjlim");
     expect(Number.isFinite(ak!.vBefore)).toBe(true);

@@ -52,7 +52,7 @@ export const { paramDefs: JK_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: JK_FF_AS_BEH
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
-    rOut: { default: 100,   unit: "Î©", description: "Output drive resistance" },
+    rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
     vOL:  { default: 0.0,   unit: "V", description: "Output low voltage" },

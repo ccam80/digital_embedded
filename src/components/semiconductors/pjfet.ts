@@ -67,7 +67,7 @@ const GMIN = 1e-12;
 export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = defineModelParams({
   primary: {
     VTO:    { default: 2.0,   unit: "V",    description: "Pinch-off (threshold) voltage" },
-    BETA:   { default: 1e-4,  unit: "A/VÂ²", description: "Transconductance coefficient" },
+    BETA:   { default: 1e-4,  unit: "A/V²", description: "Transconductance coefficient" },
     LAMBDA: { default: 0.0,   unit: "1/V",  description: "Channel-length modulation" },
   },
   secondary: {

@@ -31,8 +31,8 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = defineModelParams({
   primary: {
     vDrop:      { default: 1.5, unit: "V", description: "Voltage drop from VCC for high output state" },
-    rDischarge: { default: 10,  unit: "Î©", description: "Saturation resistance of the discharge transistor" },
-    rOut:       { default: 100, unit: "Î©", description: "Output drive resistance" },
+    rDischarge: { default: 10,  unit: "Ω", description: "Saturation resistance of the discharge transistor" },
+    rOut:       { default: 100, unit: "Ω", description: "Output drive resistance" },
     cOut:       { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:        { default: 5.0, unit: "V", description: "Output high voltage" },
     vOL:        { default: 0.0, unit: "V", description: "Output low voltage" },

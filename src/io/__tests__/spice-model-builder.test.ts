@@ -92,7 +92,7 @@ R1 a b 1k
       .find((e) => e.getAttribute("label") === "a");
     const resistor = circuit.elements.find((e) => e.typeId === "Resistor");
     const inANet = inA!.getPins()[0].position.x;
-    const pinA = resistor!.getPins().find((p) => p.label === "A");
+    const pinA = resistor!.getPins().find((p) => p.label === "pos");
     expect(pinA!.position.x).toBe(inANet);
   });
 
@@ -104,7 +104,7 @@ R1 a 0 1k
 `);
     const circuit = buildSpiceSubcircuit(sc);
     const resistor = circuit.elements.find((e) => e.typeId === "Resistor");
-    const pinB = resistor!.getPins().find((p) => p.label === "B");
+    const pinB = resistor!.getPins().find((p) => p.label === "neg");
     expect(pinB!.position.x).toBe(0);
   });
 });
@@ -438,7 +438,7 @@ R1 inp 1 10k
       .find((e) => e.getAttribute("label") === "inp");
     const resistor = circuit.elements.find((e) => e.typeId === "Resistor");
     const inpNetX = inpEl!.getPins()[0].position.x;
-    const pinA = resistor!.getPins().find((p) => p.label === "A");
+    const pinA = resistor!.getPins().find((p) => p.label === "pos");
     expect(pinA!.position.x).toBe(inpNetX);
   });
 });

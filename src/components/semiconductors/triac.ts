@@ -43,9 +43,9 @@ export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = d
   },
   secondary: {
     BR:  { default: BJT_PNP_DEFAULTS.BR,  description: "Reverse current gain (PNP, Q2/Q4)" },
-    RC:  { default: 0,                     unit: "Î©", description: "Collector resistance" },
-    RB:  { default: 0,                     unit: "Î©", description: "Base resistance" },
-    RE:  { default: 0,                     unit: "Î©", description: "Emitter resistance" },
+    RC:  { default: 0,                     unit: "Ω", description: "Collector resistance" },
+    RB:  { default: 0,                     unit: "Ω", description: "Base resistance" },
+    RE:  { default: 0,                     unit: "Ω", description: "Emitter resistance" },
     AREA: { default: 1,                    description: "Device area factor" },
     TEMP: { default: 300.15,               unit: "K", description: "Operating temperature", spiceConverter: kelvinToCelsius },
   },

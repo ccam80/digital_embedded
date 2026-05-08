@@ -147,8 +147,8 @@ describe("step-alignment: self-compare invariance for timeAlign", () => {
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["vs:pos", "r1:A"],
-          ["r1:B",   "c1:pos"],
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "c1:pos"],
           ["c1:neg", "gnd:out"],
           ["vs:neg", "gnd:out"],
         ],
@@ -188,8 +188,8 @@ describe("step-alignment: self-compare invariance for timeAlign", () => {
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["vs:pos", "r1:A"],
-          ["r1:B",   "gnd:out"],
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "gnd:out"],
           ["vs:neg", "gnd:out"],
         ],
       });
@@ -220,8 +220,8 @@ describe("matrix semantic join: self-compare leaves entryKind='both' for every e
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["vs:pos", "r1:A"],
-          ["r1:B",   "gnd:out"],
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "gnd:out"],
           ["vs:neg", "gnd:out"],
         ],
       });
@@ -268,8 +268,8 @@ describe("matrix semantic join: _buildMatrixMaps routes BJT internal nodes via n
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["vs:pos", "r1:A"],
-          ["r1:B",   "gnd:out"],
+          ["vs:pos", "r1:pos"],
+          ["r1:neg",   "gnd:out"],
           ["vs:neg", "gnd:out"],
         ],
       });

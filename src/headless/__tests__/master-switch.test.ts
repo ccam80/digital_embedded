@@ -23,8 +23,8 @@ function buildRcCircuit(facade: DefaultSimulatorFacade) {
       { id: "gnd", type: "Ground" },
     ],
     connections: [
-      ["vs:pos", "r1:A"],
-      ["r1:B",   "c1:pos"],
+      ["vs:pos", "r1:pos"],
+      ["r1:neg",   "c1:pos"],
       ["c1:neg", "gnd:out"],
       ["vs:neg", "gnd:out"],
     ],

@@ -18,8 +18,8 @@ describe('DIAGNOSTIC RC step response R=1k C=1uF tau=1ms V=5V', () => {
         { id: 'gnd', type: 'Ground' },
       ],
       connections: [
-        ['vs:pos', 'r1:A'],
-        ['r1:B',   'c1:pos'],
+        ['vs:pos', 'r1:pos'],
+        ['r1:neg',   'c1:pos'],
         ['c1:neg', 'gnd:out'],
         ['vs:neg', 'gnd:out'],
       ],
@@ -76,9 +76,9 @@ describe('DIAGNOSTIC RL step response R=1k L=1H tau=1ms V=5V', () => {
         { id: 'gnd', type: 'Ground' },
       ],
       connections: [
-        ['vs:pos', 'r1:A'],
-        ['r1:B',   'l1:A'],
-        ['l1:B',   'gnd:out'],
+        ['vs:pos', 'r1:pos'],
+        ['r1:neg',   'l1:pos'],
+        ['l1:neg',   'gnd:out'],
         ['vs:neg', 'gnd:out'],
       ],
     });

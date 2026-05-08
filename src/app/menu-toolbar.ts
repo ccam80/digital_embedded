@@ -511,6 +511,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           ctx.circuit.wires,
           registry,
           modelAssignments,
+          ctx.circuit.specConnections,
         );
 
         const hitGroup = groups.find(g => g.wires.includes(wireHit));
@@ -1493,6 +1494,7 @@ function refreshOverrideIndicators(ctx: AppContext): void {
     ctx.circuit.wires,
     ctx.palette.getRegistry(),
     modelAssignments,
+    ctx.circuit.specConnections,
   );
 
   // Apply loading decisions so domain tags match what the compiler sees

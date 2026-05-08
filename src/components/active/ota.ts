@@ -12,12 +12,12 @@
  *   tanh(x)  x    I_out  gm * V_diff  (linear region)
  *
  * For large V_diff:
- *   I_out  Â±I_bias  (saturated at bias current)
+ *   I_out  ±I_bias  (saturated at bias current)
  *
  * MNA formulation:
  *   The OTA is a nonlinear VCCS. At operating point V_diff0:
  *     I_out = I_bias * tanh(V_diff0 / (2*V_T))
- *     dI_out/dV_diff = I_bias / (2*V_T) * sechÂ²(V_diff0 / (2*V_T)) = gm_eff
+ *     dI_out/dV_diff = I_bias / (2*V_T) * sech²(V_diff0 / (2*V_T)) = gm_eff
  *
  *   NR-linearized Norton equivalent:
  *     I_out  gm_eff * V_diff + [I_out0 - gm_eff * V_diff0]

@@ -705,8 +705,8 @@ test.describe('Component sweep tests', () => {
     for (const entry of SPLITTER_MATRIX) {
       test(`Splitter ${entry.inputSplitting}→${entry.outputSplitting}: set properties and compile`, async () => {
         await builder.placeLabeled('Splitter', 10, 8, 'DUT');
-        const inSplitLabel  = await builder.resolvePropertyLabel('Splitter', 'input splitting');
-        const outSplitLabel = await builder.resolvePropertyLabel('Splitter', 'output splitting');
+        const inSplitLabel  = await builder.resolvePropertyLabel('Splitter', 'inputSplitting');
+        const outSplitLabel = await builder.resolvePropertyLabel('Splitter', 'outputSplitting');
         await builder.setComponentProperty('DUT', inSplitLabel, entry.inputSplitting);
         await builder.setComponentProperty('DUT', outSplitLabel, entry.outputSplitting);
 

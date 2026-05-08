@@ -52,7 +52,7 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
     },
     secondary: {
       N:   { default: DIODE_PARAM_DEFAULTS.N,    description: "Emission coefficient" },
-      RS:  { default: DIODE_PARAM_DEFAULTS.RS,   unit: "Î©", description: "Ohmic (series) resistance" },
+      RS:  { default: DIODE_PARAM_DEFAULTS.RS,   unit: "Ω", description: "Ohmic (series) resistance" },
       BV:  { default: DIODE_PARAM_DEFAULTS.BV,   unit: "V", description: "Reverse breakdown voltage" },
       IBV: { default: DIODE_PARAM_DEFAULTS.IBV,  unit: "A", description: "Reverse breakdown current" },
       NBV: { default: DIODE_PARAM_DEFAULTS.NBV,             description: "Breakdown emission coefficient (default=N)" },
@@ -63,11 +63,14 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
       KF:  { default: DIODE_PARAM_DEFAULTS.KF,              description: "Flicker noise coefficient" },
       AF:  { default: DIODE_PARAM_DEFAULTS.AF,              description: "Flicker noise exponent" },
       TNOM: { default: DIODE_PARAM_DEFAULTS.TNOM, unit: "K", description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
+      ISW: { default: DIODE_PARAM_DEFAULTS.ISW, unit: "A", spiceName: "JSW", description: "Sidewall saturation current" },
+      NSW: { default: DIODE_PARAM_DEFAULTS.NSW,             description: "Sidewall emission coefficient (default=N)" },
     },
     instance: {
       AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },
       OFF:  { default: DIODE_PARAM_DEFAULTS.OFF, emit: "flag", description: "Initial condition: device off" },
       IC:   { default: DIODE_PARAM_DEFAULTS.IC,  unit: "V", description: "Initial condition: junction voltage for UIC" },
+      TEMP: { default: DIODE_PARAM_DEFAULTS.TEMP, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     },
   });
 

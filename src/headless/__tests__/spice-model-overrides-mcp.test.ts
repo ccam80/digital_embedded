@@ -46,7 +46,7 @@ function createElement(
 // Helper: build a minimal NPN common-emitter circuit
 //
 // Topology:
-//   Vcc(5V) pos â†’ Rc(10kÎ©) A, Rc B â†’ Q1 C
+//   Vcc(5V) pos â†’ Rc(10kΩ) A, Rc B â†’ Q1 C
 //   Vb(0.7V) pos â†’ Q1 B
 //   Q1 E â†’ Ground
 //   Vcc neg â†’ Ground
@@ -90,8 +90,8 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const gndOut = pinWorldPosition(gnd, gndPins[0]!);
   const vccPos = pinWorldPosition(vcc, vccPins.find(p => p.label === 'pos')!);
   const vccNeg = pinWorldPosition(vcc, vccPins.find(p => p.label === 'neg')!);
-  const rcA    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'A')!);
-  const rcB    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'B')!);
+  const rcA    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'pos')!);
+  const rcB    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'neg')!);
   const vbPos  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'pos')!);
   const vbNeg  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'neg')!);
   const q1B    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'B')!);

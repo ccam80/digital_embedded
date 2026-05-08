@@ -11,7 +11,7 @@
  * The two slots are consumed via siblingState by the parent composite's
  * outPin DigitalOutputPinLoaded sub-element- `inputLogic` selects which
  * voltage to drive, `enableLogic` switches the Norton conductance between
- * 1/rOut (active) and 1 GÎ© (high-Z) so the pin disconnects from the shared
+ * 1/rOut (active) and 1 GΩ (high-Z) so the pin disconnects from the shared
  * net when sel is low.
  *
  * Per Composite M13 (phase-composite-architecture.md), J-145

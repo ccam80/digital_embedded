@@ -5,7 +5,7 @@
  */
 
 import type { CircuitElement } from '../core/element.js';
-import type { Wire } from '../core/circuit.js';
+import type { Wire, SpecConnection } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { PinDirection } from '../core/pin.js';
@@ -147,28 +147,34 @@ function resolveDomainFromModelKey(modelKey: string): string {
 /**
  * Unified netlist extraction algorithm.
  *
- * Algorithm (spec Section 4.3):
- * 1. Collect slots: assign each pin a numeric slot ID, each wire endpoint
- *    two virtual slot IDs. Union wire start↔end virtual slots.
- * 2. Position-merge: union all slots at the same world-space position.
- * 3. Tunnel-merge: union all Tunnel-component pin slots sharing a label.
- *    Digital tunnels use "label" property; analog tunnels use "NetName"
- *    property. Both are checked (NetName preferred if present).
- * 4. Extract groups: walk union-find; build ConnectivityGroup per component.
- * 5. Tag domains: each group's `domains` = union of all pin domains.
- * 6. Validate widths: digital pins in a group must agree on bit width;
- *    mismatches produce diagnostics.
+ * Two paths share the same downstream pipeline:
  *
- * Returns [groups, diagnostics].
+ *   • Spec-authoritative path (when `specConnections` is provided):
+ *     pin-pair equivalence comes directly from the build's connection list.
+ *     Wires are decorative routing — they do not contribute to pin-pin
+ *     unification. This is immune to auto-layout coordinate-collision
+ *     artifacts (e.g. two distinct nets routed through the same Z-route
+ *     corner). Wires are still attached to groups for rendering, via BFS
+ *     over wire-endpoint adjacency.
+ *
+ *   • Legacy position-merge path (when `specConnections` is absent):
+ *     used for `.dig`/`.dts` circuits where the wire graph is the only
+ *     source of truth. Pins and wire endpoints sharing a world position
+ *     are union-merged.
+ *
+ * Both paths apply Tunnel/Port label-merge, build the same group view, and
+ * run the same width validation and post-group diagnostics.
  */
 export function extractConnectivityGroups(
   elements: readonly CircuitElement[],
   wires: readonly Wire[],
   _registry: ComponentRegistry,
   modelAssignments: ModelAssignment[],
+  specConnections?: readonly SpecConnection[],
 ): [ConnectivityGroup[], Diagnostic[]] {
   const diagnostics: Diagnostic[] = [];
   const componentCount = elements.length;
+  const useSpecMode = specConnections !== undefined;
 
   // -------------------------------------------------------------------------
   // Step 1: Compute slot base offsets and collect all pins
@@ -183,55 +189,97 @@ export function extractConnectivityGroups(
     totalPinSlots += allPins[i]!.length;
   }
 
-  // Wire virtual slots start after all pin slots
-  // Each wire gets 2 virtual slot IDs: wireVirtualBase + k*2 (start) and +k*2+1 (end)
+  // Wire virtual slots are only used in legacy position-merge mode. In
+  // spec-authoritative mode the wires are decorative and contribute no slots.
   const wireVirtualBase = totalPinSlots;
-  const totalSlots = totalPinSlots + wires.length * 2;
+  const totalSlots = useSpecMode
+    ? totalPinSlots
+    : totalPinSlots + wires.length * 2;
 
   const uf = new UnionFind(totalSlots);
 
   // -------------------------------------------------------------------------
-  // Step 2: Build position map; add wire virtual slots; union wire endpoints
+  // Step 2: Pin-pair equivalence
+  //   Spec mode: union pin slots per spec connection.
+  //   Legacy mode: position-merge (pins + wire endpoints).
   // -------------------------------------------------------------------------
 
-  const posToSlots = new Map<string, number[]>();
-
-  function addToPos(key: string, slot: number): void {
-    let list = posToSlots.get(key);
-    if (list === undefined) {
-      list = [];
-      posToSlots.set(key, list);
+  if (useSpecMode) {
+    // Build (instanceId → pinLabel → slot) lookup.
+    const pinIndex = new Map<string, Map<string, number>>();
+    for (let i = 0; i < componentCount; i++) {
+      const el = elements[i]!;
+      const pins = allPins[i]!;
+      const pinMap = new Map<string, number>();
+      for (let j = 0; j < pins.length; j++) {
+        pinMap.set(pins[j]!.label, slotBase[i]! + j);
+      }
+      pinIndex.set(el.instanceId, pinMap);
     }
-    list.push(slot);
-  }
 
-  // Add pin slots at their world positions
-  for (let i = 0; i < componentCount; i++) {
-    const el = elements[i]!;
-    const pins = allPins[i]!;
-    for (let j = 0; j < pins.length; j++) {
-      const pin = pins[j]!;
-      const wp = pinWorldPosition(el, pin);
-      addToPos(`${wp.x},${wp.y}`, slotBase[i]! + j);
+    for (const conn of specConnections!) {
+      const srcMap = pinIndex.get(conn.srcId);
+      const dstMap = pinIndex.get(conn.dstId);
+      if (srcMap === undefined || dstMap === undefined) {
+        diagnostics.push({
+          severity: 'warning',
+          code: 'spec-connection-missing-element',
+          message: `Spec connection references unknown element: ${conn.srcId}:${conn.srcPin} → ${conn.dstId}:${conn.dstPin}`,
+        });
+        continue;
+      }
+      const srcSlot = srcMap.get(conn.srcPin);
+      const dstSlot = dstMap.get(conn.dstPin);
+      if (srcSlot === undefined || dstSlot === undefined) {
+        diagnostics.push({
+          severity: 'warning',
+          code: 'spec-connection-missing-pin',
+          message: `Spec connection references unknown pin: ${conn.srcId}:${conn.srcPin} → ${conn.dstId}:${conn.dstPin}`,
+        });
+        continue;
+      }
+      uf.union(srcSlot, dstSlot);
     }
-  }
+  } else {
+    const posToSlots = new Map<string, number[]>();
 
-  // Add wire virtual slots and union their endpoints
-  for (let k = 0; k < wires.length; k++) {
-    const wire = wires[k]!;
-    const startSlot = wireVirtualBase + k * 2;
-    const endSlot = wireVirtualBase + k * 2 + 1;
-    addToPos(`${wire.start.x},${wire.start.y}`, startSlot);
-    addToPos(`${wire.end.x},${wire.end.y}`, endSlot);
-    // A wire electrically connects its two endpoints
-    uf.union(startSlot, endSlot);
-  }
+    function addToPos(key: string, slot: number): void {
+      let list = posToSlots.get(key);
+      if (list === undefined) {
+        list = [];
+        posToSlots.set(key, list);
+      }
+      list.push(slot);
+    }
 
-  // Position-merge: union all slots at the same world position
-  for (const slots of posToSlots.values()) {
-    if (slots.length > 1) {
-      for (let m = 1; m < slots.length; m++) {
-        uf.union(slots[0]!, slots[m]!);
+    // Add pin slots at their world positions
+    for (let i = 0; i < componentCount; i++) {
+      const el = elements[i]!;
+      const pins = allPins[i]!;
+      for (let j = 0; j < pins.length; j++) {
+        const pin = pins[j]!;
+        const wp = pinWorldPosition(el, pin);
+        addToPos(`${wp.x},${wp.y}`, slotBase[i]! + j);
+      }
+    }
+
+    // Add wire virtual slots and union their endpoints
+    for (let k = 0; k < wires.length; k++) {
+      const wire = wires[k]!;
+      const startSlot = wireVirtualBase + k * 2;
+      const endSlot = wireVirtualBase + k * 2 + 1;
+      addToPos(`${wire.start.x},${wire.start.y}`, startSlot);
+      addToPos(`${wire.end.x},${wire.end.y}`, endSlot);
+      // A wire electrically connects its two endpoints
+      uf.union(startSlot, endSlot);
+    }
+
+    // Position-merge: union all slots at the same world position
+    for (const slots of posToSlots.values()) {
+      if (slots.length > 1) {
+        for (let m = 1; m < slots.length; m++) {
+          uf.union(slots[0]!, slots[m]!);
+        }
       }
     }
   }
@@ -303,7 +351,9 @@ export function extractConnectivityGroups(
 
   // Wire-only groups: wires whose both endpoints share no position with any pin,
   // but only when the circuit has elements (wire-only circuits have no groups).
-  if (totalPinSlots > 0) {
+  // Only meaningful in legacy mode where wires carry virtual slots; spec mode
+  // treats wires as decorative routing (no groups created from wires alone).
+  if (!useSpecMode && totalPinSlots > 0) {
     for (let k = 0; k < wires.length; k++) {
       const startSlot = wireVirtualBase + k * 2;
       const root = uf.find(startSlot);
@@ -354,21 +404,94 @@ export function extractConnectivityGroups(
     }
   }
 
-  // Populate wire membership- a wire belongs to a group if either of its
-  // virtual slots maps to a group (which it does if it shares position with a pin)
-  for (let k = 0; k < wires.length; k++) {
-    const startSlot = wireVirtualBase + k * 2;
-    const root = uf.find(startSlot);
-    const groupId = rootToGroupId.get(root);
-    if (groupId !== undefined) {
-      groupWireIndices[groupId]!.add(k);
+  if (useSpecMode) {
+    // Wire membership in spec mode: walk wires as a graph (linked via shared
+    // endpoints), flood-fill into connected components, and attach each
+    // component to a group via any pin coordinate it touches. A wire-only
+    // component that touches no pin is left unattached. A component that
+    // touches two distinct groups indicates a visual auto-layout collision —
+    // the routing visually merges two electrically distinct nets at a corner.
+    // Connectivity is unaffected (spec connections are authoritative) but a
+    // diagnostic surfaces the rendering hazard.
+    const pinPosToGroupId = new Map<string, number>();
+    for (let g = 0; g < groupPins.length; g++) {
+      for (const pin of groupPins[g]!) {
+        pinPosToGroupId.set(`${pin.worldPosition.x},${pin.worldPosition.y}`, g);
+      }
     }
-    // Also check end slot (in case the start slot is isolated)
-    const endSlot = wireVirtualBase + k * 2 + 1;
-    const endRoot = uf.find(endSlot);
-    const endGroupId = rootToGroupId.get(endRoot);
-    if (endGroupId !== undefined) {
-      groupWireIndices[endGroupId]!.add(k);
+
+    const posToWires = new Map<string, number[]>();
+    for (let k = 0; k < wires.length; k++) {
+      const w = wires[k]!;
+      const sk = `${w.start.x},${w.start.y}`;
+      const ek = `${w.end.x},${w.end.y}`;
+      let s = posToWires.get(sk);
+      if (s === undefined) { s = []; posToWires.set(sk, s); }
+      s.push(k);
+      let e = posToWires.get(ek);
+      if (e === undefined) { e = []; posToWires.set(ek, e); }
+      e.push(k);
+    }
+
+    const visitedWire = new Uint8Array(wires.length);
+    for (let start = 0; start < wires.length; start++) {
+      if (visitedWire[start]) continue;
+      const componentWires: number[] = [];
+      const componentGroups = new Set<number>();
+      const stack: number[] = [start];
+      visitedWire[start] = 1;
+      while (stack.length > 0) {
+        const wIdx = stack.pop()!;
+        componentWires.push(wIdx);
+        const wire = wires[wIdx]!;
+        for (const ep of [wire.start, wire.end]) {
+          const key = `${ep.x},${ep.y}`;
+          const gid = pinPosToGroupId.get(key);
+          if (gid !== undefined) componentGroups.add(gid);
+          const neighbors = posToWires.get(key);
+          if (neighbors === undefined) continue;
+          for (const n of neighbors) {
+            if (!visitedWire[n]) {
+              visitedWire[n] = 1;
+              stack.push(n);
+            }
+          }
+        }
+      }
+
+      if (componentGroups.size === 1) {
+        const gid = componentGroups.values().next().value!;
+        for (const w of componentWires) groupWireIndices[gid]!.add(w);
+      } else if (componentGroups.size > 1) {
+        const ids = [...componentGroups].sort((a, b) => a - b);
+        diagnostics.push({
+          severity: 'warning',
+          code: 'auto-layout-collision',
+          message: `Wire routing visually joins distinct nets ${ids.join(' and ')} at a coincident corner. Connectivity is unaffected (spec connections are authoritative); the diagram may mislead readers.`,
+          netId: ids[0]!,
+        });
+        // Attach all wires to the lowest group id so the renderer has a
+        // canonical home for them.
+        for (const w of componentWires) groupWireIndices[ids[0]!]!.add(w);
+      }
+      // size === 0: stray wire-only component, leave unattached.
+    }
+  } else {
+    // Legacy: a wire belongs to a group if either of its virtual slots
+    // maps to a group (i.e., it shares position with a pin).
+    for (let k = 0; k < wires.length; k++) {
+      const startSlot = wireVirtualBase + k * 2;
+      const root = uf.find(startSlot);
+      const groupId = rootToGroupId.get(root);
+      if (groupId !== undefined) {
+        groupWireIndices[groupId]!.add(k);
+      }
+      const endSlot = wireVirtualBase + k * 2 + 1;
+      const endRoot = uf.find(endSlot);
+      const endGroupId = rootToGroupId.get(endRoot);
+      if (endGroupId !== undefined) {
+        groupWireIndices[endGroupId]!.add(k);
+      }
     }
   }
 

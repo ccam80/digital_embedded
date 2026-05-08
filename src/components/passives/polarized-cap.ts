@@ -194,7 +194,7 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 
     // Plate 2  curved (exact Falstad 7-segment polyline)
     // Falstad pixel coords: (41,-12),(37,-9),(36,-5),(36,-2),(36,2),(36,5),(37,9),(41,12)
-    // Grid coords (Ã·16):   (2.5625,-0.75),(2.3125,-0.5625),(2.25,-0.3125),(2.25,-0.125),
+    // Grid coords (÷16):   (2.5625,-0.75),(2.3125,-0.5625),(2.25,-0.3125),(2.25,-0.125),
     //                      (2.25,0.125),(2.25,0.3125),(2.3125,0.5625),(2.5625,0.75)
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(plateOffset, 0, 4 - plateOffset, 0, [

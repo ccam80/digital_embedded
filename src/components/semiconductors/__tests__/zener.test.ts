@@ -36,13 +36,13 @@ function buildZenerForward(
   return facade.build({
     components: [
       { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: 1 } },
-      { id: "z1",  type: "ZenerDiode",      props: { label: "Z1", model: "simplified" } },
+      { id: "d1",  type: "ZenerDiode",      props: { label: "D1", model: "simplified" } },
       { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: 1000 } },
       { id: "gnd", type: "Ground",          props: { label: "GND" } },
     ],
     connections: [
-      ["vs:pos", "z1:A"],
-      ["z1:K",   "r1:pos"],
+      ["vs:pos", "d1:A"],
+      ["d1:K",   "r1:pos"],
       ["r1:neg", "gnd:out"],
       ["vs:neg", "gnd:out"],
     ],
@@ -55,13 +55,13 @@ function buildZenerBreakdown(
   return facade.build({
     components: [
       { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: 8 } },
-      { id: "z1",  type: "ZenerDiode",      props: { label: "Z1", model: "simplified" } },
+      { id: "d1",  type: "ZenerDiode",      props: { label: "D1", model: "simplified" } },
       { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: 1000 } },
       { id: "gnd", type: "Ground",          props: { label: "GND" } },
     ],
     connections: [
-      ["vs:pos", "z1:K"],
-      ["z1:A",   "r1:pos"],
+      ["vs:pos", "d1:K"],
+      ["d1:A",   "r1:pos"],
       ["r1:neg", "gnd:out"],
       ["vs:neg", "gnd:out"],
     ],
@@ -103,8 +103,8 @@ describe("Zener initialization (T1)", () => {
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_IEQ])).toBe(true);
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_ID])).toBe(true);
 
-    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("Z1:A")!);
-    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("Z1:K")!);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     expect(Number.isFinite(vA)).toBe(true);
     expect(Number.isFinite(vK)).toBe(true);
   });
@@ -129,8 +129,8 @@ describe("Zener DCOP analytical (T1)", () => {
     const result = fix.coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
-    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("Z1:A")!);
-    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("Z1:K")!);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     const vf = vA - vK;
     expect(vf).toBeGreaterThan(0.4);
     expect(vf).toBeLessThan(0.8);
@@ -141,8 +141,8 @@ describe("Zener DCOP analytical (T1)", () => {
     const result = fix.coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
-    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("Z1:A")!);
-    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("Z1:K")!);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     const vd = vA - vK; // reverse → strongly negative
     // tBV ≈ 5.1V (default BV after diotemp.c iteration). Clamp band ±0.5V.
     expect(vd).toBeLessThan(-4.6);
@@ -174,8 +174,8 @@ describe("Zener parameter hot-load (T1)", () => {
   it("hotload_IS_changes_vf_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
     const ce = getZenerCe(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("Z1:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("Z1:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "IS", 1e-10);
     fix.coordinator.step();
@@ -188,8 +188,8 @@ describe("Zener parameter hot-load (T1)", () => {
   it("hotload_N_changes_vf_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
     const ce = getZenerCe(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("Z1:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("Z1:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "N", 2.0);
     fix.coordinator.step();
@@ -202,8 +202,8 @@ describe("Zener parameter hot-load (T1)", () => {
   it("hotload_BV_shifts_breakdown_clamp", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerBreakdown(f) });
     const ce = getZenerCe(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("Z1:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("Z1:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "BV", 3.3);
     fix.coordinator.step();
@@ -217,8 +217,8 @@ describe("Zener parameter hot-load (T1)", () => {
   it("hotload_NBV_changes_breakdown_response", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerBreakdown(f) });
     const ce = getZenerCe(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("Z1:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("Z1:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     // NBV scales the breakdown emission coefficient. Bumping it from N=1.0
     // (default) to 1.5 reshapes nbvVt and the breakdown-region exp slope.
@@ -234,8 +234,8 @@ describe("Zener parameter hot-load (T1)", () => {
     // vcritBrk, tBV.
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
     const ce = getZenerCe(fix);
-    const vAnode = fix.circuit.labelToNodeId.get("Z1:A")!;
-    const vCath = fix.circuit.labelToNodeId.get("Z1:K")!;
+    const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
     fix.coordinator.step();
@@ -259,7 +259,7 @@ describe("Zener limiting events own-engine (T1)", () => {
     fix.coordinator.setLimitingCapture(true);
     fix.coordinator.dcOperatingPoint();
     const events = fix.coordinator.getLimitingEvents();
-    const ak = events.find(e => e.label === "Z1" && e.junction === "AK");
+    const ak = events.find(e => e.label === "D1" && e.junction === "AK");
     expect(ak).toBeDefined();
     expect(ak!.limitType).toBe("pnjlim");
     expect(Number.isFinite(ak!.vBefore)).toBe(true);

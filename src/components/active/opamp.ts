@@ -41,7 +41,7 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: OPAMP_PARAM_DEFS, defaults: OPAMP_DEFAULTS } = defineModelParams({
   primary: {
     gain: { default: 1e6,  description: "Open-loop voltage gain" },
-    rOut: { default: 75,   unit: "Î©",  description: "Output resistance" },
+    rOut: { default: 75,   unit: "Ω",  description: "Output resistance" },
   },
 });
 
