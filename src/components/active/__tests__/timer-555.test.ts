@@ -452,7 +452,7 @@ describe("Timer555 digital interaction (Cat 9)", () => {
     const fix = buildBridgeFixture({ vTrig: 0.5, vThr: 1.0 });
     fix.coordinator.step();
     const sig = fix.coordinator.readByLabel("OUT_DIG");
-    expect(sig.type).toBe("digital");
+    if (sig.type !== "digital") throw new Error(`expected digital, got ${sig.type}`);
     expect(sig.value).toBe(1);
   });
 
@@ -462,7 +462,7 @@ describe("Timer555 digital interaction (Cat 9)", () => {
     const fix = buildBridgeFixture({ vTrig: 4.0, vThr: 4.0 });
     fix.coordinator.step();
     const sig = fix.coordinator.readByLabel("OUT_DIG");
-    expect(sig.type).toBe("digital");
+    if (sig.type !== "digital") throw new Error(`expected digital, got ${sig.type}`);
     expect(sig.value).toBe(0);
   });
 });

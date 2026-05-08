@@ -1,0 +1,290 @@
+{
+  "circuit": {
+    "description": "NTC thermistor with selfHeating=false: static resistor regime. DcVoltageSource (1V) -> NTC -> Ground. Exercises Cat 2/3/5 in non-self-heating code path.",
+    "elements": [
+      {
+        "id": "23f7d686-16f7-4685-be96-18ee0de2c745",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 1
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "a0259ed7-fc57-4458-a83c-236ed1a7b8d1",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "beta": 3950,
+            "r0": 10000,
+            "t0": 298.15,
+            "temperature": 298.15,
+            "thermalCapacitance": 0.01,
+            "thermalResistance": 50
+          },
+          "label": "ntc",
+          "model": "behavioral",
+          "position": [
+            0,
+            8
+          ],
+          "selfHeating": false
+        },
+        "rotation": 0,
+        "type": "NTCThermistor"
+      },
+      {
+        "id": "3f982b6a-cc17-435c-8dd0-49aada9c4b95",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "ntc-canon-fixed-temp",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 1
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 18,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 5
+          },
+          {
+            "x": 18,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 1
+          },
+          {
+            "x": 24,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

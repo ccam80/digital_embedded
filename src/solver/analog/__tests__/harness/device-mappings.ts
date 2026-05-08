@@ -24,6 +24,9 @@ import type { DeviceMapping } from "./types.js";
 // ---------------------------------------------------------------------------
 // ngspice cap state offsets (capdefs.h:66-67): CAPqcap=0, CAPccap=1.
 
+// Capacitor pin currents: CCAP at converged step-end is the displacement
+// current (capload.c stamps it as the companion-current source). Passive
+// sign convention- pos pin sees +CCAP into the device, neg pin sees -CCAP.
 export const CAPACITOR_MAPPING: DeviceMapping = {
   deviceType: "capacitor",
   slotToNgspice: {
@@ -33,6 +36,10 @@ export const CAPACITOR_MAPPING: DeviceMapping = {
   ngspiceToSlot: {
     0: "Q",
     1: "CCAP",
+  },
+  pinCurrents: {
+    pos: [{ slot: "CCAP", sign: 1 }],
+    neg: [{ slot: "CCAP", sign: -1 }],
   },
 };
 
@@ -48,6 +55,12 @@ export const CAPACITOR_MAPPING: DeviceMapping = {
 //
 // digiTS schema (inductor.ts INDUCTOR_SCHEMA): PHI=0, CCAP=1- same offsets,
 // same semantics, ngspice-exact 1:1.
+//
+// Inductor pin currents: NOT projectable from CKTstate. The actual
+// through-current is the MNA branch variable for the inductor (captured
+// in the `branches` channel). INDvolt at slot 1 is the niinteg companion
+// for VOLTAGE (phi_dot), not current- mapping it to a pin would mislabel
+// the quantity. `pinCurrents` is therefore omitted.
 
 export const INDUCTOR_MAPPING: DeviceMapping = {
   deviceType: "inductor",
@@ -73,6 +86,8 @@ export const INDUCTOR_MAPPING: DeviceMapping = {
 // The digiTS schema `CCAP` slot is a niIntegrate companion-current output
 // with no ngspice CKTstate correspondence- not mapped.
 
+// Diode pin currents: ID at slot 1 is the diode through-current (anode→cathode
+// passive sign). Anode A sees +ID into the device, cathode K sees -ID.
 export const DIODE_MAPPING: DeviceMapping = {
   deviceType: "diode",
   slotToNgspice: {
@@ -88,6 +103,10 @@ export const DIODE_MAPPING: DeviceMapping = {
     2: "GEQ",
     3: "Q",
     4: "CAP_CURRENT",
+  },
+  pinCurrents: {
+    A: [{ slot: "ID", sign: 1 }],
+    K: [{ slot: "ID", sign: -1 }],
   },
 };
 
@@ -110,6 +129,10 @@ export const DIODE_MAPPING: DeviceMapping = {
 // these slots. The mappings below therefore compare our cap-augmented
 // values against ngspice's CKTstate0 offsets, which are likewise augmented.
 
+// BJT pin currents: CC=BJTcc (collector terminal current, slot 2) and
+// CB=BJTcb (base terminal current, slot 3) are the directly-stored
+// terminal currents. Emitter is not in CKTstate- ngspice derives it
+// by KCL: Ie = -(Ic + Ib). bjtdefs.h:289-313 has no BJTce.
 export const BJT_MAPPING: DeviceMapping = {
   deviceType: "bjt",
   slotToNgspice: {
@@ -134,6 +157,11 @@ export const BJT_MAPPING: DeviceMapping = {
     GEQCB: 18,
     GCSUB: 19,
     GEQBX: 20,
+  },
+  pinCurrents: {
+    C: [{ slot: "CC", sign: 1 }],
+    B: [{ slot: "CB", sign: 1 }],
+    E: [{ slot: "CC", sign: -1 }, { slot: "CB", sign: -1 }],
   },
   ngspiceToSlot: {
     0: "VBE",
@@ -175,6 +203,11 @@ export const BJT_MAPPING: DeviceMapping = {
 // slots 0-16. Schema slots 17-27 (CD, CBD, CBS, GBD, GBS, GM, GDS, GMBS,
 // MODE, VON, VDSAT) correspond to MOS1instance struct fields, NOT to
 // CKTstate offsets- they are not comparable via the state-pool path.
+//
+// MOSFET pin currents: NOT projectable from CKTstate. CD/CBS/CBD live on
+// MOS1instance and would require a parallel instance-field bridge through
+// the harness. Until that work lands, `pinCurrents` is omitted; consumers
+// see an empty record for MOSFET entries.
 
 export const MOSFET_MAPPING: DeviceMapping = {
   deviceType: "mosfet",
@@ -230,6 +263,9 @@ export const MOSFET_MAPPING: DeviceMapping = {
 // prior fet-base invented slots (IDS, ID_JUNCTION, GD_JUNCTION, MEYER_GS,
 // CCAP_GS/GD, etc.) are A1-excised.
 
+// JFET pin currents: CG=JFETcg (gate, slot 2) and CD=JFETcd (drain,
+// slot 3) are directly stored. Source is derived by KCL: Is = -(Ig + Id).
+// jfetdefs.h:154-166 has no JFETcs.
 export const JFET_MAPPING: DeviceMapping = {
   deviceType: "jfet",
   slotToNgspice: {
@@ -261,6 +297,11 @@ export const JFET_MAPPING: DeviceMapping = {
     10: "CQGS",
     11: "QGD",
     12: "CQGD",
+  },
+  pinCurrents: {
+    G: [{ slot: "CG", sign: 1 }],
+    D: [{ slot: "CD", sign: 1 }],
+    S: [{ slot: "CG", sign: -1 }, { slot: "CD", sign: -1 }],
   },
 };
 
@@ -314,4 +355,34 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
  */
 export function normalizeDeviceType(typeId: string): string {
   return TYPE_ID_TO_CANONICAL[typeId] ?? "unknown";
+}
+
+/**
+ * Apply a `DeviceMapping.pinCurrents` projection to a slot value map,
+ * producing the per-pin terminal currents for one element. Returns an
+ * empty record when the mapping has no projection (MOSFET, inductor) or
+ * any required slot is missing from `slots`.
+ *
+ * Used by both engines' element-state captures so both sides emit
+ * identically labelled `ElementStateSnapshot.pinCurrents` from the same
+ * underlying slot data.
+ */
+export function projectPinCurrents(
+  mapping: DeviceMapping | undefined,
+  slots: Record<string, number>,
+): Record<string, number> {
+  const proj = mapping?.pinCurrents;
+  if (!proj) return {};
+  const out: Record<string, number> = {};
+  for (const [pin, terms] of Object.entries(proj)) {
+    let sum = 0;
+    let ok = true;
+    for (const term of terms) {
+      const v = slots[term.slot];
+      if (v === undefined) { ok = false; break; }
+      sum += term.sign * v;
+    }
+    if (ok) out[pin] = sum;
+  }
+  return out;
 }

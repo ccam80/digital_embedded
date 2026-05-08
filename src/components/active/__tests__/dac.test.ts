@@ -4,7 +4,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  dllAvailable,
   describeIfDll,
   DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";

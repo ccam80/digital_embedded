@@ -1,0 +1,574 @@
+{
+  "circuit": {
+    "description": "Two-winding transformer AC bench: AC source -> P1; P2 grounded; S1 to R_load to GND; S2 grounded.",
+    "elements": [
+      {
+        "id": "7941f64f-7db7-4cbf-baf1-a18e272eba2d",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1.2,
+            "dcOffset": 0,
+            "fallTime": 1e-12,
+            "frequency": 1000,
+            "noiseSampleTime": 0,
+            "phase": 0,
+            "riseTime": 1e-12
+          },
+          "amplitude": 1.2,
+          "frequency": 1000,
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "6f4d76d2-a746-4cfc-ad0a-661503cae779",
+        "position": {
+          "x": 12,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "IC1": null,
+            "IC2": null,
+            "M": 1,
+            "couplingCoefficient": 0.8,
+            "primaryInductance": 0.1,
+            "primaryResistance": 0,
+            "secondaryResistance": 0,
+            "turnsRatio": 2
+          },
+          "couplingCoefficient": 0.8,
+          "label": "TX1",
+          "position": [
+            0,
+            8
+          ],
+          "primaryInductance": 0.1,
+          "primaryResistance": 0,
+          "secondaryResistance": 0,
+          "turnsRatio": 2
+        },
+        "rotation": 0,
+        "type": "Transformer"
+      },
+      {
+        "id": "3ef26a82-cf75-4875-9ef9-ad8f43fad835",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 50
+          },
+          "label": "R_LOAD",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 50
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c3c45955-5bd3-4512-9401-f4bc06343eb6",
+        "position": {
+          "x": 36,
+          "y": 4
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "transformer-canon-ac-step-down",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 11,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 11,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 8
+          },
+          {
+            "x": 24,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 8
+          },
+          {
+            "x": 30,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 8
+          },
+          {
+            "x": 30,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 3
+          },
+          {
+            "x": 38,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": 3
+          },
+          {
+            "x": 38,
+            "y": -2.375
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": -2.375
+          },
+          {
+            "x": 10,
+            "y": -2.375
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": -2.375
+          },
+          {
+            "x": 10,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 2
+          },
+          {
+            "x": 17,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 2
+          },
+          {
+            "x": 20,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 2
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 4
+          },
+          {
+            "x": 24,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 31,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 4
+          },
+          {
+            "x": 31,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

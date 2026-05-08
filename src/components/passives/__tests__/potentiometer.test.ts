@@ -1,258 +1,179 @@
-/**
- * Tests for the Potentiometer component.
- *
- * Covers:
- *   - Conductance stamp computation for both top and bottom resistors
- *   - Position-based resistance splitting
- *   - Edge cases (position 0 and 1)
- *   - Clamping to minimum resistance
- *   - Component definition completeness
- *   - Voltage divider integration test
- */
-
 import { describe, it, expect } from "vitest";
-import {
-  PotentiometerDefinition,
-  POTENTIOMETER_ATTRIBUTE_MAPPINGS,
-} from "../potentiometer.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { makeLoadCtx, makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
-import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
+import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Programmatic circuit factory (T1)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
+//
+// Resistive divider with a potentiometer between V1 and GND, wiper observed
+// via a high-impedance sense resistor (1e8 Ohm) so the wiper node lives in
+// the MNA without disturbing the divider voltage. Closed-form DCOP at the
+// wiper:
+//   R_top    = R * position
+//   R_bottom = R * (1 - position)
+//   V(W) ~= Vsrc * R_bottom / (R_top + R_bottom) = Vsrc * (1 - position)
+// (The 1e8 Ohm sense resistor draws < 0.001% of the divider current, so the
+// closed-form is bit-exact at the assertion's precision.)
+
+interface PotDividerParams {
+  vSource?: number;
+  R?: number;
+  position?: number;
 }
 
+function buildPotDividerCircuit(facade: DefaultSimulatorFacade, p: PotDividerParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",   type: "DcVoltageSource", props: { label: "V1",  voltage:    p.vSource ?? 1.0 } },
+      { id: "pot",  type: "Potentiometer",   props: { label: "POT", resistance: p.R ?? 10000, position: p.position ?? 0.5 } },
+      { id: "rsns", type: "Resistor",        props: { label: "RSNS", resistance: 1e8 } },
+      { id: "gnd",  type: "Ground",          props: { label: "gnd" } },
+    ],
+    connections: [
+      ["vs:pos",   "pot:pos"],
+      ["pot:neg",  "gnd:out"],
+      ["vs:neg",   "gnd:out"],
+      ["pot:W",    "rsns:pos"],
+      ["rsns:neg", "gnd:out"],
+    ],
+  });
+}
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
 
-import { vi } from "vitest";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-
-function makeCaptureSolver(): { solver: SparseSolverType; stamps: [number, number, number][] } {
-  const stamps: [number, number, number][] = [];
-  const solver = {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    stampRHS: vi.fn((_row: number, _v: number) => {}),
-  } as unknown as SparseSolverType;
-  return { solver, stamps };
+function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
-// stamps_two_conductance_pairs tests
+// Potentiometer initialization (T1) - Cat 1
 // ---------------------------------------------------------------------------
+//
+// Potentiometer carries no state-pool slots (purely conductive G stamps with
+// no time-derivative state). Cat 1 reduces to the post-warm-start node
+// observability: at step 0, the wiper voltage already matches the closed-
+// form divider value because warm-start runs DCOP before the first transient
+// step.
 
-describe("Potentiometer", () => {
-  describe("stamps_two_conductance_pairs", () => {
-    it("stamps 8 conductance entries for position 0.5", () => {
-      const props = new PropertyBag();
-      props.setModelParam("resistance", 10000);
-      props.setModelParam("position", 0.5);
-
-      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2], ["W", 3]]),
-        props,
-        () => 0,
-      );
-
-      const { solver, stamps } = makeCaptureSolver();
-      const setupCtx = makeTestSetupContext({ solver });
-      analogElement.setup(setupCtx);
-      const ctx = makeLoadCtx({ solver });
-      analogElement.load(ctx);
-
-      expect(stamps.length).toBe(8);
-
-      // Nodes are 1-based: A=1, B=2, W=3. The capture solver records raw node IDs.
-      // Top resistor: A(1) ↔ W(3) (A↔W)
-      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
-      expect(topStamps.some((s) => Math.abs(s[2] - 0.0002) < 1e-6)).toBe(true);
-
-      // Bottom resistor: W(3) ↔ B(2) (W↔B)
-      const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
-      expect(bottomStamps.some((s) => Math.abs(s[2] - 0.0002) < 1e-6)).toBe(true);
+describe("Potentiometer initialization (T1)", () => {
+  it("init_post_warm_start_wiper_matches_closed_form_divider", () => {
+    // V1 = 1V, R = 10k, position = 0.5: R_top = R_bottom = 5k.
+    // V(W) = Vsrc * (1 - position) = 1.0 * 0.5 = 0.5V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildPotDividerCircuit(facade, { vSource: 1.0, R: 10000, position: 0.5 }),
     });
-  });
-
-  describe("position_0_gives_full_resistance_on_bottom", () => {
-    it("position=0 clamps R_top to minimum and R_bottom to full", () => {
-      const props = new PropertyBag();
-      props.setModelParam("resistance", 10000);
-      props.setModelParam("position", 0);
-
-      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2], ["W", 3]]),
-        props,
-        () => 0,
-      );
-
-      const { solver, stamps } = makeCaptureSolver();
-      const setupCtx = makeTestSetupContext({ solver });
-      analogElement.setup(setupCtx);
-      const ctx = makeLoadCtx({ solver });
-      analogElement.load(ctx);
-
-      // Nodes are 1-based: A=1, W=3, B=2. Top resistor (R_AW): A(1) ↔ W(3). Bottom resistor (R_WB): W(3) ↔ B(2).
-      // Top resistance is 0, clamped to 1e-9: G_AW = 1/(1e-9) = 1e9- A(1) ↔ W(3)
-      // Bottom resistance is 10000: G_WB = 1/10000 = 0.0001- W(3) ↔ B(2)
-      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
-      const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
-
-      expect(topStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_top
-      expect(bottomStamps.some((s) => Math.abs(s[2] - 0.0001) < 1e-6)).toBe(true);
-    });
-  });
-
-  describe("position_1_gives_full_resistance_on_top", () => {
-    it("position=1 clamps R_bottom to minimum and R_top to full", () => {
-      const props = new PropertyBag();
-      props.setModelParam("resistance", 10000);
-      props.setModelParam("position", 1);
-
-      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2], ["W", 3]]),
-        props,
-        () => 0,
-      );
-
-      const { solver, stamps } = makeCaptureSolver();
-      const setupCtx = makeTestSetupContext({ solver });
-      analogElement.setup(setupCtx);
-      const ctx = makeLoadCtx({ solver });
-      analogElement.load(ctx);
-
-      // Nodes are 1-based: A=1, W=3, B=2. Top resistor (R_AW): A(1) ↔ W(3). Bottom resistor (R_WB): W(3) ↔ B(2).
-      // Top resistance is 10000: G_AW = 1/10000 = 0.0001- A(1) ↔ W(3)
-      // Bottom resistance is 0, clamped to 1e-9: G_WB = 1/(1e-9) = 1e9- W(3) ↔ B(2)
-      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
-      const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
-
-      expect(topStamps.some((s) => Math.abs(s[2] - 0.0001) < 1e-6)).toBe(true);
-      expect(bottomStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_WB
-    });
-  });
-
-  describe("definition", () => {
-    it("PotentiometerDefinition name is 'Potentiometer'", () => {
-      expect(PotentiometerDefinition.name).toBe("Potentiometer");
-    });
-
-    it("PotentiometerDefinition has analog model", () => {
-      expect(PotentiometerDefinition.modelRegistry?.behavioral).toBeDefined();
-    });
-
-    it("PotentiometerDefinition has analogFactory", () => {
-      expect((PotentiometerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
-    });
-
-    it("PotentiometerDefinition category is PASSIVES", () => {
-      expect(PotentiometerDefinition.category).toBe(ComponentCategory.PASSIVES);
-    });
-
-    it("PotentiometerDefinition can be registered without error", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PotentiometerDefinition)).not.toThrow();
-    });
-  });
-
-  describe("pinLayout", () => {
-    it("PotentiometerDefinition.pinLayout has 3 entries (A, B, W)", () => {
-      expect(PotentiometerDefinition.pinLayout).toHaveLength(3);
-      expect(PotentiometerDefinition.pinLayout[0].label).toBe("A");
-      expect(PotentiometerDefinition.pinLayout[1].label).toBe("B");
-      expect(PotentiometerDefinition.pinLayout[2].label).toBe("W");
-    });
-  });
-
-  describe("attributeMapping", () => {
-    it("resistance maps to resistance property", () => {
-      const m = POTENTIOMETER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "resistance");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("resistance");
-    });
-
-    it("position maps to position property", () => {
-      const m = POTENTIOMETER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "position");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("position");
-    });
-
-    it("Label maps to label property", () => {
-      const m = POTENTIOMETER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(m).toBeDefined();
-      expect(m!.propertyKey).toBe("label");
-      expect(m!.convert("R1")).toBe("R1");
-    });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "POT:W"))).toBeCloseTo(0.5, 4);
+    // Power-rail nodes also seeded at DCOP values in step 0.
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "V1:pos"))).toBeCloseTo(1.0, 6);
   });
 });
 
 // ---------------------------------------------------------------------------
-// potentiometer_load_dcop_parity- C4.1 / Task 6.2.1
-//
-// Pot at wiper=0.5, 10kΩ total. Each half is 5kΩ → G = 1/5000.
-//
-// NGSPICE reference: resload.c:16-41 (function RESload, four stamps per
-// resistor segment). Potentiometer = two series resistors sharing wiper W.
-//   Top resistor (A↔W):   G_top = 1/R_top = 1/(10000*0.5) = 1/5000
-//   Bottom resistor (W↔B): G_bottom = 1/R_bottom = 1/(10000*0.5) = 1/5000
-// Diagonal totals: (rA,rA)=G_AW, (rB,rB)=G_WB, (rW,rW)=G_AW+G_WB.
+// Potentiometer DCOP analytical (T1) - Cat 2 analytical
 // ---------------------------------------------------------------------------
 
-describe("potentiometer_load_dcop_parity", () => {
-  it("wiper=0.5 10kΩ pot G_top=G_bottom=1/5000 bit-exact", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 1.0 } },
-            { id: "pot", type: "Potentiometer",   props: { label: "pot", resistance: 10000, position: 0.5 } },
-            { id: "gnd", type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",  "pot:pos"],
-            ["pot:neg", "gnd:out"],
-            ["vs:neg",  "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
+describe("Potentiometer DCOP analytical (T1)", () => {
+  it("dcop_midpoint_symmetric_split", () => {
+    // Cat 2 analytical: position = 0.5, R = 10k, V1 = 1V.
+    //   R_top = R_bottom = 5k -> V(W) = Vsrc / 2 = 0.5V exactly.
+    const fix = buildFixture({
+      build: (_r, facade) => buildPotDividerCircuit(facade, { vSource: 1.0, R: 10000, position: 0.5 }),
     });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "POT:W"))).toBeCloseTo(0.5, 4);
+  });
 
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
-    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
-    const N = lastIter.matrixSize - 2;
-    const M = lastIter.matrix!;
-    const rowOf = (tag: string) => {
-      for (const [row, label] of session.ourTopology.matrixRowLabels.entries()) {
-        if (label.includes(tag)) return row;
-      }
-      throw new Error(`row not found: ${tag}`);
-    };
-    const rA = rowOf("pot:pos");
-    const rB = rowOf("pot:neg");
-    const rW = rowOf("pot:W");
-    const G = 1 / 5000;
-    expect(M[rA * N + rA]).toBe(G);
-    expect(M[rB * N + rB]).toBe(G);
-    expect(M[rW * N + rW]).toBe(G + G);   // 0.0004- wiper shared diagonal
-    expect(M[rA * N + rW]).toBe(-G);
-    expect(M[rW * N + rB]).toBe(-G);
+  it("dcop_position_low_wiper_near_source", () => {
+    // Cat 2 analytical: position = 0.01, R = 10k, V1 = 1V.
+    //   R_top = 100, R_bottom = 9900 -> V(W) = 9900 / 10000 = 0.99V exactly.
+    const fix = buildFixture({
+      build: (_r, facade) => buildPotDividerCircuit(facade, { vSource: 1.0, R: 10000, position: 0.01 }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "POT:W"))).toBeCloseTo(0.99, 3);
+  });
+
+  it("dcop_position_high_wiper_near_ground", () => {
+    // Cat 2 analytical: position = 0.99, R = 10k, V1 = 1V.
+    //   R_top = 9900, R_bottom = 100 -> V(W) = 100 / 10000 = 0.01V exactly.
+    const fix = buildFixture({
+      build: (_r, facade) => buildPotDividerCircuit(facade, { vSource: 1.0, R: 10000, position: 0.99 }),
+    });
+    const result = fix.coordinator.dcOperatingPoint()!;
+    expect(result.converged).toBe(true);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "POT:W"))).toBeCloseTo(0.01, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Potentiometer parameter hot-load (T1) - Cat 4
+// ---------------------------------------------------------------------------
+//
+// Two structural model parameters: resistance, position. Each setParam(...)
+// recomputes G_AW and G_WB (the two stamped conductances) so each is a
+// derived-state recompute path.
+
+describe("Potentiometer parameter hot-load (T1)", () => {
+  it("hotload_position_changes_wiper_voltage", () => {
+    // Cat 4: shifting position from 0.5 to 0.1 changes G_AW and G_WB so the
+    // wiper voltage moves from V/2 to V*(1-0.1) = 0.9*V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildPotDividerCircuit(facade, { vSource: 1.0, R: 10000, position: 0.5 }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const wNode = nodeOf(fix, "POT:W");
+    const before = fix.engine.getNodeVoltage(wNode);
+    expect(before).toBeCloseTo(0.5, 4);
+
+    const potEl = ceByLabel(fix, "POT");
+    fix.coordinator.setComponentProperty(potEl, "position", 0.1);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(wNode);
+    // Closed-form: V(W) = Vsrc * (1 - position) = 1.0 * 0.9 = 0.9V.
+    expect(after).toBeCloseTo(0.9, 4);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_resistance_preserves_voltage_ratio_at_constant_position", () => {
+    // Cat 4: scaling R uniformly leaves the divider ratio unchanged at fixed
+    // position, but the per-half conductances both halve when R doubles.
+    // The observable shift comes from the sense-resistor loading: the larger
+    // R the more the 1e8 sense path perturbs V(W). Hold position=0.5 and
+    // raise R from 10k to 1e7 - the divider ratio still resolves at 0.5V at
+    // closed-form, but the sense load draws relatively more current and the
+    // node moves measurably away from 0.5V.
+    const fix = buildFixture({
+      build: (_r, facade) => buildPotDividerCircuit(facade, { vSource: 1.0, R: 10000, position: 0.5 }),
+    });
+    fix.coordinator.dcOperatingPoint();
+    const wNode = nodeOf(fix, "POT:W");
+    const before = fix.engine.getNodeVoltage(wNode);
+    expect(before).toBeCloseTo(0.5, 4);
+
+    const potEl = ceByLabel(fix, "POT");
+    // Raise R by 1000x. R_top = R_bottom = 5e6 - now comparable to the 1e8
+    // sense load, so V(W) sags below 0.5V noticeably.
+    fix.coordinator.setComponentProperty(potEl, "resistance", 1e7);
+    fix.coordinator.dcOperatingPoint();
+    const after = fix.engine.getNodeVoltage(wNode);
+    // V(W) at position=0.5 with R=1e7 and 1e8 load:
+    //   parallel(R_bottom, R_load) = 5e6 * 1e8 / (5e6 + 1e8) ~= 4.762e6
+    //   V(W) = Vsrc * Rp / (R_top + Rp) = 1 * 4.762e6 / (5e6 + 4.762e6)
+    //        ~= 0.4878V.
+    expect(after).toBeCloseTo(0.4878, 3);
+    expect(after).not.toBeCloseTo(before, 3);
   });
 });

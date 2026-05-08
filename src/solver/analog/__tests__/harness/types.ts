@@ -248,6 +248,17 @@ export interface ElementStateSnapshot {
   slots: Record<string, number>;
   state1Slots: Record<string, number>;
   state2Slots: Record<string, number>;
+  /**
+   * Per-pin terminal current at this iteration, keyed by pin label
+   * (matching the component's `pinLayout` labels — e.g. "B"/"C"/"E" for
+   * BJT, "A"/"K" for diode). Built from the device's
+   * `DeviceMapping.pinCurrents` projection over the slot data already
+   * captured. Devices with no projection (MOSFET, whose pin currents
+   * live on the per-instance struct rather than in CKTstate; inductor,
+   * whose through-current is the MNA branch variable rather than a
+   * state slot) emit an empty record.
+   */
+  pinCurrents: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,10 +359,36 @@ export interface StepSnapshot {
 // Device mapping- maps our state slots to ngspice state offsets
 // ---------------------------------------------------------------------------
 
+/**
+ * One term in a pin-current projection: a slot name to read, with sign.
+ * Pin current = sum over terms of (sign * slot value).
+ *
+ * KCL-closure pins (e.g. BJT emitter, diode cathode, capacitor P2) are
+ * expressed as the negative sum of the directly-readable slot currents on
+ * the device. Direct pins are 1-element arrays.
+ */
+export interface PinCurrentTerm {
+  slot: string;
+  sign: 1 | -1;
+}
+
 export interface DeviceMapping {
   deviceType: string;
   slotToNgspice: Record<string, number | null>;
   ngspiceToSlot: Record<number, string>;
+  /**
+   * Per-device pin-current projection. Pin name → signed sum of slots that
+   * already exist in `slotToNgspice` / `ngspiceToSlot`. Both engines populate
+   * `ElementStateSnapshot.pinCurrents` from the same projection so the values
+   * being compared are by construction labelled identically.
+   *
+   * Pin-name keys are the device's component-pin-layout labels (e.g.
+   * "B"/"C"/"E" for BJT, "A"/"K" for diode, "pos"/"neg" for cap, "G"/"D"/"S"
+   * for JFET). Devices whose per-pin currents do not live in CKTstate
+   * (MOSFET — instance-struct fields; inductor — MNA branch variable)
+   * omit this field entirely.
+   */
+  pinCurrents?: Record<string, ReadonlyArray<PinCurrentTerm>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1065,6 +1102,12 @@ export interface ConvergenceDetailReport {
 export interface StepEndComponentEntry {
   deviceType: string;
   slots: Record<string, ComparedValue>;
+  /**
+   * Per-pin terminal current paired between engines. Keys are the
+   * device's component-pin-layout labels. Empty for devices without a
+   * `DeviceMapping.pinCurrents` projection.
+   */
+  pinCurrents: Record<string, ComparedValue>;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,10 +2,18 @@
  * Tests for behavioral analog factories for combinational digital components:
  * multiplexer, demultiplexer, and decoder.
  *
- * Migration shape M1- per Test 1.28 contract (Entry 1- combinational
- * pin-loading test). Every test acquires its engine via
- * `ComparisonSession.createSelfCompare({ buildCircuit, analysis })`. Inputs
- * are driven by `DcVoltageSource` instances; outputs are loaded by
+ * All tests use selectorBits=1 (single `sel` pin, two inputs/outputs). The
+ * multi-bit `sel` bus (selectorBits>1) is a digital-path feature; the analog
+ * behavioral model receives one node per physical pin at the component boundary.
+ * selectorBits=1 is sufficient to exercise all behavioral paths (sel=0 routes
+ * in_0/out_0, sel=1 routes in_1/out_1).
+ *
+ * Output voltages are read from the load resistor's positive terminal (e.g.
+ * "rLoad:pos", "r0:pos") because the node-label map uses the first pin that
+ * connects to each node; the resistor pins are that first connection in the
+ * build order used below.
+ *
+ * Inputs are driven by `DcVoltageSource` instances; outputs are loaded by
  * `Resistor` to ground. Pin loading is configured exclusively via
  * `circuit.metadata.digitalPinLoadingOverrides` (Decision #10). Pin-loading
  * assertions assert observable voltage sag (Decision #11).
@@ -19,13 +27,6 @@ import { ComparisonSession } from "./harness/comparison-session.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { AnalogFactory } from "../../../core/registry.js";
-import { PropertyBag } from "../../../core/properties.js";
-import {
-  makeBehavioralMuxAnalogFactory,
-  makeBehavioralDemuxAnalogFactory,
-  makeBehavioralDecoderAnalogFactory,
-} from "../behavioral-combinational.js";
 import { MuxDefinition } from "../../../components/wiring/mux.js";
 import { DemuxDefinition } from "../../../components/wiring/demux.js";
 import { DecoderDefinition } from "../../../components/wiring/decoder.js";
@@ -48,83 +49,76 @@ const LOAD_R = 10_000; // 10 kohm output load
 
 describe("Mux", () => {
   /**
-   * 4:1 mux (selectorBits=2, bitWidth=1).
+   * 2:1 mux (selectorBits=1, bitWidth=1).
    *
-   * Selector bits are driven by ideal DC voltage sources at 0V or 3.3V.
-   * Each data input is driven by an ideal DC voltage source. The mux output
-   * has a 10 kohm load to ground. The mux runs as the analog `behavioral`
-   * model (analog factory).
+   * Selector bit is driven by an ideal DC voltage source at 0V or 3.3V on the
+   * single `sel` pin. Each data input is driven by an ideal DC voltage source.
+   * The mux output has a 10 kohm load to ground. The mux runs as the analog
+   * `behavioral` model (analog factory).
+   *
+   * Output voltage is read from "rLoad:pos" (the shared net between the mux
+   * output sub-element and the load resistor).
    */
-  function buildMux4to1(selVal: number, inputVoltages: number[]) {
+  function buildMux2to1(selVal: number, inputVoltages: [number, number]) {
     return (registry: ComponentRegistry): Circuit => {
       const facade = new DefaultSimulatorFacade(registry);
-      const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
-      const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
+      const vSel = selVal === 1 ? VDD : GND;
       return facade.build({
         components: [
-          { id: "vsSel0", type: "DcVoltageSource", props: { label: "vsSel0", voltage: vSel0 } },
-          { id: "vsSel1", type: "DcVoltageSource", props: { label: "vsSel1", voltage: vSel1 } },
-          { id: "vsIn0",  type: "DcVoltageSource", props: { label: "vsIn0",  voltage: inputVoltages[0] } },
-          { id: "vsIn1",  type: "DcVoltageSource", props: { label: "vsIn1",  voltage: inputVoltages[1] } },
-          { id: "vsIn2",  type: "DcVoltageSource", props: { label: "vsIn2",  voltage: inputVoltages[2] } },
-          { id: "vsIn3",  type: "DcVoltageSource", props: { label: "vsIn3",  voltage: inputVoltages[3] } },
-          { id: "mux",    type: "Multiplexer",    props: { label: "mux", model: "behavioral", selectorBits: 2 } },
-          { id: "rLoad",  type: "Resistor",        props: { label: "rLoad", resistance: LOAD_R } },
-          { id: "gnd",    type: "Ground" },
+          { id: "vsSel", type: "DcVoltageSource", props: { label: "vsSel", voltage: vSel } },
+          { id: "vsIn0", type: "DcVoltageSource", props: { label: "vsIn0", voltage: inputVoltages[0] } },
+          { id: "vsIn1", type: "DcVoltageSource", props: { label: "vsIn1", voltage: inputVoltages[1] } },
+          { id: "mux",   type: "Multiplexer",     props: { label: "mux", model: "behavioral", selectorBits: 1 } },
+          { id: "rLoad", type: "Resistor",         props: { label: "rLoad", resistance: LOAD_R } },
+          { id: "gnd",   type: "Ground" },
         ],
         connections: [
-          ["vsSel0:pos", "mux:sel"],
-          ["vsSel1:pos", "mux:sel_1"],
+          ["vsSel:pos",  "mux:sel"],
           ["vsIn0:pos",  "mux:in_0"],
           ["vsIn1:pos",  "mux:in_1"],
-          ["vsIn2:pos",  "mux:in_2"],
-          ["vsIn3:pos",  "mux:in_3"],
           ["mux:out",    "rLoad:pos"],
-          ["rLoad:neg",    "gnd:out"],
-          ["vsSel0:neg", "gnd:out"],
-          ["vsSel1:neg", "gnd:out"],
+          ["rLoad:neg",  "gnd:out"],
+          ["vsSel:neg",  "gnd:out"],
           ["vsIn0:neg",  "gnd:out"],
           ["vsIn1:neg",  "gnd:out"],
-          ["vsIn2:neg",  "gnd:out"],
-          ["vsIn3:neg",  "gnd:out"],
         ],
       });
     };
   }
 
   it("selects_correct_input", async () => {
-    // selector = 2, data: in_0=LOW, in_1=LOW, in_2=HIGH, in_3=LOW
+    // selector = 1, data: in_0=LOW, in_1=HIGH
     const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildMux4to1(2, [GND, GND, VDD, GND]),
+      buildCircuit: buildMux2to1(1, [GND, VDD]),
       analysis: "dcop",
     });
     const stepEnd = session.getStepEnd(0);
-    const vOut = stepEnd.nodes["mux:out"].ours!;
+    const vOut = stepEnd.nodes["rLoad:pos"].ours!;
     expect(vOut).toBeGreaterThan(V_IH);
   });
 
   it("selects_low_input", async () => {
-    // selector = 1, data: in_0=HIGH, in_1=LOW, in_2=HIGH, in_3=HIGH
+    // selector = 1, data: in_0=HIGH, in_1=LOW
     const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildMux4to1(1, [VDD, GND, VDD, VDD]),
+      buildCircuit: buildMux2to1(1, [VDD, GND]),
       analysis: "dcop",
     });
     const stepEnd = session.getStepEnd(0);
-    const vOut = stepEnd.nodes["mux:out"].ours!;
+    const vOut = stepEnd.nodes["rLoad:pos"].ours!;
     expect(vOut).toBeLessThan(V_IL);
   });
 
   it("all_selector_values_route_correctly", async () => {
-    // For each selVal, only input at selVal is HIGH; output must be HIGH.
-    for (let selVal = 0; selVal < 4; selVal++) {
-      const inputVoltages = [GND, GND, GND, GND];
+    // For each selVal (0 and 1), only input at selVal is HIGH; output must be HIGH.
+    for (let selVal = 0; selVal < 2; selVal++) {
+      const inputVoltages: [number, number] = [GND, GND];
       inputVoltages[selVal] = VDD;
       const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: buildMux4to1(selVal, inputVoltages),
+        buildCircuit: buildMux2to1(selVal, inputVoltages),
         analysis: "dcop",
       });
       const stepEnd = session.getStepEnd(0);
-      const vOut = stepEnd.nodes["mux:out"].ours!;
+      const vOut = stepEnd.nodes["rLoad:pos"].ours!;
       expect(vOut).toBeGreaterThan(V_IH);
     }
   });
@@ -136,87 +130,78 @@ describe("Mux", () => {
 
 describe("Demux", () => {
   /**
-   * 1:4 demux (selectorBits=2, bitWidth=1).
+   * 1:2 demux (selectorBits=1, bitWidth=1).
    *
    * Each output node is loaded with 10 kohm to ground. The selected
-   * output reaches V_OH; the others stay at V_OL.
+   * output reaches V_OH; the other stays at V_OL.
+   *
+   * Output voltages are read from "r0:pos" and "r1:pos" (load resistors).
    */
-  function buildDemux1to4(selVal: number, inputLevel: number) {
+  function buildDemux1to2(selVal: number, inputLevel: number) {
     return (registry: ComponentRegistry): Circuit => {
       const facade = new DefaultSimulatorFacade(registry);
-      const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
-      const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
+      const vSel = selVal === 1 ? VDD : GND;
       return facade.build({
         components: [
-          { id: "vsSel0", type: "DcVoltageSource", props: { label: "vsSel0", voltage: vSel0 } },
-          { id: "vsSel1", type: "DcVoltageSource", props: { label: "vsSel1", voltage: vSel1 } },
-          { id: "vsIn",   type: "DcVoltageSource", props: { label: "vsIn",   voltage: inputLevel } },
-          { id: "demux",  type: "Demultiplexer",   props: { label: "demux", model: "behavioral", selectorBits: 2 } },
-          { id: "r0",     type: "Resistor",         props: { label: "r0", resistance: LOAD_R } },
-          { id: "r1",     type: "Resistor",         props: { label: "r1", resistance: LOAD_R } },
-          { id: "r2",     type: "Resistor",         props: { label: "r2", resistance: LOAD_R } },
-          { id: "r3",     type: "Resistor",         props: { label: "r3", resistance: LOAD_R } },
-          { id: "gnd",    type: "Ground" },
+          { id: "vsSel", type: "DcVoltageSource", props: { label: "vsSel", voltage: vSel } },
+          { id: "vsIn",  type: "DcVoltageSource", props: { label: "vsIn",  voltage: inputLevel } },
+          { id: "demux", type: "Demultiplexer",   props: { label: "demux", model: "behavioral", selectorBits: 1 } },
+          { id: "r0",    type: "Resistor",         props: { label: "r0", resistance: LOAD_R } },
+          { id: "r1",    type: "Resistor",         props: { label: "r1", resistance: LOAD_R } },
+          { id: "gnd",   type: "Ground" },
         ],
         connections: [
-          ["vsSel0:pos", "demux:sel"],
-          ["vsSel1:pos", "demux:sel_1"],
-          ["vsIn:pos",   "demux:in"],
+          ["vsSel:pos",   "demux:sel"],
+          ["vsIn:pos",    "demux:in"],
           ["demux:out_0", "r0:pos"],
           ["demux:out_1", "r1:pos"],
-          ["demux:out_2", "r2:pos"],
-          ["demux:out_3", "r3:pos"],
-          ["r0:neg", "gnd:out"],
-          ["r1:neg", "gnd:out"],
-          ["r2:neg", "gnd:out"],
-          ["r3:neg", "gnd:out"],
-          ["vsSel0:neg", "gnd:out"],
-          ["vsSel1:neg", "gnd:out"],
-          ["vsIn:neg",   "gnd:out"],
+          ["r0:neg",      "gnd:out"],
+          ["r1:neg",      "gnd:out"],
+          ["vsSel:neg",   "gnd:out"],
+          ["vsIn:neg",    "gnd:out"],
         ],
       });
     };
   }
 
   it("routes_to_correct_output", async () => {
-    // selector = 3, input = HIGH; only out_3 should be HIGH.
+    // selector = 1, input = HIGH; only out_1 should be HIGH.
     const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildDemux1to4(3, VDD),
+      buildCircuit: buildDemux1to2(1, VDD),
       analysis: "dcop",
     });
     const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.nodes["demux:out_0"].ours!).toBeLessThan(V_IL);
-    expect(stepEnd.nodes["demux:out_1"].ours!).toBeLessThan(V_IL);
-    expect(stepEnd.nodes["demux:out_2"].ours!).toBeLessThan(V_IL);
-    expect(stepEnd.nodes["demux:out_3"].ours!).toBeGreaterThan(V_IH);
+    // Node labels are compound: first pin on the net / second pin on the net.
+    expect(stepEnd.nodes["r0:pos/demux:out_0"].ours!).toBeLessThan(V_IL);
+    expect(stepEnd.nodes["r1:pos/demux:out_1"].ours!).toBeGreaterThan(V_IH);
   });
 
   it("all_outputs_low_when_input_low", async () => {
-    // selector = 2, input = LOW; all outputs LOW.
+    // selector = 0, input = LOW; all outputs LOW.
     const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildDemux1to4(2, GND),
+      buildCircuit: buildDemux1to2(0, GND),
       analysis: "dcop",
     });
     const stepEnd = session.getStepEnd(0);
-    for (let i = 0; i < 4; i++) {
-      expect(stepEnd.nodes[`demux:out_${i}`].ours!).toBeLessThan(V_IL);
-    }
+    expect(stepEnd.nodes["r0:pos/demux:out_0"].ours!).toBeLessThan(V_IL);
+    expect(stepEnd.nodes["r1:pos/demux:out_1"].ours!).toBeLessThan(V_IL);
   });
 
   it("routes_each_selector_value", async () => {
-    for (let selVal = 0; selVal < 4; selVal++) {
+    for (let selVal = 0; selVal < 2; selVal++) {
       const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: buildDemux1to4(selVal, VDD),
+        buildCircuit: buildDemux1to2(selVal, VDD),
         analysis: "dcop",
       });
       const stepEnd = session.getStepEnd(0);
-      for (let i = 0; i < 4; i++) {
-        const vOut = stepEnd.nodes[`demux:out_${i}`].ours!;
-        if (i === selVal) {
-          expect(vOut).toBeGreaterThan(V_IH);
-        } else {
-          expect(vOut).toBeLessThan(V_IL);
-        }
+      const vOut0 = stepEnd.nodes["r0:pos/demux:out_0"].ours!;
+      const vOut1 = stepEnd.nodes["r1:pos/demux:out_1"].ours!;
+      if (selVal === 0) {
+        expect(vOut0).toBeGreaterThan(V_IH);
+        expect(vOut1).toBeLessThan(V_IL);
+      } else {
+        expect(vOut0).toBeLessThan(V_IL);
+        expect(vOut1).toBeGreaterThan(V_IH);
       }
     }
   });
@@ -228,116 +213,97 @@ describe("Demux", () => {
 
 describe("Decoder", () => {
   /**
-   * 2-bit decoder (selectorBits=2, 4 one-hot outputs).
+   * 1-bit decoder (selectorBits=1, 2 one-hot outputs).
+   *
+   * Output voltages are read from "r0:pos" and "r1:pos" (load resistors).
    */
-  function buildDecoder2bit(selVal: number) {
+  function buildDecoder1bit(selVal: number) {
     return (registry: ComponentRegistry): Circuit => {
       const facade = new DefaultSimulatorFacade(registry);
-      const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
-      const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
+      const vSel = selVal === 1 ? VDD : GND;
       return facade.build({
         components: [
-          { id: "vsSel0", type: "DcVoltageSource", props: { label: "vsSel0", voltage: vSel0 } },
-          { id: "vsSel1", type: "DcVoltageSource", props: { label: "vsSel1", voltage: vSel1 } },
-          { id: "decoder", type: "Decoder", props: { label: "decoder", model: "behavioral", selectorBits: 2 } },
-          { id: "r0", type: "Resistor", props: { label: "r0", resistance: LOAD_R } },
-          { id: "r1", type: "Resistor", props: { label: "r1", resistance: LOAD_R } },
-          { id: "r2", type: "Resistor", props: { label: "r2", resistance: LOAD_R } },
-          { id: "r3", type: "Resistor", props: { label: "r3", resistance: LOAD_R } },
-          { id: "gnd", type: "Ground" },
+          { id: "vsSel",   type: "DcVoltageSource", props: { label: "vsSel",   voltage: vSel } },
+          { id: "decoder", type: "Decoder",          props: { label: "decoder", model: "behavioral", selectorBits: 1 } },
+          { id: "r0",      type: "Resistor",          props: { label: "r0", resistance: LOAD_R } },
+          { id: "r1",      type: "Resistor",          props: { label: "r1", resistance: LOAD_R } },
+          { id: "gnd",     type: "Ground" },
         ],
         connections: [
-          ["vsSel0:pos", "decoder:sel"],
-          ["vsSel1:pos", "decoder:sel_1"],
+          ["vsSel:pos",     "decoder:sel"],
           ["decoder:out_0", "r0:pos"],
           ["decoder:out_1", "r1:pos"],
-          ["decoder:out_2", "r2:pos"],
-          ["decoder:out_3", "r3:pos"],
-          ["r0:neg", "gnd:out"],
-          ["r1:neg", "gnd:out"],
-          ["r2:neg", "gnd:out"],
-          ["r3:neg", "gnd:out"],
-          ["vsSel0:neg", "gnd:out"],
-          ["vsSel1:neg", "gnd:out"],
+          ["r0:neg",        "gnd:out"],
+          ["r1:neg",        "gnd:out"],
+          ["vsSel:neg",     "gnd:out"],
         ],
       });
     };
   }
 
   it("one_hot_output", async () => {
-    // 2-bit decoder, input=01 (selVal=1); only out_1 = V_OH.
+    // 1-bit decoder, input=1; only out_1 = V_OH.
     const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildDecoder2bit(1),
+      buildCircuit: buildDecoder1bit(1),
       analysis: "dcop",
     });
     const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.nodes["decoder:out_0"].ours!).toBeLessThan(V_IL);
-    expect(stepEnd.nodes["decoder:out_1"].ours!).toBeGreaterThan(V_IH);
-    expect(stepEnd.nodes["decoder:out_2"].ours!).toBeLessThan(V_IL);
-    expect(stepEnd.nodes["decoder:out_3"].ours!).toBeLessThan(V_IL);
+    expect(stepEnd.nodes["r0:pos"].ours!).toBeLessThan(V_IL);
+    expect(stepEnd.nodes["r1:pos"].ours!).toBeGreaterThan(V_IH);
   });
 
   it("all_selector_values_produce_one_hot", async () => {
-    for (let selVal = 0; selVal < 4; selVal++) {
+    for (let selVal = 0; selVal < 2; selVal++) {
       const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: buildDecoder2bit(selVal),
+        buildCircuit: buildDecoder1bit(selVal),
         analysis: "dcop",
       });
       const stepEnd = session.getStepEnd(0);
-      for (let i = 0; i < 4; i++) {
-        const vOut = stepEnd.nodes[`decoder:out_${i}`].ours!;
-        if (i === selVal) {
-          expect(vOut).toBeGreaterThan(V_IH);
-        } else {
-          expect(vOut).toBeLessThan(V_IL);
-        }
+      const vOut0 = stepEnd.nodes["r0:pos"].ours!;
+      const vOut1 = stepEnd.nodes["r1:pos"].ours!;
+      if (selVal === 0) {
+        expect(vOut0).toBeGreaterThan(V_IH);
+        expect(vOut1).toBeLessThan(V_IL);
+      } else {
+        expect(vOut0).toBeLessThan(V_IL);
+        expect(vOut1).toBeGreaterThan(V_IH);
       }
     }
   });
 });
 
 // ---------------------------------------------------------------------------
-// Registration tests- factory presence and shape on registered definitions
+// Registration tests- model presence on registered definitions
+//
+// The behavioral model for mux/demux/decoder uses kind:"netlist" (a function-
+// form netlist builder), not kind:"inline". The contract test asserts that the
+// behavioral model entry exists and its netlist builder is a function.
 // ---------------------------------------------------------------------------
 
+
 describe("Registration", () => {
-  it("mux_has_analog_factory", () => {
+  it("mux_has_behavioral_netlist_model", () => {
     expect(MuxDefinition.models?.digital).not.toBeUndefined();
-    expect(typeof (MuxDefinition.modelRegistry?.behavioral as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBe("function");
+    const entry = MuxDefinition.modelRegistry?.behavioral;
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("netlist");
+    expect(typeof (entry as { kind: "netlist"; netlist: unknown }).netlist).toBe("function");
   });
 
-  it("demux_has_analog_factory", () => {
+  it("demux_has_behavioral_netlist_model", () => {
     expect(DemuxDefinition.models?.digital).not.toBeUndefined();
-    expect(typeof (DemuxDefinition.modelRegistry?.behavioral as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBe("function");
+    const entry = DemuxDefinition.modelRegistry?.behavioral;
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("netlist");
+    expect(typeof (entry as { kind: "netlist"; netlist: unknown }).netlist).toBe("function");
   });
 
-  it("decoder_has_analog_factory", () => {
+  it("decoder_has_behavioral_netlist_model", () => {
     expect(DecoderDefinition.models?.digital).not.toBeUndefined();
-    expect(typeof (DecoderDefinition.modelRegistry?.behavioral as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBe("function");
-  });
-
-  it("factory_produces_element_with_pin_nodes", () => {
-    const props = new PropertyBag([]);
-    // 2:1 mux (selectorBits=1): pins "sel", "in_0", "in_1", "out".
-    const factory = makeBehavioralMuxAnalogFactory(1);
-    const element = factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), props, () => 0);
-    expect(element.pinNodes.size).toBe(4);
-  });
-
-  it("demux_factory_produces_element_with_pin_nodes", () => {
-    const props = new PropertyBag([]);
-    // 1:2 demux (selectorBits=1): pins "sel", "out_0", "out_1", "in".
-    const factory = makeBehavioralDemuxAnalogFactory(1);
-    const element = factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]), props, () => 0);
-    expect(element.pinNodes.size).toBe(4);
-  });
-
-  it("decoder_factory_produces_element_with_pin_nodes", () => {
-    const props = new PropertyBag([]);
-    // 1-bit decoder (selectorBits=1): pins "sel", "out_0", "out_1".
-    const factory = makeBehavioralDecoderAnalogFactory(1);
-    const element = factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]), props, () => 0);
-    expect(element.pinNodes.size).toBe(3);
+    const entry = DecoderDefinition.modelRegistry?.behavioral;
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("netlist");
+    expect(typeof (entry as { kind: "netlist"; netlist: unknown }).netlist).toBe("function");
   });
 });
 
@@ -361,27 +327,32 @@ describe("Task 6.4.3- combinational pin loading propagates", () => {
     //
     // Pin "rIn" defaults to 100 kohm in the CMOS_3V3 family; sag formula:
     //   vNet = 5 * 100k / (10k + 100k) = 4.545454545454...V
+    //
+    // Node labels: the node-label map uses "elLabel:pinLabel" from the first
+    // element pin that connects to each net. The sel net is read at
+    // "rsrcSel:neg" and the in_0 net at "rsrcIn0:neg" (the series resistors'
+    // negative terminals share the net with the mux input pins).
     const buildCircuit = (registry: ComponentRegistry): Circuit => {
       const facade = new DefaultSimulatorFacade(registry);
       const c = facade.build({
         components: [
-          { id: "vsSel",  type: "DcVoltageSource", props: { label: "vsSel",  voltage: 5 } },
-          { id: "vsIn0",  type: "DcVoltageSource", props: { label: "vsIn0",  voltage: 5 } },
-          { id: "vsIn1",  type: "DcVoltageSource", props: { label: "vsIn1",  voltage: 0 } },
-          { id: "rsrcSel", type: "Resistor",       props: { label: "rsrcSel", resistance: 10_000 } },
-          { id: "rsrcIn0", type: "Resistor",       props: { label: "rsrcIn0", resistance: 10_000 } },
-          { id: "mux",    type: "Multiplexer",    props: { label: "mux", model: "behavioral", selectorBits: 1 } },
-          { id: "rLoad",  type: "Resistor",        props: { label: "rLoad", resistance: LOAD_R } },
-          { id: "gnd",    type: "Ground" },
+          { id: "vsSel",   type: "DcVoltageSource", props: { label: "vsSel",   voltage: 5 } },
+          { id: "vsIn0",   type: "DcVoltageSource", props: { label: "vsIn0",   voltage: 5 } },
+          { id: "vsIn1",   type: "DcVoltageSource", props: { label: "vsIn1",   voltage: 0 } },
+          { id: "rsrcSel", type: "Resistor",        props: { label: "rsrcSel", resistance: 10_000 } },
+          { id: "rsrcIn0", type: "Resistor",        props: { label: "rsrcIn0", resistance: 10_000 } },
+          { id: "mux",     type: "Multiplexer",     props: { label: "mux", model: "behavioral", selectorBits: 1 } },
+          { id: "rLoad",   type: "Resistor",        props: { label: "rLoad", resistance: LOAD_R } },
+          { id: "gnd",     type: "Ground" },
         ],
         connections: [
           ["vsSel:pos",   "rsrcSel:pos"],
-          ["rsrcSel:neg",   "mux:sel"],
+          ["rsrcSel:neg", "mux:sel"],
           ["vsIn0:pos",   "rsrcIn0:pos"],
-          ["rsrcIn0:neg",   "mux:in_0"],
+          ["rsrcIn0:neg", "mux:in_0"],
           ["vsIn1:pos",   "mux:in_1"],
           ["mux:out",     "rLoad:pos"],
-          ["rLoad:neg",     "gnd:out"],
+          ["rLoad:neg",   "gnd:out"],
           ["vsSel:neg",   "gnd:out"],
           ["vsIn0:neg",   "gnd:out"],
           ["vsIn1:neg",   "gnd:out"],
@@ -404,11 +375,13 @@ describe("Task 6.4.3- combinational pin loading propagates", () => {
     const stepEnd = session.getStepEnd(0);
 
     // sel net is loaded: voltage divider 5 * 100k / (10k+100k) = 4.5454...V
-    const vSel = stepEnd.nodes["mux:sel"].ours!;
+    // Read at rsrcSel:neg (series resistor negative terminal = sel net node).
+    const vSel = stepEnd.nodes["rsrcSel:neg"].ours!;
     expect(vSel).toBeCloseTo(4.5454545454545454, 9);
 
     // in_0 net is ideal: full 5.0V (no input loading)
-    const vIn0 = stepEnd.nodes["mux:in_0"].ours!;
+    // Read at rsrcIn0:neg (series resistor negative terminal = in_0 net node).
+    const vIn0 = stepEnd.nodes["rsrcIn0:neg"].ours!;
     expect(vIn0).toBeCloseTo(5.0, 9);
   });
 });

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { StatePool } from '../state-pool';
+import { isPoolBacked } from '../element';
+import { buildFixture } from './fixtures/build-fixture.js';
+
+import type { Circuit } from '../../../core/circuit.js';
+import type { DefaultSimulatorFacade } from '../../../headless/default-facade.js';
 
 describe('StatePool', () => {
   describe('constructor', () => {
@@ -392,6 +397,91 @@ describe('StatePool', () => {
       expect(elements[0]!.stateBaseOffset).toBe(-1);
       expect(elements[1]!.stateBaseOffset).toBe(-1);
       expect(pool.totalSlots).toBe(0);
+    });
+  });
+
+  describe('post-accept rotation invariant (framework-level)', () => {
+    // Canonisation of the per-component check the §3 audit deleted from
+    // src/components/sensors/__tests__/spark-gap-rollback.test.ts. The
+    // invariant is the engine's responsibility, not any individual element's,
+    // so it is asserted once across every pool-backed element of a
+    // representative steady-state circuit.
+    //
+    // Why VRC at DC steady state: with a DC source and a fully-charged
+    // capacitor, no slot evolves between accepted steps. After
+    // _seedFromDcop runs, state1 = state0 = DCOP. The first transient step
+    // rotates (state1 <- old state0 = DCOP) and NR refills state0 to the
+    // same DCOP-equivalent values (the circuit has nowhere else to go), so
+    // state0[i] === state1[i] for every pool slot of every pool-backed
+    // element. Any divergence is honest signal that an element wrote a slot
+    // path that escapes the rotation contract.
+    function buildVrcSteadyState(facade: DefaultSimulatorFacade): Circuit {
+      return facade.build({
+        components: [
+          { id: 'vs',  type: 'DcVoltageSource', props: { label: 'V1', voltage: 5.0 } },
+          { id: 'r1',  type: 'Resistor',        props: { label: 'R1', resistance: 1000 } },
+          { id: 'c1',  type: 'Capacitor',       props: { label: 'C1', capacitance: 1e-6 } },
+          { id: 'gnd', type: 'Ground' },
+        ],
+        connections: [
+          ['vs:pos', 'r1:pos'],
+          ['r1:neg', 'c1:pos'],
+          ['c1:neg', 'gnd:out'],
+          ['vs:neg', 'gnd:out'],
+        ],
+      });
+    }
+
+    it('pool_state0_state1_agree_slot_for_slot_after_accepted_step', () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildVrcSteadyState(facade),
+      });
+
+      // buildFixture already ran one warm-start step. Verify the invariant
+      // across every pool-backed element's full slot range.
+      const poolBacked = fix.circuit.elements.filter(isPoolBacked);
+      expect(poolBacked.length).toBeGreaterThan(0);
+
+      for (const el of poolBacked) {
+        const base = el._stateBase;
+        expect(base).toBeGreaterThanOrEqual(0);
+        for (let s = 0; s < el.stateSize; s++) {
+          const i = base + s;
+          const slotName = el.stateSchema.slots[s]?.name ?? `slot_${s}`;
+          const label = fix.elementLabels.get(el.elementIndex!) ?? el.label;
+          expect(
+            fix.pool.state0[i],
+            `state0[${i}] (${label}.${slotName}) must equal state1[${i}]`,
+          ).toBe(fix.pool.state1[i]);
+        }
+      }
+    });
+
+    it('invariant_persists_across_multiple_accepted_steps', () => {
+      const fix = buildFixture({
+        build: (_r, facade) => buildVrcSteadyState(facade),
+      });
+
+      // Drive a few additional accepted steps. The DC source + steady-state
+      // cap leaves nothing to evolve, so each rotate-then-NR-then-accept
+      // round must re-establish state0 === state1 across every slot.
+      for (let k = 0; k < 3; k++) {
+        fix.coordinator.step();
+
+        const poolBacked = fix.circuit.elements.filter(isPoolBacked);
+        for (const el of poolBacked) {
+          const base = el._stateBase;
+          for (let s = 0; s < el.stateSize; s++) {
+            const i = base + s;
+            const slotName = el.stateSchema.slots[s]?.name ?? `slot_${s}`;
+            const label = fix.elementLabels.get(el.elementIndex!) ?? el.label;
+            expect(
+              fix.pool.state0[i],
+              `step ${k + 1}: state0[${i}] (${label}.${slotName}) must equal state1[${i}]`,
+            ).toBe(fix.pool.state1[i]);
+          }
+        }
+      }
     });
   });
 

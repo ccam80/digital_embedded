@@ -1,0 +1,700 @@
+{
+  "circuit": {
+    "description": "TransGate canonical pass-through: vs=1V drives tg:out1; p1=1V (NFET drv ON, V(p1)-V(out2)>Vth), p2=0V (PFET drv ON, V(p2)-V(out2)<-Vth means we need a different bias; with Vth=0.5V default 2.5V we need both paths conducting); load Rload=1k from tg:out2 to ground. Both gates conducting -> series Ron path delivers near-vs to out2.",
+    "elements": [
+      {
+        "id": "6b45d900-466d-4bf7-baa0-30e02479dbe5",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 1
+          },
+          "label": "vs",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "93c3fbf9-d2e1-4f74-a5ae-216fe03963de",
+        "position": {
+          "x": 0,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 1
+          },
+          "label": "vp1",
+          "position": [
+            0,
+            8
+          ],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "603a2ba5-1829-4f2a-92b2-1fdcfea3f80d",
+        "position": {
+          "x": 12,
+          "y": 6
+        },
+        "properties": {
+          "Roff": 1000000000,
+          "Ron": 1,
+          "Vth": 0.5,
+          "_modelParams": {
+            "Roff": 1000000000,
+            "Ron": 1,
+            "Vth": 0.5
+          },
+          "label": "tg",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "TransGate"
+      },
+      {
+        "id": "d6d4776a-f40a-4d03-9af5-f3e79533c25c",
+        "position": {
+          "x": 22,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "rload",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "01ba1b28-58db-4ecb-8314-f92821469198",
+        "position": {
+          "x": 34,
+          "y": 6
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "trans-gate-canon-pass-through",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 11,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 6
+          },
+          {
+            "x": 11,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 6
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": 6,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 3
+          },
+          {
+            "x": 6,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 2
+          },
+          {
+            "x": 12,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 17,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 2
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 22,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 28,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 28,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 5
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 8
+          },
+          {
+            "x": 5,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 5
+          },
+          {
+            "x": 13,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 8
+          },
+          {
+            "x": 9,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 8
+          },
+          {
+            "x": 9,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 4
+          },
+          {
+            "x": 13,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 8
+          },
+          {
+            "x": -1,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 6
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 8
+          },
+          {
+            "x": -2,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 8
+          },
+          {
+            "x": -2,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 11
+          },
+          {
+            "x": 12,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 11
+          },
+          {
+            "x": 17,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 12
+          },
+          {
+            "x": 22,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 12
+          },
+          {
+            "x": 29,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 12
+          },
+          {
+            "x": 29,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 5
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 6
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 7
+          },
+          {
+            "x": 13,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 8
+          },
+          {
+            "x": 13,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 6
+          },
+          {
+            "x": 15,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 21,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 6
+          },
+          {
+            "x": 18,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 6
+          },
+          {
+            "x": 18,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 4
+          },
+          {
+            "x": 21,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 4
+          },
+          {
+            "x": 27,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 6
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 4
+          },
+          {
+            "x": 31,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 4
+          },
+          {
+            "x": 31,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 5
+          },
+          {
+            "x": 34,
+            "y": 5
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

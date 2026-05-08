@@ -1,0 +1,382 @@
+{
+  "circuit": {
+    "description": "NTC self-heating transient: V1=5V across small pull-up RP=1Ω → NTC (r0=100Ω, selfHeating=true) → GND. Low-impedance arrangement dissipates real power so T evolves visibly across the transient.",
+    "elements": [
+      {
+        "id": "bc3d5ec2-2cd1-4b9a-9964-009beeb7cbaf",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "dd93c5a1-b61c-4370-bdf4-a32429ed94c8",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1
+          },
+          "label": "RP",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "e9b1e348-2442-4df6-a527-7d45a3a9c63f",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "beta": 3950,
+            "r0": 100,
+            "t0": 298.15,
+            "temperature": 298.15,
+            "thermalCapacitance": 0.01,
+            "thermalResistance": 50
+          },
+          "label": "NTC1",
+          "position": [
+            0,
+            16
+          ],
+          "r0": 100,
+          "selfHeating": true
+        },
+        "rotation": 0,
+        "type": "NTCThermistor"
+      },
+      {
+        "id": "43ce4d95-8f70-4ce3-adbc-3073c8094779",
+        "position": {
+          "x": 36,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "ntc-canon-self-heating-transient",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 24,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

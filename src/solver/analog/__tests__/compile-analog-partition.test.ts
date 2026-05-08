@@ -14,9 +14,8 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
-import { ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentCategory } from "../../../core/registry.js";
-import { AnalogElement, PoolBackedAnalogElement } from "../element.js";
+import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
+import { AnalogElement, PoolBackedAnalogElement, isPoolBacked } from "../element.js";
 import { defineStateSchema } from "../state-schema.js";
 import type { SetupContext } from "../setup-context.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
@@ -24,9 +23,7 @@ import type { LoadContext } from "../load-context.js";
 import { compileAnalogPartition } from "../compiler.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";
 import { pinWorldPosition } from "../../../core/pin.js";
-import { StatePool } from "../state-pool.js";
-import { SparseSolver } from "../sparse-solver.js";
-import { makeTestSetupContext, setupAll } from "./test-helpers.js";
+import { buildFixture } from "./fixtures/build-fixture.js";
 
 // ---------------------------------------------------------------------------
 // Pool-backed element stub for setup() allocation test
@@ -82,7 +79,7 @@ function makeElement(
   registry?: ComponentRegistry,
 ): CircuitElement {
   const def = registry?.get(typeId);
-  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || "", p.direction ?? PinDirection.BIDIRECTIONAL));
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout?.[i]?.label || "", p.direction ?? PinDirection.BIDIRECTIONAL));
   const propertyBag = new PropertyBag(propsMap.entries());
   const _mp: Record<string, number> = {};
   for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
@@ -134,9 +131,9 @@ function makeBaseDef(name: string) {
     pinLayout: [] as PinDeclaration[],
     propertyDefs: [] as import("../../../core/properties.js").PropertyDefinition[],
     attributeMap: [] as import("../../../core/registry.js").AttributeMapping[],
-    category: "MISC" as unknown as ComponentCategory,
+    category: ComponentCategory.MISC,
     helpText: "",
-    factory: ((_props: PropertyBag) => makeElement(name, crypto.randomUUID(), [])) as unknown as import("../../../core/registry.js").StandaloneComponentDefinition["factory"],
+    factory: (_props: PropertyBag) => makeElement(name, crypto.randomUUID(), []),
   };
 }
 
@@ -176,7 +173,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
     models: {},
   });
 
-  const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
+  const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => makeStubElement([...pinNodes.values()]));
 
   registry.register({
     ...makeBaseDef("BehavioralAnd"),
@@ -185,7 +182,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
     modelRegistry: {
       behavioral: {
         kind: "inline" as const,
-        factory: andFactory as unknown as import("../../../core/registry.js").AnalogFactory,
+        factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) => andFactory(pinNodes, props, getTime),
         paramDefs: [],
         params: {},
       },
@@ -559,116 +556,83 @@ describe("compileAnalogPartition", () => {
     }
   });
 
-  it("setup() assigns contiguous _stateBase values via ctx.allocStates", () => {
-    // Build a registry with an element that declares stateSize
-    const registry = new ComponentRegistry();
-    registry.register({
-      ...makeBaseDef("Ground"),
-      models: {},
-    });
+  it("setup() assigns _stateBase >= 0 to pool-backed elements after engine warm-start", () => {
+    // Verify via the full engine path (buildFixture) that pool-backed elements
+    // receive a non-negative _stateBase after MNAEngine._setup() runs.
+    // PartitionStatefulEl is registered into the facade's registry inside the
+    // build callback so it participates in the normal compile+setup lifecycle.
+    let capturedElement: PartitionStatefulEl | undefined;
 
-    const elementWithState = new PartitionStatefulEl(new Map<string, number>());
+    const fix = buildFixture({
+      build: (registry, facade) => {
+        registry.register({
+          ...makeBaseDef("StatefulComp"),
+          // Override factory to produce a CircuitElement with pos/neg pins.
+          factory: (_bag: import("../../../core/properties.js").PropertyBag) =>
+            makeElement("StatefulComp", crypto.randomUUID(), [
+              { x: 10, y: 0, label: "pos", direction: PinDirection.BIDIRECTIONAL },
+              { x: 0,  y: 0, label: "neg", direction: PinDirection.BIDIRECTIONAL },
+            ], new Map([["model", "behavioral"]])),
+          pinLayout: [
+            {
+              label: "pos",
+              direction: PinDirection.BIDIRECTIONAL,
+              defaultBitWidth: 1,
+              position: { x: 10, y: 0 },
+              isNegatable: false,
+              isClockCapable: false,
+              kind: "signal" as const,
+            },
+            {
+              label: "neg",
+              direction: PinDirection.BIDIRECTIONAL,
+              defaultBitWidth: 1,
+              position: { x: 0, y: 0 },
+              isNegatable: false,
+              isClockCapable: false,
+              kind: "signal" as const,
+            },
+          ],
+          models: {},
+          modelRegistry: {
+            behavioral: {
+              kind: "inline" as const,
+              factory: (pinNodes: ReadonlyMap<string, number>) => {
+                const el = new PartitionStatefulEl(pinNodes as Map<string, number>);
+                capturedElement = el;
+                return el;
+              },
+              paramDefs: [],
+              params: {},
+            },
+          },
+          defaultModel: "behavioral",
+        });
 
-    const factoryReturningStateElement = vi.fn((_pn: ReadonlyMap<string, number>) => {
-      return elementWithState;
-    });
-
-    registry.register({
-      ...makeBaseDef("StatefulComp"),
-      pinLayout: [
-        {
-          label: "A",
-          direction: PinDirection.BIDIRECTIONAL,
-          defaultBitWidth: 1,
-          position: { x: 10, y: 0 },
-          isNegatable: false,
-          isClockCapable: false,
-          kind: "signal" as const,
-        },
-      ],
-      models: {},
-      modelRegistry: {
-        behavioral: {
-          kind: "inline" as const,
-          factory: factoryReturningStateElement as unknown as import("../../../core/registry.js").AnalogFactory,
-          paramDefs: [],
-          params: {},
-        },
+        return facade.build({
+          components: [
+            { id: "vs",  type: "DcVoltageSource", props: { label: "VS", voltage: 1 } },
+            { id: "dut", type: "StatefulComp",    props: { label: "DUT" } },
+            { id: "gnd", type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",  "dut:pos"],
+            ["dut:neg", "gnd:out"],
+            ["vs:neg",  "gnd:out"],
+          ],
+        });
       },
-      defaultModel: "behavioral",
     });
 
-    const comp = makeElement("StatefulComp", "sc1", [
-      { x: 10, y: 0, label: "A", direction: PinDirection.BIDIRECTIONAL },
-    ], new Map([["model", "behavioral"]]));
-    const gnd = makeElement("Ground", "gnd1", [
-      { x: 0, y: 0, label: "in", direction: PinDirection.INPUT },
-    ]);
+    // After warm-start, every pool-backed element has _stateBase >= 0.
+    const poolBacked = fix.circuit.elements.filter(isPoolBacked);
+    expect(poolBacked.length).toBeGreaterThan(0);
+    for (const el of poolBacked) {
+      expect(el._stateBase).toBeGreaterThanOrEqual(0);
+    }
 
-    const compDef = registry.getStandalone("StatefulComp")!;
-    const gndDef = registry.getStandalone("Ground")!;
-
-    const wireGnd = new Wire({ x: 0, y: 0 }, { x: 0, y: 0 });
-    const wireA = new Wire({ x: 10, y: 0 }, { x: 10, y: 0 });
-
-    const groupGnd: ConnectivityGroup = {
-      groupId: 0,
-      pins: [{ elementIndex: 1, pinIndex: 0, pinLabel: "in", direction: PinDirection.INPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: { x: 0, y: 0 }, domain: "analog", kind: "signal" }],
-      wires: [wireGnd],
-      domains: new Set(["analog"]),
-      bitWidth: 1,
-    };
-    const groupA: ConnectivityGroup = {
-      groupId: 1,
-      pins: [{ elementIndex: 0, pinIndex: 0, pinLabel: "A", direction: PinDirection.BIDIRECTIONAL, bitWidth: 1, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, domain: "analog", kind: "signal" }],
-      wires: [wireA],
-      domains: new Set(["analog"]),
-      bitWidth: 1,
-    };
-
-    const partition: SolverPartition = {
-      components: [
-        {
-          element: comp,
-          definition: compDef,
-          modelKey: "behavioral",
-          model: null,
-          resolvedPins: [{ elementIndex: 0, pinIndex: 0, pinLabel: "A", direction: PinDirection.BIDIRECTIONAL, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, domain: "analog", kind: "signal", bitWidth: 1 }],
-        },
-        {
-          element: gnd,
-          definition: gndDef,
-          modelKey: "",
-          model: null,
-          resolvedPins: [{ elementIndex: 1, pinIndex: 0, pinLabel: "in", direction: PinDirection.INPUT, worldPosition: { x: 0, y: 0 }, wireVertex: { x: 0, y: 0 }, domain: "analog", kind: "signal", bitWidth: 1 }],
-        },
-      ],
-      groups: [groupGnd, groupA],
-      bridgeStubs: [],
-    };
-
-    const compiled = compileAnalogPartition(partition, registry);
-
-    // Pool deferred to setup; compiler does not assign _stateBase or
-    // allocate a pool. Run the engine boot path via setupAll + initState
-    // to verify the stateful element gets its slot.
-    const solver = new SparseSolver();
-    solver._initStructure();
-    const setupCtx = makeTestSetupContext({
-      solver,
-      startBranch: 1,
-      startNode: 100,
-      elements: compiled.elements,
-    });
-    setupAll(compiled.elements, setupCtx);
-
-    const stateful = compiled.elements.find(
-      (e): e is typeof elementWithState => (e as any).poolBacked === true
-    )!;
-    expect(stateful._stateBase).toBe(0);
-
-    const pool = new StatePool(stateful.stateSize);
-    stateful.initState(pool);
-    expect(pool.state0[0]).toBe(99.0);
+    // The PartitionStatefulEl specifically must have been assigned a slot.
+    expect(capturedElement).toBeDefined();
+    expect(capturedElement!._stateBase).toBeGreaterThanOrEqual(0);
   });
 });

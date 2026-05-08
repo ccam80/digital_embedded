@@ -1,79 +1,83 @@
-/** Tests for NTCThermistorElement. */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as path from "path";
 
-import { describe, it, expect } from "vitest";
-import {
-  NTCThermistorElement,
-  NTCThermistorDefinition,
-  createNTCThermistorElement,
-  NTC_DEFAULTS,
-  NTC_SCHEMA,
-} from "../ntc-thermistor.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentCategory } from "../../../core/registry.js";
 import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  describeIfDll,
+  DLL_PATH,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
-import type { AnalogFactory } from "../../../core/registry.js";
+import { NTC_SCHEMA, NTCThermistorElement } from "../ntc-thermistor.js";
+
 import type { Circuit } from "../../../core/circuit.js";
+import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Slot index resolved by name from schema (ss0 rule #4 — no raw SLOT_* imports)
+// Schema-resolved slot indices (B-3: no raw SLOT_* imports).
 // ---------------------------------------------------------------------------
 
 const SLOT_TEMPERATURE = NTC_SCHEMA.indexOf.get("TEMPERATURE")!;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// DTS fixture paths (T3 harness).
 // ---------------------------------------------------------------------------
+//
+// Authored via MCP circuit_build + circuit_save under
+// src/components/sensors/__tests__/fixtures/.
+//
+// 1. ntc-canon-divider.dts: V1=5V, RP=10k, NTC (defaults: r0=10k,
+//    beta=3950, t0=298.15, temperature=298.15, selfHeating=false), GND.
+//    R(T)=R0 at T=T0 -> V(mid) ~= Vs/2; flat divider exercises the NTC
+//    stamp at fixed ambient.
+// 2. ntc-canon-self-heating-transient.dts: V1=5V, RP=1ohm, NTC (r0=100,
+//    selfHeating=true; thermalResistance/Capacitance default), GND. Low-
+//    impedance arrangement dissipates real power so the bottom-of-load
+//    thermal ODE integrates over the transient.
+
+const DTS_DIVIDER = path.resolve(
+  "src/components/sensors/__tests__/fixtures/ntc-canon-divider.dts",
+);
+const DTS_SELF_HEATING = path.resolve(
+  "src/components/sensors/__tests__/fixtures/ntc-canon-self-heating-transient.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic circuit factories (T1)
+// ---------------------------------------------------------------------------
+//
+// Pull-up divider: VS -> R_pull -> ntc:pos - NTC - ntc:neg -> GND <- VS:neg.
+// At DCOP the NTC body is a pure resistor R(T), so the divider node voltage
+//   V(ntc:pos) = Vs * R_ntc / (R_pull + R_ntc)
+// inverts to
+//   R_ntc = R_pull * V_div / (Vs - V_div)
+// which lets us read R(T) at the public engine surface.
 
 interface NtcDividerParams {
-  /** Voltage source magnitude across the divider (V). Default 5. */
   vSource?: number;
-  /** Pull-up resistor between vs:pos and ntc:pos (Ω). Default 10000. */
   rPull?: number;
-  /** NTC reference resistance R₀ (Ω). Default 10000. */
   r0?: number;
-  /** B-parameter (K). Default 3950. */
   beta?: number;
-  /** Reference temperature T₀ (K). Default 298.15. */
   t0?: number;
-  /** Operating temperature (K). Default 298.15. */
   temperature?: number;
-  /** Enable self-heating thermal model. Default false. */
   selfHeating?: boolean;
-  /** Thermal resistance to ambient (K/W). Default 50. */
   thermalResistance?: number;
-  /** Thermal capacitance (J/K). Default 0.01. */
   thermalCapacitance?: number;
-  /** Steinhart-Hart A coefficient (optional). */
   shA?: number;
-  /** Steinhart-Hart B coefficient (optional). */
   shB?: number;
-  /** Steinhart-Hart C coefficient (optional). */
   shC?: number;
 }
 
-/**
- * Build a single-loop voltage divider:
- *   Vsrc → R_pull → ntc:pos ─ NTC ─ ntc:neg → GND ← Vsrc:neg
- *
- * At DCOP the NTC body is a pure resistor `R(T)`, so the divider node
- * voltage is `V(ntc:pos) = Vs · R_ntc / (R_pull + R_ntc)`. Solving for
- * `R_ntc` yields `R_ntc = R_pull · V_div / (Vs − V_div)`, which we use
- * to verify the B-parameter / Steinhart-Hart resistance formulas at the
- * public engine surface.
- */
 function buildNtcDivider(facade: DefaultSimulatorFacade, p: NtcDividerParams): Circuit {
-  const ntcProps: Record<string, number | string | boolean> = {
-    label: "ntc",
-    r0:                 p.r0          ?? 10000,
-    beta:               p.beta        ?? 3950,
-    t0:                 p.t0          ?? 298.15,
-    temperature:        p.temperature ?? 298.15,
-    selfHeating:        p.selfHeating ?? false,
-    thermalResistance:  p.thermalResistance  ?? 50,
-    thermalCapacitance: p.thermalCapacitance ?? 0.01,
-  };
+  const ntcProps: Record<string, number | string | boolean> = { label: "ntc" };
+  if (p.r0 !== undefined) ntcProps.r0 = p.r0;
+  if (p.beta !== undefined) ntcProps.beta = p.beta;
+  if (p.t0 !== undefined) ntcProps.t0 = p.t0;
+  if (p.temperature !== undefined) ntcProps.temperature = p.temperature;
+  if (p.selfHeating !== undefined) ntcProps.selfHeating = p.selfHeating;
+  if (p.thermalResistance !== undefined) ntcProps.thermalResistance = p.thermalResistance;
+  if (p.thermalCapacitance !== undefined) ntcProps.thermalCapacitance = p.thermalCapacitance;
   if (p.shA !== undefined) ntcProps.shA = p.shA;
   if (p.shB !== undefined) ntcProps.shB = p.shB;
   if (p.shC !== undefined) ntcProps.shC = p.shC;
@@ -83,7 +87,7 @@ function buildNtcDivider(facade: DefaultSimulatorFacade, p: NtcDividerParams): C
       { id: "vs",  type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource ?? 5 } },
       { id: "rp",  type: "Resistor",        props: { label: "rp", resistance: p.rPull ?? 10000 } },
       { id: "ntc", type: "NTCThermistor",   props: ntcProps },
-      { id: "gnd", type: "Ground" },
+      { id: "gnd", type: "Ground",          props: { label: "gnd" } },
     ],
     connections: [
       ["vs:pos",  "rp:pos"],
@@ -94,288 +98,361 @@ function buildNtcDivider(facade: DefaultSimulatorFacade, p: NtcDividerParams): C
   });
 }
 
-function findNTC(elements: ReadonlyArray<unknown>): NTCThermistorElement {
-  const idx = elements.findIndex((el) => el instanceof NTCThermistorElement);
-  if (idx < 0) throw new Error("NTCThermistorElement not found in compiled circuit");
-  return elements[idx] as NTCThermistorElement;
-}
-
 function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
 }
 
-/** Extract R_ntc from the divider node voltage. */
+function findNtcElement(fix: Fixture): NTCThermistorElement {
+  for (const el of fix.circuit.elements) {
+    if (el instanceof NTCThermistorElement) return el;
+  }
+  throw new Error("NTCThermistorElement not found in compiled circuit");
+}
+
+function ceByLabel(fix: Fixture, label: string): CircuitElement {
+  for (const ce of fix.circuit.elementToCircuitElement.values()) {
+    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
+  }
+  throw new Error(`CircuitElement with label '${label}' not found`);
+}
+
+/** Closed-form NTC resistance from divider node voltage. */
 function rNtcFromDividerVoltage(vDiv: number, vSrc: number, rPull: number): number {
   return (rPull * vDiv) / (vSrc - vDiv);
 }
 
-/** Closed-form B-parameter resistance: R(T) = R₀ · exp(β · (1/T − 1/T₀)). */
+/** Closed-form B-parameter resistance: R(T) = R0 * exp(beta * (1/T - 1/T0)). */
 function rBParam(r0: number, beta: number, t0: number, t: number): number {
   return r0 * Math.exp(beta * (1 / t - 1 / t0));
 }
 
-describe("NTC", () => {
-  describe("definition", () => {
-    it("NTCThermistorDefinition has a behavioral inline factory", () => {
-      expect(NTCThermistorDefinition.modelRegistry?.behavioral).toBeDefined();
-    });
+// ---------------------------------------------------------------------------
+// Cat 1 - Initialization (T1)
+// ---------------------------------------------------------------------------
 
-    it("NTCThermistorDefinition category is PASSIVES", () => {
-      expect(NTCThermistorDefinition.category).toBe(ComponentCategory.PASSIVES);
+describe("NTCThermistor initialization (T1)", () => {
+  it("init_temperature_slot_seeded_to_ambient_at_step_zero", () => {
+    // Per ntc-thermistor.ts:245-248, the first load() seeds
+    // s0[base + SLOT_TEMPERATURE] to the ambient temperature. After
+    // buildFixture's warm-start step we expect that slot value to equal
+    // the configured ambient (350K, deliberately non-default to distinguish
+    // from zero-init).
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, t0: 298.15, temperature: 350,
+      }),
     });
-
-    it("NTCThermistorDefinition r0 default is 10000", () => {
-      const params = NTCThermistorDefinition.modelRegistry?.behavioral?.params;
-      expect(params).toBeDefined();
-      expect(params!["r0"]).toBe(10000);
-    });
-
-    it("analogFactory creates an NTCThermistorElement", () => {
-      const props = new PropertyBag();
-      props.replaceModelParams(NTC_DEFAULTS);
-      const element = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
-      expect(element).toBeInstanceOf(NTCThermistorElement);
-    });
-
-    it("branchCount is falsy (NTC stamps in-place; no branch row)", () => {
-      const entry = NTCThermistorDefinition.modelRegistry?.behavioral as
-        | { kind: "inline"; factory: AnalogFactory; branchCount?: number }
-        | undefined;
-      expect(entry?.branchCount).toBeFalsy();
-    });
-
-    it("factory_returns_element_with_stateBase_minus_one_before_compile", () => {
-      const props = new PropertyBag();
-      props.replaceModelParams(NTC_DEFAULTS);
-      const el = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
-      expect(el._stateBase).toBe(-1);
-    });
+    const ntc = findNtcElement(fix);
+    const slotIdx = ntc._stateBase + SLOT_TEMPERATURE;
+    expect(fix.pool.state0[slotIdx]).toBeCloseTo(350, 6);
   });
 
-  // -------------------------------------------------------------------------
-  // resistance_at_t0_equals_r0
-  //
-  // At T = T₀ the B-parameter exponent is zero, so R(T₀) = R₀. With a
-  // matched pull-up R_pull = R₀ the divider lands at exactly Vs / 2.
-  // -------------------------------------------------------------------------
-  describe("resistance_at_t0_equals_r0", () => {
-    it("at T = T₀ = 298.15K with R_pull = R₀ = 10kΩ, V(ntc:pos) = Vs/2", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, r0: 10000, t0: 298.15, temperature: 298.15,
-        }),
-      });
-      const result = fix.coordinator.dcOperatingPoint()!;
-      expect(result.converged).toBe(true);
-
-      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
-      expect(vDiv).toBeCloseTo(2.5, 6);
-
-      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
-      expect(rNtc).toBeCloseTo(10000, 0);
+  it("init_node_voltage_seeded_to_dcop_value", () => {
+    // R(T0)=R0, so with R_pull=R0 the divider node lands at Vs/2 after the
+    // warm-start step.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, t0: 298.15, temperature: 298.15,
+      }),
     });
-
-    it("at T = T₀ = 300K with R_pull = R₀ = 5kΩ, R_ntc reads back as 5kΩ", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 5000, r0: 5000, t0: 300, temperature: 300,
-        }),
-      });
-      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
-      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 5000);
-      expect(rNtc).toBeCloseTo(5000, 0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // resistance_decreases_with_temperature (NTC behaviour)
-  //
-  // At T > T₀ the B-parameter formula gives R(T) < R₀, so the divider
-  // node voltage on the NTC arm (NTC pulled to GND, R_pull to Vs) drops.
-  // At T < T₀ the divider node rises above Vs/2.
-  // -------------------------------------------------------------------------
-  describe("resistance_decreases_with_temperature", () => {
-    it("R(348K) < R₀ ⇒ divider node falls below Vs/2 (NTC behaviour above T₀)", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 348,
-        }),
-      });
-      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
-
-      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
-      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
-      const rExpected = rBParam(10000, 3950, 298.15, 348);
-      expect(vDiv).toBeLessThan(2.5);
-      expect(rNtc).toBeCloseTo(rExpected, -1); // ~1Ω relative on a ~2.4kΩ value
-    });
-
-    it("R(273K) > R₀ ⇒ divider node rises above Vs/2 (NTC behaviour below T₀)", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 273,
-        }),
-      });
-      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
-
-      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
-      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
-      const rExpected = rBParam(10000, 3950, 298.15, 273);
-      expect(vDiv).toBeGreaterThan(2.5);
-      expect(rNtc).toBeCloseTo(rExpected, -2); // expected ≈ 27kΩ
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // beta_model_formula
-  //
-  // R(T=350K, R₀=10k, β=3950, T₀=298.15) ≈ 1405 Ω. Verify the divider
-  // observation matches the closed-form value.
-  // -------------------------------------------------------------------------
-  describe("beta_model_formula", () => {
-    it("R(350K, 10k, 3950, 298.15) ≈ 1405Ω via DCOP divider observation", () => {
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 350,
-        }),
-      });
-      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
-
-      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
-      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
-      const rExpected = rBParam(10000, 3950, 298.15, 350);
-      expect(rExpected).toBeGreaterThan(1300);
-      expect(rExpected).toBeLessThan(1500);
-      // Engine-observed R within 0.1% of closed-form (DCOP convergence).
-      expect(Math.abs(rNtc - rExpected) / rExpected).toBeLessThan(0.001);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // self_heating_increases_temperature
-  //
-  // With self-heating enabled and a low-impedance NTC dissipating real
-  // power, the pool TEMPERATURE slot must rise above ambient after a
-  // sustained transient. We observe the slot through `fix.pool.state1`
-  // (last-accepted history) after stepping for several thermal RC
-  // periods.
-  // -------------------------------------------------------------------------
-  describe("self_heating_increases_temperature", () => {
-    it("pool TEMPERATURE slot rises from ambient under sustained power", () => {
-      // Vs=1V across r0=100Ω NTC ⇒ ~10 mW dissipated.
-      // τ_th = R_th · C_th = 50 · 0.01 = 0.5 s. Step for several τ.
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 1, rPull: 1, // tiny pull-up so most of Vs drops across NTC
-          r0: 100, beta: 3950, t0: 298.15, temperature: 298.15,
-          selfHeating: true, thermalResistance: 50, thermalCapacitance: 0.01,
-        }),
-        params: { tStop: 5.0, maxTimeStep: 1e-3 },
-      });
-      const ntc = findNTC(fix.circuit.elements);
-      const slotIdx = ntc._stateBase + SLOT_TEMPERATURE;
-      const initialTemp = fix.pool.state1[slotIdx];
-
-      // Step ~2 s of sim time (≥ 4 thermal time constants).
-      while (fix.engine.simTime < 2.0) fix.coordinator.step();
-
-      const finalTemp = fix.pool.state1[slotIdx];
-      expect(finalTemp).toBeGreaterThan(initialTemp);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // thermal_equilibrium
-  //
-  // At steady state: T_eq = T_ambient + P · R_thermal, where P = V²/R(T_eq).
-  // Tight thermal capacitance shrinks τ; we step well past 5 τ.
-  // -------------------------------------------------------------------------
-  describe("thermal_equilibrium", () => {
-    it("self-heating reaches T_amb + P · R_th at steady state (within feedback margin)", () => {
-      const thermalResistance = 100;   // K/W
-      const thermalCapacitance = 0.001; // J/K — small for fast convergence (τ = 0.1 s)
-      const r0 = 10000;
-      const tAmbient = 298.15;
-      const vSource = 1.0;
-
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource,
-          rPull: 1, // negligible pull-up so V across NTC ≈ Vs
-          r0, beta: 3950, t0: tAmbient, temperature: tAmbient,
-          selfHeating: true, thermalResistance, thermalCapacitance,
-        }),
-        params: { tStop: 5.0, maxTimeStep: 1e-3 },
-      });
-      const ntc = findNTC(fix.circuit.elements);
-      const slotIdx = ntc._stateBase + SLOT_TEMPERATURE;
-
-      while (fix.engine.simTime < 2.0) fix.coordinator.step();
-      const finalTemp = fix.pool.state1[slotIdx];
-
-      // Ambient-power estimate: P ≈ V² / R₀ at T₀ before feedback.
-      const pApprox = (vSource * vSource) / r0;
-      const expectedEq = tAmbient + pApprox * thermalResistance;
-
-      // Allow 10% margin around expectedEq for resistance-temperature feedback.
-      expect(finalTemp).toBeGreaterThan(expectedEq * 0.9);
-      expect(finalTemp).toBeLessThan(expectedEq * 1.1 + 1);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // steinhart_hart_mode
-  //
-  // S-H coefficients for a typical 10kΩ NTC at 25°C land R(25°C) ≈ 10kΩ.
-  // We verify via the same divider observation that the divider behaves
-  // consistently and that R(hot) < R(cold) (NTC behaviour) under the S-H
-  // formula.
-  // -------------------------------------------------------------------------
-  describe("steinhart_hart_mode", () => {
-    it("S-H mode converges DCOP and R(25°C) ≈ 10kΩ via divider", () => {
-      const shA = 1.1e-3;
-      const shB = 2.4e-4;
-      const shC = 7.5e-8;
-
-      const fix = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, temperature: 298.15, shA, shB, shC,
-        }),
-      });
-      expect(fix.coordinator.dcOperatingPoint()!.converged).toBe(true);
-
-      const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
-      const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
-      // The chosen S-H coefficients land R(25°C) within ±20% of 10kΩ.
-      expect(rNtc).toBeGreaterThan(8000);
-      expect(rNtc).toBeLessThan(12000);
-    });
-
-    it("S-H mode: R(358.15K) < R(298.15K) (NTC behaviour)", () => {
-      const shA = 1.1e-3;
-      const shB = 2.4e-4;
-      const shC = 7.5e-8;
-
-      const fixCold = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, temperature: 298.15, shA, shB, shC,
-        }),
-      });
-      const fixHot = buildFixture({
-        build: (_r, facade) => buildNtcDivider(facade, {
-          vSource: 5, rPull: 10000, temperature: 358.15, shA, shB, shC,
-        }),
-      });
-
-      const vCold = fixCold.engine.getNodeVoltage(nodeOf(fixCold, "ntc:pos"));
-      const vHot  = fixHot .engine.getNodeVoltage(nodeOf(fixHot,  "ntc:pos"));
-      const rCold = rNtcFromDividerVoltage(vCold, 5, 10000);
-      const rHot  = rNtcFromDividerVoltage(vHot,  5, 10000);
-
-      expect(rHot).toBeLessThan(rCold);
-    });
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"))).toBeCloseTo(2.5, 6);
   });
 });
 
+// ---------------------------------------------------------------------------
+// Cat 2 - DCOP analytical (T1)
+// ---------------------------------------------------------------------------
+
+describe("NTCThermistor DCOP analytical (T1)", () => {
+  it("dcop_at_t0_yields_r0_via_divider_observation", () => {
+    // At T=T0 the B-parameter exponent is zero so R(T0)=R0. With R_pull=R0
+    // the divider sits at exactly Vs/2 and the inverted formula returns R0.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 298.15,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+
+    const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+    expect(vDiv).toBeCloseTo(2.5, 6);
+
+    const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+    expect(rNtc).toBeCloseTo(10000, 0);
+  });
+
+  it("dcop_at_350K_matches_b_parameter_closed_form", () => {
+    // Closed-form: R(350K, R0=10k, beta=3950, T0=298.15) ~= 1405 ohm.
+    // The divider voltage is then Vs * R/(R_pull+R) and inverting matches.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 350,
+      }),
+    });
+    const dc = fix.coordinator.dcOperatingPoint();
+    expect(dc!.converged).toBe(true);
+
+    const vDiv = fix.engine.getNodeVoltage(nodeOf(fix, "ntc:pos"));
+    const rNtc = rNtcFromDividerVoltage(vDiv, 5, 10000);
+    const rExpected = rBParam(10000, 3950, 298.15, 350);
+    // Engine-observed R within 0.1% of closed-form.
+    expect(Math.abs(rNtc - rExpected) / rExpected).toBeLessThan(1e-3);
+  });
+
+  it("dcop_below_t0_resistance_rises_above_r0_steinhart_hart", () => {
+    // Steinhart-Hart coefficient set lands R(298.15K) ~= 10k for a typical
+    // 10k NTC; at lower T (273.15K) R rises. Closed-form S-H inversion is
+    // intractable here so assert directionally + within sanity envelope.
+    const shA = 1.1e-3, shB = 2.4e-4, shC = 7.5e-8;
+    const fix25 = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, temperature: 298.15, shA, shB, shC,
+      }),
+    });
+    const fix0 = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, temperature: 273.15, shA, shB, shC,
+      }),
+    });
+    const r25 = rNtcFromDividerVoltage(
+      fix25.engine.getNodeVoltage(nodeOf(fix25, "ntc:pos")), 5, 10000,
+    );
+    const r0K = rNtcFromDividerVoltage(
+      fix0.engine.getNodeVoltage(nodeOf(fix0, "ntc:pos")), 5, 10000,
+    );
+    expect(r25).toBeGreaterThan(8000);
+    expect(r25).toBeLessThan(12000);
+    expect(r0K).toBeGreaterThan(r25);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 4 - Parameter hot-load (T1)
+// ---------------------------------------------------------------------------
+//
+// NTC primary params: r0, beta, temperature. Secondary: t0, thermalResistance,
+// thermalCapacitance. Hot-load through setComponentProperty exercises the
+// element setParam(...) path. One it() per param whose post-change observable
+// has a tractable closed-form prediction or strictly-monotonic direction.
+
+describe("NTCThermistor parameter hot-load (T1)", () => {
+  it("hotload_r0_changes_divider_midpoint_voltage", () => {
+    // At T=T0 R(T)=R0. Halving R0 from 10k -> 5k while R_pull stays at 10k
+    // shifts the divider from Vs/2 to Vs * 5k/15k = Vs/3.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 298.15,
+      }),
+    });
+    const midNode = nodeOf(fix, "ntc:pos");
+    const before = fix.engine.getNodeVoltage(midNode);
+    expect(before).toBeCloseTo(2.5, 4);
+
+    const ntcEl = ceByLabel(fix, "ntc");
+    fix.coordinator.setComponentProperty(ntcEl, "r0", 5000);
+    fix.coordinator.dcOperatingPoint();
+
+    const after = fix.engine.getNodeVoltage(midNode);
+    expect(after).not.toBeCloseTo(before, 4);
+    expect(after).toBeCloseTo(5 * 5000 / 15000, 6);
+  });
+
+  it("hotload_beta_at_offset_temperature_changes_divider_voltage", () => {
+    // At T != T0, R(T) = R0 * exp(beta*(1/T - 1/T0)) depends on beta. With
+    // T=350K, T0=298.15K, raising beta from 3950 -> 4500 lowers R(350K)
+    // (the exponent is more negative), so V(ntc:pos) drops.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 350,
+      }),
+    });
+    const midNode = nodeOf(fix, "ntc:pos");
+    const before = fix.engine.getNodeVoltage(midNode);
+
+    const ntcEl = ceByLabel(fix, "ntc");
+    fix.coordinator.setComponentProperty(ntcEl, "beta", 4500);
+    fix.coordinator.dcOperatingPoint();
+
+    const after = fix.engine.getNodeVoltage(midNode);
+    const rExpected = rBParam(10000, 4500, 298.15, 350);
+    const vExpected = 5 * rExpected / (10000 + rExpected);
+    expect(after).not.toBeCloseTo(before, 4);
+    expect(after).toBeCloseTo(vExpected, 4);
+  });
+
+  it("hotload_temperature_changes_divider_voltage", () => {
+    // Raising temperature (NTC contract) decreases R(T), pulling V(ntc:pos)
+    // toward 0. Closed-form check against the B-parameter formula at the
+    // new temperature.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 298.15,
+      }),
+    });
+    const midNode = nodeOf(fix, "ntc:pos");
+    const before = fix.engine.getNodeVoltage(midNode);
+
+    const ntcEl = ceByLabel(fix, "ntc");
+    fix.coordinator.setComponentProperty(ntcEl, "temperature", 348.15);
+    fix.coordinator.dcOperatingPoint();
+
+    const after = fix.engine.getNodeVoltage(midNode);
+    const rExpected = rBParam(10000, 3950, 298.15, 348.15);
+    const vExpected = 5 * rExpected / (10000 + rExpected);
+    expect(after).not.toBeCloseTo(before, 4);
+    expect(after).toBeCloseTo(vExpected, 4);
+    expect(after).toBeLessThan(before);
+  });
+
+  it("hotload_t0_shifts_reference_temperature_and_changes_divider_voltage", () => {
+    // R(T) depends on T0 through (1/T - 1/T0). With T held at 298.15 and
+    // T0 raised from 298.15 -> 310, the exponent becomes positive so R
+    // grows above R0 and V(ntc:pos) rises.
+    const fix = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, {
+        vSource: 5, rPull: 10000, r0: 10000, beta: 3950, t0: 298.15, temperature: 298.15,
+      }),
+    });
+    const midNode = nodeOf(fix, "ntc:pos");
+    const before = fix.engine.getNodeVoltage(midNode);
+
+    const ntcEl = ceByLabel(fix, "ntc");
+    fix.coordinator.setComponentProperty(ntcEl, "t0", 310);
+    fix.coordinator.dcOperatingPoint();
+
+    const after = fix.engine.getNodeVoltage(midNode);
+    const rExpected = rBParam(10000, 3950, 310, 298.15);
+    const vExpected = 5 * rExpected / (10000 + rExpected);
+    expect(after).not.toBeCloseTo(before, 4);
+    expect(after).toBeCloseTo(vExpected, 4);
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it("hotload_thermalResistance_changes_steady_state_temperature_under_self_heating", () => {
+    // Steady-state temperature under self-heating: T_eq = T_amb + P*R_th.
+    // Doubling R_th (with the same dissipation) raises T_eq, which (NTC
+    // contract) drops R and therefore raises P slightly. After a number of
+    // thermal time constants the s0[TEMPERATURE] slot must rise vs the
+    // baseline. Directional assertion - closed-form depends on the R(T)/P(T)
+    // feedback fixed point and is not tractable in closed form.
+    const baseProps = {
+      vSource: 1, rPull: 1, r0: 100, beta: 3950, t0: 298.15, temperature: 298.15,
+      selfHeating: true, thermalCapacitance: 0.001,
+    } as const;
+    const fixLow = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, { ...baseProps, thermalResistance: 50 }),
+      params: { tStop: 5.0, maxTimeStep: 1e-3 },
+    });
+    const fixHigh = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, { ...baseProps, thermalResistance: 200 }),
+      params: { tStop: 5.0, maxTimeStep: 1e-3 },
+    });
+    while (fixLow.engine.simTime < 1.0) fixLow.coordinator.step();
+    while (fixHigh.engine.simTime < 1.0) fixHigh.coordinator.step();
+
+    const ntcLow = findNtcElement(fixLow);
+    const ntcHigh = findNtcElement(fixHigh);
+    const tLow = fixLow.pool.state0[ntcLow._stateBase + SLOT_TEMPERATURE];
+    const tHigh = fixHigh.pool.state0[ntcHigh._stateBase + SLOT_TEMPERATURE];
+
+    expect(tHigh).toBeGreaterThan(tLow);
+    expect(tLow).toBeGreaterThan(298.15);
+  });
+
+  it("hotload_thermalCapacitance_changes_self_heating_time_constant", () => {
+    // Higher thermal capacitance => longer thermal time constant (tau =
+    // R_th * C_th) => less temperature rise after a fixed wall-clock window.
+    const baseProps = {
+      vSource: 1, rPull: 1, r0: 100, beta: 3950, t0: 298.15, temperature: 298.15,
+      selfHeating: true, thermalResistance: 50,
+    } as const;
+    const fixFast = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, { ...baseProps, thermalCapacitance: 0.001 }),
+      params: { tStop: 5.0, maxTimeStep: 1e-4 },
+    });
+    const fixSlow = buildFixture({
+      build: (_r, facade) => buildNtcDivider(facade, { ...baseProps, thermalCapacitance: 0.1 }),
+      params: { tStop: 5.0, maxTimeStep: 1e-4 },
+    });
+    while (fixFast.engine.simTime < 0.05) fixFast.coordinator.step();
+    while (fixSlow.engine.simTime < 0.05) fixSlow.coordinator.step();
+
+    const ntcFast = findNtcElement(fixFast);
+    const ntcSlow = findNtcElement(fixSlow);
+    const tFast = fixFast.pool.state0[ntcFast._stateBase + SLOT_TEMPERATURE];
+    const tSlow = fixSlow.pool.state0[ntcSlow._stateBase + SLOT_TEMPERATURE];
+
+    expect(tFast).toBeGreaterThan(tSlow);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 2 num / 3 / 5 - paired vs ngspice on the divider .dts (T3)
+// ---------------------------------------------------------------------------
+
+describeIfDll("NTCThermistor paired vs ngspice - divider (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_DIVIDER, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  // Per Step 2c: the FIRST it() owns the run; siblings read from the
+  // recorded session. A throw inside runTransient surfaces as a visible
+  // failed test instead of a silent skip across the whole describe.
+  it("transient_step_end_paired_divider", async () => {
+    await session.runTransient(0, 1e-3, 10e-6);
+    session.compareAllSteps();
+  }, 180_000);
+
+  it("dcop_paired_divider", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_divider", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cat 2 num / 3 / 5 - paired vs ngspice on the self-heating .dts (T3)
+// ---------------------------------------------------------------------------
+
+describeIfDll("NTCThermistor paired vs ngspice - self-heating transient (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_SELF_HEATING, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_self_heating", async () => {
+    await session.runTransient(0, 1e-3, 10e-6);
+    session.compareAllSteps();
+  }, 180_000);
+
+  it("dcop_paired_self_heating", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_self_heating", () => {
+    session.compareAllAttempts();
+  });
+});

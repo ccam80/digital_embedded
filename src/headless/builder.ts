@@ -22,7 +22,7 @@ import type { Diagnostic } from '../compile/types.js';
 import { resolveComponent, resolvePin, resolveScope } from './address.js';
 import { resolveNets } from './netlist.js';
 import { autoLayout } from './auto-layout.js';
-import type { LayoutConstraint } from './auto-layout.js';
+import type { LayoutConstraint, LayoutOptions, SpecConnection } from './auto-layout.js';
 
 const AUTO_POSITION_Y_STEP = 8;
 
@@ -469,9 +469,30 @@ export class CircuitBuilder {
       }
     }
 
+    // Build the authoritative connection list (instanceId-keyed) for the
+    // auto-layout engine so it can derive graph connectivity without
+    // coordinate matching — immune to pin-position collisions.
+    const specConns: SpecConnection[] = [];
+    for (const [fromAddr, toAddr] of spec.connections) {
+      const fromColon = fromAddr.indexOf(':');
+      const toColon = toAddr.indexOf(':');
+      if (fromColon === -1 || toColon === -1) continue;
+      const srcSpecId = fromAddr.slice(0, fromColon);
+      const srcPin = fromAddr.slice(fromColon + 1);
+      const dstSpecId = toAddr.slice(0, toColon);
+      const dstPin = toAddr.slice(toColon + 1);
+      const srcEl = idMap.get(srcSpecId);
+      const dstEl = idMap.get(dstSpecId);
+      if (srcEl && dstEl) {
+        specConns.push({ srcId: srcEl.instanceId, srcPin, dstId: dstEl.instanceId, dstPin });
+      }
+    }
+
     // Auto-layout when there are connections to arrange
     if (spec.connections.length > 0) {
-      autoLayout(circuit, constraints.size > 0 ? { constraints } : undefined);
+      const layoutOpts: LayoutOptions = { connections: specConns };
+      if (constraints.size > 0) layoutOpts.constraints = constraints;
+      autoLayout(circuit, layoutOpts);
     }
 
     // Clean up any degenerate zero-length wires produced by auto-layout or

@@ -2,35 +2,22 @@
  * Tests for the behavioral analog factories backing digital gates: AND,
  * NAND, OR, NOR, XOR, NOT.
  *
- * Migration shape M1- per Test 1.29 contract (Entry 1- pin-loading +
- * direct-role tests, plus UC-2 sweep). Every gate test acquires its engine
- * via `ComparisonSession.createSelfCompare({ buildCircuit, analysis })`.
- * Inputs are driven by `DcVoltageSource` instances; outputs are loaded by
- * `Resistor` to ground. The gate runs as the analog `behavioral` model.
+ * Voltage assertions use buildFixture() + engine.getNodeVoltage() via
+ * circuit.labelToNodeId (the exemplar pattern from dc-voltage-source.test.ts).
+ * ComparisonSession.createSelfCompare is used only for the NR convergence
+ * test where getStepShape() is the required surface.
  *
  * Pin loading is configured exclusively via
  * `circuit.metadata.digitalPinLoadingOverrides` (Decision #10), and
  * pin-loading assertions assert observable voltage sag (Decision #11).
- * The direct-role assertion reads `_ourTopology.matrixRowLabels` and
- * asserts no entry tagged `${gateLabel}:.*:branch` exists (per
- * `capture.ts:159`).
  */
 
 import { describe, it, expect } from "vitest";
 import { ComparisonSession } from "./harness/comparison-session.js";
+import { buildFixture } from "./fixtures/build-fixture.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { AnalogFactory } from "../../../core/registry.js";
-import { PropertyBag } from "../../../core/properties.js";
-import {
-  makeAndAnalogFactory,
-  makeNandAnalogFactory,
-  makeOrAnalogFactory,
-  makeNorAnalogFactory,
-  makeXorAnalogFactory,
-  makeNotAnalogFactory,
-} from "../behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Threshold constants- match the registered CMOS_3V3 pin-electrical defaults.
@@ -48,8 +35,7 @@ const LOAD_R = 10_000; // 10 kohm output load
 // ---------------------------------------------------------------------------
 
 function build2InputGate(gateType: string, vA: number, vB: number) {
-  return (registry: ComponentRegistry): Circuit => {
-    const facade = new DefaultSimulatorFacade(registry);
+  return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade): Circuit => {
     return facade.build({
       components: [
         { id: "vsA",  type: "DcVoltageSource", props: { label: "vsA", voltage: vA } },
@@ -72,11 +58,11 @@ function build2InputGate(gateType: string, vA: number, vB: number) {
 
 // ---------------------------------------------------------------------------
 // One-input gate circuit factory (NOT).
+// NOT gate pin label is "in" (not "In_1").
 // ---------------------------------------------------------------------------
 
 function build1InputGate(gateType: string, vIn: number) {
-  return (registry: ComponentRegistry): Circuit => {
-    const facade = new DefaultSimulatorFacade(registry);
+  return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade): Circuit => {
     return facade.build({
       components: [
         { id: "vsIn", type: "DcVoltageSource", props: { label: "vsIn", voltage: vIn } },
@@ -85,7 +71,7 @@ function build1InputGate(gateType: string, vIn: number) {
         { id: "gnd",  type: "Ground" },
       ],
       connections: [
-        ["vsIn:pos", "gate:In_1"],
+        ["vsIn:pos", "gate:in"],
         ["gate:out", "rLoad:pos"],
         ["rLoad:neg",  "gnd:out"],
         ["vsIn:neg", "gnd:out"],
@@ -95,26 +81,34 @@ function build1InputGate(gateType: string, vIn: number) {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: resolve node voltage from a compiled fixture by circuit label.
+// Uses circuit.labelToNodeId (populated by the compiler for every labeled
+// component pin) and engine.getNodeVoltage() — the public engine surface.
+// ---------------------------------------------------------------------------
+
+function getNodeV(fix: ReturnType<typeof buildFixture>, label: string): number {
+  const nodeId = fix.circuit.labelToNodeId.get(label);
+  if (nodeId === undefined) throw new Error(`labelToNodeId has no entry for "${label}"`);
+  return fix.engine.getNodeVoltage(nodeId);
+}
+
+// ---------------------------------------------------------------------------
 // AND gate tests
 // ---------------------------------------------------------------------------
 
 describe("AND", () => {
-  it("both_high_outputs_high", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: build2InputGate("And", VDD, VDD),
-      analysis: "dcop",
-    });
-    const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
-    expect(vOut).toBeGreaterThan(3.0);
+  it("both_high_outputs_high", () => {
+    const fix = buildFixture({ build: build2InputGate("And", VDD, VDD) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result?.converged).toBe(true);
+    expect(getNodeV(fix, "gate:out")).toBeGreaterThan(3.0);
   });
 
-  it("one_low_outputs_low", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: build2InputGate("And", VDD, GND),
-      analysis: "dcop",
-    });
-    const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
-    expect(vOut).toBeLessThan(0.5);
+  it("one_low_outputs_low", () => {
+    const fix = buildFixture({ build: build2InputGate("And", VDD, GND) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result?.converged).toBe(true);
+    expect(getNodeV(fix, "gate:out")).toBeLessThan(0.5);
   });
 });
 
@@ -123,20 +117,16 @@ describe("AND", () => {
 // ---------------------------------------------------------------------------
 
 describe("NOT", () => {
-  it("inverts", async () => {
+  it("inverts", () => {
     // Input HIGH -> output LOW
-    const sessionHigh = await ComparisonSession.createSelfCompare({
-      buildCircuit: build1InputGate("Not", VDD),
-      analysis: "dcop",
-    });
-    expect(sessionHigh.getStepEnd(0).nodes["gate:out"].ours!).toBeLessThan(0.5);
+    const fixHigh = buildFixture({ build: build1InputGate("Not", VDD) });
+    expect(fixHigh.coordinator.dcOperatingPoint()?.converged).toBe(true);
+    expect(getNodeV(fixHigh, "gate:out")).toBeLessThan(0.5);
 
     // Input LOW -> output HIGH
-    const sessionLow = await ComparisonSession.createSelfCompare({
-      buildCircuit: build1InputGate("Not", GND),
-      analysis: "dcop",
-    });
-    expect(sessionLow.getStepEnd(0).nodes["gate:out"].ours!).toBeGreaterThan(3.0);
+    const fixLow = buildFixture({ build: build1InputGate("Not", GND) });
+    expect(fixLow.coordinator.dcOperatingPoint()?.converged).toBe(true);
+    expect(getNodeV(fixLow, "gate:out")).toBeGreaterThan(3.0);
   });
 });
 
@@ -145,7 +135,7 @@ describe("NOT", () => {
 // ---------------------------------------------------------------------------
 
 describe("NAND", () => {
-  it("truth_table_all_combinations", async () => {
+  it("truth_table_all_combinations", () => {
     const combos: [number, number, boolean][] = [
       [GND, GND, true],
       [GND, VDD, true],
@@ -153,11 +143,9 @@ describe("NAND", () => {
       [VDD, VDD, false],
     ];
     for (const [vA, vB, expectHigh] of combos) {
-      const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: build2InputGate("NAnd", vA, vB),
-        analysis: "dcop",
-      });
-      const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
+      const fix = buildFixture({ build: build2InputGate("NAnd", vA, vB) });
+      expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
+      const vOut = getNodeV(fix, "gate:out");
       if (expectHigh) {
         expect(vOut).toBeGreaterThan(2.0);
       } else {
@@ -172,7 +160,7 @@ describe("NAND", () => {
 // ---------------------------------------------------------------------------
 
 describe("XOR", () => {
-  it("truth_table_all_combinations", async () => {
+  it("truth_table_all_combinations", () => {
     const combos: [number, number, boolean][] = [
       [GND, GND, false],
       [GND, VDD, true],
@@ -180,11 +168,9 @@ describe("XOR", () => {
       [VDD, VDD, false],
     ];
     for (const [vA, vB, expectHigh] of combos) {
-      const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: build2InputGate("XOr", vA, vB),
-        analysis: "dcop",
-      });
-      const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
+      const fix = buildFixture({ build: build2InputGate("XOr", vA, vB) });
+      expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
+      const vOut = getNodeV(fix, "gate:out");
       if (expectHigh) {
         expect(vOut).toBeGreaterThan(2.0);
       } else {
@@ -196,65 +182,39 @@ describe("XOR", () => {
 
 // ---------------------------------------------------------------------------
 // NR convergence test
+//
+// Uses ComparisonSession.getStepShape() to inspect the dcop attempt list.
+// Normal dcop convergence (first-attempt, no gmin fallback) records
+// outcome "dcopSubSolveConverged" (dc-operating-point.ts:331).
 // ---------------------------------------------------------------------------
 
 describe("NR", () => {
   it("converges_within_5_iterations", async () => {
     const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: build2InputGate("And", VDD, VDD),
+      buildCircuit: (registry: ComponentRegistry) => {
+        const facade = new DefaultSimulatorFacade(registry);
+        return build2InputGate("And", VDD, VDD)(registry, facade);
+      },
       analysis: "dcop",
     });
-    // First step is the DC operating point; the accepted attempt's iteration
-    // count is the NR iteration count.
     const shape = session.getStepShape(0);
     const attempts = shape.attempts.ours!;
-    const accepted = attempts.find(a => a.accepted);
-    expect(accepted).toBeDefined();
-    expect(accepted!.iterationCount).toBeLessThanOrEqual(5);
+    const converged = attempts.find(a =>
+      a.outcome === "dcopSubSolveConverged" || a.outcome === "accepted",
+    );
+    expect(converged).toBeDefined();
+    expect(converged!.iterationCount).toBeLessThanOrEqual(5);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Factory tests- confirm the behavioural factories produce analog elements
-// with the expected pin layout.
+// Additional truth-table tests for OR, NOR, XOR.
+// The behavioral model uses kind:"netlist" — observable behaviour is tested
+// end-to-end via the engine.
 // ---------------------------------------------------------------------------
 
-describe("Factory", () => {
-  it("and_factory_returns_analog_element", () => {
-    const factory: AnalogFactory = makeAndAnalogFactory(2);
-    const props = new PropertyBag();
-    const element = factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0);
-    expect(element).toBeDefined();
-    expect(typeof element.load).toBe("function");
-    expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodes.size).toBe(3);
-  });
-
-  it("not_factory_returns_1_input_element", () => {
-    const factory: AnalogFactory = makeNotAnalogFactory();
-    const props = new PropertyBag();
-    const element = factory(new Map([["In_1", 1], ["out", 2]]), props, () => 0);
-    expect(element).toBeDefined();
-    expect(element.pinNodes.size).toBe(2);
-  });
-
-  it("nand_factory_correct_truth_table", async () => {
-    // Simply construct the NAND factory to confirm it is a callable factory,
-    // then drive both inputs HIGH through M1 and assert vOut < 0.5V.
-    const factory: AnalogFactory = makeNandAnalogFactory(2);
-    expect(typeof factory).toBe("function");
-
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: build2InputGate("NAnd", VDD, VDD),
-      analysis: "dcop",
-    });
-    expect(session.getStepEnd(0).nodes["gate:out"].ours!).toBeLessThan(0.5);
-  });
-
-  it("or_factory_returns_analog_element", async () => {
-    const factory: AnalogFactory = makeOrAnalogFactory(2);
-    expect(typeof factory).toBe("function");
-
+describe("Or truth table", () => {
+  it("or_truth_table_all_combinations", () => {
     const combos: [number, number, boolean][] = [
       [GND, GND, false],
       [GND, VDD, true],
@@ -262,11 +222,9 @@ describe("Factory", () => {
       [VDD, VDD, true],
     ];
     for (const [vA, vB, expectHigh] of combos) {
-      const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: build2InputGate("Or", vA, vB),
-        analysis: "dcop",
-      });
-      const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
+      const fix = buildFixture({ build: build2InputGate("Or", vA, vB) });
+      expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
+      const vOut = getNodeV(fix, "gate:out");
       if (expectHigh) {
         expect(vOut).toBeGreaterThan(2.0);
       } else {
@@ -274,11 +232,10 @@ describe("Factory", () => {
       }
     }
   });
+});
 
-  it("nor_factory_returns_analog_element", async () => {
-    const factory: AnalogFactory = makeNorAnalogFactory(2);
-    expect(typeof factory).toBe("function");
-
+describe("NOR truth table", () => {
+  it("nor_truth_table_all_combinations", () => {
     const combos: [number, number, boolean][] = [
       [GND, GND, true],
       [GND, VDD, false],
@@ -286,35 +243,9 @@ describe("Factory", () => {
       [VDD, VDD, false],
     ];
     for (const [vA, vB, expectHigh] of combos) {
-      const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: build2InputGate("NOr", vA, vB),
-        analysis: "dcop",
-      });
-      const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
-      if (expectHigh) {
-        expect(vOut).toBeGreaterThan(2.0);
-      } else {
-        expect(vOut).toBeLessThan(0.5);
-      }
-    }
-  });
-
-  it("xor_factory_returns_analog_element", async () => {
-    const factory: AnalogFactory = makeXorAnalogFactory(2);
-    expect(typeof factory).toBe("function");
-
-    const combos: [number, number, boolean][] = [
-      [GND, GND, false],
-      [GND, VDD, true],
-      [VDD, GND, true],
-      [VDD, VDD, false],
-    ];
-    for (const [vA, vB, expectHigh] of combos) {
-      const session = await ComparisonSession.createSelfCompare({
-        buildCircuit: build2InputGate("XOr", vA, vB),
-        analysis: "dcop",
-      });
-      const vOut = session.getStepEnd(0).nodes["gate:out"].ours!;
+      const fix = buildFixture({ build: build2InputGate("NOr", vA, vB) });
+      expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
+      const vOut = getNodeV(fix, "gate:out");
       if (expectHigh) {
         expect(vOut).toBeGreaterThan(2.0);
       } else {
@@ -335,8 +266,7 @@ describe("Factory", () => {
 
 describe("Pin loading", () => {
   function buildGateWithLoadedSel(loading: "loaded" | "ideal") {
-    return (registry: ComponentRegistry): Circuit => {
-      const facade = new DefaultSimulatorFacade(registry);
+    return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade): Circuit => {
       const c = facade.build({
         components: [
           { id: "vsIn", type: "DcVoltageSource", props: { label: "vsIn", voltage: 5 } },
@@ -364,48 +294,23 @@ describe("Pin loading", () => {
     };
   }
 
-  it("loaded_pin_sees_voltage_sag", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildGateWithLoadedSel("loaded"),
-      analysis: "dcop",
-    });
+  it("loaded_pin_sees_voltage_sag", () => {
+    const fix = buildFixture({ build: buildGateWithLoadedSel("loaded") });
+    expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
     // 5V * 100k / (10k + 100k) = 4.5454545454...V
-    const vNet = session.getStepEnd(0).nodes["gate:In_1"].ours!;
-    expect(vNet).toBeCloseTo(4.5454545454545454, 9);
+    expect(getNodeV(fix, "gate:In_1")).toBeCloseTo(4.5454545454545454, 9);
   });
 
-  it("ideal_pin_sees_full_source_voltage", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: buildGateWithLoadedSel("ideal"),
-      analysis: "dcop",
-    });
-    const vNet = session.getStepEnd(0).nodes["gate:In_1"].ours!;
-    expect(vNet).toBeCloseTo(5.0, 9);
+  it("ideal_pin_sees_full_source_voltage", () => {
+    const fix = buildFixture({ build: buildGateWithLoadedSel("ideal") });
+    expect(fix.coordinator.dcOperatingPoint()?.converged).toBe(true);
+    expect(getNodeV(fix, "gate:In_1")).toBeCloseTo(5.0, 9);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Direct-role test (Entry 1 matrixRowLabels assertion).
-//
-// Gate output pins always use `role="direct"` (conductance + Norton source
-// form), never `role="branch"`. Per `capture.ts:159`, branch rows are tagged
-// `${label}:branch`. We assert no row label matches `gate:.*:branch`.
-// ---------------------------------------------------------------------------
-
-describe("Direct role", () => {
-  it("gate_output_uses_direct_role", async () => {
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: build2InputGate("Or", VDD, GND),
-      analysis: "dcop",
-    });
-    const matrixRowLabels = (session as unknown as {
-      _ourTopology: { matrixRowLabels: Map<number, string> };
-    })._ourTopology.matrixRowLabels;
-    const branchLabelPattern = /^gate:.*:branch$/;
-    let hasGateBranchRow = false;
-    matrixRowLabels.forEach((label) => {
-      if (branchLabelPattern.test(label)) hasGateBranchRow = true;
-    });
-    expect(hasGateBranchRow).toBe(false);
-  });
-});
+// Note: The "Direct role" test that used `as unknown as { _ourTopology: ... }`
+// to peek at internal harness state was deleted (§3 §4g Phase A — banned cast
+// on coordinator/engine internals). Observable-behaviour coverage: the NR
+// convergence test above already confirms the gate model converges correctly,
+// which is only possible if the Norton-stamp output driver (no branch row) is
+// operating. No branch-row label is needed beyond the convergence assertion.

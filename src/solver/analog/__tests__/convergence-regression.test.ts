@@ -86,7 +86,8 @@ describe("convergence regression", () => {
         ["vs:neg", "gnd:out"],
       ],
     });
-    const coordinator = facade.compile(circuit);
+    facade.compile(circuit);
+    const coordinator = facade.getActiveCoordinator()!;
     const engine = coordinator.getAnalogEngine();
     expect(engine).not.toBeNull();
     const dcResult = engine!.dcOperatingPoint();

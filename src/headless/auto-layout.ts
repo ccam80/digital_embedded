@@ -40,6 +40,16 @@ export interface LayoutConstraint {
   row?: number;
 }
 
+/** Authoritative pin-level connection record passed from the circuit builder. */
+export interface SpecConnection {
+  /** instanceId of the source element. */
+  srcId: string;
+  srcPin: string;
+  /** instanceId of the destination element. */
+  dstId: string;
+  dstPin: string;
+}
+
 export interface LayoutOptions {
   /** Horizontal gap between layer columns (grid units). Default: 8 */
   layerGap?: number;
@@ -53,6 +63,18 @@ export interface LayoutOptions {
    * Nodes with a `row` constraint are pinned to that order within their layer.
    */
   constraints?: Map<string, LayoutConstraint>;
+  /**
+   * Authoritative connection list from the circuit builder.
+   *
+   * When provided, `buildGraph` derives pin-level connectivity directly from
+   * these records (keyed by instanceId + pin label) and skips the
+   * coordinate-keyed posMap matching entirely for connection identity.
+   * This prevents dropped connections when two elements share world-coordinate
+   * pin positions after initial auto-placement.
+   *
+   * Falls back to coordinate-keyed matching when absent (legacy .dig circuits).
+   */
+  connections?: SpecConnection[];
 }
 
 /**
@@ -71,7 +93,7 @@ export function autoLayout(circuit: Circuit, options?: LayoutOptions): void {
 
   if (circuit.elements.length === 0) return;
 
-  const g = buildGraph(circuit);
+  const g = buildGraph(circuit, options?.connections);
   if (g.nodes.size === 0) return;
 
   breakCycles(g);
@@ -127,24 +149,7 @@ interface Graph {
 // Step 1- Build directed graph from circuit wires
 // ═══════════════════════════════════════════════════════════════════════════
 
-function buildGraph(circuit: Circuit): Graph {
-  // Index: world-position key → list of (element, pin) at that position.
-  // Multiple pins from different components can share coordinates (e.g. when
-  // auto-positioned components have tall pin spans), so we store an array.
-  const posMap = new Map<string, Array<{ el: CircuitElement; pin: Pin }>>();
-  for (const el of circuit.elements) {
-    for (const pin of el.getPins()) {
-      const wp = pinWorldPosition(el, pin);
-      const key = `${wp.x},${wp.y}`;
-      let arr = posMap.get(key);
-      if (arr === undefined) {
-        arr = [];
-        posMap.set(key, arr);
-      }
-      arr.push({ el, pin });
-    }
-  }
-
+function buildGraph(circuit: Circuit, specConns?: SpecConnection[]): Graph {
   const nodes = new Map<string, GNode>();
   const out = new Map<string, GEdge[]>();
   const in_ = new Map<string, GEdge[]>();
@@ -169,53 +174,118 @@ function buildGraph(circuit: Circuit): Graph {
   const conns: PinConn[] = [];
   const seen = new Set<string>();
 
-  for (const wire of circuit.wires) {
-    const aList = posMap.get(`${wire.start.x},${wire.start.y}`);
-    const bList = posMap.get(`${wire.end.x},${wire.end.y}`);
-    if (!aList || !bList) continue;
+  if (specConns !== undefined) {
+    // Identity-based path: use the authoritative connection list from the
+    // circuit builder. No coordinate matching — immune to pin position
+    // collisions between elements placed at coincident world coordinates.
+    for (const sc of specConns) {
+      if (!nodes.has(sc.srcId) || !nodes.has(sc.dstId)) continue;
 
-    // Find a pair (a, b) from different elements.
-    let a: { el: CircuitElement; pin: Pin } | undefined;
-    let b: { el: CircuitElement; pin: Pin } | undefined;
-    for (const ai of aList) {
-      for (const bi of bList) {
-        if (ai.el !== bi.el) {
-          a = ai;
-          b = bi;
-          break;
-        }
+      // Orient: find pin directions to decide src→dst vs dst→src for the graph edge.
+      const srcEl = circuit.elements.find((e) => e.instanceId === sc.srcId);
+      const dstEl = circuit.elements.find((e) => e.instanceId === sc.dstId);
+      const srcPin = srcEl?.getPins().find((p) => p.label === sc.srcPin);
+      const dstPin = dstEl?.getPins().find((p) => p.label === sc.dstPin);
+
+      // Determine graph edge orientation: prefer OUTPUT→INPUT ordering.
+      let edgeSrcId = sc.srcId;
+      let edgeSrcPin = sc.srcPin;
+      let edgeDstId = sc.dstId;
+      let edgeDstPin = sc.dstPin;
+      if (
+        srcPin?.direction === PinDirection.INPUT &&
+        dstPin?.direction === PinDirection.OUTPUT
+      ) {
+        edgeSrcId = sc.dstId;
+        edgeSrcPin = sc.dstPin;
+        edgeDstId = sc.srcId;
+        edgeDstPin = sc.srcPin;
       }
-      if (a) break;
+
+      const key = `${edgeSrcId}:${edgeSrcPin}->${edgeDstId}:${edgeDstPin}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      // Only add a graph edge when the two endpoints are different elements.
+      if (edgeSrcId !== edgeDstId) {
+        const edge: GEdge = { src: edgeSrcId, dst: edgeDstId, reversed: false };
+        edges.push(edge);
+        out.get(edgeSrcId)!.push(edge);
+        in_.get(edgeDstId)!.push(edge);
+      }
+
+      conns.push({
+        srcId: edgeSrcId,
+        srcPin: edgeSrcPin,
+        dstId: edgeDstId,
+        dstPin: edgeDstPin,
+      });
     }
-    if (!a || !b) continue;
-
-    // Orient: output → input
-    let src = a;
-    let dst = b;
-    if (
-      src.pin.direction === PinDirection.INPUT &&
-      dst.pin.direction === PinDirection.OUTPUT
-    ) {
-      [src, dst] = [dst, src];
+  } else {
+    // Coordinate-based fallback for legacy circuits loaded from .dig files.
+    // Index: world-position key → list of (element, pin) at that position.
+    const posMap = new Map<string, Array<{ el: CircuitElement; pin: Pin }>>();
+    for (const el of circuit.elements) {
+      for (const pin of el.getPins()) {
+        const wp = pinWorldPosition(el, pin);
+        const key = `${wp.x},${wp.y}`;
+        let arr = posMap.get(key);
+        if (arr === undefined) {
+          arr = [];
+          posMap.set(key, arr);
+        }
+        arr.push({ el, pin });
+      }
     }
 
-    const srcId = src.el.instanceId;
-    const dstId = dst.el.instanceId;
-    const key = `${srcId}:${src.pin.label}->${dstId}:${dst.pin.label}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    for (const wire of circuit.wires) {
+      const aList = posMap.get(`${wire.start.x},${wire.start.y}`);
+      const bList = posMap.get(`${wire.end.x},${wire.end.y}`);
+      if (!aList || !bList) continue;
 
-    const edge: GEdge = { src: srcId, dst: dstId, reversed: false };
-    edges.push(edge);
-    out.get(srcId)!.push(edge);
-    in_.get(dstId)!.push(edge);
+      // Find a pair (a, b) from different elements.
+      let a: { el: CircuitElement; pin: Pin } | undefined;
+      let b: { el: CircuitElement; pin: Pin } | undefined;
+      for (const ai of aList) {
+        for (const bi of bList) {
+          if (ai.el !== bi.el) {
+            a = ai;
+            b = bi;
+            break;
+          }
+        }
+        if (a) break;
+      }
+      if (!a || !b) continue;
 
-    conns.push({
-      srcId,
-      srcPin: src.pin.label,
-      dstId,
-      dstPin: dst.pin.label,
-    });
+      // Orient: output → input
+      let src = a;
+      let dst = b;
+      if (
+        src.pin.direction === PinDirection.INPUT &&
+        dst.pin.direction === PinDirection.OUTPUT
+      ) {
+        [src, dst] = [dst, src];
+      }
+
+      const srcId = src.el.instanceId;
+      const dstId = dst.el.instanceId;
+      const key = `${srcId}:${src.pin.label}->${dstId}:${dst.pin.label}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const edge: GEdge = { src: srcId, dst: dstId, reversed: false };
+      edges.push(edge);
+      out.get(srcId)!.push(edge);
+      in_.get(dstId)!.push(edge);
+
+      conns.push({
+        srcId,
+        srcPin: src.pin.label,
+        dstId,
+        dstPin: dst.pin.label,
+      });
+    }
   }
 
   return { nodes, edges, conns, out, in_, layers: [] };

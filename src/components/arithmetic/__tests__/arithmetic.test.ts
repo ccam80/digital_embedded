@@ -35,7 +35,7 @@ function buildDigital(spec: {
 }): DigitalFixture {
   const facade = new DefaultSimulatorFacade(registry);
   const circuit = facade.build({
-    components: spec.components.map((c) => ({ id: c.id, type: c.type, props: c.props })),
+    components: spec.components.map((c) => ({ id: c.id, type: c.type, ...(c.props ? { props: c.props } : {}) })),
     connections: spec.connections.map((c) => [c[0], c[1]] as [string, string]),
   });
   const coordinator = facade.compile(circuit);

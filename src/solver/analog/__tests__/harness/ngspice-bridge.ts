@@ -37,7 +37,7 @@ import type {
 import type { IntegrationMethod } from "../../integration.js";
 import type { LimitingEvent } from "../../newton-raphson.js";
 import { bitsToName } from "../../ckt-mode.js";
-import { DEVICE_MAPPINGS } from "./device-mappings.js";
+import { DEVICE_MAPPINGS, projectPinCurrents } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------
 // CKTmode constants (from ref/ngspice/src/include/ngspice/cktdefs.h:166-182)
@@ -545,10 +545,12 @@ export class NgspiceBridge {
       }
 
       if (Object.keys(slots).length > 0) {
+        const pinCurrents = projectPinCurrents(mapping, slots);
         snapshots.push({
           elementIndex: -1,
           label: dev.name.toUpperCase(),
           slots, state1Slots, state2Slots,
+          pinCurrents,
         });
       }
     }

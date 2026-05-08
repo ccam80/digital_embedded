@@ -22,7 +22,7 @@ import type {
   IntegrationCoefficients,
 } from "./types.js";
 import type { LimitingEvent } from "../../newton-raphson.js";
-import { normalizeDeviceType } from "./device-mappings.js";
+import { normalizeDeviceType, DEVICE_MAPPINGS, projectPinCurrents } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------
 // Topology capture (once per compile)
@@ -201,6 +201,7 @@ export function captureElementStates(
   elements: readonly AnalogElement[],
   statePool: StatePool | null,
   elementLabels?: Map<number, string>,
+  elementTypes?: Map<number, string>,
 ): ElementStateSnapshot[] {
   if (!statePool) return [];
   const snapshots: ElementStateSnapshot[] = [];
@@ -225,12 +226,17 @@ export function captureElementStates(
       if (s2) state2Slots[name] = s2[base + s];
     }
 
+    const deviceType = elementTypes?.get(i);
+    const mapping = deviceType ? DEVICE_MAPPINGS[deviceType] : undefined;
+    const pinCurrents = projectPinCurrents(mapping, slots);
+
     snapshots.push({
       elementIndex: i,
       label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
       slots,
       state1Slots,
       state2Slots,
+      pinCurrents,
     });
   }
 
@@ -274,6 +280,7 @@ export function createIterationCaptureHook(
   elements: readonly AnalogElement[],
   statePool: StatePool | null | (() => StatePool | null),
   elementLabels?: Map<number, string>,
+  elementTypes?: Map<number, string>,
 ): {
   hook: PostIterationHook;
   preFactorHook: (ctx: CKTCircuitContext) => void;
@@ -372,7 +379,7 @@ export function createIterationCaptureHook(
       prevVoltages: prevVoltages.slice(),
       preSolveRhs: preSolveRhs.slice(),
       matrix: preFactorMatrix,
-      elementStates: captureElementStates(elements, getStatePool(), elementLabels),
+      elementStates: captureElementStates(elements, getStatePool(), elementLabels, elementTypes),
       noncon,
       diagGmin: ctx.diagonalGmin,
       srcFact: ctx.srcFact,
@@ -454,6 +461,7 @@ export function createStepCaptureHook(
   elements: readonly AnalogElement[],
   statePool: StatePool | null | (() => StatePool | null),
   elementLabels?: Map<number, string>,
+  elementTypes?: Map<number, string>,
 ): {
   iterationHook: PostIterationHook & { drainForLog: () => NRAttemptRecord["iterationDetails"] };
   preFactorHook: (ctx: CKTCircuitContext) => void;
@@ -477,7 +485,7 @@ export function createStepCaptureHook(
   getSteps: () => StepSnapshot[];
   clear: () => void;
 } {
-  const iterCapture = createIterationCaptureHook(solver, elements, statePool, elementLabels);
+  const iterCapture = createIterationCaptureHook(solver, elements, statePool, elementLabels, elementTypes);
   const steps: StepSnapshot[] = [];
 
   // Current open step state

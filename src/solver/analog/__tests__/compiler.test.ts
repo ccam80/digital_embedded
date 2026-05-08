@@ -11,11 +11,12 @@ import { Circuit, Wire } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
-import type { PropertyBag, PropertyValue } from "../../../core/properties.js";
+import { PropertyBag } from "../../../core/properties.js";
+import type { PropertyValue } from "../../../core/properties.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
-import { ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentCategory } from "../../../core/registry.js";
+import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
+import type { ComponentLayout } from "../../../core/registry.js";
 import { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
@@ -45,23 +46,8 @@ function makeElement(
   registry?: ComponentRegistry,
 ): CircuitElement {
   const def = registry?.get(typeId);
-  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
-  const propertyBag: PropertyBag = {
-    has(k: string) { return propsMap.has(k); },
-    get<T>(k: string): T { return propsMap.get(k) as T; },
-    set(k: string, v: PropertyValue) { propsMap.set(k, v); },
-    delete(k: string) { propsMap.delete(k); },
-    keys() { return Array.from(propsMap.keys()); },
-    entries() { return Array.from(propsMap.entries()); },
-    clone() { return this; },
-    size: propsMap.size,
-    getModelParam<T>(_k: string): T { return undefined as unknown as T; },
-    setModelParam(_k: string, _v: PropertyValue) { /* no-op */ },
-    hasModelParam(_k: string): boolean { return false; },
-    getModelParamKeys(): string[] { return []; },
-    replaceModelParams(_p: Record<string, number>) { /* no-op */ },
-    getOrDefault<T>(_k: string, d: T): T { return propsMap.has(_k) ? propsMap.get(_k) as T : d; },
-  } as unknown as PropertyBag;
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || (def?.pinLayout ?? [])[i]?.label || ""));
+  const propertyBag = new PropertyBag(propsMap);
 
   const serialized: SerializedElement = {
     typeId,
@@ -143,7 +129,7 @@ function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number
 // Test registry builder
 // ---------------------------------------------------------------------------
 
-function noopExecuteFn(): void { /* no-op */ }
+function noopExecuteFn(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void { /* no-op */ }
 
 function makeBaseDef(name: string) {
   return {
@@ -152,9 +138,9 @@ function makeBaseDef(name: string) {
     pinLayout: [] as import("../../../core/pin.js").PinDeclaration[],
     propertyDefs: [] as import("../../../core/properties.js").PropertyDefinition[],
     attributeMap: [] as import("../../../core/registry.js").AttributeMapping[],
-    category: "MISC" as unknown as ComponentCategory,
+    category: ComponentCategory.MISC,
     helpText: "",
-    factory: ((_props: PropertyBag) => { throw new Error("not used in tests"); }) as unknown as import("../../../core/registry.js").StandaloneComponentDefinition["factory"],
+    factory: (_props: PropertyBag): CircuitElement => { throw new Error("not used in tests"); },
   };
 }
 
@@ -236,7 +222,7 @@ function buildTestRegistry(): ComponentRegistry {
       { label: "In_1", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
       { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ],
-    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../../core/registry.js").ExecuteFunction } },
+    models: { digital: { executeFn: noopExecuteFn } },
   });
 
   return registry;
@@ -550,8 +536,8 @@ function buildPinLoadingTestRegistry(
   registry.register({
     ...makeBaseDef("AnalogR"),
     pinLayout: [
-      { label: "A", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
-      { label: "B", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+      { label: "pos", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+      { label: "neg", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
     ],
     defaultModel: "behavioral",
     models: {},
@@ -574,7 +560,7 @@ function buildPinLoadingTestRegistry(
       { label: "out",  direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
     ],
     defaultModel: "behavioral",
-    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../../core/registry.js").ExecuteFunction } },
+    models: { digital: { executeFn: noopExecuteFn } },
     modelRegistry: {
       behavioral: { kind: "inline" as const, factory: (pinNodes, props, _getTime) => {
         onFactory?.(props, pinNodes);
@@ -626,7 +612,7 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
 
     const registry = buildPinLoadingTestRegistry((props) => {
       if (props.has("_pinLoading")) {
-        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+        capturedPinLoading = props.get<Record<string, boolean>>("_pinLoading");
       }
     });
 
@@ -644,7 +630,7 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
 
     const registry = buildPinLoadingTestRegistry((props) => {
       if (props.has("_pinLoading")) {
-        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+        capturedPinLoading = props.get<Record<string, boolean>>("_pinLoading");
       }
     });
 
@@ -665,7 +651,7 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
 
     const registry = buildPinLoadingTestRegistry((props) => {
       if (props.has("_pinLoading")) {
-        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+        capturedPinLoading = props.get<Record<string, boolean>>("_pinLoading");
       }
     });
 
@@ -695,7 +681,7 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
 
     const registry = buildPinLoadingTestRegistry((props) => {
       if (props.has("_pinLoading")) {
-        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+        capturedPinLoading = props.get<Record<string, boolean>>("_pinLoading");
       }
     });
     const { circuit } = buildPinLoadingCircuit({ digitalPinLoading: "all" }, registry);
@@ -705,7 +691,7 @@ describe("Task 6.4.1- _pinLoading threaded to behavioural factory", () => {
 
     const registry2 = buildPinLoadingTestRegistry((props) => {
       if (props.has("_pinLoading")) {
-        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+        capturedPinLoading = props.get<Record<string, boolean>>("_pinLoading");
       }
     });
     const { circuit: circuit2 } = buildPinLoadingCircuit({ digitalPinLoading: "none" }, registry2);

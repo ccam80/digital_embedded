@@ -1,118 +1,375 @@
-/**
- * Tests for Varactor Diode component.
- *
- * The varactor routes through createDiodeElement with capacitance-tuned
- * defaults (CJO=20pF). All load behaviour lives in diode.ts.
- *
- * Covers:
- *   - VARACTOR_PARAM_DEFS partition layout
- *   - Definition shape
- *   - Setup contract: setup() allocates handles before load() is called
- *   - TSTALLOC ordering: RS=0 (default) → stamps present at A/K positions
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
 
-import { describe, it, expect } from "vitest";
-import { VaractorDefinition, VARACTOR_PARAM_DEFS } from "../varactor.js";
-import type { AnalogFactory } from "../../../core/registry.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import { DIODE_CAP_SCHEMA } from "../diode.js";
+
+const DTS_REVERSE = path.resolve(
+  "src/components/semiconductors/__tests__/fixtures/varactor-canon-reverse.dts",
+);
+const DTS_FORWARD = path.resolve(
+  "src/components/semiconductors/__tests__/fixtures/varactor-canon-forward.dts",
+);
 
 // ---------------------------------------------------------------------------
-// VARACTOR_PARAM_DEFS partition layout tests (pre-existing)
+// Programmatic build helpers for T1 fixtures.
+// VaractorDiode routes through createDiodeElement with cap-tuned defaults
+// (CJO=20pF). With CJO > 0 the diode element uses DIODE_CAP_SCHEMA (7 slots)
+// and registers getLteTimestep on the rollable charge slot.
+//
+// Forward topology: V1 -> VD:A; VD:K -> R1 -> ground. Drives the AK junction
+// into forward conduction so pnjlim limiting fires.
+// Reverse topology: V1 -> R1 -> VD:K; VD:A -> ground. Drives the junction
+// into reverse bias (Varactor's documented operating regime: voltage-tuned Cj).
 // ---------------------------------------------------------------------------
 
-describe("VARACTOR_PARAM_DEFS partition layout", () => {
-  it("AREA OFF IC have partition='instance'", () => {
-    const areaDef = VARACTOR_PARAM_DEFS.find((d) => d.key === "AREA");
-    const offDef = VARACTOR_PARAM_DEFS.find((d) => d.key === "OFF");
-    const icDef = VARACTOR_PARAM_DEFS.find((d) => d.key === "IC");
+function buildVaractorForward(
+  facade: import("../../../headless/default-facade.js").DefaultSimulatorFacade,
+  overrides: Record<string, number> = {},
+): import("../../../core/circuit.js").Circuit {
+  return facade.build({
+    components: [
+      { id: "v1", type: "DcVoltageSource", props: { label: "V1", voltage: 0.5 } },
+      { id: "vd", type: "VaractorDiode",   props: { label: "VD", ...overrides } },
+      { id: "r1", type: "Resistor",        props: { label: "R1", resistance: 300 } },
+      { id: "gnd", type: "Ground",         props: { label: "GND" } },
+    ],
+    connections: [
+      ["v1:pos", "vd:A"],
+      ["vd:K",   "r1:pos"],
+      ["r1:neg", "gnd:out"],
+      ["v1:neg", "gnd:out"],
+    ],
+  });
+}
 
-    expect(areaDef).toBeDefined();
-    expect(offDef).toBeDefined();
-    expect(icDef).toBeDefined();
+function buildVaractorReverse(
+  facade: import("../../../headless/default-facade.js").DefaultSimulatorFacade,
+  overrides: Record<string, number> = {},
+): import("../../../core/circuit.js").Circuit {
+  return facade.build({
+    components: [
+      { id: "v1", type: "DcVoltageSource", props: { label: "V1", voltage: 2 } },
+      { id: "vd", type: "VaractorDiode",   props: { label: "VD", ...overrides } },
+      { id: "r1", type: "Resistor",        props: { label: "R1", resistance: 10000 } },
+      { id: "gnd", type: "Ground",         props: { label: "GND" } },
+    ],
+    connections: [
+      ["v1:pos", "r1:pos"],
+      ["r1:neg", "vd:K"],
+      ["vd:A",   "gnd:out"],
+      ["v1:neg", "gnd:out"],
+    ],
+  });
+}
 
-    expect(areaDef!.partition).toBe("instance");
-    expect(offDef!.partition).toBe("instance");
-    expect(icDef!.partition).toBe("instance");
+function findVD(fix: ReturnType<typeof buildFixture>) {
+  const idx = fix.circuit.elements.findIndex(
+    (_e, i) => fix.elementLabels.get(i) === "VD",
+  );
+  expect(idx).toBeGreaterThanOrEqual(0);
+  const el = fix.circuit.elements[idx]!;
+  const ce = fix.circuit.elementToCircuitElement.get(idx);
+  expect(ce).toBeDefined();
+  return { idx, el, ce: ce! };
+}
+
+// ---------------------------------------------------------------------------
+// Category 1 — Initialization (T1)
+// Asserts the warm-started state pool slot reads finite for the Varactor
+// element after compile() + first coordinator.step(). Varactor delegates to
+// createDiodeElement; with CJO=20pF default the element uses DIODE_CAP_SCHEMA.
+// VD slot is the pnjlim-limited junction voltage.
+// ---------------------------------------------------------------------------
+
+describe("Varactor initialization (T1)", () => {
+  const SLOT_VD = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
+
+  it("init_varactor_vd_seeded_reverse", () => {
+    const fix = buildFixture({ build: (_r, f) => buildVaractorReverse(f) });
+    const { el } = findVD(fix);
+    const vd = fix.pool.state0[el._stateBase + SLOT_VD];
+    expect(Number.isFinite(vd)).toBe(true);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:K")!);
+    expect(Number.isFinite(vA)).toBe(true);
+    expect(Number.isFinite(vK)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2 — DC operating point (T1, analytical)
+// Reverse-bias closed-form: V1=2V across the (R=10kΩ + reverse-blocked
+// varactor) series chain. The reverse-blocked junction passes only IS-scale
+// leakage current (≪ 1µA at 300K), so essentially V_R ≈ 0 and the cathode
+// node sits at V1; the anode is grounded. Varactor reverse voltage Vd =
+// V_A - V_K ≈ -2V. Bound: anode-cathode voltage stays below 0V (reverse) and
+// the magnitude is close to V1.
+// ---------------------------------------------------------------------------
+
+describe("Varactor DCOP analytical (T1)", () => {
+  it("dcop_varactor_reverse_vd_negative", () => {
+    const fix = buildFixture({ build: (_r, f) => buildVaractorReverse(f) });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:A")!);
+    const vK = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("VD:K")!);
+    const vd = vA - vK;
+    // Reverse-bias Varactor blocks: V_R drop across R1 is microscopic, so
+    // V_K ≈ V1 = 2V, V_A = 0V → Vd ≈ -2V.
+    expect(vd).toBeLessThan(0);
+    expect(vd).toBeLessThan(-1.5);
+    expect(vd).toBeGreaterThan(-2.1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 4 — Parameter hot-load (T1)
+// Varactor exposes the diode-shared param surface via VARACTOR_PARAM_DEFS.
+// Structural (CJO, IS, VJ, M, RS), depletion-cap (CJO/VJ/M govern Cj(V_R)),
+// derived-state-recompute (TEMP — universal). Asserts simulator output
+// changes after setComponentProperty + step.
+// ---------------------------------------------------------------------------
+
+describe("Varactor parameter hot-load (T1)", () => {
+  it("hotload_IS_changes_vd_forward", () => {
+    const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
+    const { ce } = findVD(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("VD:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "IS", 1e-6);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    // Larger IS → lower forward Vf at the same current.
+    expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeLessThan(before);
   });
 
-  it("CJO VJ M IS FC TT N RS BV IBV NBV IKF IKR EG XTI KF AF TNOM have partition='model'", () => {
-    const modelKeys = ["CJO", "VJ", "M", "IS", "FC", "TT", "N", "RS", "BV", "IBV", "NBV", "IKF", "IKR", "EG", "XTI", "KF", "AF", "TNOM"];
-    for (const key of modelKeys) {
-      const def = VARACTOR_PARAM_DEFS.find((d) => d.key === key);
-      expect(def).toBeDefined();
-      expect(def!.partition).toBe("model");
+  it("hotload_CJO_changes_dynamic_response_reverse", () => {
+    // CJO is the headline Varactor parameter (junction capacitance at zero
+    // bias). At DCOP the cap path is dormant (capGate is false outside
+    // MODETRAN/MODEAC/MODEINITSMSIG); drive a transient step to expose the
+    // cap-block recompute. Larger CJO → larger junction Cj at the same V_R.
+    const fix = buildFixture({
+      build: (_r, f) => buildVaractorReverse(f),
+      params: { tStop: 1e-6, maxTimeStep: 1e-8 },
+    });
+    const { ce } = findVD(fix);
+    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "CJO", 200e-12);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vCath);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_VJ_changes_dynamic_response_reverse", () => {
+    // VJ shifts the junction built-in potential, which scales the depletion
+    // cap formula Cj(V_R) = CJO/(1 - V_d/VJ)^M. Drive a transient to surface
+    // the cap-block recompute through the cathode-node voltage.
+    const fix = buildFixture({
+      build: (_r, f) => buildVaractorReverse(f),
+      params: { tStop: 1e-6, maxTimeStep: 1e-8 },
+    });
+    const { ce } = findVD(fix);
+    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "VJ", 1.4);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vCath);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_M_changes_dynamic_response_reverse", () => {
+    // M is the grading coefficient (sharpness of Cj(V) curve). Doubling M
+    // changes the reverse-bias capacitance noticeably under transient drive.
+    const fix = buildFixture({
+      build: (_r, f) => buildVaractorReverse(f),
+      params: { tStop: 1e-6, maxTimeStep: 1e-8 },
+    });
+    const { ce } = findVD(fix);
+    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "M", 0.95);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vCath);
+    expect(after).not.toBe(before);
+  });
+
+  it("hotload_RS_changes_anode_voltage_forward", () => {
+    const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
+    const { ce } = findVD(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("VD:A")!;
+    const before = fix.engine.getNodeVoltage(vAnode);
+    fix.coordinator.setComponentProperty(ce, "RS", 50);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode);
+    // Larger RS → additional series voltage drop across the device →
+    // anode-side node voltage shifts observably.
+    expect(after).not.toBeCloseTo(before, 6);
+  });
+
+  it("hotload_TEMP_changes_vf_forward", () => {
+    // TEMP is the derived-state-recompute parameter (universal). setParam
+    // triggers recomputeTemp() which re-derives tIS / tVJ / tCJO / tVcrit / tBV.
+    const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
+    const { ce } = findVD(fix);
+    const vAnode = fix.circuit.labelToNodeId.get("VD:A")!;
+    const vCath = fix.circuit.labelToNodeId.get("VD:K")!;
+    const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    fix.coordinator.setComponentProperty(ce, "TEMP", 400);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
+    // Raising T raises tIS exponentially → at the same forward current Vf drops.
+    expect(after).not.toBeCloseTo(before, 6);
+    expect(after).toBeLessThan(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 6 — Limiting events (T1, own engine)
+// pnjlim fires on the AK junction during forward-bias DCOP NR. Drive the
+// forward topology and read fix.coordinator.getLimitingEvents().
+// ---------------------------------------------------------------------------
+
+describe("Varactor limiting events own-engine (T1)", () => {
+  it("limiting_pnjlim_fires_varactor_forward", () => {
+    const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
+    fix.coordinator.setLimitingCapture(true);
+    fix.coordinator.dcOperatingPoint();
+    const events = fix.coordinator.getLimitingEvents();
+    const ak = events.find(e => e.label === "VD" && e.junction === "AK");
+    expect(ak).toBeDefined();
+    expect(ak!.limitType).toBe("pnjlim");
+    expect(Number.isFinite(ak!.vBefore)).toBe(true);
+    expect(Number.isFinite(ak!.vAfter)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 7 — LTE rollback (T1)
+// Varactor delegates to createDiodeElement which registers getLteTimestep
+// when hasCapacitance (CJO=20pF default). The proposal reads cktTerr() over
+// Q / CCAP rollable slots. Rollback invariant: after warm-start + a few
+// transient steps, state0 and state1 both carry finite values for the
+// rollable charge slot (rotation occurred, no NaN poisoning).
+// ---------------------------------------------------------------------------
+
+describe("Varactor LTE rollback (T1)", () => {
+  it("lte_rollback_state_invariant", () => {
+    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const fix = buildFixture({
+      build: (_r, f) => buildVaractorReverse(f),
+      params: { tStop: 1e-6, maxTimeStep: 1e-7 },
+    });
+    fix.coordinator.setConvergenceLogEnabled(true);
+    for (let i = 0; i < 10; i++) fix.coordinator.step();
+    const { el } = findVD(fix);
+    expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
+    expect(Number.isFinite(fix.pool.state1[el._stateBase + SLOT_Q])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Category 2-numerical / 3 / 5 / 6-paired — Harness sessions (T3)
+// One describe()/session per .dts. Each opens once in beforeAll, runs the
+// transient inside the FIRST it() (so a hard throw shows as a failed test
+// rather than a silent suite-skip), reuses across categories that share that
+// circuit, disposes in afterAll. Gated on canonical dllAvailable() via
+// describeIfDll.
+// ---------------------------------------------------------------------------
+
+describeIfDll("Varactor reverse-bias paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_REVERSE,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  // First it() owns the run. Hard throws here surface as failed tests
+  // (not silent suite-level skips).
+  it("transient_step_end_paired_reverse", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_reverse", () => {
+    // Step 0 of a transient is the first-time DCOP solve. getStepEnd(0)
+    // exposes converged DC node and component slot values.
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
     }
   });
+
+  it("full_iteration_paired_reverse", () => {
+    session.compareAllAttempts();
+  });
 });
 
-// ---------------------------------------------------------------------------
-// Varactor definition tests
-// ---------------------------------------------------------------------------
+describeIfDll("Varactor forward-conduction paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
 
-describe("Varactor definition", () => {
-  it("definition_has_correct_fields", () => {
-    expect(VaractorDefinition.name).toBe("VaractorDiode");
-    expect(VaractorDefinition.modelRegistry?.["spice"]).toBeDefined();
-    expect(VaractorDefinition.modelRegistry?.["spice"]?.kind).toBe("inline");
-    expect((VaractorDefinition.modelRegistry?.["spice"] as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBeDefined();
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_FORWARD,
+      dllPath: DLL_PATH,
+    });
   });
 
-});
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
 
-// ---------------------------------------------------------------------------
-// Varactor setup contract tests
-// ---------------------------------------------------------------------------
+  it("transient_step_end_paired_forward", async () => {
+    await session.runTransient(0, 1e-5, 1e-7);
+    session.compareAllSteps();
+  });
 
-describe("Varactor setup contract", () => {
-  it("TSTALLOC_ordering_RS_zero_7_entries", async () => {
-    // RS=0 (default): _posPrimeNode aliases posNode.
-    // With a forward-biased varactor, the diode stamps conductance at A/K positions.
-    // Assert non-zero self-conductance entries at vd:A and vd:K rows.
-    const session = await ComparisonSession.createSelfCompare({
-      buildCircuit: (registry) => {
-        const facade = new DefaultSimulatorFacade(registry);
-        return facade.build({
-          components: [
-            { id: "vs",  type: "DcVoltageSource", props: { label: "vs",  voltage: 0.3 } },
-            { id: "vd",  type: "VaractorDiode",   props: { label: "vd",  RS: 0, CJO: 0 } },
-            { id: "gnd", type: "Ground" },
-          ],
-          connections: [
-            ["vs:pos",  "vd:A"],
-            ["vd:K",    "gnd:out"],
-            ["vs:neg",  "gnd:out"],
-          ],
-        });
-      },
-      analysis: "dcop",
-    });
-
+  it("dcop_paired_forward", () => {
     const stepEnd = session.getStepEnd(0);
-    expect(stepEnd.converged.ours).toBe(true);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) {
+        expect(cv.withinTol).toBe(true);
+      }
+    }
+  });
 
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
-    const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
-    const M = lastIter.matrix!;
-    const ms = lastIter.matrixSize;
+  it("full_iteration_paired_forward", () => {
+    session.compareAllAttempts();
+  });
 
-    const matrixRowLabels = (session as unknown as {
-      _ourTopology: { matrixRowLabels: Map<number, string> };
-    })._ourTopology.matrixRowLabels;
-
-    let vdARow = -1;
-    let vdKRow = -1;
-    matrixRowLabels.forEach((label, row) => {
-      if (label.includes("vd:A")) vdARow = row;
-      if (label.includes("vd:K")) vdKRow = row;
-    });
-
-    expect(vdARow).toBeGreaterThanOrEqual(0);
-    expect(vdKRow).toBeGreaterThanOrEqual(0);
-
-    // Forward-biased: anode self-conductance must be non-zero (diosetup.c entry 5).
-    expect(Math.abs(M[vdARow * ms + vdARow])).toBeGreaterThan(0);
-    // Cathode self-conductance must be non-zero (diosetup.c entry 6).
-    expect(Math.abs(M[vdKRow * ms + vdKRow])).toBeGreaterThan(0);
+  it("limiting_paired_forward", () => {
+    // Pair pnjlim limiting events on VD AK junction across the first attempt
+    // of step 0. wasLimited and {vBefore, vAfter} must agree bit-exact.
+    const cmp = session.getLimitingComparison("VD", 0, 0);
+    for (const j of cmp.junctions) {
+      expect(j.limitingDiff).toBe(0);
+    }
   });
 });

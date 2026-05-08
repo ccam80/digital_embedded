@@ -140,6 +140,35 @@ describe("Invariant 2: at most one clock-capable input pin per digital component
 
 const IDENT_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+// ---------------------------------------------------------------------------
+// Invariant 4 — clock-capable pin label convention
+// ---------------------------------------------------------------------------
+//
+// Sequential components conventionally name their clock input "C", "CLK", or
+// "CK".  When a pin is flagged `isClockCapable: true` its label must come from
+// this allowlist so the visual convention (drawing the wire to a pin labelled
+// "C") matches the runtime semantics (edge-detection on that pin).  A typo
+// like flagging "DIN" as clock-capable, or naming the clock pin "Clk2" while
+// flagging it, would silently break the wire-drawing convention this audit
+// guards against.
+
+const CLOCK_LABELS: ReadonlySet<string> = new Set(["C", "CLK", "CK"]);
+
+describe("Invariant 4: isClockCapable pins use a recognised clock label", () => {
+  it.each(DIGITAL_CASES.map((c) => [c.name, c] as const))(
+    "%s: every isClockCapable pin has label C / CLK / CK",
+    (_name, c) => {
+      const layout: readonly PinDeclaration[] = c.definition.pinLayout ?? [];
+      const clockPins = layout.filter(
+        (p) => p.direction === PinDirection.INPUT && p.isClockCapable === true,
+      );
+      for (const pin of clockPins) {
+        expect(CLOCK_LABELS.has(pin.label)).toBe(true);
+      }
+    },
+  );
+});
+
 describe("Invariant 3: propertyDefs keys are unique identifier-shaped strings", () => {
   it.each(DIGITAL_CASES.map((c) => [c.name, c] as const))(
     "%s: propertyDefs keys are unique and match /^[a-zA-Z_][a-zA-Z0-9_]*$/",

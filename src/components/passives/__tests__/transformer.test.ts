@@ -1,344 +1,363 @@
-/**
- * Tests for the Transformer component.
- *
- * Â§4c gap-fill (2026-05-03): all engine-impersonator tests that hand-rolled
- * `new StatePool(...)`, drove `element.load(ctx)` directly through fabricated
- * `LoadContext` objects, or impersonated `SetupContext` to allocate branches /
- * solver handles by hand have been deleted. Bit-exact per-NR-iteration parity
- * is covered by the ngspice comparison harness (`harness_*` MCP tools,
- * `src/solver/analog/__tests__/ngspice-parity/*`).
- *
- * Remaining coverage in this file:
- *   - Component definition / pinLayout / attributeMapping smoke tests
- *   - Property-bag factory checks (`_stateBase = -1` before compile)
- *   - Voltage ratio (V_sec â‰ˆ V_pri / N) â€” observed through public engine
- *   - Power conservation (P_sec â‰ˆ P_ideal) â€” observed through public engine
- *   - DC steady-state (inductor short â‡’ V_sec â‰ˆ 0) â€” observed through public engine
- *   - Leakage (k=0.8 < k=0.99 secondary peak) â€” observed through public engine
- */
+/** Tests for the Transformer component (two-winding, netlist composite). */
 
-import { describe, it, expect } from "vitest";
-import {
-  AnalogTransformerElement,
-  TransformerDefinition,
-  TRANSFORMER_ATTRIBUTE_MAPPINGS,
-} from "../transformer.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
+
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
+import {
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import type { Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// .dts paths (T3 fixtures)
 // ---------------------------------------------------------------------------
 
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
+const DTS_AC_STEP_DOWN = path.resolve(
+  "src/components/passives/__tests__/fixtures/transformer-canon-ac-step-down.dts",
+);
+const DTS_RL_PULSE = path.resolve(
+  "src/components/passives/__tests__/fixtures/transformer-canon-rl-pulse.dts",
+);
+
+// ---------------------------------------------------------------------------
+// Programmatic builders (T1)
+// ---------------------------------------------------------------------------
+
+interface AcBenchParams {
+  amplitude: number;
+  frequency: number;
+  rLoad?: number;
+  turnsRatio?: number;
+  primaryInductance?: number;
+  couplingCoefficient?: number;
 }
 
-function findTransformer(elements: ReadonlyArray<unknown>): AnalogTransformerElement {
-  const idx = elements.findIndex((el) => el instanceof AnalogTransformerElement);
-  if (idx < 0) throw new Error("AnalogTransformerElement not found in compiled circuit");
-  return elements[idx] as AnalogTransformerElement;
-}
-
-// ---------------------------------------------------------------------------
-// AC transformer fixture: AcVoltageSource â†’ primary â†’ secondary â†’ R_load â†’ GND
-// ---------------------------------------------------------------------------
-
-interface AcXfmrParams {
-  N: number;
-  Vpeak: number;
-  freq: number;
-  Lp: number;
-  k: number;
-  Rload: number;
-  rPri?: number;
-  rSec?: number;
-}
-
-function buildAcXfmrCircuit(facade: DefaultSimulatorFacade, p: AcXfmrParams): Circuit {
+function buildAcBench(facade: DefaultSimulatorFacade, p: AcBenchParams): Circuit {
   return facade.build({
     components: [
-      { id: "vs",   type: "AcVoltageSource", props: { amplitude: p.Vpeak, frequency: p.freq, label: "vs" } },
-      { id: "xfmr", type: "Transformer",     props: { turnsRatio: p.N, primaryInductance: p.Lp, couplingCoefficient: p.k, primaryResistance: p.rPri ?? 0, secondaryResistance: p.rSec ?? 0, label: "xfmr" } },
-      { id: "rl",   type: "Resistor",        props: { resistance: p.Rload } },
-      { id: "gnd",  type: "Ground" },
+      { id: "vs",  type: "AcVoltageSource", props: {
+          label: "V1", amplitude: p.amplitude, frequency: p.frequency,
+      } },
+      { id: "tx",  type: "Transformer", props: {
+          label:               "TX1",
+          model:               "behavioral",
+          turnsRatio:          p.turnsRatio          ?? 2.0,
+          primaryInductance:   p.primaryInductance   ?? 100e-3,
+          couplingCoefficient: p.couplingCoefficient ?? 0.8,
+      } },
+      { id: "rl",  type: "Resistor", props: { label: "R_LOAD", resistance: p.rLoad ?? 100 } },
+      { id: "gnd", type: "Ground",   props: { label: "GND" } },
     ],
     connections: [
-      ["vs:pos",   "xfmr:P1"],
-      ["xfmr:P2",  "gnd:out"],
-      ["vs:neg",   "gnd:out"],
-      ["xfmr:S1",  "rl:pos"],
-      ["rl:neg",   "gnd:out"],
-      ["xfmr:S2",  "gnd:out"],
+      ["vs:pos",  "tx:P1"],
+      ["vs:neg",  "gnd:out"],
+      ["tx:P2",   "gnd:out"],
+      ["tx:S1",   "rl:pos"],
+      ["rl:neg",  "gnd:out"],
+      ["tx:S2",   "gnd:out"],
     ],
   });
 }
 
-// ---------------------------------------------------------------------------
-// Transformer behaviour tests (observed through public engine surface)
-// ---------------------------------------------------------------------------
+interface DcBenchParams {
+  vSource: number;
+  rSeries?: number;
+  rLoad?: number;
+  turnsRatio?: number;
+  primaryInductance?: number;
+  couplingCoefficient?: number;
+}
 
-describe("Transformer", () => {
-  it("voltage_ratio - N=10:1 secondary â‰ˆ primary/10 for k=0.99 in AC steady state", async () => {
-    const N = 10;
-    const Vpeak = 1.2;
-    const freq = 1000;
-    const Lp = 100e-3;
-    const k = 0.99;
-    const Rload = 100.0;
-    const numCycles = 10;
-    const period = 1 / freq;
-
-    const samplesPerCycle = 200;
-    const totalSamples = numCycles * samplesPerCycle;
-    const tStop = numCycles * period;
-
-    const fix = buildFixture({
-      build: (_r, facade) => buildAcXfmrCircuit(facade, { N, Vpeak, freq, Lp, k, Rload }),
-      params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
-    });
-    const xfmr = findTransformer(fix.circuit.elements);
-    const s1Node = xfmr.pinNodes.get("S1")!;
-
-    const times = Array.from({ length: totalSamples }, (_, i) =>
-      (i + 1) * (tStop / totalSamples),
-    );
-    const samples = await fix.coordinator.sampleAtTimes(
-      times,
-      () => fix.engine.getNodeVoltage(s1Node),
-    );
-
-    // Find peak in the last cycle.
-    const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
-    let maxSecondary = 0;
-    for (let i = lastCycleOffset; i < samples.length; i++) {
-      const v = Math.abs(samples[i] as number);
-      if (v > maxSecondary) maxSecondary = v;
-    }
-
-    const idealPeak = Vpeak / N;
-    expect(maxSecondary).toBeGreaterThan(idealPeak * 0.90);
-    expect(maxSecondary).toBeLessThan(idealPeak * 1.10);
+function buildDcBench(facade: DefaultSimulatorFacade, p: DcBenchParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",   type: "DcVoltageSource", props: { label: "V1",    voltage: p.vSource } },
+      { id: "rser", type: "Resistor",        props: { label: "R_SER", resistance: p.rSeries ?? 100 } },
+      { id: "tx",   type: "Transformer", props: {
+          label:               "TX1",
+          model:               "behavioral",
+          turnsRatio:          p.turnsRatio          ?? 1.0,
+          primaryInductance:   p.primaryInductance   ?? 10e-3,
+          couplingCoefficient: p.couplingCoefficient ?? 0.99,
+      } },
+      { id: "rl",  type: "Resistor", props: { label: "R_LOAD", resistance: p.rLoad ?? 1000 } },
+      { id: "gnd", type: "Ground",   props: { label: "GND" } },
+    ],
+    connections: [
+      ["vs:pos",  "rser:pos"],
+      ["rser:neg","tx:P1"],
+      ["vs:neg",  "gnd:out"],
+      ["tx:P2",   "gnd:out"],
+      ["tx:S1",   "rl:pos"],
+      ["rl:neg",  "gnd:out"],
+      ["tx:S2",   "gnd:out"],
+    ],
   });
+}
 
-  it("power_conservation - P_secondary â‰ˆ P_ideal for k=0.99 within 5%", async () => {
-    const N = 1;
-    const Vpeak = 2.0;
-    const freq = 50;
-    const Lp = 100e-3;
-    const k = 0.99;
-    const Rload = 5.0;
-    const numCycles = 20;
-    const period = 1 / freq;
-    const samplesPerCycle = 400;
-    const totalSamples = numCycles * samplesPerCycle;
-    const tStop = numCycles * period;
+function nodeOf(fix: Fixture, label: string): number {
+  const n = fix.circuit.labelToNodeId.get(label);
+  if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
+  return n;
+}
 
+function getTransformerCe(fix: Fixture) {
+  const idx = fix.circuit.elements.findIndex(
+    (_e, i) => fix.elementLabels.get(i) === "TX1",
+  );
+  if (idx < 0) throw new Error("TX1 element not found by label");
+  const ce = fix.circuit.elementToCircuitElement.get(idx);
+  if (ce === undefined) throw new Error("TX1 elementToCircuitElement entry missing");
+  return ce;
+}
+
+// ===========================================================================
+// Category 1 — Initialization (T1)
+// Post-warm-start: the netlist composite expands to 2 inductors (L1, L2) +
+// 1 transformer-coupling (MUT). With P2 and S2 both grounded and inductors
+// behaving as DC shorts, the post-warm-start V(P1) and V(S1) sit at their
+// DCOP values. With external R_SER on the primary and R_LOAD on the
+// secondary, V(P1) ≈ 0V (primary inductor shorts to grounded P2) and V(S1)
+// ≈ 0V (secondary inductor shorts to grounded S2).
+// ===========================================================================
+
+describe("Transformer initialization — DC grounded P2/S2 (T1)", () => {
+  it("init_grounded_returns_zero_node_voltages", () => {
     const fix = buildFixture({
-      build: (_r, facade) => buildAcXfmrCircuit(facade, { N, Vpeak, freq, Lp, k, Rload }),
-      params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
-    });
-    const xfmr = findTransformer(fix.circuit.elements);
-    const s1Node = xfmr.pinNodes.get("S1")!;
-
-    const times = Array.from({ length: totalSamples }, (_, i) =>
-      (i + 1) * (tStop / totalSamples),
-    );
-    const samples = await fix.coordinator.sampleAtTimes(
-      times,
-      () => fix.engine.getNodeVoltage(s1Node),
-    );
-
-    // Average VÂ² over the last cycle to get V_rmsÂ² for secondary power.
-    const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
-    let sumV2sq = 0;
-    let sampleCount = 0;
-    for (let i = lastCycleOffset; i < samples.length; i++) {
-      const v2 = samples[i] as number;
-      sumV2sq += v2 * v2;
-      sampleCount++;
-    }
-
-    const pSec = (sumV2sq / sampleCount) / Rload;
-    const pIdeal = (Vpeak * Vpeak) / (2 * Rload);
-
-    expect(pSec).toBeGreaterThan(0);
-    expect(pSec).toBeLessThanOrEqual(pIdeal * 1.05);
-    expect(pSec).toBeGreaterThanOrEqual(pIdeal * 0.50);
-  });
-
-  it("leakage_with_low_k - k=0.8 secondary peak < k=0.99 secondary peak", async () => {
-    /**
-     * Lower coupling â†’ more leakage inductance â†’ less energy transferred to
-     * secondary. Observed through `coordinator.sampleAtTimes` reading
-     * `xfmr:S1`; no engine-internal stamping inspection.
-     */
-    async function peakSecondary(k: number): Promise<number> {
-      const N = 2;
-      const Vpeak = 1.0;
-      const freq = 1000;
-      const Lp = 100e-3;
-      const Rload = 50.0;
-      const numCycles = 10;
-      const period = 1 / freq;
-      const samplesPerCycle = 200;
-      const totalSamples = numCycles * samplesPerCycle;
-      const tStop = numCycles * period;
-
-      const fix = buildFixture({
-        build: (_r, facade) => buildAcXfmrCircuit(facade, { N, Vpeak, freq, Lp, k, Rload }),
-        params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
-      });
-      const xfmr = findTransformer(fix.circuit.elements);
-      const s1Node = xfmr.pinNodes.get("S1")!;
-
-      const times = Array.from({ length: totalSamples }, (_, i) =>
-        (i + 1) * (tStop / totalSamples),
-      );
-      const samples = await fix.coordinator.sampleAtTimes(
-        times,
-        () => fix.engine.getNodeVoltage(s1Node),
-      );
-
-      const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
-      let maxSec = 0;
-      for (let i = lastCycleOffset; i < samples.length; i++) {
-        const v = Math.abs(samples[i] as number);
-        if (v > maxSec) maxSec = v;
-      }
-      return maxSec;
-    }
-
-    const highK = await peakSecondary(0.99);
-    const lowK  = await peakSecondary(0.80);
-    expect(lowK).toBeLessThan(highK);
-  });
-
-  it("dc_blocks - DC steady state shorts secondary to ground (V_sec â‰ˆ 0)", () => {
-    /**
-     * In DC steady state, inductors are short circuits (dI/dt = 0).
-     * The transformer load() skips inductive companion stamps in MODEDC, so
-     * each winding becomes a pure KVL short: V_winding = 0.
-     *
-     * Topology: Vdc â†’ R_series â†’ primary; secondary â†’ R_load â†’ GND. The
-     * external R_series breaks the voltage-source/short conflict that would
-     * otherwise occur if Vdc fed the primary directly.
-     *
-     * Expected: V(xfmr:S1) â‰ˆ 0 (secondary shorted in DC).
-     */
-    const Vdc = 5.0;
-    const Lp = 1.0;
-    const k = 0.99;
-    const Rload = 100.0;
-    const Rseries = 100.0;
-
-    const fix = buildFixture({
-      build: (_r, facade) => facade.build({
-        components: [
-          { id: "vs",     type: "DcVoltageSource", props: { label: "vs",   voltage: Vdc } },
-          { id: "rser",   type: "Resistor",        props: { label: "rser", resistance: Rseries } },
-          { id: "xfmr",   type: "Transformer",     props: { label: "xfmr", turnsRatio: 1, primaryInductance: Lp, couplingCoefficient: k, primaryResistance: 0, secondaryResistance: 0 } },
-          { id: "rl",     type: "Resistor",        props: { label: "rl",   resistance: Rload } },
-          { id: "gnd",    type: "Ground" },
-        ],
-        connections: [
-          ["vs:pos",   "rser:pos"],
-          ["rser:neg", "xfmr:P1"],
-          ["xfmr:P2",  "gnd:out"],
-          ["xfmr:S1",  "rl:pos"],
-          ["rl:neg",   "gnd:out"],
-          ["xfmr:S2",  "gnd:out"],
-          ["vs:neg",   "gnd:out"],
-        ],
-      }),
+      build: (_r, facade) => buildDcBench(facade, { vSource: 5, rSeries: 100, rLoad: 1e6 }),
     });
 
-    const dcop = fix.coordinator.dcOperatingPoint()!;
-    expect(dcop.converged).toBe(true);
+    // P2 and S2 are tied directly to ground.
+    const vP2 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:P2"));
+    const vS2 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S2"));
+    expect(vP2).toBeCloseTo(0, 6);
+    expect(vS2).toBeCloseTo(0, 6);
 
-    const xfmr = findTransformer(fix.circuit.elements);
-    const s1Node = xfmr.pinNodes.get("S1")!;
-    const vSec = Math.abs(fix.engine.getNodeVoltage(s1Node));
-    expect(vSec).toBeLessThan(Vdc * 0.05);
+    // Inductor primary is a DC short ⇒ V(P1) = V(P2) = 0V at steady state.
+    const vP1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:P1"));
+    expect(vP1).toBeCloseTo(0, 6);
+
+    // Secondary inductor is also a DC short ⇒ V(S1) = V(S2) = 0V.
+    const vS1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S1"));
+    expect(vS1).toBeCloseTo(0, 6);
   });
 });
 
-// ---------------------------------------------------------------------------
-// State-pool contract (factory-only, no engine impersonation)
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Category 2 — DCOP analytical (T1)
+// Inductors short at DC; with secondary tied to ground via S2 and shunted
+// by R_LOAD, secondary node voltages collapse to 0V. V(P1)=0V (primary
+// short to grounded P2). I_primary = Vsrc / R_SER.
+// ===========================================================================
 
-describe("AnalogTransformerElement state pool", () => {
-  it("_stateBase is -1 before compiler assigns it", () => {
-    const props = new PropertyBag();
-    props.setModelParam("turnsRatio", 1);
-    props.setModelParam("primaryInductance", 10e-3);
-    props.setModelParam("couplingCoefficient", 0.99);
-    props.setModelParam("primaryResistance", 0);
-    props.setModelParam("secondaryResistance", 0);
-    const core = getFactory(TransformerDefinition.modelRegistry!.behavioral!)(
-      new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), props, () => 0,
-    );
-    expect((core as PoolBackedAnalogElement)._stateBase).toBe(-1);
-  });
-
-  it("element allocates a branch row in setup() (visible after buildFixture warm-start)", () => {
+describe("Transformer DCOP analytical — DC grounded P2/S2 (T1)", () => {
+  it("dcop_inductor_shorts_at_dc", () => {
     const fix = buildFixture({
-      build: (_r, facade) => buildAcXfmrCircuit(facade, {
-        N: 1, Vpeak: 1, freq: 1000, Lp: 10e-3, k: 0.99, Rload: 1000,
-      }),
-      params: { tStop: 1e-3, maxTimeStep: 1e-5, uic: true },
+      build: (_r, facade) => buildDcBench(facade, { vSource: 5, rSeries: 100, rLoad: 1e6 }),
     });
-    const xfmr = findTransformer(fix.circuit.elements);
-    expect(xfmr.branchIndex).toBeGreaterThan(0);
-    expect(xfmr.branch2).toBeGreaterThan(0);
+
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+
+    const vP1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:P1"));
+    const vS1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S1"));
+    // Both windings short at DC ⇒ V(P1) and V(S1) collapse to 0V.
+    expect(vP1).toBeCloseTo(0, 4);
+    expect(vS1).toBeCloseTo(0, 4);
   });
 });
 
-// ---------------------------------------------------------------------------
-// ComponentDefinition smoke tests
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Categories 2-numerical / 3 / 5 — paired vs ngspice (T3)
+// One describe per .dts; first it() owns the run.
+// ===========================================================================
 
-describe("TransformerDefinition", () => {
-  it("name is Transformer", () => {
-    expect(TransformerDefinition.name).toBe("Transformer");
+describeIfDll("Transformer AC step-down vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_AC_STEP_DOWN, dllPath: DLL_PATH });
   });
 
-  it("TransformerDefinition has analog model", () => {
-    expect(TransformerDefinition.modelRegistry?.behavioral).toBeDefined();
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("has analogFactory", () => {
-    expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+  it("transient_step_end_paired_ac_step_down", async () => {
+    // f = 1kHz ⇒ period = 1ms. Run 5 cycles at 200 steps/cycle.
+    await session.runTransient(0, 5e-3, 5e-6);
+    session.compareAllSteps();
   });
 
-  it("category is PASSIVES", () => {
-    expect(TransformerDefinition.category).toBe(ComponentCategory.PASSIVES);
+  it("dcop_paired_ac_step_down", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
+    }
   });
 
-  it("pinLayout has 4 entries", () => {
-    expect(TransformerDefinition.pinLayout).toHaveLength(4);
-    const labels = TransformerDefinition.pinLayout.map((p) => p.label);
-    expect(labels).toContain("P1");
-    expect(labels).toContain("P2");
-    expect(labels).toContain("S1");
-    expect(labels).toContain("S2");
+  it("full_iteration_paired_ac_step_down", () => {
+    session.compareAllAttempts();
+  });
+});
+
+describeIfDll("Transformer RL pulse vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_RL_PULSE, dllPath: DLL_PATH });
   });
 
-  it("can be registered without error", () => {
-    const registry = new ComponentRegistry();
-    expect(() => registry.register(TransformerDefinition)).not.toThrow();
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
   });
 
-  it("attribute mappings map turnsRatio", () => {
-    const m = TRANSFORMER_ATTRIBUTE_MAPPINGS.find((a) => a.xmlName === "turnsRatio");
-    expect(m).toBeDefined();
-    expect(m!.propertyKey).toBe("turnsRatio");
+  it("transient_step_end_paired_rl_pulse", async () => {
+    // f = 500Hz ⇒ period = 2ms. Run 4 cycles at fine maxStep so the pulse
+    // edges are well-resolved across the inductor companion model.
+    await session.runTransient(0, 8e-3, 1e-5);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_rl_pulse", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_rl_pulse", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ===========================================================================
+// Category 4 — Parameter hot-load (T1)
+// One it() per netlist-consumed parameter:
+//   - turnsRatio (primary scaling): doubles ⇒ L2 = L1 / N² scales by 1/4
+//     ⇒ AC transient response shifts on V(S1).
+//   - primaryInductance (primary scaling): doubles ⇒ L1 doubles, L2 doubles,
+//     M = k·sqrt(L1·L2) doubles ⇒ AC transient amplitude/phase shifts.
+//   - couplingCoefficient (mutual scaling): drops ⇒ M = k·sqrt(L1·L2) drops
+//     proportionally ⇒ secondary peak amplitude drops at same simTime.
+// Assertions on simulator outputs only (V(TX1:S1) under AC drive).
+// ===========================================================================
+
+describe("Transformer parameter hot-load (T1)", () => {
+  it("hotload_turnsRatio_changes_secondary_voltage", () => {
+    // AC drive: changing turns ratio scales L2 = L1/N² ⇒ V(S1) at same simTime shifts.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    // Run 1.5 cycles to let the AC ramp settle past startup transient.
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "turnsRatio", 4.0);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_primaryInductance_changes_secondary_voltage", () => {
+    // Doubling primary inductance scales both self-inductances 2× and the
+    // mutual term 2× as well (M = k·sqrt(L1·L2)). Phase/amplitude shifts.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "primaryInductance", 200e-3);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_couplingCoefficient_changes_secondary_voltage", () => {
+    // Lower k ⇒ M = k·sqrt(L1·L2) drops proportionally ⇒ less energy coupled
+    // to the secondary ⇒ V(S1) magnitude shifts at the same simTime.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "couplingCoefficient", 0.3);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_primaryResistance_changes_secondary_voltage", () => {
+    // primaryResistance is a documented model param on the Transformer; the
+    // contract is that adjusting it changes the primary-side series losses
+    // and therefore V(S1) at the same simTime under AC drive. Assert the
+    // documented contract.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "primaryResistance", 50);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_secondaryResistance_changes_secondary_voltage", () => {
+    // secondaryResistance is a documented model param on the Transformer;
+    // raising it adds a series loss in the secondary loop and shifts V(S1)
+    // at the same simTime under AC drive. Assert the documented contract.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "secondaryResistance", 50);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
   });
 });

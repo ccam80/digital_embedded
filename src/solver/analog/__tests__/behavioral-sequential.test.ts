@@ -21,17 +21,6 @@ import { createDefaultRegistry } from "../../../components/register-all.js";
 import { CounterDefinition } from "../../../components/memory/counter.js";
 import { CounterPresetDefinition } from "../../../components/memory/counter-preset.js";
 import { RegisterDefinition } from "../../../components/memory/register.js";
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import { PropertyBag } from "../../../core/properties.js";
-
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
 // ---------------------------------------------------------------------------
 // Bit reconstruction helper
 // ---------------------------------------------------------------------------
@@ -283,7 +272,7 @@ describe("Register", () => {
           });
         }
 
-        const connections: import("../../../headless/netlist-types.js").CircuitSpec["connections"] = [
+        const connections: [string, string][] = [
           ["clk:out",  "reg:C"],
           ["vsEN:pos", "reg:en"],
           ["vsEN:neg", "gnd:out"],
@@ -291,8 +280,8 @@ describe("Register", () => {
         for (let bit = 0; bit < 8; bit++) {
           connections.push([`vsD${bit}:pos`, `reg:D${bit}`]);
           connections.push([`vsD${bit}:neg`, "gnd:out"]);
-          connections.push([`reg:Q${bit}`, `rQ${bit}:A`]);
-          connections.push([`rQ${bit}:B`, "gnd:out"]);
+          connections.push([`reg:Q${bit}`, `rQ${bit}:pos`]);
+          connections.push([`rQ${bit}:neg`, "gnd:out"]);
         }
 
         return facade.build({ components, connections });
@@ -333,7 +322,7 @@ describe("Register", () => {
           components.push({ id: `rQ${bit}`,  type: "Resistor",        props: { resistance: 10000 } });
         }
 
-        const connections: import("../../../headless/netlist-types.js").CircuitSpec["connections"] = [
+        const connections: [string, string][] = [
           ["clk:out",  "reg:C"],
           ["vsEN:pos", "reg:en"],
           ["vsEN:neg", "gnd:out"],
@@ -341,8 +330,8 @@ describe("Register", () => {
         for (let bit = 0; bit < 8; bit++) {
           connections.push([`vsD${bit}:pos`, `reg:D${bit}`]);
           connections.push([`vsD${bit}:neg`, "gnd:out"]);
-          connections.push([`reg:Q${bit}`, `rQ${bit}:A`]);
-          connections.push([`rQ${bit}:B`, "gnd:out"]);
+          connections.push([`reg:Q${bit}`, `rQ${bit}:pos`]);
+          connections.push([`rQ${bit}:neg`, "gnd:out"]);
         }
 
         return facade.build({ components, connections });
@@ -390,7 +379,7 @@ describe("Register", () => {
           components.push({ id: `rQ${bit}`, type: "Resistor", props: { resistance: 10000 } });
         }
 
-        const connections: import("../../../headless/netlist-types.js").CircuitSpec["connections"] = [
+        const connections: [string, string][] = [
           ["clk:out",  "reg:C"],
           ["vsEN:pos", "reg:en"],
           ["vsEN:neg", "gnd:out"],
@@ -398,8 +387,8 @@ describe("Register", () => {
         for (let bit = 0; bit < 8; bit++) {
           connections.push([`vsD${bit}:pos`, `reg:D${bit}`]);
           connections.push([`vsD${bit}:neg`, "gnd:out"]);
-          connections.push([`reg:Q${bit}`, `rQ${bit}:A`]);
-          connections.push([`rQ${bit}:B`, "gnd:out"]);
+          connections.push([`reg:Q${bit}`, `rQ${bit}:pos`]);
+          connections.push([`rQ${bit}:neg`, "gnd:out"]);
         }
 
         return facade.build({ components, connections });
@@ -422,8 +411,11 @@ describe("Register", () => {
 // ---------------------------------------------------------------------------
 
 describe("Registration", () => {
-  it("counter_has_analog_factory", () => {
-    expect(typeof (CounterDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
+  it("counter_has_behavioral_netlist_model", () => {
+    const entry = CounterDefinition.modelRegistry?.behavioral;
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("netlist");
+    expect(typeof (entry as { kind: "netlist"; netlist: unknown }).netlist).toBe("function");
   });
 
   it("counter_engine_type_is_both", () => {
@@ -436,8 +428,11 @@ describe("Registration", () => {
     expect(CounterDefinition.modelRegistry?.behavioral).not.toBeUndefined();
   });
 
-  it("counter_preset_has_analog_factory", () => {
-    expect(typeof (CounterPresetDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
+  it("counter_preset_has_behavioral_netlist_model", () => {
+    const entry = CounterPresetDefinition.modelRegistry?.behavioral;
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("netlist");
+    expect(typeof (entry as { kind: "netlist"; netlist: unknown }).netlist).toBe("function");
   });
 
   it("counter_preset_engine_type_is_both", () => {
@@ -445,8 +440,11 @@ describe("Registration", () => {
     expect(CounterPresetDefinition.modelRegistry?.behavioral).not.toBeUndefined();
   });
 
-  it("register_has_analog_factory", () => {
-    expect(typeof (RegisterDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
+  it("register_has_behavioral_netlist_model", () => {
+    const entry = RegisterDefinition.modelRegistry?.behavioral;
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("netlist");
+    expect(typeof (entry as { kind: "netlist"; netlist: unknown }).netlist).toBe("function");
   });
 
   it("register_engine_type_is_both", () => {
@@ -459,30 +457,12 @@ describe("Registration", () => {
     expect(RegisterDefinition.modelRegistry?.behavioral).not.toBeUndefined();
   });
 
-  it("counter_analog_factory_returns_analog_element", () => {
-    const factory = getFactory(CounterDefinition.modelRegistry!.behavioral!);
-    const props = new PropertyBag();
-    props.set("bitWidth", 4 as unknown as import("../../../core/properties.js").PropertyValue);
-    const element = factory(
-      new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
-      props, () => 0,
-    );
-    expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodes.size).toBe(5);
-  });
-
-  it("register_analog_factory_returns_analog_element", () => {
-    const factory = getFactory(RegisterDefinition.modelRegistry!.behavioral!);
-    const props = new PropertyBag();
-    props.set("bitWidth", 8 as unknown as import("../../../core/properties.js").PropertyValue);
-    const element = factory(
-      new Map([["D", 1], ["C", 2], ["en", 3], ["Q", 4]]),
-      props, () => 0,
-    );
-    expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodes.size).toBe(4);
-  });
 });
+// Note: "counter_analog_factory_returns_analog_element" and
+// "register_analog_factory_returns_analog_element" were deleted.
+// Counter/Register behavioral models are kind:"netlist" (not kind:"inline");
+// direct factory construction is the §4c poison pattern. Observable-behaviour
+// coverage is provided by the transient tests above.
 
 // ---------------------------------------------------------------------------
 // Task 6.4.3- sequential_pin_loading_propagates
@@ -530,14 +510,14 @@ describe("Task 6.4.3- sequential pin loading propagates", () => {
         ["vsCLK:neg", "gnd:out"],
         ["vsCLR:neg", "gnd:out"],
       ],
-      metadata: {
-        digitalPinLoadingOverrides: {
-          "ctr:en": true,
-          "ctr:C":  false,
-          "ctr:clr": false,
-        },
-      },
     });
+    // Per-net pin-loading overrides on the Circuit object (Decision #10).
+    // en is loaded (draws current through rEN); C and clr are ideal (no sag).
+    circuit.metadata.digitalPinLoadingOverrides = [
+      { anchor: { type: "pin", instanceId: "ctr", pinLabel: "en" },  loading: "loaded" },
+      { anchor: { type: "pin", instanceId: "ctr", pinLabel: "C" },   loading: "ideal" },
+      { anchor: { type: "pin", instanceId: "ctr", pinLabel: "clr" }, loading: "ideal" },
+    ];
 
     const coordinator = facade.compile(circuit);
     facade.getDcOpResult();

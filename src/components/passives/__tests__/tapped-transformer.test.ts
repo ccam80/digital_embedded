@@ -1,80 +1,111 @@
-/**
- * Tests for the TappedTransformer component.
- *
- * §4c gap-fill (2026-05-03): the prior test file impersonated the engine
- * end-to-end - it instantiated the (now-deleted) `AnalogTappedTransformerElement`
- * with positional MNA constructor args, hand-rolled `SetupContext` with
- * `allocStates` / `makeCur` shims, drove `el.load(ctx)` through
- * `loadCtxFromFields`, and read state from `_l1.statePoolForMut.s0[base+0]`.
- * None of those surfaces survive §4: `AnalogTappedTransformerElement` has been
- * replaced by the netlist composite from `buildTappedTransformerNetlist` (3 x
- * Inductor + 3 x TransformerCoupling), the test-helpers module is deleted, and
- * direct setup/load drives are §3 poison.
- *
- * Bit-exact per-NR-iteration parity (the prior "C4.2 transient parity" check)
- * is covered by the ngspice comparison harness (`harness_*` MCP tools,
- * `src/solver/analog/__tests__/ngspice-parity/*`). Auto-deleted per
- * category-1 §4c rules.
- */
+/** Tests for the TappedTransformer component (3-winding, center-tapped). */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import path from "node:path";
+
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  TappedTransformerDefinition,
-  TAPPED_TRANSFORMER_ATTRIBUTE_MAPPINGS,
-} from "../tapped-transformer.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+  DLL_PATH,
+  describeIfDll,
+} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition smoke tests
+// .dts paths (T3 fixtures)
 // ---------------------------------------------------------------------------
 
-describe("TappedTransformerDefinition", () => {
-  it("name is TappedTransformer", () => {
-    expect(TappedTransformerDefinition.name).toBe("TappedTransformer");
-  });
-
-  it("TappedTransformerDefinition has behavioral model", () => {
-    expect(TappedTransformerDefinition.modelRegistry?.behavioral).toBeDefined();
-  });
-
-  it("behavioral model is netlist-form (Composite M26 decomposition)", () => {
-    const entry = TappedTransformerDefinition.modelRegistry?.behavioral;
-    expect(entry?.kind).toBe("netlist");
-  });
-
-  it("category is PASSIVES", () => {
-    expect(TappedTransformerDefinition.category).toBe(ComponentCategory.PASSIVES);
-  });
-
-  it("pinLayout has 5 entries with correct labels", () => {
-    expect(TappedTransformerDefinition.pinLayout).toHaveLength(5);
-    const labels = TappedTransformerDefinition.pinLayout.map((p) => p.label);
-    expect(labels).toContain("P1");
-    expect(labels).toContain("P2");
-    expect(labels).toContain("S1");
-    expect(labels).toContain("CT");
-    expect(labels).toContain("S2");
-  });
-
-  it("can be registered without error", () => {
-    const registry = new ComponentRegistry();
-    expect(() => registry.register(TappedTransformerDefinition)).not.toThrow();
-  });
-
-  it("attribute mappings include turnsRatio", () => {
-    const m = TAPPED_TRANSFORMER_ATTRIBUTE_MAPPINGS.find((a) => a.xmlName === "turnsRatio");
-    expect(m).toBeDefined();
-    expect(m!.propertyKey).toBe("turnsRatio");
-  });
-});
+const DTS_DC_GROUNDED_CT = path.resolve(
+  "src/components/passives/__tests__/fixtures/tapped-transformer-canon-dc-grounded-ct.dts",
+);
+const DTS_AC_SINUSOID = path.resolve(
+  "src/components/passives/__tests__/fixtures/tapped-transformer-canon-ac-sinusoid.dts",
+);
 
 // ---------------------------------------------------------------------------
-// Behavioural coverage — exercises the netlist composite end-to-end.
+// Programmatic builders (T1)
 // ---------------------------------------------------------------------------
+
+interface DcBenchParams {
+  vSource: number;
+  rSeries?: number;
+  rLoad?: number;
+  turnsRatio?: number;
+  primaryInductance?: number;
+  couplingCoefficient?: number;
+}
+
+function buildDcBench(facade: DefaultSimulatorFacade, p: DcBenchParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",   type: "DcVoltageSource", props: { label: "V1", voltage: p.vSource } },
+      { id: "rser", type: "Resistor",        props: { label: "R_SER", resistance: p.rSeries ?? 100 } },
+      { id: "tx",   type: "TappedTransformer", props: {
+          label:               "TX1",
+          model:               "behavioral",
+          turnsRatio:          p.turnsRatio          ?? 2.0,
+          primaryInductance:   p.primaryInductance   ?? 10e-3,
+          couplingCoefficient: p.couplingCoefficient ?? 0.99,
+      } },
+      { id: "rs1", type: "Resistor", props: { label: "R_S1", resistance: p.rLoad ?? 1000 } },
+      { id: "rs2", type: "Resistor", props: { label: "R_S2", resistance: p.rLoad ?? 1000 } },
+      { id: "gnd", type: "Ground",   props: { label: "GND" } },
+    ],
+    connections: [
+      ["vs:pos",  "rser:pos"],
+      ["rser:neg","tx:P1"],
+      ["vs:neg",  "gnd:out"],
+      ["tx:P2",   "gnd:out"],
+      ["tx:CT",   "gnd:out"],
+      ["tx:S1",   "rs1:pos"],
+      ["rs1:neg", "gnd:out"],
+      ["tx:S2",   "rs2:pos"],
+      ["rs2:neg", "gnd:out"],
+    ],
+  });
+}
+
+interface AcBenchParams {
+  amplitude: number;
+  frequency: number;
+  rLoad?: number;
+  turnsRatio?: number;
+  primaryInductance?: number;
+  couplingCoefficient?: number;
+}
+
+function buildAcBench(facade: DefaultSimulatorFacade, p: AcBenchParams): Circuit {
+  return facade.build({
+    components: [
+      { id: "vs",  type: "AcVoltageSource", props: {
+          label: "V1", amplitude: p.amplitude, frequency: p.frequency,
+      } },
+      { id: "tx",  type: "TappedTransformer", props: {
+          label:               "TX1",
+          model:               "behavioral",
+          turnsRatio:          p.turnsRatio          ?? 2.0,
+          primaryInductance:   p.primaryInductance   ?? 100e-3,
+          couplingCoefficient: p.couplingCoefficient ?? 0.8,
+      } },
+      { id: "rs1", type: "Resistor", props: { label: "R_S1", resistance: p.rLoad ?? 100 } },
+      { id: "rs2", type: "Resistor", props: { label: "R_S2", resistance: p.rLoad ?? 100 } },
+      { id: "gnd", type: "Ground",   props: { label: "GND" } },
+    ],
+    connections: [
+      ["vs:pos",  "tx:P1"],
+      ["vs:neg",  "gnd:out"],
+      ["tx:P2",   "gnd:out"],
+      ["tx:CT",   "gnd:out"],
+      ["tx:S1",   "rs1:pos"],
+      ["rs1:neg", "gnd:out"],
+      ["tx:S2",   "rs2:pos"],
+      ["rs2:neg", "gnd:out"],
+    ],
+  });
+}
 
 function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
@@ -82,178 +113,226 @@ function nodeOf(fix: Fixture, label: string): number {
   return n;
 }
 
-/**
- * Build a tapped-transformer bench:
- *
- *   Vsrc(+) ─ rser ─ tx:P1
- *   Vsrc(-) ─ GND ─ tx:P2
- *   tx:CT   ─ GND
- *   tx:S1   ─ rS1 ─ GND
- *   tx:S2   ─ rS2 ─ GND
- *
- * The series primary resistance breaks the DC short that an ideal inductor
- * primary would otherwise place across the source. With CT held to ground,
- * the centre tap fixes the symmetric midpoint; light resistive loading on
- * the secondary halves keeps the secondary ends solvable.
- */
-function buildTappedTransformerBench(
-  facade: DefaultSimulatorFacade,
-  p: { vSource: number; rLoad?: number; turnsRatio?: number; rSeries?: number },
-): Circuit {
-  return facade.build({
-    components: [
-      { id: "vs",   type: "DcVoltageSource", props: { label: "vs", voltage: p.vSource } },
-      { id: "rser", type: "Resistor", props: { label: "rser", resistance: p.rSeries ?? 100 } },
-      { id: "tx",  type: "TappedTransformer", props: {
-          label:               "tx",
-          model:               "behavioral",
-          turnsRatio:          p.turnsRatio ?? 2.0,
-          primaryInductance:   10e-3,
-          couplingCoefficient: 0.99,
-      } },
-      { id: "rs1", type: "Resistor", props: { label: "rs1", resistance: p.rLoad ?? 1e6 } },
-      { id: "rs2", type: "Resistor", props: { label: "rs2", resistance: p.rLoad ?? 1e6 } },
-      { id: "gnd", type: "Ground" },
-    ],
-    connections: [
-      ["vs:pos",   "rser:pos"],
-      ["rser:neg", "tx:P1"],
-      ["vs:neg",   "gnd:out"],
-      ["tx:P2",    "gnd:out"],
-      ["tx:CT",    "gnd:out"],
-      ["tx:S1",    "rs1:pos"],
-      ["rs1:neg",  "gnd:out"],
-      ["tx:S2",    "rs2:pos"],
-      ["rs2:neg",  "gnd:out"],
-    ],
-  });
+function getTappedTransformerCe(fix: Fixture) {
+  const idx = fix.circuit.elements.findIndex(
+    (_e, i) => fix.elementLabels.get(i) === "TX1",
+  );
+  if (idx < 0) throw new Error("TX1 element not found by label");
+  const ce = fix.circuit.elementToCircuitElement.get(idx);
+  if (ce === undefined) throw new Error("TX1 elementToCircuitElement entry missing");
+  return ce;
 }
 
-describe("TappedTransformer behavioural", () => {
-  it("centre_tap_voltage_with_grounded_CT", () => {
-    // P2 and CT held to ground via direct GND ties. With ideal coupled
-    // inductors (DC short), the primary inductor forces V(P1)=V(P2)=0 at
-    // steady state, so V_source falls entirely across rser.
+// ===========================================================================
+// Category 1 — Initialization (T1)
+// Post-warm-start: the netlist composite expands to 3 inductors + 3 couplings.
+// With CT grounded, the leaf inductor branches each act as DC shorts, so the
+// post-warm-start V(P1) = 0V (Vsrc drops entirely across R_SER) and V(CT) = 0V.
+// ===========================================================================
+
+describe("TappedTransformer initialization — DC grounded CT (T1)", () => {
+  it("init_grounded_ct_node_voltages", () => {
     const fix = buildFixture({
-      build: (_r, facade) => buildTappedTransformerBench(facade, {
-        vSource: 10.0, rLoad: 1e6, turnsRatio: 2.0, rSeries: 100,
-      }),
+      build: (_r, facade) => buildDcBench(facade, { vSource: 10, rSeries: 100, rLoad: 1e6 }),
     });
-    const dc = fix.coordinator.dcOperatingPoint()!;
-    expect(dc.converged).toBe(true);
 
-    const vP2 = fix.engine.getNodeVoltage(nodeOf(fix, "tx:P2"));
-    const vCT = fix.engine.getNodeVoltage(nodeOf(fix, "tx:CT"));
+    // CT and P2 are tied directly to ground.
+    const vCT = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:CT"));
+    const vP2 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:P2"));
+    expect(vCT).toBeCloseTo(0, 6);
+    expect(vP2).toBeCloseTo(0, 6);
 
-    // P2 and CT are tied to ground.
-    expect(Math.abs(vP2)).toBeLessThan(1e-3);
-    expect(Math.abs(vCT)).toBeLessThan(1e-3);
+    // Inductor primary is a DC short ⇒ V(P1) = V(P2) = 0V at steady state.
+    const vP1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:P1"));
+    expect(vP1).toBeCloseTo(0, 6);
+  });
+});
+
+// ===========================================================================
+// Category 2 — DCOP analytical (T1)
+// Inductors short at DC; CT held to ground; symmetric secondary loading.
+//   • V(P1) = 0V  (primary inductor shorts, R_SER carries Vsrc/R_SER)
+//   • V(S1) = V(S2) = 0V  (secondary halves short to grounded CT)
+//   • |V(S1) - V(CT)| ≈ |V(CT) - V(S2)|  (secondary symmetry)
+// ===========================================================================
+
+describe("TappedTransformer DCOP analytical — DC grounded CT (T1)", () => {
+  it("dcop_grounded_ct_secondary_shorts_to_ground", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildDcBench(facade, { vSource: 10, rSeries: 100, rLoad: 1e6 }),
+    });
+
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+
+    const vS1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S1"));
+    const vS2 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S2"));
+    const vCT = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:CT"));
+    // Secondary halves short to CT (grounded) at DC.
+    expect(vS1).toBeCloseTo(0, 4);
+    expect(vS2).toBeCloseTo(0, 4);
+    expect(vCT).toBeCloseTo(0, 6);
   });
 
-  it("symmetric_secondary_halves_at_DC", () => {
-    // Symmetric construction (L2 = L3, M12 = M13 by `halfRatio = N/2`) plus
-    // symmetric loads (rs1 = rs2) must produce |V(S1) - V(CT)| = |V(CT) - V(S2)|.
-    // The check is structural: the netlist generator is wired correctly and
-    // both secondary halves see the same coupling.
+  it("dcop_grounded_ct_secondary_halves_symmetric", () => {
     const fix = buildFixture({
-      build: (_r, facade) => buildTappedTransformerBench(facade, {
-        vSource: 5.0, rLoad: 1e6, turnsRatio: 2.0, rSeries: 100,
-      }),
+      build: (_r, facade) => buildDcBench(facade, { vSource: 5, rSeries: 100, rLoad: 1e6 }),
     });
-    const dc = fix.coordinator.dcOperatingPoint()!;
-    expect(dc.converged).toBe(true);
 
-    const vS1 = fix.engine.getNodeVoltage(nodeOf(fix, "tx:S1"));
-    const vCT = fix.engine.getNodeVoltage(nodeOf(fix, "tx:CT"));
-    const vS2 = fix.engine.getNodeVoltage(nodeOf(fix, "tx:S2"));
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-    // Halves are symmetric ⇒ |V(S1,CT)| ≈ |V(CT,S2)| within numerical noise.
-    const top = Math.abs(vS1 - vCT);
-    const bot = Math.abs(vCT - vS2);
-    expect(Math.abs(top - bot)).toBeLessThan(1e-3);
+    const vS1 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S1"));
+    const vCT = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:CT"));
+    const vS2 = fix.engine.getNodeVoltage(nodeOf(fix, "TX1:S2"));
+    // Half-symmetric construction (L2 = L3, M12 = M13) plus symmetric loads
+    // ⇒ |V(S1,CT)| = |V(CT,S2)| within numerical noise.
+    expect(Math.abs(Math.abs(vS1 - vCT) - Math.abs(vCT - vS2))).toBeLessThan(1e-6);
+  });
+});
+
+// ===========================================================================
+// Categories 2-numerical / 3 / 5 — paired vs ngspice (T3)
+// One describe per .dts; first it() owns the run.
+// ===========================================================================
+
+describeIfDll("TappedTransformer DC grounded CT vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_DC_GROUNDED_CT, dllPath: DLL_PATH });
   });
 
-  it("secondary_swings_under_transient_drive", async () => {
-    // Drive the primary with a sinusoid; both secondary halves (S1, S2)
-    // must swing around the grounded centre tap. CT grounded fixes the
-    // midpoint; uic:true skips DC-OP and lets the AC source ramp from t=0.
-    const facadeBuild = (_r: unknown, facade: DefaultSimulatorFacade): Circuit =>
-      facade.build({
-        components: [
-          { id: "vs",  type: "AcVoltageSource", props: {
-              label: "vs", amplitude: 5.0, frequency: 1000,
-          } },
-          { id: "tx",  type: "TappedTransformer", props: {
-              label:               "tx",
-              model:               "behavioral",
-              turnsRatio:          2.0,
-              primaryInductance:   100e-3,
-              // k=0.8 keeps the 3x3 mutual-inductance matrix well away from
-              // singular. k=0.99 has been observed to stagnate during transient
-              // NR for this composite (3 branches couple all-to-all so the
-              // off-diagonal weight grows quadratically with k).
-              couplingCoefficient: 0.8,
-          } },
-          { id: "rs1", type: "Resistor", props: { label: "rs1", resistance: 100 } },
-          { id: "rs2", type: "Resistor", props: { label: "rs2", resistance: 100 } },
-          { id: "gnd", type: "Ground" },
-        ],
-        connections: [
-          ["vs:pos",  "tx:P1"],
-          ["vs:neg",  "gnd:out"],
-          ["tx:P2",   "gnd:out"],
-          ["tx:CT",   "gnd:out"],
-          ["tx:S1",   "rs1:pos"],
-          ["rs1:neg", "gnd:out"],
-          ["tx:S2",   "rs2:pos"],
-          ["rs2:neg", "gnd:out"],
-        ],
-      });
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
 
-    const freq = 1000;
-    const period = 1 / freq;
-    const numCycles = 5;
-    const samplesPerCycle = 200;
-    const totalSamples = numCycles * samplesPerCycle;
-    const tStop = numCycles * period;
+  it("transient_step_end_paired_dc_grounded_ct", async () => {
+    // Short transient on the DC bench: τ_L = L1/R_SER = 10mH/100Ω = 100µs.
+    // Run 5τ at 100 steps/τ to capture the inductive transient settling.
+    await session.runTransient(0, 5e-4, 1e-6);
+    session.compareAllSteps();
+  });
 
-    const fix = buildFixture({
-      build: facadeBuild,
-      params: { tStop, maxTimeStep: period / samplesPerCycle, uic: true },
-    });
-
-    // With CT=0V and the coupled inductors driven sinusoidally, an ideal
-    // symmetric secondary swings bipolar around the grounded centre tap.
-    const times = Array.from({ length: totalSamples }, (_, i) =>
-      (i + 1) * (tStop / totalSamples),
-    );
-    const s1Node = nodeOf(fix, "tx:S1");
-    const s2Node = nodeOf(fix, "tx:S2");
-    const samples = await fix.coordinator.sampleAtTimes(
-      times, () => ({
-        s1: fix.engine.getNodeVoltage(s1Node),
-        s2: fix.engine.getNodeVoltage(s2Node),
-      }),
-    );
-
-    // Inspect the last cycle so the windings have settled past the AC
-    // ramp-up transient.
-    const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
-    let maxS1 = -Infinity, minS1 = +Infinity;
-    let maxS2 = -Infinity, minS2 = +Infinity;
-    for (let i = lastCycleOffset; i < totalSamples; i++) {
-      const sample = samples[i] as { s1: number; s2: number };
-      if (sample.s1 > maxS1) maxS1 = sample.s1;
-      if (sample.s1 < minS1) minS1 = sample.s1;
-      if (sample.s2 > maxS2) maxS2 = sample.s2;
-      if (sample.s2 < minS2) minS2 = sample.s2;
+  it("dcop_paired_dc_grounded_ct", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
     }
+  });
 
-    // Each secondary half must swing positive AND negative — energy reaches
-    // both halves through the mutual-inductance stamps and crosses zero.
-    expect(maxS1).toBeGreaterThan(1e-4);
-    expect(minS1).toBeLessThan(-1e-4);
-    expect(maxS2).toBeGreaterThan(1e-4);
-    expect(minS2).toBeLessThan(-1e-4);
+  it("full_iteration_paired_dc_grounded_ct", () => {
+    session.compareAllAttempts();
+  });
+});
+
+describeIfDll("TappedTransformer AC sinusoid vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_AC_SINUSOID, dllPath: DLL_PATH });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_ac_sinusoid", async () => {
+    // f = 1kHz ⇒ period = 1ms. Run 5 cycles at 200 steps/cycle.
+    await session.runTransient(0, 5e-3, 5e-6);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_ac_sinusoid", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
+    for (const [, comp] of Object.entries(stepEnd.components)) {
+      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_ac_sinusoid", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ===========================================================================
+// Category 4 — Parameter hot-load (T1)
+// One it() per parameter the netlist composite exposes:
+//   - turnsRatio (primary scaling): doubles ⇒ secondary half inductance
+//     L2 = L3 = L1·(N/2)² scales by 4 ⇒ AC transient response shifts.
+//   - primaryInductance (primary scaling): doubles ⇒ all three inductances
+//     scale linearly ⇒ AC transient amplitude/phase shifts.
+//   - couplingCoefficient (mutual scaling): drops ⇒ M12, M13, M23 drop
+//     proportionally ⇒ secondary peak amplitude drops (less coupled energy).
+// Assertions on simulator outputs only (V(tx:S1) under AC drive).
+// ===========================================================================
+
+describe("TappedTransformer parameter hot-load (T1)", () => {
+  it("hotload_turnsRatio_changes_secondary_voltage", async () => {
+    // AC drive: doubling the turns ratio scales L2 = L3 by 4×.
+    // V(S1) at the same simTime must change.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    // Run 1.5 cycles to let the AC ramp settle past startup transient.
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTappedTransformerCe(fix), "turnsRatio", 4.0);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_primaryInductance_changes_secondary_voltage", async () => {
+    // Doubling primary inductance scales all three self-inductances 2× and
+    // mutual terms by 2× as well (M = k·sqrt(L·L)). Phase/amplitude shifts.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTappedTransformerCe(fix), "primaryInductance", 200e-3);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
+  });
+
+  it("hotload_couplingCoefficient_changes_secondary_voltage", async () => {
+    // Lower k ⇒ M12, M13, M23 drop proportionally ⇒ less energy coupled to
+    // the secondary halves ⇒ V(S1) magnitude shifts at the same simTime.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcBench(facade, {
+        amplitude: 5, frequency: 1000, rLoad: 100,
+        turnsRatio: 2.0, primaryInductance: 100e-3, couplingCoefficient: 0.8,
+      }),
+      params: { tStop: 5e-3, maxTimeStep: 5e-6, uic: true },
+    });
+    const s1Node = nodeOf(fix, "TX1:S1");
+
+    while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
+    const before = fix.engine.getNodeVoltage(s1Node);
+
+    fix.coordinator.setComponentProperty(getTappedTransformerCe(fix), "couplingCoefficient", 0.3);
+    fix.coordinator.step();
+    const after = fix.engine.getNodeVoltage(s1Node);
+    expect(after).not.toBeCloseTo(before, 3);
   });
 });

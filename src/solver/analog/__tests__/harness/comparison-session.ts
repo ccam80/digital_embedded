@@ -481,6 +481,13 @@ export class ComparisonSession {
       this._engine.getNodeTable(),
     );
 
+    // elementIndex → canonical device type, used by captureElementStates to
+    // project per-pin terminal currents from the slot data via DEVICE_MAPPINGS.
+    // Type IDs do not change between init and post-setup, so building this
+    // once at hook-creation time is correct.
+    const elementTypes = new Map<number, string>();
+    for (const el of this._ourTopology.elements) elementTypes.set(el.index, el.type);
+
     this._stepCapture = createStepCaptureHook(
       this._engine.solver!,
       this._engine.elements,
@@ -492,6 +499,7 @@ export class ComparisonSession {
       // divergences from every parity test).
       () => this._engine.statePool,
       this._elementLabels,
+      elementTypes,
     );
 
     // captureTopology(...) above ran BEFORE engine._setup()- engine.matrixSize
@@ -883,9 +891,14 @@ export class ComparisonSession {
           const ngValue = ngEs?.slots[slot] ?? NaN;
           slots[slot] = makeComparedValue(value, ngValue);
         }
+        const pinCurrents: Record<string, ComparedValue> = {};
+        for (const [pin, value] of Object.entries(es.pinCurrents)) {
+          const ngValue = ngEs?.pinCurrents[pin] ?? NaN;
+          pinCurrents[pin] = makeComparedValue(value, ngValue);
+        }
         const topoEl = this._ourTopology.elements.find(
           el => el.label.toUpperCase() === es.label.toUpperCase());
-        components[es.label] = { deviceType: topoEl?.type ?? "unknown", slots };
+        components[es.label] = { deviceType: topoEl?.type ?? "unknown", slots, pinCurrents };
       }
     }
 

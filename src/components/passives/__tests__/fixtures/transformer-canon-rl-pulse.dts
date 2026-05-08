@@ -1,0 +1,666 @@
+{
+  "circuit": {
+    "description": "Two-winding transformer pulse bench: pulse source via primary series resistance to P1; P2 grounded; S1 to R_load to GND; S2 grounded. Exercises transient di/dt at sharper edge than sinusoid.",
+    "elements": [
+      {
+        "id": "33dd5074-d529-4df7-8b3a-1396b5213751",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 2,
+            "dcOffset": 0,
+            "fallTime": 1e-12,
+            "frequency": 500,
+            "noiseSampleTime": 0,
+            "phase": 0,
+            "riseTime": 1e-12
+          },
+          "amplitude": 2,
+          "frequency": 500,
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "f545daf1-569a-45eb-a1fc-236319f09abd",
+        "position": {
+          "x": 12,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10
+          },
+          "label": "R_SER",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 10
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "71968d36-5973-4816-adec-3348e6a0665e",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "IC1": null,
+            "IC2": null,
+            "M": 1,
+            "couplingCoefficient": 0.95,
+            "primaryInductance": 0.05,
+            "primaryResistance": 0,
+            "secondaryResistance": 0,
+            "turnsRatio": 1
+          },
+          "couplingCoefficient": 0.95,
+          "label": "TX1",
+          "position": [
+            0,
+            16
+          ],
+          "primaryInductance": 0.05,
+          "primaryResistance": 0,
+          "secondaryResistance": 0,
+          "turnsRatio": 1
+        },
+        "rotation": 0,
+        "type": "Transformer"
+      },
+      {
+        "id": "46edc07b-caea-4025-8f3d-b3c05e8aabcb",
+        "position": {
+          "x": 36,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          },
+          "label": "R_LOAD",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "3c37e023-7032-4b95-adea-36fdc97e53f0",
+        "position": {
+          "x": 48,
+          "y": 4
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "transformer-canon-rl-pulse",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 2
+          },
+          {
+            "x": 11,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 11,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 2
+          },
+          {
+            "x": 17,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 18,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 6
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 24,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 8
+          },
+          {
+            "x": 36,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 8
+          },
+          {
+            "x": 42,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 8
+          },
+          {
+            "x": 42,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 3
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 23,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 3
+          },
+          {
+            "x": 50,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 50,
+            "y": 3
+          },
+          {
+            "x": 50,
+            "y": -2.375
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 50,
+            "y": -2.375
+          },
+          {
+            "x": 22,
+            "y": -2.375
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": -2.375
+          },
+          {
+            "x": 22,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 4
+          },
+          {
+            "x": 23,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 2
+          },
+          {
+            "x": 32,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 2
+          },
+          {
+            "x": 32,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 0
+          },
+          {
+            "x": 41,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 0
+          },
+          {
+            "x": 45,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 0
+          },
+          {
+            "x": 45,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 3
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 4
+          },
+          {
+            "x": 29,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 43,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 4
+          },
+          {
+            "x": 43,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 3
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

@@ -35,10 +35,10 @@ describe("competing voltage constraints diagnostic", () => {
       ],
       connections: [
         ["vs1:pos", "vs2:pos"],
-        ["vs2:pos", "r1:A"],
+        ["vs2:pos", "r1:pos"],
         ["vs1:neg", "vs2:neg"],
-        ["vs2:neg", "r1:B"],
-        ["r1:B",   "gnd:out"],
+        ["vs2:neg", "r1:neg"],
+        ["r1:neg",  "gnd:out"],
       ],
     });
 
@@ -56,8 +56,8 @@ describe("competing voltage constraints diagnostic", () => {
         { id: "gnd", type: "Ground" },
       ],
       connections: [
-        ["vs:pos", "r1:A"],
-        ["r1:B",  "gnd:out"],
+        ["vs:pos", "r1:pos"],
+        ["r1:neg", "gnd:out"],
         ["vs:neg", "gnd:out"],
       ],
     });
@@ -75,10 +75,10 @@ describe("competing voltage constraints diagnostic", () => {
         { id: "gnd", type: "Ground" },
       ],
       connections: [
-        ["vs:pos", "r1:A"],
-        ["r1:B",   "r2:A"],
-        ["r2:B",   "gnd:out"],
-        ["vs:neg",  "gnd:out"],
+        ["vs:pos", "r1:pos"],
+        ["r1:neg", "r2:pos"],
+        ["r2:neg", "gnd:out"],
+        ["vs:neg", "gnd:out"],
       ],
     });
 

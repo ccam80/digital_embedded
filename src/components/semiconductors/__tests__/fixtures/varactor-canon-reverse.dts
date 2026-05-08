@@ -1,0 +1,347 @@
+{
+  "circuit": {
+    "description": "Varactor reverse-biased: V1=2V drives Varactor cathode through R=10kohm to ground (anode) so V_d < 0. Reverse-bias is the Varactor's documented operating regime (voltage-controlled junction capacitance, Cj=CJO/(1-Vd/VJ)^M). Exercises depletion-cap formula in reverse bias and DIODE_CAP_SCHEMA slots.",
+    "elements": [
+      {
+        "id": "c1acdd4b-3631-4ef7-929b-633b67a4d2ff",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 2
+          },
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 2
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "c53e6b62-db86-4ad9-a205-a453eb23b5bd",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "AREA": 1,
+            "BV": "_inf",
+            "CJO": 2e-11,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IC": null,
+            "IKF": "_inf",
+            "IKR": "_inf",
+            "IS": 1e-14,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1,
+            "NBV": null,
+            "OFF": 0,
+            "RS": 0,
+            "TNOM": 300.15,
+            "TT": 0,
+            "VJ": 0.7,
+            "XTI": 3
+          },
+          "label": "VD",
+          "position": [
+            0,
+            8
+          ]
+        },
+        "rotation": 0,
+        "type": "VaractorDiode"
+      },
+      {
+        "id": "6174de57-f6ff-42aa-8448-001237c3b2fd",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "label": "R1",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "075e682b-b93c-4f87-98c4-d9371896bbc2",
+        "position": {
+          "x": 12,
+          "y": 4
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "varactor-canon-reverse",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 30,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 0
+          },
+          {
+            "x": 30,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 18,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 3
+          },
+          {
+            "x": 18,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
