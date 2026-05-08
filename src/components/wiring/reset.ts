@@ -125,15 +125,13 @@ export class ResetElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // executeReset- flat simulation function
 //
-// Uses internal state slot 0 as the init flag.
-//   state[stateOffset+0] = 0: in init phase, output = !invertOutput (reset active)
-//   state[stateOffset+0] = 1: init complete, output = invertOutput (reset released)
+// Reset has no inputs; the engine drives its output via the init sequence
+// (init-sequence.ts:releaseResetComponents). On every step the executeFn
+// re-asserts the released value `invertOutput` so the net stays at the
+// non-active level once init is past.
 //
-// The engine sets state[stateOffset+0] = 1 after the init phase completes.
-//
-// For this flat function, we read the output polarity from the output slot
-// directly. The engine initialises the output to the reset value before
-// simulation starts.
+//   active (during init):     output = !invertOutput
+//   released (after init):    output =  invertOutput
 //
 // Pin layout:
 //   No inputs
@@ -146,14 +144,10 @@ export function executeReset(
   _highZs: Uint32Array,
   layout: ComponentLayout,
 ): void {
-  // Reset is a source component: its output is managed by the engine's
-  // init/clear-reset protocol. The executeFn is a no-op- the engine
-  // writes the output directly via the init sequence.
-  // This satisfies the interface requirement while the engine handles
-  // the actual reset/release logic.
-  const outIdx = layout.outputOffset(index);
-  // Preserve whatever value the engine has written- do not overwrite.
-  void state[outIdx];
+  const wt = layout.wiringTable;
+  const outBase = layout.outputOffset(index);
+  const invertOutput = layout.getProperty(index, "invertOutput") === true;
+  state[wt[outBase]] = invertOutput ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------

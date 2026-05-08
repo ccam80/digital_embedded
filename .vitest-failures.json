@@ -1,45 +1,21 @@
 {
   "summary": {
-    "passed": 14156,
-    "failed": 811,
+    "passed": 14155,
+    "failed": 767,
     "skipped": 0,
-    "totalFiles": 398,
-    "durationSeconds": 57
+    "totalFiles": 396,
+    "durationSeconds": 66
   },
   "failures": [
     {
-      "message": "expected 1 to be less than 0.01",
+      "message": "expected [ 'Color' ] to deeply equal []",
       "count": 1,
       "locations": [
         {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "series resistors: every wire on the loop carries the same current",
-          "line": 125,
-          "column": 55
-        }
-      ]
-    },
-    {
-      "message": "expected 0.3999999999999999 to be less than 0.01",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "parallel split at junction: branch wires carry their branch's current",
-          "line": 176,
-          "column": 66
-        }
-      ]
-    },
-    {
-      "message": "expected 0.9534883720930233 to be less than 0.01",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "every junction's wires carry positive current and KCL is satisfied",
-          "line": 305,
-          "column": 55
+          "file": "src\\core\\__tests__\\registry.test.ts",
+          "test": "attributeMap xmlNames are unique within the component",
+          "line": 628,
+          "column": 28
         }
       ]
     },
@@ -47,12 +23,6 @@
       "message": "expected 0 to be greater than 0",
       "count": 15,
       "locations": [
-        {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "non-junction pin wires carry the adjacent element's current",
-          "line": 436,
-          "column": 31
-        },
         {
           "file": "src\\core\\__tests__\\registry.test.ts",
           "test": "pinLayout declares at least one pin",
@@ -132,34 +102,16 @@
           "column": 33
         },
         {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "non-junction pin wires carry the adjacent element's current",
+          "line": 436,
+          "column": 31
+        },
+        {
           "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
           "test": "findLargestDelta identifies worst convergence point",
           "line": 350,
           "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected [] to include 'out'",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\core\\__tests__\\digital-registry.test.ts",
-          "test": "In: pinLayout input/output labels equal digital inputSchema/outputSchema",
-          "line": 119,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected [ 'Color' ] to deeply equal []",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\core\\__tests__\\registry.test.ts",
-          "test": "attributeMap xmlNames are unique within the component",
-          "line": 628,
-          "column": 28
         }
       ]
     },
@@ -476,6 +428,42 @@
       ]
     },
     {
+      "message": "expected 1 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "series resistors: every wire on the loop carries the same current",
+          "line": 125,
+          "column": 55
+        }
+      ]
+    },
+    {
+      "message": "expected 0.3999999999999999 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "parallel split at junction: branch wires carry their branch's current",
+          "line": 176,
+          "column": 66
+        }
+      ]
+    },
+    {
+      "message": "expected 0.9534883720930233 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "every junction's wires carry positive current and KCL is satisfied",
+          "line": 305,
+          "column": 55
+        }
+      ]
+    },
+    {
       "message": "expected 4.999999999999995 to be less than or equal to 3.223814850025644",
       "count": 1,
       "locations": [
@@ -620,290 +608,8 @@
       ]
     },
     {
-      "message": "expected 4294967295 to be 255 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: -1 = 0xFF (two's complement)",
-          "line": 119,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "bitWidth=8 vs bitWidth=16: same input 1 -> different output mask widths",
-          "line": 161,
-          "column": 30
-        }
-      ]
-    },
-    {
-      "message": "expected 4294967169 to be 129 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: -0x7F = 0x81",
-          "line": 125,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected 4294967168 to be 128 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: -0x80 = 0x80 (min signed value negates to itself)",
-          "line": 131,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected 4294967041 to be 65281 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "16-bit: -(255) = 0xFF01",
-          "line": 150,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 85 // Object.is equality",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: se=1 with S=0x55 on rising clock seeds R to 0x55",
-          "line": 663,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "bitWidth=8 vs bitWidth=16: same seed mechanism, different LFSR widths reach different seeded values",
-          "line": 736,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\memory\\__tests__\\ram.test.ts",
-          "test": "RAMSinglePortSel write-then-read round-trip across the bidirectional D pin",
-          "line": 835,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 1 // Object.is equality",
-      "count": 23,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: se=1 with S=0 on rising clock seeds R to 1 (no all-zero lock-up)",
-          "line": 670,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: after seeding to 1, ne=1 on rising clock changes R to a non-zero, non-1 value",
-          "line": 687,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-          "test": "bridge_trig_below_third_vcc_drives_out_high_digital",
-          "line": 456,
-          "column": 23
-        },
-        {
-          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
-          "test": "two_input_one_bit_and_truth_table_via_data",
-          "line": 111,
-          "column": 39
-        },
-        {
-          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
-          "test": "address_formation_input_zero_is_lsb_three_input",
-          "line": 137,
-          "column": 38
-        },
-        {
-          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
-          "test": "single_input_lut_acts_as_not_gate_via_data",
-          "line": 187,
-          "column": 37
-        },
-        {
-          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
-          "test": "hotload_inputCount_changes_address_space_observable",
-          "line": 299,
-          "column": 20
-        },
-        {
-          "file": "src\\components\\wiring\\__tests__\\sim-control.test.ts",
-          "test": "inverted Reset releases output high after the init phase completes",
-          "line": 260,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\wiring\\__tests__\\sim-control.test.ts",
-          "test": "invertOutput flips the post-init Reset output polarity",
-          "line": 277,
-          "column": 17
-        },
-        {
-          "file": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-          "test": "sel_high_passes_input_to_output_one_bit",
-          "line": 84,
-          "column": 37
-        },
-        {
-          "file": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-          "test": "split_pattern_one_one_one_one_four_extracts_individual_bits_and_nibble",
-          "line": 257,
-          "column": 36
-        },
-        {
-          "file": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-          "test": "oe_high_splits_d_into_individual_bit_outputs",
-          "line": 305,
-          "column": 37
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "withEnable=true: post-warm-start Q=0, ~Q=1 with no prior clock activity",
-          "line": 146,
-          "column": 58
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "withEnable=false: post-warm-start Q=0, ~Q=1 with no prior clock activity",
-          "line": 152,
-          "column": 58
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "withEnable=true: DCOP converges with Q / ~Q complementary at the documented init level",
-          "line": 173,
-          "column": 58
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "withEnable=false: DCOP converges with Q / ~Q complementary at the documented init level",
-          "line": 184,
-          "column": 58
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "first rising clock edge with T=1 toggles Q from 0 to 1",
-          "line": 198,
-          "column": 57
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "two successive rising edges with T=1 toggle Q back to 0",
-          "line": 206,
-          "column": 57
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "rising clock edge with T=0 holds Q at its current value",
-          "line": 217,
-          "column": 57
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "first rising clock edge unconditionally toggles Q from 0 to 1",
-          "line": 249,
-          "column": 57
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "two successive rising edges toggle Q 0→1→0 unconditionally",
-          "line": 256,
-          "column": 57
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "vIH hot-load: raising vIH past current logic-high level suppresses subsequent rising-edge toggle",
-          "line": 277,
-          "column": 57
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "forceToggle structural: withEnable=false (forceToggle=1) toggles on rising edge even with T LOW; withEnable=true (forceToggle=0) does not",
-          "line": 321,
-          "column": 67
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 51966 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "16-bit: se=1 with S=0xCAFE on rising clock seeds R to 0xCAFE",
-          "line": 677,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected 1 to be greater than or equal to 10",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: ne=1 over many clock edges produces multiple distinct values",
-          "line": 707,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 66 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
-          "test": "8-bit: with no rising clock edge after seeding, R remains the seed value",
-          "line": 717,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\memory\\__tests__\\two-phase-memory.test.ts",
-          "test": "write_then_read_round_trip_drives_d_to_written_value",
-          "line": 616,
-          "column": 43
-        }
-      ]
-    },
-    {
-      "message": "Pin 'lo' not found on component 'Mul'. Valid pins: a, b, mul (connection: \"mul:lo\" → \"outLo:in\")",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\headless\\builder.ts",
-          "test": "16-bit unsigned 0xFFFF*0xFFFF: low word 0x0001, high word 0xFFFE on independent output pins",
-          "line": 448,
-          "column": 17
-        },
-        {
-          "file": "src\\headless\\builder.ts",
-          "test": "32-bit unsigned 0x80000000*2: low word 0, high word 1 on independent output pins",
-          "line": 448,
-          "column": 17
-        }
-      ]
-    },
-    {
       "message": "Matrix-entry value divergence at step=0 attempt=0 iter=0:",
-      "count": 26,
+      "count": 25,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
@@ -943,24 +649,6 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "[suite-setup] BJT NPN CE paired vs ngspice (T3)",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "[suite-setup] BJT PNP common-collector paired vs ngspice (T3)",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_bjt_ce",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_mid_state",
           "line": 2936,
           "column": 11
@@ -968,6 +656,18 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_edge_state",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "[suite-setup] BJT NPN CE paired vs ngspice (T3)",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "[suite-setup] BJT PNP common-collector paired vs ngspice (T3)",
           "line": 2936,
           "column": 11
         },
@@ -1065,7 +765,7 @@
     },
     {
       "message": "expected false to be true // Object.is equality",
-      "count": 112,
+      "count": 101,
       "locations": [
         {
           "file": "src\\components\\active\\__tests__\\analog-switch.test.ts",
@@ -1272,156 +972,6 @@
           "column": 28
         },
         {
-          "file": "src\\components\\semiconductors\\__tests__\\diac.test.ts",
-          "test": "dcop_paired_blocking",
-          "line": 209,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diac.test.ts",
-          "test": "dcop_paired_breakover",
-          "line": 239,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "dcop_paired_resistive",
-          "line": 375,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "dcop_paired_cap_rc",
-          "line": 424,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_njfet_cs",
-          "line": 458,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_njfet_cutoff",
-          "line": 494,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_pjfet_cs",
-          "line": 530,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_pjfet_cutoff",
-          "line": 566,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "dcop_paired_nmos_inverter",
-          "line": 409,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "dcop_paired_pmos_cs",
-          "line": 457,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\phase-3-xfact-predictor.test.ts",
-          "test": "dcop_paired_diode_resistive",
-          "line": 63,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\phase-3-xfact-predictor.test.ts",
-          "test": "dcop_paired_bjt_ce",
-          "line": 105,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
-          "test": "dcop_paired_forward",
-          "line": 265,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
-          "test": "dcop_paired_reverse",
-          "line": 313,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
-          "test": "dcop_paired_blocking",
-          "line": 246,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
-          "test": "dcop_paired_triggered",
-          "line": 276,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "dcop_paired_blocking",
-          "line": 392,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "dcop_paired_gated_on",
-          "line": 422,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "dcop_paired_reverse_blocking",
-          "line": 454,
-          "column": 78
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triode.test.ts",
-          "test": "dcop_paired_common_cathode",
-          "line": 258,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triode.test.ts",
-          "test": "dcop_paired_cutoff",
-          "line": 294,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
-          "test": "dcop_paired_reverse",
-          "line": 318,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
-          "test": "dcop_paired_forward",
-          "line": 354,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
-          "test": "dcop_paired_forward",
-          "line": 299,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
-          "test": "dcop_paired_breakdown",
-          "line": 346,
-          "column": 30
-        },
-        {
           "file": "src\\components\\passives\\__tests__\\analog-fuse-rollback.test.ts",
           "test": "dcop_paired_intact",
           "line": 157,
@@ -1448,7 +998,7 @@
         {
           "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
           "test": "dcop_paired_rlc",
-          "line": 469,
+          "line": 468,
           "column": 28
         },
         {
@@ -1542,6 +1092,108 @@
           "column": 78
         },
         {
+          "file": "src\\components\\semiconductors\\__tests__\\diac.test.ts",
+          "test": "dcop_paired_blocking",
+          "line": 209,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diac.test.ts",
+          "test": "dcop_paired_breakover",
+          "line": 239,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "dcop_paired_resistive",
+          "line": 372,
+          "column": 30
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "dcop_paired_cap_rc",
+          "line": 421,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_njfet_cs",
+          "line": 458,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_njfet_cutoff",
+          "line": 494,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_pjfet_cs",
+          "line": 530,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_pjfet_cutoff",
+          "line": 566,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
+          "test": "dcop_paired_blocking",
+          "line": 246,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
+          "test": "dcop_paired_triggered",
+          "line": 276,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "dcop_paired_blocking",
+          "line": 392,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "dcop_paired_gated_on",
+          "line": 422,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "dcop_paired_reverse_blocking",
+          "line": 454,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triode.test.ts",
+          "test": "dcop_paired_common_cathode",
+          "line": 258,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triode.test.ts",
+          "test": "dcop_paired_cutoff",
+          "line": 294,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "dcop_paired_forward",
+          "line": 298,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "dcop_paired_breakdown",
+          "line": 345,
+          "column": 30
+        },
+        {
           "file": "src\\components\\sensors\\__tests__\\ldr.test.ts",
           "test": "dcop_paired_bright_divider",
           "line": 328,
@@ -1606,24 +1258,6 @@
           "test": "dcop_paired_square_rc",
           "line": 436,
           "column": 28
-        },
-        {
-          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-          "test": "dcop_paired_sine_rc",
-          "line": 476,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-          "test": "dcop_paired_triangle_rc",
-          "line": 512,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-          "test": "dcop_paired_sawtooth_rc",
-          "line": 548,
-          "column": 30
         },
         {
           "file": "src\\components\\sources\\__tests__\\current-source-kcl.test.ts",
@@ -1813,42 +1447,6 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_blocking",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_breakover",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_njfet_cs",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_njfet_cutoff",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_pjfet_cs",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_pjfet_cutoff",
-          "line": 2936,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_intact",
           "line": 2936,
           "column": 11
@@ -1880,6 +1478,42 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_ac_drift",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_blocking",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_breakover",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_njfet_cs",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_njfet_cutoff",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_pjfet_cs",
+          "line": 2936,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_pjfet_cutoff",
           "line": 2936,
           "column": 11
         },
@@ -2019,7 +1653,7 @@
     },
     {
       "message": "Matrix structural divergence (A1): equation counts differ between engines.",
-      "count": 49,
+      "count": 47,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
@@ -2185,54 +1819,6 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "[suite-setup] BJT NPN CE full-model paired vs ngspice (T3)",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_forward",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_reverse",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_blocking",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_triggered",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_blocking",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_gated_on",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_reverse_blocking",
-          "line": 2757,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_dc_block",
           "line": 2757,
           "column": 11
@@ -2282,6 +1868,42 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_step_end_paired_lossy_open_end",
+          "line": 2757,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "[suite-setup] BJT NPN CE full-model paired vs ngspice (T3)",
+          "line": 2757,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_blocking",
+          "line": 2757,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_triggered",
+          "line": 2757,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_blocking",
+          "line": 2757,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_gated_on",
+          "line": 2757,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_reverse_blocking",
           "line": 2757,
           "column": 11
         },
@@ -2761,6 +2383,12 @@
         },
         {
           "file": "src\\solver\\coordinator.ts",
+          "test": "limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias",
+          "line": 250,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\coordinator.ts",
           "test": "init_pnp_simple_vbe_seeded",
           "line": 250,
           "column": 13
@@ -2834,12 +2462,6 @@
         {
           "file": "src\\solver\\coordinator.ts",
           "test": "hotload_rGI_changes_plate",
-          "line": 250,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias",
           "line": 250,
           "column": 13
         },
@@ -3170,7 +2792,7 @@
       ]
     },
     {
-      "message": "132 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p0/rLed:neg/tx:anode ours=4.9504950495049505 ngspice=5 absDelta=0.04950495049504955: expected 132 to be +0 // Object.is equality",
+      "message": "133 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p0/rLed:neg/tx:anode ours=4.9504950495049505 ngspice=5 absDelta=0.04950495049504955: expected 133 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -3188,7 +2810,7 @@
       ]
     },
     {
-      "message": "132 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p0/rLed:neg/tx:anode ours=1.4851485148514851 ngspice=1.5 absDelta=0.014851485148514865: expected 132 to be +0 // Object.is equality",
+      "message": "133 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p0/rLed:neg/tx:anode ours=1.4851485148514851 ngspice=1.5 absDelta=0.014851485148514865: expected 133 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -3218,7 +2840,7 @@
       ]
     },
     {
-      "message": "428 per-iteration divergence(s); first: voltage step 0/iter 0 ota1:V+/vp:pos ours=0.019228398924449188 ngspice=0 absDelta=0.019228398924449188: expected 428 to be +0 // Object.is equality",
+      "message": "535 per-iteration divergence(s); first: voltage step 0/iter 0 ota1:V+/vp:pos ours=0.019228398924449188 ngspice=0 absDelta=0.019228398924449188: expected 535 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -3230,7 +2852,7 @@
       ]
     },
     {
-      "message": "214 per-iteration divergence(s); first: voltage step 0/iter 0 ota1:V+/vp:pos ours=5 ngspice=0 absDelta=5: expected 214 to be +0 // Object.is equality",
+      "message": "321 per-iteration divergence(s); first: voltage step 0/iter 0 ota1:V+/vp:pos ours=5 ngspice=0 absDelta=5: expected 321 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -3494,7 +3116,7 @@
       ]
     },
     {
-      "message": "146 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p1/rdis:neg/t:DIS ours=4.9504950495049505 ngspice=5 absDelta=0.04950495049504955: expected 146 to be +0 // Object.is equality",
+      "message": "147 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p1/rdis:neg/t:DIS ours=4.9504950495049505 ngspice=5 absDelta=0.04950495049504955: expected 147 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -3548,6 +3170,132 @@
       ]
     },
     {
+      "message": "expected +0 to be 1 // Object.is equality",
+      "count": 20,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
+          "test": "bridge_trig_below_third_vcc_drives_out_high_digital",
+          "line": 456,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: se=1 with S=0 on rising clock seeds R to 1 (no all-zero lock-up)",
+          "line": 670,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: after seeding to 1, ne=1 on rising clock changes R to a non-zero, non-1 value",
+          "line": 687,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
+          "test": "two_input_one_bit_and_truth_table_via_data",
+          "line": 111,
+          "column": 39
+        },
+        {
+          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
+          "test": "address_formation_input_zero_is_lsb_three_input",
+          "line": 137,
+          "column": 38
+        },
+        {
+          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
+          "test": "single_input_lut_acts_as_not_gate_via_data",
+          "line": 187,
+          "column": 37
+        },
+        {
+          "file": "src\\components\\memory\\__tests__\\lookup-table.test.ts",
+          "test": "hotload_inputCount_changes_address_space_observable",
+          "line": 299,
+          "column": 20
+        },
+        {
+          "file": "src\\components\\wiring\\__tests__\\sim-control.test.ts",
+          "test": "inverted Reset releases output high after the init phase completes",
+          "line": 260,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\wiring\\__tests__\\sim-control.test.ts",
+          "test": "invertOutput flips the post-init Reset output polarity",
+          "line": 277,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "withEnable=true: post-warm-start Q=0, ~Q=1 with no prior clock activity",
+          "line": 146,
+          "column": 58
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "withEnable=false: post-warm-start Q=0, ~Q=1 with no prior clock activity",
+          "line": 152,
+          "column": 58
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "withEnable=true: DCOP converges with Q / ~Q complementary at the documented init level",
+          "line": 173,
+          "column": 58
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "withEnable=false: DCOP converges with Q / ~Q complementary at the documented init level",
+          "line": 184,
+          "column": 58
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "first rising clock edge with T=1 toggles Q from 0 to 1",
+          "line": 198,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "two successive rising edges with T=1 toggle Q back to 0",
+          "line": 206,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "rising clock edge with T=0 holds Q at its current value",
+          "line": 217,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "first rising clock edge unconditionally toggles Q from 0 to 1",
+          "line": 249,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "two successive rising edges toggle Q 0→1→0 unconditionally",
+          "line": 256,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "vIH hot-load: raising vIH past current logic-high level suppresses subsequent rising-edge toggle",
+          "line": 277,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
+          "test": "forceToggle structural: withEnable=false (forceToggle=1) toggles on rising edge even with T LOW; withEnable=true (forceToggle=0) does not",
+          "line": 321,
+          "column": 67
+        }
+      ]
+    },
+    {
       "message": "expected 1 to not be close to 1, received difference is 0, but expected 0.005",
       "count": 1,
       "locations": [
@@ -3572,7 +3320,7 @@
       ]
     },
     {
-      "message": "321 per-iteration divergence(s); first: voltage step 0/iter 0 vccs:ctrl+/vs:pos ours=0.8999999999999997 ngspice=0 absDelta=0.8999999999999997: expected 321 to be +0 // Object.is equality",
+      "message": "428 per-iteration divergence(s); first: voltage step 0/iter 0 vccs:ctrl+/vs:pos ours=0.8999999999999997 ngspice=0 absDelta=0.8999999999999997: expected 428 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -3686,6 +3434,138 @@
       ]
     },
     {
+      "message": "expected 4294967295 to be 255 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: -1 = 0xFF (two's complement)",
+          "line": 119,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "bitWidth=8 vs bitWidth=16: same input 1 -> different output mask widths",
+          "line": 161,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected 4294967169 to be 129 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: -0x7F = 0x81",
+          "line": 125,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected 4294967168 to be 128 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: -0x80 = 0x80 (min signed value negates to itself)",
+          "line": 131,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected 4294967041 to be 65281 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "16-bit: -(255) = 0xFF01",
+          "line": 150,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 85 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: se=1 with S=0x55 on rising clock seeds R to 0x55",
+          "line": 663,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "bitWidth=8 vs bitWidth=16: same seed mechanism, different LFSR widths reach different seeded values",
+          "line": 736,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 51966 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "16-bit: se=1 with S=0xCAFE on rising clock seeds R to 0xCAFE",
+          "line": 677,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be greater than or equal to 10",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: ne=1 over many clock edges produces multiple distinct values",
+          "line": 707,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 66 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\arithmetic\\__tests__\\arithmetic-utils.test.ts",
+          "test": "8-bit: with no rising clock edge after seeding, R remains the seed value",
+          "line": 717,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\memory\\__tests__\\two-phase-memory.test.ts",
+          "test": "write_then_read_round_trip_drives_d_to_written_value",
+          "line": 616,
+          "column": 43
+        }
+      ]
+    },
+    {
+      "message": "Pin 'lo' not found on component 'Mul'. Valid pins: a, b, mul (connection: \"mul:lo\" → \"outLo:in\")",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\headless\\builder.ts",
+          "test": "16-bit unsigned 0xFFFF*0xFFFF: low word 0x0001, high word 0xFFFE on independent output pins",
+          "line": 448,
+          "column": 17
+        },
+        {
+          "file": "src\\headless\\builder.ts",
+          "test": "32-bit unsigned 0x80000000*2: low word 0, high word 1 on independent output pins",
+          "line": 448,
+          "column": 17
+        }
+      ]
+    },
+    {
       "message": "expected 0 to be greater than 4.5",
       "count": 1,
       "locations": [
@@ -3722,7 +3602,7 @@
       ]
     },
     {
-      "message": "235 per-iteration divergence(s); first: voltage step 0/iter 0 r:pos/clk:out ours=3.3000000000000003 ngspice=0 absDelta=3.3000000000000003: expected 235 to be +0 // Object.is equality",
+      "message": "236 per-iteration divergence(s); first: voltage step 0/iter 0 r:pos/clk:out ours=3.3000000000000003 ngspice=0 absDelta=3.3000000000000003: expected 236 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -4058,32 +3938,44 @@
       ]
     },
     {
-      "message": "expected +0 to be 171 // Object.is equality",
-      "count": 4,
+      "message": "Bus conflict on net 0: conflicting drivers",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\components\\memory\\__tests__\\ram.test.ts",
+          "file": "src\\solver\\digital\\bus-resolution.ts",
           "test": "RAMSinglePort write-then-read round-trip across the bidirectional D pin",
-          "line": 818,
-          "column": 32
+          "line": 229,
+          "column": 12
         },
         {
-          "file": "src\\components\\memory\\__tests__\\two-phase-memory.test.ts",
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "RAMSinglePortSel write-then-read round-trip across the bidirectional D pin",
+          "line": 229,
+          "column": 12
+        }
+      ]
+    },
+    {
+      "message": "Bus conflict on net 1: conflicting drivers",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "masked_addresses_are_independent_across_distinct_register_slots",
+          "line": 229,
+          "column": 12
+        },
+        {
+          "file": "src\\solver\\digital\\bus-resolution.ts",
           "test": "write_then_read_round_trip_drives_d_to_written_value",
-          "line": 377,
-          "column": 47
+          "line": 229,
+          "column": 12
         },
         {
-          "file": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-          "test": "sel_high_passes_wide_input_to_output_eight_bit",
-          "line": 97,
-          "column": 37
-        },
-        {
-          "file": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-          "test": "merge_two_four_bit_nibbles_into_eight_bit_bus",
-          "line": 224,
-          "column": 37
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "write_with_str_low_does_not_modify_memory",
+          "line": 229,
+          "column": 12
         }
       ]
     },
@@ -4132,738 +4024,6 @@
           "test": "vIL hot-load: lowering vIL changes the band edge that defines clock-low for edge detection",
           "line": 307,
           "column": 24
-        }
-      ]
-    },
-    {
-      "message": "expected { type: 'digital', value: 4294967295 } to match object { type: 'digital', value: 15 }",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "pullup_4bit_drives_all_ones_mask",
-          "line": 148,
-          "column": 45
-        }
-      ]
-    },
-    {
-      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 1 }",
-      "count": 8,
-      "locations": [
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "diode_backward_drives_dout_to_din",
-          "line": 177,
-          "column": 45
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "diode_anode_high_pulls_cathode_to_one",
-          "line": 214,
-          "column": 48
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "blown_property_disables_active_drive_observable_at_dout",
-          "line": 259,
-          "column": 46
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "blown_property_keeps_cathode_at_pulldown_default_with_anode_high",
-          "line": 302,
-          "column": 49
-        },
-        {
-          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
-          "test": "digital_g_high_blown_false_propagates_d_to_s",
-          "line": 503,
-          "column": 42
-        },
-        {
-          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
-          "test": "blown_property_seeds_state_to_permanently_off",
-          "line": 530,
-          "column": 37
-        },
-        {
-          "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-          "test": "digital_executeSwitch_writes_state_slot_when_closed",
-          "line": 429,
-          "column": 44
-        },
-        {
-          "file": "src\\components\\switching\\__tests__\\switches.test.ts",
-          "test": "digital_executeSwitchDT_routes_b_when_closed",
-          "line": 475,
-          "column": 45
-        }
-      ]
-    },
-    {
-      "message": "Bus conflict on net 1: conflicting drivers",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\bus-resolution.ts",
-          "test": "diode_forward_drives_dout_high_when_din_high",
-          "line": 229,
-          "column": 12
-        },
-        {
-          "file": "src\\solver\\digital\\bus-resolution.ts",
-          "test": "diode_forward_yields_to_pulldown_when_din_low",
-          "line": 229,
-          "column": 12
-        },
-        {
-          "file": "src\\solver\\digital\\bus-resolution.ts",
-          "test": "blown_property_keeps_dout_at_pulldown_default_with_din_high",
-          "line": 229,
-          "column": 12
-        }
-      ]
-    },
-    {
-      "message": "Analog engine stagnation: simTime stuck at 0.000001s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "lte_rollback_state_invariant",
-          "line": 250,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "lte_rollback_state_invariant",
-          "line": 250,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "lte_rollback_state_invariant",
-          "line": 250,
-          "column": 13
-        }
-      ]
-    },
-    {
-      "message": "113 per-iteration divergence(s); first: voltage step 0/iter 0 X1:p1/X2:p0/DIAC1:A ours=19.985867857310218 ngspice=0 absDelta=19.985867857310218: expected 113 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_blocking",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "113 per-iteration divergence(s); first: voltage step 0/iter 0 X1:p1/X2:p0/DIAC1:A ours=37.358364698751046 ngspice=0 absDelta=37.358364698751046: expected 113 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_breakover",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected 0.6928681432162742 to not be close to 0.6928681429973097, received difference is 2.1896451318781374e-10, but expected 0.0005",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "hotload_RS_changes_vd",
-          "line": 192,
-          "column": 23
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "hotload_AREA_changes_vd",
-          "line": 204,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 10 not to be 10 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "hotload_BV_changes_reverse_breakdown_vd",
-          "line": 265,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "step 0 D1.GEQ: ours=0.01432776207648208 ngspice=0.014327762076482078 absDelta=1.734723475976807e-18: expected false to be true // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_resistive",
-          "line": 42,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_diode_resistive",
-          "line": 42,
-          "column": 11
-        }
-      ]
-    },
-    {
-      "message": "113 per-iteration divergence(s); first: state step 0/iter 0 D1.ID ours=0.0003705759094132005 ngspice=0.0003705759094132004 absDelta=1.0842021724855044e-19: expected 113 to be +0 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_resistive",
-          "line": 63,
-          "column": 31
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_diode_resistive",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "step 0 node d1:A/r1:neg: ours=0.0010470130262913507 ngspice=0.0010470130263612123 absDelta=6.986165118627596e-14: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_cap_rc",
-          "line": 29,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "1228 per-iteration divergence(s); first: voltage step 0/iter 0 r1:pos/vs:pos ours=0.0010470130262913507 ngspice=0.0010470130263612123 absDelta=6.986165118627596e-14: expected 1228 to be +0 // Object.i...",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_cap_rc",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "963 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=5.9999999399 ngspice=10 absDelta=4.0000000601: expected 963 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_njfet_cs",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "963 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=9.999999869900002 ngspice=10 absDelta=1.300999983300244e-7: expected 963 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_njfet_cutoff",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "1498 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0000000600999999 ngspice=0 absDelta=1.0000000600999999: expected 1498 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_pjfet_cs",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "1177 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0009999899667418e-7 ngspice=0 absDelta=1.0009999899667418e-7: expected 1177 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_pjfet_cutoff",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected 4.95999999503 not to be 4.95999999503 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "hotload_PHI_changes_vd",
-          "line": 266,
-          "column": 23
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "hotload_GAMMA_changes_vd",
-          "line": 278,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "step 0 branch V_DD:branch: ours=-0.0000345314379969 ngspice=-0.00001726571899845 absDelta=0.00001726571899845: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_nmos_inverter",
-          "line": 35,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "1294 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=-0.0000345314379969 ngspice=-0.00001726571899845 absDelta=0.00001726571899845: expected 1294 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_nmos_inverter",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "step 0 branch Vdd:branch: ours=6.906287599379999e-7 ngspice=-1.5881867761018131e-22 absDelta=6.906287599380001e-7: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_pmos_cs",
-          "line": 35,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "428 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=6.906287599379999e-7 ngspice=-1.5881867761018131e-22 absDelta=6.906287599380001e-7: expected 428 to be +0 // Object.is equalit...",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_pmos_cs",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "1919 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/R_B:neg ours=0.6928682118747389 ngspice=0.6928682111811713 absDelta=6.935676477581865e-10: expected 1919 to be +0 // Object.is equal...",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_bjt_ce",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected 0.5 to not be close to 0.5, received difference is 0, but expected 5e-7",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
-          "test": "hotload_RS_changes_anode_voltage",
-          "line": 146,
-          "column": 23
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
-          "test": "hotload_RS_changes_anode_voltage_forward",
-          "line": 219,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 0.5 not to be 0.5 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
-          "test": "hotload_CJO_changes_dynamic_response",
-          "line": 166,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "1284 per-iteration divergence(s); first: voltage step 0/iter 0 D1:A/V1:pos ours=0.1979674119640948 ngspice=0 absDelta=0.1979674119640948: expected 1284 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_forward",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be +0 // Object.is equality",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
-          "test": "limiting_paired_forward",
-          "line": 283,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
-          "test": "limiting_paired_forward",
-          "line": 372,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
-          "test": "limiting_paired_forward",
-          "line": 315,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
-          "test": "limiting_paired_breakdown",
-          "line": 358,
-          "column": 30
-        }
-      ]
-    },
-    {
-      "message": "963 per-iteration divergence(s); first: voltage step 0/iter 0 D1:internal ours=1.9998999803376047 ngspice=2 absDelta=0.0001000196623952565: expected 963 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_reverse",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "963 per-iteration divergence(s); first: voltage step 0/iter 0 X3:p0/X4:p1 ours=4.999998655958183 ngspice=5 absDelta=0.0000013440418173971125: expected 963 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_blocking",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "126 per-iteration divergence(s); first: voltage step 0/iter 0 X3:p2/RA:neg/scr:A ours=9.900990099009901 ngspice=10 absDelta=0.0990099009900991: expected 126 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_triggered",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "No test found in suite spice-model-overrides-prop  canonical set (empty by capability gate)",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\spice-model-overrides-prop.test.ts",
-          "test": "[suite-setup] spice-model-overrides-prop  canonical set (empty by capability gate)",
-          "line": null,
-          "column": null
-        }
-      ]
-    },
-    {
-      "message": "expected 0.005 to be less than 0.001",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "dcop_reverse_polarity_blocking_current_below_one_milliamp",
-          "line": 225,
-          "column": 30
-        }
-      ]
-    },
-    {
-      "message": "expected 4.999998650948163 to not be close to 4.999998650949606, received difference is 1.4432899320127035e-12, but expected 0.005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "hotload_BF_changes_blocking_anode_voltage",
-          "line": 286,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 4.999995323830982 to not be close to 4.999998650949606, received difference is 0.000003327118624163461, but expected 0.005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "hotload_TEMP_changes_blocking_anode_voltage",
-          "line": 306,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 4.999998626999368 to not be close to 4.999998650949606, received difference is 2.3950238237091526e-8, but expected 0.005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "hotload_AREA_changes_blocking_anode_voltage",
-          "line": 327,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 4.999998253036962 to not be close to 4.999998650949606, received difference is 3.9791264416777494e-7, but expected 0.005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "hotload_IS_changes_blocking_anode_voltage",
-          "line": 345,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 4.999998650958135 to not be close to 4.999998650949606, received difference is 8.529177364380303e-12, but expected 0.005",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "hotload_BR_changes_blocking_anode_voltage",
-          "line": 363,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "1498 per-iteration divergence(s); first: voltage step 0/iter 0 X4:p0/X5:p1 ours=4.999998650948162 ngspice=5 absDelta=0.0000013490518382397454: expected 1498 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_blocking",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "132 per-iteration divergence(s); first: voltage step 0/iter 0 X5:p2/X6:p2/RA:neg ours=4.9504950495049505 ngspice=5 absDelta=0.04950495049504955: expected 132 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_gated_on",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "642 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p0/X7:p1 ours=3.7559884928905453e-29 ngspice=NaN absDelta=NaN: expected 642 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_reverse_blocking",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "step 0 dt: ours=0 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_common_cathode",
-          "line": 24,
-          "column": 7
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_cutoff",
-          "line": 24,
-          "column": 7
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_pull_in",
-          "line": 24,
-          "column": 7
-        }
-      ]
-    },
-    {
-      "message": "1 per-iteration divergence(s); first: shape step 0/iter -1 step_shape[0] ours=14 ngspice=0 absDelta=14: expected 1 to be +0 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_common_cathode",
-          "line": 63,
-          "column": 31
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_cutoff",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "step 0 node VD:K/R1:neg: ours=1.9999999799000006 ngspice=1.9999999799 absDelta=6.661338147750939e-16: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_reverse",
-          "line": 29,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "382 per-iteration divergence(s); first: voltage step 0/iter 0 R1:pos/V1:pos ours=1.9999999799000006 ngspice=1.9999999799 absDelta=6.661338147750939e-16: expected 382 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_reverse",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "step 0 node VD:K/R1:pos: ours=0.0007254584105811923 ngspice=0.0007254584105811368 absDelta=5.551115123125783e-17: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_forward",
-          "line": 29,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "260 per-iteration divergence(s); first: voltage step 0/iter 0 node_2 ours=0.0007254584105811923 ngspice=0.0007254584105811368 absDelta=5.551115123125783e-17: expected 260 to be +0 // Object.is equalit...",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_forward",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected 0.8148882772563919 to be less than 0.6294240905881262",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
-          "test": "hotload_TEMP_changes_vf_forward",
-          "line": 246,
-          "column": 19
-        }
-      ]
-    },
-    {
-      "message": "step 0 node Z1:K/R1:pos: ours=0.3705759094118738 ngspice=0.3705759094118739 absDelta=1.1102230246251565e-16: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_forward",
-          "line": 29,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "567 per-iteration divergence(s); first: voltage step 0/iter 0 node_2 ours=0.3705759094118738 ngspice=0.3705759094118739 absDelta=1.1102230246251565e-16: expected 567 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_forward",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "step 0 Z1.VD: ours=-5.127293305849111 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_breakdown",
-          "line": 42,
-          "column": 11
-        }
-      ]
-    },
-    {
-      "message": "741 per-iteration divergence(s); first: rhs step 1/iter 0 rhs[1] ours=-0.5666101125942706 ngspice=-0.566610156479408 absDelta=4.388513741293565e-8: expected 741 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_breakdown",
-          "line": 63,
-          "column": 31
         }
       ]
     },
@@ -4928,42 +4088,6 @@
       ]
     },
     {
-      "message": "step 0 C1.GEQ: ours=99999.99999999999 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_rc",
-          "line": 42,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_rc",
-          "line": 42,
-          "column": 11
-        }
-      ]
-    },
-    {
-      "message": "1039 per-iteration divergence(s); first: rhs step 1/iter 0 rhs[0] ours=0 ngspice=-0.000009999999900000001 absDelta=0.000009999999900000001: expected 1039 to be +0 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_rc",
-          "line": 63,
-          "column": 31
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_rc",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
       "message": "step 0 node C1:pos/L1:neg: ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected false to be true // Object.is equality",
       "count": 2,
       "locations": [
@@ -4982,7 +4106,7 @@
       ]
     },
     {
-      "message": "10037 per-iteration divergence(s); first: voltage step 0/iter 0 L1:pos/R1:neg ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 10037 to be +0 // Objec...",
+      "message": "10033 per-iteration divergence(s); first: voltage step 0/iter 0 L1:pos/R1:neg ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 10033 to be +0 // Objec...",
       "count": 2,
       "locations": [
         {
@@ -5192,7 +4316,7 @@
       ]
     },
     {
-      "message": "963 per-iteration divergence(s); first: voltage step 0/iter 0 rs:pos/vs:pos ours=4.999800002993624 ngspice=5 absDelta=0.00019999700637640672: expected 963 to be +0 // Object.is equality",
+      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 rs:pos/vs:pos ours=4.999800002993624 ngspice=5 absDelta=0.00019999700637640672: expected 1070 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -5444,6 +4568,564 @@
       ]
     },
     {
+      "message": "Analog engine stagnation: simTime stuck at 0.000001s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\coordinator.ts",
+          "test": "lte_rollback_state_invariant",
+          "line": 250,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\coordinator.ts",
+          "test": "lte_rollback_state_invariant",
+          "line": 250,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\coordinator.ts",
+          "test": "lte_rollback_state_invariant",
+          "line": 250,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "113 per-iteration divergence(s); first: voltage step 0/iter 0 X1:p1/X2:p0/DIAC1:A ours=19.985867857310218 ngspice=0 absDelta=19.985867857310218: expected 113 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_blocking",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "113 per-iteration divergence(s); first: voltage step 0/iter 0 X1:p1/X2:p0/DIAC1:A ours=37.358364698751046 ngspice=0 absDelta=37.358364698751046: expected 113 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_breakover",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 0.6928681432162742 to not be close to 0.6928681429973097, received difference is 2.1896451318781374e-10, but expected 0.0005",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "hotload_RS_changes_vd",
+          "line": 189,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "hotload_AREA_changes_vd",
+          "line": 201,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 10 not to be 10 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "hotload_BV_changes_reverse_breakdown_vd",
+          "line": 262,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "step 0 D1.ID: ours=0.0003705759094132005 ngspice=0.0003705759094132004 absDelta=1.0842021724855044e-19: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_resistive",
+          "line": 42,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "message": "4 per-iteration divergence(s); first: rhs step 0/iter 0 rhs[0] ours=-0.008647662705740902 ngspice=-0.0086476627057409 absDelta=1.734723475976807e-18: expected 4 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_resistive",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "step 0 node d1:A/r1:neg: ours=0.0010470130262913507 ngspice=0.0010470130263612123 absDelta=6.986165118627596e-14: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_cap_rc",
+          "line": 29,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "1228 per-iteration divergence(s); first: voltage step 0/iter 0 r1:pos/vs:pos ours=0.0010470130262913507 ngspice=0.0010470130263612123 absDelta=6.986165118627596e-14: expected 1228 to be +0 // Object.i...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_cap_rc",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=5.9999999399 ngspice=10 absDelta=4.0000000601: expected 1070 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_njfet_cs",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=9.999999869900002 ngspice=10 absDelta=1.300999983300244e-7: expected 1070 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_njfet_cutoff",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1498 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0000000600999999 ngspice=0 absDelta=1.0000000600999999: expected 1498 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_pjfet_cs",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1177 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0009999899667418e-7 ngspice=0 absDelta=1.0009999899667418e-7: expected 1177 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_pjfet_cutoff",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 4.95999999503 not to be 4.95999999503 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "hotload_PHI_changes_vd",
+          "line": 266,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "hotload_GAMMA_changes_vd",
+          "line": 278,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "step 0 branch V_DD:branch: ours=-0.0000345314379969 ngspice=-0.00001726571899845 absDelta=0.00001726571899845: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_nmos_inverter",
+          "line": 35,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "2175 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=-0.0000345314379969 ngspice=-0.00001726571899845 absDelta=0.00001726571899845: expected 2175 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_nmos_inverter",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "step 0 branch Vdd:branch: ours=6.906287599379999e-7 ngspice=-1.5881867761018131e-22 absDelta=6.906287599380001e-7: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_pmos_cs",
+          "line": 35,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "428 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=6.906287599379999e-7 ngspice=-1.5881867761018131e-22 absDelta=6.906287599380001e-7: expected 428 to be +0 // Object.is equalit...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_pmos_cs",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 X3:p0/X4:p1 ours=4.999998655958183 ngspice=5 absDelta=0.0000013440418173971125: expected 1070 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_blocking",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "127 per-iteration divergence(s); first: voltage step 0/iter 0 X3:p2/RA:neg/scr:A ours=9.900990099009901 ngspice=10 absDelta=0.0990099009900991: expected 127 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_triggered",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "No test found in suite spice-model-overrides-prop  canonical set (empty by capability gate)",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\spice-model-overrides-prop.test.ts",
+          "test": "[suite-setup] spice-model-overrides-prop  canonical set (empty by capability gate)",
+          "line": null,
+          "column": null
+        }
+      ]
+    },
+    {
+      "message": "expected 0.005 to be less than 0.001",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "dcop_reverse_polarity_blocking_current_below_one_milliamp",
+          "line": 225,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999998650948163 to not be close to 4.999998650949606, received difference is 1.4432899320127035e-12, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_BF_changes_blocking_anode_voltage",
+          "line": 286,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999995323830982 to not be close to 4.999998650949606, received difference is 0.000003327118624163461, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_TEMP_changes_blocking_anode_voltage",
+          "line": 306,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999998626999368 to not be close to 4.999998650949606, received difference is 2.3950238237091526e-8, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_AREA_changes_blocking_anode_voltage",
+          "line": 327,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999998253036962 to not be close to 4.999998650949606, received difference is 3.9791264416777494e-7, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_IS_changes_blocking_anode_voltage",
+          "line": 345,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999998650958135 to not be close to 4.999998650949606, received difference is 8.529177364380303e-12, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_BR_changes_blocking_anode_voltage",
+          "line": 363,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "1605 per-iteration divergence(s); first: voltage step 0/iter 0 X4:p0/X5:p1 ours=4.999998650948162 ngspice=5 absDelta=0.0000013490518382397454: expected 1605 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_blocking",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "132 per-iteration divergence(s); first: voltage step 0/iter 0 X5:p2/X6:p2/RA:neg ours=4.9504950495049505 ngspice=5 absDelta=0.04950495049504955: expected 132 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_gated_on",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "749 per-iteration divergence(s); first: voltage step 0/iter 0 X6:p0/X7:p1 ours=3.7559884928905453e-29 ngspice=NaN absDelta=NaN: expected 749 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_reverse_blocking",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "step 0 dt: ours=0 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_common_cathode",
+          "line": 24,
+          "column": 7
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_cutoff",
+          "line": 24,
+          "column": 7
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_pull_in",
+          "line": 24,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "message": "1 per-iteration divergence(s); first: shape step 0/iter -1 step_shape[0] ours=14 ngspice=0 absDelta=14: expected 1 to be +0 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_common_cathode",
+          "line": 63,
+          "column": 31
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_cutoff",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 0.8148882772563919 to be less than 0.6294240905881262",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "hotload_TEMP_changes_vf_forward",
+          "line": 245,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "step 0 node Z1:K/R1:pos: ours=0.3705759094118738 ngspice=0.3705759094118739 absDelta=1.1102230246251565e-16: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_forward",
+          "line": 29,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "567 per-iteration divergence(s); first: voltage step 0/iter 0 node_2 ours=0.3705759094118738 ngspice=0.3705759094118739 absDelta=1.1102230246251565e-16: expected 567 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_forward",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected NaN to be +0 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "limiting_paired_forward",
+          "line": 314,
+          "column": 30
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "limiting_paired_breakdown",
+          "line": 357,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "step 0 Z1.VD: ours=-5.127293305849111 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_breakdown",
+          "line": 42,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "message": "741 per-iteration divergence(s); first: rhs step 1/iter 0 rhs[1] ours=-0.5666101125942706 ngspice=-0.566610156479408 absDelta=4.388513741293565e-8: expected 741 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_breakdown",
+          "line": 63,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: 4294967295 } to match object { type: 'digital', value: 15 }",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "pullup_4bit_drives_all_ones_mask",
+          "line": 148,
+          "column": 45
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 1 }",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "diode_backward_drives_dout_to_din",
+          "line": 177,
+          "column": 45
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "diode_forward_drives_dout_high_when_din_high",
+          "line": 192,
+          "column": 45
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "diode_anode_high_pulls_cathode_to_one",
+          "line": 214,
+          "column": 48
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "blown_property_disables_active_drive_observable_at_dout",
+          "line": 259,
+          "column": 46
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "blown_property_keeps_dout_at_pulldown_default_with_din_high",
+          "line": 281,
+          "column": 46
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "blown_property_keeps_cathode_at_pulldown_default_with_anode_high",
+          "line": 302,
+          "column": 49
+        }
+      ]
+    },
+    {
       "message": "321 per-iteration divergence(s); first: voltage step 0/iter 0 node_2 ours=2.5 ngspice=5 absDelta=2.5: expected 321 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
@@ -5654,31 +5336,19 @@
       ]
     },
     {
-      "message": "step 0 c1.GEQ: ours=1.9999999999999998 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
-      "count": 3,
+      "message": "step 12 node r1:pos/acsrc:pos: ours=3.7816181676934866 ngspice=3.7816181676934875 absDelta=8.881784197001252e-16: expected false to be true // Object.is equality",
+      "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
           "test": "transient_step_end_paired_sine_rc",
-          "line": 42,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_triangle_rc",
-          "line": 42,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_sawtooth_rc",
-          "line": 42,
-          "column": 11
+          "line": 29,
+          "column": 9
         }
       ]
     },
     {
-      "message": "558 per-iteration divergence(s); first: voltage step 0/iter 0 node_3 ours=-0.000015700087385704967 ngspice=NaN absDelta=NaN: expected 558 to be +0 // Object.is equality",
+      "message": "448 per-iteration divergence(s); first: voltage step 0/iter 0 node_3 ours=-0.000015700087385704967 ngspice=NaN absDelta=NaN: expected 448 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -5690,7 +5360,19 @@
       ]
     },
     {
-      "message": "910 per-iteration divergence(s); first: voltage step 0/iter 0 node_3 ours=-0.000009995002498749093 ngspice=NaN absDelta=NaN: expected 910 to be +0 // Object.is equality",
+      "message": "step 17 node c1:pos/r1:neg: ours=-2.8318209187897803 ngspice=-2.831323406351969 absDelta=0.0004975124378110429: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_triangle_rc",
+          "line": 29,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "892 per-iteration divergence(s); first: voltage step 0/iter 0 node_3 ours=-0.000009995002498749093 ngspice=NaN absDelta=NaN: expected 892 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -5702,7 +5384,7 @@
       ]
     },
     {
-      "message": "560 per-iteration divergence(s); first: voltage step 0/iter 0 node_3 ours=-0.000004997501254372719 ngspice=NaN absDelta=NaN: expected 560 to be +0 // Object.is equality",
+      "message": "448 per-iteration divergence(s); first: voltage step 0/iter 0 node_3 ours=-0.000004997501254372719 ngspice=NaN absDelta=NaN: expected 448 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -5732,7 +5414,7 @@
       ]
     },
     {
-      "message": "214 per-iteration divergence(s); first: voltage step 0/iter 0 node_1 ours=10 ngspice=0 absDelta=10: expected 214 to be +0 // Object.is equality",
+      "message": "321 per-iteration divergence(s); first: voltage step 0/iter 0 node_1 ours=10 ngspice=0 absDelta=10: expected 321 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -5768,7 +5450,7 @@
       ]
     },
     {
-      "message": "1620 per-iteration divergence(s); first: voltage step 0/iter 0 node_1 ours=9.999999999999998 ngspice=0 absDelta=9.999999999999998: expected 1620 to be +0 // Object.is equality",
+      "message": "2025 per-iteration divergence(s); first: voltage step 0/iter 0 node_1 ours=9.999999999999998 ngspice=0 absDelta=9.999999999999998: expected 2025 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -5798,7 +5480,7 @@
       ]
     },
     {
-      "message": "115 per-iteration divergence(s); first: voltage step 0/iter 0 r1:pos/vrail:pos ours=4.999999999999999 ngspice=0 absDelta=4.999999999999999: expected 115 to be +0 // Object.is equality",
+      "message": "116 per-iteration divergence(s); first: voltage step 0/iter 0 r1:pos/vrail:pos ours=4.999999999999999 ngspice=0 absDelta=4.999999999999999: expected 116 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -5853,8 +5535,14 @@
     },
     {
       "message": "expected { type: 'digital', value: 1 } to match object { type: 'digital', value: +0 }",
-      "count": 1,
+      "count": 2,
       "locations": [
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "blown_property_seeds_state_to_permanently_off",
+          "line": 539,
+          "column": 37
+        },
         {
           "file": "src\\components\\switching\\__tests__\\fets.test.ts",
           "test": "blown_property_seeds_state_to_permanently_off",
@@ -6008,7 +5696,7 @@
       ]
     },
     {
-      "message": "203 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=-9.99999999998398e-8 ngspice=0 absDelta=9.99999999998398e-8: expected 203 to be +0 // Object.is equality",
+      "message": "232 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=-9.99999999998398e-8 ngspice=0 absDelta=9.99999999998398e-8: expected 232 to be +0 // Object.is equality",
       "count": 2,
       "locations": [
         {
@@ -6022,30 +5710,6 @@
           "test": "full_iteration_paired_isolation",
           "line": 63,
           "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected 34 to be 17 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\wiring\\__tests__\\mux.test.ts",
-          "test": "sel toggle 0->1->0 follows the addressed input on each step",
-          "line": 141,
-          "column": 30
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 11 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-          "test": "split_eight_bit_bus_into_two_four_bit_nibbles",
-          "line": 200,
-          "column": 36
         }
       ]
     },
@@ -6464,31 +6128,7 @@
       ]
     },
     {
-      "message": "Unguarded xfact reads:",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
-          "test": "has zero unguarded xfact reads in src/components/",
-          "line": 143,
-          "column": 76
-        }
-      ]
-    },
-    {
-      "message": "Stale allowlist entries:",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
-          "test": "allowlist is exhaustive- no stale entries",
-          "line": 191,
-          "column": 74
-        }
-      ]
-    },
-    {
-      "message": "state0[0] (C1.GEQ) must equal state1[0]: expected 6 to be +0 // Object.is equality",
+      "message": "state0[0] (C1.Q) must equal state1[0]: expected 0.000004999999999999998 to be 0.0000049999999999999996 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -6500,7 +6140,7 @@
       ]
     },
     {
-      "message": "step 1: state0[1] (C1.IEQ) must equal state1[1]: expected -29.999999999999986 to be -29.999999999999996 // Object.is equality",
+      "message": "step 1: state0[0] (C1.Q) must equal state1[0]: expected 0.000004999999999999996 to be 0.000004999999999999998 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -6508,6 +6148,18 @@
           "test": "invariant_persists_across_multiple_accepted_steps",
           "line": 481,
           "column": 15
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 5, received difference is NaN, but expected 5e-7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\fixtures\\build-fixture.test.ts",
+          "test": "warm-started simulation reaches DC steady state (cap holds source voltage)",
+          "line": 65,
+          "column": 59
         }
       ]
     },

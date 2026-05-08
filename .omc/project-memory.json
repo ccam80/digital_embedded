@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit -p tsconfig.json 2>&1 | head -20",
-    "testCommand": "npx vitest run src/compile src/solver/digital src/components/wiring src/components/gates --reporter=default 2>&1 | tail -8",
+    "buildCommand": "npx tsc --noEmit 2>&1 | tail -200",
+    "testCommand": "npx vitest run src/compile src/solver/digital src/components/wiring src/components/gates src/components/io src/components/memory src/components/flipflops --reporter=default 2>&1 | head -300 > C:/Users/cca79/AppData/Local/Temp/sweep.log ; type C:\\Users\\cca79\\AppData\\Local\\Temp\\sweep.log 2>&1",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -306,15 +306,15 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\digital\\digital-engine.ts",
-      "accessCount": 14,
-      "lastAccessed": 1778245139881,
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 15,
+      "lastAccessed": 1778245997825,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 13,
-      "lastAccessed": 1778244360178,
+      "path": "src\\solver\\digital\\digital-engine.ts",
+      "accessCount": 14,
+      "lastAccessed": 1778245139881,
       "type": "file"
     },
     {
@@ -420,6 +420,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1778246001707,
+      "type": "file"
+    },
+    {
       "path": "src\\headless\\netlist.ts",
       "accessCount": 2,
       "lastAccessed": 1778205936828,
@@ -502,12 +508,6 @@
       "accessCount": 1,
       "lastAccessed": 1778206703096,
       "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778206720029,
-      "type": "file"
     },
     {
       "path": "src/components/semiconductors/schottky.ts",

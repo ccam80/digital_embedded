@@ -7,14 +7,14 @@ import {
   DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
-import { DIODE_CAP_SCHEMA } from "../diode.js";
+import { DIODE_SCHEMA } from "../diode.js";
 
 const DTS_FORWARD = path.resolve("src/components/semiconductors/__tests__/fixtures/schottky-canon-forward.dts");
 const DTS_REVERSE = path.resolve("src/components/semiconductors/__tests__/fixtures/schottky-canon-reverse.dts");
 
 // ---------------------------------------------------------------------------
 // Programmatic build helper for T1 fixtures.
-// Schottky default props (CJO=1pF, RS=1Ω) → cap-active path → DIODE_CAP_SCHEMA.
+// Schottky default props (CJO=1pF, RS=1Ω) → cap-active path → DIODE_SCHEMA.
 // ---------------------------------------------------------------------------
 
 function buildSchottkyForward(
@@ -52,12 +52,12 @@ function findD1(fix: ReturnType<typeof buildFixture>) {
 // Category 1 — Initialization (T1)
 // Asserts the warm-started state pool slot reads finite for the Schottky
 // element after compile() + first coordinator.step(). Schottky delegates to
-// createDiodeElement; with default CJO=1pF the element uses DIODE_CAP_SCHEMA
-// (7 slots). VD slot is the pnjlim-limited junction voltage.
+// createDiodeElement; with default CJO=1pF the element uses DIODE_SCHEMA.
+// VD slot is the pnjlim-limited junction voltage.
 // ---------------------------------------------------------------------------
 
 describe("Schottky initialization (T1)", () => {
-  const SLOT_VD = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
+  const SLOT_VD = DIODE_SCHEMA.indexOf.get("VD")!;
 
   it("init_schottky_vd_seeded", () => {
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
@@ -214,7 +214,7 @@ describe("Schottky limiting events own-engine (T1)", () => {
 
 describe("Schottky LTE rollback (T1)", () => {
   it("lte_rollback_state_invariant", () => {
-    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const SLOT_Q = DIODE_SCHEMA.indexOf.get("Q")!;
     const fix = buildFixture({
       build: (_r, f) => buildSchottkyForward(f),
       params: { tStop: 1e-6, maxTimeStep: 1e-7 },

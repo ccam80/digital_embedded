@@ -138,14 +138,15 @@ export class OutElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeOut- reads input, copies to output slot for display
+// executeOut- pure sink. The displayed value is read from the labeled
+// input net via the labelSignalMap; there is no separate display shadow.
+// outputSchema is empty (0 output slots), so writing to wt[outputOffset(i)]
+// would index past this component's output range into the next component's
+// slot and clobber it.
 // ---------------------------------------------------------------------------
 
-export function executeOut(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const wt = layout.wiringTable;
-  const inputIdx = layout.inputOffset(index);
-  const outputIdx = layout.outputOffset(index);
-  state[wt[outputIdx]] = state[wt[inputIdx]];
+export function executeOut(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
+  // no-op
 }
 
 // ---------------------------------------------------------------------------
