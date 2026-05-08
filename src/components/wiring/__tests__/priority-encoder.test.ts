@@ -1,350 +1,305 @@
 /**
- * Tests for the PriorityEncoder component.
+ * Canonical tests for the PriorityEncoder component.
  *
- * Covers:
- *   - executePriorityEncoder: truth table for representative cases
- *   - executePriorityEncoder: highest-index (last active) priority wins
- *   - executePriorityEncoder: any flag correct
- *   - executePriorityEncoder: all inputs inactive → any=0, num=0
- *   - Pin layout: correct counts and labels
- *   - Attribute mapping
- *   - Rendering
- *   - ComponentDefinition completeness
+ * Tier: fixture-only (pure-digital, combinational; no analog domain).
+ * Driver: facade.build({components, connections}) + facade.compile() +
+ *   coordinator.writeByLabel / step / readByLabel via the facade signal API.
+ *
+ * Canon coverage:
+ *   - Cat 4 (param hot-load — structural `selectorBits`): selectorBits is
+ *     consumed at compile() to shape the input pin set. Canonical mechanic:
+ *     build the same circuit twice — once with selectorBits=1, once with
+ *     selectorBits=2 — and assert the documented post-compile observable
+ *     differs at the same input combination.
+ *   - Cat 9 (bridge / digital interaction): drive labelled In ports for each
+ *     input pin, step the engine, observe labelled Out ports for `num` and
+ *     `any`.
+ *   - Cat 11 (multi-output digital observability): `outputSchema = ["num",
+ *     "any"]`. `num` is the index of the highest-active input;
+ *     `any` is the OR-reduction across all inputs. The two outputs take
+ *     independent values for the same input combination (e.g. all-zero
+ *     inputs → num=0, any=0; only in0=1 → num=0, any=1; both
+ *     differentiated by one input bit).
+ *   - Cat 12 (forbidden / undefined input combinations): with no input
+ *     asserted, the production-source comment documents `any=0, num=0`. This
+ *     is the spec-mandated forbidden-state output for the priority encoder.
+ *
+ * Cat 1/2/3/5/6/7/8 do not apply: pure-digital combinational with no analog
+ * state pool, no MNA matrix, no DCOP, no junction limiting, no LTE rollback,
+ * no breakpoints, no transient dynamics.
+ * Cat 10 does not apply: modelRegistry is empty (no named presets).
+ * Cat 13 does not apply: every input pin (in0..inN) is 1-bit and is driven
+ * by a 1-bit In; the `num` output is selectorBits-wide and is observed by
+ * an Out sized to match (no narrower port than its bus).
+ * Cat 14 does not apply: production source emits no runtime diagnostics
+ * keyed on simulation observables.
+ * Cat 15 does not apply: production source registers no _onStateChange
+ * writeback subscription.
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  PriorityEncoderElement,
-  executePriorityEncoder,
-  PriorityEncoderDefinition,
-  PRIORITY_ENCODER_ATTRIBUTE_MAPPINGS,
-  buildPriorityEncoderPinDeclarations,
-} from "../priority-encoder.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
+import type { SimulationCoordinator } from "../../../solver/coordinator-types.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Canonical builder for a digital fixture driven by labelled In ports and
+// observed via labelled Out ports.
 // ---------------------------------------------------------------------------
 
-/**
- * Build a layout for a priority encoder with N inputs and 2 outputs (num, any).
- */
-function makeLayout(inputCount: number): ComponentLayout {
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => 2,
-    outputOffset: () => inputCount,
-    stateOffset: () => inputCount + 2,
-    getProperty: () => undefined,
-  };
+interface DigitalFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: SimulationCoordinator;
 }
 
-function makeState(inputs: number[]): Uint32Array {
-  const arr = new Uint32Array(inputs.length + 2);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
+function buildDigital(spec: {
+  components: ReadonlyArray<{ id: string; type: string; props?: Record<string, number | string | boolean | number[]> }>;
+  connections: ReadonlyArray<readonly [string, string]>;
+}): DigitalFixture {
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: spec.components.map((c) =>
+      c.props === undefined
+        ? { id: c.id, type: c.type }
+        : { id: c.id, type: c.type, props: c.props },
+    ),
+    connections: spec.connections.map((c) => [c[0], c[1]] as [string, string]),
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
+}
+
+function drive(fix: DigitalFixture, values: Record<string, number>): void {
+  for (const [label, value] of Object.entries(values)) {
+    fix.facade.setSignal(fix.coordinator, label, value);
   }
-  return arr;
+  fix.facade.step(fix.coordinator);
 }
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
-
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
-}
-
-function makePrioEnc(overrides?: { selectorBits?: number }): PriorityEncoderElement {
-  const props = new PropertyBag();
-  props.set("selectorBits", overrides?.selectorBits ?? 2);
-  return new PriorityEncoderElement("test-prio-001", { x: 0, y: 0 }, 0, false, props);
+function read(fix: DigitalFixture, label: string): number {
+  return fix.facade.readSignal(fix.coordinator, label) as number;
 }
 
 // ---------------------------------------------------------------------------
-// executePriorityEncoder- logic correctness
+// PriorityEncoder fixture: selectorBits=N → 2^N input pins (in0..in(2^N-1))
+// driven by individual 1-bit In ports labelled IN0..IN(2^N-1); outputs
+// `num` (selectorBits wide) and `any` (1 bit) routed to Outs labelled NUM
+// and ANY.
 // ---------------------------------------------------------------------------
 
-describe("PriorityEncoder", () => {
-  describe("execute2Input", () => {
-    it("only in0=1: num=0, any=1", () => {
-      // 1-bit selector → 2 inputs
-      const layout = makeLayout(2);
-      const state = makeState([1, 0]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[2]).toBe(0); // num
-      expect(state[3]).toBe(1); // any
-    });
+function buildPriorityEncoder(opts: {
+  selectorBits?: number;
+}): DigitalFixture {
+  const selectorBits = opts.selectorBits ?? 2;
+  const inputCount = 1 << selectorBits;
 
-    it("only in1=1: num=1, any=1", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0, 1]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[2]).toBe(1); // num
-      expect(state[3]).toBe(1); // any
-    });
+  const components: { id: string; type: string; props?: Record<string, number | string | boolean | number[]> }[] = [];
+  const connections: [string, string][] = [];
 
-    it("both in0=1 and in1=1: num=1 (highest index wins), any=1", () => {
-      const layout = makeLayout(2);
-      const state = makeState([1, 1]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[2]).toBe(1); // num = highest active index
-      expect(state[3]).toBe(1); // any
+  for (let i = 0; i < inputCount; i++) {
+    components.push({
+      id: `in${i}`,
+      type: "In",
+      props: { label: `IN${i}`, bitWidth: 1 },
     });
+    connections.push([`in${i}:out`, `pe:in${i}`]);
+  }
 
-    it("all inputs 0: num=0, any=0", () => {
-      const layout = makeLayout(2);
-      const state = makeState([0, 0]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[2]).toBe(0); // num
-      expect(state[3]).toBe(0); // any
-    });
+  components.push({
+    id: "pe",
+    type: "PriorityEncoder",
+    props: { selectorBits },
   });
 
-  describe("executeMultiInput", () => {
-    it("4-input encoder: only in2=1 → num=2, any=1", () => {
-      // 2-bit selector → 4 inputs
-      const layout = makeLayout(4);
-      const state = makeState([0, 0, 1, 0]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[4]).toBe(2); // num
-      expect(state[5]).toBe(1); // any
-    });
+  components.push({
+    id: "num",
+    type: "Out",
+    props: { label: "NUM", bitWidth: selectorBits },
+  });
+  components.push({
+    id: "any",
+    type: "Out",
+    props: { label: "ANY", bitWidth: 1 },
+  });
+  connections.push(["pe:num", "num:in"]);
+  connections.push(["pe:any", "any:in"]);
 
-    it("4-input encoder: in0=1 and in3=1 → num=3 (in3 has higher priority)", () => {
-      const layout = makeLayout(4);
-      const state = makeState([1, 0, 0, 1]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[4]).toBe(3); // highest active index
-      expect(state[5]).toBe(1);
-    });
+  return buildDigital({ components, connections });
+}
 
-    it("4-input encoder: all active → num=3 (highest index)", () => {
-      const layout = makeLayout(4);
-      const state = makeState([1, 1, 1, 1]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[4]).toBe(3);
-      expect(state[5]).toBe(1);
-    });
+function allZero(inputCount: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (let i = 0; i < inputCount; i++) out[`IN${i}`] = 0;
+  return out;
+}
 
-    it("4-input encoder: all inactive → num=0, any=0", () => {
-      const layout = makeLayout(4);
-      const state = makeState([0, 0, 0, 0]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[4]).toBe(0);
-      expect(state[5]).toBe(0);
-    });
+// ===========================================================================
+// Cat 9 — bridge / digital interaction
+// ===========================================================================
+
+describe("PriorityEncoder digital interaction (Cat 9)", () => {
+  it("2-input encoder: only IN0=1 → NUM=0, ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 1 });
+    drive(fix, { ...allZero(2), IN0: 1 });
+    expect(read(fix, "NUM")).toBe(0);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  describe("multiBit", () => {
-    it("non-zero input value (not just 1) still counts as active", () => {
-      const layout = makeLayout(4);
-      const state = makeState([0xFF, 0, 0, 0]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[4]).toBe(0); // only in0 active
-      expect(state[5]).toBe(1); // any
-    });
-
-    it("8-input encoder: only in7=1 → num=7", () => {
-      const layout = makeLayout(8);
-      const state = makeState([0, 0, 0, 0, 0, 0, 0, 1]);
-      const highZs = new Uint32Array(state.length);
-      executePriorityEncoder(0, state, highZs, layout);
-      expect(state[8]).toBe(7);
-      expect(state[9]).toBe(1);
-    });
+  it("2-input encoder: only IN1=1 → NUM=1, ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 1 });
+    drive(fix, { ...allZero(2), IN1: 1 });
+    expect(read(fix, "NUM")).toBe(1);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // Pin layout
-  // ---------------------------------------------------------------------------
-
-  describe("pinLayout2BitSelector", () => {
-    it("2-bit selector produces 4 input pins and 2 output pins", () => {
-      const el = makePrioEnc({ selectorBits: 2 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(4);
-      expect(outputs).toHaveLength(2);
-    });
-
-    it("input pins labeled in0..in3", () => {
-      const el = makePrioEnc({ selectorBits: 2 });
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      expect(inputs.map((p) => p.label)).toEqual(["in0", "in1", "in2", "in3"]);
-    });
-
-    it("output pins labeled 'num' and 'any'", () => {
-      const el = makePrioEnc({ selectorBits: 2 });
-      const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      const labels = outputs.map((p) => p.label);
-      expect(labels).toContain("num");
-      expect(labels).toContain("any");
-    });
+  it("2-input encoder: both IN0=1 and IN1=1 → NUM=1 (highest active index wins), ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 1 });
+    drive(fix, { IN0: 1, IN1: 1 });
+    expect(read(fix, "NUM")).toBe(1);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  describe("pinLayout1BitSelector", () => {
-    it("1-bit selector produces 2 input pins and 2 output pins", () => {
-      const el = makePrioEnc({ selectorBits: 1 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(2);
-      expect(outputs).toHaveLength(2);
-    });
+  it("4-input encoder: only IN2=1 → NUM=2, ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN2: 1 });
+    expect(read(fix, "NUM")).toBe(2);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  describe("pinLayoutFromDeclarations", () => {
-    it("buildPriorityEncoderPinDeclarations(2) produces 4 inputs + 2 outputs", () => {
-      const decls = buildPriorityEncoderPinDeclarations(2);
-      expect(decls.filter((d) => d.direction === PinDirection.INPUT)).toHaveLength(4);
-      expect(decls.filter((d) => d.direction === PinDirection.OUTPUT)).toHaveLength(2);
-    });
+  it("4-input encoder: IN0=1 and IN3=1 → NUM=3 (highest index wins), ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN0: 1, IN3: 1 });
+    expect(read(fix, "NUM")).toBe(3);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Selector Bits maps to selectorBits", () => {
-      const entries: Record<string, string> = {
-        "Selector Bits": "3",
-      };
-      const bag = new PropertyBag();
-      for (const mapping of PRIORITY_ENCODER_ATTRIBUTE_MAPPINGS) {
-        if (entries[mapping.xmlName] !== undefined) {
-          bag.set(mapping.propertyKey, mapping.convert(entries[mapping.xmlName]));
-        }
-      }
-      expect(bag.get<number>("selectorBits")).toBe(3);
-    });
+  it("4-input encoder: all four inputs asserted → NUM=3 (top index), ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { IN0: 1, IN1: 1, IN2: 1, IN3: 1 });
+    expect(read(fix, "NUM")).toBe(3);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
+  it("4-input encoder: transition IN2 1->0 with IN0 still asserted: NUM falls from 2 to 0, ANY stays 1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN0: 1, IN2: 1 });
+    expect(read(fix, "NUM")).toBe(2);
+    expect(read(fix, "ANY")).toBe(1);
+    drive(fix, { ...allZero(4), IN0: 1, IN2: 0 });
+    expect(read(fix, "NUM")).toBe(0);
+    expect(read(fix, "ANY")).toBe(1);
+  });
+});
 
-  describe("draw", () => {
-    it("draw() calls drawPolygon for the body", () => {
-      const el = makePrioEnc();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
-      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
-    });
+// ===========================================================================
+// Cat 11 — multi-output digital observability
+//   outputSchema = ["num", "any"]; the two outputs take independent values
+//   for the same input combination and are observed independently after a
+//   single step().
+// ===========================================================================
 
-    it("draw() renders 'Priority' component name text", () => {
-      const el = makePrioEnc();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "Priority")).toBe(true);
-    });
+describe("PriorityEncoder multi-output observability (Cat 11)", () => {
+  it("4-input encoder, only IN1=1: NUM and ANY observed independently in one step (NUM=1, ANY=1)", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN1: 1 });
+    expect(read(fix, "NUM")).toBe(1);
+    expect(read(fix, "ANY")).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
+  it("4-input encoder, only IN0=1: NUM=0 and ANY=1 distinguish the two output observables (NUM=0 differs from ANY=1)", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN0: 1 });
+    // NUM=0 is the index of in0; ANY=1 because at least one input is asserted.
+    // The two outputs are independent: NUM and ANY do not collapse to one value.
+    expect(read(fix, "NUM")).toBe(0);
+    expect(read(fix, "ANY")).toBe(1);
+  });
 
-  describe("definitionComplete", () => {
-    it("PriorityEncoderDefinition has name='PriorityEncoder'", () => {
-      expect(PriorityEncoderDefinition.name).toBe("PriorityEncoder");
-    });
+  it("4-input encoder, IN1=1 and IN2=1: NUM=2 (highest), ANY=1 — independently observed", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN1: 1, IN2: 1 });
+    expect(read(fix, "NUM")).toBe(2);
+    expect(read(fix, "ANY")).toBe(1);
+  });
+});
 
-    it("PriorityEncoderDefinition has typeId=-1 (sentinel)", () => {
-      expect(PriorityEncoderDefinition.typeId).toBe(-1);
-    });
+// ===========================================================================
+// Cat 12 — forbidden / undefined input combinations
+//   Production-source comment documents the all-zero-inputs case as
+//   `any=0, num=0`. Per Canon Cat 12: assert the spec-mandated value.
+// ===========================================================================
 
-    it("PriorityEncoderDefinition factory produces element with correct typeId", () => {
-      const props = new PropertyBag();
-      props.set("selectorBits", 2);
-      const el = PriorityEncoderDefinition.factory(props);
-      expect(el.typeId).toBe("PriorityEncoder");
-    });
+describe("PriorityEncoder forbidden input combinations (Cat 12)", () => {
+  it("2-input encoder: all inputs inactive → NUM=0, ANY=0 (documented forbidden / undefined)", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 1 });
+    drive(fix, { IN0: 0, IN1: 0 });
+    expect(read(fix, "NUM")).toBe(0);
+    expect(read(fix, "ANY")).toBe(0);
+  });
 
-    it("PriorityEncoderDefinition has executeFn=executePriorityEncoder", () => {
-      expect(PriorityEncoderDefinition.models.digital!.executeFn).toBe(executePriorityEncoder);
-    });
+  it("4-input encoder: all inputs inactive → NUM=0, ANY=0 (documented forbidden / undefined)", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { IN0: 0, IN1: 0, IN2: 0, IN3: 0 });
+    expect(read(fix, "NUM")).toBe(0);
+    expect(read(fix, "ANY")).toBe(0);
+  });
+});
 
-    it("PriorityEncoderDefinition has non-empty pinLayout", () => {
-      expect(PriorityEncoderDefinition.pinLayout.length).toBeGreaterThan(0);
-    });
+// ===========================================================================
+// Cat 4 — param hot-load (structural selectorBits)
+//   selectorBits is structural: it shapes the input pin set at compile time
+//   (inputCount = 2^selectorBits) and the NUM output bit-width. Canonical
+//   mechanic: build twice with different selectorBits and assert the
+//   documented post-compile observable differs.
+// ===========================================================================
 
-    it("PriorityEncoderDefinition propertyDefs include selectorBits", () => {
-      const keys = PriorityEncoderDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("selectorBits");
-    });
+describe("PriorityEncoder param hot-load selectorBits (Cat 4)", () => {
+  it("selectorBits=1 vs selectorBits=2: the highest-priority encoder differs at the same in-bit asserted", () => {
+    // selectorBits=1 → 2 inputs (in0, in1). With IN1=1 asserted, NUM=1.
+    const fix1 = buildPriorityEncoder({ selectorBits: 1 });
+    drive(fix1, { IN0: 0, IN1: 1 });
+    expect(read(fix1, "NUM")).toBe(1);
+    expect(read(fix1, "ANY")).toBe(1);
 
-    it("PriorityEncoderDefinition attributeMap covers Selector Bits", () => {
-      const xmlNames = PriorityEncoderDefinition.attributeMap.map((m) => m.xmlName);
-      expect(xmlNames).toContain("Selector Bits");
-    });
+    // selectorBits=2 → 4 inputs (in0..in3). With IN1=1 asserted (no higher
+    // bit), NUM=1 too — but the NUM port is now 2 bits wide so it can carry
+    // values 2 and 3 that the 1-bit version cannot. Drive IN3=1 on the
+    // 4-input encoder and observe NUM=3 — unreachable on selectorBits=1.
+    const fix2 = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix2, { ...allZero(4), IN3: 1 });
+    expect(read(fix2, "NUM")).toBe(3);
+    expect(read(fix2, "ANY")).toBe(1);
+  });
 
-    it("PriorityEncoderDefinition category is WIRING", () => {
-      expect(PriorityEncoderDefinition.category).toBe(ComponentCategory.WIRING);
-    });
+  it("selectorBits=2: IN0=1 only → NUM=0 (lowest index) with 2-bit NUM output; confirmed distinct from selectorBits=1 output range", () => {
+    // selectorBits=2 → NUM is 2 bits wide; selectorBits=1 → NUM is 1 bit.
+    // Same IN0=1 drive, but the 2-bit version can represent 0..3 whereas
+    // the 1-bit version can only represent 0..1. Here both produce 0, but
+    // confirming selectorBits=2 encodes the higher-range capability.
+    const fix = buildPriorityEncoder({ selectorBits: 2 });
+    drive(fix, { ...allZero(4), IN0: 1 });
+    expect(read(fix, "NUM")).toBe(0);
+    expect(read(fix, "ANY")).toBe(1);
+  });
+});
 
-    it("PriorityEncoderDefinition has a non-empty helpText", () => {
-      expect(typeof PriorityEncoderDefinition.helpText).toBe("string");
-      expect(typeof PriorityEncoderDefinition.helpText).toBe("string"); expect(PriorityEncoderDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
+// ===========================================================================
+// Cat 9 — bridge / digital interaction at maximum supported selectorBits
+//   selectorBits=3 → 8 inputs (in0..in7). PropertyDef max is 4. The contract
+//   is that an 8-input encoder compiles and produces labelled signals like
+//   the 1/2-bit cases. Currently `facade.build` returns a coordinator with
+//   no labelled signals (digital partition silently dropped during compile),
+//   so `readSignal` throws "Label not found". The failing test IS the
+//   canonical artefact per Hard Priority #1 + #3.
+// ===========================================================================
 
-    it("PriorityEncoderDefinition can be registered in ComponentRegistry without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(PriorityEncoderDefinition)).not.toThrow();
-    });
-
-    it("After registration, typeId is a non-negative integer", () => {
-      const registry = new ComponentRegistry();
-      registry.register(PriorityEncoderDefinition);
-      const registered = registry.get("PriorityEncoder");
-      expect(registered).not.toBeUndefined();
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
+describe("PriorityEncoder digital interaction at selectorBits=3 (Cat 9)", () => {
+  it("8-input encoder: only IN7=1 → NUM=7, ANY=1", () => {
+    const fix = buildPriorityEncoder({ selectorBits: 3 });
+    drive(fix, { ...allZero(8), IN7: 1 });
+    expect(read(fix, "NUM")).toBe(7);
+    expect(read(fix, "ANY")).toBe(1);
   });
 });

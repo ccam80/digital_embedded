@@ -1,367 +1,245 @@
 /**
- * Tests for the Multiplexer component.
+ * Canonical tests for the Multiplexer (Mux) digital component.
  *
- * Covers:
- *   - executeMux: truth table verification for representative cases
- *   - executeMux: multi-bit operation
- *   - Pin layout: correct count and labels for 1-bit and 2-bit selector configs
- *   - Attribute mapping: .dig XML attributes convert to correct PropertyBag entries
- *   - Rendering: draw() calls polygon and text
- *   - ComponentDefinition: all required fields present
+ * Tier: fixture-only (pure-digital, combinational; no analog domain).
+ * Driver: facade.build({components, connections}) + facade.compile() +
+ *   facade.setSignal / facade.step / facade.readSignal.
+ *
+ * Canon coverage:
+ *   - Cat 9 (bridge / digital interaction): drive labelled In ports for
+ *     selector and data inputs, step the engine, observe labelled Out port.
+ *     Exercises sel=0 / sel=1 selection on a 1-bit selector mux with multi-bit
+ *     data, sel sweep across all 4 inputs of a 2-bit selector mux, and the
+ *     pin-width follower behaviour (output value follows the selected input
+ *     on the next step after sel changes).
+ *   - Cat 13 (port-width clamping on overrun): the `sel` pin is `selectorBits`
+ *     wide. Driving a value wider than `selectorBits` from a labelled In sized
+ *     to that pin masks via BitVector.fromNumber(value, selectorBits) inside
+ *     setSignal — effective_sel = source & ((1 << selectorBits) - 1).
+ *
+ * Cat 1/2/3/5/6/7/8 do not apply: pure digital component with no analog
+ * state pool, no MNA matrix, no DCOP, no junction limiting, no LTE rollback,
+ * no breakpoints, no transient analog dynamics.
+ * Cat 10 does not apply: MuxDefinition exposes a single digital `models.digital`
+ * entry plus a `behavioral` netlist model — there is no second named-preset
+ * with a closed-form parameter delta against the default to assert.
+ * Cat 11 does not apply: `models.digital.outputSchema = ["out"]` (single output).
+ * Cat 12 does not apply: production source documents no spec-mandated forbidden
+ * input combinations; the selector indexes the data array directly.
+ * Cat 14 does not apply: production source emits no runtime diagnostics keyed
+ * on a simulation observable.
+ * Cat 15 does not apply: production source registers no _onStateChange
+ * writeback subscription back to PropertyBag.
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  MuxElement,
-  executeMux,
-  MuxDefinition,
-  MUX_ATTRIBUTE_MAPPINGS,
-  buildMuxPinDeclarations,
-} from "../mux.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
+import type { SimulationCoordinator } from "../../../solver/coordinator-types.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Canonical builder for a digital fixture driven by labelled In ports and
+// observed via a labelled Out port.
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => inputCount + outputCount,
-    getProperty: () => undefined,
-  };
+interface DigitalFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: SimulationCoordinator;
 }
 
-function makeState(inputs: number[]): Uint32Array {
-  const arr = new Uint32Array(inputs.length + 8);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
+function buildDigital(spec: {
+  components: ReadonlyArray<{ id: string; type: string; props?: Record<string, number | string | boolean> }>;
+  connections: ReadonlyArray<readonly [string, string]>;
+}): DigitalFixture {
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: spec.components.map((c) =>
+      c.props === undefined
+        ? { id: c.id, type: c.type }
+        : { id: c.id, type: c.type, props: c.props },
+    ),
+    connections: spec.connections.map((c) => [c[0], c[1]] as [string, string]),
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
+}
+
+function drive(fix: DigitalFixture, values: Record<string, number>): void {
+  for (const [label, value] of Object.entries(values)) {
+    fix.facade.setSignal(fix.coordinator, label, value);
   }
-  return arr;
+  fix.facade.step(fix.coordinator);
 }
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
-
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
-}
-
-function makeMux(overrides?: { selectorBits?: number; bitWidth?: number }): MuxElement {
-  const props = new PropertyBag();
-  props.set("selectorBits", overrides?.selectorBits ?? 1);
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  return new MuxElement("test-mux-001", { x: 0, y: 0 }, 0, false, props);
+function read(fix: DigitalFixture, label: string): number {
+  return fix.facade.readSignal(fix.coordinator, label) as number;
 }
 
 // ---------------------------------------------------------------------------
-// executeMux- logic correctness
+// Mux fixture builders.
+// Pin layout (Multiplexer):
+//   sel              (input,  selectorBits wide)
+//   in_0..in_{N-1}   (inputs, bitWidth      wide), N = 2^selectorBits
+//   out              (output, bitWidth      wide)
 // ---------------------------------------------------------------------------
 
-describe("Multiplexer", () => {
-  describe("execute2Input", () => {
-    it("sel=0 selects in_0", () => {
-      // 1-bit selector: 2 data inputs
-      // state: [sel=0, in_0=0xAA, in_1=0xBB, out]
-      const layout = makeLayout(3, 1);
-      const state = makeState([0, 0xAA, 0xBB]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[3]).toBe(0xAA);
+function buildMux(opts: { selectorBits: number; bitWidth: number }): DigitalFixture {
+  const { selectorBits, bitWidth } = opts;
+  const N = 1 << selectorBits;
+  const components: Array<{ id: string; type: string; props: Record<string, number | string | boolean> }> = [
+    { id: "sel", type: "In", props: { label: "SEL", bitWidth: selectorBits } },
+    { id: "mux", type: "Multiplexer", props: { selectorBits, bitWidth } },
+    { id: "out", type: "Out", props: { label: "OUT", bitWidth } },
+  ];
+  const connections: Array<[string, string]> = [
+    ["sel:out", "mux:sel"],
+    ["mux:out", "out:in"],
+  ];
+  for (let i = 0; i < N; i++) {
+    components.push({
+      id: `i${i}`,
+      type: "In",
+      props: { label: `IN${i}`, bitWidth },
     });
+    connections.push([`i${i}:out`, `mux:in_${i}`]);
+  }
+  return buildDigital({ components, connections });
+}
 
-    it("sel=1 selects in_1", () => {
-      const layout = makeLayout(3, 1);
-      const state = makeState([1, 0xAA, 0xBB]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[3]).toBe(0xBB);
-    });
+// ===========================================================================
+// Cat 9 — Bridge / digital interaction
+// ===========================================================================
 
-    it("sel=0 with 1-bit inputs: selects 0", () => {
-      const layout = makeLayout(3, 1);
-      const state = makeState([0, 0, 1]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[3]).toBe(0);
-    });
-
-    it("sel=1 with 1-bit inputs: selects 1", () => {
-      const layout = makeLayout(3, 1);
-      const state = makeState([1, 0, 1]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[3]).toBe(1);
-    });
+describe("Mux digital interaction (Cat 9) — 1-bit selector", () => {
+  it("sel=0 routes in_0 to out (multi-bit data passes through)", () => {
+    // 2-input mux (selectorBits=1), 8-bit data.
+    // sel=0 → out = in_0.
+    const fix = buildMux({ selectorBits: 1, bitWidth: 8 });
+    drive(fix, { SEL: 0, IN0: 0xAA, IN1: 0xBB });
+    expect(read(fix, "OUT")).toBe(0xAA);
   });
 
-  describe("executeMultiInput", () => {
-    it("4-input mux: sel=2 selects in_2", () => {
-      // 2-bit selector: 4 data inputs
-      // state: [sel=2, in_0=0x11, in_1=0x22, in_2=0x33, in_3=0x44, out]
-      const layout = makeLayout(5, 1);
-      const state = makeState([2, 0x11, 0x22, 0x33, 0x44]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[5]).toBe(0x33);
-    });
-
-    it("4-input mux: sel=3 selects in_3", () => {
-      const layout = makeLayout(5, 1);
-      const state = makeState([3, 0x11, 0x22, 0x33, 0x44]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[5]).toBe(0x44);
-    });
-
-    it("4-input mux: sel=0 selects in_0", () => {
-      const layout = makeLayout(5, 1);
-      const state = makeState([0, 0x11, 0x22, 0x33, 0x44]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[5]).toBe(0x11);
-    });
+  it("sel=1 routes in_1 to out (multi-bit data passes through)", () => {
+    // 2-input mux (selectorBits=1), 8-bit data.
+    // sel=1 → out = in_1.
+    const fix = buildMux({ selectorBits: 1, bitWidth: 8 });
+    drive(fix, { SEL: 1, IN0: 0xAA, IN1: 0xBB });
+    expect(read(fix, "OUT")).toBe(0xBB);
   });
 
-  describe("multiBit", () => {
-    it("multi-bit: sel=1, 32-bit values", () => {
-      const layout = makeLayout(3, 1);
-      const state = makeState([1, 0xDEADBEEF, 0xCAFEBABE]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[3]).toBe(0xCAFEBABE >>> 0);
-    });
-
-    it("multi-bit: sel=0, 32-bit all-ones passes through", () => {
-      const layout = makeLayout(3, 1);
-      const state = makeState([0, 0xFFFFFFFF, 0x00000000]);
-      const highZs = new Uint32Array(state.length);
-      executeMux(0, state, highZs, layout);
-      expect(state[3]).toBe(0xFFFFFFFF);
-    });
+  it("sel toggle 0->1->0 follows the addressed input on each step", () => {
+    // Same fixture; sweep sel and assert OUT tracks the selected input
+    // after each subsequent step.
+    const fix = buildMux({ selectorBits: 1, bitWidth: 8 });
+    drive(fix, { SEL: 0, IN0: 0x11, IN1: 0x22 });
+    expect(read(fix, "OUT")).toBe(0x11);
+    drive(fix, { SEL: 1 });
+    expect(read(fix, "OUT")).toBe(0x22);
+    drive(fix, { SEL: 0 });
+    expect(read(fix, "OUT")).toBe(0x11);
   });
 
-  // ---------------------------------------------------------------------------
-  // Pin layout
-  // ---------------------------------------------------------------------------
+  it("1-bit data: sel=0 selects 0, sel=1 selects 1", () => {
+    // 2-input mux (selectorBits=1), 1-bit data — degenerate width.
+    const fix = buildMux({ selectorBits: 1, bitWidth: 1 });
+    drive(fix, { SEL: 0, IN0: 0, IN1: 1 });
+    expect(read(fix, "OUT")).toBe(0);
+    drive(fix, { SEL: 1 });
+    expect(read(fix, "OUT")).toBe(1);
+  });
+});
 
-  describe("pinLayout1BitSelector", () => {
-    it("1-bit selector produces 3 input pins (sel + 2 data) and 1 output", () => {
-      const el = makeMux({ selectorBits: 1 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(3); // sel + in_0 + in_1
-      expect(outputs).toHaveLength(1);
-    });
-
-    it("sel pin is labeled 'sel'", () => {
-      const el = makeMux({ selectorBits: 1 });
-      const sel = el.getPins().find((p) => p.label === "sel");
-      expect(sel).toBeDefined();
-      expect(sel!.direction).toBe(PinDirection.INPUT);
-    });
-
-    it("data input pins are labeled in_0 and in_1", () => {
-      const el = makeMux({ selectorBits: 1 });
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT && p.label !== "sel");
-      expect(inputs.map((p) => p.label)).toEqual(["in_0", "in_1"]);
-    });
-
-    it("output pin is labeled 'out'", () => {
-      const el = makeMux({ selectorBits: 1 });
-      const out = el.getPins().find((p) => p.direction === PinDirection.OUTPUT);
-      expect(out?.label).toBe("out");
-    });
+describe("Mux digital interaction (Cat 9) — 2-bit selector", () => {
+  it("sel=0 routes in_0 to out (4-input mux)", () => {
+    // 4-input mux (selectorBits=2), 8-bit data.
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 0, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x11);
   });
 
-  describe("pinLayout2BitSelector", () => {
-    it("2-bit selector produces 5 input pins (sel + 4 data) and 1 output", () => {
-      const el = makeMux({ selectorBits: 2 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(5); // sel + in_0..in_3
-      expect(outputs).toHaveLength(1);
-    });
-
-    it("4 data input pins labeled in_0..in_3", () => {
-      const el = makeMux({ selectorBits: 2 });
-      const dataInputs = el
-        .getPins()
-        .filter((p) => p.direction === PinDirection.INPUT && p.label !== "sel");
-      expect(dataInputs.map((p) => p.label)).toEqual(["in_0", "in_1", "in_2", "in_3"]);
-    });
+  it("sel=1 routes in_1 to out (4-input mux)", () => {
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 1, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x22);
   });
 
-  describe("pinLayoutFromDeclarations", () => {
-    it("buildMuxPinDeclarations(1,1) produces 3 inputs + 1 output", () => {
-      const decls = buildMuxPinDeclarations(1, 1);
-      expect(decls.filter((d) => d.direction === PinDirection.INPUT)).toHaveLength(3);
-      expect(decls.filter((d) => d.direction === PinDirection.OUTPUT)).toHaveLength(1);
-    });
+  it("sel=2 routes in_2 to out (4-input mux)", () => {
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 2, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x33);
   });
 
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Bits and Selector Bits map to correct PropertyBag entries", () => {
-      const entries: Record<string, string> = {
-        Bits: "8",
-        "Selector Bits": "2",
-      };
-      const bag = new PropertyBag();
-      for (const mapping of MUX_ATTRIBUTE_MAPPINGS) {
-        if (entries[mapping.xmlName] !== undefined) {
-          bag.set(mapping.propertyKey, mapping.convert(entries[mapping.xmlName]));
-        }
-      }
-      expect(bag.get<number>("bitWidth")).toBe(8);
-      expect(bag.get<number>("selectorBits")).toBe(2);
-    });
-
-    it("Label maps to label property key", () => {
-      const mapping = MUX_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(mapping).not.toBeUndefined();
-      expect(mapping!.propertyKey).toBe("label");
-      expect(mapping!.convert("MuxLabel")).toBe("MuxLabel");
-    });
+  it("sel=3 routes in_3 to out (4-input mux)", () => {
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 3, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x44);
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
-  describe("draw", () => {
-    it("draw() calls drawPolygon for trapezoid body", () => {
-      const el = makeMux();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
-      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
+  it("32-bit data: sel routes wide values without truncation", () => {
+    // 4-input mux (selectorBits=2), 32-bit data. Drive widely-spaced
+    // patterns and confirm each routes through without bit loss.
+    const fix = buildMux({ selectorBits: 2, bitWidth: 32 });
+    drive(fix, {
+      SEL: 1,
+      IN0: 0x00000000,
+      IN1: 0xCAFEBABE,
+      IN2: 0xDEADBEEF,
+      IN3: 0xFFFFFFFF,
     });
+    expect(read(fix, "OUT") >>> 0).toBe(0xCAFEBABE);
+    drive(fix, { SEL: 2 });
+    expect(read(fix, "OUT") >>> 0).toBe(0xDEADBEEF);
+    drive(fix, { SEL: 3 });
+    expect(read(fix, "OUT") >>> 0).toBe(0xFFFFFFFF);
+  });
+});
 
-    it("draw() renders '0' text label", () => {
-      const el = makeMux();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "0")).toBe(true);
-    });
+// ===========================================================================
+// Cat 13 — Port-width clamping on overrun
+//
+// The mux `sel` pin is `selectorBits` wide. The labelled In driving SEL is
+// declared at the same width, and BitVector.fromNumber(value, selectorBits)
+// inside setSignal masks the source value to the port width:
+//   effective_sel = source & ((1 << selectorBits) - 1)
+// ===========================================================================
+
+describe("Mux Cat 13 — sel port-width clamping (selectorBits=1, 1-bit sel pin)", () => {
+  it("sel source 0b10 (=2) masks to 0 → out = in_0", () => {
+    // 1-bit sel port: source 2 = 0b10 → masked = 0.
+    const fix = buildMux({ selectorBits: 1, bitWidth: 8 });
+    drive(fix, { SEL: 2, IN0: 0xAA, IN1: 0xBB });
+    expect(read(fix, "OUT")).toBe(0xAA);
   });
 
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
+  it("sel source 0b11 (=3) masks to 1 → out = in_1", () => {
+    // 1-bit sel port: source 3 = 0b11 → masked = 1.
+    const fix = buildMux({ selectorBits: 1, bitWidth: 8 });
+    drive(fix, { SEL: 3, IN0: 0xAA, IN1: 0xBB });
+    expect(read(fix, "OUT")).toBe(0xBB);
+  });
+});
 
-  describe("definitionComplete", () => {
-    it("MuxDefinition has name='Multiplexer'", () => {
-      expect(MuxDefinition.name).toBe("Multiplexer");
-    });
+describe("Mux Cat 13 — sel port-width clamping (selectorBits=2, 2-bit sel pin)", () => {
+  it("sel source 0b100 (=4) masks to 0 → out = in_0", () => {
+    // 2-bit sel port: source 4 = 0b100 → masked = 0.
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 4, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x11);
+  });
 
-    it("MuxDefinition has typeId=-1 (sentinel)", () => {
-      expect(MuxDefinition.typeId).toBe(-1);
-    });
+  it("sel source 0b110 (=6) masks to 2 → out = in_2", () => {
+    // 2-bit sel port: source 6 = 0b110 → masked = 2.
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 6, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x33);
+  });
 
-    it("MuxDefinition has a factory function", () => {
-      expect(typeof MuxDefinition.factory).toBe("function");
-    });
-
-    it("MuxDefinition factory produces a MuxElement with correct typeId", () => {
-      const props = new PropertyBag();
-      props.set("selectorBits", 1);
-      props.set("bitWidth", 1);
-      const el = MuxDefinition.factory(props);
-      expect(el.typeId).toBe("Multiplexer");
-    });
-
-    it("MuxDefinition has executeFn=executeMux", () => {
-      expect(MuxDefinition.models.digital!.executeFn).toBe(executeMux);
-    });
-
-    it("MuxDefinition has a non-empty pinLayout", () => {
-      expect(MuxDefinition.pinLayout.length).toBeGreaterThan(0);
-    });
-
-    it("MuxDefinition has non-empty propertyDefs", () => {
-      expect(MuxDefinition.propertyDefs.length).toBeGreaterThan(0);
-    });
-
-    it("MuxDefinition propertyDefs include selectorBits and bitWidth", () => {
-      const keys = MuxDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("selectorBits");
-      expect(keys).toContain("bitWidth");
-    });
-
-    it("MuxDefinition has non-empty attributeMap", () => {
-      expect(MuxDefinition.attributeMap.length).toBeGreaterThan(0);
-    });
-
-    it("MuxDefinition attributeMap covers Bits and Selector Bits", () => {
-      const xmlNames = MuxDefinition.attributeMap.map((m) => m.xmlName);
-      expect(xmlNames).toContain("Bits");
-      expect(xmlNames).toContain("Selector Bits");
-    });
-
-    it("MuxDefinition category is WIRING", () => {
-      expect(MuxDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("MuxDefinition has a non-empty helpText", () => {
-      expect(typeof MuxDefinition.helpText).toBe("string");
-      expect(typeof MuxDefinition.helpText).toBe("string"); expect(MuxDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("MuxDefinition can be registered in ComponentRegistry without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(MuxDefinition)).not.toThrow();
-    });
-
-    it("After registration, typeId is a non-negative integer", () => {
-      const registry = new ComponentRegistry();
-      registry.register(MuxDefinition);
-      const registered = registry.get("Multiplexer");
-      expect(registered).not.toBeUndefined();
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
+  it("sel source 0b111 (=7) masks to 3 → out = in_3", () => {
+    // 2-bit sel port: source 7 = 0b111 → masked = 3.
+    const fix = buildMux({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 7, IN0: 0x11, IN1: 0x22, IN2: 0x33, IN3: 0x44 });
+    expect(read(fix, "OUT")).toBe(0x44);
   });
 });

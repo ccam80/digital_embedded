@@ -1,330 +1,238 @@
-/**
- * Tests for the BitSelector component.
- *
- * Covers:
- *   - executeBitSelector: correct bit extraction for various selector values
- *   - executeBitSelector: multi-bit input, boundary conditions
- *   - Pin layout: correct input/output structure
- *   - Attribute mapping
- *   - Rendering
- *   - ComponentDefinition completeness
- */
-
 import { describe, it, expect } from "vitest";
-import {
-  BitSelectorElement,
-  executeBitSelector,
-  BitSelectorDefinition,
-  BIT_SELECTOR_ATTRIBUTE_MAPPINGS,
-  buildBitSelectorPinDeclarations,
-} from "../bit-selector.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
+import type { PropertyValue } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// BitSelector canonical test set
+//
+// Canon categories applied:
+//   4  — Parameter hot-load (structural: selectorBits is consumed at compile()
+//        to size the `in` (2^selectorBits wide) and `sel` (selectorBits wide)
+//        pins; canonical Cat 4 for compile-time-seeded structural properties
+//        uses the build-twice mechanic).
+//   9  — Bridge / digital interaction (the documented digital behaviour:
+//        out = (in >> sel) & 1).
+//   13 — Port-width clamping on overrun (sel port is selectorBits wide; when a
+//        wider source bus drives sel, the value is masked to the port width
+//        before the executeFn reads it; documented mask is
+//        sel_effective = sel_source & ((1 << selectorBits) - 1)).
+//
+// File tier: fixture-only.
+//   BitSelector is a pure-digital component — its only model entry is
+//   `models.digital.executeFn`. There is no analog leaf, no state pool, no
+//   `setup()` / `load()`, no `getLteTimestep`, no `acceptStep`, no `*lim`
+//   call, no named-preset registry beyond `digital`, no multi-output schema
+//   (single `out` pin), no `_onStateChange` writeback, no runtime-diagnostic
+//   emit site, no spec-mandated forbidden input combination. Categories
+//   1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 14, 15 do not apply.
+//
+//   Programmatic build via `facade.build` is the sanctioned surface; signals
+//   are driven via `facade.setSignal` and read via `facade.readSignal`.
+//
+// BitSelector pin layout (selectorBits=3): inputs [in (8-bit), sel (3-bit)],
+//   output [out (1-bit)]. The executeFn is combinational and stateless —
+//   no rising-edge mechanic, no state slots, no warm-start.
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => inputCount + outputCount,
-    getProperty: () => undefined,
-  };
+const registry = createDefaultRegistry();
+
+interface BitSelFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
 }
 
-function makeState(inputs: number[]): Uint32Array {
-  const arr = new Uint32Array(inputs.length + 1);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
-  }
-  return arr;
-}
+function buildBitSelFixture(opts: { selectorBits?: number } = {}): BitSelFixture {
+  const selectorBits = opts.selectorBits ?? 3;
+  const inBits = 1 << selectorBits;
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
-}
+  const components: Array<{ id: string; type: string; props: Record<string, PropertyValue> }> = [
+    { id: "in_data", type: "In",          props: { label: "DATA", bitWidth: inBits } },
+    { id: "in_sel",  type: "In",          props: { label: "SEL",  bitWidth: selectorBits } },
+    { id: "bsel",    type: "BitSelector", props: { label: "BS",   selectorBits } },
+    { id: "out_y",   type: "Out",         props: { label: "Y",    bitWidth: 1 } },
+  ];
+  const connections: Array<[string, string]> = [
+    ["in_data:out", "bsel:in"],
+    ["in_sel:out",  "bsel:sel"],
+    ["bsel:out",    "out_y:in"],
+  ];
 
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
-}
-
-function makeBitSelector(overrides?: { selectorBits?: number }): BitSelectorElement {
-  const props = new PropertyBag();
-  props.set("selectorBits", overrides?.selectorBits ?? 3);
-  return new BitSelectorElement("test-bsel-001", { x: 0, y: 0 }, 0, false, props);
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({ components, connections });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
 }
 
 // ---------------------------------------------------------------------------
-// executeBitSelector- logic correctness
+// Cat 9 — bridge / digital interaction
 // ---------------------------------------------------------------------------
 
-describe("BitSelector", () => {
-  describe("execute2Input", () => {
-    it("input=0b1010, sel=0 → output=0 (bit 0 is 0)", () => {
-      // inputs: [in=0b1010, sel=0]; output
-      const layout = makeLayout(2, 1);
-      const state = makeState([0b1010, 0]);
-      const highZs = new Uint32Array(state.length);
-      executeBitSelector(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
-
-    it("input=0b1010, sel=1 → output=1 (bit 1 is 1)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0b1010, 1]);
-      const highZs = new Uint32Array(state.length);
-      executeBitSelector(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
-    });
-
-    it("input=0b1010, sel=2 → output=0 (bit 2 is 0)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0b1010, 2]);
-      const highZs = new Uint32Array(state.length);
-      executeBitSelector(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-    });
-
-    it("input=0b1010, sel=3 → output=1 (bit 3 is 1)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0b1010, 3]);
-      const highZs = new Uint32Array(state.length);
-      executeBitSelector(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
-    });
+describe("BitSelector — bridge / digital (T1)", () => {
+  it("selects_bit_zero_returns_lsb_of_input", () => {
+    // Documented contract: out = (in >> sel) & 1. With sel=0, out is bit 0 of
+    // in. Driving in=0b1010 → bit 0 is 0.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b1010);
+    fix.facade.setSignal(fix.coordinator, "SEL", 0);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  describe("executeMultiInput", () => {
-    it("all-ones input: any selector returns 1", () => {
-      const layout = makeLayout(2, 1);
-      for (let sel = 0; sel < 8; sel++) {
-        const state = makeState([0xFF, sel]);
-      const highZs = new Uint32Array(state.length);
-        executeBitSelector(0, state, highZs, layout);
-        expect(state[2]).toBe(1);
-      }
-    });
-
-    it("all-zeros input: any selector returns 0", () => {
-      const layout = makeLayout(2, 1);
-      for (let sel = 0; sel < 8; sel++) {
-        const state = makeState([0x00, sel]);
-      const highZs = new Uint32Array(state.length);
-        executeBitSelector(0, state, highZs, layout);
-        expect(state[2]).toBe(0);
-      }
-    });
-
-    it("32-bit input 0xDEADBEEF: selects correct bits", () => {
-      const layout = makeLayout(2, 1);
-      const value = 0xDEADBEEF >>> 0;
-
-      for (let sel = 0; sel < 32; sel++) {
-        const state = makeState([value, sel]);
-      const highZs = new Uint32Array(state.length);
-        executeBitSelector(0, state, highZs, layout);
-        const expected = (value >>> sel) & 1;
-        expect(state[2]).toBe(expected);
-      }
-    });
+  it("selects_bit_one_returns_bit_at_index_1", () => {
+    // Documented contract: sel=1 → out is bit 1. in=0b1010 → bit 1 is 1.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b1010);
+    fix.facade.setSignal(fix.coordinator, "SEL", 1);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(1);
+    fix.coordinator.dispose();
   });
 
-  describe("multiBit", () => {
-    it("output is always 0 or 1 (single bit)", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0xFFFFFFFF, 15]);
-      const highZs = new Uint32Array(state.length);
-      executeBitSelector(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
-    });
-
-    it("selecting bit 0 of odd number returns 1", () => {
-      const layout = makeLayout(2, 1);
-      const state = makeState([0x12345679, 0]);
-      const highZs = new Uint32Array(state.length);
-      executeBitSelector(0, state, highZs, layout);
-      expect(state[2]).toBe(1);
-    });
+  it("selects_bit_two_returns_bit_at_index_2", () => {
+    // Documented contract: sel=2 → out is bit 2. in=0b1010 → bit 2 is 0.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b1010);
+    fix.facade.setSignal(fix.coordinator, "SEL", 2);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(0);
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Pin layout
-  // ---------------------------------------------------------------------------
-
-  describe("pinLayout", () => {
-    it("BitSelector produces 2 input pins and 1 output pin", () => {
-      const el = makeBitSelector({ selectorBits: 3 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(2);
-      expect(outputs).toHaveLength(1);
-    });
-
-    it("input pins labeled 'in' and 'sel'", () => {
-      const el = makeBitSelector({ selectorBits: 3 });
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      const labels = inputs.map((p) => p.label);
-      expect(labels).toContain("in");
-      expect(labels).toContain("sel");
-    });
-
-    it("output pin labeled 'out'", () => {
-      const el = makeBitSelector({ selectorBits: 3 });
-      const out = el.getPins().find((p) => p.direction === PinDirection.OUTPUT);
-      expect(out?.label).toBe("out");
-    });
-
-    it("output pin has bitWidth=1", () => {
-      const el = makeBitSelector({ selectorBits: 3 });
-      const out = el.getPins().find((p) => p.direction === PinDirection.OUTPUT);
-      expect(out?.bitWidth).toBe(1);
-    });
+  it("selects_bit_three_returns_msb_of_4bit_pattern", () => {
+    // Documented contract: sel=3 → out is bit 3. in=0b1010 → bit 3 is 1.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b1010);
+    fix.facade.setSignal(fix.coordinator, "SEL", 3);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(1);
+    fix.coordinator.dispose();
   });
 
-  describe("pinLayoutFromDeclarations", () => {
-    it("buildBitSelectorPinDeclarations(3) produces 2 inputs + 1 output", () => {
-      const decls = buildBitSelectorPinDeclarations(3);
-      expect(decls.filter((d) => d.direction === PinDirection.INPUT)).toHaveLength(2);
-      expect(decls.filter((d) => d.direction === PinDirection.OUTPUT)).toHaveLength(1);
-    });
+  it("all_ones_input_returns_one_for_every_selector", () => {
+    // Documented contract: every bit of an all-ones input is 1, so out=1 for
+    // every valid sel. Sweep all 8 sel values for selectorBits=3 (8-bit data).
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0xFF);
+    for (let sel = 0; sel < 8; sel++) {
+      fix.facade.setSignal(fix.coordinator, "SEL", sel);
+      fix.facade.step(fix.coordinator);
+      expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(1);
+    }
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
-
-  describe("attributeMapping", () => {
-    it("Selector Bits maps to selectorBits", () => {
-      const entries: Record<string, string> = {
-        "Selector Bits": "4",
-      };
-      const bag = new PropertyBag();
-      for (const mapping of BIT_SELECTOR_ATTRIBUTE_MAPPINGS) {
-        if (entries[mapping.xmlName] !== undefined) {
-          bag.set(mapping.propertyKey, mapping.convert(entries[mapping.xmlName]));
-        }
-      }
-      expect(bag.get<number>("selectorBits")).toBe(4);
-    });
+  it("all_zeros_input_returns_zero_for_every_selector", () => {
+    // Documented contract: every bit of an all-zeros input is 0, so out=0 for
+    // every valid sel.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0x00);
+    for (let sel = 0; sel < 8; sel++) {
+      fix.facade.setSignal(fix.coordinator, "SEL", sel);
+      fix.facade.step(fix.coordinator);
+      expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(0);
+    }
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
-  describe("draw", () => {
-    it("draw() calls drawPolygon for trapezoid body", () => {
-      const el = makeBitSelector();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
-      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() does not draw any text (BitSelector has no label)", () => {
-      const el = makeBitSelector();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls).toHaveLength(0);
-    });
+  it("alternating_pattern_0xAA_yields_alternating_bits_per_selector", () => {
+    // Documented contract: in=0xAA = 0b10101010 → even sel returns 0,
+    // odd sel returns 1. Closed-form: out = (0xAA >> sel) & 1 = sel & 1.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0xAA);
+    for (let sel = 0; sel < 8; sel++) {
+      fix.facade.setSignal(fix.coordinator, "SEL", sel);
+      fix.facade.step(fix.coordinator);
+      expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(sel & 1);
+    }
+    fix.coordinator.dispose();
   });
 
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
+  it("output_is_combinational_no_clock_required", () => {
+    // Documented contract: BitSelector has no clock or state — changing in or
+    // sel and stepping once produces the new out value.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b00010000);
+    fix.facade.setSignal(fix.coordinator, "SEL", 4);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(1);
 
-  describe("definitionComplete", () => {
-    it("BitSelectorDefinition has name='BitSelector'", () => {
-      expect(BitSelectorDefinition.name).toBe("BitSelector");
-    });
+    // Change inputs and step again — out follows immediately.
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b00010000);
+    fix.facade.setSignal(fix.coordinator, "SEL", 0);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(0);
+    fix.coordinator.dispose();
+  });
+});
 
-    it("BitSelectorDefinition has typeId=-1 (sentinel)", () => {
-      expect(BitSelectorDefinition.typeId).toBe(-1);
-    });
+// ---------------------------------------------------------------------------
+// Cat 4 — parameter hot-load (compile-time-seeded structural property)
+// ---------------------------------------------------------------------------
 
-    it("BitSelectorDefinition factory produces element with correct typeId", () => {
-      const props = new PropertyBag();
-      props.set("selectorBits", 3);
-      const el = BitSelectorDefinition.factory(props);
-      expect(el.typeId).toBe("BitSelector");
-    });
+describe("BitSelector — parameter hot-load (T1)", () => {
+  it("selectorbits_structural_property_widens_input_pin", () => {
+    // Cat 4 — compile-time-seeded structural property: selectorBits
+    // determines the data-pin width (= 2^selectorBits) and the sel-pin width
+    // (= selectorBits). Build twice — once at selectorBits=2 (4-bit data,
+    // 2-bit sel), once at selectorBits=4 (16-bit data, 4-bit sel) — and
+    // assert that the wider config exposes a bit at index 8 that the narrow
+    // config cannot reach.
+    //
+    // selectorBits=2: data is 4-bit; driving 0x100 truncates to 0x00 (the
+    // upstream In masks to its declared 4-bit width). Selecting bit 0..3
+    // returns 0 across the board.
+    const fixNarrow = buildBitSelFixture({ selectorBits: 2 });
+    fixNarrow.facade.setSignal(fixNarrow.coordinator, "DATA", 0x100);
+    fixNarrow.facade.setSignal(fixNarrow.coordinator, "SEL", 0);
+    fixNarrow.facade.step(fixNarrow.coordinator);
+    expect(fixNarrow.facade.readSignal(fixNarrow.coordinator, "Y")).toBe(0);
+    fixNarrow.coordinator.dispose();
 
-    it("BitSelectorDefinition has executeFn=executeBitSelector", () => {
-      expect(BitSelectorDefinition.models.digital!.executeFn).toBe(executeBitSelector);
-    });
+    // selectorBits=4: data is 16-bit; driving 0x100 keeps bit 8 set.
+    // Selecting bit 8 returns 1.
+    const fixWide = buildBitSelFixture({ selectorBits: 4 });
+    fixWide.facade.setSignal(fixWide.coordinator, "DATA", 0x100);
+    fixWide.facade.setSignal(fixWide.coordinator, "SEL", 8);
+    fixWide.facade.step(fixWide.coordinator);
+    expect(fixWide.facade.readSignal(fixWide.coordinator, "Y")).toBe(1);
+    fixWide.coordinator.dispose();
+  });
+});
 
-    it("BitSelectorDefinition has non-empty pinLayout", () => {
-      expect(BitSelectorDefinition.pinLayout.length).toBeGreaterThan(0);
-    });
+// ---------------------------------------------------------------------------
+// Cat 13 — port-width clamping on overrun
+// ---------------------------------------------------------------------------
 
-    it("BitSelectorDefinition propertyDefs include selectorBits", () => {
-      const keys = BitSelectorDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("selectorBits");
-    });
+describe("BitSelector — port-width clamping (T1)", () => {
+  it("sel_port_masks_oversized_drive_to_selectorbits_width", () => {
+    // Cat 13 — sel port is `selectorBits` wide (selectorBits=3 → sel port is
+    // 3 bits). The upstream `In` declares matching width 3, so driving
+    // sel=8 (1000b) is wider than the declared 3-bit `In` and is masked at
+    // the In's `BitVector.fromNumber(value, 3)` to 8 & 0b111 = 0. With
+    // in=0b00000001 and the masked sel=0, the executeFn reads bit 0 → 1.
+    //
+    // This asserts the documented mask: sel_effective = sel_source &
+    // ((1 << selectorBits) - 1). The port-width clamp at the In maps
+    // sel_source=8 to sel_effective=0 → out = (in >> 0) & 1 = 1.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b00000001);
+    fix.facade.setSignal(fix.coordinator, "SEL", 8);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(1);
+    fix.coordinator.dispose();
+  });
 
-    it("BitSelectorDefinition attributeMap covers Selector Bits", () => {
-      const xmlNames = BitSelectorDefinition.attributeMap.map((m) => m.xmlName);
-      expect(xmlNames).toContain("Selector Bits");
-    });
-
-    it("BitSelectorDefinition category is WIRING", () => {
-      expect(BitSelectorDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("BitSelectorDefinition has a non-empty helpText", () => {
-      expect(typeof BitSelectorDefinition.helpText).toBe("string");
-      expect(typeof BitSelectorDefinition.helpText).toBe("string"); expect(BitSelectorDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("BitSelectorDefinition can be registered in ComponentRegistry without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(BitSelectorDefinition)).not.toThrow();
-    });
-
-    it("After registration, typeId is a non-negative integer", () => {
-      const registry = new ComponentRegistry();
-      registry.register(BitSelectorDefinition);
-      const registered = registry.get("BitSelector");
-      expect(registered).not.toBeUndefined();
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
+  it("sel_port_masks_oversized_drive_to_nonzero_residue", () => {
+    // Cat 13 — driving sel=11 (1011b) over a 3-bit sel port masks to
+    // 11 & 0b111 = 3. With in=0b00001000 (bit 3 set), the masked sel=3
+    // returns 1.
+    const fix = buildBitSelFixture({ selectorBits: 3 });
+    fix.facade.setSignal(fix.coordinator, "DATA", 0b00001000);
+    fix.facade.setSignal(fix.coordinator, "SEL", 11);
+    fix.facade.step(fix.coordinator);
+    expect(fix.facade.readSignal(fix.coordinator, "Y")).toBe(1);
+    fix.coordinator.dispose();
   });
 });

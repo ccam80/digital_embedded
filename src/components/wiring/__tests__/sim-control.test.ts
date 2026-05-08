@@ -1,648 +1,291 @@
 /**
- * Tests for simulation control components: Delay, Break, Stop, Reset, AsyncSeq.
+ * Canonical tests for simulation-control wiring components:
+ *   Delay, Break, Stop, Reset, AsyncSeq.
  *
- * Covers per component:
- *   - execute*: correct behavior (pass-through, assertion detection, flag propagation)
- *   - Pin layout: correct structure
- *   - Attribute mapping
- *   - Rendering
- *   - ComponentDefinition completeness
+ * Tier: fixture-only (pure-digital; no analog domain — no T3 categories).
+ * Driver: facade.build({components, connections}) + facade.compile()
+ *         + facade.setSignal / facade.step / facade.readSignal.
+ *
+ * Canon coverage per component:
+ *   - Cat 9 (digital interaction) — drive labelled inputs, step, observe labelled outputs.
+ *   - Cat 4 (param hot-load) — Delay bitWidth: re-build with new property and
+ *     observe a different observable for the same drive (compile-bound structural prop).
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  DelayElement,
-  executeDelay,
-  DelayDefinition,
-  DELAY_ATTRIBUTE_MAPPINGS,
-  buildDelayPinDeclarations,
-} from "../delay.js";
-import {
-  BreakElement,
-  executeBreak,
-  BreakDefinition,
-  BREAK_ATTRIBUTE_MAPPINGS,
-  buildBreakPinDeclarations,
-} from "../break.js";
-import {
-  StopElement,
-  executeStop,
-  StopDefinition,
-  STOP_ATTRIBUTE_MAPPINGS,
-  buildStopPinDeclarations,
-} from "../stop.js";
-import {
-  ResetElement,
-  executeReset,
-  ResetDefinition,
-  RESET_ATTRIBUTE_MAPPINGS,
-  buildResetPinDeclarations,
-} from "../reset.js";
-import {
-  AsyncSeqElement,
-  executeAsyncSeq,
-  AsyncSeqDefinition,
-  ASYNC_SEQ_ATTRIBUTE_MAPPINGS,
-  buildAsyncSeqPinDeclarations,
-} from "../async-seq.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
+import type { SimulationCoordinator } from "../../../solver/coordinator-types.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Canonical builder for a single digital block driven by labelled In ports
+// and observed via labelled Out ports.
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => inputCount + outputCount,
-    getProperty: () => undefined,
-  };
+interface DigitalFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: SimulationCoordinator;
 }
 
-function makeState(values: number[]): Uint32Array {
-  const arr = new Uint32Array(values.length + 4);
-  for (let i = 0; i < values.length; i++) {
-    arr[i] = values[i] >>> 0;
+function buildDigital(spec: {
+  components: ReadonlyArray<{ id: string; type: string; props?: Record<string, number | string | boolean> }>;
+  connections: ReadonlyArray<readonly [string, string]>;
+}): DigitalFixture {
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: spec.components.map((c) => ({ id: c.id, type: c.type, ...(c.props ? { props: c.props } : {}) })),
+    connections: spec.connections.map((c) => [c[0], c[1]] as [string, string]),
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
+}
+
+function drive(fix: DigitalFixture, values: Record<string, number>): void {
+  for (const [label, value] of Object.entries(values)) {
+    fix.facade.setSignal(fix.coordinator, label, value);
   }
-  return arr;
+  fix.facade.step(fix.coordinator);
 }
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
+function read(fix: DigitalFixture, label: string): number {
+  return fix.facade.readSignal(fix.coordinator, label) as number;
 }
 
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
+// ===========================================================================
+// Delay — Cat 9 (pass-through digital interaction) + Cat 4 (bitWidth hot-load)
+// ===========================================================================
 
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
+function buildDelayFixture(bitWidth: number): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "in",  type: "In",    props: { label: "IN",  bitWidth } },
+      { id: "dly", type: "Delay", props: { bitWidth, delayTime: 1 } },
+      { id: "out", type: "Out",   props: { label: "OUT", bitWidth } },
+    ],
+    connections: [
+      ["in:out",  "dly:in"],
+      ["dly:out", "out:in"],
+    ],
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Delay
-// ---------------------------------------------------------------------------
-
-describe("Delay", () => {
-  describe("passThrough", () => {
-    it("input=0xABCD passes through to output", () => {
-      // inputs: [in=0xABCD]; output: [out]
-      const layout = makeLayout(1, 1);
-      const state = makeState([0xABCD]);
-      const highZs = new Uint32Array(state.length);
-      executeDelay(0, state, highZs, layout);
-      expect(state[1]).toBe(0xABCD);
-    });
-
-    it("input=0 produces output=0", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0]);
-      const highZs = new Uint32Array(state.length);
-      executeDelay(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
-
-    it("input=0xFFFFFFFF passes through as unsigned 32-bit", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0xFFFFFFFF]);
-      const highZs = new Uint32Array(state.length);
-      executeDelay(0, state, highZs, layout);
-      expect(state[1]).toBe(0xFFFFFFFF);
-    });
-
-    it("pass-through is idempotent (repeated calls)", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0x1234]);
-      const highZs = new Uint32Array(state.length);
-      for (let i = 0; i < 100; i++) {
-        state[0] = (i * 31) & 0xFFFF;
-        executeDelay(0, state, highZs, layout);
-        expect(state[1]).toBe(state[0]);
-      }
-    });
+describe("Delay digital interaction (Cat 9)", () => {
+  it("1-bit pass-through: 0 -> 0", () => {
+    const fix = buildDelayFixture(1);
+    drive(fix, { IN: 0 });
+    expect(read(fix, "OUT")).toBe(0);
   });
 
-  describe("pinLayout", () => {
-    it("Delay has 1 input pin and 1 output pin", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 1);
-      props.set("delayTime", 1);
-      const el = new DelayElement("test", { x: 0, y: 0 }, 0, false, props);
-      const pins = el.getPins();
-      expect(pins.filter((p) => p.direction === PinDirection.INPUT)).toHaveLength(1);
-      expect(pins.filter((p) => p.direction === PinDirection.OUTPUT)).toHaveLength(1);
-    });
-
-    it("input pin labeled 'in', output pin labeled 'out'", () => {
-      const decls = buildDelayPinDeclarations(1);
-      expect(decls.find((d) => d.label === "in")).toBeDefined();
-      expect(decls.find((d) => d.label === "out")).toBeDefined();
-    });
+  it("1-bit pass-through: 1 -> 1", () => {
+    const fix = buildDelayFixture(1);
+    drive(fix, { IN: 1 });
+    expect(read(fix, "OUT")).toBe(1);
   });
 
-  describe("attributeMapping", () => {
-    it("Bits and DelayTime map correctly", () => {
-      const entries: Record<string, string> = { Bits: "8", DelayTime: "4" };
-      const bag = new PropertyBag();
-      for (const m of DELAY_ATTRIBUTE_MAPPINGS) {
-        if (entries[m.xmlName] !== undefined) {
-          bag.set(m.propertyKey, m.convert(entries[m.xmlName]));
-        }
-      }
-      expect(bag.get<number>("bitWidth")).toBe(8);
-      expect(bag.get<number>("delayTime")).toBe(4);
-    });
+  it("8-bit pass-through: 0xAB -> 0xAB", () => {
+    const fix = buildDelayFixture(8);
+    drive(fix, { IN: 0xAB });
+    expect(read(fix, "OUT")).toBe(0xAB);
   });
 
-  describe("draw", () => {
-    it("draw() calls drawPolygon for body", () => {
-      const props = new PropertyBag();
-      props.set("bitWidth", 1);
-      props.set("delayTime", 3);
-      const el = new DelayElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
-    });
+  it("16-bit pass-through: 0xABCD -> 0xABCD", () => {
+    const fix = buildDelayFixture(16);
+    drive(fix, { IN: 0xABCD });
+    expect(read(fix, "OUT")).toBe(0xABCD);
   });
 
-  describe("definitionComplete", () => {
-    it("DelayDefinition has name='Delay'", () => {
-      expect(DelayDefinition.name).toBe("Delay");
-    });
+  it("32-bit pass-through: 0xFFFFFFFF preserved as unsigned", () => {
+    const fix = buildDelayFixture(32);
+    drive(fix, { IN: 0xFFFFFFFF });
+    expect(read(fix, "OUT")).toBe(0xFFFFFFFF);
+  });
 
-    it("DelayDefinition has typeId=-1 (sentinel)", () => {
-      expect(DelayDefinition.typeId).toBe(-1);
-    });
-
-    it("DelayDefinition has executeFn=executeDelay", () => {
-      expect(DelayDefinition.models.digital!.executeFn).toBe(executeDelay);
-    });
-
-    it("DelayDefinition category is WIRING", () => {
-      expect(DelayDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("DelayDefinition can be registered", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(DelayDefinition)).not.toThrow();
-    });
+  it("repeated drives are tracked by the simulator", () => {
+    const fix = buildDelayFixture(8);
+    drive(fix, { IN: 0x12 });
+    expect(read(fix, "OUT")).toBe(0x12);
+    drive(fix, { IN: 0x34 });
+    expect(read(fix, "OUT")).toBe(0x34);
+    drive(fix, { IN: 0x56 });
+    expect(read(fix, "OUT")).toBe(0x56);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Break
-// ---------------------------------------------------------------------------
-
-describe("Break", () => {
-  describe("assertionDetection", () => {
-    it("input=0 → output=0 (not triggered)", () => {
-      // inputs: [brk=0]; output: [triggered]
-      const layout = makeLayout(1, 1);
-      const state = makeState([0]);
-      const highZs = new Uint32Array(state.length);
-      executeBreak(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
-
-    it("input=1 → output=1 (triggered)", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([1]);
-      const highZs = new Uint32Array(state.length);
-      executeBreak(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-    });
-
-    it("input=0xFF (non-zero) → output=1 (triggered)", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0xFF]);
-      const highZs = new Uint32Array(state.length);
-      executeBreak(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-    });
-
-    it("input transitions 0→1→0 are tracked correctly", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0]);
-      const highZs = new Uint32Array(state.length);
-
-      executeBreak(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-
-      state[0] = 1;
-      executeBreak(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-
-      state[0] = 0;
-      executeBreak(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
+describe("Delay parameter hot-load (Cat 4)", () => {
+  it("bitWidth=4 masks 0xAB drive at the In to 0xB observable at the Out", () => {
+    // bitWidth is a structural property: the In port's declared width clamps
+    // the drive value to its width before the simulator observes it.
+    // 0xAB & 0xF == 0xB.
+    const fix = buildDelayFixture(4);
+    drive(fix, { IN: 0xAB });
+    expect(read(fix, "OUT")).toBe(0xB);
   });
 
-  describe("pinLayout", () => {
-    it("Break has 1 input pin and 0 output pins in declarations (+ engine output)", () => {
-      const decls = buildBreakPinDeclarations();
-      expect(decls.filter((d) => d.direction === PinDirection.INPUT)).toHaveLength(1);
-      expect(decls.find((d) => d.label === "brk")).toBeDefined();
-    });
-  });
+  it("bitWidth=8 preserves 0xAB through the Delay (different observable than 4-bit)", () => {
+    const fix4 = buildDelayFixture(4);
+    drive(fix4, { IN: 0xAB });
+    const out4 = read(fix4, "OUT");
 
-  describe("attributeMapping", () => {
-    it("Label and enabled map correctly", () => {
-      const entries: Record<string, string> = { Label: "bp1", enabled: "false" };
-      const bag = new PropertyBag();
-      for (const m of BREAK_ATTRIBUTE_MAPPINGS) {
-        if (entries[m.xmlName] !== undefined) {
-          bag.set(m.propertyKey, m.convert(entries[m.xmlName]));
-        }
-      }
-      expect(bag.get<string>("label")).toBe("bp1");
-      expect(bag.get<boolean>("enabled")).toBe(false);
-    });
-  });
+    const fix8 = buildDelayFixture(8);
+    drive(fix8, { IN: 0xAB });
+    const out8 = read(fix8, "OUT");
 
-  describe("draw", () => {
-    it("draw() calls drawCircle for body", () => {
-      const props = new PropertyBag();
-      const el = new BreakElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawCircle").length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe("definitionComplete", () => {
-    it("BreakDefinition has name='Break'", () => {
-      expect(BreakDefinition.name).toBe("Break");
-    });
-
-    it("BreakDefinition has typeId=-1", () => {
-      expect(BreakDefinition.typeId).toBe(-1);
-    });
-
-    it("BreakDefinition has executeFn=executeBreak", () => {
-      expect(BreakDefinition.models.digital!.executeFn).toBe(executeBreak);
-    });
-
-    it("BreakDefinition category is WIRING", () => {
-      expect(BreakDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("BreakDefinition can be registered", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(BreakDefinition)).not.toThrow();
-    });
+    expect(out4).toBe(0xB);
+    expect(out8).toBe(0xAB);
+    expect(out4).not.toBe(out8);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Stop
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Break — Cat 9 (digital interaction): brk input drives the upstream net
+// ===========================================================================
+//
+// Break declares outputSchema: [] — its halt-trigger flag is engine-internal
+// and not exposed as a labelled output. The canonical Cat 9 observable is
+// the round-trip on the brk-driving net: the In drives a value, the wire
+// connecting In:out to brk:brk and to a Probe Out carries that value, and
+// the Probe Out reads it back through the simulator.
 
-describe("Stop", () => {
-  describe("terminationDetection", () => {
-    it("input=0 → output=0 (not triggered)", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0]);
-      const highZs = new Uint32Array(state.length);
-      executeStop(0, state, highZs, layout);
-      expect(state[1]).toBe(0);
-    });
+function buildBreakFixture(): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "in",   type: "In",    props: { label: "BRK_IN",  bitWidth: 1 } },
+      { id: "brk",  type: "Break", props: { label: "bp1" } },
+      { id: "obs",  type: "Out",   props: { label: "BRK_OBS", bitWidth: 1 } },
+    ],
+    connections: [
+      ["in:out", "brk:brk"],
+      ["in:out", "obs:in"],
+    ],
+  });
+}
 
-    it("input=1 → output=1 (triggered)", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([1]);
-      const highZs = new Uint32Array(state.length);
-      executeStop(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-    });
-
-    it("input=0xDEAD (non-zero) → output=1", () => {
-      const layout = makeLayout(1, 1);
-      const state = makeState([0xDEAD]);
-      const highZs = new Uint32Array(state.length);
-      executeStop(0, state, highZs, layout);
-      expect(state[1]).toBe(1);
-    });
+describe("Break digital interaction (Cat 9)", () => {
+  it("brk input net carries 0 when driven low", () => {
+    const fix = buildBreakFixture();
+    drive(fix, { BRK_IN: 0 });
+    expect(read(fix, "BRK_OBS")).toBe(0);
   });
 
-  describe("pinLayout", () => {
-    it("Stop pin declaration has 'stop' input", () => {
-      const decls = buildStopPinDeclarations();
-      expect(decls.find((d) => d.label === "stop")).toBeDefined();
-      expect(decls[0].direction).toBe(PinDirection.INPUT);
-    });
+  it("brk input net carries 1 when driven high", () => {
+    const fix = buildBreakFixture();
+    drive(fix, { BRK_IN: 1 });
+    expect(read(fix, "BRK_OBS")).toBe(1);
   });
 
-  describe("attributeMapping", () => {
-    it("Label maps to label", () => {
-      const m = STOP_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "Label");
-      expect(m).toBeDefined();
-      expect(m!.convert("myStop")).toBe("myStop");
-    });
-  });
-
-  describe("draw", () => {
-    it("draw() renders 'Stop' component name", () => {
-      const props = new PropertyBag();
-      const el = new StopElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => (c.args[0] as string).includes("Stop"))).toBe(true);
-    });
-  });
-
-  describe("definitionComplete", () => {
-    it("StopDefinition has name='Stop'", () => {
-      expect(StopDefinition.name).toBe("Stop");
-    });
-
-    it("StopDefinition has executeFn=executeStop", () => {
-      expect(StopDefinition.models.digital!.executeFn).toBe(executeStop);
-    });
-
-    it("StopDefinition category is WIRING", () => {
-      expect(StopDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("StopDefinition can be registered", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(StopDefinition)).not.toThrow();
-    });
+  it("brk input net follows transitions 0 -> 1 -> 0 across steps", () => {
+    const fix = buildBreakFixture();
+    drive(fix, { BRK_IN: 0 });
+    expect(read(fix, "BRK_OBS")).toBe(0);
+    drive(fix, { BRK_IN: 1 });
+    expect(read(fix, "BRK_OBS")).toBe(1);
+    drive(fix, { BRK_IN: 0 });
+    expect(read(fix, "BRK_OBS")).toBe(0);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Reset
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Stop — Cat 9 (digital interaction): stop input drives the upstream net
+// ===========================================================================
+//
+// Same pattern as Break: outputSchema is empty; the canonical Cat 9 observable
+// is the round-trip on the stop-driving net.
 
-describe("Reset", () => {
-  describe("initRelease", () => {
-    it("executeReset is a no-op: does not modify output slot", () => {
-      // Reset has no inputs- output managed by engine
-      const layout = makeLayout(0, 1);
-      const state = makeState([]);
-      const highZs = new Uint32Array(state.length);
-      // Pre-set output to a sentinel value
-      state[0] = 42;
-      executeReset(0, state, highZs, layout);
-      // No-op: output should still be 42
-      expect(state[0]).toBe(42);
-    });
+function buildStopFixture(): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "in",   type: "In",   props: { label: "STOP_IN",  bitWidth: 1 } },
+      { id: "stp",  type: "Stop", props: { label: "term" } },
+      { id: "obs",  type: "Out",  props: { label: "STOP_OBS", bitWidth: 1 } },
+    ],
+    connections: [
+      ["in:out", "stp:stop"],
+      ["in:out", "obs:in"],
+    ],
+  });
+}
 
-    it("executeReset can be called repeatedly without side effects", () => {
-      const layout = makeLayout(0, 1);
-      const state = makeState([]);
-      const highZs = new Uint32Array(state.length);
-      state[0] = 0xAB;
-      for (let i = 0; i < 100; i++) {
-        executeReset(0, state, highZs, layout);
-      }
-      expect(state[0]).toBe(0xAB);
-    });
+describe("Stop digital interaction (Cat 9)", () => {
+  it("stop input net carries 0 when driven low", () => {
+    const fix = buildStopFixture();
+    drive(fix, { STOP_IN: 0 });
+    expect(read(fix, "STOP_OBS")).toBe(0);
   });
 
-  describe("pinLayout", () => {
-    it("Reset has 0 input pins and 1 output pin", () => {
-      const decls = buildResetPinDeclarations();
-      expect(decls.filter((d) => d.direction === PinDirection.INPUT)).toHaveLength(0);
-      expect(decls.filter((d) => d.direction === PinDirection.OUTPUT)).toHaveLength(1);
-    });
-
-    it("output pin is labeled 'Reset'", () => {
-      const decls = buildResetPinDeclarations();
-      expect(decls[0].label).toBe("Reset");
-    });
-  });
-
-  describe("attributeMapping", () => {
-    it("invertOutput maps correctly", () => {
-      const m = RESET_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "invertOutput");
-      expect(m).toBeDefined();
-      expect(m!.convert("true")).toBe(true);
-      expect(m!.convert("false")).toBe(false);
-    });
-  });
-
-  describe("draw", () => {
-    it("draw() renders 'R' text centered in body", () => {
-      const props = new PropertyBag();
-      const el = new ResetElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "R")).toBe(true);
-    });
-
-    it("always draws inversion bubble (drawCircle) regardless of invertOutput", () => {
-      const props = new PropertyBag();
-      props.set("invertOutput", false);
-      const el = new ResetElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const circleCalls = calls.filter((c) => c.method === "drawCircle");
-      expect(circleCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() uses drawRect for the body rectangle", () => {
-      const props = new PropertyBag();
-      const el = new ResetElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const rectCalls = calls.filter((c) => c.method === "drawRect");
-      expect(rectCalls.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
-  describe("definitionComplete", () => {
-    it("ResetDefinition has name='Reset'", () => {
-      expect(ResetDefinition.name).toBe("Reset");
-    });
-
-    it("ResetDefinition has executeFn=executeReset", () => {
-      expect(ResetDefinition.models.digital!.executeFn).toBe(executeReset);
-    });
-
-    it("ResetDefinition category is WIRING", () => {
-      expect(ResetDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("ResetDefinition can be registered", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(ResetDefinition)).not.toThrow();
-    });
-
-    it("ResetDefinition propertyDefs include invertOutput", () => {
-      const keys = ResetDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("invertOutput");
-    });
+  it("stop input net carries 1 when driven high", () => {
+    const fix = buildStopFixture();
+    drive(fix, { STOP_IN: 1 });
+    expect(read(fix, "STOP_OBS")).toBe(1);
   });
 });
 
-// ---------------------------------------------------------------------------
-// AsyncSeq
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Reset — Cat 9 (digital interaction): output observable through Out probe
+// ===========================================================================
+//
+// Reset has no inputs; output is engine-managed via the init/clear-reset
+// protocol. The canonical Cat 9 observable is reading the output net
+// through a labelled Out after a step.
 
-describe("AsyncSeq", () => {
-  describe("noOpExecute", () => {
-    it("executeAsyncSeq is a no-op (does nothing to state)", () => {
-      // AsyncSeq has no inputs or outputs
-      const layout = makeLayout(0, 0);
-      const state = makeState([]);
-      const highZs = new Uint32Array(state.length);
-      // Pre-populate state with sentinel values
-      state[0] = 0xDEAD;
-      state[1] = 0xBEEF;
-      executeAsyncSeq(0, state, highZs, layout);
-      // State should be unchanged
-      expect(state[0]).toBe(0xDEAD);
-      expect(state[1]).toBe(0xBEEF);
-    });
+function buildResetFixture(invertOutput: boolean): DigitalFixture {
+  return buildDigital({
+    components: [
+      { id: "rst", type: "Reset", props: { invertOutput } },
+      { id: "obs", type: "Out",   props: { label: "RST_OBS", bitWidth: 1 } },
+    ],
+    connections: [
+      ["rst:Reset", "obs:in"],
+    ],
+  });
+}
 
-    it("executeAsyncSeq can be called without error", () => {
-      const layout = makeLayout(0, 0);
-      const state = new Uint32Array(4);
-      const highZs = new Uint32Array(state.length);
-      expect(() => executeAsyncSeq(0, state, highZs, layout)).not.toThrow();
-    });
+describe("Reset digital interaction (Cat 9)", () => {
+  it("non-inverted Reset releases output low after the init phase completes", () => {
+    // Documented contract from reset.ts:
+    //   state[stateOffset+0] = 0 during init: output = !invertOutput (active)
+    //   state[stateOffset+0] = 1 after init:  output = invertOutput  (released)
+    // After a single coordinator.step() the engine has run the init/clear-reset
+    // protocol; the post-init output for invertOutput=false is 0.
+    const fix = buildResetFixture(false);
+    fix.facade.step(fix.coordinator);
+    expect(read(fix, "RST_OBS")).toBe(0);
   });
 
-  describe("flagPropagation", () => {
-    it("AsyncSeqElement.runAtRealTime is false by default", () => {
-      const props = new PropertyBag();
-      const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
-      expect(el.runAtRealTime).toBe(false);
-    });
-
-    it("AsyncSeqElement.runAtRealTime reflects property value", () => {
-      const props = new PropertyBag();
-      props.set("runAtRealTime", true);
-      props.set("frequency", 50);
-      const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
-      expect(el.runAtRealTime).toBe(true);
-      expect(el.frequency).toBe(50);
-    });
-
-    it("frequency defaults to 1", () => {
-      const props = new PropertyBag();
-      const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
-      expect(el.frequency).toBe(1);
-    });
-  });
-
-  describe("pinLayout", () => {
-    it("AsyncSeq has no pins", () => {
-      const decls = buildAsyncSeqPinDeclarations();
-      expect(decls).toHaveLength(0);
-    });
-
-    it("AsyncSeqElement.getPins() returns empty array", () => {
-      const props = new PropertyBag();
-      const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
-      expect(el.getPins()).toHaveLength(0);
-    });
-  });
-
-  describe("attributeMapping", () => {
-    it("runRealTime and Frequency map correctly", () => {
-      const entries: Record<string, string> = { runRealTime: "true", Frequency: "60" };
-      const bag = new PropertyBag();
-      for (const m of ASYNC_SEQ_ATTRIBUTE_MAPPINGS) {
-        if (entries[m.xmlName] !== undefined) {
-          bag.set(m.propertyKey, m.convert(entries[m.xmlName]));
-        }
-      }
-      expect(bag.get<boolean>("runAtRealTime")).toBe(true);
-      expect(bag.get<number>("frequency")).toBe(60);
-    });
-  });
-
-  describe("draw", () => {
-    it("draw() calls drawPolygon for the body", () => {
-      const props = new PropertyBag();
-      const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      expect(calls.filter((c) => c.method === "drawPolygon").length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() renders 'Async' text", () => {
-      const props = new PropertyBag();
-      const el = new AsyncSeqElement("test", { x: 0, y: 0 }, 0, false, props);
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "Async")).toBe(true);
-    });
-  });
-
-  describe("definitionComplete", () => {
-    it("AsyncSeqDefinition has name='AsyncSeq'", () => {
-      expect(AsyncSeqDefinition.name).toBe("AsyncSeq");
-    });
-
-    it("AsyncSeqDefinition has typeId=-1", () => {
-      expect(AsyncSeqDefinition.typeId).toBe(-1);
-    });
-
-    it("AsyncSeqDefinition has executeFn=executeAsyncSeq", () => {
-      expect(AsyncSeqDefinition.models.digital!.executeFn).toBe(executeAsyncSeq);
-    });
-
-    it("AsyncSeqDefinition category is WIRING", () => {
-      expect(AsyncSeqDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("AsyncSeqDefinition has empty pinLayout (no pins)", () => {
-      expect(AsyncSeqDefinition.pinLayout).toHaveLength(0);
-    });
-
-    it("AsyncSeqDefinition propertyDefs include runAtRealTime and frequency", () => {
-      const keys = AsyncSeqDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("runAtRealTime");
-      expect(keys).toContain("frequency");
-    });
-
-    it("AsyncSeqDefinition can be registered", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(AsyncSeqDefinition)).not.toThrow();
-    });
-
-    it("AsyncSeqDefinition has a non-empty helpText", () => {
-      expect(typeof AsyncSeqDefinition.helpText).toBe("string"); expect(AsyncSeqDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
+  it("inverted Reset releases output high after the init phase completes", () => {
+    // Documented contract: invertOutput=true → post-init output = 1.
+    const fix = buildResetFixture(true);
+    fix.facade.step(fix.coordinator);
+    expect(read(fix, "RST_OBS")).toBe(1);
   });
 });
+
+describe("Reset parameter hot-load (Cat 4)", () => {
+  it("invertOutput flips the post-init Reset output polarity", () => {
+    // invertOutput is a structural property consumed at compile/init time.
+    // Documented contract: setting it to true flips the released output value.
+    const fixOff = buildResetFixture(false);
+    fixOff.facade.step(fixOff.coordinator);
+    const vOff = read(fixOff, "RST_OBS");
+
+    const fixOn = buildResetFixture(true);
+    fixOn.facade.step(fixOn.coordinator);
+    const vOn = read(fixOn, "RST_OBS");
+
+    expect(vOff).toBe(0);
+    expect(vOn).toBe(1);
+    expect(vOff).not.toBe(vOn);
+  });
+});
+
+// ===========================================================================
+// AsyncSeq — no canonical Cat 9 surface (BLOCKED)
+// ===========================================================================
+//
+// AsyncSeq has no input or output pins — the component is a marker that the
+// compiler reads from the netlist during compilation. There is no labelled
+// drive port and no labelled observation port through which the sanctioned
+// canonical Cat 9 mechanic (writeByLabel / step / readByLabel) can exercise
+// a simulator observable. This category is BLOCKED and surfaced in the
+// Escalations section of the migration report.

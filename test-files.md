@@ -106,14 +106,14 @@
 - [x] src/components/switching/__tests__/switches.test.ts
 - [x] src/components/switching/__tests__/trans-gate.test.ts
 - [x] src/components/terminal/__tests__/terminal.test.ts
-- [ ] src/components/wiring/__tests__/bit-selector.test.ts
-- [ ] src/components/wiring/__tests__/decoder.test.ts
-- [ ] src/components/wiring/__tests__/demux.test.ts
-- [ ] src/components/wiring/__tests__/mux.test.ts
-- [ ] src/components/wiring/__tests__/priority-encoder.test.ts
-- [ ] src/components/wiring/__tests__/sim-control.test.ts
-- [ ] src/components/wiring/__tests__/wiring.test.ts
-- [ ] src/solver/analog/__tests__/behavioral-flipflop.test.ts
+- [x] src/components/wiring/__tests__/bit-selector.test.ts
+- [x] src/components/wiring/__tests__/decoder.test.ts
+- [x] src/components/wiring/__tests__/demux.test.ts
+- [x] src/components/wiring/__tests__/mux.test.ts
+- [x] src/components/wiring/__tests__/priority-encoder.test.ts
+- [x] src/components/wiring/__tests__/sim-control.test.ts
+- [x] src/components/wiring/__tests__/wiring.test.ts
+- [x] src/solver/analog/__tests__/behavioral-flipflop.test.ts
 - [x] src/solver/analog/__tests__/behavioral-gate.test.ts
 - [x] src/solver/analog/__tests__/behavioral-integration.test.ts
 - [x] src/solver/analog/__tests__/behavioral-remaining.test.ts

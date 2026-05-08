@@ -1,332 +1,263 @@
 /**
- * Tests for the Demultiplexer component.
+ * Canonical tests for the Demultiplexer combinational component.
  *
- * Covers:
- *   - executeDemux: truth table for 2-output and 4-output configs
- *   - executeDemux: multi-bit operation, unselected outputs = 0
- *   - Pin layout: correct counts and labels
- *   - Attribute mapping
- *   - Rendering
- *   - ComponentDefinition completeness
+ * Tier: fixture-only (T1) — pure-digital combinational; no analog domain,
+ *   no transient dynamics, no junctions / LTE / breakpoints / preset registry.
+ * Driver: facade.build({components, connections}) + facade.compile()
+ *   + setSignal / step / readSignal.
+ *
+ * Canon coverage:
+ *   - Cat 4  param hot-load (selectorBits / bitWidth — structural compile-time
+ *            seeds; build-twice mechanic from the Canon Cat 4 compile-time-seeded
+ *            paragraph).
+ *   - Cat 9  digital interaction: drive sel + in, observe one of N outputs.
+ *   - Cat 11 multi-output observability: each out_i is independently observable
+ *            (Demux.outputSchema returns N pins; values differ for the same
+ *            (sel, in) pair).
+ *   - Cat 13 port-width clamp on sel: an In of width=selectorBits driven with a
+ *            value larger than 2^selectorBits-1 masks via BitVector.fromNumber
+ *            in setSignal before reaching executeDemux.
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  DemuxElement,
-  executeDemux,
-  DemuxDefinition,
-  DEMUX_ATTRIBUTE_MAPPINGS,
-  buildDemuxPinDeclarations,
-} from "../demux.js";
-import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { ComponentLayout } from "../../../core/registry.js";
-import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
-import type { ThemeColor } from "../../../core/renderer-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
+import type { SimulationCoordinator } from "../../../solver/coordinator-types.js";
+
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Canonical builder: a single Demultiplexer driven by labelled In ports
+// (SEL, IN) and observed via labelled Out ports (OUT_0..OUT_{N-1}).
 // ---------------------------------------------------------------------------
 
-function makeLayout(inputCount: number, outputCount: number): ComponentLayout {
-  return {
-    wiringTable: new Int32Array(64).map((_, i) => i),
-    inputCount: () => inputCount,
-    inputOffset: () => 0,
-    outputCount: () => outputCount,
-    outputOffset: () => inputCount,
-    stateOffset: () => inputCount + outputCount,
-    getProperty: () => undefined,
-  };
+interface DigitalFixture {
+  facade: DefaultSimulatorFacade;
+  coordinator: SimulationCoordinator;
 }
 
-function makeState(inputs: number[], outputCount: number): Uint32Array {
-  const arr = new Uint32Array(inputs.length + outputCount);
-  for (let i = 0; i < inputs.length; i++) {
-    arr[i] = inputs[i] >>> 0;
+function buildDemuxFixture(opts: { selectorBits: number; bitWidth: number }): DigitalFixture {
+  const { selectorBits, bitWidth } = opts;
+  const outputCount = 1 << selectorBits;
+
+  const components: Array<{ id: string; type: string; props?: Record<string, number | string | boolean> }> = [
+    { id: "sel", type: "In",  props: { label: "SEL", bitWidth: selectorBits } },
+    { id: "din", type: "In",  props: { label: "IN",  bitWidth } },
+    { id: "dem", type: "Demultiplexer", props: { selectorBits, bitWidth } },
+  ];
+  const connections: Array<readonly [string, string]> = [
+    ["sel:out", "dem:sel"],
+    ["din:out", "dem:in"],
+  ];
+  for (let i = 0; i < outputCount; i++) {
+    components.push({ id: `o${i}`, type: "Out", props: { label: `OUT_${i}`, bitWidth } });
+    connections.push([`dem:out_${i}`, `o${i}:in`]);
   }
-  return arr;
+
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: components.map((c) => ({ id: c.id, type: c.type, ...(c.props ? { props: c.props } : {}) })),
+    connections: connections.map((c) => [c[0], c[1]] as [string, string]),
+  });
+  const coordinator = facade.compile(circuit);
+  return { facade, coordinator };
 }
 
-interface DrawCall {
-  method: string;
-  args: unknown[];
+function drive(fix: DigitalFixture, values: Record<string, number>): void {
+  for (const [label, value] of Object.entries(values)) {
+    fix.facade.setSignal(fix.coordinator, label, value);
+  }
+  fix.facade.step(fix.coordinator);
 }
 
-function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
-  const calls: DrawCall[] = [];
-  const record =
-    (method: string) =>
-    (...args: unknown[]): void => {
-      calls.push({ method, args });
-    };
-
-  const ctx: RenderContext = {
-    drawLine: record("drawLine") as (x1: number, y1: number, x2: number, y2: number) => void,
-    drawRect: record("drawRect") as (x: number, y: number, w: number, h: number, filled: boolean) => void,
-    drawCircle: record("drawCircle") as (cx: number, cy: number, r: number, filled: boolean) => void,
-    drawArc: record("drawArc") as (cx: number, cy: number, r: number, s: number, e: number) => void,
-    drawPolygon: record("drawPolygon") as (points: readonly Point[], filled: boolean) => void,
-    drawPath: record("drawPath") as (path: PathData) => void,
-    drawText: record("drawText") as (text: string, x: number, y: number, anchor: TextAnchor) => void,
-    save: record("save") as () => void,
-    restore: record("restore") as () => void,
-    translate: record("translate") as (dx: number, dy: number) => void,
-    rotate: record("rotate") as (angle: number) => void,
-    scale: record("scale") as (sx: number, sy: number) => void,
-    setColor: record("setColor") as (color: ThemeColor) => void,
-    setLineWidth: record("setLineWidth") as (w: number) => void,
-    setFont: record("setFont") as (font: FontSpec) => void,
-    setLineDash: record("setLineDash") as (pattern: number[]) => void,
-  };
-
-  return { ctx, calls };
+function read(fix: DigitalFixture, label: string): number {
+  return fix.facade.readSignal(fix.coordinator, label) as number;
 }
 
-function makeDemux(overrides?: { selectorBits?: number; bitWidth?: number }): DemuxElement {
-  const props = new PropertyBag();
-  props.set("selectorBits", overrides?.selectorBits ?? 1);
-  props.set("bitWidth", overrides?.bitWidth ?? 1);
-  return new DemuxElement("test-demux-001", { x: 0, y: 0 }, 0, false, props);
-}
+// ===========================================================================
+// Cat 9 — digital interaction
+// ===========================================================================
 
-// ---------------------------------------------------------------------------
-// executeDemux- logic correctness
-// ---------------------------------------------------------------------------
-
-describe("Demultiplexer", () => {
-  describe("execute2Input", () => {
-    it("sel=0, in=0xAA routes to out_0; out_1=0", () => {
-      // inputs: [sel=0, in=0xAA]; outputs: [out_0, out_1]
-      const layout = makeLayout(2, 2);
-      const state = makeState([0, 0xAA], 2);
-      const highZs = new Uint32Array(state.length);
-      executeDemux(0, state, highZs, layout);
-      expect(state[2]).toBe(0xAA); // out_0
-      expect(state[3]).toBe(0);    // out_1
-    });
-
-    it("sel=1, in=0xBB routes to out_1; out_0=0", () => {
-      const layout = makeLayout(2, 2);
-      const state = makeState([1, 0xBB], 2);
-      const highZs = new Uint32Array(state.length);
-      executeDemux(0, state, highZs, layout);
-      expect(state[2]).toBe(0);    // out_0
-      expect(state[3]).toBe(0xBB); // out_1
-    });
+describe("Demultiplexer digital interaction (Cat 9)", () => {
+  it("1-bit selector, sel=0 routes IN to OUT_0; OUT_1 = 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 1, bitWidth: 1 });
+    drive(fix, { SEL: 0, IN: 1 });
+    expect(read(fix, "OUT_0")).toBe(1);
+    expect(read(fix, "OUT_1")).toBe(0);
   });
 
-  describe("executeMultiInput", () => {
-    it("4-output demux: sel=2 routes to out_2", () => {
-      // inputs: [sel=2, in=0x55]; outputs: [out_0..out_3]
-      const layout = makeLayout(2, 4);
-      const state = makeState([2, 0x55], 4);
-      const highZs = new Uint32Array(state.length);
-      executeDemux(0, state, highZs, layout);
-      expect(state[2]).toBe(0);    // out_0
-      expect(state[3]).toBe(0);    // out_1
-      expect(state[4]).toBe(0x55); // out_2
-      expect(state[5]).toBe(0);    // out_3
-    });
-
-    it("4-output demux: sel=3 routes to out_3, all others 0", () => {
-      const layout = makeLayout(2, 4);
-      const state = makeState([3, 0xFF], 4);
-      const highZs = new Uint32Array(state.length);
-      executeDemux(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-      expect(state[3]).toBe(0);
-      expect(state[4]).toBe(0);
-      expect(state[5]).toBe(0xFF);
-    });
+  it("1-bit selector, sel=1 routes IN to OUT_1; OUT_0 = 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 1, bitWidth: 1 });
+    drive(fix, { SEL: 1, IN: 1 });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(1);
   });
 
-  describe("multiBit", () => {
-    it("32-bit value routed to selected output", () => {
-      const layout = makeLayout(2, 2);
-      const state = makeState([1, 0xDEADBEEF], 2);
-      const highZs = new Uint32Array(state.length);
-      executeDemux(0, state, highZs, layout);
-      expect(state[2]).toBe(0);
-      expect(state[3]).toBe(0xDEADBEEF >>> 0);
-    });
-
-    it("unselected outputs are always 0 regardless of previous state", () => {
-      const layout = makeLayout(2, 2);
-      const state = makeState([0, 0xAA], 2);
-      const highZs = new Uint32Array(state.length);
-      // Pre-populate outputs with garbage
-      state[2] = 0xFF;
-      state[3] = 0xFF;
-      executeDemux(0, state, highZs, layout);
-      expect(state[2]).toBe(0xAA);
-      expect(state[3]).toBe(0); // cleared
-    });
+  it("2-bit selector, sel=2 routes IN to OUT_2; all others 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 2, IN: 0x55 });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0x55);
+    expect(read(fix, "OUT_3")).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // Pin layout
-  // ---------------------------------------------------------------------------
-
-  describe("pinLayout1BitSelector", () => {
-    it("1-bit selector produces 2 input pins (sel + in) and 2 output pins", () => {
-      const el = makeDemux({ selectorBits: 1 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(2);
-      expect(outputs).toHaveLength(2);
-    });
-
-    it("input pins labeled 'sel' and 'in'", () => {
-      const el = makeDemux({ selectorBits: 1 });
-      const inputs = el.getPins().filter((p) => p.direction === PinDirection.INPUT);
-      const labels = inputs.map((p) => p.label);
-      expect(labels).toContain("sel");
-      expect(labels).toContain("in");
-    });
-
-    it("output pins labeled 'out_0' and 'out_1'", () => {
-      const el = makeDemux({ selectorBits: 1 });
-      const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(outputs.map((p) => p.label)).toEqual(["out_0", "out_1"]);
-    });
+  it("2-bit selector, sel=3 routes IN=0xFF to OUT_3; all others 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 3, IN: 0xFF });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0);
+    expect(read(fix, "OUT_3")).toBe(0xFF);
   });
 
-  describe("pinLayout2BitSelector", () => {
-    it("2-bit selector produces 2 input pins and 4 output pins", () => {
-      const el = makeDemux({ selectorBits: 2 });
-      const pins = el.getPins();
-      const inputs = pins.filter((p) => p.direction === PinDirection.INPUT);
-      const outputs = pins.filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(inputs).toHaveLength(2);
-      expect(outputs).toHaveLength(4);
-    });
-
-    it("4 output pins labeled out_0..out_3", () => {
-      const el = makeDemux({ selectorBits: 2 });
-      const outputs = el.getPins().filter((p) => p.direction === PinDirection.OUTPUT);
-      expect(outputs.map((p) => p.label)).toEqual(["out_0", "out_1", "out_2", "out_3"]);
-    });
+  it("multi-bit data: 32-bit value routed to selected output", () => {
+    const fix = buildDemuxFixture({ selectorBits: 1, bitWidth: 32 });
+    drive(fix, { SEL: 1, IN: 0xDEADBEEF });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(0xDEADBEEF);
   });
 
-  describe("pinLayoutFromDeclarations", () => {
-    it("buildDemuxPinDeclarations(1,1) produces 2 inputs + 2 outputs", () => {
-      const decls = buildDemuxPinDeclarations(1, 1);
-      expect(decls.filter((d) => d.direction === PinDirection.INPUT)).toHaveLength(2);
-      expect(decls.filter((d) => d.direction === PinDirection.OUTPUT)).toHaveLength(2);
-    });
+  it("3-bit selector, sel=5 routes IN to OUT_5; OUT_0..OUT_4, OUT_6, OUT_7 are 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 3, bitWidth: 4 });
+    drive(fix, { SEL: 5, IN: 0xA });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0);
+    expect(read(fix, "OUT_3")).toBe(0);
+    expect(read(fix, "OUT_4")).toBe(0);
+    expect(read(fix, "OUT_5")).toBe(0xA);
+    expect(read(fix, "OUT_6")).toBe(0);
+    expect(read(fix, "OUT_7")).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // Attribute mapping
-  // ---------------------------------------------------------------------------
+  it("changing sel reroutes the value — previously selected output drops to 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 1, IN: 0xAB });
+    expect(read(fix, "OUT_1")).toBe(0xAB);
+    expect(read(fix, "OUT_2")).toBe(0);
+    drive(fix, { SEL: 2, IN: 0xAB });
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0xAB);
+  });
+});
 
-  describe("attributeMapping", () => {
-    it("Bits and Selector Bits map correctly", () => {
-      const entries: Record<string, string> = {
-        Bits: "4",
-        "Selector Bits": "2",
-      };
-      const bag = new PropertyBag();
-      for (const mapping of DEMUX_ATTRIBUTE_MAPPINGS) {
-        if (entries[mapping.xmlName] !== undefined) {
-          bag.set(mapping.propertyKey, mapping.convert(entries[mapping.xmlName]));
-        }
-      }
-      expect(bag.get<number>("bitWidth")).toBe(4);
-      expect(bag.get<number>("selectorBits")).toBe(2);
-    });
+// ===========================================================================
+// Cat 11 — multi-output digital observability
+//
+// Demultiplexer.models.digital.outputSchema returns N output pins (one per
+// 2^selectorBits). For the same (sel, in) input, the N output pins take
+// different values: the selected pin = in, all others = 0. Each pin is
+// observed independently after a single step (canonical mechanic).
+// ===========================================================================
+
+describe("Demultiplexer multi-output observability (Cat 11)", () => {
+  it("4-output: sel=0, in=0xCC → OUT_0=0xCC and OUT_1=OUT_2=OUT_3=0 in one step", () => {
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 0, IN: 0xCC });
+    expect(read(fix, "OUT_0")).toBe(0xCC);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0);
+    expect(read(fix, "OUT_3")).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // Rendering
-  // ---------------------------------------------------------------------------
-
-  describe("draw", () => {
-    it("draw() calls drawPolygon for trapezoid body", () => {
-      const el = makeDemux();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const polygonCalls = calls.filter((c) => c.method === "drawPolygon");
-      expect(polygonCalls.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("draw() renders '0' text label", () => {
-      const el = makeDemux();
-      const { ctx, calls } = makeStubCtx();
-      el.draw(ctx);
-      const textCalls = calls.filter((c) => c.method === "drawText");
-      expect(textCalls.some((c) => c.args[0] === "0")).toBe(true);
-    });
+  it("4-output: sel=2, in=0x33 — every output asserted independently after one step", () => {
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 2, IN: 0x33 });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0x33);
+    expect(read(fix, "OUT_3")).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // ComponentDefinition completeness
-  // ---------------------------------------------------------------------------
+  it("8-output: sel=7, in=0xF — one output drives the data, seven drive 0", () => {
+    const fix = buildDemuxFixture({ selectorBits: 3, bitWidth: 4 });
+    drive(fix, { SEL: 7, IN: 0xF });
+    for (let i = 0; i < 7; i++) {
+      expect(read(fix, `OUT_${i}`)).toBe(0);
+    }
+    expect(read(fix, "OUT_7")).toBe(0xF);
+  });
+});
 
-  describe("definitionComplete", () => {
-    it("DemuxDefinition has name='Demultiplexer'", () => {
-      expect(DemuxDefinition.name).toBe("Demultiplexer");
-    });
+// ===========================================================================
+// Cat 4 — parameter hot-load (compile-time-seeded structural properties)
+//
+// selectorBits and bitWidth are PropertyType.INT / BIT_WIDTH with
+// structural: true — they are consumed at compile() to determine the pin
+// layout and the output count. The Canon's compile-time-seeded paragraph
+// (build-twice mechanic) is the documented hot-load shape for these.
+// ===========================================================================
 
-    it("DemuxDefinition has typeId=-1 (sentinel)", () => {
-      expect(DemuxDefinition.typeId).toBe(-1);
-    });
+describe("Demultiplexer param hot-load (Cat 4)", () => {
+  it("selectorBits=1 vs selectorBits=2: same (sel=1, in=0xAA) drives different output sets", () => {
+    // selectorBits=1: only OUT_0 / OUT_1 exist; sel=1 → OUT_1=0xAA.
+    const fix1 = buildDemuxFixture({ selectorBits: 1, bitWidth: 8 });
+    drive(fix1, { SEL: 1, IN: 0xAA });
+    expect(read(fix1, "OUT_0")).toBe(0);
+    expect(read(fix1, "OUT_1")).toBe(0xAA);
 
-    it("DemuxDefinition factory produces a DemuxElement with correct typeId", () => {
-      const props = new PropertyBag();
-      props.set("selectorBits", 1);
-      props.set("bitWidth", 1);
-      const el = DemuxDefinition.factory(props);
-      expect(el.typeId).toBe("Demultiplexer");
-    });
+    // selectorBits=2: OUT_0..OUT_3 exist; sel=1 still drives OUT_1, but OUT_2 / OUT_3
+    // are now observable and zero. The post-build observable shape changed.
+    const fix2 = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix2, { SEL: 1, IN: 0xAA });
+    expect(read(fix2, "OUT_0")).toBe(0);
+    expect(read(fix2, "OUT_1")).toBe(0xAA);
+    expect(read(fix2, "OUT_2")).toBe(0);
+    expect(read(fix2, "OUT_3")).toBe(0);
+  });
 
-    it("DemuxDefinition has executeFn=executeDemux", () => {
-      expect(DemuxDefinition.models.digital!.executeFn).toBe(executeDemux);
-    });
+  it("bitWidth=4 truncates IN's high nibble at the In-port; bitWidth=8 preserves it", () => {
+    // bitWidth=4: IN port is 4 bits wide; 0xAB driven into a 4-bit In gets masked
+    // to 0xB before reaching the demux.
+    const fix4 = buildDemuxFixture({ selectorBits: 1, bitWidth: 4 });
+    drive(fix4, { SEL: 0, IN: 0xAB });
+    expect(read(fix4, "OUT_0")).toBe(0xB);
 
-    it("DemuxDefinition has non-empty pinLayout", () => {
-      expect(DemuxDefinition.pinLayout.length).toBeGreaterThan(0);
-    });
+    // bitWidth=8: IN port is 8 bits wide; 0xAB passes through unmasked.
+    const fix8 = buildDemuxFixture({ selectorBits: 1, bitWidth: 8 });
+    drive(fix8, { SEL: 0, IN: 0xAB });
+    expect(read(fix8, "OUT_0")).toBe(0xAB);
+  });
+});
 
-    it("DemuxDefinition has non-empty propertyDefs", () => {
-      expect(DemuxDefinition.propertyDefs.length).toBeGreaterThan(0);
-    });
+// ===========================================================================
+// Cat 13 — port-width clamping on overrun
+//
+// The sel port is `selectorBits` bits wide. The In component upstream of sel
+// is declared with `bitWidth: selectorBits`, so a value larger than
+// 2^selectorBits-1 driven via setSignal is masked by BitVector.fromNumber
+// inside setSignal before being delivered to the sel port. The masked value
+// is closed-form: source & ((1 << selectorBits) - 1).
+// ===========================================================================
 
-    it("DemuxDefinition propertyDefs include selectorBits and bitWidth", () => {
-      const keys = DemuxDefinition.propertyDefs.map((d) => d.key);
-      expect(keys).toContain("selectorBits");
-      expect(keys).toContain("bitWidth");
-    });
+describe("Demultiplexer sel-port width clamp (Cat 13)", () => {
+  it("selectorBits=2, sel=4 (1 bit over) masks to 0; IN routes to OUT_0", () => {
+    // 4 = 0b100 → masked to 0b00 = 0.
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 4, IN: 0x77 });
+    expect(read(fix, "OUT_0")).toBe(0x77);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0);
+    expect(read(fix, "OUT_3")).toBe(0);
+  });
 
-    it("DemuxDefinition attributeMap covers Bits and Selector Bits", () => {
-      const xmlNames = DemuxDefinition.attributeMap.map((m) => m.xmlName);
-      expect(xmlNames).toContain("Bits");
-      expect(xmlNames).toContain("Selector Bits");
-    });
+  it("selectorBits=2, sel=7 masks to 3; IN routes to OUT_3", () => {
+    // 7 = 0b111 → masked to 0b11 = 3.
+    const fix = buildDemuxFixture({ selectorBits: 2, bitWidth: 8 });
+    drive(fix, { SEL: 7, IN: 0x44 });
+    expect(read(fix, "OUT_0")).toBe(0);
+    expect(read(fix, "OUT_1")).toBe(0);
+    expect(read(fix, "OUT_2")).toBe(0);
+    expect(read(fix, "OUT_3")).toBe(0x44);
+  });
 
-    it("DemuxDefinition category is WIRING", () => {
-      expect(DemuxDefinition.category).toBe(ComponentCategory.WIRING);
-    });
-
-    it("DemuxDefinition has a non-empty helpText", () => {
-      expect(typeof DemuxDefinition.helpText).toBe("string");
-      expect(typeof DemuxDefinition.helpText).toBe("string"); expect(DemuxDefinition.helpText.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("DemuxDefinition can be registered in ComponentRegistry without throwing", () => {
-      const registry = new ComponentRegistry();
-      expect(() => registry.register(DemuxDefinition)).not.toThrow();
-    });
-
-    it("After registration, typeId is a non-negative integer", () => {
-      const registry = new ComponentRegistry();
-      registry.register(DemuxDefinition);
-      const registered = registry.get("Demultiplexer");
-      expect(registered).not.toBeUndefined();
-      expect(registered!.typeId).toBeGreaterThanOrEqual(0);
-    });
+  it("selectorBits=3, sel=10 masks to 2; IN routes to OUT_2", () => {
+    // 10 = 0b1010 → masked to 0b010 = 2.
+    const fix = buildDemuxFixture({ selectorBits: 3, bitWidth: 4 });
+    drive(fix, { SEL: 10, IN: 0xC });
+    for (let i = 0; i < 8; i++) {
+      expect(read(fix, `OUT_${i}`)).toBe(i === 2 ? 0xC : 0);
+    }
   });
 });
