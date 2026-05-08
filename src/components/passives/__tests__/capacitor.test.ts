@@ -92,15 +92,14 @@ describe("Capacitor initialization (T1)", () => {
     // C * V_terminal where V_terminal is the DCOP-converged terminal voltage.
     // RC with VS=1V, R=1k, C=1uF: at DCOP the cap is open, so V_C = VS = 1V
     //   Q = C * V = 1e-6 * 1.0 = 1e-6 C.
+    // ngspice CAPstate is 2 slots {qcap, ccap} per capsetup.c:103; terminal
+    // voltage is not stored — query via getNodeVoltage.
     const fix = buildFixture({
       build: (_r, facade) => buildRcCircuit(facade, { vSource: 1.0, R: 1000, C: 1e-6 }),
     });
     const { el } = findCapacitor(fix);
-    const SCHEMA = el.stateSchema;
-    const SLOT_Q = SCHEMA.indexOf.get("Q")!;
-    const SLOT_V = SCHEMA.indexOf.get("V")!;
+    const SLOT_Q = el.stateSchema.indexOf.get("Q")!;
 
-    expect(fix.pool.state0[el._stateBase + SLOT_V]).toBeCloseTo(1.0, 6);
     expect(fix.pool.state0[el._stateBase + SLOT_Q]).toBeCloseTo(1e-6, 9);
     // V(C1:pos) at step 0 is the DCOP value (cap open at DC) = VS = 1V.
     expect(fix.engine.getNodeVoltage(nodeOf(fix, "C1:pos"))).toBeCloseTo(1.0, 6);

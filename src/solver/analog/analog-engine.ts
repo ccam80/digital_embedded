@@ -23,7 +23,6 @@ import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
 import { HistoryStore, computeNIcomCof } from "./integration.js";
-import { computeAgp, predictVoltages } from "./ni-pred.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
 import type { StepRecord, NRAttemptRecord } from "./convergence-log.js";
@@ -68,10 +67,6 @@ export class MNAEngine implements AnalogEngine {
   private _history: HistoryStore = new HistoryStore(0);
   private _diagnostics: DiagnosticCollector = new DiagnosticCollector();
   private _convergenceLog: ConvergenceLog = new ConvergenceLog(128);
-
-  // -------------------------------------------------------------------------
-  // NIpred predictor state lives on _ctx (agp, nodeVoltageHistory)
-  // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
   // CKTCircuitContext- pre-allocated god-object for NR/DC-OP hot paths
@@ -414,21 +409,13 @@ export class MNAEngine implements AnalogEngine {
       const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
       if (cac?.timeRef) cac.timeRef.value = this._simTime;
 
-      // NIpred: compute agp[] then predict voltages as NR initial guess.
-      // Fires on every retry iteration (dt changes on NR-failure/LTE-rejection).
-      // Matches ngspice dctran.c:734 NIcomCof + dctran.c:750 NIpred.
-      // Gated on _stepCount > 0: on step 0, ctx.rhs already holds the
-      // converged DC-OP solution (written by _seedFromDcop, mirroring
-      // dctran.c:349-350). ngspice does not run MODEINITPRED under
-      // MODEINITTRAN, so the DC-OP result in CKTrhsOld is used directly
-      // as the NR initial guess.
-      if (this._stepCount > 0 && (this._params.predictor ?? false)) {
-        computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
-          dt, this._timestep.deltaOld, ctx.agp);
-        predictVoltages(ctx.nodeVoltageHistory, this._timestep.deltaOld,
-          this._timestep.currentOrder, this._timestep.currentMethod,
-          ctx.agp, ctx.rhs);
-      }
+      // ngspice's NIpred predictor is undef'd in default builds
+      // (ref/ngspice/visualc/include/ngspice/config.h:475 `/* #undef PREDICTOR */`,
+      // doc/ngspice.texi:693-696 "enabling it is NOT considered safe"). Both
+      // dctran.c:750-752 (`#ifdef PREDICTOR error = NIpred(ckt)`) and the
+      // nicomcof.c:129 agp block compile out, so the previous NR iterate in
+      // CKTrhsOld is the NR initial guess for every step. We mirror that:
+      // no predictor, no agp, no CKTpred buffer, no NodeVoltageHistory.
 
       // --- Phase hook: begin attempt ---
       // Label from the cktMode INITF bit the NR call will see on iter 1,
@@ -466,10 +453,9 @@ export class MNAEngine implements AnalogEngine {
       // (wired in MNAEngine.init), so rotateDeltaOld()/setDeltaOldCurrent()
       // updates are visible here without an explicit copy loop.
       //
-      // xfact = deltaOld[0] / deltaOld[1] for predictor extrapolation in
-      // element load(). Written here so all elements read the correct value
-      // during this NR call.
-      ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
+      // xfact (CKTdelta / CKTdeltaOld[1]) is computed function-local inside
+      // each device load() that needs it under MODEINITPRED, mirroring
+      // bjtload.c:279, mos1load.c, dioload.c. No engine-side write.
       // dt for reactive elements to use in load() (CKTdelta).
       ctx.loadCtx.dt = dt;
       // Synchronize integration order and method with the timestep controller
@@ -684,11 +670,6 @@ export class MNAEngine implements AnalogEngine {
     if (statePool) {
       statePool.tranStep++;
     }
-
-    // NIpred: push fully-accepted solution into history for next step predictor.
-    // Only fires after both NR convergence AND LTE acceptance- never on rejected attempts.
-    // ngspice: CKTsols rotation in dctran.c acceptance block.
-    ctx.nodeVoltageHistory.rotateNodeVoltages(ctx.rhs);
 
     if (logging) {
       stepRec!.acceptedDt = dt;

@@ -18,7 +18,6 @@
  *   CKTdeltaOld -> deltaOld
  *   CKTsrcFact  -> srcFact
  *   CKTnoncon   -> noncon.value
- *   CKTxmu/xfact-> xfact
  *   CKTgmin     -> gmin
  *   CKTreltol   -> reltol
  *   CKTabstol   -> iabstol
@@ -103,8 +102,6 @@ export interface LoadContext {
    * element checkConvergence() runs. Synced by cktLoad / NR per-iteration.
    */
   convergenceCollector: ConvergenceEvent[] | null;
-  /** Extrapolation factor for predictor (deltaOld[0] / deltaOld[1]). */
-  xfact: number;
   /** Diagonal conductance added for numerical stability (CKTgmin). */
   gmin: number;
   /** Relative convergence tolerance (CKTreltol). */

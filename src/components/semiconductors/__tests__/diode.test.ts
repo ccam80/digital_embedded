@@ -7,7 +7,7 @@ import {
   DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
-import { DIODE_SCHEMA, DIODE_CAP_SCHEMA } from "../diode.js";
+import { DIODE_SCHEMA } from "../diode.js";
 
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { Circuit } from "../../../core/circuit.js";
@@ -65,16 +65,16 @@ function findDiode(fix: ReturnType<typeof buildFixture>): { idx: number; ce: Cir
 
 // ---------------------------------------------------------------------------
 // Category 1 — Initialization (T1)
-// One block per topology variant whose code path differs:
-//   - resistive (CJO=0, TT=0): 4-slot DIODE_SCHEMA
-//   - capacitive (CJO>0 or TT>0): 7-slot DIODE_CAP_SCHEMA
+// Single 5-slot DIODE_SCHEMA mirrors ngspice diodefs.h offsets and is allocated
+// unconditionally per diosetup.c:199 (`*states += 5`). The Q/CCAP slots are
+// unused when CJO=0 and TT=0, but always present.
 // Asserts the post-warm-start state pool VD slot is finite and a converged
 // junction node voltage exists at step 0.
 // ---------------------------------------------------------------------------
 
 describe("Diode initialization (T1)", () => {
-  const SLOT_VD_RES = DIODE_SCHEMA.indexOf.get("VD")!;
-  const SLOT_VD_CAP = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
+  const SLOT_VD = DIODE_SCHEMA.indexOf.get("VD")!;
+  const SLOT_Q  = DIODE_SCHEMA.indexOf.get("Q")!;
 
   it("init_resistive_vd_seeded", () => {
     const fix = buildFixture({
@@ -82,7 +82,7 @@ describe("Diode initialization (T1)", () => {
     });
     const { idx } = findDiode(fix);
     const el = fix.circuit.elements[idx]!;
-    const vd = fix.pool.state0[el._stateBase + SLOT_VD_RES];
+    const vd = fix.pool.state0[el._stateBase + SLOT_VD];
     expect(Number.isFinite(vd)).toBe(true);
     const vAnode = fix.engine.getNodeVoltage(
       fix.circuit.labelToNodeId.get("d1:A")!,
@@ -99,11 +99,8 @@ describe("Diode initialization (T1)", () => {
     });
     const { idx } = findDiode(fix);
     const el = fix.circuit.elements[idx]!;
-    const vd = fix.pool.state0[el._stateBase + SLOT_VD_CAP];
+    const vd = fix.pool.state0[el._stateBase + SLOT_VD];
     expect(Number.isFinite(vd)).toBe(true);
-    // The cap-schema branch allocates 4 extra rolled state slots above the
-    // resistive layout; assert the pool has enough headroom for SLOT_Q reads.
-    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
   });
 });
@@ -298,7 +295,7 @@ describe("Diode limiting events own-engine (T1)", () => {
 
 describe("Diode LTE rollback (T1)", () => {
   it("lte_rollback_state_invariant", () => {
-    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const SLOT_Q = DIODE_SCHEMA.indexOf.get("Q")!;
     const fix = buildFixture({
       build: (_r, f) => f.build({
         components: [
@@ -394,9 +391,9 @@ describeIfDll("Diode resistive forward paired vs ngspice (T3)", () => {
 // ---------------------------------------------------------------------------
 // Category 2-numerical / 3 / 5 — Harness sessions (T3) — capacitive diode
 // 1V sine @ 100kHz → 1kΩ → diode (CJO=10pF, TT=1ns) → GND. Activates the
-// 7-slot DIODE_CAP_SCHEMA path: junction-charge integration, NIintegrate
-// companion stamping, MODEINITTRAN / MODEINITSMSIG cap-block branches that
-// are dormant in the resistive .dts.
+// junction-charge / Q / CCAP slots in the unified DIODE_SCHEMA: charge
+// integration, NIintegrate companion stamping, MODEINITTRAN /
+// MODEINITSMSIG cap-block branches that are dormant in the resistive .dts.
 // ---------------------------------------------------------------------------
 
 describeIfDll("Diode capacitive RC paired vs ngspice (T3)", () => {

@@ -61,23 +61,16 @@ const TRANSMISSION_SEGMENT_C_PIN_LAYOUT: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// State schema- mirrors AnalogCapacitorElement (capacitor.ts), 5 slots.
-// Matches ngspice CAPstate semantics; ngspice itself uses 2 (q, ccap) and
-// derives the rest, but digiTS allocates the full set so load() can write
-// every cached field for diagnostic readout.
+// State schema — ngspice CAPstate, 2 slots (capsetup.c:103, niinteg.c:15).
+// Same layout as AnalogCapacitorElement: Q = CAPqcap, CCAP = qcap+1. geq /
+// ieq / V live as locals in capload.c, not the state vector.
 // ---------------------------------------------------------------------------
 
 const SCHEMA: StateSchema = defineStateSchema("TransmissionSegmentC", [
-  { name: "GEQ",  doc: "Companion conductance" },
-  { name: "IEQ",  doc: "Companion history current" },
-  { name: "V",    doc: "Terminal voltage this step" },
-  { name: "Q",    doc: "Charge Q = C*V this step" },
-  { name: "CCAP", doc: "Companion current (NIintegrate)" },
+  { name: "Q",    doc: "Charge Q = C*V — ngspice CAPqcap (CAPstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current — ngspice ccap (CAPstate+1) per niinteg.c:15" },
 ]);
 
-const SLOT_GEQ  = SCHEMA.indexOf.get("GEQ")!;
-const SLOT_IEQ  = SCHEMA.indexOf.get("IEQ")!;
-const SLOT_V    = SCHEMA.indexOf.get("V")!;
 const SLOT_Q    = SCHEMA.indexOf.get("Q")!;
 const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 
@@ -174,32 +167,21 @@ export class TransmissionSegmentCElement extends PoolBackedAnalogElement {
         s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
       }
 
-      // Cache companion state for diagnostic / getPinCurrents.
-      s0[base + SLOT_GEQ] = geq;
-      s0[base + SLOT_IEQ] = ceq;
-      s0[base + SLOT_V] = vcap;
-
       // capload.c:74-79- companion stamp reduced for negNode === 0.
       if (n !== 0) {
         solver.stampElement(this._hJJ, geq);
         stampRHS(ctx.rhs, n, -ceq);
       }
     } else {
-      // capload.c:84- DC operating point: store charge, no matrix stamp.
+      // capload.c:80-81 — DC operating point: store charge, no matrix stamp.
       s0[base + SLOT_Q] = C * vcap;
-      s0[base + SLOT_V] = vcap;
-      s0[base + SLOT_GEQ] = 0;
-      s0[base + SLOT_IEQ] = 0;
     }
   }
 
-  getPinCurrents(rhs: Float64Array): number[] {
-    const v = rhs[this.pinNodes.get("junc")!];
-    const s0 = this._pool.states[0];
-    const base = this._stateBase;
-    const geq = s0[base + SLOT_GEQ];
-    const ieq = s0[base + SLOT_IEQ];
-    return [geq * v + ieq];
+  getPinCurrents(_rhs: Float64Array): number[] {
+    // Pin current at converged step = CCAP (NIintegrate companion current).
+    // See AnalogCapacitorElement.getPinCurrents for derivation.
+    return [this._pool.states[0][this._stateBase + SLOT_CCAP]];
   }
 
   getLteTimestep(

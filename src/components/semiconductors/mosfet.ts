@@ -673,20 +673,29 @@ function devQmeyer(
 //   QBS (15) = mos1defs.h MOS1qbs
 //   CQBS (16) = mos1defs.h MOS1cqbs
 //
-// DC operating-point scalars (non-cross-method, mirror MOS1instance fields):
-//   CD (17)    = MOS1instance MOS1cd      (channel + drain jct current)
-//   CBD (18)   = MOS1instance MOS1cbd
-//   CBS (19)   = MOS1instance MOS1cbs
-//   GBD (20)   = MOS1instance MOS1gbd
-//   GBS (21)   = MOS1instance MOS1gbs
-//   GM  (22)   = MOS1instance MOS1gm
-//   GDS (23)   = MOS1instance MOS1gds
-//   GMBS (24)  = MOS1instance MOS1gmbs
-//   MODE (25)  = MOS1instance MOS1mode (+1 normal, -1 reverse)
-//   VON (26)   = MOS1instance MOS1von
-//   VDSAT (27) = MOS1instance MOS1vdsat
+// DC operating-point scalars are stored as private number fields on the
+// MosfetAnalogElement instance, mirroring ngspice's MOS1instance struct
+// layout. These are NOT part of the state vector — ngspice does not allocate
+// state slots for them (mos1set.c:97 `*states += MOS1numStates` = 17 only).
+// Per-instance fields written by load() / read by getPinCurrents:
+//   _cd     = MOS1instance MOS1cd      (channel + drain jct current)
+//   _cbd    = MOS1instance MOS1cbd
+//   _cbs    = MOS1instance MOS1cbs
+//   _gbd    = MOS1instance MOS1gbd
+//   _gbs    = MOS1instance MOS1gbs
+//   _gm     = MOS1instance MOS1gm
+//   _gds    = MOS1instance MOS1gds
+//   _gmbs   = MOS1instance MOS1gmbs
+//   _mode   = MOS1instance MOS1mode (+1 normal, -1 reverse)
+//   _von    = MOS1instance MOS1von
+// MOS1vdsat is write-only diagnostic in ngspice — digiTS does not retain it.
 // ---------------------------------------------------------------------------
 
+// ngspice mos1defs.h:0..16 — MOS1numStates = 17 (mos1defs.h:292). The
+// remaining MOS1instance fields (cd, cbd, cbs, gbd, gbs, gm, gds, gmbs, mode,
+// von, vdsat) live as struct fields on MOS1instance, not in the state vector.
+// digiTS mirrors that by declaring them as private number fields on
+// MosfetAnalogElement instead of allocating extra state slots.
 export const MOSFET_SCHEMA: StateSchema = defineStateSchema("MosfetElement", [
   { name: "VBD",   doc: "mos1defs.h MOS1vbd=0" },
   { name: "VBS",   doc: "mos1defs.h MOS1vbs=1" },
@@ -705,17 +714,6 @@ export const MOSFET_SCHEMA: StateSchema = defineStateSchema("MosfetElement", [
   { name: "CQBD",  doc: "mos1defs.h MOS1cqbd=14" },
   { name: "QBS",   doc: "mos1defs.h MOS1qbs=15" },
   { name: "CQBS",  doc: "mos1defs.h MOS1cqbs=16" },
-  { name: "CD",    doc: "MOS1instance MOS1cd" },
-  { name: "CBD",   doc: "MOS1instance MOS1cbd" },
-  { name: "CBS",   doc: "MOS1instance MOS1cbs" },
-  { name: "GBD",   doc: "MOS1instance MOS1gbd" },
-  { name: "GBS",   doc: "MOS1instance MOS1gbs" },
-  { name: "GM",    doc: "MOS1instance MOS1gm" },
-  { name: "GDS",   doc: "MOS1instance MOS1gds" },
-  { name: "GMBS",  doc: "MOS1instance MOS1gmbs" },
-  { name: "MODE",  doc: "MOS1instance MOS1mode (+1 / -1)" },
-  { name: "VON",   doc: "MOS1instance MOS1von" },
-  { name: "VDSAT", doc: "MOS1instance MOS1vdsat" },
 ]);
 
 // Slot index constants (match MOSFET_SCHEMA order).
@@ -736,17 +734,6 @@ const SLOT_QBD = 13;
 const SLOT_CQBD = 14;
 const SLOT_QBS = 15;
 const SLOT_CQBS = 16;
-const SLOT_CD = 17;
-const SLOT_CBD = 18;
-const SLOT_CBS = 19;
-const SLOT_GBD = 20;
-const SLOT_GBS = 21;
-const SLOT_GM = 22;
-const SLOT_GDS = 23;
-const SLOT_GMBS = 24;
-const SLOT_MODE = 25;
-const SLOT_VON = 26;
-const SLOT_VDSAT = 27;
 
 // ---------------------------------------------------------------------------
 // createMosfetElement  AnalogElement factory (closure-based, BJT pattern)
@@ -854,6 +841,20 @@ function _createMosfetElementWithPolarity(
     private _hSSP = -1;  private _hBDP = -1;  private _hBSP = -1;  private _hDPSP = -1;
     private _hDPD = -1;  private _hBG = -1;   private _hDPG = -1;  private _hSPG = -1;
     private _hSPS = -1;  private _hDPB = -1;  private _hSPB = -1;  private _hSPDP = -1;
+
+    // ngspice MOS1instance struct fields (not in the state vector). Each
+    // is written by load() and read across NR iterations within a step
+    // (bypass / cdhat extrapolation) and post-converge (getPinCurrents).
+    private _cd   = 0;
+    private _cbd  = 0;
+    private _cbs  = 0;
+    private _gbd  = 0;
+    private _gbs  = 0;
+    private _gm   = 0;
+    private _gds  = 0;
+    private _gmbs = 0;
+    private _mode = 0;
+    private _von  = 0;
 
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);
@@ -1030,15 +1031,15 @@ function _createMosfetElementWithPolarity(
         // pnjlim/fetlim/limvds events post to ctx.limitingCollector when bypass
         // fires, and icheckLimited stays false on bypass.
         {
-          const prevCd   = s0[this._stateBase + SLOT_CD];
-          const prevCbs  = s0[this._stateBase + SLOT_CBS];
-          const prevCbd  = s0[this._stateBase + SLOT_CBD];
-          const prevGm   = s0[this._stateBase + SLOT_GM];
-          const prevGds  = s0[this._stateBase + SLOT_GDS];
-          const prevGmbs = s0[this._stateBase + SLOT_GMBS];
-          const prevGbd  = s0[this._stateBase + SLOT_GBD];
-          const prevGbs  = s0[this._stateBase + SLOT_GBS];
-          const prevMode = s0[this._stateBase + SLOT_MODE];
+          const prevCd   = this._cd;
+          const prevCbs  = this._cbs;
+          const prevCbd  = this._cbd;
+          const prevGm   = this._gm;
+          const prevGds  = this._gds;
+          const prevGmbs = this._gmbs;
+          const prevGbd  = this._gbd;
+          const prevGbs  = this._gbs;
+          const prevMode = this._mode;
           const prevVbs  = s0[this._stateBase + SLOT_VBS];
           const prevVbd  = s0[this._stateBase + SLOT_VBD];
           const prevVgs  = s0[this._stateBase + SLOT_VGS];
@@ -1095,7 +1096,7 @@ function _createMosfetElementWithPolarity(
           // INITPRED/INITTRAN/INITSMSIG exclude bypass via the gate above, so
           // they always land here.
           // mos1load.c:356: von = MOS1type * here->MOS1von.
-          const vonStored = s0[this._stateBase + SLOT_VON];
+          const vonStored = this._von;
           const vonForLim = vonStored !== 0 ? vonStored : tp.tVto;
 
           const vgsOldStored = s0[this._stateBase + SLOT_VGS];
@@ -1257,21 +1258,21 @@ function _createMosfetElementWithPolarity(
 
       if (bypassed) {
         // cite: mos1load.c:322-340  bypass path: reload conductances from state0.
-        gmNR  = s0[this._stateBase + SLOT_GM];
-        gdsNR = s0[this._stateBase + SLOT_GDS];
-        gmbsNR= s0[this._stateBase + SLOT_GMBS];
-        gbd   = s0[this._stateBase + SLOT_GBD];
-        gbs   = s0[this._stateBase + SLOT_GBS];
-        cbd   = s0[this._stateBase + SLOT_CBD];
-        cbs   = s0[this._stateBase + SLOT_CBS];
-        cd    = s0[this._stateBase + SLOT_CD];
+        gmNR  = this._gm;
+        gdsNR = this._gds;
+        gmbsNR= this._gmbs;
+        gbd   = this._gbd;
+        gbs   = this._gbs;
+        cbd   = this._cbd;
+        cbs   = this._cbs;
+        cd    = this._cd;
         // cite: mos1load.c:472-478  Reconstruct cdrain from cd:
         //   cd = opMode * cdrain - cbd  cdrain = opMode * (cd + cbd).
         // ngspice writes `cdrain = here->MOS1mode * (here->MOS1cd + here->MOS1cbd)`
         // where MOS1mode is the stored mode from the previous iteration. Here we
         // use `opMode` freshly computed from the just-reloaded vds (line 1192).
         // These are numerically identical because bypass reloaded `vds = prevVds`
-        // from state0, and the stored s0[SLOT_MODE] was written as
+        // from state0, and the stored this._mode was written as
         // (prevVds >= 0 ? 1 : -1). The two signs always agree on bypass  vds
         // is deterministic once prevVds is reloaded. Documented per review G-2.
         cdrain = opMode * (cd + cbd);
@@ -1337,11 +1338,13 @@ function _createMosfetElementWithPolarity(
           }
         }
 
-        // mos1load.c:557-563: von, vdsat, cd write-back with polarity.
-        s0[this._stateBase + SLOT_VON] = polarity * von;
-        s0[this._stateBase + SLOT_VDSAT] = polarity * vdsat;
+        // mos1load.c:557-563: von, cd write-back with polarity. MOS1vdsat is
+        // a write-only diagnostic on the ngspice instance — digiTS does not
+        // retain it (the value `polarity * vdsat` is observable via local
+        // computation if needed, not stored).
+        this._von = polarity * von;
         cd = opMode * cdrain - cbd;
-        s0[this._stateBase + SLOT_CD] = cd;
+        this._cd = cd;
 
         // mos1load.c:565-725: cap + charge block.
         // Gate on (MODETRAN|MODETRANOP|MODEINITSMSIG).
@@ -1417,7 +1420,7 @@ function _createMosfetElementWithPolarity(
             gbd += geq_bd;
             cbd += ccap_bd;
             // Store updated cd
-            s0[this._stateBase + SLOT_CD] = cd - ccap_bd;
+            this._cd = cd - ccap_bd;
           }
           // mos1load.c:720-724: BS junction integrate, lump into gbs & cbs.
           {
@@ -1487,9 +1490,9 @@ function _createMosfetElementWithPolarity(
         const vgb1 = vgs1 - s1[this._stateBase + SLOT_VBS];
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
           // mos1load.c:828-836: predictor extrapolation using xfact.
-          // xfact = delta/deltaOld[1]; uses 0 when deltaOld[1]=0.
-          // q0 = (1+xfact)*q1 - xfact*q2. Do NOT use ctx.xfact  compute
-          // locally to match mos1load.c verbatim.
+          // xfact = CKTdelta/CKTdeltaOld[1] (function-local in ngspice, same
+          // here per spec/engine-asymmetries-observed.md fold).
+          // q0 = (1+xfact)*q1 - xfact*q2.
           const xfactQ = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
           s0[this._stateBase + SLOT_QGS] = (1 + xfactQ) * s1[this._stateBase + SLOT_QGS] - xfactQ * s2[this._stateBase + SLOT_QGS];
           s0[this._stateBase + SLOT_QGD] = (1 + xfactQ) * s1[this._stateBase + SLOT_QGD] - xfactQ * s2[this._stateBase + SLOT_QGD];
@@ -1605,14 +1608,14 @@ function _createMosfetElementWithPolarity(
       }
 
       // Store DC-op scalars for convergence test (mos1conv.c / MOS1convTest).
-      s0[this._stateBase + SLOT_CBD] = cbd;
-      s0[this._stateBase + SLOT_CBS] = cbs;
-      s0[this._stateBase + SLOT_GBD] = gbd;
-      s0[this._stateBase + SLOT_GBS] = gbs;
-      s0[this._stateBase + SLOT_GM] = gmNR;
-      s0[this._stateBase + SLOT_GDS] = gdsNR;
-      s0[this._stateBase + SLOT_GMBS] = gmbsNR;
-      s0[this._stateBase + SLOT_MODE] = opMode;
+      this._cbd = cbd;
+      this._cbs = cbs;
+      this._gbd = gbd;
+      this._gbs = gbs;
+      this._gm = gmNR;
+      this._gds = gdsNR;
+      this._gmbs = gmbsNR;
+      this._mode = opMode;
 
       // mos1load.c:917-924: RHS stamps.
       // NOTE: ngspice accounts for Meyer caps at gate node separately from
@@ -1693,15 +1696,15 @@ function _createMosfetElementWithPolarity(
       const delvgs = vgsRaw - storedVgs;
       const delvds = vdsRaw - storedVds;
 
-      const cd = s0[this._stateBase + SLOT_CD];
-      const gm = s0[this._stateBase + SLOT_GM];
-      const gds = s0[this._stateBase + SLOT_GDS];
-      const gmbs = s0[this._stateBase + SLOT_GMBS];
-      const gbd = s0[this._stateBase + SLOT_GBD];
-      const gbs = s0[this._stateBase + SLOT_GBS];
-      const cbs = s0[this._stateBase + SLOT_CBS];
-      const cbd = s0[this._stateBase + SLOT_CBD];
-      const opMode = s0[this._stateBase + SLOT_MODE];
+      const cd = this._cd;
+      const gm = this._gm;
+      const gds = this._gds;
+      const gmbs = this._gmbs;
+      const gbd = this._gbd;
+      const gbs = this._gbs;
+      const cbs = this._cbs;
+      const cbd = this._cbd;
+      const opMode = this._mode;
 
       let cdhat: number;
       if (opMode >= 0) {
@@ -1720,7 +1723,7 @@ function _createMosfetElementWithPolarity(
     getPinCurrents(_rhs: Float64Array): number[] {
       const s0 = this._pool.states[0];
       // Drain current: polarity * cd per mos1load.c:563.
-      const id = polarity * s0[this._stateBase + SLOT_CD];
+      const id = polarity * this._cd;
       const iG = 0;
       const iD = id;
       const iS = -id;

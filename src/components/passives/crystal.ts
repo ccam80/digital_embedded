@@ -62,46 +62,28 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 // State-pool schema
 // ---------------------------------------------------------------------------
 
-// Slot layout  15 slots total (3 reactive stores Ã— 4 slots each + 3 CCAP slots).
-// Previous values are read from s1/s2/s3 at the same offsets.
+// Slot layout — 6 slots total: 2 per reactive sub-element (one inductor +
+// two capacitors), matching ngspice's per-element slot allocations.
+//   L_s  → ngspice INDflux/INDvolt   (indsetup.c:79 *states += 2)
+//   C_s  → ngspice CAPqcap/ccap      (capsetup.c:103 *states += 2)
+//   C_0  → ngspice CAPqcap/ccap      (capsetup.c:103 *states += 2)
+// geq / ieq / V / branch-current are recomputable from state + ag[] +
+// rhsOld and live as locals in indload.c / capload.c, not the state vector.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
-  // L_s (inductor motional arm)
-  { name: "GEQ_L",  doc: "L_s companion conductance" },
-  { name: "IEQ_L",  doc: "L_s companion history current" },
-  { name: "I_L",    doc: "L_s branch current this step" },
-  { name: "PHI_L",  doc: "L_s flux phi=Ls*i this step" },
-  // C_s (series motional capacitor)
-  { name: "GEQ_CS", doc: "C_s companion conductance" },
-  { name: "IEQ_CS", doc: "C_s companion history current" },
-  { name: "V_CS",   doc: "C_s terminal voltage this step" },
-  { name: "Q_CS",   doc: "C_s charge Cs*V this step" },
-  // C_0 (shunt electrode capacitor)
-  { name: "GEQ_C0", doc: "C_0 companion conductance" },
-  { name: "IEQ_C0", doc: "C_0 companion history current" },
-  { name: "V_C0",   doc: "C_0 terminal voltage this step" },
-  { name: "Q_C0",   doc: "C_0 charge C0*V this step" },
-  // CCAP slots (NIintegrate companion current, stored for LTE reuse)
-  { name: "CCAP_L",  doc: "L_s companion current" },
-  { name: "CCAP_CS", doc: "C_s companion current" },
-  { name: "CCAP_C0", doc: "C_0 companion current" },
+  { name: "PHI_L",   doc: "L_s flux Φ = Ls·i — ngspice INDflux (INDstate+0)" },
+  { name: "CCAP_L",  doc: "L_s NIintegrate companion current — ngspice INDvolt (INDstate+1)" },
+  { name: "Q_CS",    doc: "C_s charge Q = Cs·V — ngspice CAPqcap (CAPstate+0)" },
+  { name: "CCAP_CS", doc: "C_s NIintegrate companion current — ngspice ccap (CAPstate+1)" },
+  { name: "Q_C0",    doc: "C_0 charge Q = C0·V — ngspice CAPqcap (CAPstate+0)" },
+  { name: "CCAP_C0", doc: "C_0 NIintegrate companion current — ngspice ccap (CAPstate+1)" },
 ]);
 
-// Slot indices  must match the layout above.
-const SLOT_GEQ_L  = 0;
-const SLOT_IEQ_L  = 1;
-const SLOT_I_L    = 2;
-const SLOT_PHI_L  = 3;
-const SLOT_GEQ_CS = 4;
-const SLOT_IEQ_CS = 5;
-const SLOT_V_CS   = 6;
-const SLOT_Q_CS   = 7;
-const SLOT_GEQ_C0 = 8;
-const SLOT_IEQ_C0 = 9;
-const SLOT_V_C0   = 10;
-const SLOT_Q_C0   = 11;
-const SLOT_CCAP_L  = 12;
-const SLOT_CCAP_CS = 13;
-const SLOT_CCAP_C0 = 14;
+const SLOT_PHI_L   = 0;
+const SLOT_CCAP_L  = 1;
+const SLOT_Q_CS    = 2;
+const SLOT_CCAP_CS = 3;
+const SLOT_Q_C0    = 4;
+const SLOT_CCAP_C0 = 5;
 
 // ---------------------------------------------------------------------------
 // Derived parameter helpers
@@ -302,8 +284,8 @@ export class AnalogCrystalElement extends PoolBackedAnalogElement {
     const aNode = this.pinNodes.get("pos")!;  // external terminal pos
     const bNode = this.pinNodes.get("neg")!;  // external terminal neg
 
-    // Allocate 15 state slots as a monolithic block (CRYSTAL_SCHEMA).
-    this._stateBase = ctx.allocStates(15);
+    // Allocate the schema's slot block (2 per reactive sub-element).
+    this._stateBase = ctx.allocStates(this.stateSize);
 
     // Allocate internal nodes- n1 (Rsâ†”Ls junction), n2 (Lsâ†”Cs junction).
     const n1Node = ctx.makeVolt(this.label, "n1");
@@ -508,54 +490,29 @@ export class AnalogCrystalElement extends PoolBackedAnalogElement {
       solver.stampElement(this._hC0_NP, -geqC0);
       stampRHS(ctx.rhs, nA, -ceqC0);
       stampRHS(ctx.rhs, nB,  ceqC0);
-
-      // Cache.
-      s0[base + SLOT_GEQ_L]  = geqL;
-      s0[base + SLOT_IEQ_L]  = ceqL;
-      s0[base + SLOT_I_L]    = iNow;
-      s0[base + SLOT_GEQ_CS] = geqCs;
-      s0[base + SLOT_IEQ_CS] = ceqCs;
-      s0[base + SLOT_V_CS]   = vCs;
-      s0[base + SLOT_GEQ_C0] = geqC0;
-      s0[base + SLOT_IEQ_C0] = ceqC0;
-      s0[base + SLOT_V_C0]   = vC0;
     } else {
-      // DC-OP: just store, no reactive stamps.
+      // DC-OP — just store charges/flux, no matrix stamps (capload.c:80-81 +
+      // indload.c equivalent).
       s0[base + SLOT_PHI_L] = this.L_s * iNow;
       s0[base + SLOT_Q_CS]  = this.C_s * vCs;
       s0[base + SLOT_Q_C0]  = this.C_0 * vC0;
-      s0[base + SLOT_I_L]   = iNow;
-      s0[base + SLOT_V_CS]  = vCs;
-      s0[base + SLOT_V_C0]  = vC0;
-      s0[base + SLOT_GEQ_L]  = 0;
-      s0[base + SLOT_IEQ_L]  = 0;
-      s0[base + SLOT_GEQ_CS] = 0;
-      s0[base + SLOT_IEQ_CS] = 0;
-      s0[base + SLOT_GEQ_C0] = 0;
-      s0[base + SLOT_IEQ_C0] = 0;
     }
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
     const nA = this.pinNodes.get("pos")!;
-    const nB = this.pinNodes.get("neg")!;
     const n1 = this._n1Node;
 
     // Current through the series R_s (from pos pin into the motional arm):
     // I_Rs = G_s * (V_pos - V_n1). By KCL at n1 this equals the L_s branch current.
-    const vA = rhs[nA];
-    const vN1 = rhs[n1];
-    const iMotional = this.G_s * (vA - vN1);
+    const iMotional = this.G_s * (rhs[nA] - rhs[n1]);
 
-    // C_0 shunt current flowing into pos pin: I = geqC0 * (vA - vB) + ieqC0
-    const vB = rhs[nB];
-    const s0 = this._pool.states[0];
-    const base = this._stateBase;
-    const geqC0 = s0[base + SLOT_GEQ_C0];
-    const ieqC0 = s0[base + SLOT_IEQ_C0];
-    const iShunt = geqC0 * (vA - vB) + ieqC0;
+    // C_0 shunt current at the converged step = NIintegrate companion current
+    // (CCAP_C0). The companion-stamp formula geq*V + ceq collapses to ccap at
+    // the operating point because Q = C·V; ngspice device queries read the
+    // stored ccap slot rather than recomputing.
+    const iShunt = this._pool.states[0][this._stateBase + SLOT_CCAP_C0];
 
-    // Total current into pos pin = motional arm current + shunt current
     const I = iMotional + iShunt;
     return [I, -I];
   }

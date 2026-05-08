@@ -661,8 +661,10 @@ function _createBjtElementWithPolarity(
         s0[base + SLOT_GM]  = s1[base + SLOT_GM];  // cite: bjtload.c:293
         s0[base + SLOT_GO]  = s1[base + SLOT_GO];  // cite: bjtload.c:294
         s0[base + SLOT_GX]  = s1[base + SLOT_GX];  // cite: bjtload.c:295
-        vbeRaw = (1 + ctx.xfact) * s1[base + SLOT_VBE] - ctx.xfact * s2[base + SLOT_VBE];
-        vbcRaw = (1 + ctx.xfact) * s1[base + SLOT_VBC] - ctx.xfact * s2[base + SLOT_VBC];
+        // bjtload.c:279 — xfact = CKTdelta / CKTdeltaOld[1], function-local.
+        const xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
+        vbeRaw = (1 + xfact) * s1[base + SLOT_VBE] - xfact * s2[base + SLOT_VBE];
+        vbcRaw = (1 + xfact) * s1[base + SLOT_VBC] - xfact * s2[base + SLOT_VBC];
       } else {
         // bjtload.c:311-319: normal NR iteration  read from CKTrhsOld.
         const vB = voltages[nodeB];
@@ -1378,9 +1380,11 @@ export function createSpiceL1BjtElement(
         s0[base + SLOT_GM]   = s1[base + SLOT_GM];    // cite: bjtload.c:295
         s0[base + SLOT_GO]   = s1[base + SLOT_GO];    // cite: bjtload.c:296
         s0[base + SLOT_GX]   = s1[base + SLOT_GX];    // cite: bjtload.c:297
-        vbeRaw  = (1 + ctx.xfact) * s1[base + SLOT_VBE]  - ctx.xfact * s2[base + SLOT_VBE];
-        vbcRaw  = (1 + ctx.xfact) * s1[base + SLOT_VBC]  - ctx.xfact * s2[base + SLOT_VBC];
-        vsubRaw = (1 + ctx.xfact) * s1[base + SLOT_VSUB] - ctx.xfact * s2[base + SLOT_VSUB];
+        // bjtload.c:279 — xfact = CKTdelta / CKTdeltaOld[1], function-local.
+        const xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
+        vbeRaw  = (1 + xfact) * s1[base + SLOT_VBE]  - xfact * s2[base + SLOT_VBE];
+        vbcRaw  = (1 + xfact) * s1[base + SLOT_VBC]  - xfact * s2[base + SLOT_VBC];
+        vsubRaw = (1 + xfact) * s1[base + SLOT_VSUB] - xfact * s2[base + SLOT_VSUB];
         vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
         vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
       } else {

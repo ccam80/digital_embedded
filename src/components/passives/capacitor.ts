@@ -145,21 +145,18 @@ export class CapacitorElement extends AbstractCircuitElement {
 // AnalogCapacitorElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-// Slot layout  5 slots total. Previous values are read from s1/s2/s3
-// at the same offsets (pointer-rotation history).
+// Slot layout — ngspice CAPstate, 2 slots (capsetup.c:103 `*states += 2`,
+// niinteg.c:15 `#define ccap qcap+1`). Q = CKTstate0[CAPqcap]; CCAP =
+// CKTstate0[CAPqcap+1]. geq/ieq/V are recomputable on the fly from
+// state + ag[] + voltages and live as locals in capload.c, not the state
+// vector — so they are not allocated here.
 const CAPACITOR_SCHEMA: StateSchema = defineStateSchema("AnalogCapacitorElement", [
-  { name: "GEQ",  doc: "Companion conductance" },
-  { name: "IEQ",  doc: "Companion history current" },
-  { name: "V",    doc: "Terminal voltage this step" },
-  { name: "Q",    doc: "Charge Q=C*V this step" },
-  { name: "CCAP", doc: "Companion current (NIintegrate)" },
+  { name: "Q",    doc: "Charge Q=C*V — ngspice CAPqcap (CAPstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current — ngspice ccap (CAPstate+1) per niinteg.c:15" },
 ]);
 
-const SLOT_GEQ  = 0;
-const SLOT_IEQ  = 1;
-const SLOT_V    = 2;
-const SLOT_Q    = 3;
-const SLOT_CCAP = 4;
+const SLOT_Q    = 0;
+const SLOT_CCAP = 1;
 
 /**
  * This class is the runtime element produced by the registered
@@ -208,11 +205,8 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
     const posNode = this.pinNodes.get("pos")!;  // CAPposNode
     const negNode = this.pinNodes.get("neg")!;  // CAPnegNode
 
-    // capsetup.c:102-103  *states += 2 (CAPqcap slot).
-    // digiTS uses stateSize slots (GEQ, IEQ, V, Q, CCAP) to cover all
-    // companion-model state; ngspice uses only 2 (q, ccap) because it
-    // derives GEQ/IEQ/V on the fly from state. Allocate full stateSize so
-    // the pool covers every field load() reads/writes.
+    // capsetup.c:102-103 — `*states += 2` (CAPqcap slot, with ccap = qcap+1
+    // per niinteg.c:15).
     this._stateBase = ctx.allocStates(this.stateSize);
 
     // capsetup.c:114-117  TSTALLOC sequence, line-for-line. ngspice
@@ -329,11 +323,6 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
         s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
       }
 
-      // Cache companion state for diagnostic readout / getPinCurrents.
-      s0[base + SLOT_GEQ] = geq;
-      s0[base + SLOT_IEQ] = ceq;
-      s0[base + SLOT_V] = vcap;
-
       // Stamp companion model (capload.c:74-79  all entries scaled by m = CAPm).
       // ngspice writes unconditionally; ground rows/cols land in the TrashCan
       // (matrix) or rhs[0] (post-solve cleared). No caller-side ground guards.
@@ -344,24 +333,20 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
       stampRHS(ctx.rhs, n0, -m * ceq);
       stampRHS(ctx.rhs, n1,  m * ceq);
     } else {
-      // DC operating point: just store charge, no matrix stamp (capload.c:84).
+      // DC operating point — just store charge, no matrix stamp (capload.c:80-81).
       s0[base + SLOT_Q] = C * vcap;
-      s0[base + SLOT_V] = vcap;
-      s0[base + SLOT_GEQ] = 0;
-      s0[base + SLOT_IEQ] = 0;
     }
   }
 
-  getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this.pinNodes.get("pos")!;
-    const n1 = this.pinNodes.get("neg")!;
-    const v0 = rhs[n0];
-    const v1 = rhs[n1];
-    const s0 = this._pool.states[0];
-    const base = this._stateBase;
-    const geq = s0[base + SLOT_GEQ];
-    const ieq = s0[base + SLOT_IEQ];
-    const I = geq * (v0 - v1) + ieq;
+  getPinCurrents(_rhs: Float64Array): number[] {
+    // Capacitor current at the converged step = CCAP (NIintegrate companion
+    // current). At the converged operating point the companion-stamp formula
+    // `geq*V + ceq` collapses to ccap (since ceq = ccap - ag[0]*Q and Q=C*V),
+    // so ngspice device queries (e.g. dioask.c CKTstate0[ccap] reads) return
+    // the stored slot directly instead of recomputing. DC-OP holds CCAP at 0
+    // because the DC branch of load() doesn't touch it (capload.c:80-81 only
+    // writes Q).
+    const I = this._pool.states[0][this._stateBase + SLOT_CCAP];
     return [I, -I];
   }
 

@@ -71,21 +71,17 @@ const MIN_RESISTANCE = 1e-9;
 // State schema
 // ---------------------------------------------------------------------------
 
-// Slot layout  5 slots total. Previous values are read from s1/s2/s3
-// at the same offsets (pointer-rotation history).
+// Slot layout — ngspice CAPstate, 2 slots (capsetup.c:103, niinteg.c:15).
+// Same shape as AnalogCapacitorElement: Q = CAPqcap, CCAP = qcap+1. geq /
+// ieq / V are recomputable from state + ag[] + voltages and live as locals
+// in capload.c, not the state vector.
 const POLARIZED_CAP_SCHEMA: StateSchema = defineStateSchema("AnalogPolarizedCapElement", [
-  { name: "GEQ",  doc: "Companion conductance" },
-  { name: "IEQ",  doc: "Companion history current" },
-  { name: "V",    doc: "Terminal voltage this step" },
-  { name: "Q",    doc: "Charge Q=C*V this step" },
-  { name: "CCAP", doc: "Companion current (NIintegrate)" },
+  { name: "Q",    doc: "Charge Q=C*V — ngspice CAPqcap (CAPstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current — ngspice ccap (CAPstate+1) per niinteg.c:15" },
 ]);
 
-const SLOT_GEQ  = 0;
-const SLOT_IEQ  = 1;
-const SLOT_V    = 2;
-const SLOT_Q    = 3;
-const SLOT_CCAP = 4;
+const SLOT_Q    = 0;
+const SLOT_CCAP = 1;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -263,8 +259,9 @@ export class AnalogPolarizedCapElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;
-  // PC-W3-1: total state = cap-body slots + clamp diode slots (dioload.c:245-265)
-  readonly stateSize = POLARIZED_CAP_SCHEMA.size + CLAMP_DIODE_STATE_SIZE; // 5 + 4 = 9 slots
+  // PC-W3-1: total state = cap-body slots + clamp diode slots (dioload.c:245-265).
+  // Cap body = 2 (ngspice CAPstate); clamp diode = DIODE_SCHEMA.size.
+  readonly stateSize = POLARIZED_CAP_SCHEMA.size + CLAMP_DIODE_STATE_SIZE;
 
   private _nCap: number = -1;
   private readonly _internalLabels: string[] = [];
@@ -339,7 +336,7 @@ export class AnalogPolarizedCapElement extends PoolBackedAnalogElement {
     this._internalLabels.length = 0;
     this._internalLabels.push("cap");
 
-    // State slots- 9 total (5 cap body + 4 clamp diode).
+    // State slots — 2 cap body (ngspice CAPstate) + clamp diode slots.
     this._stateBase = ctx.allocStates(this.stateSize);
 
     // ESR RES stamps (ressetup.c:46-49, pos ↔ nCap).
@@ -517,10 +514,6 @@ export class AnalogPolarizedCapElement extends PoolBackedAnalogElement {
         s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
       }
 
-      s0[base + SLOT_GEQ] = geq;
-      s0[base + SLOT_IEQ] = ceq;
-      s0[base + SLOT_V]   = vNow;
-
       // Stamp companion between nCap and nNeg via cached handles, scaled by m (PC-W3-6).
       // cite: capload.c:74-79 *(ptr) += m * geq / *(rhs) -= m * ceq
       solver.stampElement(this._hCAP_PP,  m * geq);
@@ -532,12 +525,8 @@ export class AnalogPolarizedCapElement extends PoolBackedAnalogElement {
       stampRHS(ctx.rhs, nCap, -m * ceq);
       stampRHS(ctx.rhs, nNeg,  m * ceq);
     } else {
-      // DC operating point.
-      // cite: capload.c:81 state0[CAPqcap] = here->CAPcapac * vcap
+      // DC operating point — just store charge, no matrix stamp (capload.c:80-81).
       s0[base + SLOT_Q] = C * vNow;
-      s0[base + SLOT_V] = vNow;
-      s0[base + SLOT_GEQ] = 0;
-      s0[base + SLOT_IEQ] = 0;
     }
   }
 

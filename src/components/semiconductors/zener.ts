@@ -103,11 +103,15 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
 // State schema declaration
 // ---------------------------------------------------------------------------
 
+// ngspice diodefs.h:154-158 — diosetup.c:199 allocates 5 slots unconditionally.
+// Q / CCAP are unused by the zener (no junction capacitance) but allocated for
+// slot-layout parity with the unified diode schema.
 const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
-  { name: "VD",  doc: "Diode junction voltage (V)" },
-  { name: "GEQ", doc: "GMIN-adjusted junction conductance (S)" },
-  { name: "IEQ", doc: "Linearized current source (A)" },
-  { name: "ID",  doc: "GMIN-adjusted diode current (A)" },
+  { name: "VD",   doc: "Junction voltage — diodefs.h DIOvoltage (DIOstate+0)" },
+  { name: "ID",   doc: "GMIN-adjusted diode current — diodefs.h DIOcurrent (DIOstate+1)" },
+  { name: "GEQ",  doc: "GMIN-adjusted junction conductance — diodefs.h DIOconduct (DIOstate+2)" },
+  { name: "Q",    doc: "Junction charge (unused by zener) — diodefs.h DIOcapCharge (DIOstate+3)" },
+  { name: "CCAP", doc: "NIintegrate companion current (unused by zener) — diodefs.h DIOcapCurrent (DIOstate+4)" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -180,7 +184,7 @@ interface ZenerTp {
 class ZenerAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
   readonly stateSchema = ZENER_STATE_SCHEMA;
-  readonly stateSize = 4;
+  readonly stateSize = ZENER_STATE_SCHEMA.size;
 
   private readonly _params: Record<string, number>;
   private readonly _nodeCathode: number;
@@ -271,7 +275,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+    const SLOT_VD = 0, SLOT_ID = 1, SLOT_GEQ = 2;
 
     // Direct state-array access per call  no cached Float64Array refs.
     const s0 = this._pool.states[0];
@@ -428,8 +432,9 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     s0[base + SLOT_ID]  = cd;           // GMIN-adjusted (matches dioload.c:418)
     s0[base + SLOT_GEQ] = gd;           // GMIN-adjusted (matches dioload.c:419)
 
+    // ngspice has no DIOieq slot — companion Norton current `cdeq = cd - gd*vd`
+    // is a function-local in dioload.c, used at the stamp call site below.
     const ieq = cd - gd * vdLimited;
-    s0[base + SLOT_IEQ] = ieq;
 
     // -----------------------------------------------------------------------
     // Stamp Norton companion  cite: dioload.c:429-441
@@ -466,7 +471,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   }
 
   checkConvergence(ctx: LoadContext): boolean {
-    const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_ID = 3;
+    const SLOT_VD = 0, SLOT_ID = 1, SLOT_GEQ = 2;
     const s0 = this._pool.states[0];
     const base = this._stateBase;
 
@@ -488,7 +493,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
-    const SLOT_ID = 3;
+    const SLOT_ID = 1;  // diodefs.h DIOcurrent
     // pinLayout order: [A (anode), K (cathode)]
     // Positive = current flowing INTO element at that pin.
     const id = this._pool.states[0][this._stateBase + SLOT_ID];

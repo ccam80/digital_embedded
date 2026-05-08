@@ -84,9 +84,10 @@ function findZenerAnalog(fix: ReturnType<typeof buildFixture>): {
 
 // ---------------------------------------------------------------------------
 // Category 1 — Initialization (T1)
-// Asserts the warm-started pool slots for the simplified zener (VD, GEQ, IEQ,
-// ID) are finite after compile() + first coordinator.step(), and that anode /
-// cathode node voltages are solved.
+// Asserts the warm-started pool slots for the zener match ngspice diodefs.h
+// (VD, ID, GEQ, Q, CCAP — diosetup.c:199 always allocates 5; companion ieq is
+// recomputed inline as cd-gd*vd per dioload.c) and are finite after compile() +
+// first coordinator.step(), with anode/cathode node voltages solved.
 // ---------------------------------------------------------------------------
 
 describe("Zener initialization (T1)", () => {
@@ -95,12 +96,10 @@ describe("Zener initialization (T1)", () => {
     const { el } = findZenerAnalog(fix);
     const SLOT_VD  = el.stateSchema.indexOf.get("VD")!;
     const SLOT_GEQ = el.stateSchema.indexOf.get("GEQ")!;
-    const SLOT_IEQ = el.stateSchema.indexOf.get("IEQ")!;
     const SLOT_ID  = el.stateSchema.indexOf.get("ID")!;
 
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_VD])).toBe(true);
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_GEQ])).toBe(true);
-    expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_IEQ])).toBe(true);
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_ID])).toBe(true);
 
     const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);

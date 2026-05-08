@@ -16,7 +16,6 @@ import { StatePool } from "./state-pool.js";
 import { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { LimitingEvent } from "./newton-raphson.js";
-import { NodeVoltageHistory } from "./integration.js";
 export type { LoadContext } from "./load-context.js";
 import type { LoadContext, ConvergenceEvent } from "./load-context.js";
 import type { IntegrationMethod } from "./integration.js";
@@ -58,7 +57,6 @@ export class LoadCtxImpl implements LoadContext {
   noncon!: { value: number };
   limitingCollector!: LimitingEvent[] | null;
   convergenceCollector!: ConvergenceEvent[] | null;
-  xfact!: number;
   gmin!: number;
   reltol!: number;
   iabstol!: number;
@@ -255,15 +253,11 @@ export class CKTCircuitContext {
   dcopOldState0: Float64Array;
 
   // -------------------------------------------------------------------------
-  // Integration coefficients (ngspice CKTag[], CKTagp[], CKTsols[])
+  // Integration coefficients (ngspice CKTag[])
   // -------------------------------------------------------------------------
 
   /** Integration coefficients computed by computeNIcomCof (CKTag[]). Length 7. */
   ag: Float64Array;
-  /** Predictor coefficients (CKTagp[]). Length 7. */
-  agp: Float64Array;
-  /** Per-node voltage history for NIpred predictor (CKTsols[]). */
-  nodeVoltageHistory: NodeVoltageHistory;
   /**
    * Previous timestep history (ngspice CKTdeltaOld[7], cktdefs.h).
    *
@@ -632,13 +626,11 @@ export class CKTCircuitContext {
 
     // Integration
     this.ag = new Float64Array(7);
-    this.agp = new Float64Array(7);
     // ngspice dctran.c:316-317: CKTdeltaOld[i] = CKTmaxStep for all 7 slots at
     // transient init. Seeded here so every CKTCircuitContext is born with
     // ngspice-faithful deltaOld contents, and the TimestepController wired in
     // MNAEngine.init() inherits them (shared-reference invariant).
     this.deltaOld = new Array<number>(7).fill(params.maxTimeStep);
-    this.nodeVoltageHistory = new NodeVoltageHistory();
 
     // Gear scratch (7×7 flat)
     this.gearMatScratch = new Float64Array(49);
@@ -683,7 +675,6 @@ export class CKTCircuitContext {
       noncon: nonconRef,
       limitingCollector: null,
       convergenceCollector: null,
-      xfact: 0,
       gmin: params.gmin ?? 1e-12,
       reltol: params.reltol,
       iabstol: params.abstol,
@@ -770,7 +761,6 @@ export class CKTCircuitContext {
     this.dcopResult.nodeVoltages   = this.dcopVoltages;
     this.loadCtx.rhs               = this.rhs;
     this.loadCtx.rhsOld            = this.rhsOld;
-    this.nodeVoltageHistory.initNodeVoltages(sizePlusOne);
   }
 
   /**

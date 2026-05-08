@@ -88,8 +88,6 @@ export interface SimulationParams {
   numGminSteps?: number;
   /** Number of source stepping levels. 0 or 1 = gillespie (default), >1 = spice3_src. ngspice: CKTnumSrcSteps */
   numSrcSteps?: number;
-  /** Enable voltage predictor. ngspice: #ifdef PREDICTOR. Default false. */
-  predictor?: boolean;
   /** Use Initial Conditions mode. ngspice: MODEUIC. Default false. */
   uic?: boolean;
   /** Active diagonal gmin during stepping (ngspice CKTdiagGmin). Persistent engine state. Default: 0 */
@@ -177,7 +175,6 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
-  predictor: false,
   gshunt: 0,
   diagGmin: 0,
   pivotAbsTol: 0,

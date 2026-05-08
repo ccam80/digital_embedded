@@ -69,34 +69,26 @@ const GMIN = 1e-12;
 // State schemas
 // ---------------------------------------------------------------------------
 
-// Slot index constants  shared between both schema variants.
-const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-// SLOT_CAP_CURRENT dual semantics (dioload.c:363): under MODETRAN holds iqcap (A);
-// under MODEINITSMSIG holds capd (F) = raw total capacitance.
-// D-W3-4: SLOT_V (vestigial junction-voltage copy) deleted  zero reads outside load().
-const SLOT_CAP_CURRENT = 4, SLOT_Q = 5;
-const SLOT_CCAP = 6;
-
-/** Schema for resistive diode (no junction capacitance): 4 slots. */
+// Slot layout — single 5-slot schema mirroring ngspice diodefs.h:154-158
+// (DIOvoltage..DIOcapCurrent). Allocated unconditionally per diosetup.c:199
+// `*states += 5`, regardless of CJO/TT — the cap slots are unused when the
+// junction has no capacitance but always exist. Companion-current `ieq` is
+// recomputed inline as `cd - gd*vdLimited` per dioload.c (cdeq formula); no
+// state slot is allocated for it. CAP_CURRENT and CCAP collapse to a single
+// slot per niinteg.c:15 `#define ccap qcap+1`.
 export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
-  { name: "VD",  doc: "pnjlim-limited junction voltage" },
-  { name: "GEQ", doc: "NR companion conductance" },
-  { name: "IEQ", doc: "NR companion Norton current" },
-  { name: "ID",  doc: "Diode current at operating point" },
+  { name: "VD",   doc: "pnjlim-limited junction voltage — diodefs.h DIOvoltage (DIOstate+0)" },
+  { name: "ID",   doc: "Diode current at operating point — diodefs.h DIOcurrent (DIOstate+1)" },
+  { name: "GEQ",  doc: "NR companion conductance — diodefs.h DIOconduct (DIOstate+2)" },
+  { name: "Q",    doc: "Junction charge — diodefs.h DIOcapCharge (DIOstate+3)" },
+  { name: "CCAP", doc: "MODETRAN: NIintegrate companion current iqcap; MODEINITSMSIG: capd (F) per dioload.c:363 — diodefs.h DIOcapCurrent (DIOstate+4)" },
 ]);
 
-/** Schema for capacitive diode (CJO > 0 or TT > 0): 7 slots.
- *  D-W3-4: SLOT_V (was slot 5) removed  it was a vestigial copy of vdLimited
- *  with no reads outside load(). ngspice has no corresponding state offset. */
-export const DIODE_CAP_SCHEMA: StateSchema = defineStateSchema("DiodeElement_cap", [
-  { name: "VD",          doc: "pnjlim-limited junction voltage" },
-  { name: "GEQ",         doc: "NR companion conductance" },
-  { name: "IEQ",         doc: "NR companion Norton current" },
-  { name: "ID",          doc: "Diode current at operating point" },
-  { name: "CAP_CURRENT", doc: "MODETRAN: iqcap (A); MODEINITSMSIG: capd (F)  dioload.c:363 DIOcapCurrent" },
-  { name: "Q",           doc: "Junction charge at current step (DIOcapCharge)" },
-  { name: "CCAP",        doc: "Companion current (NIintegrate)" },
-]);
+const SLOT_VD   = 0;
+const SLOT_ID   = 1;
+const SLOT_GEQ  = 2;
+const SLOT_Q    = 3;
+const SLOT_CCAP = 4;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -476,8 +468,9 @@ export function createDiodeElement(
 
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);
-      this.stateSize = hasCapacitance ? 7 : 4;
-      this.stateSchema = hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA;
+      // diosetup.c:199 — `*states += 5` always, regardless of CJO/TT.
+      this.stateSize = DIODE_SCHEMA.size;
+      this.stateSchema = DIODE_SCHEMA;
     }
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
@@ -558,7 +551,10 @@ export function createDiodeElement(
         s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
         // dioload.c:144: vd = DEVpred(ckt, DIOvoltage) =
         //       (1+xfact)*state1[vd] - xfact*state2[vd] under #ifndef PREDICTOR.
-        vdRaw = (1 + ctx.xfact) * s1[base + SLOT_VD] - ctx.xfact * s2[base + SLOT_VD];
+        // xfact computed as function-local matching bjtload.c:279 / mos1load.c
+        // pattern (CKTdelta / CKTdeltaOld[1]).
+        const xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
+        vdRaw = (1 + xfact) * s1[base + SLOT_VD] - xfact * s2[base + SLOT_VD];
       } else {
         // dioload.c:151-152: normal NR  read from CKTrhsOld.
         const va = voltages[nodeJunction];
@@ -691,8 +687,10 @@ export function createDiodeElement(
 
       s0[base + SLOT_ID] = cd;
       s0[base + SLOT_GEQ] = gd;
+      // ngspice has no DIOieq slot — companion Norton current is computed
+      // inline as `cdeq = cd - gd*vd` at the stamp call site (dioload.c
+      // pattern). Stamp uses `ieq` as a function-local below.
       const ieq = cd - gd * vdLimited;
-      s0[base + SLOT_IEQ] = ieq;
 
       const solver = ctx.solver;
 
@@ -771,15 +769,15 @@ export function createDiodeElement(
         if ((mode & MODEINITSMSIG) &&
             !((mode & MODETRANOP) && (mode & MODEUIC))) {
           // dioload.c:363: *(CKTstate0 + DIOcapCurrent) = capd (Farads)
-          s0[base + SLOT_CAP_CURRENT] = Ctotal;
+          s0[base + SLOT_CCAP] = Ctotal;
           // dioload.c:374: continue  skip matrix/RHS cap companion stamp.
           return;
         }
 
         // dioload.c:397-398: MODETRAN path  gd += geq, cd += ccap. We
-        // mirror by stamping the capacitance companion below. SLOT_CAP_CURRENT
+        // mirror by stamping the capacitance companion below. SLOT_CCAP
         // stores iqcap (Amps) per dioload.c DIOcapCurrent semantics.
-        s0[base + SLOT_CAP_CURRENT] = ccap;
+        s0[base + SLOT_CCAP] = ccap;
 
         if (capGeq !== 0 || capIeq !== 0) {
           solver.stampElement(_hPPPP,   capGeq);

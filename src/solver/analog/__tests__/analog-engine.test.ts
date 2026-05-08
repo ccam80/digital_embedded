@@ -1,9 +1,8 @@
 /** Tests for MNAEngine — exercised through buildFixture. */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { buildFixture } from "./fixtures/build-fixture.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import * as NiPredModule from "../ni-pred.js";
 import { AnalogFuseElement } from "../../../components/passives/analog-fuse.js";
 
 import type { Circuit } from "../../../core/circuit.js";
@@ -286,40 +285,6 @@ describe("MNAEngine", () => {
     expect(states).toHaveLength(0);
   });
 
-  // ----- Predictor / regressions -------------------------------------------
-
-  it("predictor_off_uses_last_converged_guess", () => {
-    const fix = buildFixture({ build: (_r, f) => buildDiodeCircuit(f) });
-    fix.engine.configure({ predictor: false });
-
-    for (let i = 0; i < 20; i++) {
-      fix.engine.step();
-      expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
-    }
-
-    const vAnode = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
-    expect(vAnode).toBeGreaterThan(0.55);
-    expect(vAnode).toBeLessThan(0.80);
-  });
-
-  it("predictor_off_rc_regression", () => {
-    const fix = buildFixture({ build: (_r, f) => buildRC(f) });
-
-    const RC = 1e-3;
-    let steps = 0;
-    while (fix.engine.simTime < RC && steps < 10000) {
-      fix.engine.step();
-      steps++;
-      if (fix.engine.getState() === EngineState.ERROR) break;
-    }
-
-    expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
-    const vCap = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("C1:pos")!);
-    expect(vCap).toBeGreaterThan(4.5);
-    expect(vCap).toBeLessThanOrEqual(5.01);
-    expect(fix.engine.simTime).toBeGreaterThanOrEqual(RC - 1e-9);
-  });
-
   // ----- Generic acceptStep dispatch on a non-source element ---------------
   // The fuse blowing requires the engine to dispatch acceptStep() on a
   // non-source element. If acceptStep dispatch regresses (e.g. only sources
@@ -416,26 +381,3 @@ describe("MNAEngine accessors are populated after dcop", () => {
   });
 });
 
-describe("predictor_gate_off_by_default", () => {
-  it("predictor_gate_off_by_default", () => {
-    // predictVoltages must not be invoked when predictor: false.
-    const spy = vi.spyOn(NiPredModule, "predictVoltages");
-
-    try {
-      const fix = buildFixture({
-        build: (_r, f) => buildRC(f),
-        params: { predictor: false },
-      });
-
-      for (let i = 0; i < 10; i++) {
-        fix.engine.step();
-        expect(fix.engine.getState()).not.toBe(EngineState.ERROR);
-      }
-
-      expect(fix.engine.simTime).toBeGreaterThan(0);
-      expect(spy).not.toHaveBeenCalled();
-    } finally {
-      spy.mockRestore();
-    }
-  });
-});
