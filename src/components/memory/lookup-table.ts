@@ -200,6 +200,13 @@ const LUT_PROPERTY_DEFS: PropertyDefinition[] = [
     max: 32,
     description: "Bit width of the output value",
   },
+  {
+    key: "data",
+    type: PropertyType.HEX_DATA,
+    label: "Data",
+    defaultValue: [],
+    description: "Truth-table backing data (entry per address, 0..2^inputCount-1)",
+  },
   LABEL_PROPERTY_DEF,
 ];
 

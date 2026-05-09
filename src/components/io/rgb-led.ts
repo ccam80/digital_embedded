@@ -133,18 +133,14 @@ export class RgbLedElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeRgbLed(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  const r = state[wt[inputStart]] !== 0 ? 1 : 0;
-  const g = state[wt[inputStart + 1]] !== 0 ? 1 : 0;
-  const b = state[wt[inputStart + 2]] !== 0 ? 1 : 0;
-  // Pack channels into output: bits 2=R, 1=G, 0=B
-  state[wt[layout.outputOffset(index)]] = (r << 2) | (g << 1) | b;
+  // Pure sink: outputSchema is []. The panel reads R/G/B input nets directly
+  // to drive the visual. Writing via outputOffset(index) when outputCount === 0
+  // would corrupt the next component's slot.
 }
 
 // ---------------------------------------------------------------------------

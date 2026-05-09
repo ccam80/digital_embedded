@@ -131,14 +131,14 @@ export class SevenSegHexElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeSevenSegHex(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const digit = state[wt[layout.inputOffset(index)]] & 0xF;
-  state[wt[layout.outputOffset(index)]] = HEX_SEGMENT_TABLE[digit];
+  // Pure sink: outputSchema is []. The display panel decodes d/dp inputs
+  // directly. Writing via layout.outputOffset(index) when outputCount === 0
+  // would index past this component's range into the next component's slot.
 }
 
 // ---------------------------------------------------------------------------

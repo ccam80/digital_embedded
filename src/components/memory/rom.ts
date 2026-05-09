@@ -203,7 +203,10 @@ export function executeROM(index: number, state: Uint32Array, _highZs: Uint32Arr
 
   if (sel) {
     const mem = getBackingStore(index);
-    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
+    const raw = mem !== undefined ? mem.read(A) : 0;
+    const dataBits = (layout.getProperty(index, "dataBits") as number | undefined) ?? 8;
+    const mask = dataBits >= 32 ? 0xFFFFFFFF : ((1 << dataBits) - 1);
+    state[wt[outBase]] = (raw & mask) >>> 0;
   } else {
     state[wt[outBase]] = 0;
   }
@@ -338,8 +341,10 @@ export function executeROMDualPort(index: number, state: Uint32Array, _highZs: U
   const s2 = state[wt[inBase + 3]] & 1;
 
   const mem = getBackingStore(index);
-  state[wt[outBase]] = s1 ? (mem !== undefined ? mem.read(A1) : 0) : 0;
-  state[wt[outBase + 1]] = s2 ? (mem !== undefined ? mem.read(A2) : 0) : 0;
+  const dataBits = (layout.getProperty(index, "dataBits") as number | undefined) ?? 8;
+  const mask = dataBits >= 32 ? 0xFFFFFFFF : ((1 << dataBits) - 1);
+  state[wt[outBase]] = s1 ? (((mem !== undefined ? mem.read(A1) : 0) & mask) >>> 0) : 0;
+  state[wt[outBase + 1]] = s2 ? (((mem !== undefined ? mem.read(A2) : 0) & mask) >>> 0) : 0;
 }
 
 export const ROM_DUAL_PORT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [...SHARED_ATTRIBUTE_MAPPINGS];

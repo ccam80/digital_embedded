@@ -147,14 +147,14 @@ export class LedElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeLed(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputVal = state[wt[layout.inputOffset(index)]];
-  state[wt[layout.outputOffset(index)]] = inputVal !== 0 ? 1 : 0;
+  // Pure sink: outputSchema is []. The display panel reads the input net
+  // directly. Writing via outputOffset(index) when outputCount === 0 would
+  // index past this component's range into the next component's slot.
 }
 
 // ---------------------------------------------------------------------------

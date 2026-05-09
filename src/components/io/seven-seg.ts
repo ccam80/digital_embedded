@@ -216,20 +216,15 @@ export class SevenSegElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeSevenSeg(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  let packed = 0;
-  for (let i = 0; i < 8; i++) {
-    if (state[wt[inputStart + i]] !== 0) {
-      packed |= (1 << i);
-    }
-  }
-  state[wt[layout.outputOffset(index)]] = packed >>> 0;
+  // Pure sink: outputSchema is []. The display panel reads each segment's
+  // input net directly. Writing through layout.outputOffset(index) when
+  // outputCount(index) === 0 indexes past the component's output range
+  // and clobbers the next component's slot.
 }
 
 // ---------------------------------------------------------------------------

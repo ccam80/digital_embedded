@@ -492,9 +492,13 @@ function _createBjtElementWithPolarity(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ) {
-  const nodeB = pinNodes.get("B")!;
-  const nodeC = pinNodes.get("C")!;
-  const nodeE = pinNodes.get("E")!;
+  // Pin node IDs are RESOLVED in setup(), not at construction time. Composite-
+  // leaf instances see internal-net pins as the placeholder -1; PatcherLeaf
+  // rewrites the Map between construction and setup. setup() reassigns these
+  // from this.pinNodes after the patcher has run.
+  let nodeB = -1;
+  let nodeC = -1;
+  let nodeE = -1;
 
   const params: Record<string, number> = {
     IS: props.getModelParam<number>("IS"),
@@ -553,7 +557,9 @@ function _createBjtElementWithPolarity(
   // L0 has RC=RB=RE=0 always, so prime nodes alias external nodes.
   // 23 TSTALLOC entries per bjtsetup.c:435-464.
   // L0 = Gummel-Poon resistive subset: no terminal resistances (RB/RC/RE = 0),
-  // no substrate junction, no excess phase, no caps, no transit time.
+  // no excess phase, no caps, no transit time. Substrate junction is included
+  // (csubsat=0 default → contributes only CKTgmin to substConNode diagonal,
+  // matching bjtload.c:480-490 + 798 + 823).
   //
   // ngspice gating per bjtsetup.c:372-428 skips the prime-node TSTALLOC entries
   // when the corresponding model resistance is zero. For L0 the resistances are
@@ -573,6 +579,13 @@ function _createBjtElementWithPolarity(
     private _hBPCP = -1; private _hBPEP = -1;
     private _hEPCP = -1; private _hEPBP = -1;
     private _hCPCP = -1; private _hBPBP = -1; private _hEPEP = -1;
+    // bjtsetup.c TSTALLOC entry 19: BJTsubstConSubstConPtr — substrate-conn diag.
+    // For NPN (VERTICAL substrate, bjtsetup.c:42-43) substConNode = colPrime;
+    // for PNP (LATERAL, bjtsetup.c:44-45) substConNode = basePrime. With L0's
+    // RC=RB=0, prime nodes alias external nodes, so the cell is (col,col) for
+    // NPN and (base,base) for PNP — same diag as _hCPCP / _hBPBP, but stamped
+    // separately to mirror bjtload.c:822-823 accumulation order bit-for-bit.
+    private _hSCSC = -1;
 
     constructor(pn: ReadonlyMap<string, number>) { super(pn); }
 
@@ -581,6 +594,11 @@ function _createBjtElementWithPolarity(
       const baseNode = this.pinNodes.get("B")!;
       const colNode  = this.pinNodes.get("C")!;
       const emitNode = this.pinNodes.get("E")!;
+      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
+      // filled in any composite-internal-net placeholders.
+      nodeB = baseNode;
+      nodeC = colNode;
+      nodeE = emitNode;
 
       // State slots- bjtsetup.c:366-367
       this._stateBase = ctx.allocStates(24);
@@ -603,12 +621,19 @@ function _createBjtElementWithPolarity(
       this._hCPCP = solver.allocElement(cp, cp);       // (16)
       this._hBPBP = solver.allocElement(bp, bp);       // (17)
       this._hEPEP = solver.allocElement(ep, ep);       // (18)
+      // bjtsetup.c TSTALLOC entry 19: BJTsubstConSubstConPtr.
+      // bjtsetup.c:42-46: NPN→VERTICAL→substConNode=colPrime;
+      //                    PNP→LATERAL →substConNode=basePrime.
+      const substConNode = polarity > 0 ? cp : bp;
+      this._hSCSC = solver.allocElement(substConNode, substConNode); // (19)
     }
 
     /**
      * Single-pass load mirroring bjtload.c::BJTload for the resistive subset
-     * (no caps, no transit time, no excess phase, no substrate, no terminal
-     * resistances). L0 is the direct dc-op of the Gummel-Poon equations.
+     * (no caps, no transit time, no excess phase, no terminal resistances).
+     * L0 is the direct dc-op of the Gummel-Poon equations. Substrate junction
+     * is included with csubsat=0 (default), contributing only CKTgmin at the
+     * substConNode diagonal per bjtload.c:480-490 + 798 + 823.
      */
     load(ctx: LoadContext): void {
       const base = this._stateBase;
@@ -714,10 +739,6 @@ function _createBjtElementWithPolarity(
           vbcLimFlag = vbcResult.limited;
         }
         this._icheckLimited = vbeLimFlag || vbcLimFlag;
-        // L0 has no substrate junction  substrate is L1-only per the model-registry
-        // split (architectural-alignment.md ÂssE1 APPROVED ACCEPT). See also the
-        // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
-        // the top of this load() body.
 
         // cite: bjtload.c:749-754  icheck++ unless MODEINITFIX && OFF
         if (this._icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
@@ -908,15 +929,27 @@ function _createBjtElementWithPolarity(
       //   BJTbasePrimeEmitPrimePtr  += -gpi
       //   BJTemitPrimeColPrimePtr   += -go   (no geqcb)
       //   BJTemitPrimeBasePrimePtr  += -gpi - gm  (no geqcb)
-      solver.stampElement(this._hBPBP, m * (gpi + gmu));
-      solver.stampElement(this._hCPCP, m * (gmu + go));
-      solver.stampElement(this._hEPEP, m * (gpi + gm + go));
-      solver.stampElement(this._hCPBP, m * (-gmu + gm));
-      solver.stampElement(this._hCPEP, m * (-gm - go));
-      solver.stampElement(this._hBPCP, m * -gmu);
-      solver.stampElement(this._hBPEP, m * -gpi);
-      solver.stampElement(this._hEPCP, m * -go);
-      solver.stampElement(this._hEPBP, m * (-gpi - gm));
+      //
+      // Stamp order mirrors bjtload.c:819-842 line-for-line: CPCP (822),
+      // SCSC (823), BPBP (824), EPEP (825), then cross-terms (830-837).
+      // Order matters at LSB level because for PNP, _hSCSC and _hBPBP
+      // address the same matrix cell (substConNode = basePrime when LATERAL),
+      // so the SCSC-then-BPBP accumulation sequence is preserved bit-exact.
+      //
+      // Substrate junction (bjtload.c:480-490 + 798): with csubsat=0 default
+      // and gcsub=0 in DC-OP / no-cap path, gdsub = CKTgmin and geqsub = gdsub.
+      // ceqsub = polarity * subs * (state0[cqsub] + cdsub - vsub*geqsub) = 0
+      // when csubsat=0 (cdsub = CKTgmin*vsub, the term cancels exactly).
+      solver.stampElement(this._hCPCP, m * (gmu + go));        // bjtload.c:822
+      solver.stampElement(this._hSCSC, m * GMIN);              // bjtload.c:823 (geqsub = gdsub = GMIN)
+      solver.stampElement(this._hBPBP, m * (gpi + gmu));       // bjtload.c:824
+      solver.stampElement(this._hEPEP, m * (gpi + gm + go));   // bjtload.c:825
+      solver.stampElement(this._hCPBP, m * (-gmu + gm));       // bjtload.c:830
+      solver.stampElement(this._hCPEP, m * (-gm - go));        // bjtload.c:831
+      solver.stampElement(this._hBPCP, m * -gmu);              // bjtload.c:833
+      solver.stampElement(this._hBPEP, m * -gpi);              // bjtload.c:834
+      solver.stampElement(this._hEPCP, m * -go);               // bjtload.c:836
+      solver.stampElement(this._hEPBP, m * (-gpi - gm));       // bjtload.c:837
     }
 
     checkConvergence(ctx: LoadContext): boolean {
@@ -1055,9 +1088,13 @@ export function createSpiceL1BjtElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ) {
-  const nodeB_ext = pinNodes.get("B")!;
-  const nodeC_ext = pinNodes.get("C")!;
-  const nodeE_ext = pinNodes.get("E")!;
+  // Pin node IDs are RESOLVED in setup(), not at construction time. Composite-
+  // leaf instances see internal-net pins as the placeholder -1; PatcherLeaf
+  // rewrites the Map between construction and setup. setup() reassigns these
+  // from this.pinNodes after the patcher has run.
+  let nodeB_ext = -1;
+  let nodeC_ext = -1;
+  let nodeE_ext = -1;
 
   const params: Record<string, number> = {
     IS: props.getModelParam<number>("IS"),
@@ -1202,6 +1239,11 @@ export function createSpiceL1BjtElement(
       const colNode   = this.pinNodes.get("C")!;
       const emitNode  = this.pinNodes.get("E")!;
       const substNode = 0;
+      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
+      // filled in any composite-internal-net placeholders.
+      nodeB_ext = baseNode;
+      nodeC_ext = colNode;
+      nodeE_ext = emitNode;
 
       // State slots- bjtsetup.c:366-367
       this._stateBase = ctx.allocStates(24);

@@ -97,9 +97,13 @@ export class VddElement extends AbstractCircuitElement {
 
 export function executeVdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
-  // Output all ones. The bit-width mask is applied by the net resolver;
-  // writing 0xFFFFFFFF is correct for any width up to 32 bits.
-  state[wt[layout.outputOffset(index)]] = 0xFFFFFFFF;
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1;
+  // Mask all-ones to the declared bit-width so observers see the canonical
+  // value (e.g. 1 for 1-bit, 0xFF for 8-bit). The bus resolver does not
+  // apply per-net width masking; producers self-mask, mirroring add.ts /
+  // barrel-shifter.ts conventions.
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1);
+  state[wt[layout.outputOffset(index)]] = mask >>> 0;
 }
 
 // ---------------------------------------------------------------------------

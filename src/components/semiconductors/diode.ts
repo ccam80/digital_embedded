@@ -368,8 +368,15 @@ export function createDiodeElement(
   props: PropertyBag,
   _getTime: () => number,
 ): PoolBackedAnalogElement {
-  const nodeAnode = pinNodes.get("A")!;
-  const nodeCathode = pinNodes.get("K")!;
+  // Pin node IDs are RESOLVED in setup(), not at construction time. When the
+  // diode is a leaf inside a composite (e.g. Optocoupler.dLed), the parent
+  // compiler hands us pinNodes whose internal-net entries are the placeholder
+  // -1; the PatcherLeaf rewrites them between construction and setup. Reading
+  // these into closure consts here would freeze the placeholders into every
+  // subsequent load() call. setup() reassigns these from this.pinNodes after
+  // the patcher has run.
+  let nodeAnode = -1;
+  let nodeCathode = -1;
 
   const params: Record<string, number> = {
     IS:  props.getModelParam<number>("IS"),
@@ -477,6 +484,10 @@ export function createDiodeElement(
       const solver = ctx.solver;
       const posNode = this.pinNodes.get("A")!;
       const negNode = this.pinNodes.get("K")!;
+      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
+      // filled in any composite-internal-net placeholders.
+      nodeAnode = posNode;
+      nodeCathode = negNode;
 
       // State slots- diosetup.c:198-199 (*states += DIOstateCount; here->DIOstate = *states)
       // Idempotent guard mirrors mutual-inductor.ts:94-95. When a composite

@@ -94,25 +94,31 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
   readonly stateSize = SCHEMA.size;
 
   private readonly _inputCount: number;
-  private readonly _inputNodes: number[];
-  private readonly _gndNode: number;
+  // Pin node IDs are RESOLVED in setup(), not in the constructor. As a leaf
+  // inside a composite, pinNodes is mid-resolution at construction time and
+  // the PatcherLeaf rewrites placeholders before any device's setup() runs.
+  // Reading this.pinNodes here would freeze -1 placeholders for any
+  // composite-internal-net pin.
+  private _inputNodes: number[];
+  private _gndNode: number;
   private _vIH: number;
   private _vIL: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._inputCount = props.getModelParam<number>("inputCount");
-    this._inputNodes = new Array(this._inputCount);
-    for (let i = 0; i < this._inputCount; i++) {
-      this._inputNodes[i] = pinNodes.get(`In_${i + 1}`)!;
-    }
-    this._gndNode = pinNodes.get("gnd")!;
+    this._inputNodes = new Array(this._inputCount).fill(-1);
+    this._gndNode = -1;
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
   }
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    for (let i = 0; i < this._inputCount; i++) {
+      this._inputNodes[i] = this.pinNodes.get(`In_${i + 1}`)!;
+    }
+    this._gndNode = this.pinNodes.get("gnd")!;
   }
 
   /**

@@ -410,6 +410,16 @@ export interface StandaloneComponentDefinition extends ComponentDefinition {
   pinElectrical?: PinElectricalSpec;
   /** Per-pin overrides for bridge adapter specs. */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
+  /**
+   * When `false`, this component opts out of paired-with-ngspice comparison
+   * (`ComparisonSession.create` rejects circuits containing it). Defaults to
+   * `true` (or absent). Use `false` for components whose digiTS factoring is
+   * non-SPICE-faithful (sibling-ref-coupled leaves, behavioural macromodels
+   * with no SPICE primitive equivalent, expression-driven sources, etc.).
+   * Tests for these components must use `ComparisonSession.createSelfCompare`
+   * instead.
+   */
+  pairedSpiceEquivalent?: boolean;
 }
 
 /** Type guard: narrows a definition to the user-facing extender. */

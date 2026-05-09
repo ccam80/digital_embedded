@@ -535,10 +535,51 @@ export class ComparisonSession {
       const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
       this._cirClean = stripControlBlock(cirRaw);
     } else if (!this._opts.selfCompare) {
+      this._assertAllComponentsPairedSpiceEquivalent(compiled);
       this._cirClean = generateSpiceNetlist(compiled, this._registry, this._elementLabels);
     }
 
     this._inited = true;
+  }
+
+  /**
+   * Reject paired comparison when any component in the compiled circuit has
+   * declared `pairedSpiceEquivalent: false`. Such components either have no
+   * SPICE-primitive equivalent (behavioural macromodels), use sibling-ref
+   * coupling between sub-elements (non-SPICE-faithful factoring), or hold
+   * expression-driven controlled sources that cannot be emitted bit-exact.
+   * Tests for these components must use `ComparisonSession.createSelfCompare`
+   * instead. Throws an aggregated error listing every offender so the author
+   * can address them all at once rather than rediscovering the next one on
+   * each rerun.
+   */
+  private _assertAllComponentsPairedSpiceEquivalent(
+    compiled: ConcreteCompiledAnalogCircuit,
+  ): void {
+    const offenders: Array<{ label: string; typeId: string }> = [];
+    const seen = new Set<unknown>();
+    for (const ce of compiled.elementToCircuitElement.values()) {
+      if (seen.has(ce)) continue;
+      seen.add(ce);
+      const def = this._registry.get(ce.typeId);
+      if (def && (def as { pairedSpiceEquivalent?: boolean }).pairedSpiceEquivalent === false) {
+        const label = ce.getProperties().getOrDefault<string>("label", "") || ce.typeId;
+        offenders.push({ label, typeId: ce.typeId });
+      }
+    }
+    if (offenders.length === 0) return;
+    const list = offenders
+      .map((o) => `  - ${o.typeId} (label='${o.label}')`)
+      .join("\n");
+    throw new Error(
+      `ComparisonSession: cannot run paired-with-ngspice comparison- the ` +
+      `following component(s) have declared pairedSpiceEquivalent: false:\n` +
+      `${list}\n` +
+      `These components either have no SPICE-primitive equivalent or use a ` +
+      `digiTS-specific factoring (sibling-ref coupling, behavioural macromodel, ` +
+      `expression-driven source) that cannot be emitted bit-exact. Use ` +
+      `ComparisonSession.createSelfCompare for tests of these components.`
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1528,7 +1569,7 @@ export class ComparisonSession {
       const ourIter = ourIters[ii] ?? null;
       const ngIter  = ngIters[ii] ?? null;
 
-      // Per-side densification- not a graceful fallback. The session-level
+      // Per-side densification. The session-level
       // structural-parity gate (_assertMatrixStructuralParity, called at the
       // end of runDcOp/runTransient) hard-fails on any matrixSize divergence,
       // so by the time this code runs in a non-failing session, both sides

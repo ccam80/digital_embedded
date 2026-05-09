@@ -242,7 +242,7 @@ function buildRAMSinglePortPins(addrBits: number, dataBits: number): PinDeclarat
     { direction: PinDirection.INPUT, label: "str", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     { direction: PinDirection.INPUT, label: "C", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: true, kind: "signal" },
     { direction: PinDirection.INPUT, label: "ld", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
@@ -303,7 +303,7 @@ export function sampleRAMSinglePort(index: number, state: Uint32Array, _highZs: 
   state[stBase] = clk;
 }
 
-export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMSinglePort(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
@@ -313,9 +313,16 @@ export function executeRAMSinglePort(index: number, state: Uint32Array, _highZs:
 
   if (ld) {
     const mem = getBackingStore(index);
-    state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
+    const dataBits = (layout.getProperty(index, "dataBits") as number | undefined) ?? 8;
+    const mask = dataBits >= 32 ? 0xFFFFFFFF : ((1 << dataBits) - 1);
+    const raw = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = (raw & mask) >>> 0;
+    highZs[wt[outBase]] = 0;
   } else {
+    // Bidirectional D pin: when not driving (ld=0), go high-Z so external
+    // drivers on D can dominate the net. The bus resolver merges shadows.
     state[wt[outBase]] = 0;
+    highZs[wt[outBase]] = 0xFFFFFFFF;
   }
 }
 
@@ -342,7 +349,11 @@ export const RAMSinglePortDefinition: StandaloneComponentDefinition = {
     digital: {
       executeFn: executeRAMSinglePort,
       sampleFn: sampleRAMSinglePort,
-      inputSchema: ["A", "str", "C", "ld"],
+      // D is bidirectional: appears in inputSchema (so sampleFn reads the
+      // resolved real-net value driven externally during write phases) AND
+      // in outputSchema (so executeFn writes to a per-driver shadow that
+      // the bus resolver merges with other drivers on D's net).
+      inputSchema: ["A", "str", "C", "ld", "D"],
       outputSchema: ["D"],
       stateSlotCount: (props) => 1 + (1 << (props.getOrDefault<number>("addrBits", 4))),
       defaultDelay: 10,
@@ -371,7 +382,7 @@ function buildRAMSinglePortSelPins(addrBits: number, dataBits: number): PinDecla
     { direction: PinDirection.INPUT, label: "CS", defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     { direction: PinDirection.INPUT, label: "WE", defaultBitWidth: 1, position: { x: 0, y: 3 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     { direction: PinDirection.INPUT, label: "OE", defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.BIDIRECTIONAL, label: "D", defaultBitWidth: dataBits, position: { x: COMP_WIDTH, y: 2 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
@@ -410,7 +421,7 @@ export class RAMSinglePortSelElement extends AbstractCircuitElement {
 
 }
 
-export function executeRAMSinglePortSel(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeRAMSinglePortSel(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
@@ -419,22 +430,29 @@ export function executeRAMSinglePortSel(index: number, state: Uint32Array, _high
   const cs = state[wt[inBase + 1]] & 1;
   const we = state[wt[inBase + 2]] & 1;
   const oe = state[wt[inBase + 3]] & 1;
+  // Bidirectional D: read external value from the resolved real-net via the
+  // schema-extended D input slot (inBase + 4).
+  const dExternal = state[wt[inBase + 4]] >>> 0;
 
-  if (cs) {
-    if (we) {
-      const mem = getBackingStore(index);
-      if (mem !== undefined) {
-        mem.write(A, state[wt[outBase]]);
-      }
+  const dataBits = (layout.getProperty(index, "dataBits") as number | undefined) ?? 8;
+  const mask = dataBits >= 32 ? 0xFFFFFFFF : ((1 << dataBits) - 1);
+
+  if (cs && we) {
+    const mem = getBackingStore(index);
+    if (mem !== undefined) {
+      mem.write(A, dExternal & mask);
     }
-    if (oe && !we) {
-      const mem = getBackingStore(index);
-      state[wt[outBase]] = mem !== undefined ? mem.read(A) : 0;
-    } else {
-      state[wt[outBase]] = 0;
-    }
+  }
+
+  if (cs && oe && !we) {
+    const mem = getBackingStore(index);
+    const raw = mem !== undefined ? mem.read(A) : 0;
+    state[wt[outBase]] = (raw & mask) >>> 0;
+    highZs[wt[outBase]] = 0;
   } else {
+    // Not driving D — go high-Z so external drivers dominate the bus.
     state[wt[outBase]] = 0;
+    highZs[wt[outBase]] = 0xFFFFFFFF;
   }
 }
 
@@ -460,7 +478,10 @@ export const RAMSinglePortSelDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeRAMSinglePortSel,
-      inputSchema: ["A", "CS", "WE", "OE"],
+      // D is bidirectional: in inputSchema for executeFn to read the
+      // resolved real-net value during write phase; in outputSchema for
+      // the bus resolver shadow that executeFn drives during read phase.
+      inputSchema: ["A", "CS", "WE", "OE", "D"],
       outputSchema: ["D"],
       stateSlotCount: 0,
       defaultDelay: 10,

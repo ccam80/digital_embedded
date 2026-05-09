@@ -7,7 +7,7 @@ import {
   DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
-import { DIODE_CAP_SCHEMA } from "../diode.js";
+import { DIODE_SCHEMA } from "../diode.js";
 
 const DTS_REVERSE = path.resolve(
   "src/components/semiconductors/__tests__/fixtures/varactor-canon-reverse.dts",
@@ -19,7 +19,7 @@ const DTS_FORWARD = path.resolve(
 // ---------------------------------------------------------------------------
 // Programmatic build helpers for T1 fixtures.
 // VaractorDiode routes through createDiodeElement with cap-tuned defaults
-// (CJO=20pF). With CJO > 0 the diode element uses DIODE_CAP_SCHEMA (7 slots)
+// (CJO=20pF). With CJO > 0 the diode element uses DIODE_SCHEMA
 // and registers getLteTimestep on the rollable charge slot.
 //
 // Forward topology: V1 -> VD:A; VD:K -> R1 -> ground. Drives the AK junction
@@ -83,12 +83,12 @@ function findVD(fix: ReturnType<typeof buildFixture>) {
 // Category 1 — Initialization (T1)
 // Asserts the warm-started state pool slot reads finite for the Varactor
 // element after compile() + first coordinator.step(). Varactor delegates to
-// createDiodeElement; with CJO=20pF default the element uses DIODE_CAP_SCHEMA.
+// createDiodeElement; with CJO=20pF default the element uses DIODE_SCHEMA.
 // VD slot is the pnjlim-limited junction voltage.
 // ---------------------------------------------------------------------------
 
 describe("Varactor initialization (T1)", () => {
-  const SLOT_VD = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
+  const SLOT_VD = DIODE_SCHEMA.indexOf.get("VD")!;
 
   it("init_varactor_vd_seeded_reverse", () => {
     const fix = buildFixture({ build: (_r, f) => buildVaractorReverse(f) });
@@ -267,7 +267,7 @@ describe("Varactor limiting events own-engine (T1)", () => {
 
 describe("Varactor LTE rollback (T1)", () => {
   it("lte_rollback_state_invariant", () => {
-    const SLOT_Q = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const SLOT_Q = DIODE_SCHEMA.indexOf.get("Q")!;
     const fix = buildFixture({
       build: (_r, f) => buildVaractorReverse(f),
       params: { tStop: 1e-6, maxTimeStep: 1e-7 },

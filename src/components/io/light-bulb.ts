@@ -122,14 +122,14 @@ export class LightBulbElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export function executeLightBulb(
-  index: number,
-  state: Uint32Array,
+  _index: number,
+  _state: Uint32Array,
   _highZs: Uint32Array,
-  layout: ComponentLayout,
+  _layout: ComponentLayout,
 ): void {
-  const wt = layout.wiringTable;
-  const inputVal = state[wt[layout.inputOffset(index)]];
-  state[wt[layout.outputOffset(index)]] = inputVal !== 0 ? 1 : 0;
+  // Pure sink: outputSchema is []. The panel reads input nets directly.
+  // Writing via outputOffset(index) when outputCount === 0 would corrupt
+  // the next component's slot.
 }
 
 // ---------------------------------------------------------------------------

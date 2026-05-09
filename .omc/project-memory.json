@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit 2>&1 | tail -200",
-    "testCommand": "npx vitest run src/compile src/solver/digital src/components/wiring src/components/gates src/components/io src/components/memory src/components/flipflops --reporter=default 2>&1 | head -300 > C:/Users/cca79/AppData/Local/Temp/sweep.log ; type C:\\Users\\cca79\\AppData\\Local\\Temp\\sweep.log 2>&1",
+    "buildCommand": "npx tsc --noEmit -p tsconfig.json 2>&1 > /tmp/tsc.out; head -10 /tmp/tsc.out",
+    "testCommand": "npx vitest run src/components/active/__tests__/timer-555.test.ts -t \"transient_step_end_paired_astable\" --reporter=default 2>&1 | tail -25",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -294,6 +294,12 @@
   },
   "hotPaths": [
     {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 30,
+      "lastAccessed": 1778285503003,
+      "type": "file"
+    },
+    {
       "path": "src\\headless\\auto-layout.ts",
       "accessCount": 24,
       "lastAccessed": 1778219320243,
@@ -306,21 +312,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 15,
-      "lastAccessed": 1778245997825,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\digital\\digital-engine.ts",
-      "accessCount": 14,
-      "lastAccessed": 1778245139881,
+      "accessCount": 17,
+      "lastAccessed": 1778246337985,
       "type": "file"
     },
     {
       "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 13,
-      "lastAccessed": 1778244467201,
+      "accessCount": 15,
+      "lastAccessed": 1778278278293,
       "type": "file"
     },
     {
@@ -333,6 +333,12 @@
       "path": "src\\compile\\compile.ts",
       "accessCount": 9,
       "lastAccessed": 1778241573512,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1778246035913,
       "type": "file"
     },
     {
@@ -354,10 +360,28 @@
       "type": "file"
     },
     {
+      "path": "src/components/semiconductors/diode.ts",
+      "accessCount": 7,
+      "lastAccessed": 1778285476325,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 7,
+      "lastAccessed": 1778285477653,
+      "type": "file"
+    },
+    {
       "path": "src\\compile\\__tests__\\partition.test.ts",
       "accessCount": 6,
       "lastAccessed": 1778217653550,
       "type": "file"
+    },
+    {
+      "path": "src/core/registry.ts",
+      "accessCount": 6,
+      "lastAccessed": 1778285464105,
+      "type": "directory"
     },
     {
       "path": "src\\core\\circuit.ts",
@@ -372,21 +396,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\components\\memory\\__tests__\\register.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778216875157,
-      "type": "file"
-    },
-    {
-      "path": "src/core/registry.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778217659780,
+      "path": "src/solver",
+      "accessCount": 5,
+      "lastAccessed": 1778278919938,
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778226640124,
+      "path": "src\\components\\memory\\__tests__\\register.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1778280951073,
       "type": "file"
     },
     {
@@ -408,21 +426,9 @@
       "type": "file"
     },
     {
-      "path": "src/solver",
-      "accessCount": 3,
-      "lastAccessed": 1778233229284,
-      "type": "directory"
-    },
-    {
       "path": "src\\compile\\partition.ts",
       "accessCount": 3,
       "lastAccessed": 1778243674250,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778246001707,
       "type": "file"
     },
     {
@@ -474,6 +480,12 @@
       "type": "directory"
     },
     {
+      "path": "src/components/switching/relay.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778281338906,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\wiring\\__tests__\\priority-encoder-partition-drop-probe.test.ts",
       "accessCount": 1,
       "lastAccessed": 1778204670475,
@@ -513,18 +525,6 @@
       "path": "src/components/semiconductors/schottky.ts",
       "accessCount": 1,
       "lastAccessed": 1778206733620,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/switching/relay.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778206775051,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/semiconductors/diode.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778206850875,
       "type": "directory"
     },
     {

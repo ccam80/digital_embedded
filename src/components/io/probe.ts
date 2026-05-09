@@ -135,13 +135,12 @@ export class ProbeElement extends AbstractCircuitElement {
 // the executeFn performs edge detection and increments the counter slot.
 // ---------------------------------------------------------------------------
 
-export function executeProbe(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const wt = layout.wiringTable;
-  const inputIdx = layout.inputOffset(index);
-  const outputIdx = layout.outputOffset(index);
-  // Copy current input value to the output/storage slot.
-  // Edge-counting is handled by the engine layer that wraps this function.
-  state[wt[outputIdx]] = state[wt[inputIdx]];
+export function executeProbe(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
+  // Pure sink: outputSchema is []. The measurement panel reads the input net
+  // directly via labelSignalMap. Edge-counting (UP/DOWN/BOTH modes) is
+  // handled by the engine wrapper that observes the input net, not by
+  // writing through outputOffset (which would index past the component's
+  // empty output range into the next component's slot).
 }
 
 // ---------------------------------------------------------------------------

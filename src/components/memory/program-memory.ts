@@ -266,6 +266,13 @@ const PROGRAM_MEMORY_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: true,
     description: "Allow Phase 6 to preload a program binary into this memory",
   },
+  {
+    key: "data",
+    type: PropertyType.HEX_DATA,
+    label: "Data",
+    defaultValue: [],
+    description: "Program-memory backing data, one word per address",
+  },
 ];
 
 function programMemoryFactory(props: PropertyBag): ProgramMemoryElement {

@@ -1,6 +1,6 @@
 {
   "circuit": {
-    "description": "Diode with junction capacitance (CJO=10pF, TT=1ns) + 1k series R driven by 100kHz sine: exercises 7-slot DIODE_CAP_SCHEMA path (cap-block, NIintegrate, getLteTimestep)",
+    "description": "Diode with junction capacitance (CJO=10pF, TT=1ns) + 1k series R driven by 100kHz sine: exercises DIODE_SCHEMA cap-block path (NIintegrate, getLteTimestep)",
     "elements": [
       {
         "id": "98ca28bd-fad2-4dfe-a2dd-ea49b36e9462",
