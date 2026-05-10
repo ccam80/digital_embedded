@@ -31,7 +31,7 @@ import type { AnalogElement } from "../../solver/analog/element.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -251,6 +251,7 @@ export function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
 
 class PJfetAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.JFET;
+  readonly deviceFamily: DeviceFamily = "JFET";
   readonly stateSchema = PJFET_SCHEMA;
   readonly stateSize = PJFET_SCHEMA.size;
 

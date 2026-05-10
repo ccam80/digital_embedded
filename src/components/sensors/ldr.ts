@@ -29,6 +29,7 @@
 
 import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -72,6 +73,7 @@ export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModel
 
 export class LDRElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
 
   private _hPP: number = -1; // (posNode, posNode)- ressetup.c:46
   private _hNN: number = -1; // (negNode, negNode)- ressetup.c:47

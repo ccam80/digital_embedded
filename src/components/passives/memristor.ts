@@ -38,7 +38,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDC } from "../../solver/analog/ckt-mode.js";
@@ -93,6 +93,7 @@ const MIN_WINDOW_P   = 1;
 
 export class MemristorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
   readonly stateSchema = MEMRISTOR_SCHEMA;
   readonly stateSize = MEMRISTOR_SCHEMA.size;
 

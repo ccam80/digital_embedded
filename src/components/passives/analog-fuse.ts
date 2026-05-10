@@ -38,7 +38,7 @@
  */
 
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { Diagnostic } from "../../compile/types.js";
@@ -85,6 +85,7 @@ const MIN_RESISTANCE = 1e-12;
 
 export class AnalogFuseElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
   readonly stateSchema = ANALOG_FUSE_SCHEMA;
   readonly stateSize = ANALOG_FUSE_SCHEMA.size;
   setParam(_key: string, _value: number): void {}

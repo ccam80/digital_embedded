@@ -19,7 +19,7 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -75,6 +75,7 @@ const FET_SW_PIN_LAYOUT: PinDeclaration[] = [
 
 export class FetSWElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly deviceFamily: DeviceFamily = "SW";
   readonly stateSchema = SCHEMA;
   readonly stateSize = 0;
 

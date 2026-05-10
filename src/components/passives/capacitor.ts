@@ -23,7 +23,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -167,6 +167,7 @@ const SLOT_CCAP = 1;
  */
 export class AnalogCapacitorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
+  readonly deviceFamily: DeviceFamily = "CAP";
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;
 

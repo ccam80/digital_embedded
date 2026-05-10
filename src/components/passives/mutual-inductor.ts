@@ -17,7 +17,7 @@
  */
 
 import { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -58,6 +58,7 @@ const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
  */
 export class InductorSubElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
+  readonly deviceFamily: DeviceFamily = "IND";
   readonly stateSchema: StateSchema = INDUCTOR_SUB_SCHEMA;
   readonly stateSize: number = INDUCTOR_SUB_SCHEMA.size;
 
@@ -236,6 +237,7 @@ export class InductorSubElement extends PoolBackedAnalogElement {
  */
 export class MutualInductorElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
+  readonly deviceFamily: DeviceFamily = "IND";
 
   private _coupling: number;
   private readonly _l1: InductorSubElement;
@@ -285,9 +287,7 @@ export class MutualInductorElement extends AnalogElement {
     //   }
     //   *(MUTbr1br2) -= MUTfactor * CKTag[0]
     //   *(MUTbr2br1) -= MUTfactor * CKTag[0]
-    const { rhsOld, ag, cktMode: mode } = ctx;
-    const b1 = this._l1.branchIndex;
-    const b2 = this._l2.branchIndex;
+    const { ag } = ctx;
     const L1 = this._l1.inductanceForMut;
     const L2 = this._l2.inductanceForMut;
     const mutFactor = this._coupling * Math.sqrt(L1 * L2);

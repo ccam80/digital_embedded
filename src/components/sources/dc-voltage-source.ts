@@ -28,7 +28,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -160,6 +160,7 @@ const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 
 class DcVoltageSourceAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+  readonly deviceFamily: DeviceFamily = "VSRC";
 
   private _voltage: number;
 

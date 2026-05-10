@@ -27,7 +27,7 @@ import {
 } from "../../core/registry.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import {
   MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
   MODETRAN, MODEAC, MODETRANOP, MODEUIC,
@@ -571,6 +571,7 @@ function _createBjtElementWithPolarity(
   // entries match the L0 load() stamp list line for line.
   class BjtL0Element extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+    readonly deviceFamily: DeviceFamily = "BJT";
     readonly stateSchema = BJT_SIMPLE_SCHEMA;
     readonly stateSize = BJT_SIMPLE_SCHEMA.size;
 
@@ -1213,6 +1214,7 @@ export function createSpiceL1BjtElement(
 
   class BjtL1Element extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+    readonly deviceFamily: DeviceFamily = "BJT";
     readonly stateSchema = BJT_L1_SCHEMA;
     readonly stateSize = BJT_L1_SCHEMA.size;
 

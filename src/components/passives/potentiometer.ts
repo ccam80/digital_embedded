@@ -22,7 +22,7 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -169,6 +169,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 
 class AnalogPotentiometerElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
 
   private R: number;
   private pos: number;

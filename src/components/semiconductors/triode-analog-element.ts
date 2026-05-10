@@ -29,7 +29,7 @@ import {
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
@@ -164,6 +164,7 @@ const TRIODE_ANALOG_PIN_LAYOUT: PinDeclaration[] = [
 
 export class TriodeAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema: StateSchema = TRIODE_ANALOG_SCHEMA;
   readonly stateSize: number = TRIODE_ANALOG_SCHEMA.size;
 

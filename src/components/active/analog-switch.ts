@@ -43,7 +43,7 @@ import {
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
@@ -243,6 +243,7 @@ function swLoadHandles(
 
 class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly deviceFamily: DeviceFamily = "SW";
   readonly stateSchema = SW_SCHEMA;
   readonly stateSize = SW_SCHEMA.size;  // 2 (SW_NUM_STATES, swdefs.h:56)
 
@@ -343,6 +344,7 @@ function createSwitchSPSTElement(
 
 class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly deviceFamily: DeviceFamily = "SW";
   readonly stateSchema = SPDT_SCHEMA;
   readonly stateSize = SPDT_SCHEMA.size;  // 4 (two SW paths × 2 slots each)
 

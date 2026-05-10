@@ -27,6 +27,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,7 @@ class GroundAnalogElement extends AnalogElement {
   // every AnalogElement must declare one. RES is the lowest-ordinal
   // bucket so any other element loads after it.
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
 
   constructor(pinNodes: ReadonlyMap<string, number>) {
     super(pinNodes);

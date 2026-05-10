@@ -38,7 +38,7 @@ import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -828,6 +828,7 @@ function _createMosfetElementWithPolarity(
 
   class MosfetAnalogElement extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MOS;
+    readonly deviceFamily: DeviceFamily = "MOS";
     readonly stateSchema: StateSchema = MOSFET_SCHEMA;
     readonly stateSize: number = MOSFET_SCHEMA.size;
 

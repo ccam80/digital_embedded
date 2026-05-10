@@ -29,7 +29,7 @@ import {
   type StateSchema,
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -109,6 +109,7 @@ const DAC_DRIVER_DEFAULTS: Record<string, number> = {
 
 export class DACDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
 

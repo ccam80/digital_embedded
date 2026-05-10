@@ -18,7 +18,7 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -68,6 +68,7 @@ const TIMER_555_LATCH_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 
 export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 

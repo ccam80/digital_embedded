@@ -21,7 +21,7 @@
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -51,6 +51,7 @@ const INTERNAL_CCCS_PIN_LAYOUT: PinDeclaration[] = [
 
 export class InternalCccsElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
+  readonly deviceFamily: DeviceFamily = "CCCS";
 
   /** Gain (CTR). Hot-loadable via setParam("gain", v). */
   private _gain: number;

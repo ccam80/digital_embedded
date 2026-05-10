@@ -26,7 +26,7 @@ import {
 } from "../../core/registry.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import {
   MODEINITJCT,
   MODEINITFIX,
@@ -183,6 +183,7 @@ interface ZenerTp {
 
 class ZenerAnalogElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+  readonly deviceFamily: DeviceFamily = "DIO";
   readonly stateSchema = ZENER_STATE_SCHEMA;
   readonly stateSize = ZENER_STATE_SCHEMA.size;
 

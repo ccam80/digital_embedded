@@ -26,7 +26,7 @@ import {
 } from "../../core/registry.js";
 import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   defineStateSchema,
@@ -318,6 +318,7 @@ export interface SpstAnalogElement extends AnalogElement {
 
 export class SwitchAnalogElement extends PoolBackedAnalogElement implements SpstAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
+  readonly deviceFamily: DeviceFamily = "SW";
 
   readonly stateSchema = SWITCH_SCHEMA;
   readonly stateSize = SWITCH_SCHEMA.size;

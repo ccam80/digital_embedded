@@ -49,7 +49,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -120,6 +120,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
  */
 export class VCCSAnalogElement extends ControlledSourceElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
+  readonly deviceFamily: DeviceFamily = "VCCS";
 
   // TSTALLOC handles- allocated in setup(), written in load()
   // vccsset.c:43-46 line-for-line

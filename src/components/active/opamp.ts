@@ -29,7 +29,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -149,6 +149,7 @@ export class OpAmpElement extends AbstractCircuitElement {
 
 class OpampElement extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly deviceFamily: DeviceFamily = "VCVS";
 
   private readonly _nInp: number;
   private readonly _nInn: number;

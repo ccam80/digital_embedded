@@ -29,7 +29,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
@@ -266,6 +266,7 @@ const AC_CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 
 class AcCurrentSourceAnalogImpl extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.ISRC;
+  readonly deviceFamily: DeviceFamily = "ISRC";
 
   private readonly _p: Record<string, number>;
   private _amplitude: number;

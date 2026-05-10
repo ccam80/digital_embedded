@@ -25,7 +25,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { AnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -165,6 +165,7 @@ const DC_CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 
 class DcCurrentSourceAnalogImpl extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.ISRC;
+  readonly deviceFamily: DeviceFamily = "ISRC";
 
   private readonly _p: Record<string, number>;
   // Captures the srcFact seen on the most recent load() call so that

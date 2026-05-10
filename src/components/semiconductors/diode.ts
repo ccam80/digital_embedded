@@ -31,7 +31,7 @@ import {
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   MODEINITJCT,
@@ -468,6 +468,7 @@ export function createDiodeElement(
 
   class DiodeAnalogElement extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+    readonly deviceFamily: DeviceFamily = "DIO";
     readonly stateSize: number;
     readonly stateSchema: import("../../solver/analog/state-schema.js").StateSchema;
 

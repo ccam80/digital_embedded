@@ -24,6 +24,7 @@
 
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { MODEDC } from "../../solver/analog/ckt-mode.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -126,6 +127,7 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 
 export class NTCThermistorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
   readonly stateSchema = NTC_SCHEMA;
   readonly stateSize = NTC_SCHEMA.size;
 

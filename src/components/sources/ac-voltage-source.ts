@@ -31,7 +31,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
@@ -554,6 +554,7 @@ export interface AcVoltageSourceAnalogElement extends AnalogElement {
 
 class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSourceAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+  readonly deviceFamily: DeviceFamily = "VSRC";
 
   // Cached matrix-entry handles — vsrcset.c TSTALLOC sequence
   private _hPosBr = -1;

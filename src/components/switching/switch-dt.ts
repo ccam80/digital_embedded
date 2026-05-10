@@ -30,7 +30,7 @@ import {
   PoolBackedAnalogElement,
 } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
@@ -334,6 +334,7 @@ export interface SpdtAnalogElement extends AnalogElement {
 
 export class SwitchDTAnalogElement extends PoolBackedAnalogElement implements SpdtAnalogElement {
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
+  readonly deviceFamily: DeviceFamily = "SW";
   readonly stateSchema = SWITCH_DT_SCHEMA;
   readonly stateSize = SWITCH_DT_SCHEMA.size;
 

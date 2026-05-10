@@ -27,6 +27,7 @@ import {
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // ProbeMode
@@ -218,6 +219,7 @@ class AnalogProbeElement extends AnalogElement {
   // Probe is a pure voltage measurement- no MNA contribution. Ordinal is
   // therefore irrelevant for parity, but every AnalogElement must declare one.
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly deviceFamily: DeviceFamily = "RES";
 
   constructor(pinNodes: ReadonlyMap<string, number>) {
     super(pinNodes);

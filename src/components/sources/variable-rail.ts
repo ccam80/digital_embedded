@@ -29,7 +29,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 
@@ -158,6 +158,7 @@ export interface VariableRailAnalogElement extends AnalogElement {
 
 class VariableRailAnalogImpl extends AnalogElement implements VariableRailAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+  readonly deviceFamily: DeviceFamily = "VSRC";
 
   private _voltage: number;
 
