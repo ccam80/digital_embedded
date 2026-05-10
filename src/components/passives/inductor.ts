@@ -339,7 +339,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   }
 
   setParam(key: string, value: number): void {
-    if (key === "inductance") {
+    if (key === "inductance" || key === "L") {
       this._nominalL = value;
       this._effectiveL = this._computeEffectiveL();
       // Cascade to MUT siblings so MUTfactor = k·√(L1·L2) stays current.
