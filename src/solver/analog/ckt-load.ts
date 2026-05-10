@@ -15,6 +15,10 @@ import {
   MODETRANOP,
   MODEUIC,
 } from "./ckt-mode.js";
+import { runByDeviceFamily } from "./family-dispatch.js";
+import type { FamilyHandler } from "./family-registry.js";
+import type { AnalogElement } from "./element.js";
+import type { LoadContext } from "./load-context.js";
 
 /**
  * Large conductance used to enforce nodeset and IC node voltages.
@@ -24,6 +28,35 @@ import {
  *   cktload.c:113 (1e10 conductance) → CKTNS_PIN
  */
 const CKTNS_PIN = 1e10;
+
+/**
+ * Per-element load with CKTtroubleNode tracking.
+ *
+ * Mirrors the deleted flat walk in pre-Phase-0 ckt-load.ts (lines 87-96),
+ * preserving per-element granularity for trouble-node assignment.
+ * Passed as the `defaultHandler` to `runByDeviceFamily` so that every
+ * bucket without a registered specialist handler (all families in Phase 2)
+ * executes the identical `el.load(ctx)` + noncon-check body as the
+ * original flat loop.
+ *
+ * cite: cktload.c:61-75 -- per-type DEVload loop.
+ * cite: cktload.c:64-65 -- CKTtroubleNode reset when noncon rises.
+ */
+function makeTroubleTrackingHandler(
+  ctx: CKTCircuitContext,
+): FamilyHandler {
+  return {
+    run(loadCtx: unknown, instances: readonly AnalogElement[]): void {
+      const lctx = loadCtx as LoadContext;
+      for (const el of instances) {
+        el.load(lctx);
+        if (lctx.noncon.value > 0) {
+          ctx.troubleNode = null;
+        }
+      }
+    },
+  };
+}
 
 /**
  * Single-pass device load function.
@@ -78,6 +111,15 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // exit (niiter.c:628-637)- sees a consistent collector reference on the
   // LoadContext handed to devices.
   ctx.loadCtx.limitingCollector = ctx.limitingCollector;
+
+  // Step 3: per-type device load (ngspice cktload.c:61-75).
+  // runByDeviceFamily iterates family buckets in ascending min(ngspiceLoadOrder)
+  // order, matching ngspice's `for i in DEVmaxnum: DEVices[i]->DEVload(ckt)`.
+  // In Phase 2 all families fall through to the default handler; no specialist
+  // handlers are registered yet (Phase 4 registers IND_FAMILY). The default
+  // handler here is a locally-constructed wrapper that preserves the per-element
+  // CKTtroubleNode tracking from the deleted flat walk (cktload.c:64-65).
+  runByDeviceFamily(ctx.elementsByFamily, "load", ctx.loadCtx, makeTroubleTrackingHandler(ctx));
 
   // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.
   // Gate: (CKTmode & MODEDC) && (CKTmode & (MODEINITJCT | MODEINITFIX))

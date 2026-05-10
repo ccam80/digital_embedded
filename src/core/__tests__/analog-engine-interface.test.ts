@@ -218,6 +218,7 @@ describe("AnalogEngineTypes", () => {
       removeMeasurementObserver(_observer: MeasurementObserver): void {},
       getElementPinCurrents(_elementId: number): number[] { return []; },
       setSimTime(_t: number): void {},
+      setCircuitTemp(_K: number): void {},
     };
 
     // Assignment to Engine base must be valid
@@ -228,6 +229,7 @@ describe("AnalogEngineTypes", () => {
     expect(typeof mockAnalogEngine.dcOperatingPoint).toBe("function");
     expect(typeof mockAnalogEngine.addBreakpoint).toBe("function");
     expect(typeof mockAnalogEngine.clearBreakpoints).toBe("function");
+    expect(typeof mockAnalogEngine.setCircuitTemp).toBe("function");
 
     // Call dcOperatingPoint to verify it works at runtime
     const result = mockAnalogEngine.dcOperatingPoint();

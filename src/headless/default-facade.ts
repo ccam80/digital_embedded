@@ -385,6 +385,15 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return this._coordinator.dcOperatingPoint();
   }
 
+  /**
+   * Set the circuit operating temperature in Kelvin.
+   * Forwards to the underlying analog engine so temperature-dependent elements
+   * recalculate their model parameters at the next solve.
+   */
+  setCircuitTemp(K: number): void {
+    this._coordinator.setCircuitTemp(K);
+  }
+
   /** Enable or disable convergence step recording on the analog engine. */
   setConvergenceLogEnabled(enabled: boolean): void {
     if (this._captureHook !== null && enabled === false) {

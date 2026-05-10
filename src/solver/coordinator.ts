@@ -497,6 +497,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._analog.convergenceLog.clear();
   }
 
+  setCircuitTemp(K: number): void {
+    if (this._analog === null) return;
+    this._analog.setCircuitTemp(K);
+  }
+
   async stepToTime(targetSimTime: number, budgetMs = 5000): Promise<number> {
     if (this._analog === null) return 0;
     this._analog.addBreakpoint(targetSimTime);

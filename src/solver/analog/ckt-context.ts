@@ -21,6 +21,7 @@ import type { LoadContext, ConvergenceEvent } from "./load-context.js";
 import type { IntegrationMethod } from "./integration.js";
 import { MODEDCOP, MODEINITFLOAT, MODEUIC } from "./ckt-mode.js";
 import type { TempContext } from "./temp-context.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // LoadCtxImpl- concrete LoadContext with live state-ring access
@@ -185,6 +186,7 @@ export class DcOpResult {
 export interface CKTCircuitInput {
   readonly nodeCount: number;
   readonly elements: readonly AnalogElement[];
+  readonly elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
   readonly statePool?: StatePool | null;
 }
 
@@ -390,6 +392,14 @@ export class CKTCircuitContext {
 
   /** All analog elements in the circuit. */
   elements: readonly AnalogElement[];
+  /**
+   * Per-family element buckets (ngspice CKThead[] linked-list analog).
+   * Built once by the compiler after the ngspiceLoadOrder sort; stable
+   * reference for the lifetime of the compiled circuit. Consumed by
+   * runByDeviceFamily in ckt-load.ts, ac-analysis.ts, and ckt-temp.ts.
+   * cite: cktload.c:61-75 -- for i in DEVmaxnum: DEVices[i]->DEVload(ckt)
+   */
+  elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
   /** Number of non-ground MNA node rows. */
   nodeCount: number;
   /** Shared state pool for per-element state. Null until allocateStateBuffers() is called. */
@@ -633,10 +643,11 @@ export class CKTCircuitContext {
     addBreakpoint: (t: number) => void,
     solver: SparseSolver,
   ) {
-    const { nodeCount, elements } = circuit;
+    const { nodeCount, elements, elementsByFamily } = circuit;
 
     this.nodeCount = nodeCount;
     this.elements = elements;
+    this.elementsByFamily = elementsByFamily;
     this.statePool = null;
 
     // Pre-computed element lists (zero-alloc invariant per spec phase-1).

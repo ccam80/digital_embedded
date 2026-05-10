@@ -42,6 +42,7 @@ import {
   MODEUIC, MODEDCOP, MODETRAN, MODETRANOP,
   MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
+import { cktTemp } from "./ckt-temp.js";
 
 // ---------------------------------------------------------------------------
 // MNAEngine
@@ -196,6 +197,7 @@ export class MNAEngine implements AnalogEngine {
       {
         nodeCount: compiled.nodeCount,
         elements: compiled.elements,
+        elementsByFamily: compiled.elementsByFamily,
       },
       this._params,
       (t) => this._timestep.addBreakpoint(t),
@@ -1002,6 +1004,7 @@ export class MNAEngine implements AnalogEngine {
       nodeCount: this._compiled.nodeCount,
       matrixSize: this._solver.matrixSize,
       elements: this._compiled.elements,
+      elementsByFamily: this._compiled.elementsByFamily,
       labelToNodeId: this._compiled.labelToNodeId,
     };
     const ac = new AcAnalysis(adapted, this._params);
@@ -1294,6 +1297,31 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
 
   // -------------------------------------------------------------------------
+  // Temperature control (ngspice CKTtemp / ckttemp.c:28-33)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Set circuit operating temperature and re-run the per-type temperature pass.
+   *
+   * cite: ckttemp.c:28-33 — sets CKTtemp then calls DEVtemperature for every
+   * device type. After this call, the next NR iteration sees updated
+   * temperature-derived parameters for every element that implements
+   * computeTemperature?(ctx).
+   *
+   * Invalidates the cached TempContext so the next access reconstructs it
+   * from the new cktTemp value.
+   */
+  setCircuitTemp(K: number): void {
+    const ctx = this._ctx;
+    if (!ctx) return;
+    ctx.cktTemp = K;
+    ctx.resetTempCtx();
+    const compiled = this._compiled as ConcreteCompiledAnalogCircuit | null;
+    if (!compiled) return;
+    cktTemp(ctx, compiled.elementsByFamily);
+  }
+
+  // -------------------------------------------------------------------------
   // Setup-phase implementation (A4.2)
   // -------------------------------------------------------------------------
 
@@ -1328,6 +1356,14 @@ export class MNAEngine implements AnalogEngine {
       const topology = buildTopologyInfo(this._elements);
       runPostSetupDetectors(topology, d => this._diagnostics.emit(d));
     }
+
+    // Initial temperature pass — cite: ckttemp.c:28-33 (DEVtemperature called
+    // once after CKTsetup completes, before the first NR iteration).
+    // All elements with computeTemperature?(ctx) see ctx.cktTemp = 300.15 K
+    // (REFTEMP) on this first pass. Phase 5 populates concrete semiconductor
+    // computeTemperature implementations; for now the default handler is a
+    // no-op so this call is observable but inert.
+    cktTemp(this._ctx!, cac.elementsByFamily);
 
     this._isSetup = true;
   }

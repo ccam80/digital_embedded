@@ -29,9 +29,12 @@ import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { CKTCircuitContext } from "./ckt-context.js";
 import { MODEAC, MODEUIC } from "./ckt-mode.js";
 import type { AnalogElement } from "./element.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
 import type { SimulationParams } from "../../core/analog-engine-interface.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
+import { runByDeviceFamily } from "./family-dispatch.js";
+import { defaultStampAcHandler, type AcHandlerCtx } from "./loaders/default-loaders.js";
 
 // ---------------------------------------------------------------------------
 // AcParams- frequency sweep configuration
@@ -95,6 +98,7 @@ export interface AcCompiledCircuit {
   readonly nodeCount: number;
   readonly matrixSize: number;
   readonly elements: readonly AnalogElement[];
+  readonly elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
   readonly labelToNodeId: Map<string, number>;
 }
 
@@ -235,6 +239,11 @@ export class AcAnalysis {
 
       // Assemble complex MNA matrix for this frequency
       complexSolver.beginAssembly(N_ac);
+
+      // Stamp all elements' AC admittances via the family dispatcher.
+      // cite: acan.c:409-414 -- per-type DEVacLoad loop.
+      const acHandlerCtx: AcHandlerCtx = { solver: complexSolver, omega, loadCtx: acLoadCtx };
+      runByDeviceFamily(compiled.elementsByFamily, "stampAc", acHandlerCtx, defaultStampAcHandler);
 
       // Stamp the ideal AC voltage source: V(sourceNode) = 1 + 0j
       // MNA voltage source stamp (node positive = sourceNodeId, negative = ground):

@@ -227,6 +227,13 @@ export interface SimulationCoordinator {
   clearConvergenceLog(): void;
 
   /**
+   * Set the circuit operating temperature in Kelvin.
+   * Forwards to the analog engine so temperature-dependent elements
+   * recalculate model parameters at the next solve. No-op for digital-only circuits.
+   */
+  setCircuitTemp(K: number): void;
+
+  /**
    * Step until simTime >= targetSimTime, with optional wall-clock budget.
    * Returns the number of steps taken. No-op (returns 0) for discrete-only circuits.
    * @param targetSimTime - Target simulation time in seconds

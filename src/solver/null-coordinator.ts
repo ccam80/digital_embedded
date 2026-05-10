@@ -119,6 +119,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   setConvergenceLogEnabled(_enabled: boolean): void { /* no-op */ }
   getConvergenceLog(_lastN?: number): StepRecord[] | null { return null; }
   clearConvergenceLog(): void { /* no-op */ }
+  setCircuitTemp(_K: number): void { /* no-op */ }
 
   async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
   async sampleAtTimes<T>(_times: readonly number[], _capture: () => T, _wallBudgetMs?: number): Promise<readonly T[]> { return []; }

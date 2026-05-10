@@ -20,6 +20,7 @@ import { describe, it, expect, vi } from "vitest";
 import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
 import type { AcCompiledCircuit } from "../ac-analysis.js";
 import { AnalogElement } from "../element.js";
+import type { DeviceFamily } from "../ngspice-load-order.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComplexSparseSolverStamp as ComplexSparseSolver } from "../complex-sparse-solver.js";
 import * as ComplexSolverModule from "../complex-sparse-solver.js";
@@ -49,6 +50,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
   class AcResistor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
+    readonly deviceFamily: DeviceFamily = "RES";
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}
     setParam(_key: string, _value: number): void {}
@@ -77,6 +79,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
   class AcCapacitor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
+    readonly deviceFamily: DeviceFamily = "CAP";
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}
     setParam(_key: string, _value: number): void {}
@@ -104,6 +107,7 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
   const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
   class AcInductor extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
+    readonly deviceFamily: DeviceFamily = "IND";
     setup(_ctx: import("../setup-context.js").SetupContext): void {}
     load(_ctx: LoadContext): void {}
     setParam(_key: string, _value: number): void {}
@@ -149,10 +153,16 @@ function makeRcLowpassCircuit(R: number, C: number): AcCompiledCircuit {
     makeAcCapacitor(2, 0, C),  // Capacitor between node 2 and ground
   ];
 
+  const elementsByFamily = new Map<DeviceFamily, readonly AnalogElement[]>([
+    ["RES", [elements[0]]],
+    ["CAP", [elements[1]]],
+  ]);
+
   return {
     nodeCount: 2,
     matrixSize: 2,
     elements,
+    elementsByFamily,
     labelToNodeId,
   };
 }
@@ -178,10 +188,17 @@ function makeRlcSeriesCircuit(R: number, L: number, C: number): AcCompiledCircui
     makeAcResistor(3, 0, R),   // Shunt resistor: node3 → GND (output across this)
   ];
 
+  const elementsByFamily = new Map<DeviceFamily, readonly AnalogElement[]>([
+    ["IND", [elements[0]]],
+    ["CAP", [elements[1]]],
+    ["RES", [elements[2]]],
+  ]);
+
   return {
     nodeCount: 3,
     matrixSize: 3,
     elements,
+    elementsByFamily,
     labelToNodeId,
   };
 }
@@ -424,10 +441,16 @@ describe("AC", () => {
       makeAcCapacitor(2, 0, C),  // C: node2 → GND (creates pole)
     ];
 
+    const elementsByFamily = new Map<DeviceFamily, readonly AnalogElement[]>([
+      ["RES", [elements[0], elements[1]]],
+      ["CAP", [elements[2]]],
+    ]);
+
     const circuit: AcCompiledCircuit = {
       nodeCount: 2,
       matrixSize: 2,
       elements,
+      elementsByFamily,
       labelToNodeId,
     };
 

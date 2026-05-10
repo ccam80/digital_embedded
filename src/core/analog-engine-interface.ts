@@ -417,6 +417,15 @@ export interface AnalogEngine extends Engine {
    */
   configure(params: Partial<SimulationParams>): void;
 
+  /**
+   * Set the circuit operating temperature in Kelvin.
+   *
+   * Propagates to all temperature-dependent elements (BJT, diode, MOSFET)
+   * so their model parameters are recalculated at the next solve.
+   * Equivalent to updating `SimulationParams.temp` via `configure()`.
+   */
+  setCircuitTemp(K: number): void;
+
   // -------------------------------------------------------------------------
   // Diagnostics
   // -------------------------------------------------------------------------
