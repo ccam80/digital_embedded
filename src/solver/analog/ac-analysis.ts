@@ -236,13 +236,6 @@ export class AcAnalysis {
       // Assemble complex MNA matrix for this frequency
       complexSolver.beginAssembly(N_ac);
 
-      // Stamp all element AC contributions
-      for (const el of compiled.elements) {
-        if (el.stampAc) {
-          el.stampAc(complexSolver, omega, acLoadCtx);
-        }
-      }
-
       // Stamp the ideal AC voltage source: V(sourceNode) = 1 + 0j
       // MNA voltage source stamp (node positive = sourceNodeId, negative = ground):
       //   B[sourceNodeIdx, branchRow] += 1   (B sub-matrix: node row, branch col)

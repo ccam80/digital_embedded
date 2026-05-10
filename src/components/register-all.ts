@@ -264,9 +264,6 @@ import { ComparatorDriverDefinition } from "./active/comparator-driver.js";
 import { ComparatorPushPullDriverDefinition } from "./active/comparator-pushpull-driver.js";
 import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.js";
 
-// Transformer coupling sub-element (internalOnly)
-import { TransformerCouplingDefinition } from "./passives/transformer-coupling.js";
-
 // Triode analog leaf (internalOnly)
 import { TriodeAnalogDefinition } from "./semiconductors/triode-analog-element.js";
 
@@ -547,9 +544,6 @@ export function createDefaultRegistry(
   registry.register(ComparatorDriverDefinition);
   registry.register(ComparatorPushPullDriverDefinition);
   registry.register(SchmittTriggerDriverDefinition);
-
-  // Transformer coupling sub-element (internalOnly)
-  registry.register(TransformerCouplingDefinition);
 
   // Triode analog leaf (internalOnly)
   registry.register(TriodeAnalogDefinition);

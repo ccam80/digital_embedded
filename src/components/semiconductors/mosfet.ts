@@ -815,12 +815,6 @@ function _createMosfetElementWithPolarity(
   // For PMOS, VTO is typically negative (e.g., -1.0). computeTempParams applies
   // polarity at the tVbi/tVto evaluation sites per mos1temp.c:170-176.
 
-  let tp = computeTempParams(params, polarity);
-  // Thread temp-corrected values into params for standalone helper functions.
-  params._tKP = tp.tTransconductance;
-  params._tPhi = tp.tPhi;
-  params._tVto = tp.tVto;
-
   // Derived reactive detection (mirrors ngspice's cap-companion gate bitmask).
   const ld = params.LD;
   const effectiveLength = params.L - 2 * ld;

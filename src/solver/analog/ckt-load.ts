@@ -79,22 +79,6 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // LoadContext handed to devices.
   ctx.loadCtx.limitingCollector = ctx.limitingCollector;
 
-  // Step 3: single device loop (ngspice cktload.c:61-75). Null-guard matches
-  // ngspice `if (DEVices[i] && DEVices[i]->DEVload && ckt->CKThead[i])`.
-  // Our element list is statically filtered at compile time (only non-null
-  // elements are pushed), but the typeof guard documents the contract and
-  // protects against pluggable subclasses that fail to provide load().
-  for (const element of ctx.elements) {
-    if (typeof element.load !== "function") continue;
-    element.load(ctx.loadCtx);
-    // CKTtroubleNode tracking- ngspice cktload.c:64-65: the most recent
-    // device-load to bump noncon zeros the trouble-node pointer so the
-    // owning consumer can identify the blame element.
-    if (ctx.loadCtx.noncon.value > 0) {
-      ctx.troubleNode = null;
-    }
-  }
-
   // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.
   // Gate: (CKTmode & MODEDC) && (CKTmode & (MODEINITJCT | MODEINITFIX))
   //- any DC-family analysis (DCOP, TRANOP, DCTRANCURVE) during JCT or FIX.

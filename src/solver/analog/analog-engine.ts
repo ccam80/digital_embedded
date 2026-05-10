@@ -38,7 +38,6 @@ import { buildTopologyInfo, runPostSetupDetectors } from "./topology-diagnostics
 import type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
 export type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
-import { assertPoolIsSoleMutableState } from "../../solver/analog/state-schema.js";
 import {
   MODEUIC, MODEDCOP, MODETRAN, MODETRANOP,
   MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
@@ -79,7 +78,6 @@ export class MNAEngine implements AnalogEngine {
   private _compiled: ConcreteCompiledAnalogCircuit | null = null;
 
   private _elements: readonly AnalogElement[] = [];
-  private _devProbeRan: boolean = false;
 
   // -------------------------------------------------------------------------
   // Setup-phase state (A4.2)
@@ -141,7 +139,6 @@ export class MNAEngine implements AnalogEngine {
     const compiled = circuit as ConcreteCompiledAnalogCircuit;
     this._compiled = compiled;
     this._elements = compiled.elements;
-    this._devProbeRan = false;
 
     const { elements } = compiled;
 
@@ -297,49 +294,6 @@ export class MNAEngine implements AnalogEngine {
     const params = this._params;
     const logging = this._convergenceLog.enabled;
     let stepRec: StepRecord | null = null;
-
-    if (import.meta.env?.DEV && !this._devProbeRan) {
-      this._devProbeRan = true;
-      const statePool = (this._compiled as ConcreteCompiledAnalogCircuit).statePool ?? null;
-      if (statePool) {
-        const poolSnapshot = statePool.state0.slice();
-        const ctx = this._ctx!;
-        // Prime the solver so element.load() can call allocElement safely.
-        // Without this the shared solver's column linked list is empty, and
-        // every allocElement call corrupts it via undefined-index coercion-
-        // the exact failure mode that hung tests using larger circuits.
-        // The stamps produced here are discarded by the next cktLoad()'s
-        // beginAssembly, so it costs us nothing to re-prime.
-        ctx.solver._resetForAssembly();
-        for (const element of this._elements) {
-          if (isPoolBacked(element)) {
-            const violations = assertPoolIsSoleMutableState(
-              element.stateSchema.owner ?? "unknown",
-              element,
-              () => {
-                element.load(ctx.loadCtx);
-              },
-            );
-            for (const v of violations) {
-              const msg =
-                `reactive-state-outside-pool: ${v.owner}.${v.field} changed during load()\n` +
-                `but is not declared in the element's StateSchema. Mutable numeric state MUST\n` +
-                `live in pool.state0 so the engine can roll it back on NR-failure and LTE-\n` +
-                `rejection retries. Move ${v.field} into\n` +
-                `a schema slot and access it via this.s0[this.base + SLOT_${v.field.replace(/^_/, "").toUpperCase()}].`;
-              this._diagnostics.emit(
-                makeDiagnostic("reactive-state-outside-pool", "error", msg, {
-                  explanation: msg,
-                  involvedElements: [],
-                  simTime: this._simTime,
-                }),
-              );
-            }
-          }
-        }
-        statePool.state0.set(poolSnapshot);
-      }
-    }
 
     const ctx = this._ctx!;
     // ngspice does NOT copy CKTrhs into CKTrhsOld between accepted steps

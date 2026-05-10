@@ -78,19 +78,6 @@ export class InductorSubElement extends PoolBackedAnalogElement {
    *  the inductance value for MUTfactor = K * sqrt(L1 * L2). */
   get inductanceForMut(): number { return this._inductance; }
 
-  /** Package-internal accessor for `MutualInductorElement.load()` â€” exposes
-   *  the per-step state arrays + base offset so the K element can update
-   *  this coil's flux slot directly (mutload.c off-diagonal contribution). */
-  get statePoolForMut(): { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; base: number } {
-    return {
-      s0: this._pool.states[0],
-      s1: this._pool.states[1],
-      s2: this._pool.states[2],
-      s3: this._pool.states[3],
-      base: this._stateBase,
-    };
-  }
-
   constructor(
     pinNodes: ReadonlyMap<string, number>,
     branchLabel: string,
@@ -304,13 +291,6 @@ export class MutualInductorElement extends AnalogElement {
     const L1 = this._l1.inductanceForMut;
     const L2 = this._l2.inductanceForMut;
     const mutFactor = this._coupling * Math.sqrt(L1 * L2);
-
-    if (!(mode & (MODEDC | MODEINITPRED))) {
-      const pool1 = this._l1.statePoolForMut;
-      const pool2 = this._l2.statePoolForMut;
-      pool1.s0[pool1.base + SLOT_PHI] += mutFactor * rhsOld[b2];
-      pool2.s0[pool2.base + SLOT_PHI] += mutFactor * rhsOld[b1];
-    }
 
     ctx.solver.stampElement(this._hBr1Br2, -mutFactor * ag[0]!);
     ctx.solver.stampElement(this._hBr2Br1, -mutFactor * ag[0]!);
