@@ -35,6 +35,23 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
+import type { ComplexSparseSolverStamp } from "../../solver/analog/complex-sparse-solver.js";
+
+// ---------------------------------------------------------------------------
+// MutSiblingNotifiable — interface for MUT elements that notify partner inductors
+// when they need to recompute MUTfactor after an L change. Declared here to avoid
+// a circular import with mutual-inductor.ts.
+// cite: muttemp.c:35-41 — MUTfactor = k · sqrt(INDinduct1 * INDinduct2)
+// ---------------------------------------------------------------------------
+
+export interface MutSiblingNotifiable {
+  /** Recompute MUTfactor = k·√(L1·L2) when a partner inductor's L changes.
+   *  Called from AnalogInductorElement.setParam("inductance", v).
+   *  cite: muttemp.c:38 — MUTfactor = here->MUTcouple * sqrt(here->MUTind1->INDinduct * here->MUTind2->INDinduct)
+   */
+  recomputeMutFactor(): void;
+}
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -174,8 +191,11 @@ const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", 
   { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
 ]);
 
-const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
-const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
+// Module-local slot index constants. External code must use
+// stateSchema.indexOf.get("PHI") / stateSchema.indexOf.get("CCAP")
+// (schema-lookups-over-exports memory entry).
+const _SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
+const _SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 
 export class AnalogInductorElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
@@ -184,7 +204,9 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   readonly stateSize = INDUCTOR_SCHEMA.size;
 
   private _nominalL: number;
-  private L: number;
+  // Effective inductance after temperature derating, SCALE, and /M.
+  // Corresponds to ngspice `here->INDinduct/m` after indtemp.c:71-72.
+  private _effectiveL: number;
   private _IC: number;
   private _TC1: number;
   private _TC2: number;
@@ -197,6 +219,33 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   protected _hIbrP:   number = -1;
   protected _hIbrIbr: number = -1;
 
+  // AC complex-matrix handles allocated during setup() or lazily in stampAc().
+  // cite: indacld.c:31-35 — same 5 matrix positions as real DC stamps but complex.
+  protected _hAcPIbr:   number = -1;
+  protected _hAcNIbr:   number = -1;
+  protected _hAcIbrN:   number = -1;
+  protected _hAcIbrP:   number = -1;
+  protected _hAcIbrIbr: number = -1;
+
+  /**
+   * MUT sibling elements registered by MutualInductorElement.setup().
+   * Populated by push from MUT so the cascade from setParam("inductance") can
+   * call m.recomputeMutFactor() for every coupled MUT element.
+   * cite: muttemp.c:35-41 — MUTfactor = k · sqrt(INDinduct1 * INDinduct2);
+   * recomputed whenever a partner inductance changes.
+   */
+  _mutSiblings: MutSiblingNotifiable[] = [];
+
+  /**
+   * Set to true by loadFluxInit() when called explicitly by the IND_FAMILY
+   * handler (IndFamilyLoadHandler, task 4.2.1) as Pass 1 before MUT coupling.
+   * load() checks this flag: if true, skips its own internal flux-init (to
+   * preserve MUT's augmentation from Pass 2) and resets the flag to false.
+   * If false (default handler path — no MUT), load() calls loadFluxInit()
+   * itself to maintain backward-compatible standalone behaviour.
+   */
+  _fluxPreInitialized = false;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._nominalL = props.getModelParam<number>("inductance");
@@ -206,7 +255,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     this._TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
     this._SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
     this._M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
-    this.L = this._computeEffectiveL();
+    this._effectiveL = this._computeEffectiveL();
   }
 
   private _computeEffectiveL(): number {
@@ -216,27 +265,48 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     return this._nominalL * factor * this._SCALE / this._M;
   }
 
+  /**
+   * Expose the post-temperature effective inductance value for MUT coupling.
+   * MUT reads this to compute MUTfactor = k · sqrt(L1 · L2) in its own
+   * computeTemperature callback.
+   * cite: muttemp.c:38 — sqrt(here->MUTind1->INDinduct * here->MUTind2->INDinduct)
+   */
+  get inductance(): number {
+    return this._effectiveL;
+  }
+
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
     const pinNodes = this.pinNodes;
     const posNode = pinNodes.get("pos")!;  // INDposNode
     const negNode = pinNodes.get("neg")!;  // INDnegNode
 
-    // indsetup.c:78-79- *states += 2 (INDflux = state+0, INDvolt = state+1)
+    // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
     this._stateBase = ctx.allocStates(2);
 
-    // indsetup.c:84-88- CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
+    // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
-    // indsetup.c:96-100- TSTALLOC sequence, line-for-line.
+    // indsetup.c:96-100 — TSTALLOC sequence, line-for-line.
     this._hPIbr   = solver.allocElement(posNode, b);  // (INDposNode, INDbrEq)
     this._hNIbr   = solver.allocElement(negNode, b);  // (INDnegNode, INDbrEq)
     this._hIbrN   = solver.allocElement(b, negNode);  // (INDbrEq,    INDnegNode)
     this._hIbrP   = solver.allocElement(b, posNode);  // (INDbrEq,    INDposNode)
     this._hIbrIbr = solver.allocElement(b, b);        // (INDbrEq,    INDbrEq)
+
+    // Eagerly allocate AC complex-matrix entries when setup() has an acSolver.
+    // cite: indacld.c:31-35 — same 5 (row,col) positions in the complex matrix.
+    const acSolver = (ctx as unknown as { acSolver?: ComplexSparseSolverStamp }).acSolver;
+    if (acSolver) {
+      this._hAcPIbr   = acSolver.allocComplexElement(posNode, b);
+      this._hAcNIbr   = acSolver.allocComplexElement(negNode, b);
+      this._hAcIbrP   = acSolver.allocComplexElement(b, posNode);
+      this._hAcIbrN   = acSolver.allocComplexElement(b, negNode);
+      this._hAcIbrIbr = acSolver.allocComplexElement(b, b);
+    }
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
@@ -247,100 +317,177 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     return this.branchIndex;
   }
 
+  /**
+   * computeTemperature — per-instance temperature derating.
+   *
+   * cite: indtemp.c:55-72 —
+   *   difference = (here->INDtemp + here->INDdtemp) - model->INDtnom
+   *   factor = 1.0 + tc1*difference + tc2*difference*difference
+   *   here->INDinduct = here->INDinduct * factor * INDscale / INDm
+   *
+   * Our instance TNOM (_TNOM) maps to ngspice’s model->INDtnom for the case
+   * where the instance does not override temperature (indtemp.c:35-43).
+   * ctx.cktTemp maps to (here->INDtemp + here->INDdtemp) = ckt->CKTtemp.
+   */
+  computeTemperature(ctx: TempContext): void {
+    // cite: indtemp.c:55 — difference = (INDtemp + INDdtemp) - INDtnom
+    const difference = ctx.cktTemp - this._TNOM;
+    // cite: indtemp.c:69 — factor = 1.0 + tc1*difference + tc2*difference*difference
+    const factor = 1.0 + this._TC1 * difference + this._TC2 * difference * difference;
+    // cite: indtemp.c:71-72 — INDinduct = INDinduct * factor * INDscale / INDm
+    this._effectiveL = this._nominalL * factor * this._SCALE / this._M;
+  }
+
   setParam(key: string, value: number): void {
     if (key === "inductance") {
       this._nominalL = value;
-      this.L = this._computeEffectiveL();
+      this._effectiveL = this._computeEffectiveL();
+      // Cascade to MUT siblings so MUTfactor = k·√(L1·L2) stays current.
+      // cite: muttemp.c:35-41 — MUTfactor depends on both partner INDinduct values.
+      for (const m of this._mutSiblings) {
+        m.recomputeMutFactor();
+      }
     } else if (key === "IC") {
       this._IC = value;
     } else if (key === "TC1") {
       this._TC1 = value;
-      this.L = this._computeEffectiveL();
+      this._effectiveL = this._computeEffectiveL();
     } else if (key === "TC2") {
       this._TC2 = value;
-      this.L = this._computeEffectiveL();
+      this._effectiveL = this._computeEffectiveL();
     } else if (key === "TNOM") {
       this._TNOM = value;
-      this.L = this._computeEffectiveL();
+      this._effectiveL = this._computeEffectiveL();
     } else if (key === "SCALE") {
       this._SCALE = value;
-      this.L = this._computeEffectiveL();
+      this._effectiveL = this._computeEffectiveL();
     } else if (key === "M") {
       this._M = value;
-      this.L = this._computeEffectiveL();
+      this._effectiveL = this._computeEffectiveL();
     }
   }
 
   /**
-   * load()  exact 1:1 port of ngspice indload.c INDload (lines 35-124).
+   * loadFluxInit — Pass 1 of the IND_FAMILY 3-pass load.
    *
-   * Structural mirror (no extra slots, no extra helpers, no DC-OP-only branch
-   * outside ngspice's MODEDC arm):
-   *   indload.c:43-51    flux-from-current update, gated on !(MODEDC|MODEINITPRED)
-   *   indload.c:88-110   req/veq: DC â‡’ 0, else mutually-exclusive
-   *                        MODEINITPRED (s0=s1 PHI) / MODEINITTRAN (s1=s0 PHI),
-   *                        then NIintegrate(geq, ceq, L, INDflux). niinteg.c:15
-   *                        `#define ccap qcap+1` â‡’ NIintegrate writes
-   *                        state0[INDflux+1] = state0[INDvolt] = s0[SLOT_CCAP]
-   *                        and reads state1[INDvolt] = s1[SLOT_CCAP] for the
-   *                        TRAP order-2 recursion buffer.
-   *   indload.c:112      *(CKTrhs + INDbrEq) += veq
-   *   indload.c:114-117  *(CKTstate1 + INDvolt) = *(CKTstate0 + INDvolt)
-   *                        on MODEINITTRAN (= s1[CCAP] = s0[CCAP]; seeds the
-   *                        TRAP-order-2 recursion buffer for the next step).
-   *   indload.c:119-123  unconditional 5-stamp sequence: ±1 incidence,
-   *                        -req branch diagonal.
+   * cite: indload.c:43-51 — flux-from-current update, gated on
+   *   !(ckt->CKTmode & (MODEDC|MODEINITPRED)).
    *
-   * `m` (parallel multiplicity) and SCALE / TC1 / TC2 / TNOM are folded into
-   * `this.L` by `_computeEffectiveL()`, so `L` here corresponds to ngspice's
-   * `here->INDinduct/m` after temperature scaling.
+   * Sets s0[INDflux] = (INDinduct/m) · CKTrhsOld[INDbrEq].
+   * Under MODEUIC + MODEINITTRAN with a valid IC, seeds from INDinitCond instead.
+   * At DC or INITPRED mode, this method is a no-op — the flux is left unchanged
+   * so the INITPRED copy in load() Pass 3 can propagate s1→s0 correctly.
+   *
+   * Called by IndFamilyLoadHandler before the MUT pass (Pass 2) so that MUT
+   * can augment s0[INDflux] with M·i_partner via augmentFlux(). Sets
+   * _fluxPreInitialized = true so load() skips its own internal flux-init and
+   * preserves any MUT augmentation from Pass 2.
+   */
+  loadFluxInit(ctx: LoadContext): void {
+    const { rhsOld, cktMode: mode } = ctx;
+    const b = this.branchIndex;
+    const L = this._effectiveL;
+    const base = this._stateBase;
+    const s0 = this._pool.states[0];
+
+    // cite: indload.c:43 — if(!(ckt->CKTmode & (MODEDC|MODEINITPRED)))
+    if (!(mode & (MODEDC | MODEINITPRED))) {
+      if ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC)) {
+        // cite: indload.c:44-46 — UIC seed: INDflux = INDinduct/m * INDinitCond
+        s0[base + _SLOT_PHI] = L * this._IC;
+      } else {
+        // cite: indload.c:48-50 — INDflux = INDinduct/m * CKTrhsOld[INDbrEq]
+        s0[base + _SLOT_PHI] = L * rhsOld[b];
+      }
+    }
+    // Signal load() that flux was pre-initialized (and possibly MUT-augmented)
+    // so it must not overwrite s0[PHI] again.
+    this._fluxPreInitialized = true;
+  }
+
+  /**
+   * augmentFlux — called by MutualInductorElement.loadCouplingPass() (Pass 2)
+   * to add M·i_partner to this inductor’s flux accumulator before Pass 3.
+   *
+   * cite: indload.c:65-67 —
+   *   *(ckt->CKTstate0 + muthere->MUTind1->INDflux) +=
+   *     muthere->MUTfactor * *(ckt->CKTrhsOld + muthere->MUTind2->INDbrEq);
+   *
+   * PHI slot is resolved via stateSchema.indexOf to honour the schema-lookup
+   * pattern (project memory feedback_schema_lookups_over_exports.md).
+   */
+  public augmentFlux(delta: number): void {
+    // cite: indload.c:65-71 — CKTstate0[INDflux] += MUTfactor * CKTrhsOld[partner->INDbrEq]
+    const slotPhi = this.stateSchema.indexOf.get("PHI")!;
+    this._pool.states[0][this._stateBase + slotPhi] += delta;
+  }
+
+  /**
+   * load — Pass 3 of the IND_FAMILY 3-pass load: NIintegrate + 5-stamp.
+   *
+   * When called by the IND_FAMILY handler (IndFamilyLoadHandler, task 4.2.1),
+   * s0[PHI] has already been set by loadFluxInit() (Pass 1) and augmented by
+   * MUT coupling (Pass 2). _fluxPreInitialized is true in that case and this
+   * method skips its own flux-init to preserve the MUT-augmented value.
+   *
+   * When called by the default load handler (no IND_FAMILY handler registered),
+   * _fluxPreInitialized is false and load() calls loadFluxInit(ctx) itself to
+   * maintain correct standalone behaviour for non-MUT inductors.
+   *
+   * cite: indload.c:88-125 —
+   *   indload.c:43-51    flux-from-current (handled by loadFluxInit or fallback below)
+   *   indload.c:88-90    DC path: req=0, veq=0.
+   *   indload.c:93-104   (#ifndef PREDICTOR): MODEINITPRED copies s1→s0 PHI;
+   *                        MODEINITTRAN copies s0→s1 PHI before NIintegrate.
+   *   indload.c:106-109  NIintegrate(ckt, &req, &veq, newmind, here->INDflux).
+   *   indload.c:112      *(CKTrhs + INDbrEq) += veq.
+   *   indload.c:114-117  MODEINITTRAN: s1[INDvolt] = s0[INDvolt].
+   *   indload.c:119-123  unconditional 5-stamp sequence.
    */
   load(ctx: LoadContext): void {
-    const { solver, rhsOld, ag, cktMode: mode } = ctx;
+    // Standalone path (default handler, no IND_FAMILY orchestration):
+    // perform flux init here if loadFluxInit() was not called externally.
+    // cite: indload.c:43-51 — flux-from-current init (Pass 1 in family context).
+    if (!this._fluxPreInitialized) {
+      this.loadFluxInit(ctx);
+      // loadFluxInit sets _fluxPreInitialized = true; reset immediately since
+      // this IS the same call site — we don't need the guard for this iteration.
+    }
+    this._fluxPreInitialized = false;
+
+    const { solver, ag, cktMode: mode } = ctx;
     const b = this.branchIndex;
-    const L = this.L;
+    const L = this._effectiveL;
     const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // indload.c:43-51  flux-from-current update.
-    if (!(mode & (MODEDC | MODEINITPRED))) {
-      if ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC)) {
-        // indload.c:44-46: UIC seed.
-        s0[base + SLOT_PHI] = L * this._IC;
-      } else {
-        // indload.c:48-50: flux from prior NR iterate branch current
-        // (CKTrhsOld + INDbrEq).
-        s0[base + SLOT_PHI] = L * rhsOld[b];
-      }
-    }
-
-    // indload.c:88-110  req/veq.
+    // indload.c:88-110 — req/veq.
     let req = 0;
     let veq = 0;
     if (mode & MODEDC) {
-      // indload.c:88-90.
+      // cite: indload.c:88-90 — DC path: req = 0, veq = 0.
       req = 0;
       veq = 0;
     } else {
-      // indload.c:93-104 (#ifndef PREDICTOR): mutually-exclusive flux copies.
+      // cite: indload.c:93-104 (#ifndef PREDICTOR): mutually-exclusive flux copies.
       if (mode & MODEINITPRED) {
-        // indload.c:94-96: predictor  s0[INDflux] = s1[INDflux].
-        s0[base + SLOT_PHI] = s1[base + SLOT_PHI];
+        // cite: indload.c:94-96 — predictor: s0[INDflux] = s1[INDflux].
+        s0[base + _SLOT_PHI] = s1[base + _SLOT_PHI];
       } else if (mode & MODEINITTRAN) {
-        // indload.c:99-102: transient init  s1[INDflux] = s0[INDflux]
+        // cite: indload.c:99-102 — transient init: s1[INDflux] = s0[INDflux]
         // BEFORE NIintegrate so the order-2 history is seeded.
-        s1[base + SLOT_PHI] = s0[base + SLOT_PHI];
+        s1[base + _SLOT_PHI] = s0[base + _SLOT_PHI];
       }
-      // indload.c:106-109: NIintegrate(ckt, &geq, &ceq, L, INDflux).
-      // niinteg.c writes state0[INDvolt] = state0[ccap] = s0[SLOT_CCAP].
-      const phi0 = s0[base + SLOT_PHI];
-      const phi1 = s1[base + SLOT_PHI];
-      const phi2 = s2[base + SLOT_PHI];
-      const phi3 = s3[base + SLOT_PHI];
-      const ccapPrev = s1[base + SLOT_CCAP];
+      // cite: indload.c:106-109 — NIintegrate(ckt, &geq, &ceq, newmind, here->INDflux).
+      // niinteg.c writes state0[INDvolt] = state0[ccap] = s0[_SLOT_CCAP].
+      const phi0 = s0[base + _SLOT_PHI];
+      const phi1 = s1[base + _SLOT_PHI];
+      const phi2 = s2[base + _SLOT_PHI];
+      const phi3 = s3[base + _SLOT_PHI];
+      const ccapPrev = s1[base + _SLOT_CCAP];
       const ni = niIntegrate(
         ctx.method,
         ctx.order,
@@ -352,27 +499,67 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
       );
       req = ni.geq;
       veq = ni.ceq;
-      s0[base + SLOT_CCAP] = ni.ccap;
+      s0[base + _SLOT_CCAP] = ni.ccap;
     }
 
-    // indload.c:114-117: state0[INDvolt]  state1[INDvolt] on MODEINITTRAN
-    // (= s0[CCAP]  s1[CCAP]; seeds the trap-order-2 recursion buffer).
+    // cite: indload.c:114-117 — MODEINITTRAN: s1[INDvolt] = s0[INDvolt]
+    // (= s1[CCAP] = s0[CCAP]; seeds the trap-order-2 recursion buffer).
     if (mode & MODEINITTRAN) {
-      s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
+      s1[base + _SLOT_CCAP] = s0[base + _SLOT_CCAP];
     }
 
-    // indload.c:119-123: unconditional 5-stamp sequence through cached handles.
+    // cite: indload.c:119-123 — unconditional 5-stamp through cached handles.
     // INDposIbrptr / INDnegIbrptr (B sub-matrix: ±1 at (n, b)).
     solver.stampElement(this._hPIbr, 1);   // *(INDposIbrptr) += 1
     solver.stampElement(this._hNIbr, -1);  // *(INDnegIbrptr) -= 1
-    // INDibrPosptr / INDibrNegptr (C sub-matrix: ±1 at (b, n)- KVL incidence).
+    // INDibrPosptr / INDibrNegptr (C sub-matrix: ±1 at (b, n) — KVL incidence).
     solver.stampElement(this._hIbrP, 1);   // *(INDibrPosptr) += 1
     solver.stampElement(this._hIbrN, -1);  // *(INDibrNegptr) -= 1
     // INDibrIbrptr (-req branch diagonal). Stamped even at DC where req=0 so
     // the structural nonzero is preserved across the handle table.
     solver.stampElement(this._hIbrIbr, -req);  // *(INDibrIbrptr) -= req
-    // indload.c:112: *(CKTrhs + INDbrEq) += veq.
+    // cite: indload.c:112 — *(CKTrhs + INDbrEq) += veq.
     stampRHS(ctx.rhs, b, veq);
+  }
+
+  /**
+   * stampAc — AC small-signal stamp per indacld.c.
+   *
+   * cite: indacld.c:27-35 —
+   *   m = here->INDm;
+   *   val = ckt->CKTomega * here->INDinduct / m;
+   *   *(INDposIbrptr)   +=  1;   (real)
+   *   *(INDnegIbrptr)   -=  1;   (real)
+   *   *(INDibrPosptr)   +=  1;   (real)
+   *   *(INDibrNegptr)   -=  1;   (real)
+   *   *(INDibrIbrptr+1) -=  val; (imaginary branch-diagonal: jωL impedance)
+   *
+   * _effectiveL already incorporates the /m division from indtemp.c:72.
+   */
+  stampAc(solver: ComplexSparseSolverStamp, omega: number, _ctx: LoadContext): void {
+    const b = this.branchIndex;
+    const posNode = this.pinNodes.get("pos")!;
+    const negNode = this.pinNodes.get("neg")!;
+
+    // cite: indacld.c:29 — val = ckt->CKTomega * here->INDinduct / m
+    const val = omega * this._effectiveL;
+
+    // Lazily allocate complex handles if setup() did not have an acSolver.
+    if (this._hAcPIbr === -1) {
+      this._hAcPIbr   = solver.allocComplexElement(posNode, b);
+      this._hAcNIbr   = solver.allocComplexElement(negNode, b);
+      this._hAcIbrP   = solver.allocComplexElement(b, posNode);
+      this._hAcIbrN   = solver.allocComplexElement(b, negNode);
+      this._hAcIbrIbr = solver.allocComplexElement(b, b);
+    }
+
+    // cite: indacld.c:31-34 — 4 real ±1 connectivity stamps (re=±1, im=0).
+    solver.stampComplexElement(this._hAcPIbr,    1,    0);  // *(INDposIbrptr) += 1
+    solver.stampComplexElement(this._hAcNIbr,   -1,    0);  // *(INDnegIbrptr) -= 1
+    solver.stampComplexElement(this._hAcIbrP,    1,    0);  // *(INDibrPosptr) += 1
+    solver.stampComplexElement(this._hAcIbrN,   -1,    0);  // *(INDibrNegptr) -= 1
+    // cite: indacld.c:35 — *(INDibrIbrptr+1) -= val  (imaginary part, re=0, im=-val).
+    solver.stampComplexElement(this._hAcIbrIbr,  0, -val);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -392,12 +579,12 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
-    const phi0 = s0[base + SLOT_PHI];
-    const phi1 = s1[base + SLOT_PHI];
-    const phi2 = s2[base + SLOT_PHI];
-    const phi3 = s3[base + SLOT_PHI];
-    const ccap0 = s0[base + SLOT_CCAP];
-    const ccap1 = s1[base + SLOT_CCAP];
+    const phi0 = s0[base + _SLOT_PHI];
+    const phi1 = s1[base + _SLOT_PHI];
+    const phi2 = s2[base + _SLOT_PHI];
+    const phi3 = s3[base + _SLOT_PHI];
+    const ccap0 = s0[base + _SLOT_CCAP];
+    const ccap1 = s1[base + _SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0, ccap1, lteParams);
   }
 }
