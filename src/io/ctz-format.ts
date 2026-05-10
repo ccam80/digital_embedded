@@ -66,7 +66,7 @@ export const CTZ_TYPE_MAP: Record<string, string> = {
   // Sources
   v: "DcVoltageSource",
   a: "AcVoltageSource",
-  i: "CurrentSource",
+  i: "DcCurrentSource",
   g: "Ground",
 
   // Semiconductors

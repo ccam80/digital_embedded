@@ -123,6 +123,14 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  _setup() runs, consumers must null-check. */
   statePool: StatePool | null;
 
+  /** Composite-internal MNA nodes allocated at compile time by
+   *  `expandCompositeInstance`. Each entry is `{ name, number, type }`,
+   *  matching the engine's `_nodeTable` shape. The engine seeds its node
+   *  table with these before `_setup()` runs, so element-private `makeVolt`
+   *  calls during setup continue from `nodeCount + 1` without colliding with
+   *  the compile-time-allocated range. Empty when no composites are present. */
+  readonly preAllocatedNodes: ReadonlyArray<{ name: string; number: number; type: "voltage" }>;
+
   /** Nodeset constraints: map of MNA nodeId → target voltage. */
   readonly nodesets?: Map<number, number>;
 
@@ -145,6 +153,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
     statePool: StatePool | null;
+    preAllocatedNodes?: ReadonlyArray<{ name: string; number: number; type: "voltage" }>;
     nodesets?: Map<number, number>;
     ics?: Map<number, number>;
   }) {
@@ -163,6 +172,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
     this.statePool = params.statePool;
+    this.preAllocatedNodes = params.preAllocatedNodes ?? [];
     if (params.nodesets !== undefined) {
       (this as { nodesets?: Map<number, number> }).nodesets = params.nodesets;
     }

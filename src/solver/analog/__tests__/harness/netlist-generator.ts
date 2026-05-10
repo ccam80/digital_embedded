@@ -15,6 +15,7 @@ import {
   type ComponentDefinition,
 } from "../../../../core/registry.js";
 import type {
+  MnaSubcircuitNetlist,
   SubcircuitElement,
   SubcircuitElementParam,
 } from "../../../../core/mna-subcircuit-netlist.js";
@@ -39,6 +40,7 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   Diode:           { prefix: "D", modelType: "D" },
   ZenerDiode:      { prefix: "D", modelType: "D" },
   VaractorDiode:   { prefix: "D", modelType: "D" },
+  SchottkyDiode:   { prefix: "D", modelType: "D" },
   NpnBJT:          { prefix: "Q", modelType: "NPN" },
   PnpBJT:          { prefix: "Q", modelType: "PNP" },
   NMOS:            { prefix: "M", modelType: "NMOS" },
@@ -49,6 +51,13 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   VCCS:            { prefix: "G" },
   CCVS:            { prefix: "H" },
   CCCS:            { prefix: "F" },
+  SwitchSPST:      { prefix: "S", modelType: "SW" },
+  SwitchSPDT:      { prefix: "S", modelType: "SW" },
+  Switch:          { prefix: "S", modelType: "SW" },
+  SwitchDT:        { prefix: "S", modelType: "SW" },
+  LDR:             { prefix: "R" },
+  VariableRail:    { prefix: "V" },
+  Clock:           { prefix: "V" },
 };
 
 /**
@@ -81,6 +90,15 @@ function canonicalizeSpiceLabel(rawLabel: string, requiredPrefix: string): strin
  * Switch+RelayCoupling collapse into one current-controlled-switch leaf
  * mapping to ngspice's W element) or mark the parent component
  * pairedSpiceEquivalent: false on its definition.
+ *
+ * Exemption: `TransformerCoupling` sub-elements are permitted to use
+ * `siblingBranch` on `L1_branch` / `L2_branch` because they map directly to
+ * ngspice's K element. K resolves L1Name/L2Name to coil branch indices and
+ * stamps mutual-inductance off-diagonals (mutsetup.c:66-67, mutload.c) — the
+ * same semantics our siblingBranch decorator carries. The K emit is handled
+ * inline in `emitElement`'s subcircuit recursion before this check fires.
+ * The exemption is keyed on (subTypeId, key) — siblingBranch on any other
+ * key or sub-typeId still throws.
  */
 function assertNoSiblingRefs(
   sub: SubcircuitElement,
@@ -92,6 +110,11 @@ function assertNoSiblingRefs(
     const v = params[key];
     if (typeof v === "object" && v !== null && "kind" in v &&
         (v.kind === "siblingBranch" || v.kind === "siblingState")) {
+      if (sub.typeId === "TransformerCoupling" &&
+          v.kind === "siblingBranch" &&
+          (key === "L1_branch" || key === "L2_branch")) {
+        continue;
+      }
       throw new Error(
         `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
         `of ${parentTypeId} '${parentLabel}' uses ${v.kind} on param '${key}'. ` +
@@ -315,6 +338,18 @@ function emitElement(
     const lines: string[] = [];
     for (let i = 0; i < subckt.elements.length; i++) {
       const sub = subckt.elements[i]!;
+
+      // TransformerCoupling maps directly to ngspice's K element. ngspice K
+      // resolves L1Name/L2Name to coil branch indices and stamps mutual-
+      // inductance off-diagonals (mutsetup.c:66-67, mutload.c) — identical to
+      // our siblingBranch semantics. Emit inline (the assertNoSiblingRefs
+      // exemption permits L1_branch/L2_branch siblingBranch refs on this
+      // typeId only).
+      if (sub.typeId === "TransformerCoupling") {
+        lines.push(...emitTransformerCouplingK(rawLabel, sub, subckt, props));
+        continue;
+      }
+
       assertNoSiblingRefs(sub, rawLabel, typeId);
 
       const subDef = registry.get(sub.typeId);
@@ -366,7 +401,7 @@ function emitElement(
     );
   }
 
-  return [emitPrimitive(rawLabel, typeId, spec, pinNodes, props, def, modelKey, modelCards)];
+  return emitPrimitive(rawLabel, typeId, spec, pinNodes, props, def, modelKey, modelCards, ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -374,11 +409,12 @@ function emitElement(
 // ---------------------------------------------------------------------------
 
 /**
- * Emit one SPICE element line for a primitive leaf (typeId in ELEMENT_SPECS).
+ * Emit SPICE element line(s) for a primitive leaf (typeId in ELEMENT_SPECS).
  * Pulls paramDefs / spice emission spec from the active model entry, applies
  * SPICE-prefix canonicalization on the instance name, and dispatches by
  * typeId / spec.prefix to the appropriate per-class branch. Pushes any
- * required `.model` cards into `modelCards`.
+ * required `.model` cards into `modelCards`. Returns one or more lines
+ * (Switch/SwitchDT emit a synthesized V-source line plus one or two S lines).
  */
 function emitPrimitive(
   rawLabel: string,
@@ -389,7 +425,8 @@ function emitPrimitive(
   def: ComponentDefinition,
   modelKey: string,
   modelCards: Map<string, string>,
-): string {
+  ctx: EmitCtx,
+): string[] {
   let paramDefs: readonly ParamDef[] = [];
   let emission: ModelEmissionSpec | undefined;
   if (spec.modelType !== undefined) {
@@ -405,20 +442,20 @@ function emitPrimitive(
 
   if (typeId === "Resistor") {
     const R = requireParam(props, def, modelKey, "resistance", rawLabel);
-    return `${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${R}`;
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${R}`];
   }
   if (typeId === "Capacitor") {
     const C = requireParam(props, def, modelKey, "capacitance", rawLabel);
-    return `${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${C}`;
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${C}`];
   }
   if (typeId === "Inductor") {
     const L = requireParam(props, def, modelKey, "inductance", rawLabel);
-    return `${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${L}`;
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${L}`];
   }
   if (typeId === "DcVoltageSource") {
     const V = requireParam(props, def, modelKey, "voltage", rawLabel);
     // SPICE convention: Vname pos neg value; our pins are [neg, pos]
-    return `${label} ${nodeAt(nodes, 1, rawLabel, "pos")} ${nodeAt(nodes, 0, rawLabel, "neg")} DC ${V}`;
+    return [`${label} ${nodeAt(nodes, 1, rawLabel, "pos")} ${nodeAt(nodes, 0, rawLabel, "neg")} DC ${V}`];
   }
   if (typeId === "AcVoltageSource") {
     const amp   = requireParam(props, def, modelKey, "amplitude", rawLabel);
@@ -428,11 +465,11 @@ function emitPrimitive(
     const waveform = props.has("waveform") ? props.get<string>("waveform") : "sine";
     const posNode = nodeAt(nodes, 1, rawLabel, "pos");
     const negNode = nodeAt(nodes, 0, rawLabel, "neg");
-    return `${label} ${posNode} ${negNode} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`;
+    return [`${label} ${posNode} ${negNode} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
   }
   if (typeId === "DcCurrentSource") {
     const I = requireParam(props, def, modelKey, "current", rawLabel);
-    return `${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} DC ${I}`;
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} DC ${I}`];
   }
   if (typeId === "AcCurrentSource") {
     const amp      = requireParam(props, def, modelKey, "amplitude", rawLabel);
@@ -442,7 +479,7 @@ function emitPrimitive(
     const waveform = props.has("waveform") ? props.get<string>("waveform") : "sine";
     const posNode = nodeAt(nodes, 1, rawLabel, "pos");
     const negNode = nodeAt(nodes, 0, rawLabel, "neg");
-    return `${label} ${posNode} ${negNode} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`;
+    return [`${label} ${posNode} ${negNode} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
   }
   if (spec.prefix === "D") {
     const modelName = `${label}_${spec.modelType}`;
@@ -450,7 +487,7 @@ function emitPrimitive(
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
     }
-    return line;
+    return [line];
   }
   if (spec.prefix === "Q") {
     const modelName = `${label}_${spec.modelType}`;
@@ -458,7 +495,7 @@ function emitPrimitive(
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
     }
-    return line;
+    return [line];
   }
   if (spec.prefix === "M") {
     const modelName = `${label}_${spec.modelType}`;
@@ -480,7 +517,7 @@ function emitPrimitive(
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
     }
-    return line;
+    return [line];
   }
   if (spec.prefix === "J") {
     const modelName = `${label}_${spec.modelType}`;
@@ -488,19 +525,19 @@ function emitPrimitive(
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
     }
-    return line;
+    return [line];
   }
   if (typeId === "VCVS") {
     // VCVS pinLayout: [ctrl+, ctrl-, out+, out-] -> SPICE `Ename N+ N- NC+ NC- gain`
     assertLinearControlExpression(props, typeId, rawLabel, "V(ctrl)");
     const gain = requireParam(props, def, modelKey, "gain", rawLabel);
-    return `${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${nodeAt(nodes, 0, rawLabel, "ctrl+")} ${nodeAt(nodes, 1, rawLabel, "ctrl-")} ${gain}`;
+    return [`${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${nodeAt(nodes, 0, rawLabel, "ctrl+")} ${nodeAt(nodes, 1, rawLabel, "ctrl-")} ${gain}`];
   }
   if (typeId === "VCCS") {
     // VCCS pinLayout: [ctrl+, ctrl-, out+, out-] -> SPICE `Gname N+ N- NC+ NC- gm`
     assertLinearControlExpression(props, typeId, rawLabel, "V(ctrl)");
     const gm = requireParam(props, def, modelKey, "transconductance", rawLabel);
-    return `${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${nodeAt(nodes, 0, rawLabel, "ctrl+")} ${nodeAt(nodes, 1, rawLabel, "ctrl-")} ${gm}`;
+    return [`${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${nodeAt(nodes, 0, rawLabel, "ctrl+")} ${nodeAt(nodes, 1, rawLabel, "ctrl-")} ${gm}`];
   }
   if (typeId === "CCVS") {
     // CCVS pinLayout: [sense+, sense-, out+, out-]; sense pins are nominal
@@ -509,7 +546,7 @@ function emitPrimitive(
     assertLinearControlExpression(props, typeId, rawLabel, "I(sense)");
     const trans = requireParam(props, def, modelKey, "transresistance", rawLabel);
     const senseRef = canonicalizeSpiceLabel(props.get<string>("senseSourceLabel"), "V");
-    return `${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${senseRef} ${trans}`;
+    return [`${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${senseRef} ${trans}`];
   }
   if (typeId === "CCCS") {
     // CCCS pinLayout: [sense+, sense-, out+, out-]; same sense-via-label rule
@@ -517,14 +554,157 @@ function emitPrimitive(
     assertLinearControlExpression(props, typeId, rawLabel, "I(sense)");
     const gain = requireParam(props, def, modelKey, "currentGain", rawLabel);
     const senseRef = canonicalizeSpiceLabel(props.get<string>("senseSourceLabel"), "V");
-    return `${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${senseRef} ${gain}`;
+    return [`${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${senseRef} ${gain}`];
+  }
+
+  // ---------------------------------------------------------------------------
+  // S-element branches — voltage-controlled switch (ngspice SW / VSWITCH)
+  // ---------------------------------------------------------------------------
+
+  if (typeId === "SwitchSPST") {
+    // Class A: real ctrl pin. pinLayout: [in, out, ctrl] (analog-switch.ts:464-493).
+    // SPICE: `S{label} {in} {out} {ctrl} 0  SWMODEL_{label}`
+    // `.model SWMODEL_{label} SW (VT={vThreshold} VH={vHysteresis} RON={rOn} ROFF={rOff})`
+    const inNode   = nodeAt(nodes, 0, rawLabel, "in");
+    const outNode  = nodeAt(nodes, 1, rawLabel, "out");
+    const ctrlNode = nodeAt(nodes, 2, rawLabel, "ctrl");
+    const modelName = `SWMODEL_${label}`;
+    const vt  = requireParam(props, def, modelKey, "vThreshold",  rawLabel);
+    const vh  = requireParam(props, def, modelKey, "vHysteresis", rawLabel);
+    const ron  = requireParam(props, def, modelKey, "rOn",  rawLabel);
+    const roff = requireParam(props, def, modelKey, "rOff", rawLabel);
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, `.model ${modelName} SW (VT=${vt} VH=${vh} RON=${ron} ROFF=${roff})`);
+    }
+    return [`${label} ${inNode} ${outNode} ${ctrlNode} 0 ${modelName}`];
+  }
+
+  if (typeId === "SwitchSPDT") {
+    // Class A: real ctrl pin. pinLayout: [com, no, nc, ctrl] (analog-switch.ts:496-534).
+    // Two complementary S elements sharing one .model card:
+    //   S{label}_AB {com} {no} {ctrl} 0  SWMODEL_{label}   (closes when v_ctrl > VT)
+    //   S{label}_AC {com} {nc} 0 {ctrl}  SWMODEL_{label}   (closes when -v_ctrl > VT)
+    const comNode  = nodeAt(nodes, 0, rawLabel, "com");
+    const noNode   = nodeAt(nodes, 1, rawLabel, "no");
+    const ncNode   = nodeAt(nodes, 2, rawLabel, "nc");
+    const ctrlNode = nodeAt(nodes, 3, rawLabel, "ctrl");
+    const modelName = `SWMODEL_${label}`;
+    const vt  = requireParam(props, def, modelKey, "vThreshold",  rawLabel);
+    const vh  = requireParam(props, def, modelKey, "vHysteresis", rawLabel);
+    const ron  = requireParam(props, def, modelKey, "rOn",  rawLabel);
+    const roff = requireParam(props, def, modelKey, "rOff", rawLabel);
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, `.model ${modelName} SW (VT=${vt} VH=${vh} RON=${ron} ROFF=${roff})`);
+    }
+    return [
+      `${label}_AB ${comNode} ${noNode} ${ctrlNode} 0 ${modelName}`,
+      `${label}_AC ${comNode} ${ncNode} 0 ${ctrlNode} ${modelName}`,
+    ];
+  }
+
+  if (typeId === "Switch") {
+    // Class B: manual click-toggle. pinLayout: [A1, B1] (switch.ts:507).
+    // Synthesize an internal ctrl net + 0V/+1V V-source snapshotting `closed` at deck-build time.
+    // SPICE:
+    //   V{label}_ctrl  {ctrlNet} 0  DC {closed ? 1 : 0}
+    //   S{label}       {a1} {b1} {ctrlNet} 0  SWMODEL_{label}
+    //   .model SWMODEL_{label} SW (VT=0 VH=0 RON={ron} ROFF={roff})
+    // Model card constants VT=0 VH=0 verified per swsetup.c:28-33 and swload.c:108-116.
+    const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
+    const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
+    const ctrlNet = allocateInternalNet(ctx);
+    const closed = props.has("closed") ? !!props.get<boolean>("closed") : false;
+    const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+    const effectivelyClosed = normallyClosed ? !closed : closed;
+    const ctrlV = effectivelyClosed ? 1 : 0;
+    const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
+    const roff = requireParam(props, def, modelKey, "Roff", rawLabel);
+    const modelName = `SWMODEL_${label}`;
+    const vCtrlLabel = canonicalizeSpiceLabel(`${rawLabel}_ctrl`, "V");
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, `.model ${modelName} SW (VT=0 VH=0 RON=${ron} ROFF=${roff})`);
+    }
+    return [
+      `${vCtrlLabel} ${ctrlNet} 0 DC ${ctrlV}`,
+      `${label} ${a1Node} ${b1Node} ${ctrlNet} 0 ${modelName}`,
+    ];
+  }
+
+  if (typeId === "SwitchDT") {
+    // Class B: manual click-toggle. pinLayout: [A1, B1, C1] (switch-dt.ts:442).
+    // One ctrl net, two complementary S elements:
+    //   V{label}_ctrl  {ctrlNet} 0  DC {closed ? 1 : 0}
+    //   S{label}_AB    {a1} {b1} {ctrlNet} 0  SWMODEL_{label}   (AB closed when closed=true)
+    //   S{label}_AC    {a1} {c1} 0 {ctrlNet}  SWMODEL_{label}   (AC closed when closed=false)
+    // Model card constants VT=0 VH=0 verified per swsetup.c:28-33 and swload.c:108-116.
+    const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
+    const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
+    const c1Node = nodeAt(nodes, 2, rawLabel, "C1");
+    const ctrlNet = allocateInternalNet(ctx);
+    const closed = props.has("closed") ? !!props.get<boolean>("closed") : false;
+    const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+    const effectivelyClosed = normallyClosed ? !closed : closed;
+    const ctrlV = effectivelyClosed ? 1 : 0;
+    const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
+    const roff = requireParam(props, def, modelKey, "Roff", rawLabel);
+    const modelName = `SWMODEL_${label}`;
+    const vCtrlLabel = canonicalizeSpiceLabel(`${rawLabel}_ctrl`, "V");
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, `.model ${modelName} SW (VT=0 VH=0 RON=${ron} ROFF=${roff})`);
+    }
+    return [
+      `${vCtrlLabel} ${ctrlNet} 0 DC ${ctrlV}`,
+      `${label}_AB ${a1Node} ${b1Node} ${ctrlNet} 0 ${modelName}`,
+      `${label}_AC ${a1Node} ${c1Node} 0 ${ctrlNet} ${modelName}`,
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Group A primitives — components whose physics collapse to a single SPICE
+  // primitive at deck-build time. The harness snapshot is exact for static
+  // analysis (DC-OP, .tran with no mid-transient parameter changes); tests
+  // that drive runtime parameter changes must use createSelfCompare.
+  // ---------------------------------------------------------------------------
+
+  if (typeId === "LDR") {
+    // LDR resistance follows a power law:
+    //   R = rDark · (lux / luxRef)^(-gamma)
+    // (see ldr.ts helpText). Hot-loadable via setParam("lux"). SPICE has no
+    // light-dependent primitive; we snapshot the resistance at deck-build time
+    // and emit as a plain R. Pin order: [pos, neg].
+    const rDark  = requireParam(props, def, modelKey, "rDark",  rawLabel);
+    const luxRef = requireParam(props, def, modelKey, "luxRef", rawLabel);
+    const gamma  = requireParam(props, def, modelKey, "gamma",  rawLabel);
+    const lux    = requireParam(props, def, modelKey, "lux",    rawLabel);
+    const R = rDark * Math.pow(lux / luxRef, -gamma);
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${R}`];
+  }
+
+  if (typeId === "VariableRail") {
+    // Single-pin DC source (neg side is implicit ground). Voltage is hot-
+    // loadable via setParam at runtime; the SPICE deck snapshots the current
+    // value at deck-build time. Pin order: [pos] only.
+    const V = requireParam(props, def, modelKey, "voltage", rawLabel);
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} 0 DC ${V}`];
+  }
+
+  if (typeId === "Clock") {
+    // Clock is a hardcoded square wave (see clock.ts AnalogClockElementImpl):
+    //   V = vdd on even half-periods, V = 0 on odd half-periods, no rise/fall.
+    // Equivalent to a SPICE PULSE source with v1=0, v2=vdd, td=tr=tf=0,
+    // pw=halfP, per=period. Single "out" pin; neg side is ground.
+    const frequency = requireParam(props, def, modelKey, "Frequency", rawLabel);
+    const vdd       = requireParam(props, def, modelKey, "vdd",       rawLabel);
+    const period = 1 / frequency;
+    const halfP  = period / 2;
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "out")} 0 PULSE(0 ${vdd} 0 0 0 ${halfP} ${period})`];
   }
 
   throw new Error(
     `netlist-generator: typeId '${typeId}' (label='${rawLabel}') has an entry in ` +
     `ELEMENT_SPECS (prefix='${spec.prefix}') but no matching emit branch in ` +
     `emitPrimitive. Add a branch handling prefix '${spec.prefix}' next to ` +
-    `the existing R/C/L/V/I/D/Q/M/J/E/F/G/H branches.`
+    `the existing R/C/L/V/I/D/Q/M/J/E/F/G/H/S branches.`
   );
 }
 
@@ -805,6 +985,134 @@ function requireParam(
     `value for param '${key}' on model '${modelKey}', and the model registry ` +
     `has no numeric default. Either set the property explicitly on the ` +
     `instance, or add params['${key}'] to def.modelRegistry['${modelKey}'].`
+  );
+}
+
+/**
+ * Emit a SPICE K element for a TransformerCoupling sub-element. Mirrors
+ * ngspice K (mutsetup.c / mutload.c): resolves L1Name/L2Name to coil branch
+ * indices and stamps -k·√(L1·L2) off-diagonals at (b1,b2) and (b2,b1).
+ *
+ * digiTS factoring stores the mutual inductance as M directly (rather than
+ * the dimensionless coupling coefficient k) to keep the parent-side runtime
+ * stamp self-contained — k is by definition `M / √(L1·L2)`. We compute k at
+ * SPICE-emit time by reading the resolved inductance values of the L1/L2
+ * sibling sub-elements; ngspice does the same lookup internally to validate
+ * |k| ≤ 1 at deck parse time.
+ *
+ * Reads M, L1, L2 from the parent subcircuit's resolved param chain
+ * (sub-element params → parent's modelParams → subckt.params defaults). The
+ * sibling Inductor sub-elements MUST declare canonical `inductance: ...`
+ * params (not legacy `L: ...` aliases) for the lookup to resolve.
+ */
+function emitTransformerCouplingK(
+  parentRawLabel: string,
+  sub: SubcircuitElement,
+  parentSubckt: MnaSubcircuitNetlist,
+  parentProps: PropertyBag,
+): string[] {
+  const subParams = sub.params ?? {};
+  const subName = sub.subElementName ?? "MUT";
+
+  const l1Ref = subParams["L1_branch"];
+  const l2Ref = subParams["L2_branch"];
+  if (!isSiblingBranchRef(l1Ref) || !isSiblingBranchRef(l2Ref)) {
+    throw new Error(
+      `netlist-generator: TransformerCoupling sub-element '${subName}' of ` +
+      `'${parentRawLabel}' must declare L1_branch and L2_branch as ` +
+      `siblingBranch refs. Got L1_branch=${JSON.stringify(l1Ref)}, ` +
+      `L2_branch=${JSON.stringify(l2Ref)}.`
+    );
+  }
+
+  const l1SubName = l1Ref.subElementName;
+  const l2SubName = l2Ref.subElementName;
+  const l1Sub = parentSubckt.elements.find((e) => e.subElementName === l1SubName);
+  const l2Sub = parentSubckt.elements.find((e) => e.subElementName === l2SubName);
+  if (!l1Sub || !l2Sub) {
+    throw new Error(
+      `netlist-generator: TransformerCoupling '${subName}' of '${parentRawLabel}' ` +
+      `references sibling sub-elements '${l1SubName}' and '${l2SubName}', ` +
+      `but ${!l1Sub ? `'${l1SubName}'` : `'${l2SubName}'`} is not present in the ` +
+      `parent's netlist.elements.`
+    );
+  }
+
+  const l1Inductance = resolveSubElementNumeric(
+    l1Sub.params?.["inductance"],
+    parentSubckt.params,
+    parentProps,
+    `${l1SubName}.inductance`,
+    parentRawLabel,
+  );
+  const l2Inductance = resolveSubElementNumeric(
+    l2Sub.params?.["inductance"],
+    parentSubckt.params,
+    parentProps,
+    `${l2SubName}.inductance`,
+    parentRawLabel,
+  );
+  const m = resolveSubElementNumeric(
+    subParams["M"],
+    parentSubckt.params,
+    parentProps,
+    `${subName}.M`,
+    parentRawLabel,
+  );
+
+  const denom = Math.sqrt(l1Inductance * l2Inductance);
+  if (!Number.isFinite(denom) || denom === 0) {
+    throw new Error(
+      `netlist-generator: TransformerCoupling '${parentRawLabel}_${subName}' has ` +
+      `degenerate inductances (L1=${l1Inductance}, L2=${l2Inductance}); ` +
+      `cannot compute coupling coefficient k = M / √(L1·L2).`
+    );
+  }
+  const k = m / denom;
+
+  const subRawLabel = `${parentRawLabel}_${subName}`;
+  const kLabel  = canonicalizeSpiceLabel(subRawLabel, "K");
+  const l1Label = canonicalizeSpiceLabel(`${parentRawLabel}_${l1SubName}`, "L");
+  const l2Label = canonicalizeSpiceLabel(`${parentRawLabel}_${l2SubName}`, "L");
+
+  return [`${kLabel} ${l1Label} ${l2Label} ${k}`];
+}
+
+function isSiblingBranchRef(
+  v: SubcircuitElementParam | undefined,
+): v is { kind: "siblingBranch"; subElementName: string } {
+  return typeof v === "object" && v !== null && "kind" in v && v.kind === "siblingBranch";
+}
+
+/**
+ * Resolve a SubcircuitElementParam (number literal or string lookup) to a
+ * concrete number using the same precedence as `resolveSubElementProps`:
+ * parent's modelParams first, then subckt.params defaults, then throw. Used
+ * by emit paths (like the K element) that need the resolved value at SPICE-
+ * emit time without going through the synthetic-PropertyBag indirection.
+ */
+function resolveSubElementNumeric(
+  value: SubcircuitElementParam | undefined,
+  subcktParams: Record<string, number> | undefined,
+  parentProps: PropertyBag,
+  pathDescription: string,
+  parentRawLabel: string,
+): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    if (parentProps.hasModelParam(value)) return parentProps.getModelParam<number>(value);
+    if (subcktParams && Object.prototype.hasOwnProperty.call(subcktParams, value)) {
+      return subcktParams[value]!;
+    }
+    throw new Error(
+      `netlist-generator: '${parentRawLabel}' ${pathDescription} references ` +
+      `'${value}' but neither the parent's model params nor the subcircuit's ` +
+      `defaults define a value for that key.`
+    );
+  }
+  throw new Error(
+    `netlist-generator: '${parentRawLabel}' ${pathDescription} has shape ` +
+    `${JSON.stringify(value)}; expected a number literal or a string lookup.`
   );
 }
 

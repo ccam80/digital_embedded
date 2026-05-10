@@ -253,6 +253,7 @@ const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
   name: "VoltageComparator",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildComparatorPinDeclarations(),

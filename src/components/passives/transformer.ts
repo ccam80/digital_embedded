@@ -204,14 +204,14 @@ export const buildTransformerNetlist = (params: PropertyBag): MnaSubcircuitNetli
         modelRef: "behavioral",
         subElementName: "L1",
         branchCount: 1,
-        params: { L: l1 },
+        params: { inductance: l1 },
       },
       {
         typeId: "Inductor",
         modelRef: "behavioral",
         subElementName: "L2",
         branchCount: 1,
-        params: { L: l2 },
+        params: { inductance: l2 },
       },
       // K-coupling — strict ngspice match. ngspice K elements are 1-to-1
       // with coupled pairs (mutsetup.c:66-67, mutload.c). Branch refs to

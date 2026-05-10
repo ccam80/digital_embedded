@@ -372,7 +372,7 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
         return new VCVSAnalogElement(pinNodes, expr, deriv, "V(ctrl)", "voltage");
       },
       paramDefs: COMPARATOR_PARAM_DEFS,
-      params: COMPARATOR_PARAM_DEFAULTS,
+      params: { ...COMPARATOR_PARAM_DEFAULTS, gain: VCVS_COMP_GAIN },
     },
   },
   defaultModel: "behavioral",

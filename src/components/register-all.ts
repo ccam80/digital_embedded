@@ -159,7 +159,8 @@ import { TriodeDefinition } from "./semiconductors/triode.js";
 
 // Analog sources
 import { DcVoltageSourceDefinition } from "./sources/dc-voltage-source.js";
-import { CurrentSourceDefinition } from "./sources/current-source.js";
+import { DcCurrentSourceDefinition } from "./sources/dc-current-source.js";
+import { AcCurrentSourceDefinition } from "./sources/ac-current-source.js";
 import { AcVoltageSourceDefinition } from "./sources/ac-voltage-source.js";
 import { VariableRailDefinition } from "./sources/variable-rail.js";
 
@@ -202,23 +203,15 @@ import { DigitalOutputPinUnloadedDefinition } from "./digital-pins/digital-outpu
 import { BehavioralOutputDriverDefinition } from "../solver/analog/behavioral-output-driver.js";
 
 // Optocoupler internal sub-elements (internalOnly)
-import { InternalZeroVoltSenseDefinition } from "./active/internal-zero-volt-sense.js";
 import { InternalCccsDefinition } from "./active/internal-cccs.js";
 
 // Timer 555 latch driver (internalOnly)
 import { Timer555LatchDriverDefinition } from "./active/timer-555-latch-driver.js";
 
 // Transmission-line segment sub-elements (internalOnly)
-import { TransmissionSegmentRDefinition } from "./passives/transmission-segment-r.js";
-import { TransmissionSegmentLDefinition } from "./passives/transmission-segment-l.js";
-import { TransmissionSegmentGDefinition } from "./passives/transmission-segment-g.js";
-import { TransmissionSegmentCDefinition } from "./passives/transmission-segment-c.js";
-import { TransmissionSegmentRLDefinition } from "./passives/transmission-segment-rl.js";
 
 // Relay sub-elements (internalOnly)
 import { RelayCouplingDefinition } from "./switching/relay-coupling.js";
-import { RelayInductorDefinition } from "./switching/relay-inductor.js";
-import { RelayResistorDefinition } from "./switching/relay-resistor.js";
 
 // Floating-gate FET blown drivers (internalOnly)
 import { FGNFETBlownDriverDefinition } from "./switching/fgnfet-blown-driver.js";
@@ -452,7 +445,8 @@ export function createDefaultRegistry(
 
   // Analog sources
   registry.register(DcVoltageSourceDefinition);
-  registry.register(CurrentSourceDefinition);
+  registry.register(DcCurrentSourceDefinition);
+  registry.register(AcCurrentSourceDefinition);
   registry.register(AcVoltageSourceDefinition);
   registry.register(VariableRailDefinition);
 
@@ -495,23 +489,13 @@ export function createDefaultRegistry(
   registry.register(BehavioralOutputDriverDefinition);
 
   // Optocoupler internal sub-elements (internalOnly)
-  registry.register(InternalZeroVoltSenseDefinition);
   registry.register(InternalCccsDefinition);
 
   // Timer 555 latch driver (internalOnly)
   registry.register(Timer555LatchDriverDefinition);
 
-  // Transmission-line segment sub-elements (internalOnly)
-  registry.register(TransmissionSegmentRDefinition);
-  registry.register(TransmissionSegmentLDefinition);
-  registry.register(TransmissionSegmentGDefinition);
-  registry.register(TransmissionSegmentCDefinition);
-  registry.register(TransmissionSegmentRLDefinition);
-
   // Relay sub-elements (internalOnly)
   registry.register(RelayCouplingDefinition);
-  registry.register(RelayInductorDefinition);
-  registry.register(RelayResistorDefinition);
 
   // Floating-gate FET blown drivers (internalOnly)
   registry.register(FGNFETBlownDriverDefinition);

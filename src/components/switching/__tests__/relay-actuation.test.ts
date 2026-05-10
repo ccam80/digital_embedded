@@ -141,7 +141,7 @@ function buildDigitalRelayCircuit(facade: DefaultSimulatorFacade): Circuit {
 // ===========================================================================
 //
 // Post-warm-start observable: the engine has compiled the relay composite
-// (RelayInductor coilL + RelayResistor coilR + Switch contactSW +
+// (Inductor coilL + Resistor coilR + Switch contactSW +
 // RelayCoupling). With vSrc=10V across the 100Ω coil the steady-state coil
 // current is 0.1A, above pullInI=0.05A, so by the end of the first
 // coordinator.step() the RelayCoupling has written CLOSED=1 into the

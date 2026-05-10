@@ -175,7 +175,15 @@ export class MNAEngine implements AnalogEngine {
     this._firstStep = false;
     this._maxEqNum = compiled.nodeCount + 1;
     this._numStates = 0;
-    this._nodeTable = [];
+    // Seed _nodeTable with composite-internal nodes the compiler pre-allocated
+    // via `expandCompositeInstance`. These IDs occupy the range
+    // [externalNodeCount + 1 .. compiled.nodeCount]; element-private nodes
+    // allocated at setup() time via `makeVolt` continue from `_maxEqNum`.
+    this._nodeTable = compiled.preAllocatedNodes.map(e => ({
+      name: e.name,
+      number: e.number,
+      type: e.type as "voltage" | "current",
+    }));
 
     // Construct CKTCircuitContext for NR and DC-OP call sites.
     // Shares the same solver and elements as the rest of init().

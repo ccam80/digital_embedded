@@ -45,7 +45,7 @@ interface IsrcCircuitParams {
 function buildIsrcCircuit(facade: DefaultSimulatorFacade, p: IsrcCircuitParams): Circuit {
   return facade.build({
     components: [
-      { id: "isrc", type: "CurrentSource", props: { label: "isrc", current: p.current ?? 0.01 } },
+      { id: "isrc", type: "DcCurrentSource", props: { label: "isrc", current: p.current ?? 0.01 } },
       { id: "r1",   type: "Resistor",      props: { label: "r1",   resistance: p.resistance ?? 1000 } },
       { id: "gnd",  type: "Ground",        props: { label: "gnd" } },
     ],

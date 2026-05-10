@@ -518,6 +518,7 @@ function ntcCircuitFactory(props: PropertyBag): NTCThermistorCircuitElement {
 export const NTCThermistorDefinition: StandaloneComponentDefinition = {
   name: "NTCThermistor",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   factory: ntcCircuitFactory,
   pinLayout: buildNTCPinDeclarations(),
   propertyDefs: NTC_PROPERTY_DEFS,

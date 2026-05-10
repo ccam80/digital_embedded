@@ -281,6 +281,7 @@ const TIMER555_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const Timer555Definition: StandaloneComponentDefinition = {
   name: "Timer555",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildTimer555PinDeclarations(),

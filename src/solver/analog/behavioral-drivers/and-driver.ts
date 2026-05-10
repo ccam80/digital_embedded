@@ -94,11 +94,11 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
   readonly stateSize = SCHEMA.size;
 
   private readonly _inputCount: number;
-  // Pin node IDs are RESOLVED in setup(), not in the constructor. As a leaf
-  // inside a composite, pinNodes is mid-resolution at construction time and
-  // the PatcherLeaf rewrites placeholders before any device's setup() runs.
-  // Reading this.pinNodes here would freeze -1 placeholders for any
-  // composite-internal-net pin.
+  // Pin node IDs are populated in setup() once `this.pinNodes` is the active
+  // source of truth. (Under the compile-time-expansion architecture, pinNodes
+  // is already fully resolved at construction time; the deferred read pattern
+  // is retained as a sibling-driver convention rather than a correctness
+  // requirement.)
   private _inputNodes: number[];
   private _gndNode: number;
   private _vIH: number;

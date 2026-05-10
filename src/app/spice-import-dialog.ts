@@ -331,7 +331,7 @@ function elementTypeId(type: string): string {
     case "M": return "NMOS";
     case "J": return "NJFET";
     case "V": return "DcVoltageSource";
-    case "I": return "CurrentSource";
+    case "I": return "DcCurrentSource";
     case "X": return "SubcircuitInstance";
     default:  return type;
   }

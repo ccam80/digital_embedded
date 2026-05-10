@@ -215,6 +215,41 @@ export function captureElementStates(
 
     const schema = el.stateSchema;
     const base = el._stateBase;
+    const baseLabel = elementLabels?.get(i) ?? el.label ?? `element_${i}`;
+
+    // SWElementSPDT (SwitchSPDT): 4 state slots split across two ngspice S-elements.
+    // Emit two sub-snapshots with labels {label}_AB (NO path, slots 0-1) and
+    // {label}_AC (NC path, slots 2-3), each carrying renamed CURRENT_STATE/V_CTRL
+    // slots to match ngspice's per-S-element CKTstate layout (swdefs.h:56).
+    if (schema.owner === "SWElementSPDT") {
+      const vswitchMapping = DEVICE_MAPPINGS["vswitch"];
+      // AB sub-entry: NO path (base+0=NO_CURRENT_STATE, base+1=NO_V_CTRL)
+      const abSlots: Record<string, number> = { CURRENT_STATE: s0[base + 0], V_CTRL: s0[base + 1] };
+      const abState1: Record<string, number> = s1 ? { CURRENT_STATE: s1[base + 0], V_CTRL: s1[base + 1] } : {};
+      const abState2: Record<string, number> = s2 ? { CURRENT_STATE: s2[base + 0], V_CTRL: s2[base + 1] } : {};
+      snapshots.push({
+        elementIndex: i,
+        label: `${baseLabel}_AB`,
+        slots: abSlots,
+        state1Slots: abState1,
+        state2Slots: abState2,
+        pinCurrents: projectPinCurrents(vswitchMapping, abSlots),
+      });
+      // AC sub-entry: NC path (base+2=NC_CURRENT_STATE, base+3=NC_V_CTRL)
+      const acSlots: Record<string, number> = { CURRENT_STATE: s0[base + 2], V_CTRL: s0[base + 2 + 1] };
+      const acState1: Record<string, number> = s1 ? { CURRENT_STATE: s1[base + 2], V_CTRL: s1[base + 2 + 1] } : {};
+      const acState2: Record<string, number> = s2 ? { CURRENT_STATE: s2[base + 2], V_CTRL: s2[base + 2 + 1] } : {};
+      snapshots.push({
+        elementIndex: i,
+        label: `${baseLabel}_AC`,
+        slots: acSlots,
+        state1Slots: acState1,
+        state2Slots: acState2,
+        pinCurrents: projectPinCurrents(vswitchMapping, acSlots),
+      });
+      continue;
+    }
+
     const slots: Record<string, number> = {};
     const state1Slots: Record<string, number> = {};
     const state2Slots: Record<string, number> = {};
@@ -232,7 +267,7 @@ export function captureElementStates(
 
     snapshots.push({
       elementIndex: i,
-      label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
+      label: baseLabel,
       slots,
       state1Slots,
       state2Slots,

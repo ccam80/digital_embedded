@@ -1,6 +1,6 @@
 {
   "circuit": {
-    "description": "ISRC=10mA driving 1k resistor to ground. V(node)=10V at DCOP. Pure resistive — exercises ISRC RHS stamp under static load.",
+    "description": "ISRC=10mA driving 1k resistor to ground. V(node)=10V at DCOP. Pure resistive \u00e2\u20ac\u201d exercises ISRC RHS stamp under static load.",
     "elements": [
       {
         "id": "38562b09-906d-4aaf-8131-07e9d91a07cd",
@@ -20,7 +20,7 @@
           ]
         },
         "rotation": 0,
-        "type": "CurrentSource"
+        "type": "DcCurrentSource"
       },
       {
         "id": "2797d81d-c5bd-413a-9a21-3836517ccc66",

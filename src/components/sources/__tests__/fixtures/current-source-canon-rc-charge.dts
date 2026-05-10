@@ -20,7 +20,7 @@
           ]
         },
         "rotation": 0,
-        "type": "CurrentSource"
+        "type": "DcCurrentSource"
       },
       {
         "id": "4b8f38d2-c381-41a6-9f9f-8dfc5fe58d76",
@@ -56,9 +56,9 @@
             "TC1": 0,
             "TC2": 0,
             "TNOM": 300.15,
-            "capacitance": 0.000001
+            "capacitance": 1e-06
           },
-          "capacitance": 0.000001,
+          "capacitance": 1e-06,
           "label": "C1",
           "position": [
             0,

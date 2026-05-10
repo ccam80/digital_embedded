@@ -232,8 +232,8 @@ export function executeRelay(index: number, state: Uint32Array, _highZs: Uint32A
 // Internal net: coilMid (index 4)
 //
 // Elements:
-//   0: RelayInductor (coilL): pos=in1(0), neg=coilMid(4)
-//   1: RelayResistor (coilR): pos=coilMid(4), neg=in2(1)
+//   0: Inductor (coilL): pos=in1(0), neg=coilMid(4)
+//   1: Resistor (coilR): pos=coilMid(4), neg=in2(1)
 //   2: Switch (contactSW):   A1(2) â†” B1(3)
 //   3: RelayCoupling:        no MNA pins
 // ---------------------------------------------------------------------------
@@ -243,8 +243,8 @@ export const RELAY_NETLIST: MnaSubcircuitNetlist = {
   params: { inductance: 0.05, coilResistance: 100,
             pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
   elements: [
-    { typeId: "RelayInductor", modelRef: "default", subElementName: "coilL",     branchCount: 1, params: { L: "inductance" } },
-    { typeId: "RelayResistor", modelRef: "default", subElementName: "coilR",                     params: { R: "coilResistance" } },
+    { typeId: "Inductor",  modelRef: "behavioral", subElementName: "coilL", branchCount: 1, params: { inductance: "inductance" } },
+    { typeId: "Resistor",  modelRef: "behavioral", subElementName: "coilR",                params: { resistance: "coilResistance" } },
     { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactSW",              params: { Ron: "Ron", Roff: "Roff" } },
     { typeId: "RelayCoupling", modelRef: "default", subElementName: "coupling",
       params: {

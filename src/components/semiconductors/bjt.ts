@@ -492,10 +492,10 @@ function _createBjtElementWithPolarity(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ) {
-  // Pin node IDs are RESOLVED in setup(), not at construction time. Composite-
-  // leaf instances see internal-net pins as the placeholder -1; PatcherLeaf
-  // rewrites the Map between construction and setup. setup() reassigns these
-  // from this.pinNodes after the patcher has run.
+  // Closure-captured pin node IDs assigned in setup() once `this.pinNodes` is
+  // available. (Under the compile-time-expansion architecture, pinNodes is
+  // already fully resolved at construction time; closure-let is retained for
+  // parity with sibling factories.)
   let nodeB = -1;
   let nodeC = -1;
   let nodeE = -1;
@@ -594,8 +594,8 @@ function _createBjtElementWithPolarity(
       const baseNode = this.pinNodes.get("B")!;
       const colNode  = this.pinNodes.get("C")!;
       const emitNode = this.pinNodes.get("E")!;
-      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
-      // filled in any composite-internal-net placeholders.
+      // Re-publish pin node IDs into the closure (compile-time-resolved by
+      // `expandCompositeInstance` for composite leaves; identical for primitives).
       nodeB = baseNode;
       nodeC = colNode;
       nodeE = emitNode;
@@ -1088,10 +1088,10 @@ export function createSpiceL1BjtElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ) {
-  // Pin node IDs are RESOLVED in setup(), not at construction time. Composite-
-  // leaf instances see internal-net pins as the placeholder -1; PatcherLeaf
-  // rewrites the Map between construction and setup. setup() reassigns these
-  // from this.pinNodes after the patcher has run.
+  // Closure-captured pin node IDs assigned in setup() once `this.pinNodes` is
+  // available. (Under the compile-time-expansion architecture, pinNodes is
+  // already fully resolved at construction time; closure-let is retained for
+  // parity with sibling factories.)
   let nodeB_ext = -1;
   let nodeC_ext = -1;
   let nodeE_ext = -1;
@@ -1239,8 +1239,8 @@ export function createSpiceL1BjtElement(
       const colNode   = this.pinNodes.get("C")!;
       const emitNode  = this.pinNodes.get("E")!;
       const substNode = 0;
-      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
-      // filled in any composite-internal-net placeholders.
+      // Re-publish pin node IDs into the closure (compile-time-resolved by
+      // `expandCompositeInstance` for composite leaves; identical for primitives).
       nodeB_ext = baseNode;
       nodeC_ext = colNode;
       nodeE_ext = emitNode;

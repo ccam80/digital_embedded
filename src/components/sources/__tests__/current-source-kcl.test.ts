@@ -51,7 +51,7 @@ function buildIsrcCircuit(
 ): Circuit {
   return facade.build({
     components: [
-      { id: "isrc", type: "CurrentSource", props: { label: "isrc", current } },
+      { id: "isrc", type: "DcCurrentSource", props: { label: "isrc", current } },
       { id: "r1",   type: "Resistor",      props: { label: "r1",   resistance } },
       { id: "gnd",  type: "Ground" },
     ],

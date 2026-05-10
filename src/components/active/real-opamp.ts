@@ -739,6 +739,7 @@ const REAL_OPAMP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const RealOpAmpDefinition: StandaloneComponentDefinition = {
   name: "RealOpAmp",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildRealOpAmpPinDeclarations(),

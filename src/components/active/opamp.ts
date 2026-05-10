@@ -355,6 +355,7 @@ const OPAMP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const OpAmpDefinition: StandaloneComponentDefinition = {
   name: "OpAmp",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildOpAmpPinDeclarations(),

@@ -453,6 +453,7 @@ function memristorCircuitFactory(props: PropertyBag): MemristorCircuitElement {
 export const MemristorDefinition: StandaloneComponentDefinition = {
   name: "Memristor",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   factory: memristorCircuitFactory,
   pinLayout: buildMemristorPinDeclarations(),
   propertyDefs: MEMRISTOR_PROPERTY_DEFS,

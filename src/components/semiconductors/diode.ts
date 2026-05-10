@@ -368,13 +368,11 @@ export function createDiodeElement(
   props: PropertyBag,
   _getTime: () => number,
 ): PoolBackedAnalogElement {
-  // Pin node IDs are RESOLVED in setup(), not at construction time. When the
-  // diode is a leaf inside a composite (e.g. Optocoupler.dLed), the parent
-  // compiler hands us pinNodes whose internal-net entries are the placeholder
-  // -1; the PatcherLeaf rewrites them between construction and setup. Reading
-  // these into closure consts here would freeze the placeholders into every
-  // subsequent load() call. setup() reassigns these from this.pinNodes after
-  // the patcher has run.
+  // Closure-captured pin node IDs assigned in setup() once `this.pinNodes` is
+  // available. (Under the compile-time-expansion architecture, pinNodes is
+  // already fully resolved at construction time, so a direct read here would
+  // also be safe; the closure-let pattern is retained for parity with sibling
+  // factories.)
   let nodeAnode = -1;
   let nodeCathode = -1;
 
@@ -484,8 +482,8 @@ export function createDiodeElement(
       const solver = ctx.solver;
       const posNode = this.pinNodes.get("A")!;
       const negNode = this.pinNodes.get("K")!;
-      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
-      // filled in any composite-internal-net placeholders.
+      // Re-publish pin node IDs into the closure (compile-time-resolved by
+      // `expandCompositeInstance` for composite leaves; identical for primitives).
       nodeAnode = posNode;
       nodeCathode = negNode;
 

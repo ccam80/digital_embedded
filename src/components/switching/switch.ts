@@ -326,17 +326,6 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
   private readonly _roff: number;
   private readonly _normallyClosed: boolean;
 
-  // Initial effective closed state from props — the boot constant per §4d
-  // ngspice-faithful seeding contract (phase-component-model-correctness-job.md
-  // §1.1.x rule 2). load() seeds s0[CLOSED] from this on the first iteration
-  // and flips _seeded; thereafter the pool is the sole source of truth.
-  private readonly _initClosed: boolean;
-
-  // One-shot first-load seed sentinel. False until load() copies _initClosed
-  // into s0[CLOSED]; never reset. Mirrors the analog-fuse `_intact` /
-  // behavioral-driver `_firstSample` instance-field pattern.
-  private _seeded: boolean = false;
-
   // Pending override staging — used when external drivers call setClosed /
   // setCtrlVoltage / setSwState before or between simulation steps.
   // Flushed in load() by writing immediately to both s0 and s1 so the
@@ -346,7 +335,6 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
   private _pendingCtrlVoltage: number = 0;
   private _useCtrlVoltage: boolean = false;
   private _forcedState: boolean | null = null;
-  private _pendingClosed: boolean | null = null;
 
   // Matrix handles allocated in setup() — port of swsetup.c:59-62 TSTALLOC sequence
   private _hPP: number = -1;
@@ -359,10 +347,12 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
     this._ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
     this._roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
     this._normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-    // Compute initial effective closed state from props. NC inverts the
-    // user-visible `closed` prop (NC + closed=false ⇒ effectively closed at rest).
+    // Seed the ctrl-voltage path from the initial `closed` prop.
+    // Pass the raw user-visible `closed` value; load() applies normallyClosed
+    // inversion via the `_normallyClosed ? v <= 0 : v > 0` logic.
     const userClosed = props.getOrDefault<boolean>("closed", false);
-    this._initClosed = this._normallyClosed ? !userClosed : userClosed;
+    this._pendingCtrlVoltage = userClosed ? 1 : 0;
+    this._useCtrlVoltage = true;
   }
 
   setup(ctx: SetupContext): void {
@@ -387,36 +377,11 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    // First-load boot-constant seed. The §4d ngspice-faithful seeding contract
-    // (phase-component-model-correctness-job.md §1.1.x) places non-zero
-    // startup values in instance fields and propagates them into s0 via the
-    // bottom-of-load idiom, then into s1 via the engine's post-DCOP copy at
-    // analog-engine.ts:1437. Switch is a discrete-state device with
-    // cross-element coupling (RelayCoupling writes s0[CLOSED] each iter):
-    // the NR-loop stamp must therefore read a value that is FROZEN across
-    // the iter loop, which means s1. To make the boot constant visible to
-    // the very first DCOP NR iter, we seed s1 alongside s0 — a per-element
-    // analogue of the engine's bulk post-DCOP copy.
-    if (!this._seeded) {
-      const v = this._initClosed ? 1 : 0;
-      s0[base + SLOT_CLOSED] = v;
-      s1[base + SLOT_CLOSED] = v;
-      this._seeded = true;
-    }
-
-    // Flush any pending external override. Write to BOTH s0 and s1 so the
-    // override takes effect within the current NR iteration. Mirrors
-    // memristor.ts setParam("initialState") hard-reset idiom.
-    if (this._pendingClosed !== null) {
-      const v = this._pendingClosed ? 1 : 0;
-      s0[base + SLOT_CLOSED] = v;
-      s1[base + SLOT_CLOSED] = v;
-      this._pendingClosed = null;
-    }
-
     // Voltage-controlled path: re-evaluate on every NR iteration.
     // Mirrors ngspice swload.c which reads SWcontVoltage from CKTrhsOld
     // each iteration. Write to both s0 and s1 for immediate effect.
+    // _useCtrlVoltage is set true from the constructor (seeded from the
+    // initial `closed` prop) and from every setClosed() call.
     if (this._useCtrlVoltage) {
       const v = this._pendingCtrlVoltage;
       const closed = this._normallyClosed ? v <= 0 : v > 0;
@@ -435,9 +400,7 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
 
     // Read s1 (frozen across the NR loop) for stamp stability — switch's
     // Ron/Roff conductance differ by ~10^9, so any mid-iter state flip would
-    // break NR convergence. Sibling RelayCoupling writes s0[CLOSED] each
-    // iter; those writes propagate into s1 either via the engine's post-DCOP
-    // copy or via the per-step s0→s1 rotation on accept (port of swload.c).
+    // break NR convergence.
     const on = s1[base + SLOT_CLOSED] >= 0.5;
 
     // Bottom-of-load history write (ngspice CKTstate0 idiom — swload.c).
@@ -453,9 +416,10 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
   }
 
   setClosed(closed: boolean): void {
-    const effectivelyClosed = this._normallyClosed ? !closed : closed;
-    this._pendingClosed = effectivelyClosed;
-    this._useCtrlVoltage = false;  // boolean driver supersedes voltage driver
+    // Pass the raw user-visible `closed` value; load() applies normallyClosed
+    // inversion via the `_normallyClosed ? v <= 0 : v > 0` logic.
+    this._pendingCtrlVoltage = closed ? 1 : 0;
+    this._useCtrlVoltage = true;
   }
 
   setCtrlVoltage(v: number): void {
@@ -473,11 +437,13 @@ export class SwitchAnalogElement extends PoolBackedAnalogElement implements Spst
     const negNode = this.pinNodes.get("B1")!;
     const vA = rhs[posNode];
     const vB = rhs[negNode];
-    // Pre-first-load probes have no pool history yet (s1 is still zero-init);
-    // fall back to the boot constant. Post-first-load reads s1 (last-accepted).
-    const on = this._seeded
-      ? this._pool.states[1][this._stateBase + SLOT_CLOSED] >= 0.5
-      : this._initClosed;
+    // _pendingCtrlVoltage holds the raw user-visible `closed` value (1 or 0).
+    // load() applies normallyClosed inversion the same way as swload.c:108-116.
+    // After load() runs at least once, s1[CLOSED] agrees with this derivation.
+    // Before the first load() (pre-warm-start probe), derive directly from
+    // _pendingCtrlVoltage so the pre-warm-start value matches the initial state.
+    const v = this._pendingCtrlVoltage;
+    const on = this._normallyClosed ? v <= 0 : v > 0;
     const G = on ? 1 / this._ron : 1 / this._roff;
     const I = G * (vA - vB);
     return [I, -I];

@@ -446,7 +446,11 @@ export const ClockDefinition: StandaloneComponentDefinition = {
         return makeAnalogClockElement(nodePos, nodeNeg, -1, frequency, vdd, getTime);
       },
       paramDefs: [],
-      params: {},
+      // Frequency / vdd are user-facing properties (see CLOCK_PROPERTY_DEFS)
+      // rather than model params. Surface their defaults here so the SPICE-
+      // emit path resolves them via requireParam without re-encoding the
+      // defaults in the harness.
+      params: { Frequency: 1, vdd: 3.3 },
     },
   },
   defaultModel: "digital",

@@ -26,10 +26,10 @@ import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.j
  * connectivity from authoritative records rather than from auto-laid-out
  * wire coordinates.
  *
- * When `Circuit.specConnections` is set, `extractConnectivityGroups` uses
- * this list as the source of truth for pin-pin equivalence and treats wires
- * as decorative routing. This makes connectivity immune to auto-layout
- * corner-collision artifacts.
+ * When `Circuit.connectivitySource.mode === 'spec'`,
+ * `extractConnectivityGroups` uses the connections list as the source of
+ * truth for pin-pin equivalence and treats wires as decorative routing.
+ * This makes connectivity immune to auto-layout corner-collision artifacts.
  */
 export interface SpecConnection {
   srcId: string;
@@ -37,6 +37,21 @@ export interface SpecConnection {
   dstId: string;
   dstPin: string;
 }
+
+/**
+ * Tagged source for a circuit's electrical connectivity.
+ *
+ *   • `'spec'`  — pin-pair equivalence is taken from the authored
+ *                 `connections` list. Wires are decorative routing.
+ *   • `'wires'` — pin-pair equivalence is derived from wire coordinates
+ *                 (position-merge of pin endpoints and wire vertices).
+ *
+ * The two modes are mutually exclusive; the union models that explicitly so
+ * "spec connections present but stale" is structurally unrepresentable.
+ */
+export type ConnectivitySource =
+  | { readonly mode: 'spec'; readonly connections: readonly SpecConnection[] }
+  | { readonly mode: 'wires' };
 
 // ---------------------------------------------------------------------------
 // Wire- visual wire segment
@@ -242,13 +257,14 @@ export class Circuit {
   metadata: CircuitMetadata;
 
   /**
-   * Authoritative pin-pair connections from a programmatic build.
+   * Source of pin-pair equivalence for this circuit.
    *
-   * When set, `extractConnectivityGroups` uses these records as the source of
-   * truth for pin-pin equivalence and treats wires as decorative routing.
-   * Absent for circuits loaded from `.dig`/`.dts` (wire-only path).
+   * Defaults to `{ mode: 'wires' }` so circuits loaded from `.dig`/`.dts`
+   * use the wire graph. Programmatic builders switch this to
+   * `{ mode: 'spec', connections }` so authored connections are
+   * authoritative and immune to auto-layout coordinate-collision artifacts.
    */
-  specConnections?: ReadonlyArray<SpecConnection>;
+  connectivitySource: ConnectivitySource = { mode: 'wires' };
 
   constructor(metadata?: Partial<CircuitMetadata>) {
     this.metadata = { ...defaultCircuitMetadata(), ...metadata };

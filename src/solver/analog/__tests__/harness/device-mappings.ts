@@ -306,6 +306,30 @@ export const JFET_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
+// Voltage-controlled switch (ngspice SW / VSWITCH)
+// ---------------------------------------------------------------------------
+// ngspice sw state offsets (swdefs.h:56, swload.c:140-141):
+//   SW_NUM_STATES=2
+//   states[0]+0: current_state  (REALLY_OFF=0, REALLY_ON=1, HYST_OFF=2, HYST_ON=3)
+//   states[0]+1: v_ctrl         (saved control voltage)
+//
+// digiTS schema (analog-switch.ts SW_SCHEMA): CURRENT_STATE=0, V_CTRL=1 — ngspice-exact 1:1.
+//
+// ngspice device name: "Switch" (swinit.c:13). Lowercased in _canonicalizeDeviceType: "switch".
+// Used for both SwitchSPST (1 SW instance) and each sub-instance of SwitchSPDT (2 SW instances).
+export const VSWITCH_MAPPING: DeviceMapping = {
+  deviceType: "vswitch",
+  slotToNgspice: {
+    CURRENT_STATE: 0,
+    V_CTRL:        1,
+  },
+  ngspiceToSlot: {
+    0: "CURRENT_STATE",
+    1: "V_CTRL",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -318,6 +342,7 @@ export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
   bjt: BJT_MAPPING,
   mosfet: MOSFET_MAPPING,
   jfet: JFET_MAPPING,
+  vswitch: VSWITCH_MAPPING,
 };
 
 // ---------------------------------------------------------------------------
@@ -343,6 +368,8 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
   AcCurrentSource: "isource",
   SCR: "scr",
   Triac: "triac",
+  SwitchSPST: "vswitch",
+  SwitchSPDT: "vswitch",
 };
 
 /**

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778204585008,
+  "lastScanned": 1778296429633,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit -p tsconfig.json 2>&1 > /tmp/tsc.out; head -10 /tmp/tsc.out",
-    "testCommand": "npx vitest run src/components/active/__tests__/timer-555.test.ts -t \"transient_step_end_paired_astable\" --reporter=default 2>&1 | tail -25",
+    "buildCommand": "npx tsc --noEmit; echo \"EXIT=$?\"",
+    "testCommand": "npx vitest run src/components/active/__tests__/comparator.test.ts src/components/active/__tests__/comparator-pushpull.test.ts src/components/sources/__tests__/variable-rail.test.ts 2>&1 | tail -25",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778204584945,
+      "lastAccessed": 1778296429555,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1778204584946,
+      "lastAccessed": 1778296429555,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1778204584946,
+      "lastAccessed": 1778296429556,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1778204584946,
+      "lastAccessed": 1778296429557,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778204584947,
+      "lastAccessed": 1778296429607,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1778204584981,
+      "lastAccessed": 1778296429608,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -143,28 +143,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1778204584982,
+      "lastAccessed": 1778296429608,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778204584982,
+      "lastAccessed": 1778296429609,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778204584982,
+      "lastAccessed": 1778296429609,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 14,
-      "lastAccessed": 1778204584982,
+      "lastAccessed": 1778296429609,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -176,8 +176,8 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 18,
-      "lastAccessed": 1778204584983,
+      "fileCount": 19,
+      "lastAccessed": 1778296429609,
       "keyFiles": [
         "dig-format-excision.md",
         "loadcontext-state-getter-fix.md",
@@ -190,7 +190,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778204584983,
+      "lastAccessed": 1778296429610,
       "keyFiles": [
         "main.ts"
       ]
@@ -198,9 +198,10 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1778204584983,
+      "fileCount": 3,
+      "lastAccessed": 1778296429610,
       "keyFiles": [
+        "playwright-failures.json",
         "test-failures.json"
       ]
     },
@@ -208,7 +209,7 @@
       "path": "tmp-hang-circuits",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1778204584984,
+      "lastAccessed": 1778296429610,
       "keyFiles": [
         "rc-ac-lowpass.dts",
         "rc-step.dts",
@@ -221,7 +222,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778204584984,
+      "lastAccessed": 1778296429611,
       "keyFiles": [
         "index.json"
       ]
@@ -230,21 +231,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1778204584984,
+      "lastAccessed": 1778296429611,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778204584985,
+      "lastAccessed": 1778296429612,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1778204584986,
+      "lastAccessed": 1778296429613,
       "keyFiles": [
         "main-DuWHuFk1.js",
         "memory-editor-DEA45Iu0.js",
@@ -255,7 +256,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1778204584986,
+      "lastAccessed": 1778296429613,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -266,7 +267,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1778204584989,
+      "lastAccessed": 1778296429615,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -277,7 +278,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1778204584989,
+      "lastAccessed": 1778296429615,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -288,27 +289,33 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1778204584989,
+      "lastAccessed": 1778296429615,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 30,
-      "lastAccessed": 1778285503003,
+      "accessCount": 35,
+      "lastAccessed": 1778299169512,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 26,
+      "lastAccessed": 1778322950793,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\extract-connectivity.ts",
+      "accessCount": 25,
+      "lastAccessed": 1778323841510,
       "type": "file"
     },
     {
       "path": "src\\headless\\auto-layout.ts",
       "accessCount": 24,
       "lastAccessed": 1778219320243,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 19,
-      "lastAccessed": 1778244239274,
       "type": "file"
     },
     {
@@ -324,15 +331,21 @@
       "type": "file"
     },
     {
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 14,
+      "lastAccessed": 1778323859710,
+      "type": "file"
+    },
+    {
       "path": "src\\core\\__tests__\\digital-registry.test.ts",
       "accessCount": 11,
       "lastAccessed": 1778237455394,
       "type": "file"
     },
     {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 9,
-      "lastAccessed": 1778241573512,
+      "path": "src\\core\\circuit.ts",
+      "accessCount": 10,
+      "lastAccessed": 1778323755195,
       "type": "file"
     },
     {
@@ -366,27 +379,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
+      "path": "src/core/registry.ts",
       "accessCount": 7,
-      "lastAccessed": 1778285477653,
+      "lastAccessed": 1778291152101,
+      "type": "directory"
+    },
+    {
+      "path": "src\\app\\menu-toolbar.ts",
+      "accessCount": 7,
+      "lastAccessed": 1778323880471,
       "type": "file"
     },
     {
       "path": "src\\compile\\__tests__\\partition.test.ts",
       "accessCount": 6,
       "lastAccessed": 1778217653550,
-      "type": "file"
-    },
-    {
-      "path": "src/core/registry.ts",
-      "accessCount": 6,
-      "lastAccessed": 1778285464105,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core\\circuit.ts",
-      "accessCount": 5,
-      "lastAccessed": 1778219294611,
       "type": "file"
     },
     {
@@ -408,33 +415,27 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\schottky.ts",
+      "accessCount": 5,
+      "lastAccessed": 1778296632266,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\wiring\\splitter.ts",
       "accessCount": 4,
       "lastAccessed": 1778237861930,
       "type": "file"
     },
     {
-      "path": "src\\app\\menu-toolbar.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778205958676,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\schottky.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778206874250,
+      "path": "src\\headless\\netlist.ts",
+      "accessCount": 4,
+      "lastAccessed": 1778323801969,
       "type": "file"
     },
     {
       "path": "src\\compile\\partition.ts",
       "accessCount": 3,
       "lastAccessed": 1778243674250,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\netlist.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778205936828,
       "type": "file"
     },
     {
@@ -484,6 +485,12 @@
       "accessCount": 2,
       "lastAccessed": 1778281338906,
       "type": "directory"
+    },
+    {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778318331500,
+      "type": "file"
     },
     {
       "path": "src\\components\\wiring\\__tests__\\priority-encoder-partition-drop-probe.test.ts",
@@ -544,12 +551,6 @@
       "accessCount": 1,
       "lastAccessed": 1778207041571,
       "type": "directory"
-    },
-    {
-      "path": "src\\core\\pin.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778207116897,
-      "type": "file"
     },
     {
       "path": "src/editor/__tests__/property-panel-model.test.ts",

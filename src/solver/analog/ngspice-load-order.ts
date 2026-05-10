@@ -17,20 +17,15 @@
  * the existing entries reflect the subset of ngspice device types we have
  * fixtures for plus a few neighbours.
  *
- * Pseudo-leaves (negative ordinals) are compiler-internal elements that the
- * engine's _setup and _load walks handle before any real ngspice device:
- *   INTERNAL_NET_ALLOC (-2): makeInternalNetAllocator- calls ctx.makeVolt for
- *     each internal net declared in the subcircuit netlist.
- *   INTERNAL_NET_PATCH (-1): patcher- writes resolved node IDs into pinNodes
- *     of every leaf element after internal net allocation completes.
- * Sort target: ALLOC -> PATCH -> URC -> ... -> VSRC -> BEHAVIORAL.
+ * Sort target: URC -> ... -> VSRC -> BEHAVIORAL.
+ *
+ * Composite-internal MNA node IDs are pre-allocated at compile time by
+ * `expandCompositeInstance` (compiler.ts) and seeded into the engine's
+ * `_nodeTable` before `_setup()` runs. There are no compiler pseudo-leaves
+ * any more; every element in the engine's walk is a real ngspice-shaped
+ * device.
  */
 export const NGSPICE_LOAD_ORDER = {
-  // Compiler pseudo-leaves (negative- precede every real device,
-  // including URC). Sort target: ALLOC -> PATCH -> URC -> ... -> VSRC -> BEHAVIORAL.
-  INTERNAL_NET_ALLOC: -2, // makeInternalNetAllocator: ctx.makeVolt per internal net
-  INTERNAL_NET_PATCH: -1, // patcher: writes resolved node IDs into pinNodes
-
   URC:  0,   // dev.c:141- MUST precede both resistors and capacitors
   BJT:  2,
   CAP:  17,

@@ -214,21 +214,21 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         modelRef: "behavioral",
         subElementName: "L1",
         branchCount: 1,
-        params: { L: l1 },
+        params: { inductance: l1 },
       },
       {
         typeId: "Inductor",
         modelRef: "behavioral",
         subElementName: "L2",
         branchCount: 1,
-        params: { L: l2 },
+        params: { inductance: l2 },
       },
       {
         typeId: "Inductor",
         modelRef: "behavioral",
         subElementName: "L3",
         branchCount: 1,
-        params: { L: l3 },
+        params: { inductance: l3 },
       },
       // Pairwise TransformerCoupling — strict ngspice match. ngspice K elements
       // are 1-to-1 with coupled pairs; a 3-winding tapped transformer emits

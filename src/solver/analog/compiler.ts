@@ -6,17 +6,18 @@
  *
  * Steps:
  *  1. Build node map (wire groups â†’ MNA node IDs, ground = 0)
- *  2. Resolve subcircuit-backed models into MnaModel factories
- *  3. Resolve pinâ†’node bindings for each element
- *  4. Call factory for each element
- *  5. Topology validation (floating nodes, voltage-source loops, inductor loops)
- *  6. Return ConcreteCompiledAnalogCircuit
+ *  2. Resolve pinâ†’node bindings for each element
+ *  3. Call factory for primitives, recursively expand composites
+ *     (`expandCompositeInstance`) into a flat list of leaves with
+ *     pre-allocated internal-net IDs
+ *  4. Topology validation (floating nodes, voltage-source loops, inductor loops)
+ *  5. Return ConcreteCompiledAnalogCircuit
  */
 
 import { Circuit } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
-import { resolvePinLayout } from "../../core/registry.js";
+import { resolvePinLayout, isStandalone } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
@@ -52,7 +53,8 @@ import { SubcircuitWrapperElement } from "./subcircuit-wrapper-element.js";
 // ---------------------------------------------------------------------------
 
 type ComponentRoute =
-  | { kind: 'stamp';  model: MnaModel; entry: ModelEntry | null }
+  | { kind: 'stamp';   model: MnaModel; entry: ModelEntry | null }
+  | { kind: 'compose'; entry: ModelEntry & { kind: "netlist" } }
   | { kind: 'skip' };
 
 /**
@@ -129,9 +131,7 @@ function resolveComponentRoute(
   if (!entry) return { kind: 'skip' };
 
   if (entry.kind === "netlist") {
-    // Netlist entries are resolved by resolveSubcircuitModels into pc.model
-    if (pc.model === null) return { kind: 'skip' };
-    return { kind: 'stamp', model: pc.model as MnaModel, entry };
+    return { kind: 'compose', entry };
   }
 
   const mnaModel = modelEntryToMnaModel(entry);
@@ -141,501 +141,337 @@ function resolveComponentRoute(
 
 
 // ---------------------------------------------------------------------------
-// Subcircuit model resolution- post-partition step (W4.1)
+// Composite expansion- compile-time recursive flattening.
+//
+// Every composite is fully expanded to primitives at compile time. Internal
+// MNA node IDs are pre-allocated by the partition-level allocator (which
+// bumps `totalNodeCount` and records the new node in `preAllocatedNodes`),
+// so each leaf factory receives a `pinNodes` Map whose values are all real,
+// resolved node IDs- no `-1` placeholder ever enters a Map.
+//
+// The allocator is threaded through `expandCompositeInstance` so nested
+// composites share the same partition-level node-ID counter, which keeps the
+// node range contiguous from `1..externalNodeCount` (deck walk) through
+// `externalNodeCount+1..totalNodeCount` (composite internals, depth-first in
+// netlist.elements order).
+//
+// Replaces: `compileSubcircuitToMnaModel` + `InternalNetAllocator` +
+// `PatcherLeaf` + the `internalNetSlots`/`patchWork`/`labelPatchWork`
+// indirections from before. The bug class around closure-captured `-1`
+// pin-node IDs is unrepresentable: factories never see a `-1`.
 // ---------------------------------------------------------------------------
 
+type NodeAllocator = (label: string, suffix: string) => number;
+
 /**
- * Resolve subcircuit-backed models into MnaModel factories.
- *
- * For each PartitionedComponent whose active model key resolves to a
- * subcircuit netlist, compile it into an MnaModel with a composite factory.
- * Replaces `pc.model` in-place so the main compiler loop only sees
- * stamp/bridge/skip.
+ * Pre-allocated MNA node entry. The engine seeds `_nodeTable` with these
+ * before `_setup()` so element-private nodes (`makeVolt` calls inside
+ * `setup()`) continue from `compiled.nodeCount + 1` without colliding with
+ * compile-time-allocated composite internals.
  */
-function resolveSubcircuitModels(
-  partition: SolverPartition,
-  registry: ComponentRegistry,
-): void {
-  for (const pc of partition.components) {
-    const def = pc.definition;
-    const modelReg = def.modelRegistry;
-    if (!modelReg) continue;
-    const entry = modelReg[pc.modelKey];
-    if (!entry || entry.kind !== 'netlist') continue;
-
-    const netlist = entry.netlist;
-
-    let resolvedNetlist: MnaSubcircuitNetlist;
-    if (typeof netlist === "function") {
-      // Spec ssI6: function-form netlist receives the merged-instance PropertyBag
-      // (paramDef defaults + entry.params + instance overrides), so the netlist
-      // builder evaluates against the same param values the leaf factories see.
-      const mergedRecord: Record<string, number> = {
-        ...paramDefDefaults(entry.paramDefs),
-        ...entry.params,
-      };
-      const instanceProps = pc.element.getProperties();
-      for (const k of instanceProps.getModelParamKeys()) {
-        mergedRecord[k] = instanceProps.getModelParam<number>(k);
-      }
-      const mergedProps = new PropertyBag();
-      for (const [k, v] of Object.entries(mergedRecord)) {
-        mergedProps.setModelParam(k, v);
-      }
-      // Also copy static (non-model-param) entries from the instance so that
-      // structural props like "bits" are accessible via getOrDefault() inside
-      // the netlist builder. These are not model params and are not included in
-      // mergedRecord above.
-      for (const [k, v] of instanceProps.entries()) {
-        mergedProps.set(k, v);
-      }
-      resolvedNetlist = netlist(mergedProps);
-    } else {
-      resolvedNetlist = netlist;
-    }
-
-    pc.model = compileSubcircuitToMnaModel(resolvedNetlist, pc, registry);
-  }
+export interface PreAllocatedNodeEntry {
+  name: string;
+  number: number;
+  type: "voltage";
 }
 
 /**
- * A thin leaf element that allocates a single internal MNA node during setup()
- * and records the allocated node ID into a shared mutable slot. Used by
- * compileSubcircuitToMnaModel so that internal-net allocation belongs to leaf
- * children (per ssA.7) rather than to the composite's setup() body.
- *
- * The allocator element has no stamps- its sole purpose is calling
- * ctx.makeVolt() and writing the result into `slot.nodeId` so that sibling
- * sub-elements sharing the same internal net can read the resolved ID
- * during their own setup() calls (which run after the allocator's setup()).
- *
- * `labelRef` is a shared mutable object whose `.value` is set to the composite
- * element's label before `super.setup(ctx)` is called, so that diagnostic node
- * names are attributed to the correct parent instance.
+ * Resolve a function-form `MnaSubcircuitNetlist` against a merged instance
+ * PropertyBag. Plain (non-function) netlists are returned as-is. Mirrors the
+ * spec ssI6 contract: the netlist builder receives paramDef defaults +
+ * entry.params + instance overrides + static (non-model-param) instance
+ * entries, in that precedence order.
  */
-class InternalNetAllocator extends AnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.INTERNAL_NET_ALLOC;
-
-  private readonly _labelRef: { value: string };
-  private readonly _suffix: string;
-  private readonly _slot: { nodeId: number };
-
-  constructor(
-    labelRef: { value: string },
-    suffix: string,
-    slot: { nodeId: number },
-  ) {
-    super(new Map());
-    this._labelRef = labelRef;
-    this._suffix = suffix;
-    this._slot = slot;
-  }
-
-  setup(ctx: import("./setup-context.js").SetupContext): void {
-    this._slot.nodeId = ctx.makeVolt(this._labelRef.value, this._suffix);
-  }
-
-  load(_ctx: import("./load-context.js").LoadContext): void {
-    // No stamps- allocator only.
-  }
-
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [];
-  }
-
-  setParam(_key: string, _value: number): void {
-    // No params.
-  }
-}
-
-type PatchWorkItem = {
-  target: Map<string, number>;
-  pinLabel: string;
-  slot: { nodeId: number };
-};
-
-type LabelPatchWorkItem = {
-  target: PropertyBag;
-  paramKey: string;
-  template: (label: string) => string;
-};
-
-class PatcherLeaf extends AnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.INTERNAL_NET_PATCH;
-
-  private readonly _patchWork: ReadonlyArray<PatchWorkItem>;
-  private readonly _labelPatchWork: ReadonlyArray<LabelPatchWorkItem>;
-  private readonly _labelRef: { value: string };
-
-  constructor(
-    patchWork: ReadonlyArray<PatchWorkItem>,
-    labelPatchWork: ReadonlyArray<LabelPatchWorkItem>,
-    labelRef: { value: string },
-  ) {
-    super(new Map());
-    this._patchWork = patchWork;
-    this._labelPatchWork = labelPatchWork;
-    this._labelRef = labelRef;
-  }
-
-  setup(_ctx: import("./setup-context.js").SetupContext): void {
-    for (const { target, pinLabel, slot } of this._patchWork) {
-      target.set(pinLabel, slot.nodeId);
-    }
-    for (const { target, paramKey, template } of this._labelPatchWork) {
-      target.set(paramKey, template(this._labelRef.value));
-    }
-  }
-
-  load(_ctx: import("./load-context.js").LoadContext): void {
-    // No stamps- patcher only.
-  }
-
-  getPinCurrents(_rhs: Float64Array): number[] {
-    return [];
-  }
-
-  setParam(_key: string, _value: number): void {
-    // No params.
-  }
-}
-
-/**
- * Compile an MnaSubcircuitNetlist into an MnaModel with a wrapper factory.
- *
- * The factory returns a plain-object wrapper AnalogElement with
- * participatesInLoad:false. The wrapper's leaves (allocator, patcher,
- * sub-elements) are exposed via `_subcircuitLeaves` so the caller in
- * compileAnalogPartition flattens them into the global `analogElements`
- * accumulator. The engine's global ngspiceLoadOrder sort then sequences
- * allocator (-2) -> patcher (-1) -> URC (0) -> real devices (>= 0) at
- * setup-time, which makes the wrapper's own setup/load redundant.
- */
-function compileSubcircuitToMnaModel(
-  netlist: MnaSubcircuitNetlist,
-  _pc: PartitionedComponent,
-  registry: ComponentRegistry,
-): MnaModel {
-  return {
-    factory(
-      pinNodes: ReadonlyMap<string, number>,
-      props: PropertyBag,
-      getTime: () => number,
-    ): AnalogElement {
-      const portLabelToNode = new Map<string, number>(pinNodes);
-
-      // Resolve subcircuit-level params: netlist defaults, then instance overrides.
-      const resolvedSubcktParams = new Map<string, number>();
-      if (netlist.params) {
-        for (const [k, v] of Object.entries(netlist.params)) {
-          resolvedSubcktParams.set(k, v);
-        }
-      }
-      for (const [k] of resolvedSubcktParams) {
-        if (props.hasModelParam(k)) {
-          resolvedSubcktParams.set(k, props.getModelParam<number>(k));
-        }
-      }
-
-      // Allocate one mutable slot per internal net. Leaf allocator elements
-      // write to these slots during setup(); sub-elements that share the
-      // same internal net read the resolved node ID from the same slot
-      // during their own setup() calls, which run after the allocators.
-      const internalNetSlots: Array<{ nodeId: number }> = [];
-      for (let i = 0; i < netlist.internalNetCount; i++) {
-        internalNetSlots.push({ nodeId: -1 });
-      }
-
-      // Binding map: subcircuit param name â†’ [{element, elementParamKey}]
-      // Used by setParam to route subcircuit-level changes to the correct
-      // sub-element param (e.g. "WP" â†’ PMOS elements' "W" param).
-      const bindings = new Map<string, Array<{ el: AnalogElement; key: string }>>();
-
-      // Per-instance label resolved at expansion time via setLabel.
-      const labelRef = { value: "" };
-
-      // All child elements: allocators first (so slots are populated before
-      // sub-elements run setup()), then the real leaf elements.
-      const allChildren: AnalogElement[] = [];
-      const subElements: AnalogElement[] = [];
-      // Per-sub-element record: { element, subElementName }- used by setLabel
-      // to stamp `${parentLabel}:${subElementName}` onto each leaf.
-      const subElementLabelInfo: Array<{ el: AnalogElement; subElementName: string }> = [];
-
-      // Build elementsByName map for siblingBranch / siblingState resolution.
-      const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
-      for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
-        const subEl = netlist.elements[elIdx]!;
-        const subName = subEl.subElementName ?? `el${elIdx}`;
-        elementsByName.set(subName, subEl);
-      }
-
-      // Map sub-element name â†’ constructed AnalogElement, populated as we build
-      // each leaf below. Used for siblingState resolution to acquire the
-      // resolved sibling element reference (not just the netlist record).
-      const constructedByName = new Map<string, AnalogElement>();
-
-      // Helper: resolve a netlist net index to a node ID or a slot reference.
-      // Port nets resolve immediately; internal nets resolve via slot.nodeId
-      // (populated by the allocator during setup()).
-      function resolveNetToNode(netIdx: number): number {
-        if (netIdx < netlist.ports.length) {
-          const portLabel = netlist.ports[netIdx];
-          return portLabel !== undefined ? (portLabelToNode.get(portLabel) ?? -1) : -1;
-        }
-        // Internal net- slot will be populated by the allocator's setup().
-        // Return the slot's current value; after all allocator setup() calls
-        // run, slot.nodeId holds the real node ID.
-        const slotIdx = netIdx - netlist.ports.length;
-        return internalNetSlots[slotIdx]?.nodeId ?? -1;
-      }
-
-      // Helpers for creating proxy pinNodes maps that read slot values lazily.
-      // Each sub-element receives a Map whose values for internal nets are
-      // resolved at setup() time (after allocators run), not at construction.
-      // We accomplish this by giving sub-elements Maps pre-populated with -1
-      // for internal nets, then the allocator elements write the resolved IDs
-      // back into the shared slot object. Since the sub-element's pinNodes Map
-      // holds the node ID directly (it is not a live reference to the slot),
-      // we must patch the Map entries before the sub-element's setup() runs.
-      //
-      // The patching is done by a dedicated patcher element inserted between
-      // the allocators and the real sub-elements. The patcher's setup() reads
-      // all slot values (now populated) and writes the final node IDs into
-      // each sub-element's pinNodes.
-
-      // Record which sub-element pinNodes entries need patching and which slot.
-      const patchWork: Array<{
-        target: Map<string, number>;
-        pinLabel: string;
-        slot: { nodeId: number };
-      }> = [];
-
-      const labelPatchWork: Array<{
-        target: PropertyBag;
-        paramKey: string;
-        template: (label: string) => string;
-      }> = [];
-
-      for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
-        const subEl = netlist.elements[elIdx];
-        const connectivity = netlist.netlist[elIdx];
-
-        const leafDef = registry.get(subEl.typeId);
-        // CLAUDE.md "Component Model Architecture": defaultModel is for
-        // placement-time UI only and MUST NOT be a compile-time lookup
-        // key. modelRef is the canonical sub-element model selector;
-        // params.model is accepted as a secondary key. Missing entries
-        // throw at the point of origin so unresolvable models surface
-        // loudly instead of as downstream siblingState / siblingBranch
-        // errors when the unconstructed leaf is referenced.
-        const leafModelKey =
-          subEl.modelRef
-          ?? (subEl.params?.model as string | undefined);
-        if (leafModelKey === undefined) {
-          throw new Error(
-            `Composite sub-element "${subEl.subElementName ?? `el${elIdx}`}" ` +
-              `(typeId="${subEl.typeId}") has no modelRef and no params.model. ` +
-              `defaultModel is for placement-time UI only and is not a valid ` +
-              `compile-time lookup key.`,
-          );
-        }
-        const leafEntry = leafDef ? resolveModelEntry(leafDef, leafModelKey) : null;
-        if (!leafEntry) {
-          const available = leafDef?.modelRegistry
-            ? Object.keys(leafDef.modelRegistry).join(", ") || "(none)"
-            : "(typeId not in registry)";
-          throw new Error(
-            `Composite sub-element "${subEl.subElementName ?? `el${elIdx}`}" ` +
-              `requested model "${leafModelKey}" on typeId "${subEl.typeId}", ` +
-              `but the component has no such model entry. Available: ${available}.`,
-          );
-        }
-        if (leafEntry.kind !== "inline") continue;
-        const leafFactory = leafEntry.factory;
-
-        const subProps = new PropertyBag();
-        // Seed with leaf definition's default model params (e.g. MOSFET VTO, KP, LAMBDA)
-        if (leafEntry.params) {
-          for (const [k, v] of Object.entries(leafEntry.params)) {
-            if (typeof v === "number") subProps.setModelParam(k, v);
-          }
-        }
-        // Override with subcircuit-specific params- discriminated dispatch on value shape.
-        if (subEl.params) {
-          for (const [paramKey, v] of Object.entries(subEl.params)) {
-            if (typeof v === "number") {
-              // Literal pass-through to leaf prop bag.
-              subProps.setModelParam(paramKey, v);
-            } else if (typeof v === "string") {
-              // Existing subcircuit-level param ref; resolve from merged-instance PropertyBag.
-              const resolved = resolvedSubcktParams.get(v);
-              if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
-            } else if (v !== null && typeof v === "object") {
-              const tag = (v as { kind?: string }).kind;
-              if (tag === "siblingBranch") {
-                const ref = v as { kind: "siblingBranch"; subElementName: string };
-                const sibling = elementsByName.get(ref.subElementName);
-                if (!sibling) {
-                  throw new Error(
-                    `siblingBranch: unknown element "${ref.subElementName}"`,
-                  );
-                }
-                // Write the GLOBAL label into the dependent leaf's prop bag.
-                // The dependent leaf's setup() calls ctx.findBranch(label).
-                labelPatchWork.push({
-                  target: subProps,
-                  paramKey,
-                  template: (label) => `${label}:${ref.subElementName}`,
-                });
-              } else if (tag === "siblingState") {
-                const ref = v as { kind: "siblingState"; subElementName: string; slotName: string };
-                const sibling = elementsByName.get(ref.subElementName);
-                if (!sibling) {
-                  throw new Error(
-                    `siblingState: unknown element "${ref.subElementName}"`,
-                  );
-                }
-                const siblingDef = registry.get(sibling.typeId);
-                if (!siblingDef) {
-                  throw new Error(
-                    `siblingState: registry has no definition for typeId "${sibling.typeId}"`,
-                  );
-                }
-                // The constructed sibling carries the per-instance schema- variable-arity
-                // drivers like Counter / Register build their schema from props in the
-                // constructor, and fixed-shape drivers expose the same canonical schema.
-                // Sibling MUST appear before the consumer in `netlist.elements`
-                // iteration order- d-flipflop's parent emits [drv, qPin, nqPin],
-                // counter parent emits [drv, outBit0, outBit1, ...]; the d-flipflop
-                // / counter drv constructor runs first and populates constructedByName.
-                const siblingEl = constructedByName.get(ref.subElementName);
-                const siblingSchema =
-                  siblingEl !== undefined && isPoolBacked(siblingEl)
-                    ? siblingEl.stateSchema
-                    : undefined;
-                const slotIdx = siblingSchema?.indexOf.get(ref.slotName) ?? -1;
-                if (slotIdx < 0) {
-                  throw new Error(
-                    `siblingState: unknown slot "${ref.slotName}" on "${ref.subElementName}"`,
-                  );
-                }
-                if (siblingEl === undefined) {
-                  // Per the in-loop invariant (sibling MUST precede consumer in
-                  // netlist.elements iteration order), siblingEl is always
-                  // populated by the time we reach a consumer's siblingState
-                  // ref. If we hit this branch, the parent netlist's element
-                  // ordering is wrong.
-                  throw new Error(
-                    `siblingState: sibling "${ref.subElementName}" not yet ` +
-                      `constructed when consumer needs slot "${ref.slotName}". ` +
-                      `Reorder netlist.elements so the sibling appears first.`,
-                  );
-                }
-                // The dependent leaf's setup() resolves to a flat pool index via
-                //   sibling._stateBase + slotIdx
-                // because at setup-time the sibling's _stateBase is already populated
-                // (initState ran before setup). Write the deferred ref:
-                subProps.set(paramKey, { kind: "poolSlotRef", element: siblingEl, slotIdx });
-              } else {
-                throw new Error(
-                  "Unsupported SubcircuitElementParam discriminator. " +
-                    "Cross-leaf coupling MUST go through pool slots (siblingState) " +
-                    "to preserve StatePool rollback. See composite-architecture-job.md ss11.2.",
-                );
-              }
-            }
-          }
-        }
-
-        // Build pin-label-keyed Map for the sub-element.
-        // Port nets resolve immediately; internal nets start as -1 and are
-        // patched by the patcher element before this sub-element's setup() runs.
-        // Variable-shape drivers (Template A-variable: gates with N inputs,
-        // counters/registers with N output bits) supply `pinLayoutFactory`;
-        // resolvePinLayout invokes it with the sub-element's resolved props.
-        const subPinNodes = new Map<string, number>();
-        if (leafDef) {
-          const subPinLayout = resolvePinLayout(leafDef, subProps);
-          for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
-            const netIdx = connectivity[pi];
-            if (netIdx === undefined) continue;
-            const pinLabel = subPinLayout[pi]!.label;
-            if (netIdx < netlist.ports.length) {
-              subPinNodes.set(pinLabel, resolveNetToNode(netIdx));
-            } else {
-              // Internal net- will be patched before this element's setup()
-              const slotIdx = netIdx - netlist.ports.length;
-              const slot = internalNetSlots[slotIdx];
-              if (slot !== undefined) {
-                subPinNodes.set(pinLabel, -1);
-                patchWork.push({ target: subPinNodes, pinLabel, slot });
-              }
-            }
-          }
-        }
-
-        const childEl = leafFactory(subPinNodes, subProps, getTime);
-        subElements.push(childEl);
-        const subName = subEl.subElementName ?? `el${elIdx}`;
-        constructedByName.set(subName, childEl);
-        subElementLabelInfo.push({ el: childEl, subElementName: subName });
-
-        // Record string-ref bindings for setParam routing
-        if (subEl.params) {
-          for (const [k, v] of Object.entries(subEl.params)) {
-            if (typeof v === "string") {
-              let arr = bindings.get(v);
-              if (!arr) { arr = []; bindings.set(v, arr); }
-              arr.push({ el: childEl, key: k });
-            }
-          }
-        }
-      }
-
-      // Determine which internal net slots actually need an allocator
-      // (only those referenced by at least one sub-element).
-      const usedSlotIndices = new Set(
-        patchWork.map(pw => internalNetSlots.indexOf(pw.slot)),
-      );
-
-      const internalNetLabelsResolved: string[] = [];
-      for (let i = 0; i < netlist.internalNetCount; i++) {
-        if (!usedSlotIndices.has(i)) continue;
-        const slot = internalNetSlots[i]!;
-        const suffix = `int${i}`;
-        internalNetLabelsResolved.push(suffix);
-        allChildren.push(new InternalNetAllocator(labelRef, suffix, slot));
-      }
-
-      // Patcher leaf element: runs after allocators, before real sub-elements,
-      // to write resolved internal-node IDs into each sub-element's pinNodes.
-      const patcher = new PatcherLeaf(patchWork, labelPatchWork, labelRef);
-
-      if (patchWork.length > 0 || labelPatchWork.length > 0) {
-        allChildren.push(patcher);
-      }
-
-      allChildren.push(...subElements);
-
-      // Wrapper is a SubcircuitWrapperElement- the engine walks it like any
-      // other AnalogElement, but its setup/load are no-ops; the real work
-      // lives in the leaves (allocator, patcher, sub-elements) flattened
-      // alongside the wrapper into the global accumulator by the caller.
-      // ngspiceLoadOrder is set to VCVS for parity with the controlled-source
-      // family; the no-op load means the order is functionally arbitrary.
-      return new SubcircuitWrapperElement({
-        pinNodes,
-        ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-        subElements,
-        leaves: allChildren,
-        bindings: { map: bindings },
-        subElementLabelInfo,
-        internalNetLabels: internalNetLabelsResolved,
-        labelRef,
-      });
-    },
+function resolveNetlistInstance(
+  entry: ModelEntry & { kind: "netlist" },
+  instanceProps: PropertyBag,
+): MnaSubcircuitNetlist {
+  if (typeof entry.netlist !== "function") return entry.netlist;
+  const mergedRecord: Record<string, number> = {
+    ...paramDefDefaults(entry.paramDefs),
+    ...entry.params,
   };
+  for (const k of instanceProps.getModelParamKeys()) {
+    mergedRecord[k] = instanceProps.getModelParam<number>(k);
+  }
+  const mergedProps = new PropertyBag();
+  for (const [k, v] of Object.entries(mergedRecord)) {
+    mergedProps.setModelParam(k, v);
+  }
+  for (const [k, v] of instanceProps.entries()) {
+    mergedProps.set(k, v);
+  }
+  return entry.netlist(mergedProps);
+}
+
+/**
+ * Compute the merged subcircuit-level params for an instance: netlist
+ * defaults overridden by the instance's modelParams.
+ */
+function computeSubcktParams(
+  netlist: MnaSubcircuitNetlist,
+  instanceProps: PropertyBag,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (netlist.params) {
+    for (const [k, v] of Object.entries(netlist.params)) out.set(k, v);
+  }
+  for (const k of out.keys()) {
+    if (instanceProps.hasModelParam(k)) {
+      out.set(k, instanceProps.getModelParam<number>(k));
+    }
+  }
+  return out;
+}
+
+/**
+ * Expand a composite instance into a flat list of leaf AnalogElements with
+ * fully-resolved pin-node IDs. Recursive- nested composites are expanded in
+ * the same pass. The returned `wrapper` is a presentation-only
+ * SubcircuitWrapperElement (no-op setup/load) used for setParam routing,
+ * getPinCurrents aggregation, and internal-node label exposure. The returned
+ * `allLeaves` is the depth-first flattening that the engine's element walk
+ * sees as primary participants.
+ */
+function expandCompositeInstance(
+  netlist: MnaSubcircuitNetlist,
+  subcktParams: Map<string, number>,
+  outerPinNodes: ReadonlyMap<string, number>,
+  parentLabel: string,
+  registry: ComponentRegistry,
+  getTime: () => number,
+  allocateNode: NodeAllocator,
+  hook?: import("../../core/registry.js").AnalogWrapperHook,
+): { wrapper: SubcircuitWrapperElement; allLeaves: AnalogElement[] } {
+  // Pre-allocate one MNA node per declared internal net.
+  const internalNetIds: number[] = [];
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < netlist.internalNetCount; i++) {
+    const suffix = netlist.internalNetLabels?.[i] ?? `int${i}`;
+    internalNetIds.push(allocateNode(parentLabel, suffix));
+    internalNetLabels.push(suffix);
+  }
+
+  // Build elementsByName index for siblingBranch / siblingState resolution.
+  const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
+  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+    const subEl = netlist.elements[elIdx]!;
+    const subName = subEl.subElementName ?? `el${elIdx}`;
+    elementsByName.set(subName, subEl);
+  }
+
+  // Resolve a netlist net index to a concrete MNA node ID.
+  const resolveNetToNode = (netIdx: number): number => {
+    if (netIdx < netlist.ports.length) {
+      const portLabel = netlist.ports[netIdx];
+      if (portLabel === undefined) {
+        throw new Error(`composite "${parentLabel}": invalid port index ${netIdx}`);
+      }
+      const id = outerPinNodes.get(portLabel);
+      if (id === undefined) {
+        throw new Error(
+          `composite "${parentLabel}": port "${portLabel}" not present in outerPinNodes`,
+        );
+      }
+      return id;
+    }
+    return internalNetIds[netIdx - netlist.ports.length]!;
+  };
+
+  const constructedByName = new Map<string, AnalogElement>();
+  const subElements: AnalogElement[] = [];
+  const allLeaves: AnalogElement[] = [];
+  const subElementLabelInfo: Array<{ el: AnalogElement; subElementName: string }> = [];
+  const bindings = new Map<string, Array<{ el: AnalogElement; key: string }>>();
+
+  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+    const subEl = netlist.elements[elIdx]!;
+    const connectivity = netlist.netlist[elIdx]!;
+    const subName = subEl.subElementName ?? `el${elIdx}`;
+    const childLabel = `${parentLabel}:${subName}`;
+
+    const leafDef = registry.get(subEl.typeId);
+    // CLAUDE.md "Component Model Architecture": defaultModel is for
+    // placement-time UI only and MUST NOT be a compile-time lookup key.
+    const leafModelKey =
+      subEl.modelRef ?? (subEl.params?.model as string | undefined);
+    if (leafModelKey === undefined) {
+      throw new Error(
+        `Composite sub-element "${subName}" (typeId="${subEl.typeId}") has no ` +
+          `modelRef and no params.model. defaultModel is for placement-time UI ` +
+          `only and is not a valid compile-time lookup key.`,
+      );
+    }
+    const leafEntry = leafDef ? resolveModelEntry(leafDef, leafModelKey) : null;
+    if (!leafEntry) {
+      const available = leafDef?.modelRegistry
+        ? Object.keys(leafDef.modelRegistry).join(", ") || "(none)"
+        : "(typeId not in registry)";
+      throw new Error(
+        `Composite sub-element "${subName}" requested model "${leafModelKey}" ` +
+          `on typeId "${subEl.typeId}", but the component has no such model ` +
+          `entry. Available: ${available}.`,
+      );
+    }
+
+    // Build the sub-element's PropertyBag: leaf-entry defaults + sub-element
+    // param overrides (literal numbers, subcircuit-param refs, sibling refs).
+    const subProps = new PropertyBag();
+    if (leafEntry.params) {
+      for (const [k, v] of Object.entries(leafEntry.params)) {
+        if (typeof v === "number") subProps.setModelParam(k, v);
+      }
+    }
+    if (subEl.params) {
+      for (const [paramKey, v] of Object.entries(subEl.params)) {
+        if (typeof v === "number") {
+          subProps.setModelParam(paramKey, v);
+        } else if (typeof v === "string") {
+          const resolved = subcktParams.get(v);
+          if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
+        } else if (v !== null && typeof v === "object") {
+          const tag = (v as { kind?: string }).kind;
+          if (tag === "siblingBranch") {
+            const ref = v as { kind: "siblingBranch"; subElementName: string };
+            const sibling = elementsByName.get(ref.subElementName);
+            if (!sibling) {
+              throw new Error(`siblingBranch: unknown element "${ref.subElementName}"`);
+            }
+            // Parent label is known at compile time; resolve immediately
+            // instead of deferring to a patcher leaf at engine setup time.
+            subProps.set(paramKey, `${parentLabel}:${ref.subElementName}`);
+          } else if (tag === "siblingState") {
+            const ref = v as {
+              kind: "siblingState";
+              subElementName: string;
+              slotName: string;
+            };
+            const sibling = elementsByName.get(ref.subElementName);
+            if (!sibling) {
+              throw new Error(`siblingState: unknown element "${ref.subElementName}"`);
+            }
+            const siblingDef = registry.get(sibling.typeId);
+            if (!siblingDef) {
+              throw new Error(
+                `siblingState: registry has no definition for typeId "${sibling.typeId}"`,
+              );
+            }
+            const siblingEl = constructedByName.get(ref.subElementName);
+            if (siblingEl === undefined) {
+              throw new Error(
+                `siblingState: sibling "${ref.subElementName}" not yet constructed ` +
+                  `when consumer needs slot "${ref.slotName}". Reorder ` +
+                  `netlist.elements so the sibling appears first.`,
+              );
+            }
+            const siblingSchema = isPoolBacked(siblingEl)
+              ? siblingEl.stateSchema
+              : undefined;
+            const slotIdx = siblingSchema?.indexOf.get(ref.slotName) ?? -1;
+            if (slotIdx < 0) {
+              throw new Error(
+                `siblingState: unknown slot "${ref.slotName}" on "${ref.subElementName}"`,
+              );
+            }
+            subProps.set(paramKey, {
+              kind: "poolSlotRef",
+              element: siblingEl,
+              slotIdx,
+            });
+          } else {
+            throw new Error(
+              "Unsupported SubcircuitElementParam discriminator. " +
+                "Cross-leaf coupling MUST go through pool slots (siblingState) " +
+                "to preserve StatePool rollback. See composite-architecture-job.md ss11.2.",
+            );
+          }
+        }
+      }
+    }
+
+    // Build pin-label-keyed Map for the sub-element. All node IDs are
+    // already resolved (port pins via outer pinNodes; internal-net pins via
+    // pre-allocated IDs) - no `-1` placeholder ever appears here.
+    const subPinNodes = new Map<string, number>();
+    if (leafDef) {
+      const subPinLayout = resolvePinLayout(leafDef, subProps);
+      for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
+        const netIdx = connectivity[pi];
+        if (netIdx === undefined) continue;
+        const pinLabel = subPinLayout[pi]!.label;
+        subPinNodes.set(pinLabel, resolveNetToNode(netIdx));
+      }
+    }
+
+    // Build the child element. Inline factories produce a primitive directly;
+    // netlist-form leaves recurse to expand nested composites into a flat
+    // list of primitives whose internal nets share the partition-level
+    // allocator's node-ID range.
+    let childEl: AnalogElement;
+    if (leafEntry.kind === "inline") {
+      childEl = leafEntry.factory(subPinNodes, subProps, getTime);
+      childEl.label = childLabel;
+      subElements.push(childEl);
+      allLeaves.push(childEl);
+    } else if (leafEntry.kind === "netlist") {
+      const innerNetlist = resolveNetlistInstance(leafEntry, subProps);
+      const innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
+      const inner = expandCompositeInstance(
+        innerNetlist,
+        innerSubcktParams,
+        subPinNodes,
+        childLabel,
+        registry,
+        getTime,
+        allocateNode,
+      );
+      childEl = inner.wrapper;
+      // Inner expansion already set inner.wrapper.label = childLabel via
+      // the SubcircuitWrapperElement constructor option; reassert here so
+      // future direct construction paths can't drift.
+      childEl.label = childLabel;
+      subElements.push(childEl);
+      allLeaves.push(childEl, ...inner.allLeaves);
+    } else {
+      // Future ModelEntry kinds: surface loudly so we never silently drop a
+      // sub-element the way the old code did with `if (kind !== "inline") continue`.
+      throw new Error(
+        `Composite sub-element "${subName}" has unsupported ModelEntry kind ` +
+          `"${(leafEntry as { kind: string }).kind}".`,
+      );
+    }
+
+    constructedByName.set(subName, childEl);
+    subElementLabelInfo.push({ el: childEl, subElementName: subName });
+
+    // Record string-ref bindings for setParam routing.
+    if (subEl.params) {
+      for (const [k, v] of Object.entries(subEl.params)) {
+        if (typeof v === "string") {
+          let arr = bindings.get(v);
+          if (!arr) {
+            arr = [];
+            bindings.set(v, arr);
+          }
+          arr.push({ el: childEl, key: k });
+        }
+      }
+    }
+  }
+
+  const wrapper = new SubcircuitWrapperElement({
+    pinNodes: outerPinNodes,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+    subElements,
+    leaves: allLeaves,
+    bindings: { map: bindings },
+    subElementLabelInfo,
+    internalNetLabels,
+    label: parentLabel,
+    ...(hook !== undefined ? { hook } : {}),
+  });
+
+  return { wrapper, allLeaves };
 }
 
 // ---------------------------------------------------------------------------
@@ -755,6 +591,23 @@ function runPassA_partition(
           }
           props.replaceModelParams(merged);
         }
+        elementMeta.push({ pc, route });
+        continue;
+      }
+      case 'compose': {
+        // Composites manage their own internal subcircuit-level params via
+        // `computeSubcktParams` at expand time, but the instance's modelParams
+        // bag still has to carry merged defaults for the wrapper's setParam
+        // dispatch and any non-composite read paths.
+        const props = el.getProperties();
+        const merged: Record<string, number> = {
+          ...paramDefDefaults(route.entry.paramDefs),
+          ...route.entry.params,
+        };
+        for (const k of props.getModelParamKeys()) {
+          merged[k] = props.getModelParam<number>(k);
+        }
+        props.replaceModelParams(merged);
         elementMeta.push({ pc, route });
         continue;
       }
@@ -1048,9 +901,6 @@ export function compileAnalogPartition(
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
-  // Stage 2b: Resolve subcircuit-backed models into MnaModel factories.
-  resolveSubcircuitModels(partition, registry);
-
   // Extract typed inline runtime models for use in route resolution.
   const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
     outerCircuit?.metadata.models;
@@ -1061,6 +911,22 @@ export function compileAnalogPartition(
 
   let branchCount = 0;
   let totalNodeCount = externalNodeCount;
+
+  // Compile-time node allocator for composite-internal nets. Threaded into
+  // `expandCompositeInstance` so every nested level shares one contiguous
+  // node-ID range. The engine seeds `_nodeTable` with `preAllocatedNodes`
+  // before `_setup()` so element-private `makeVolt` calls continue from
+  // `compiled.nodeCount + 1` without colliding.
+  const preAllocatedNodes: PreAllocatedNodeEntry[] = [];
+  const allocateCompositeNode: NodeAllocator = (label, suffix) => {
+    totalNodeCount += 1;
+    preAllocatedNodes.push({
+      name: `${label}#${suffix}`,
+      number: totalNodeCount,
+      type: "voltage",
+    });
+    return totalNodeCount;
+  };
 
   // Build a minimal circuit-like wire lookup for resolveElementNodes.
   // We need to pass wireToNodeId and a circuit object. We create a minimal
@@ -1092,12 +958,10 @@ export function compileAnalogPartition(
       continue;
     }
 
-    // route.kind === 'stamp'
     const def = pc.definition;
     const props = el.getProperties();
-    const activeModel = route.model;
 
-    // Resolve pin â†’ node ID bindings
+    // Resolve pin â†’ node ID bindings.
     const livePins = el.getPins();
     const pinVertices: Array<{ x: number; y: number } | null> = new Array(
       livePins.length,
@@ -1146,7 +1010,10 @@ export function compileAnalogPartition(
       }
     }
 
-    if (activeModel.factory !== undefined) {
+    // Pin electrical / pin loading metadata (consumed by both inline
+    // factories and composite leaf factories: composites flatten outer
+    // pinElectrical onto each sub-element pin via the netlist's port mapping).
+    {
       const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
         ? props.get<Record<string, number>>("_pinElectricalOverrides")
         : {};
@@ -1178,8 +1045,6 @@ export function compileAnalogPartition(
       }
       props.set("_pinElectrical", pinElectricalMap);
 
-      // Build per-pin loading map and inject into PropertyBag so that
-      // behavioural factories can read it during pin-model construction.
       const pinLoadingMap: Record<string, boolean> = {};
       for (const pinLabel of pinLabelsForElec) {
         const nodeId = pinNodes.get(pinLabel);
@@ -1195,8 +1060,10 @@ export function compileAnalogPartition(
       props.set("_pinLoading", pinLoadingMap);
     }
 
-    // Populate model params.
-    // Merge order (lowest wins): model entry defaults â†’ element _mparams.
+    // Schema-keys validation: warn for params declared on the model entry
+    // that aren't in its paramDefs schema. The merge of defaults +
+    // entry.params + instance overrides already happened in
+    // `runPassA_partition` for both 'stamp' and 'compose' routes.
     const modelEntry = route.entry;
     if (modelEntry) {
       const schemaKeys = new Set(modelEntry.paramDefs.map(d => d.key));
@@ -1208,28 +1075,52 @@ export function compileAnalogPartition(
           ));
         }
       }
-      const merged: Record<string, number> = { ...paramDefDefaults(modelEntry.paramDefs), ...modelEntry.params };
-      for (const k of props.getModelParamKeys()) {
-        merged[k] = props.getModelParam<number>(k);
-      }
-      props.replaceModelParams(merged);
     }
 
-    const analogFactory = activeModel.factory;
-    if (!analogFactory) continue;
-    const core = analogFactory(pinNodes, props, getTime);
     const resolvedLabel = el.getProperties().has("label")
       ? String(el.getProperties().get("label") ?? el.instanceId)
       : el.instanceId;
-    // Subcircuit-wrapper case: the factory returned a SubcircuitWrapperElement.
-    // Stamp the wrapper's label before flattening leaves so each leaf carries
-    // `${parentLabel}:${subElementName}` (Composite I5).
-    if (core instanceof SubcircuitWrapperElement) {
-      core.setLabel(resolvedLabel);
+
+    // Build the element. Primitive (`stamp`): call the factory directly.
+    // Composite (`compose`): fully expand to a flat list of primitive leaves
+    // at compile time, with internal-net IDs pre-allocated from the
+    // partition-level allocator. Sub-element factories see fully-resolved
+    // pinNodes Maps - no `-1` placeholder ever appears.
+    let core: import("./element.js").AnalogElement;
+    let composedLeaves: import("./element.js").AnalogElement[] = [];
+    if (route.kind === 'stamp') {
+      const analogFactory = route.model.factory;
+      if (!analogFactory) continue;
+      core = analogFactory(pinNodes, props, getTime);
+      core.label = resolvedLabel;
+    } else {
+      const netlist = resolveNetlistInstance(route.entry, props);
+      const subcktParams = computeSubcktParams(netlist, props);
+      // Parent-side runtime hook: instantiate once per parent-component
+      // instance and thread to the wrapper. The wrapper forwards
+      // load/setDiagnosticEmitter/setParam/acceptStep calls to the hook;
+      // the existing RuntimeDiagnosticAware wiring in MNAEngine.init()
+      // hooks the diagnostic emitter via the wrapper's setDiagnosticEmitter.
+      const hook = isStandalone(def) && def.analogWrapperHook
+        ? def.analogWrapperHook(pinNodes, props, getTime)
+        : undefined;
+      const expanded = expandCompositeInstance(
+        netlist,
+        subcktParams,
+        pinNodes,
+        resolvedLabel,
+        registry,
+        getTime,
+        allocateCompositeNode,
+        hook,
+      );
+      core = expanded.wrapper;
+      core.label = resolvedLabel;
+      composedLeaves = expanded.allLeaves;
     }
+
     const elementIndex = analogElements.length;
     const element: import("./element.js").AnalogElement = Object.assign(core, {
-      label: resolvedLabel,
       elementIndex,
     });
     analogElements.push(element);
@@ -1256,14 +1147,14 @@ export function compileAnalogPartition(
       elementResolvedPins.set(elementIndex, resolvedPinsOut);
     }
 
-    // If the factory was a subcircuit wrapper, push its leaves (allocator,
-    // patcher, sub-elements) directly into the analog accumulator so the
-    // global ngspiceLoadOrder sort sequences them ahead of real devices.
-    // The wrapper itself stays in `analogElements` with no-op setup/load.
-    if (core instanceof SubcircuitWrapperElement) {
-      for (const leaf of core._subcircuitLeaves) {
-        analogElements.push(leaf);
-      }
+    // Composite leaves were depth-first flattened by `expandCompositeInstance`.
+    // Push them into the global accumulator so the engine's per-element walk
+    // sees each one in `ngspiceLoadOrder` bucket order. The wrapper itself
+    // stays in `analogElements`; its load/setDiagnosticEmitter/setParam/
+    // acceptStep methods forward to the optional `analogWrapperHook` for
+    // parent-side runtime concerns (UI diagnostics).
+    for (const leaf of composedLeaves) {
+      analogElements.push(leaf);
     }
   }
 
@@ -1442,5 +1333,6 @@ export function compileAnalogPartition(
     diagnostics,
     timeRef,
     statePool,
+    preAllocatedNodes,
   });
 }

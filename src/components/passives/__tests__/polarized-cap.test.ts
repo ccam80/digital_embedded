@@ -8,10 +8,7 @@ import {
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
-import {
-  AnalogPolarizedCapElement,
-} from "../polarized-cap.js";
-import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
+import { PoolBackedAnalogElement, AnalogElement } from "../../../solver/analog/element.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -19,12 +16,32 @@ import type { PropertyValue } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // Slot indices — resolved via stateSchema, never raw SLOT_* imports (B-3).
-// AnalogPolarizedCapElement composes a 9-slot region: 5 cap-body slots
-// (POLARIZED_CAP_SCHEMA) + 4 clamp-diode slots (DIODE_SCHEMA) appended after.
+//
+// After the Wave 1 refactor PolarizedCap is a kind:"netlist" subcircuit with
+// four canonical leaves (rEsr, rLeak, cBody, dClamp) and a parent-side
+// diagnostic observer. The cap-body charge slot (Q) now lives on the
+// `cap_cBody` Capacitor leaf, addressed by element label.
 // ---------------------------------------------------------------------------
 
 function getCapSchema(el: PoolBackedAnalogElement) {
   return el.stateSchema;
+}
+
+/** Find a sub-element leaf by its compiler-assigned label (`${parent}_${subElementName}`). */
+function findLeafByLabel(
+  elements: ReadonlyArray<AnalogElement>,
+  label: string,
+): PoolBackedAnalogElement {
+  const idx = elements.findIndex((el) => el.label === label);
+  if (idx < 0) throw new Error(`leaf '${label}' not found in compiled circuit`);
+  return elements[idx] as PoolBackedAnalogElement;
+}
+
+function findLeafIndexByLabel(
+  elements: ReadonlyArray<AnalogElement>,
+  label: string,
+): number {
+  return elements.findIndex((el) => el.label === label);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,10 +111,13 @@ function buildPolCapCircuit(facade: DefaultSimulatorFacade, p: PolCapBuildOpts):
   return facade.build({ components, connections });
 }
 
-function findCap(elements: ReadonlyArray<unknown>): AnalogPolarizedCapElement {
-  const idx = elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
-  if (idx < 0) throw new Error("AnalogPolarizedCapElement not found in compiled circuit");
-  return elements[idx] as AnalogPolarizedCapElement;
+/**
+ * Returns the cBody Capacitor leaf, which owns the Q slot in the new
+ * netlist-subcircuit layout. State-slot probes that previously read into the
+ * 9-slot composite element now address the leaf directly.
+ */
+function findCap(elements: ReadonlyArray<AnalogElement>): PoolBackedAnalogElement {
+  return findLeafByLabel(elements, "cap:cBody");
 }
 
 function getCapCe(fix: ReturnType<typeof buildFixture>) {
@@ -208,7 +228,7 @@ describe("PolarizedCap DCOP analytical (T1)", () => {
       params: { tStop: 1e-3, maxTimeStep: 1e-4 },
     });
 
-    const capIdx = fix.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     expect(capIdx).toBeGreaterThanOrEqual(0);
     const [iPos] = fix.engine.getElementPinCurrents(capIdx);
     const expectedI = V / (esr + rLeak);
@@ -332,7 +352,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-6, maxTimeStep: 1e-9, uic: true },
     });
-    const idxSmall = fixSmall.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const idxSmall = findLeafIndexByLabel(fixSmall.circuit.elements, "cap:cBody");
     const [iSmall] = fixSmall.engine.getElementPinCurrents(idxSmall);
 
     const fixLarge = buildFixture({
@@ -341,7 +361,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-6, maxTimeStep: 1e-9, uic: true },
     });
-    const idxLarge = fixLarge.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const idxLarge = findLeafIndexByLabel(fixLarge.circuit.elements, "cap:cBody");
     const [iLarge] = fixLarge.engine.getElementPinCurrents(idxLarge);
 
     // 1000× capacitance → larger initial current draw at fixed dt.
@@ -354,7 +374,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-6, maxTimeStep: 1e-9, uic: true },
     });
-    const idxFix = fix.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const idxFix = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(idxFix);
 
     fix.coordinator.setComponentProperty(getCapCe(fix), "capacitance", 1e-3);
@@ -377,7 +397,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-6, maxTimeStep: 1e-9, uic: true },
     });
-    const capIdx = fix.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
     // I ≈ V/ESR = 10/5 = 2A.
     expect(Math.abs(iBefore)).toBeCloseTo(2, 0);
@@ -408,7 +428,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-4 },
     });
-    const capIdx = fix.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
     expect(Math.abs(iBefore)).toBeCloseTo(V / (esr + Vrate / 1e-6), 8);
 
@@ -437,7 +457,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-4 },
     });
-    const capIdx = fix.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
     expect(Math.abs(iBefore)).toBeCloseTo(V / (esr + 25 / Ileak), 8);
 
@@ -521,7 +541,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-4 },
     });
-    const capIdx = fix.circuit.elements.findIndex((el) => el instanceof AnalogPolarizedCapElement);
+    const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
 
     fix.coordinator.setComponentProperty(getCapCe(fix), "M", 2);

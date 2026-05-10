@@ -40,7 +40,7 @@ import { getComponentLabel } from './address.js';
 export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netlist {
   const [assignments, assignDiags] = resolveModelAssignments(circuit.elements, registry);
   const [groups, groupDiags] = extractConnectivityGroups(
-    circuit.elements, circuit.wires, registry, assignments, circuit.specConnections,
+    circuit.elements, circuit.wires, registry, assignments, circuit.connectivitySource,
   );
   return buildNetlistView(
     circuit.elements, registry, assignments, groups,

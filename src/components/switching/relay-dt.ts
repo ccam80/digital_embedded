@@ -231,8 +231,8 @@ export function executeRelayDT(index: number, state: Uint32Array, _highZs: Uint3
 // Internal net: coilMid (index 5)
 //
 // Elements:
-//   0: RelayInductor (coilL):    pos=in1(0), neg=coilMid(5)
-//   1: RelayResistor (coilR):    pos=coilMid(5), neg=in2(1)
+//   0: Inductor (coilL):    pos=in1(0), neg=coilMid(5)
+//   1: Resistor (coilR):    pos=coilMid(5), neg=in2(1)
 //   2: Switch (contactNO):       A1(2) â†” B1(3)   (normally-open: closes when energised)
 //   3: Switch (contactNC):       A1(2) â†” C1(4)   (normally-closed: opens when energised)
 //   4: RelayCoupling (couplingNO): no MNA pins- writes NO contact CLOSED slot
@@ -244,8 +244,8 @@ export const RELAY_DT_NETLIST: MnaSubcircuitNetlist = {
   params: { inductance: 0.05, coilResistance: 100,
             pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
   elements: [
-    { typeId: "RelayInductor", modelRef: "default", subElementName: "coilL",      branchCount: 1, params: { L: "inductance" } },
-    { typeId: "RelayResistor", modelRef: "default", subElementName: "coilR",                      params: { R: "coilResistance" } },
+    { typeId: "Inductor",  modelRef: "behavioral", subElementName: "coilL", branchCount: 1, params: { inductance: "inductance" } },
+    { typeId: "Resistor",  modelRef: "behavioral", subElementName: "coilR",                params: { resistance: "coilResistance" } },
     { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactNO",                params: { Ron: "Ron", Roff: "Roff" } },
     { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactNC",                params: { Ron: "Ron", Roff: "Roff" } },
     { typeId: "RelayCoupling", modelRef: "default", subElementName: "couplingNO",

@@ -223,6 +223,7 @@ function triodeCircuitFactory(props: PropertyBag): TriodeCircuitElement {
 export const TriodeDefinition: StandaloneComponentDefinition = {
   name: "Triode",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   factory: triodeCircuitFactory,
   pinLayout: buildTriodePinDeclarations(),
   propertyDefs: TRIODE_PROPERTY_DEFS,

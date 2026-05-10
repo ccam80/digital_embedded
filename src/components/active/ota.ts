@@ -377,6 +377,7 @@ const OTA_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 export const OTADefinition: StandaloneComponentDefinition = {
   name: "OTA",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildOTAPinDeclarations(),

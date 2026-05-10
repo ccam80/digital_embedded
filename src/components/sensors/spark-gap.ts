@@ -401,6 +401,7 @@ function sparkGapCircuitFactory(props: PropertyBag): SparkGapCircuitElement {
 export const SparkGapDefinition: StandaloneComponentDefinition = {
   name: "SparkGap",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   factory: sparkGapCircuitFactory,
   pinLayout: buildSparkGapPinDeclarations(),
   propertyDefs: SPARK_GAP_PROPERTY_DEFS,

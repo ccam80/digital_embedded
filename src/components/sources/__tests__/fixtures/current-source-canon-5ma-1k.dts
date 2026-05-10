@@ -1,6 +1,6 @@
 {
   "circuit": {
-    "description": "Ideal CurrentSource (5 mA) driving 1 kΩ to ground; V_node = I*R = 5.0 V at DCOP",
+    "description": "Ideal CurrentSource (5 mA) driving 1 k\u00ce\u00a9 to ground; V_node = I*R = 5.0 V at DCOP",
     "elements": [
       {
         "id": "dbd1f0a3-2b8b-4d92-9fe9-963f6d2c5b85",
@@ -20,7 +20,7 @@
           ]
         },
         "rotation": 0,
-        "type": "CurrentSource"
+        "type": "DcCurrentSource"
       },
       {
         "id": "32ee0c11-62df-42f5-b741-1c8a0d55a358",

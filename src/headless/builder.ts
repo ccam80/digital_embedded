@@ -492,7 +492,7 @@ export class CircuitBuilder {
     // as the authoritative source for pin-pair equivalence (immune to
     // auto-layout corner-collision artifacts).
     if (specConns.length > 0) {
-      circuit.specConnections = specConns;
+      circuit.connectivitySource = { mode: 'spec', connections: specConns };
     }
 
     // Auto-layout when there are connections to arrange
@@ -778,14 +778,14 @@ export class CircuitBuilder {
     targetCircuit.removeZeroLengthWires();
 
     // Patches mutate the circuit's wire/element state directly without
-    // updating circuit.specConnections. Rather than try to mirror every op
-    // back into the spec list (which would have to handle re-instantiation
-    // in `set`/`replace` and label-vs-position rewires), invalidate the
-    // spec list so connectivity falls back to wire-based extraction. This
-    // is safe: patches don't run autoLayout, so any wires they emit go
-    // pin-to-pin without producing colliding Z-route corners.
+    // updating the spec connection list. Rather than try to mirror every
+    // op back into the spec list (which would have to handle
+    // re-instantiation in `set`/`replace` and label-vs-position rewires),
+    // demote connectivity to wire-graph mode. This is safe: patches don't
+    // run autoLayout, so any wires they emit go pin-to-pin without
+    // producing colliding Z-route corners.
     if (ops.length > 0) {
-      circuit.specConnections = undefined;
+      circuit.connectivitySource = { mode: 'wires' };
     }
 
     // Validate the top-level circuit (not just the scoped subcircuit).

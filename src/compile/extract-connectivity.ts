@@ -5,7 +5,7 @@
  */
 
 import type { CircuitElement } from '../core/element.js';
-import type { Wire, SpecConnection } from '../core/circuit.js';
+import type { Wire, ConnectivitySource } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { PinDirection } from '../core/pin.js';
@@ -145,20 +145,19 @@ function resolveDomainFromModelKey(modelKey: string): string {
 /**
  * Unified netlist extraction algorithm.
  *
- * Two paths share the same downstream pipeline:
+ * Two paths share the same downstream pipeline; the caller selects which
+ * via the `connectivitySource` discriminated union:
  *
- *   • Spec-authoritative path (when `specConnections` is provided):
- *     pin-pair equivalence comes directly from the build's connection list.
- *     Wires are decorative routing — they do not contribute to pin-pin
- *     unification. This is immune to auto-layout coordinate-collision
- *     artifacts (e.g. two distinct nets routed through the same Z-route
- *     corner). Wires are still attached to groups for rendering, via BFS
- *     over wire-endpoint adjacency.
+ *   • `{ mode: 'spec', connections }` — pin-pair equivalence comes directly
+ *     from the authored connection list. Wires are decorative routing —
+ *     they do not contribute to pin-pin unification. This is immune to
+ *     auto-layout coordinate-collision artifacts (e.g. two distinct nets
+ *     routed through the same Z-route corner). Wires are still attached
+ *     to groups for rendering, via BFS over wire-endpoint adjacency.
  *
- *   • Wire-graph position-merge path (when `specConnections` is absent):
- *     used for `.dig`/`.dts` circuits where the wire graph is the only
- *     source of truth. Pins and wire endpoints sharing a world position
- *     are union-merged.
+ *   • `{ mode: 'wires' }` — used for `.dig`/`.dts` circuits where the wire
+ *     graph is the only source of truth. Pins and wire endpoints sharing
+ *     a world position are union-merged.
  *
  * Both paths apply Tunnel/Port label-merge, build the same group view, and
  * run the same width validation and post-group diagnostics.
@@ -168,11 +167,11 @@ export function extractConnectivityGroups(
   wires: readonly Wire[],
   _registry: ComponentRegistry,
   modelAssignments: ModelAssignment[],
-  specConnections?: readonly SpecConnection[],
+  connectivitySource: ConnectivitySource = { mode: 'wires' },
 ): [ConnectivityGroup[], Diagnostic[]] {
   const diagnostics: Diagnostic[] = [];
   const componentCount = elements.length;
-  const useSpecMode = specConnections !== undefined;
+  const useSpecMode = connectivitySource.mode === 'spec';
 
   // -------------------------------------------------------------------------
   // Step 1: Compute slot base offsets and collect all pins
@@ -202,7 +201,7 @@ export function extractConnectivityGroups(
   //   Wire-graph mode: position-merge (pins + wire endpoints).
   // -------------------------------------------------------------------------
 
-  if (useSpecMode) {
+  if (connectivitySource.mode === 'spec') {
     // Build (instanceId → pinLabel → slot) lookup.
     const pinIndex = new Map<string, Map<string, number>>();
     for (let i = 0; i < componentCount; i++) {
@@ -215,7 +214,7 @@ export function extractConnectivityGroups(
       pinIndex.set(el.instanceId, pinMap);
     }
 
-    for (const conn of specConnections!) {
+    for (const conn of connectivitySource.connections) {
       const srcMap = pinIndex.get(conn.srcId);
       const dstMap = pinIndex.get(conn.dstId);
       if (srcMap === undefined || dstMap === undefined) {

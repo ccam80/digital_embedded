@@ -415,11 +415,14 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
 
     // COM-NC path: inverted polarity SW (slots base+2..base+3)
     // digiTS extension beyond ngspice SW primitive  see F4b-composite discussion
+    // SWzero_stateGiven=false: ngspice S{label}_AC has no "on" IC flag, so ngspice
+    // initialises this path as REALLY_OFF at MODEINITJCT. invertCtrl=true handles
+    // steady-state polarity; the IC flag is not needed here.
     swLoadHandles(
       ctx, this._pool, this._stateBase + 2,
       this._nCtrl, gOn, gOff,
       this._vThreshold, this._vHysteresis,
-      true,   // SWzero_stateGiven=true: NC path starts ON (normally closed)
+      false,  // SWzero_stateGiven=false: matches ngspice S{label}_AC (no "on" IC flag)
       true,   // invertCtrl=true: complementary polarity
       this._hNC_PP, this._hNC_PN, this._hNC_NP, this._hNC_NN,
     );

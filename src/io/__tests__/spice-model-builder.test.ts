@@ -393,14 +393,14 @@ describe("buildSpiceSubcircuit- V element mapping", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit- I element mapping", () => {
-  it("maps I to CurrentSource", () => {
+  it("maps I to DcCurrentSource", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t p n\nI1 p n DC 1m\n.ENDS`));
-    expect(circuit.elements.find((e) => e.typeId === "CurrentSource")).toBeDefined();
+    expect(circuit.elements.find((e) => e.typeId === "DcCurrentSource")).toBeDefined();
   });
 
   it("sets current property", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t p n\nI1 p n DC 1m\n.ENDS`));
-    circuit.elements.find((e) => e.typeId === "CurrentSource");
+    circuit.elements.find((e) => e.typeId === "DcCurrentSource");
   });
 });
 

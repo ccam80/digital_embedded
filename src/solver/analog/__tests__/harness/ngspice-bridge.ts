@@ -563,6 +563,7 @@ export class NgspiceBridge {
       "capacitor": "capacitor", "inductor": "inductor",
       "diode": "diode", "bjt": "bjt",
       "mos1": "mosfet", "mosfet": "mosfet", "jfet": "jfet",
+      "switch": "vswitch",
     };
     return map[lower] ?? null;
   }

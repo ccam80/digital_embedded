@@ -300,7 +300,7 @@ function buildElement(
       const netPos = netMap.get(el.nodes[0]) ?? 0;
       const netNeg = netMap.get(el.nodes[1]) ?? 0;
       if (el.value !== undefined) props.push(["current", el.value]);
-      return makeCircuitElement("CurrentSource", [
+      return makeCircuitElement("DcCurrentSource", [
         { x: netPos, y: yRow, label: "pos" },
         { x: netNeg, y: yRow, label: "neg" },
       ], props);

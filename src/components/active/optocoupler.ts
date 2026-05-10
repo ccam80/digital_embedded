@@ -50,7 +50,7 @@ export const OPTOCOUPLER_NETLIST: MnaSubcircuitNetlist = {
   params: { ctr: 1.0, Is: 1e-14, n: 1.0 },
   elements: [
     { typeId: "Diode",                 modelRef: "spice",   subElementName: "dLed",       params: { IS: "Is", N: "n" } },
-    { typeId: "InternalZeroVoltSense", modelRef: "default", subElementName: "vSense",     branchCount: 1 },
+    { typeId: "DcVoltageSource", modelRef: "behavioral", subElementName: "vSense", branchCount: 1, params: { voltage: 0 } },
     { typeId: "InternalCccs",          modelRef: "default", subElementName: "cccsCouple",
       params: { gain: "ctr", sense: { kind: "siblingBranch", subElementName: "vSense" } } },
     { typeId: "NpnBJT",                modelRef: "spice",   subElementName: "bjtPhoto" },

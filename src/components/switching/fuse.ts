@@ -410,6 +410,7 @@ function fuseFactory(props: PropertyBag): FuseElement {
 export const FuseDefinition: StandaloneComponentDefinition = {
   name: "Fuse",
   typeId: -1,
+  pairedSpiceEquivalent: false,
   factory: fuseFactory,
   pinLayout: FUSE_PIN_DECLARATIONS,
   propertyDefs: FUSE_PROPERTY_DEFS,

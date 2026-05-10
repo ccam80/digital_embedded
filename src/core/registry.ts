@@ -11,8 +11,10 @@ import type { PinDeclaration } from "./pin.js";
 import { PropertyBag, PropertyType } from "./properties.js";
 import type { PropertyDefinition, PropertyValue } from "./properties.js";
 import type { AnalogElement } from "../solver/analog/element.js";
+import type { LoadContext } from "../solver/analog/load-context.js";
 import type { MnaSubcircuitNetlist } from "./mna-subcircuit-netlist.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
+import type { Diagnostic } from "../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // AnalogFactory- named factory signature for MNA element construction
@@ -23,6 +25,48 @@ export type AnalogFactory = (
   props: PropertyBag,
   getTime: () => number,
 ) => AnalogElement;
+
+// ---------------------------------------------------------------------------
+// AnalogWrapperHook- parent-specific runtime work attached to the
+// SubcircuitWrapperElement of a `kind: "netlist"` component
+// ---------------------------------------------------------------------------
+
+/**
+ * Parent-side runtime hook invoked by the SubcircuitWrapperElement of a
+ * `kind: "netlist"` component. Lets a parent declare runtime concerns that
+ * don't belong on any canonical leaf — typically UI diagnostics tied to
+ * parent-pin voltages or composite-level state. The hook contributes nothing
+ * to MNA: the leaves do all the matrix and RHS work.
+ *
+ * The wrapper is already in the engine's `analogElements` walk and already
+ * receives `setDiagnosticEmitter` via the existing `RuntimeDiagnosticAware`
+ * wiring in `MNAEngine.init()`. Methods on this hook are forwarded by the
+ * wrapper at the corresponding simulation lifecycle points.
+ */
+export interface AnalogWrapperHook {
+  /** Called per NR iteration alongside the wrapper's `load()`. Read voltages
+   *  from `ctx.rhsOld[node]`, emit diagnostics — no matrix or RHS contribution. */
+  load?(ctx: LoadContext): void;
+  /** Wired once by `MNAEngine.init()`; the hook captures the emitter and
+   *  uses it during `load()` / `acceptStep()`. */
+  setDiagnosticEmitter?(emit: (diag: Diagnostic) => void): void;
+  /** Called when external code updates a parent-level model param the hook
+   *  cares about (e.g. `reverseMax` for a polarity-warning diagnostic). The
+   *  wrapper's own sub-element binding routing fires independently. */
+  setParam?(key: string, value: number): void;
+  /** Called per accepted timestep — register breakpoints, resync UI state. */
+  acceptStep?(
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+    atBreakpoint: boolean,
+  ): void;
+}
+
+export type AnalogWrapperHookFactory = (
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  getTime: () => number,
+) => AnalogWrapperHook;
 
 // ---------------------------------------------------------------------------
 // ParamDef- schema entry for one model parameter
@@ -420,6 +464,22 @@ export interface StandaloneComponentDefinition extends ComponentDefinition {
    * instead.
    */
   pairedSpiceEquivalent?: boolean;
+  /**
+   * Optional parent-side runtime hook attached to the SubcircuitWrapperElement
+   * of a `kind: "netlist"` component. The wrapper itself is already an
+   * AnalogElement in the engine's element walk and already receives
+   * `setDiagnosticEmitter` via the existing RuntimeDiagnosticAware wiring;
+   * the hook just lets the parent declare what to *do* during load() /
+   * acceptStep() / setParam() without becoming a sub-element in the SPICE
+   * deck. Use this for UI-only diagnostics that must read parent-pin
+   * voltages but contribute nothing to MNA.
+   *
+   * The factory is invoked once per parent-component instance with the
+   * parent's resolved `pinNodes` Map and `props` bag. Returning an empty
+   * object is valid (no hooks fire). Only valid alongside a `kind: "netlist"`
+   * model entry — the wrapper only exists for composite expansion.
+   */
+  analogWrapperHook?: AnalogWrapperHookFactory;
 }
 
 /** Type guard: narrows a definition to the user-facing extender. */

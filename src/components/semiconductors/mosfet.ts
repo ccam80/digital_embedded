@@ -750,10 +750,10 @@ function _createMosfetElementWithPolarity(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ) {
-  // Pin node IDs are RESOLVED in setup(), not at construction time. Composite-
-  // leaf instances see internal-net pins as the placeholder -1; PatcherLeaf
-  // rewrites the Map between construction and setup. setup() reassigns these
-  // from this.pinNodes after the patcher has run.
+  // Closure-captured pin node IDs assigned in setup() once `this.pinNodes` is
+  // available. (Under the compile-time-expansion architecture, pinNodes is
+  // already fully resolved at construction time; closure-let is retained for
+  // parity with sibling factories.)
   let nodeG = -1;
   let nodeS_ext = -1;
   let nodeD_ext = -1;
@@ -874,8 +874,8 @@ function _createMosfetElementWithPolarity(
 
     setup(ctx: SetupContext): void {
       const solver = ctx.solver;
-      // Resolve closure-captured pin node IDs now that the PatcherLeaf has
-      // filled in any composite-internal-net placeholders.
+      // Re-publish pin node IDs into the closure (compile-time-resolved by
+      // `expandCompositeInstance` for composite leaves; identical for primitives).
       nodeG     = this.pinNodes.get("G")!;
       nodeS_ext = this.pinNodes.get("S")!;
       nodeD_ext = this.pinNodes.get("D")!;

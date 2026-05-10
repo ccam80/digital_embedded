@@ -208,30 +208,45 @@ export const buildTransmissionLineNetlist = (params: PropertyBag): MnaSubcircuit
   }
 
   const ports = ["P1a", "P1b", "P2a", "P2b"];
+  // Internal net layout (all N segments use a canonical Resistor + Inductor pair):
+  //   rlMid0..rlMid(N-1): indices 4..4+(N-1)       — one per segment, between R and L (N nodes)
+  //   junc0..junc(N-2):   indices 4+N..4+N+(N-2)   — after the L, only for non-final segments (N-1 nodes)
+  // Total internal nets: N + (N-1) = 2*N - 1
   const internalNetLabels: string[] = [];
-  for (let k = 0; k < N - 1; k++) internalNetLabels.push(`rlMid${k}`);
+  for (let k = 0; k < N; k++) internalNetLabels.push(`rlMid${k}`);
   for (let k = 0; k < N - 1; k++) internalNetLabels.push(`junc${k}`);
+
+  // Node index helpers:
+  //   ports occupy indices 0..3 (P1a=0, P1b=1, P2a=2, P2b=3)
+  //   rlMid(k) = 4 + k
+  //   junc(k)  = 4 + N + k
+  const rlMidIndex = (k: number): number => 4 + k;
+  const juncIndex  = (k: number): number => 4 + N + k;
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
   for (let k = 0; k < N; k++) {
-    const inputNet = (k === 0) ? 1 /* P1b */ : 4 + (N - 1) + (k - 1);
+    const inputNet = (k === 0) ? 1 /* P1b */ : juncIndex(k - 1);
+    const outputNet = (k < N - 1) ? juncIndex(k) : 3 /* P2b */;
+    const rlMidK = rlMidIndex(k);
+
+    // Series Resistor (R portion of each segment)
+    elements.push({ typeId: "Resistor", modelRef: "behavioral", subElementName: `seg${k}_R`, params: { resistance: rSeg } });
+    netlist.push([inputNet, rlMidK]);
+
+    // Series Inductor (L portion of each segment)
+    elements.push({ typeId: "Inductor", modelRef: "behavioral", subElementName: `seg${k}_L`, branchCount: 1, params: { inductance: lSeg } });
+    netlist.push([rlMidK, outputNet]);
+
     if (k < N - 1) {
-      const rlMidK = 4 + k;
-      const juncK = 4 + (N - 1) + k;
-      elements.push({ typeId: "TransmissionSegmentR", modelRef: "default", subElementName: `seg${k}_R`, params: { R: rSeg } });
-      netlist.push([inputNet, rlMidK]);
-      elements.push({ typeId: "TransmissionSegmentL", modelRef: "default", subElementName: `seg${k}_L`, branchCount: 1, params: { L: lSeg } });
-      netlist.push([rlMidK, juncK]);
+      // Shunt conductance G → canonical Resistor with resistance = 1/gSeg, to node 0 (GND)
       if (gSeg > 0) {
-        elements.push({ typeId: "TransmissionSegmentG", modelRef: "default", subElementName: `seg${k}_G`, params: { G: gSeg } });
-        netlist.push([juncK]);
+        elements.push({ typeId: "Resistor", modelRef: "behavioral", subElementName: `seg${k}_G`, params: { resistance: 1 / gSeg } });
+        netlist.push([outputNet, 0]);
       }
-      elements.push({ typeId: "TransmissionSegmentC", modelRef: "default", subElementName: `seg${k}_C`, params: { C: cSeg } });
-      netlist.push([juncK]);
-    } else {
-      elements.push({ typeId: "TransmissionSegmentRL", modelRef: "default", subElementName: `seg${k}_RL`, branchCount: 1, params: { R: rSeg, L: lSeg } });
-      netlist.push([inputNet, 3 /* P2b */]);
+      // Shunt capacitor C → canonical Capacitor, to node 0 (GND)
+      elements.push({ typeId: "Capacitor", modelRef: "behavioral", subElementName: `seg${k}_C`, params: { capacitance: cSeg } });
+      netlist.push([outputNet, 0]);
     }
   }
 
@@ -240,7 +255,7 @@ export const buildTransmissionLineNetlist = (params: PropertyBag): MnaSubcircuit
   // type. Per-element type-assertion casts on each SubcircuitElement literal
   // were dropped: literals satisfy the structural type when params values are
   // plain numbers, so no widening cast is required.
-  return { ports, elements, internalNetCount: 2 * (N - 1), internalNetLabels, netlist };
+  return { ports, elements, internalNetCount: 2 * N - 1, internalNetLabels, netlist };
 };
 
 // ---------------------------------------------------------------------------

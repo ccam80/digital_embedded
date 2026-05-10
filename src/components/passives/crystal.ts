@@ -1,30 +1,28 @@
-﻿/**
+/**
  * Quartz crystal analog component  Butterworth-Van Dyke (BVD) equivalent circuit.
  *
  * The BVD model represents the mechanical resonance of a quartz crystal as a
  * series RLC branch (motional arm) in parallel with a shunt electrode capacitance:
  *
- *   Series (motional) arm: R_s  L_s  C_s  (between terminal A and B)
- *   Shunt arm:             C_0               (directly across A and B)
+ *   Series (motional) arm: R_s  L_s  C_s  (between terminal pos and neg)
+ *   Shunt arm:             C_0               (directly across pos and neg)
  *
  * This produces two resonant frequencies:
  *   Series resonance:   f_s = 1 / (2Ï€ âˆš(L_s · C_s))
  *   Parallel resonance: f_p  f_s · âˆš(1 + C_s / C_0)   (slightly above f_s)
  *
- * MNA topology (1-based node indices, 0 = ground):
- *   pinNodes.get("pos")  = n_A      external terminal pos
- *   pinNodes.get("neg")  = n_B      external terminal neg
- *   n1                             junction between R_s and L_s (internal)
- *   n2                             junction between L_s and C_s (internal)
- *   branchIndex                    branch current row for L_s
+ * Subcircuit factoring (CRYSTAL_NETLIST):
+ *   Sub-elements: rS, lS, cS, c0  four canonical primitives.
+ *   Internal nets: n1 (rSlS junction), n2 (lScS junction).
+ *   Topology:
+ *     rS:  pos  n1
+ *     lS:  n1  n2
+ *     cS:  n2  neg
+ *     c0:  pos  neg
+ *   No sibling refs  every leaf is independent. SPICE-faithful: paired
+ *   comparison emits the exact same R+L+C+C primitives.
  *
- * Elements stamped:
- *   R_s: conductance G_s = 1/R_s between n_A and n1
- *   L_s: companion model (geq, ieq, branch row) between n1 and n2
- *   C_s: companion model (geq_cs, ieq_cs) between n2 and n_B
- *   C_0: companion model (geq_c0, ieq_c0) between n_A and n_B
- *
- * Derived parameters from user-specified frequency, Q, C_s, C_0:
+ * Derived parameters (computed at netlist-build time from frequency, qualityFactor):
  *   L_s = 1 / (4Ï€² · f² · C_s)
  *   R_s = 2Ï€ · f · L_s / Q
  */
@@ -44,46 +42,8 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import type { IntegrationMethod } from "../../solver/analog/integration.js";
-import type { LoadContext } from "../../solver/analog/load-context.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
-import {
-  defineStateSchema,
-  type StateSchema,
-} from "../../solver/analog/state-schema.js";
-import { cktTerr } from "../../solver/analog/ckt-terr.js";
-
-// ---------------------------------------------------------------------------
-// State-pool schema
-// ---------------------------------------------------------------------------
-
-// Slot layout — 6 slots total: 2 per reactive sub-element (one inductor +
-// two capacitors), matching ngspice's per-element slot allocations.
-//   L_s  → ngspice INDflux/INDvolt   (indsetup.c:79 *states += 2)
-//   C_s  → ngspice CAPqcap/ccap      (capsetup.c:103 *states += 2)
-//   C_0  → ngspice CAPqcap/ccap      (capsetup.c:103 *states += 2)
-// geq / ieq / V / branch-current are recomputable from state + ag[] +
-// rhsOld and live as locals in indload.c / capload.c, not the state vector.
-const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
-  { name: "PHI_L",   doc: "L_s flux Φ = Ls·i — ngspice INDflux (INDstate+0)" },
-  { name: "CCAP_L",  doc: "L_s NIintegrate companion current — ngspice INDvolt (INDstate+1)" },
-  { name: "Q_CS",    doc: "C_s charge Q = Cs·V — ngspice CAPqcap (CAPstate+0)" },
-  { name: "CCAP_CS", doc: "C_s NIintegrate companion current — ngspice ccap (CAPstate+1)" },
-  { name: "Q_C0",    doc: "C_0 charge Q = C0·V — ngspice CAPqcap (CAPstate+0)" },
-  { name: "CCAP_C0", doc: "C_0 NIintegrate companion current — ngspice ccap (CAPstate+1)" },
-]);
-
-const SLOT_PHI_L   = 0;
-const SLOT_CCAP_L  = 1;
-const SLOT_Q_CS    = 2;
-const SLOT_CCAP_CS = 3;
-const SLOT_Q_C0    = 4;
-const SLOT_CCAP_C0 = 5;
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
 // Derived parameter helpers
@@ -219,393 +179,67 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 
 }
 
-
 // ---------------------------------------------------------------------------
-// AnalogCrystalElement  MNA implementation
-// ---------------------------------------------------------------------------
-
-export class AnalogCrystalElement extends PoolBackedAnalogElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly stateSchema = CRYSTAL_SCHEMA;
-  readonly stateSize = CRYSTAL_SCHEMA.size;
-
-  // Series resistance
-  private G_s: number;
-
-  // Physical params for companion model recomputation
-  private L_s: number;
-  private C_s: number;
-  private C_0: number;
-
-  // Internal nodes- populated in setup()
-  private _n1Node: number = -1;
-  private _n2Node: number = -1;
-
-  // Rs handles
-  private _hRs_PP: number = -1;  private _hRs_NN: number = -1;
-  private _hRs_PN: number = -1;  private _hRs_NP: number = -1;
-  // Ls handles
-  private _hLs_PIbr:   number = -1;  private _hLs_NIbr:   number = -1;
-  private _hLs_IbrN:   number = -1;  private _hLs_IbrP:   number = -1;
-  private _hLs_IbrIbr: number = -1;
-  // Cs handles
-  private _hCs_PP: number = -1;  private _hCs_NN: number = -1;
-  private _hCs_PN: number = -1;  private _hCs_NP: number = -1;
-  // C0 handles
-  private _hC0_PP: number = -1;  private _hC0_NN: number = -1;
-  private _hC0_PN: number = -1;  private _hC0_NP: number = -1;
-
-  // Internal-node label tracking for getInternalNodeLabels()
-  private readonly _internalLabels: string[] = [];
-
-  /**
-   * @param pinNodes - ReadonlyMap with "pos" and "neg" external terminals
-   * @param Rs          - Series (motional) resistance in ohms
-   * @param Ls          - Motional inductance in henries
-   * @param Cs          - Motional capacitance in farads
-   * @param C0          - Shunt electrode capacitance in farads
-   */
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    Rs: number,
-    Ls: number,
-    Cs: number,
-    C0: number,
-  ) {
-    super(pinNodes);
-    this.G_s = 1 / Math.max(Rs, 1e-12);
-    this.L_s = Ls;
-    this.C_s = Cs;
-    this.C_0 = C0;
-  }
-
-  setup(ctx: SetupContext): void {
-    const solver = ctx.solver;
-    const aNode = this.pinNodes.get("pos")!;  // external terminal pos
-    const bNode = this.pinNodes.get("neg")!;  // external terminal neg
-
-    // Allocate the schema's slot block (2 per reactive sub-element).
-    this._stateBase = ctx.allocStates(this.stateSize);
-
-    // Allocate internal nodes- n1 (Rsâ†”Ls junction), n2 (Lsâ†”Cs junction).
-    const n1Node = ctx.makeVolt(this.label, "n1");
-    this._internalLabels.push("n1");
-    const n2Node = ctx.makeVolt(this.label, "n2");
-    this._internalLabels.push("n2");
-    this._n1Node = n1Node;
-    this._n2Node = n2Node;
-
-    // Allocate Ls branch row- indsetup.c:84-88 idempotent guard.
-    if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this.label, "Ls_branch");
-    }
-    const b = this.branchIndex;
-
-    // Rs- ressetup.c:46-49 (aNode=pos, n1Node=neg)
-    this._hRs_PP = solver.allocElement(aNode, aNode);
-    this._hRs_NN = solver.allocElement(n1Node, n1Node);
-    this._hRs_PN = solver.allocElement(aNode, n1Node);
-    this._hRs_NP = solver.allocElement(n1Node, aNode);
-
-    // Ls- indsetup.c:96-100 (n1Node=pos, n2Node=neg, b=branch).
-    // Unconditional alloc - ground rows/cols route to TrashCan handle 0
-    // (sparse-solver.ts:28-32, ngspice spbuild.c:272-273).
-    this._hLs_PIbr   = solver.allocElement(n1Node, b);
-    this._hLs_NIbr   = solver.allocElement(n2Node, b);
-    this._hLs_IbrN   = solver.allocElement(b, n2Node);
-    this._hLs_IbrP   = solver.allocElement(b, n1Node);
-    this._hLs_IbrIbr = solver.allocElement(b, b);
-
-    // Cs- capsetup.c:114-117 (n2Node=pos, bNode=neg).
-    this._hCs_PP = solver.allocElement(n2Node, n2Node);
-    this._hCs_NN = solver.allocElement(bNode,  bNode);
-    this._hCs_PN = solver.allocElement(n2Node, bNode);
-    this._hCs_NP = solver.allocElement(bNode,  n2Node);
-
-    // C0- capsetup.c:114-117 (aNode=pos, bNode=neg).
-    this._hC0_PP = solver.allocElement(aNode, aNode);
-    this._hC0_NN = solver.allocElement(bNode, bNode);
-    this._hC0_PN = solver.allocElement(aNode, bNode);
-    this._hC0_NP = solver.allocElement(bNode, aNode);
-  }
-
-  findBranchFor(_name: string, ctx: SetupContext): number {
-    if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this.label, "Ls_branch");
-    }
-    return this.branchIndex;
-  }
-
-  getInternalNodeLabels(): readonly string[] {
-    return this._internalLabels;
-  }
-
-  updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {
-    this.G_s = 1 / Math.max(Rs, 1e-12);
-    this.L_s = Ls;
-    this.C_s = Cs;
-    this.C_0 = C0;
-  }
-
-  /**
-   * Unified load()  BVD crystal model.
-   *
-   * Stamps in one pass:
-   *   - R_s series conductance (nA â†” n1, topology-constant).
-   *   - L_s branch incidence + NIintegrate companion (n1 â†” n2).
-   *   - C_s series capacitor companion (n2 â†” nB) via inline NIintegrate.
-   *   - C_0 shunt capacitor companion (nA â†” nB) via inline NIintegrate.
-   * All three reactive components use ctx.ag[] coefficients directly.
-   */
-  load(ctx: LoadContext): void {
-    const { solver, rhsOld: voltages, ag } = ctx;
-    const mode = ctx.cktMode;
-    const nA = this.pinNodes.get("pos")!;
-    const nB = this.pinNodes.get("neg")!;
-    const n2 = this._n2Node;
-    const b = this.branchIndex;
-    const base = this._stateBase;
-
-    // R_s conductance (nA â†” n1)- via cached handles.
-    solver.stampElement(this._hRs_PP, this.G_s);
-    solver.stampElement(this._hRs_PN, -this.G_s);
-    solver.stampElement(this._hRs_NP, -this.G_s);
-    solver.stampElement(this._hRs_NN, this.G_s);
-
-    // L_s branch incidence (B sub-matrix)- via cached handles.
-    // Unconditional stamps; ground rows route to TrashCan handle 0.
-    solver.stampElement(this._hLs_PIbr,  1);
-    solver.stampElement(this._hLs_NIbr, -1);
-    // L_s KVL incidence (C sub-matrix)- via cached handles.
-    solver.stampElement(this._hLs_IbrN, -1);
-    solver.stampElement(this._hLs_IbrP,  1);
-
-    if (!(mode & (MODETRAN | MODETRANOP))) return;
-
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const s2 = this._pool.states[2];
-
-    const iNow = voltages[b];
-    const vA = voltages[nA];
-    const vBv = voltages[nB];
-    const vN2 = voltages[n2];
-    const vCs = vN2 - vBv;
-    const vC0 = vA - vBv;
-
-    if (mode & MODETRAN) {
-      // L_s flux update.
-      if (mode & MODEINITPRED) {
-        s0[base + SLOT_PHI_L] = s1[base + SLOT_PHI_L];
-      } else {
-        s0[base + SLOT_PHI_L] = this.L_s * iNow;
-        if (mode & MODEINITTRAN) {
-          s1[base + SLOT_PHI_L] = s0[base + SLOT_PHI_L];
-        }
-      }
-      // C_s charge update.
-      if (mode & MODEINITPRED) {
-        s0[base + SLOT_Q_CS] = s1[base + SLOT_Q_CS];
-      } else {
-        s0[base + SLOT_Q_CS] = this.C_s * vCs;
-        if (mode & MODEINITTRAN) {
-          s1[base + SLOT_Q_CS] = s0[base + SLOT_Q_CS];
-        }
-      }
-      // C_0 charge update.
-      if (mode & MODEINITPRED) {
-        s0[base + SLOT_Q_C0] = s1[base + SLOT_Q_C0];
-      } else {
-        s0[base + SLOT_Q_C0] = this.C_0 * vC0;
-        if (mode & MODEINITTRAN) {
-          s1[base + SLOT_Q_C0] = s0[base + SLOT_Q_C0];
-        }
-      }
-
-      // NIintegrate for L_s flux.
-      const phiL_0 = s0[base + SLOT_PHI_L];
-      const phiL_1 = s1[base + SLOT_PHI_L];
-      let ccapL: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        ccapL = ag[0] * phiL_0 + ag[1] * phiL_1 + ag[2] * s2[base + SLOT_PHI_L];
-      } else {
-        ccapL = ag[0] * phiL_0 + ag[1] * phiL_1;
-      }
-      s0[base + SLOT_CCAP_L] = ccapL;
-      const geqL = ag[0] * this.L_s;
-      const ceqL = ccapL - ag[0] * phiL_0;
-      if (mode & MODEINITTRAN) {
-        s1[base + SLOT_CCAP_L] = ccapL;
-      }
-
-      // NIintegrate for C_s charge.
-      const qCs_0 = s0[base + SLOT_Q_CS];
-      const qCs_1 = s1[base + SLOT_Q_CS];
-      let ccapCs: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1 + ag[2] * s2[base + SLOT_Q_CS];
-      } else {
-        ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1;
-      }
-      s0[base + SLOT_CCAP_CS] = ccapCs;
-      const geqCs = ag[0] * this.C_s;
-      const ceqCs = ccapCs - ag[0] * qCs_0;
-      if (mode & MODEINITTRAN) {
-        s1[base + SLOT_CCAP_CS] = ccapCs;
-      }
-
-      // NIintegrate for C_0 charge.
-      const qC0_0 = s0[base + SLOT_Q_C0];
-      const qC0_1 = s1[base + SLOT_Q_C0];
-      let ccapC0: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1 + ag[2] * s2[base + SLOT_Q_C0];
-      } else {
-        ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1;
-      }
-      s0[base + SLOT_CCAP_C0] = ccapC0;
-      const geqC0 = ag[0] * this.C_0;
-      const ceqC0 = ccapC0 - ag[0] * qC0_0;
-      if (mode & MODEINITTRAN) {
-        s1[base + SLOT_CCAP_C0] = ccapC0;
-      }
-
-      // L_s companion stamp on branch row- via cached handle.
-      solver.stampElement(this._hLs_IbrIbr, -geqL);
-      stampRHS(ctx.rhs, b, ceqL);
-
-      // C_s companion stamp (n2 â†” nB)- via cached handles.
-      // Unconditional - ground stamps absorbed by TrashCan / rhs[0] clear.
-      solver.stampElement(this._hCs_PP,  geqCs);
-      solver.stampElement(this._hCs_NN,  geqCs);
-      solver.stampElement(this._hCs_PN, -geqCs);
-      solver.stampElement(this._hCs_NP, -geqCs);
-      stampRHS(ctx.rhs, n2, -ceqCs);
-      stampRHS(ctx.rhs, nB,  ceqCs);
-
-      // C_0 companion stamp (nA â†” nB)- via cached handles.
-      solver.stampElement(this._hC0_PP,  geqC0);
-      solver.stampElement(this._hC0_NN,  geqC0);
-      solver.stampElement(this._hC0_PN, -geqC0);
-      solver.stampElement(this._hC0_NP, -geqC0);
-      stampRHS(ctx.rhs, nA, -ceqC0);
-      stampRHS(ctx.rhs, nB,  ceqC0);
-    } else {
-      // DC-OP — just store charges/flux, no matrix stamps (capload.c:80-81 +
-      // indload.c equivalent).
-      s0[base + SLOT_PHI_L] = this.L_s * iNow;
-      s0[base + SLOT_Q_CS]  = this.C_s * vCs;
-      s0[base + SLOT_Q_C0]  = this.C_0 * vC0;
-    }
-  }
-
-  getPinCurrents(rhs: Float64Array): number[] {
-    const nA = this.pinNodes.get("pos")!;
-    const n1 = this._n1Node;
-
-    // Current through the series R_s (from pos pin into the motional arm):
-    // I_Rs = G_s * (V_pos - V_n1). By KCL at n1 this equals the L_s branch current.
-    const iMotional = this.G_s * (rhs[nA] - rhs[n1]);
-
-    // C_0 shunt current at the converged step = NIintegrate companion current
-    // (CCAP_C0). The companion-stamp formula geq*V + ceq collapses to ccap at
-    // the operating point because Q = C·V; ngspice device queries read the
-    // stored ccap slot rather than recomputing.
-    const iShunt = this._pool.states[0][this._stateBase + SLOT_CCAP_C0];
-
-    const I = iMotional + iShunt;
-    return [I, -I];
-  }
-
-  getLteTimestep(
-    dt: number,
-    deltaOld: readonly number[],
-    order: number,
-    method: IntegrationMethod,
-    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
-  ): number {
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const s2 = this._pool.states[2];
-    const s3 = this._pool.states[3];
-    const base = this._stateBase;
-
-    // L_s (flux-based): use stored ccap from s0 and s1
-    const phi0 = s0[base + SLOT_PHI_L];
-    const phi1 = s1[base + SLOT_PHI_L];
-    const phi2 = s2[base + SLOT_PHI_L];
-    const phi3 = s3[base + SLOT_PHI_L];
-    const ccap0L = s0[base + SLOT_CCAP_L];
-    const ccap1L = s1[base + SLOT_CCAP_L];
-    const dtL = cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0L, ccap1L, lteParams);
-
-    // C_s (charge-based): use stored ccap from s0 and s1
-    const qCs0 = s0[base + SLOT_Q_CS];
-    const qCs1 = s1[base + SLOT_Q_CS];
-    const qCs2 = s2[base + SLOT_Q_CS];
-    const qCs3 = s3[base + SLOT_Q_CS];
-    const ccap0Cs = s0[base + SLOT_CCAP_CS];
-    const ccap1Cs = s1[base + SLOT_CCAP_CS];
-    const dtCs = cktTerr(dt, deltaOld, order, method, qCs0, qCs1, qCs2, qCs3, ccap0Cs, ccap1Cs, lteParams);
-
-    // C_0 (charge-based): use stored ccap from s0 and s1
-    const qC00 = s0[base + SLOT_Q_C0];
-    const qC01 = s1[base + SLOT_Q_C0];
-    const qC02 = s2[base + SLOT_Q_C0];
-    const qC03 = s3[base + SLOT_Q_C0];
-    const ccap0C0 = s0[base + SLOT_CCAP_C0];
-    const ccap1C0 = s1[base + SLOT_CCAP_C0];
-    const dtC0 = cktTerr(dt, deltaOld, order, method, qC00, qC01, qC02, qC03, ccap0C0, ccap1C0, lteParams);
-
-    return Math.min(dtL, dtCs, dtC0);
-  }
-
-  setParam(_key: string, _value: number): void {}
-}
-
-// ---------------------------------------------------------------------------
-// analogFactory
+// buildCrystalNetlist  function-form subcircuit (Composite M26)
 // ---------------------------------------------------------------------------
 
-function buildCrystalElementFromParams(
-  pinNodes: ReadonlyMap<string, number>,
-  p: { frequency: number; qualityFactor: number; motionalCapacitance: number; shuntCapacitance: number },
-): AnalogCrystalElement {
-  const Ls = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
-  const Rs = crystalSeriesResistance(p.frequency, Ls, p.qualityFactor);
+/**
+ * Builds the MNA subcircuit netlist for the BVD crystal model. Emits four
+ * canonical primitives  no sibling refs, no shared state. The motional
+ * inductance L_s and series resistance R_s are derived at netlist-build time
+ * from the user-facing primary params (frequency, qualityFactor) and the
+ * motional capacitance.
+ *
+ * Port order: pos=0, neg=1. Internal nets: n1=2 (rSlS), n2=3 (lScS).
+ */
+export const buildCrystalNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
+  const frequency           = params.getModelParam<number>("frequency");
+  const qualityFactor       = params.getModelParam<number>("qualityFactor");
+  const motionalCapacitance = params.getModelParam<number>("motionalCapacitance");
+  const shuntCapacitance    = params.getModelParam<number>("shuntCapacitance");
 
-  const el = new AnalogCrystalElement(
-    pinNodes,
-    Rs,
-    Ls,
-    p.motionalCapacitance,
-    p.shuntCapacitance,
-  );
+  const Ls = crystalMotionalInductance(frequency, motionalCapacitance);
+  const Rs = crystalSeriesResistance(frequency, Ls, qualityFactor);
 
-  el.setParam = function(key: string, value: number): void {
-    if (key in p) {
-      (p as Record<string, number>)[key] = value;
-      const newLs = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
-      const newRs = crystalSeriesResistance(p.frequency, newLs, p.qualityFactor);
-      el.updateDerivedParams(newRs, newLs, p.motionalCapacitance, p.shuntCapacitance);
-    }
+  return {
+    ports: ["pos", "neg"],
+    elements: [
+      {
+        typeId: "Resistor",
+        modelRef: "behavioral",
+        subElementName: "rS",
+        params: { resistance: Rs },
+      },
+      {
+        typeId: "Inductor",
+        modelRef: "behavioral",
+        subElementName: "lS",
+        branchCount: 1,
+        params: { inductance: Ls },
+      },
+      {
+        typeId: "Capacitor",
+        modelRef: "behavioral",
+        subElementName: "cS",
+        params: { capacitance: motionalCapacitance },
+      },
+      {
+        typeId: "Capacitor",
+        modelRef: "behavioral",
+        subElementName: "c0",
+        params: { capacitance: shuntCapacitance },
+      },
+    ],
+    internalNetCount: 2,
+    internalNetLabels: ["n1", "n2"],
+    netlist: [
+      [0, 2],   // rS:  pos=0, n1=2
+      [2, 3],   // lS:  n1=2, n2=3
+      [3, 1],   // cS:  n2=3, neg=1
+      [0, 1],   // c0:  pos=0, neg=1 (shunt arm)
+    ],
   };
-  return el;
-}
-
-export function createCrystalElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): AnalogCrystalElement {
-  const p = {
-    frequency:           props.getModelParam<number>("frequency"),
-    qualityFactor:       props.getModelParam<number>("qualityFactor"),
-    motionalCapacitance: props.getModelParam<number>("motionalCapacitance"),
-    shuntCapacitance:    props.getModelParam<number>("shuntCapacitance"),
-  };
-  return buildCrystalElementFromParams(pinNodes, p);
-}
+};
 
 // ---------------------------------------------------------------------------
 // Property definitions
@@ -695,8 +329,8 @@ export const CrystalDefinition: StandaloneComponentDefinition = {
   models: {},
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: createCrystalElement,
+      kind: "netlist",
+      netlist: buildCrystalNetlist,
       paramDefs: CRYSTAL_PARAM_DEFS,
       params: CRYSTAL_DEFAULTS,
     },

@@ -1,5 +1,5 @@
 ﻿/**
- * Current Source  ideal independent current source for MNA simulation.
+ * DC Current Source  ideal independent current source for MNA simulation.
  *
  * Stamps only into the RHS vector  no G-matrix entries required.
  * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly inside load() to apply
@@ -34,17 +34,17 @@ import { defineModelParams } from "../../core/model-params.js";
 // Model parameter declarations
 // ---------------------------------------------------------------------------
 
-export const { paramDefs: CURRENT_SOURCE_PARAM_DEFS, defaults: CURRENT_SOURCE_DEFAULTS } = defineModelParams({
+export const { paramDefs: DC_CURRENT_SOURCE_PARAM_DEFS, defaults: DC_CURRENT_SOURCE_DEFAULTS } = defineModelParams({
   primary: {
     current: { default: 0.01, unit: "A", description: "Source current in amperes" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// CurrentSourceElement  CircuitElement implementation
+// DcCurrentSourceElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
-export class CurrentSourceElement extends AbstractCircuitElement {
+export class DcCurrentSourceElement extends AbstractCircuitElement {
   constructor(
     instanceId: string,
     position: { x: number; y: number },
@@ -52,11 +52,11 @@ export class CurrentSourceElement extends AbstractCircuitElement {
     mirror: boolean,
     props: PropertyBag,
   ) {
-    super("CurrentSource", instanceId, position, rotation, mirror, props);
+    super("DcCurrentSource", instanceId, position, rotation, mirror, props);
   }
 
   getPins(): readonly Pin[] {
-    const decls = CURRENT_SOURCE_PIN_LAYOUT;
+    const decls = DC_CURRENT_SOURCE_PIN_LAYOUT;
     return this.derivePins(decls, []);
   }
 
@@ -115,7 +115,7 @@ export class CurrentSourceElement extends AbstractCircuitElement {
 // Pin layout
 // ---------------------------------------------------------------------------
 
-const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
+const DC_CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
     label: "neg",
     direction: PinDirection.OUTPUT,
@@ -140,7 +140,7 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
 // Property definitions
 // ---------------------------------------------------------------------------
 
-const CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
+const DC_CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "label",
     type: PropertyType.STRING,
@@ -154,7 +154,7 @@ const CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
 // Attribute map
 // ---------------------------------------------------------------------------
 
-const CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
+const DC_CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
   { xmlName: "Current", propertyKey: "current", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",   propertyKey: "label",   convert: (v) => v },
 ];
@@ -163,7 +163,7 @@ const CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // analogFactory helper (exported for tests)
 // ---------------------------------------------------------------------------
 
-class CurrentSourceAnalogImpl extends AnalogElement {
+class DcCurrentSourceAnalogImpl extends AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.ISRC;
 
   private readonly _p: Record<string, number>;
@@ -208,31 +208,31 @@ class CurrentSourceAnalogImpl extends AnalogElement {
   }
 }
 
-export function makeCurrentSource(
+export function makeDcCurrentSource(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElement {
-  return new CurrentSourceAnalogImpl(pinNodes, props);
+  return new DcCurrentSourceAnalogImpl(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
 // StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
-export const CurrentSourceDefinition: StandaloneComponentDefinition = {
-  name: "CurrentSource",
+export const DcCurrentSourceDefinition: StandaloneComponentDefinition = {
+  name: "DcCurrentSource",
   typeId: -1,
   category: ComponentCategory.SOURCES,
 
-  pinLayout: CURRENT_SOURCE_PIN_LAYOUT,
-  propertyDefs: CURRENT_SOURCE_PROPERTY_DEFS,
-  attributeMap: CURRENT_SOURCE_ATTRIBUTE_MAP,
+  pinLayout: DC_CURRENT_SOURCE_PIN_LAYOUT,
+  propertyDefs: DC_CURRENT_SOURCE_PROPERTY_DEFS,
+  attributeMap: DC_CURRENT_SOURCE_ATTRIBUTE_MAP,
 
   helpText: "Ideal DC current source. Stamps only into the RHS vector  no matrix entries.",
 
-  factory(props: PropertyBag): CurrentSourceElement {
-    return new CurrentSourceElement(
+  factory(props: PropertyBag): DcCurrentSourceElement {
+    return new DcCurrentSourceElement(
       crypto.randomUUID(),
       { x: 0, y: 0 },
       0,
@@ -245,9 +245,9 @@ export const CurrentSourceDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: makeCurrentSource,
-      paramDefs: CURRENT_SOURCE_PARAM_DEFS,
-      params: CURRENT_SOURCE_DEFAULTS,
+      factory: makeDcCurrentSource,
+      paramDefs: DC_CURRENT_SOURCE_PARAM_DEFS,
+      params: DC_CURRENT_SOURCE_DEFAULTS,
     },
   },
   defaultModel: "behavioral",
