@@ -33,6 +33,8 @@ import type { LteParams } from "./ckt-terr.js";
 import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
 import type { Diagnostic } from "../../compile/types.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
+import type { TempContext } from "./temp-context.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -44,6 +46,9 @@ export abstract class AnalogElement {
 
   /** Position in ngspice's CKTload iteration order (see `ngspice-load-order.ts`). */
   abstract readonly ngspiceLoadOrder: number;
+
+  /** Device family bucket for per-type orchestration (see `ngspice-load-order.ts`). */
+  abstract readonly deviceFamily: DeviceFamily;
 
   /** Display label for diagnostic attribution; overwritten by compiler before setup(). */
   label = "";
@@ -125,6 +130,12 @@ export abstract class AnalogElement {
 
   /** Labels for internal nodes allocated in setup(), in allocation order. */
   getInternalNodeLabels?(): readonly string[];
+
+  /** Per-temperature-sweep callback. Concrete subclasses opt in starting Phase 5. */
+  computeTemperature?(ctx: TempContext): void;
+
+  /** Flux initialisation pass for inductive elements. Consumed by IND_FAMILY in Phase 4. */
+  loadFluxInit?(ctx: LoadContext): void;
 }
 
 // ---------------------------------------------------------------------------

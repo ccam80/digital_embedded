@@ -42,6 +42,7 @@ import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
 import { isPoolBacked, AnalogElement } from "./element.js";
 import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
   runCompileTimeDetectors,
@@ -1269,6 +1270,17 @@ export function compileAnalogPartition(
     }
   }
 
+  // Build per-family buckets. Preserves the relative order of the sorted
+  // flat array so each bucket is in the same (ngspiceLoadOrder ASC,
+  // originalIndex DESC) order as `analogElements`.
+  const elementsByFamilyMut = new Map<DeviceFamily, AnalogElement[]>();
+  for (const el of analogElements) {
+    let bucket = elementsByFamilyMut.get(el.deviceFamily);
+    if (!bucket) { bucket = []; elementsByFamilyMut.set(el.deviceFamily, bucket); }
+    bucket.push(el);
+  }
+  const elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]> = elementsByFamilyMut;
+
   // Compile-time topology detectors (no branchIndex needed). Post-setup
   // detectors run from MNAEngine._setup() and emit through the engine's
   // runtime DiagnosticCollector- see `topology-diagnostics.ts` and
@@ -1326,6 +1338,7 @@ export function compileAnalogPartition(
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: totalNodeCount,
     elements: analogElements,
+    elementsByFamily,
     labelToNodeId,
     labelPinNodes,
     wireToNodeId,

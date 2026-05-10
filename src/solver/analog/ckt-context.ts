@@ -20,6 +20,7 @@ export type { LoadContext } from "./load-context.js";
 import type { LoadContext, ConvergenceEvent } from "./load-context.js";
 import type { IntegrationMethod } from "./integration.js";
 import { MODEDCOP, MODEINITFLOAT, MODEUIC } from "./ckt-mode.js";
+import type { TempContext } from "./temp-context.js";
 
 // ---------------------------------------------------------------------------
 // LoadCtxImpl- concrete LoadContext with live state-ring access
@@ -300,6 +301,50 @@ export class CKTCircuitContext {
    * through the LoadContext interface (LoadCtxImpl implements LoadContext).
    */
   loadCtx: LoadCtxImpl;
+
+  // -------------------------------------------------------------------------
+  // Temperature (ngspice CKTtemp / CKTnomTemp — cktdefs.h)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Circuit operating temperature in Kelvin (ngspice CKTtemp).
+   * Default 300.15 K = REFTEMP (CONSTreftemp in ngspice const.h).
+   * cite: ckttemp.c:28-33 — DEVtemperature receives ckt->CKTtemp.
+   */
+  cktTemp: number = 300.15;
+
+  /**
+   * Nominal (reference) temperature in Kelvin (ngspice CKTnomTemp).
+   * Default 300.15 K = REFTEMP.
+   * cite: ckttemp.c:28-33 — DEVtemperature uses both CKTtemp and CKTnomTemp.
+   */
+  cktNomTemp: number = 300.15;
+
+  /** Cached TempContext instance. Null until first access of `tempCtx`. */
+  private _tempCtx: TempContext | null = null;
+
+  /**
+   * Lazy accessor that constructs a TempContext from the current cktTemp /
+   * cktNomTemp values on first access. Not allocated at construction to avoid
+   * paying the allocation cost in circuits that never run a temperature pass.
+   *
+   * If cktTemp or cktNomTemp change after first access, call resetTempCtx()
+   * to force reconstruction on the next access.
+   */
+  get tempCtx(): TempContext {
+    if (this._tempCtx === null) {
+      this._tempCtx = { cktTemp: this.cktTemp, cktNomTemp: this.cktNomTemp };
+    }
+    return this._tempCtx;
+  }
+
+  /**
+   * Invalidate the cached TempContext so the next access of `tempCtx`
+   * reconstructs it from the current cktTemp / cktNomTemp values.
+   */
+  resetTempCtx(): void {
+    this._tempCtx = null;
+  }
 
   // -------------------------------------------------------------------------
   // Assembler state

@@ -31,6 +31,7 @@ export const NGSPICE_LOAD_ORDER = {
   CAP:  17,
   CCCS: 18,
   CCVS: 19,
+  CPL:  20,  // dev.c: get_cpl_info (index 20)
   DIO:  22,
   IND:  27,
   MUT:  28,
@@ -40,6 +41,7 @@ export const NGSPICE_LOAD_ORDER = {
   RES:  40,
   SW:   42,
   TRA:  43,
+  TXL:  44,  // dev.c: get_txl_info (index 44)
   VCCS: 46,
   VCVS: 47,
   VSRC: 48,
@@ -48,6 +50,38 @@ export const NGSPICE_LOAD_ORDER = {
                   // behavioural driver leaf added by this phase uses
                   // this ordinal.
 } as const;
+
+/**
+ * DeviceFamily- bucket key for per-type device orchestration.
+ *
+ * Values mirror the ngspice DEVices[] indices in dev.c / cktload.c / ckttemp.c.
+ * Used by family-dispatch.ts to iterate buckets in NGSPICE_LOAD_ORDER order
+ * and dispatch to the registered FamilyHandler (or the default per-instance
+ * walker). CPL, TXL, URC are reserved- their family keys exist so the registry
+ * shape can accommodate them; no loaders ship today.
+ *
+ * Spec ref: spec/refactor-per-type-orchestration.md §4.1
+ */
+export type DeviceFamily =
+  | "IND"
+  | "VSRC"
+  | "ISRC"
+  | "VCVS"
+  | "VCCS"
+  | "CCVS"
+  | "CCCS"
+  | "RES"
+  | "CAP"
+  | "SW"
+  | "TRA"
+  | "DIO"
+  | "BJT"
+  | "JFET"
+  | "MOS"
+  | "BEHAVIORAL"
+  | "CPL"
+  | "TXL"
+  | "URC";
 
 /**
  * Per-`typeId` ngspice load-order lookup, mirroring `DEVices[]` indexing.
@@ -73,6 +107,7 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
   Capacitor:       NGSPICE_LOAD_ORDER.CAP,
   PolarizedCap:    NGSPICE_LOAD_ORDER.CAP,
   Inductor:        NGSPICE_LOAD_ORDER.IND,
+  MutualInductor:  NGSPICE_LOAD_ORDER.MUT,
   Transformer:     NGSPICE_LOAD_ORDER.IND,
   TappedTransformer: NGSPICE_LOAD_ORDER.IND,
   TransmissionLine: NGSPICE_LOAD_ORDER.TRA,

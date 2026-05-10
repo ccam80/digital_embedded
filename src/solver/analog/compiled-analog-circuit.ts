@@ -16,6 +16,7 @@ import type { BridgeOutputDriverElement } from "./behavioral-drivers/bridge-outp
 import type { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driver.js";
 import type { ResolvedPin } from "../../core/pin.js";
 import { StatePool } from "./state-pool.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // DeviceModel- placeholder for Phase 2 .MODEL support
@@ -60,6 +61,11 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
 
   /** All analog element instances. */
   readonly elements: AnalogElement[];
+
+  /** Per-family buckets: maps DeviceFamily to the subset of elements belonging
+   *  to that family, in the same relative order as the flat `elements` array.
+   *  Built by the compiler after the ngspiceLoadOrder sort. */
+  readonly elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
 
   /** Maps component label strings to MNA node IDs (first-pin semantics-
    *  preserved for AC analysis, Monte Carlo, parameter sweep, etc.). */
@@ -140,6 +146,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   constructor(params: {
     nodeCount: number;
     elements: AnalogElement[];
+    elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
     labelToNodeId: Map<string, number>;
     labelPinNodes?: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
     wireToNodeId: Map<Wire, number>;
@@ -159,6 +166,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   }) {
     this.nodeCount = params.nodeCount;
     this.elements = params.elements;
+    this.elementsByFamily = params.elementsByFamily;
     this.labelToNodeId = params.labelToNodeId;
     this.labelPinNodes = params.labelPinNodes ?? new Map();
     this.wireToNodeId = params.wireToNodeId;
