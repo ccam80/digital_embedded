@@ -825,7 +825,7 @@ export class MNAEngine implements AnalogEngine {
     // call dcOperatingPoint() again). After that warm-start, ag[0] holds
     // the prior step's 1/dt value from nicomcof, which corrupts the next
     // DCOP because devices whose load() unconditionally stamps -k*ag[0]
-    // (mutload.c:74-75 / TransformerCoupling.load) inject huge non-zero
+    // (mutload.c:74-75 / MutualInductorElement.loadCouplingPass) inject huge non-zero
     // off-diagonals into a matrix the DC analysis assumes is ag-independent.
     //
     // Make ngspice's implicit precondition explicit at our DCOP entry,

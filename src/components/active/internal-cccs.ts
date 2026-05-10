@@ -8,8 +8,8 @@
  * current of a sibling InternalZeroVoltSense via siblingBranch resolution
  * and injects I_out = gain * I_sense into the output (pos/neg) nodes.
  *
- * Template: hybrid of TransformerCoupling (siblingBranch reader pattern,
- * transformer-coupling.ts) and TransmissionSegmentR (2-pin stamp via cached
+ * Template: hybrid of MutualInductorElement (siblingBranch reader pattern,
+ * mutual-inductor.ts) and TransmissionSegmentR (2-pin stamp via cached
  * handles, transmission-segment-r.ts).
  *
  * Stamp math: CCCS (ccsload.c). Two off-diagonal matrix entries on the

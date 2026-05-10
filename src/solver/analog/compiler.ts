@@ -48,6 +48,8 @@ import {
   runCompileTimeDetectors,
 } from "./topology-diagnostics.js";
 import { SubcircuitWrapperElement } from "./subcircuit-wrapper-element.js";
+import { AnalogInductorElement } from "../../components/passives/inductor.js";
+import { MutualInductorElement } from "../../components/passives/mutual-inductor.js";
 
 // ---------------------------------------------------------------------------
 // Component routing- shared decision logic for Pass A and Pass B
@@ -439,6 +441,36 @@ function expandCompositeInstance(
       childEl.label = childLabel;
       subElements.push(childEl);
       allLeaves.push(childEl, ...inner.allLeaves);
+    } else if (leafEntry.kind === "mutual-inductor") {
+      // K-element construction path. The MutualInductorElement requires live
+      // AnalogInductorElement partner references; the generic AnalogFactory
+      // signature cannot provide them. We resolve L1_branch/L2_branch sibling
+      // names from the netlist params and look them up in constructedByName.
+      //
+      // ngspice anchor: mutsetup.c:44-57 — partner inductors must be allocated
+      // before MUT runs setup(), so Inductor leaves must precede MutualInductor
+      // in netlist.elements (enforced by the factory's instanceof guard).
+      const rawParams = subEl.params ?? {};
+      const l1Ref = rawParams["L1_branch"];
+      const l2Ref = rawParams["L2_branch"];
+      if (
+        typeof l1Ref !== "object" || l1Ref === null || (l1Ref as { kind?: string }).kind !== "siblingBranch" ||
+        typeof l2Ref !== "object" || l2Ref === null || (l2Ref as { kind?: string }).kind !== "siblingBranch"
+      ) {
+        throw new Error(
+          `Composite sub-element "${subName}" (kind: "mutual-inductor") must declare ` +
+          `L1_branch and L2_branch as siblingBranch refs. ` +
+          `Got L1_branch=${JSON.stringify(l1Ref)}, L2_branch=${JSON.stringify(l2Ref)}.`,
+        );
+      }
+      const l1SubName = (l1Ref as { subElementName: string }).subElementName;
+      const l2SubName = (l2Ref as { subElementName: string }).subElementName;
+      // coupling = K param from the MutualInductor's resolved params (default 1).
+      const coupling = subProps.getModelParam<number>("K") ?? 1;
+      childEl = leafEntry.factory(l1SubName, l2SubName, coupling, constructedByName);
+      childEl.label = childLabel;
+      subElements.push(childEl);
+      allLeaves.push(childEl);
     } else {
       // Future ModelEntry kinds: surface loudly so we never silently drop a
       // sub-element the way the old code did with `if (kind !== "inline") continue`.

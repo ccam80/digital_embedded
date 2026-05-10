@@ -267,6 +267,9 @@ import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.
 // Triode analog leaf (internalOnly)
 import { TriodeAnalogDefinition } from "./semiconductors/triode-analog-element.js";
 
+// Mutual inductor sub-element (internalOnly — used by Transformer composites)
+import { MutualInductorDefinition } from "./passives/mutual-inductor.js";
+
 /**
  * Create a ComponentRegistry populated with every built-in component type.
  *
@@ -547,6 +550,9 @@ export function createDefaultRegistry(
 
   // Triode analog leaf (internalOnly)
   registry.register(TriodeAnalogDefinition);
+
+  // Mutual inductor sub-element (internalOnly — used by Transformer composites)
+  registry.register(MutualInductorDefinition);
 
   return registry;
 }

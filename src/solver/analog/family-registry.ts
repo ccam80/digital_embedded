@@ -1,5 +1,8 @@
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import type { AnalogElement } from "./element.js";
+import { IndFamilyLoadHandler } from "./loaders/ind-family-loader.js";
+import { IndFamilyStampAcHandler } from "./loaders/ind-family-ac-loader.js";
+import { IndFamilyTempHandler } from "./loaders/ind-family-temperature.js";
 
 /**
  * The three per-type orchestration callbacks mirroring ngspice's
@@ -27,11 +30,16 @@ export interface FamilyHandler {
  * Global family-callback registry. Maps each DeviceFamily to a partial record
  * of (FamilyCallback → FamilyHandler) overrides.
  *
- * Initially empty. Phase 4 populates IND_FAMILY entries via mutation.
  * Any (family, callback) pair absent from the registry falls back to the
  * default per-instance handler in `loaders/default-loaders.ts`.
  *
- * Implemented as a Map (not a plain object) so Phase 4 and tests can mutate
- * entries via standard Map operations.
+ * Implemented as a Map (not a plain object) so tests can mutate entries via
+ * standard Map operations.
  */
 export const FAMILY_REGISTRY: Map<DeviceFamily, Partial<Record<FamilyCallback, FamilyHandler>>> = new Map();
+
+FAMILY_REGISTRY.set("IND", {
+  load: IndFamilyLoadHandler,
+  stampAc: IndFamilyStampAcHandler,
+  computeTemperature: IndFamilyTempHandler,
+});

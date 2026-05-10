@@ -16,7 +16,7 @@
  *   L1  (subElementName: "L1"): Inductor- primary winding (P1 pos, P2 neg)
  *   L2  (subElementName: "L2"): Inductor- secondary half-1 (S1 pos, CT neg)
  *   L3  (subElementName: "L3"): Inductor- secondary half-2 (CT pos, S2 neg)
- *   MUT (subElementName: "MUT"): TransformerCoupling- coupling between L1, L2, L3
+ *   MUT (subElementName: "MUT"): MutualInductor- coupling between L1, L2, L3
  *
  * Inductance relationships for turns ratio N (total secondary / primary):
  *   L2 = L3 = L1 x (N/2)^2
@@ -180,7 +180,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
 /**
  * Builds the MNA subcircuit netlist for a three-winding center-tapped
  * transformer. Emits three Inductor leaves (L1, L2, L3) and one
- * TransformerCoupling element that stamps the mutual-inductance terms
+ * MutualInductor element that stamps the mutual-inductance terms
  * across the coil branch indices resolved via siblingBranch.
  *
  * Port order: P1=0, P2=1, S1=2, CT=3, S2=4 (no internal nets).
@@ -198,10 +198,6 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
   const l1 = primaryInductance;
   const l2 = primaryInductance * halfRatio * halfRatio;
   const l3 = primaryInductance * halfRatio * halfRatio;
-  const k = couplingCoefficient;
-  const m12 = k * Math.sqrt(l1 * l2);
-  const m13 = k * Math.sqrt(l1 * l3);
-  const m23 = k * Math.sqrt(l2 * l3);
 
   // Port indices: P1=0, P2=1, S1=2, CT=3, S2=4
   const ports = ["P1", "P2", "S1", "CT", "S2"];
@@ -230,35 +226,36 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         branchCount: 1,
         params: { inductance: l3 },
       },
-      // Pairwise TransformerCoupling — strict ngspice match. ngspice K elements
+      // Pairwise MutualInductor — strict ngspice match. ngspice K elements
       // are 1-to-1 with coupled pairs; a 3-winding tapped transformer emits
-      // K12 + K13 + K23. Each instance carries one M and two siblingBranch refs.
+      // K12 + K13 + K23. Each carries K = couplingCoefficient; MUTfactor is
+      // computed in MutualInductorElement.setup() from live partner inductances.
       {
-        typeId: "TransformerCoupling",
+        typeId: "MutualInductor",
         modelRef: "default",
         subElementName: "MUT12",
         params: {
-          M: m12,
+          K: couplingCoefficient,
           L1_branch: { kind: "siblingBranch", subElementName: "L1" },
           L2_branch: { kind: "siblingBranch", subElementName: "L2" },
         },
       },
       {
-        typeId: "TransformerCoupling",
+        typeId: "MutualInductor",
         modelRef: "default",
         subElementName: "MUT13",
         params: {
-          M: m13,
+          K: couplingCoefficient,
           L1_branch: { kind: "siblingBranch", subElementName: "L1" },
           L2_branch: { kind: "siblingBranch", subElementName: "L3" },
         },
       },
       {
-        typeId: "TransformerCoupling",
+        typeId: "MutualInductor",
         modelRef: "default",
         subElementName: "MUT23",
         params: {
-          M: m23,
+          K: couplingCoefficient,
           L1_branch: { kind: "siblingBranch", subElementName: "L2" },
           L2_branch: { kind: "siblingBranch", subElementName: "L3" },
         },

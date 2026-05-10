@@ -4,7 +4,7 @@
  * Sub-element decomposition (netlist):
  *   L1  (subElementName: "L1"): Inductor — primary winding (P1 pos, P2 neg)
  *   L2  (subElementName: "L2"): Inductor — secondary winding (S1 pos, S2 neg)
- *   MUT (subElementName: "MUT"): TransformerCoupling — mutual coupling K(L1,L2)
+ *   MUT (subElementName: "MUT"): MutualInductor — mutual coupling K(L1,L2)
  *
  * Pin layout (4 physical terminals):
  *   P1   primary positive
@@ -172,7 +172,7 @@ export class TransformerElement extends AbstractCircuitElement {
 
 /**
  * Builds the MNA subcircuit netlist for a two-winding transformer. Emits two
- * Inductor leaves (L1, L2) and one TransformerCoupling element that stamps
+ * Inductor leaves (L1, L2) and one MutualInductor element that stamps
  * the mutual-inductance off-diagonals across the coil branch indices
  * resolved via siblingBranch.
  *
@@ -190,8 +190,6 @@ export const buildTransformerNetlist = (params: PropertyBag): MnaSubcircuitNetli
 
   const l1 = primaryInductance;
   const l2 = primaryInductance / (turnsRatio * turnsRatio);
-  const k = couplingCoefficient;
-  const m = k * Math.sqrt(l1 * l2);
 
   // Port indices: P1=0, P2=1, S1=2, S2=3
   const ports = ["P1", "P2", "S1", "S2"];
@@ -216,14 +214,15 @@ export const buildTransformerNetlist = (params: PropertyBag): MnaSubcircuitNetli
       // K-coupling — strict ngspice match. ngspice K elements are 1-to-1
       // with coupled pairs (mutsetup.c:66-67, mutload.c). Branch refs to
       // sibling Inductor leaves go through `siblingBranch`; the compiler's
-      // labelPatchWork channel resolves them at setup time after the
-      // parent's instance label is stamped via setLabel.
+      // "mutual-inductor" kind constructs MutualInductorElement with live
+      // partner references. K = couplingCoefficient; MUTfactor = K·√(L1·L2)
+      // is computed in MutualInductorElement.setup() from live partner inductances.
       {
-        typeId: "TransformerCoupling",
+        typeId: "MutualInductor",
         modelRef: "default",
         subElementName: "MUT",
         params: {
-          M: m,
+          K: couplingCoefficient,
           L1_branch: { kind: "siblingBranch", subElementName: "L1" },
           L2_branch: { kind: "siblingBranch", subElementName: "L2" },
         },

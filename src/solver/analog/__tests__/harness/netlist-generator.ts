@@ -91,7 +91,7 @@ function canonicalizeSpiceLabel(rawLabel: string, requiredPrefix: string): strin
  * mapping to ngspice's W element) or mark the parent component
  * pairedSpiceEquivalent: false on its definition.
  *
- * Exemption: `TransformerCoupling` sub-elements are permitted to use
+ * Exemption: `MutualInductor` sub-elements are permitted to use
  * `siblingBranch` on `L1_branch` / `L2_branch` because they map directly to
  * ngspice's K element. K resolves L1Name/L2Name to coil branch indices and
  * stamps mutual-inductance off-diagonals (mutsetup.c:66-67, mutload.c) — the
@@ -110,7 +110,7 @@ function assertNoSiblingRefs(
     const v = params[key];
     if (typeof v === "object" && v !== null && "kind" in v &&
         (v.kind === "siblingBranch" || v.kind === "siblingState")) {
-      if (sub.typeId === "TransformerCoupling" &&
+      if (sub.typeId === "MutualInductor" &&
           v.kind === "siblingBranch" &&
           (key === "L1_branch" || key === "L2_branch")) {
         continue;
@@ -339,14 +339,14 @@ function emitElement(
     for (let i = 0; i < subckt.elements.length; i++) {
       const sub = subckt.elements[i]!;
 
-      // TransformerCoupling maps directly to ngspice's K element. ngspice K
+      // MutualInductor maps directly to ngspice's K element. ngspice K
       // resolves L1Name/L2Name to coil branch indices and stamps mutual-
       // inductance off-diagonals (mutsetup.c:66-67, mutload.c) — identical to
       // our siblingBranch semantics. Emit inline (the assertNoSiblingRefs
       // exemption permits L1_branch/L2_branch siblingBranch refs on this
       // typeId only).
-      if (sub.typeId === "TransformerCoupling") {
-        lines.push(...emitTransformerCouplingK(rawLabel, sub, subckt, props));
+      if (sub.typeId === "MutualInductor") {
+        lines.push(...emitMutualInductorK(rawLabel, sub, subckt, props));
         continue;
       }
 
@@ -989,7 +989,7 @@ function requireParam(
 }
 
 /**
- * Emit a SPICE K element for a TransformerCoupling sub-element. Mirrors
+ * Emit a SPICE K element for a MutualInductor sub-element. Mirrors
  * ngspice K (mutsetup.c / mutload.c): resolves L1Name/L2Name to coil branch
  * indices and stamps -k·√(L1·L2) off-diagonals at (b1,b2) and (b2,b1).
  *
@@ -1005,7 +1005,7 @@ function requireParam(
  * sibling Inductor sub-elements MUST declare canonical `inductance: ...`
  * params (not `L: ...` aliases) for the lookup to resolve.
  */
-function emitTransformerCouplingK(
+function emitMutualInductorK(
   parentRawLabel: string,
   sub: SubcircuitElement,
   parentSubckt: MnaSubcircuitNetlist,
@@ -1018,7 +1018,7 @@ function emitTransformerCouplingK(
   const l2Ref = subParams["L2_branch"];
   if (!isSiblingBranchRef(l1Ref) || !isSiblingBranchRef(l2Ref)) {
     throw new Error(
-      `netlist-generator: TransformerCoupling sub-element '${subName}' of ` +
+      `netlist-generator: MutualInductor sub-element '${subName}' of ` +
       `'${parentRawLabel}' must declare L1_branch and L2_branch as ` +
       `siblingBranch refs. Got L1_branch=${JSON.stringify(l1Ref)}, ` +
       `L2_branch=${JSON.stringify(l2Ref)}.`
@@ -1031,44 +1031,58 @@ function emitTransformerCouplingK(
   const l2Sub = parentSubckt.elements.find((e) => e.subElementName === l2SubName);
   if (!l1Sub || !l2Sub) {
     throw new Error(
-      `netlist-generator: TransformerCoupling '${subName}' of '${parentRawLabel}' ` +
+      `netlist-generator: MutualInductor '${subName}' of '${parentRawLabel}' ` +
       `references sibling sub-elements '${l1SubName}' and '${l2SubName}', ` +
       `but ${!l1Sub ? `'${l1SubName}'` : `'${l2SubName}'`} is not present in the ` +
       `parent's netlist.elements.`
     );
   }
 
-  const l1Inductance = resolveSubElementNumeric(
-    l1Sub.params?.["inductance"],
-    parentSubckt.params,
-    parentProps,
-    `${l1SubName}.inductance`,
-    parentRawLabel,
-  );
-  const l2Inductance = resolveSubElementNumeric(
-    l2Sub.params?.["inductance"],
-    parentSubckt.params,
-    parentProps,
-    `${l2SubName}.inductance`,
-    parentRawLabel,
-  );
-  const m = resolveSubElementNumeric(
-    subParams["M"],
-    parentSubckt.params,
-    parentProps,
-    `${subName}.M`,
-    parentRawLabel,
-  );
-
-  const denom = Math.sqrt(l1Inductance * l2Inductance);
-  if (!Number.isFinite(denom) || denom === 0) {
-    throw new Error(
-      `netlist-generator: TransformerCoupling '${parentRawLabel}_${subName}' has ` +
-      `degenerate inductances (L1=${l1Inductance}, L2=${l2Inductance}); ` +
-      `cannot compute coupling coefficient k = M / √(L1·L2).`
+  // Resolve coupling coefficient k. Sub-elements carry either:
+  //   K: <number>  — dimensionless coupling coefficient (preferred; set by
+  //                  transformer.ts / tapped-transformer.ts after task 4.3.2)
+  //   M: <number>  — mutual inductance in H (back-compute k = M / √(L1·L2))
+  let k: number;
+  if (subParams["K"] !== undefined) {
+    k = resolveSubElementNumeric(
+      subParams["K"],
+      parentSubckt.params,
+      parentProps,
+      `${subName}.K`,
+      parentRawLabel,
     );
+  } else {
+    const l1Inductance = resolveSubElementNumeric(
+      l1Sub.params?.["inductance"],
+      parentSubckt.params,
+      parentProps,
+      `${l1SubName}.inductance`,
+      parentRawLabel,
+    );
+    const l2Inductance = resolveSubElementNumeric(
+      l2Sub.params?.["inductance"],
+      parentSubckt.params,
+      parentProps,
+      `${l2SubName}.inductance`,
+      parentRawLabel,
+    );
+    const m = resolveSubElementNumeric(
+      subParams["M"],
+      parentSubckt.params,
+      parentProps,
+      `${subName}.M`,
+      parentRawLabel,
+    );
+    const denom = Math.sqrt(l1Inductance * l2Inductance);
+    if (!Number.isFinite(denom) || denom === 0) {
+      throw new Error(
+        `netlist-generator: MutualInductor '${parentRawLabel}_${subName}' has ` +
+        `degenerate inductances (L1=${l1Inductance}, L2=${l2Inductance}); ` +
+        `cannot compute coupling coefficient k = M / √(L1·L2).`
+      );
+    }
+    k = m / denom;
   }
-  const k = m / denom;
 
   const subRawLabel = `${parentRawLabel}_${subName}`;
   const kLabel  = canonicalizeSpiceLabel(subRawLabel, "K");

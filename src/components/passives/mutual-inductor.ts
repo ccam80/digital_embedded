@@ -1,13 +1,9 @@
 ﻿/**
- * MutualInductorElement and InductorSubElement â€” class-based leaves used by
+ * MutualInductorElement and InductorSubElement — class-based leaves used by
  * Transformer composites.
  *
- * After Wave 11a, Transformer (`transformer.ts`) is `kind: "netlist"` and
- * references `Inductor` + `TransformerCoupling` by typeId for the actual
- * compiled topology. The classes in this file remain as the abstract-base
- * forms of the older inline composition primitives, available for any
- * follow-on composite that wants a 1-to-1 paired coil + K element without
- * routing through the registered `Inductor`/`TransformerCoupling` pair.
+ * Transformer (`transformer.ts`) is `kind: “netlist”` and references
+ * `Inductor` + `MutualInductor` by typeId for the compiled topology.
  *
  * ngspice anchors:
  *   indsetup.c:84-100 - IND branch allocation and TSTALLOC sequence
@@ -33,7 +29,7 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
 import type { ComplexSparseSolverStamp } from "../../solver/analog/complex-sparse-solver.js";
 import { AnalogInductorElement, type MutSiblingNotifiable } from "./inductor.js";
-import type { ComponentDefinition } from "../../core/registry.js";
+import type { ComponentDefinition, MutualInductorFactory } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";
 
 // ---------------------------------------------------------------------------
@@ -409,16 +405,43 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
 // ---------------------------------------------------------------------------
 // MutualInductorDefinition
 //
-// Internal-only sub-element registration. `MutualInductorElement` is never
-// instantiated through the registry factory — parent composites (transformer.ts
-// and tapped-transformer.ts) construct it directly with live partner references.
-// The definition exists so the registry assigns a stable typeId and so
-// register-all.ts can wire it into TYPE_ID_TO_NGSPICE_LOAD_ORDER.
+// Internal-only sub-element registration. `MutualInductorElement` is
+// constructed by the compiler via the `"mutual-inductor"` ModelEntry kind,
+// which passes live `AnalogInductorElement` partner references rather than
+// routing through a generic PropertyBag factory.
 //
-// `internalOnly: true` — excluded from the editor palette, SPICE-import primary
-// matching, and surfaced under its parent composite in harness_describe.
-// Mirrors the shape of the deleted TransformerCouplingDefinition (Phase 0).
+// `internalOnly: true` — excluded from the editor palette, SPICE-import
+// primary matching, and surfaced under its parent composite in harness_describe.
+// Registered in register-all.ts so the registry assigns a stable typeId.
+//
+// ngspice anchor: mutsetup.c:44-57 — partner inductors resolved after all IND
+// branches allocated; `"mutual-inductor"` kind enforces the same ordering.
 // ---------------------------------------------------------------------------
+
+const mutualInductorFactory: MutualInductorFactory = (
+  l1SubName: string,
+  l2SubName: string,
+  coupling: number,
+  siblings: ReadonlyMap<string, import("../../solver/analog/element.js").AnalogElement>,
+): MutualInductorElement => {
+  const l1 = siblings.get(l1SubName);
+  const l2 = siblings.get(l2SubName);
+  if (!(l1 instanceof AnalogInductorElement)) {
+    throw new Error(
+      `MutualInductorDefinition: sibling "${l1SubName}" is not an AnalogInductorElement ` +
+      `(got ${l1?.constructor.name ?? "undefined"}). ` +
+      `Inductor leaves must appear before MutualInductor in netlist.elements.`,
+    );
+  }
+  if (!(l2 instanceof AnalogInductorElement)) {
+    throw new Error(
+      `MutualInductorDefinition: sibling "${l2SubName}" is not an AnalogInductorElement ` +
+      `(got ${l2?.constructor.name ?? "undefined"}). ` +
+      `Inductor leaves must appear before MutualInductor in netlist.elements.`,
+    );
+  }
+  return new MutualInductorElement(coupling, l1, l2);
+};
 
 export const MutualInductorDefinition: ComponentDefinition = {
   name: "MutualInductor",
@@ -426,19 +449,12 @@ export const MutualInductorDefinition: ComponentDefinition = {
   internalOnly: true,
   modelRegistry: {
     default: {
-      kind: "inline",
+      kind: "mutual-inductor",
       paramDefs: [
         { key: "K", default: 1 },
       ],
       params: { K: 1 },
-      factory: (_pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => {
-        throw new Error(
-          "MutualInductorDefinition factory: MutualInductorElement must be " +
-          "constructed directly by the parent composite (transformer.ts) " +
-          "with live AnalogInductorElement partner references — it cannot be " +
-          "instantiated through the registry factory path.",
-        );
-      },
+      factory: mutualInductorFactory,
     },
   },
   defaultModel: "default",
