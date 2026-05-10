@@ -311,10 +311,19 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port order: data_0..data_{N-1}, sel_0..sel_{K-1}, out, gnd
+  // Port order: in_0..in_{N-1}, sel (K=1) or sel_0..sel_{K-1} (K>1), out, gnd.
+  // Labels match the element pinLayout exactly (see buildMuxPinDeclarations):
+  // data inputs are `in_${i}`, the (single multi-bit) selector is `sel`. The
+  // K>1 case still emits per-bit `sel_${i}` ports because the analog leaf
+  // pin needs one node per bit; that path requires a follow-up to split the
+  // user-visible `sel` pin into per-bit pins when an analog model is selected.
   const ports: string[] = [];
-  for (let i = 0; i < N; i++) ports.push(`data_${i}`);
-  for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  for (let i = 0; i < N; i++) ports.push(`in_${i}`);
+  if (K === 1) {
+    ports.push("sel");
+  } else {
+    for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  }
   ports.push("out", "gnd");
 
   const outPortIdx = N + K;

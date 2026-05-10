@@ -158,9 +158,9 @@ export class SubcircuitWrapperElement extends AnalogElement {
   }
 
   /**
-   * Read access to the wrapper's sub-element label info. Retained for
-   * diagnostic / introspection paths that previously called `setLabel` to
-   * walk children. Sub-element labels are already set during expansion.
+   * Read access to the wrapper's sub-element label info, for diagnostic and
+   * introspection paths that walk children. Sub-element labels are set
+   * during expansion.
    */
   get subElementLabelInfo(): ReadonlyArray<{ el: AnalogElement; subElementName: string }> {
     return this._subElementLabelInfo;

@@ -8,7 +8,7 @@
  *   - dClamp (Diode)     : reverse-bias clamp, A=neg / K=pos (CJO=0, TT=0)
  *
  * Internal node `nCap` sits between ESR and the capacitor body — matching the
- * legacy inline element's _nCap topology. The four leaves expand into the
+ * inline element's _nCap topology. The four leaves expand into the
  * SPICE deck as ordinary R/C/D primitives so paired comparison against
  * ngspice succeeds without translation. rLeak is derived at netlist-build
  * time from voltageRating / leakageCurrent (function-form netlist).
@@ -184,7 +184,7 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 // remaining sub-element params are string-resolved against the parent's
 // model params via the standard SubcircuitElementParam mechanism.
 //
-// Topology (matches the legacy inline element's _nCap layout):
+// Topology:
 //   pos ─ rEsr ─ nCap ─ (cBody || rLeak) ─ neg
 //   neg ─ dClamp(A=neg, K=pos) ─ pos        (reverse-bias clamp)
 
@@ -225,8 +225,7 @@ export const POLARIZED_CAP_NETLIST_BUILDER = (
         // PolarizedCap parent has its own `M` (capacitor multiplicity) and
         // `IC` (cap initial voltage) which collide with diode `M` (grading
         // coefficient) and `IC` (junction initial voltage). Literal pass-
-        // through bypasses parentProps and uses DIODE_PARAM_DEFAULTS directly,
-        // matching the legacy clamp diode's makeClampDiodeProps factory.
+        // through bypasses parentProps and uses DIODE_PARAM_DEFAULTS directly.
         params: {
           ...DIODE_PARAM_DEFAULTS,
           CJO: 0,

@@ -97,11 +97,10 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
 };
 
 /**
- * Look up ngspice load order by typeId. Falls back to a high sentinel for
+ * Look up ngspice load order by typeId. Returns a high sentinel for
  * unknown / composite typeIds so they sort to the end of the deck walk used
- * for node numbering. Composite components in fixtures mix into their own
- * bucket via this fallback; ngspice-parity for composites is not currently
- * established.
+ * for node numbering. Composite components in fixtures share that sentinel
+ * bucket; ngspice-parity for composites is not established.
  */
 export function getNgspiceLoadOrderByTypeId(typeId: string): number {
   return TYPE_ID_TO_NGSPICE_LOAD_ORDER[typeId] ?? 1000;

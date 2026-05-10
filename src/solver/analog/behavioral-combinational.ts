@@ -47,9 +47,18 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port order: sel_0..sel_{K-1}, out_0..out_{N-1}, gnd
+  // Port order: sel (K=1) or sel_0..sel_{K-1} (K>1), out_0..out_{N-1}, gnd.
+  // Single-bit `sel` matches the decoder's user-visible pinLayout label
+  // exactly. K>1 still emits per-bit `sel_${i}` ports because the analog
+  // domain needs one node per selector bit; that path requires a follow-up
+  // to split the user-visible `sel` pin into per-bit pins when an analog
+  // model is selected.
   const ports: string[] = [];
-  for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  if (K === 1) {
+    ports.push("sel");
+  } else {
+    for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  }
   for (let i = 0; i < N; i++) ports.push(`out_${i}`);
   ports.push("gnd");
 
@@ -137,9 +146,18 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port order: sel_0..sel_{K-1}, in, out_0..out_{N-1}, gnd
+  // Port order: sel (K=1) or sel_0..sel_{K-1} (K>1), in, out_0..out_{N-1}, gnd.
+  // Single-bit `sel` matches the demux's user-visible pinLayout label
+  // exactly. K>1 still emits per-bit `sel_${i}` ports because the analog
+  // domain needs one node per selector bit; that path requires a follow-up
+  // to split the user-visible `sel` pin into per-bit pins when an analog
+  // model is selected.
   const ports: string[] = [];
-  for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  if (K === 1) {
+    ports.push("sel");
+  } else {
+    for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  }
   ports.push("in");
   for (let i = 0; i < N; i++) ports.push(`out_${i}`);
   ports.push("gnd");

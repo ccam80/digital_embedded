@@ -127,8 +127,8 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port indices: in_1=0, out=1, gnd=2
-  const ports: string[] = ["in_1", "out", "gnd"];
+  // Port indices: In_1=0, out=1, gnd=2. `In_1` matches buildStandardPinDeclarations.
+  const ports: string[] = ["In_1", "out", "gnd"];
   const outIdx = 1;
   const gndIdx = 2;
 

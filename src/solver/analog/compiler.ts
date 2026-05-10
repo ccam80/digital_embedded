@@ -261,6 +261,13 @@ function expandCompositeInstance(
   }
 
   // Resolve a netlist net index to a concrete MNA node ID.
+  // Reserved port labels `gnd` / `GND` auto-bind to MNA node 0 (global ground)
+  // when the parent component's pinLayout doesn't expose a matching pin. This
+  // mirrors SPICE's node-0 convention and lets digital composites (gates,
+  // flipflops, mux/demux/decoder, drivers) reference ground internally
+  // without forcing every component to expose a user-visible GND pin. An
+  // explicit pinLayout entry with a matching label still wins, so user
+  // wiring is honoured when the component does expose GND.
   const resolveNetToNode = (netIdx: number): number => {
     if (netIdx < netlist.ports.length) {
       const portLabel = netlist.ports[netIdx];
@@ -268,12 +275,11 @@ function expandCompositeInstance(
         throw new Error(`composite "${parentLabel}": invalid port index ${netIdx}`);
       }
       const id = outerPinNodes.get(portLabel);
-      if (id === undefined) {
-        throw new Error(
-          `composite "${parentLabel}": port "${portLabel}" not present in outerPinNodes`,
-        );
-      }
-      return id;
+      if (id !== undefined) return id;
+      if (portLabel === "gnd" || portLabel === "GND") return 0;
+      throw new Error(
+        `composite "${parentLabel}": port "${portLabel}" not present in outerPinNodes`,
+      );
     }
     return internalNetIds[netIdx - netlist.ports.length]!;
   };

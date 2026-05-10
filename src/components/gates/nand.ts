@@ -179,7 +179,7 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
   const ports: string[] = [];
-  for (let i = 0; i < N; i++) ports.push(`in_${i + 1}`);
+  for (let i = 0; i < N; i++) ports.push(`In_${i + 1}`);
   ports.push("out", "gnd");
   const outIdx = N;
   const gndIdx = N + 1;

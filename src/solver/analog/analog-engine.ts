@@ -816,7 +816,7 @@ export class MNAEngine implements AnalogEngine {
   /**
    * Find the DC operating point of the circuit.
    *
-   * Delegates to the three-level fallback solver. Stores the resulting node
+   * Delegates to the three-level solver. Stores the resulting node
    * voltages in `ctx.rhs` so subsequent `step()` calls start from the
    * correct operating point.
    */
@@ -854,14 +854,37 @@ export class MNAEngine implements AnalogEngine {
     ctx.srcFact = 1;
     const uicBitDcop = ctx.cktMode & MODEUIC;
     ctx.cktMode = uicBitDcop | MODEDCOP | MODEINITJCT;
-    // dcop.c:DCop / cktop.c:CKTop never write CKTdelta. The 0 value device
-    // load() sees during DCOP iterations comes from cktdojob.c:117 (job
-    // dispatcher), not from DCop itself. Mirror only the per-iteration
-    // device-load contract here; do NOT touch the timestep controller's
-    // currentDt- that field is owned by the transient flow (configure /
-    // _transientDcop). Writing 0 here would absorb any subsequent step():
-    // first getClampedDt() returns 0 â†’ clamped to minTimeStep â†’ two-strike
-    // delmin sends the engine to ERROR.
+    // ngspice's dcop.c does NOT explicitly write CKTag[0] / CKTag[1]; it
+    // inherits the implicit precondition that ag[0] = ag[1] = 0 at DCOP
+    // entry. ngspice maintains that precondition by virtue of its analysis
+    // ordering: CKTinit calloc-zeroes the struct, and the only writers of
+    // CKTag are nicomcof.c (during transient steps) and dctran.c:348 /
+    // dcpss.c:389 (which explicitly reset to zero at transient init). The
+    // standard ngspice flow never re-enters dcop.c after a transient step,
+    // so the precondition is preserved without any explicit code.
+    //
+    // Our public API exposes coordinator.dcOperatingPoint() as a callable
+    // method that CAN run after a transient step (e.g. buildFixture's
+    // warm-start does _transientDcop + first transient step before tests
+    // call dcOperatingPoint() again). After that warm-start, ag[0] holds
+    // the prior step's 1/dt value from nicomcof, which corrupts the next
+    // DCOP because devices whose load() unconditionally stamps -k*ag[0]
+    // (mutload.c:74-75 / TransformerCoupling.load) inject huge non-zero
+    // off-diagonals into a matrix the DC analysis assumes is ag-independent.
+    //
+    // Make ngspice's implicit precondition explicit at our DCOP entry,
+    // mirroring the structure of dctran.c:348's `CKTag[0]=CKTag[1]=0`.
+    ctx.ag[0] = 0;
+    ctx.ag[1] = 0;
+    // dcop.c / cktop.c never write CKTdelta either. CKTdelta is reset by
+    // cktdojob.c:117 at job entry (CKTdelta=0; CKTtime=0;) — but again,
+    // that's a per-job reset, not a per-analysis one. We zero loadCtx.dt
+    // for the same reason as ag above: device load() reads it directly.
+    // We do NOT zero the timestep controller's currentDt — that field is
+    // owned by the transient flow (configure / _transientDcop). Writing 0
+    // there would absorb any subsequent step(): first getClampedDt()
+    // returns 0 → clamped to minTimeStep → two-strike delmin sends the
+    // engine to ERROR.
     ctx.loadCtx.dt = 0;
     this._setup();
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
@@ -1145,7 +1168,7 @@ export class MNAEngine implements AnalogEngine {
    */
   configure(params: Partial<SimulationParams>): void {
     // ngspice-parity: when the caller changes any transient input
-    // (tStop / outputStep / initTime / maxTimeStep), the previously-resolved
+    // (tStop / outputStep / initTime / maxTimeStep), the resolved
     // minTimeStep and firstStep would survive the spread and short-circuit
     // resolveSimulationParams's auto-derivation. ngspice has no user-override
     // path for CKTdelmin (= 1e-11 * CKTmaxStep, traninit.c:34) or the

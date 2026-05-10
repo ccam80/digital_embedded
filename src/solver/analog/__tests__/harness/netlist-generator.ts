@@ -1003,7 +1003,7 @@ function requireParam(
  * Reads M, L1, L2 from the parent subcircuit's resolved param chain
  * (sub-element params → parent's modelParams → subckt.params defaults). The
  * sibling Inductor sub-elements MUST declare canonical `inductance: ...`
- * params (not legacy `L: ...` aliases) for the lookup to resolve.
+ * params (not `L: ...` aliases) for the lookup to resolve.
  */
 function emitTransformerCouplingK(
   parentRawLabel: string,

@@ -46,11 +46,11 @@ describe("probe — DCOP failure isolation", () => {
         components: [
           { id: "v",   type: "DcVoltageSource", props: { label: "v",   voltage: 5 } },
           { id: "r",   type: "Resistor",       props: { label: "r",   resistance: 1000 } },
-          { id: "d",   type: "Diode",          props: { label: "d" } },
+          { id: "d1",  type: "Diode",          props: { label: "d1" } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["v:pos", "r:pos"], ["r:neg", "d:A"], ["d:K", "gnd:out"], ["v:neg", "gnd:out"],
+          ["v:pos", "r:pos"], ["r:neg", "d1:A"], ["d1:K", "gnd:out"], ["v:neg", "gnd:out"],
         ],
       });
       f.compile(c);
@@ -62,11 +62,11 @@ describe("probe — DCOP failure isolation", () => {
         components: [
           { id: "vCC", type: "DcVoltageSource", props: { label: "vCC", voltage: 5 } },
           { id: "rC",  type: "Resistor",       props: { label: "rC",  resistance: 1000 } },
-          { id: "q",   type: "NpnBJT",         props: { label: "q" } },
+          { id: "q1",  type: "NpnBJT",         props: { label: "q1" } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["vCC:pos", "rC:pos"], ["rC:neg", "q:C"], ["q:E", "gnd:out"], ["q:B", "gnd:out"], ["vCC:neg", "gnd:out"],
+          ["vCC:pos", "rC:pos"], ["rC:neg", "q1:C"], ["q1:E", "gnd:out"], ["q1:B", "gnd:out"], ["vCC:neg", "gnd:out"],
         ],
       });
       f.compile(c);
@@ -78,15 +78,15 @@ describe("probe — DCOP failure isolation", () => {
         components: [
           { id: "vLed", type: "DcVoltageSource", props: { label: "vLed", voltage: 5 } },
           { id: "rLed", type: "Resistor",       props: { label: "rLed", resistance: 1000 } },
-          { id: "d",    type: "Diode",          props: { label: "d" } },
+          { id: "d1",   type: "Diode",          props: { label: "d1" } },
           { id: "vCC",  type: "DcVoltageSource", props: { label: "vCC",  voltage: 5 } },
           { id: "rCol", type: "Resistor",       props: { label: "rCol", resistance: 1000 } },
-          { id: "q",    type: "NpnBJT",         props: { label: "q" } },
+          { id: "q1",   type: "NpnBJT",         props: { label: "q1" } },
           { id: "gnd",  type: "Ground" },
         ],
         connections: [
-          ["vLed:pos", "rLed:pos"], ["rLed:neg", "d:A"], ["d:K", "gnd:out"], ["vLed:neg", "gnd:out"],
-          ["vCC:pos", "rCol:pos"], ["rCol:neg", "q:C"], ["q:E", "gnd:out"], ["q:B", "gnd:out"], ["vCC:neg", "gnd:out"],
+          ["vLed:pos", "rLed:pos"], ["rLed:neg", "d1:A"], ["d1:K", "gnd:out"], ["vLed:neg", "gnd:out"],
+          ["vCC:pos", "rCol:pos"], ["rCol:neg", "q1:C"], ["q1:E", "gnd:out"], ["q1:B", "gnd:out"], ["vCC:neg", "gnd:out"],
         ],
       });
       f.compile(c);
@@ -98,12 +98,12 @@ describe("probe — DCOP failure isolation", () => {
         components: [
           { id: "vCC", type: "DcVoltageSource", props: { label: "vCC", voltage: 5 } },
           { id: "rC",  type: "Resistor",       props: { label: "rC",  resistance: 1000 } },
-          { id: "q",   type: "NpnBJT",         props: { label: "q" } },
+          { id: "q1",  type: "NpnBJT",         props: { label: "q1" } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
-          ["vCC:pos", "rC:pos"], ["rC:neg", "q:C"], ["q:E", "gnd:out"], ["vCC:neg", "gnd:out"],
-          // q:B left dangling — like inside Optocoupler before CCCS injects current.
+          ["vCC:pos", "rC:pos"], ["rC:neg", "q1:C"], ["q1:E", "gnd:out"], ["vCC:neg", "gnd:out"],
+          // q1:B left dangling — inside Optocoupler before CCCS injects current.
         ],
       });
       f.compile(c);

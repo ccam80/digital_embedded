@@ -112,9 +112,8 @@ function buildPolCapCircuit(facade: DefaultSimulatorFacade, p: PolCapBuildOpts):
 }
 
 /**
- * Returns the cBody Capacitor leaf, which owns the Q slot in the new
- * netlist-subcircuit layout. State-slot probes that previously read into the
- * 9-slot composite element now address the leaf directly.
+ * Returns the cBody Capacitor leaf, which owns the Q slot in the
+ * netlist-subcircuit layout. State-slot probes address the leaf directly.
  */
 function findCap(elements: ReadonlyArray<AnalogElement>): PoolBackedAnalogElement {
   return findLeafByLabel(elements, "cap:cBody");
