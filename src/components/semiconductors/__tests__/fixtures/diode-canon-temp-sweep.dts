@@ -1,0 +1,103 @@
+{
+  "circuit": {
+    "description": "Forward-biased diode temperature sweep: 1V DC source, 1kΩ series resistor, diode (default params IS=1e-14, N=1) to ground. Used at T in {300.15K,350K,400K} to exercise dioTemp() tSatCur/vt/tVcrit shift; compareAllAttempts() per temperature.",
+    "elements": [
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567801",
+        "position": { "x": 0, "y": 1 },
+        "properties": {
+          "_modelParams": { "voltage": 1 },
+          "label": "V1",
+          "position": [0, 0],
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567802",
+        "position": { "x": 12, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "R1",
+          "position": [0, 8],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567803",
+        "position": { "x": 24, "y": 0 },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "AREA": 1,
+            "BV": "_inf",
+            "CJO": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IC": null,
+            "IKF": "_inf",
+            "IKR": "_inf",
+            "IS": 1e-14,
+            "ISW": 0,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1,
+            "NBV": null,
+            "NSW": null,
+            "OFF": 0,
+            "RS": 0,
+            "TEMP": 300.15,
+            "TNOM": 300.15,
+            "TT": 0,
+            "VJ": 1,
+            "XTI": 3
+          },
+          "label": "D1",
+          "position": [0, 16]
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567804",
+        "position": { "x": 36, "y": 2 },
+        "properties": {
+          "label": "GND",
+          "position": [0, 24]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "diode-canon-temp-sweep",
+    "wires": [
+      { "points": [ { "x": 4, "y": 1 }, { "x": 5, "y": 1 } ] },
+      { "points": [ { "x": 12, "y": 0 }, { "x": 11, "y": 0 } ] },
+      { "points": [ { "x": 5, "y": 1 }, { "x": 8, "y": 1 } ] },
+      { "points": [ { "x": 8, "y": 1 }, { "x": 8, "y": 0 } ] },
+      { "points": [ { "x": 8, "y": 0 }, { "x": 11, "y": 0 } ] },
+      { "points": [ { "x": 16, "y": 0 }, { "x": 17, "y": 0 } ] },
+      { "points": [ { "x": 24, "y": 0 }, { "x": 23, "y": 0 } ] },
+      { "points": [ { "x": 17, "y": 0 }, { "x": 23, "y": 0 } ] },
+      { "points": [ { "x": 28, "y": 0 }, { "x": 29, "y": 0 } ] },
+      { "points": [ { "x": 36, "y": 2 }, { "x": 36, "y": 1 } ] },
+      { "points": [ { "x": 29, "y": 0 }, { "x": 33, "y": 0 } ] },
+      { "points": [ { "x": 33, "y": 0 }, { "x": 33, "y": 1 } ] },
+      { "points": [ { "x": 33, "y": 1 }, { "x": 36, "y": 1 } ] },
+      { "points": [ { "x": 0, "y": 1 }, { "x": -1, "y": 1 } ] },
+      { "points": [ { "x": -1, "y": 1 }, { "x": -2, "y": 1 } ] },
+      { "points": [ { "x": -2, "y": 1 }, { "x": -2, "y": 4 } ] },
+      { "points": [ { "x": -2, "y": 4 }, { "x": 12, "y": 4 } ] },
+      { "points": [ { "x": 12, "y": 4 }, { "x": 24, "y": 4 } ] },
+      { "points": [ { "x": 24, "y": 4 }, { "x": 30, "y": 4 } ] },
+      { "points": [ { "x": 30, "y": 4 }, { "x": 30, "y": 1 } ] },
+      { "points": [ { "x": 30, "y": 1 }, { "x": 36, "y": 1 } ] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

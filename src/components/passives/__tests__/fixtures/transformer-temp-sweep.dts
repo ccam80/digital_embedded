@@ -1,0 +1,119 @@
+{
+  "circuit": {
+    "description": "Two-winding 1:1 transformer temp-sweep bench: AC source (1V, 1kHz) -> P1; P2 grounded; S1 to R_LOAD (100 ohm) to GND; S2 grounded. L1=L2=1mH, k=0.99. Used at T in {300.15K, 350K, 400K} for parity sweep.",
+    "elements": [
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "position": { "x": 0, "y": 3 },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1,
+            "dcOffset": 0,
+            "fallTime": 1e-12,
+            "frequency": 1000,
+            "noiseSampleTime": 0,
+            "phase": 0,
+            "riseTime": 1e-12
+          },
+          "amplitude": 1,
+          "frequency": 1000,
+          "label": "V1",
+          "position": [0, 0]
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "position": { "x": 12, "y": 2 },
+        "properties": {
+          "_modelParams": {
+            "IC1": null,
+            "IC2": null,
+            "M": 9.9e-4,
+            "couplingCoefficient": 0.99,
+            "primaryInductance": 1e-3,
+            "primaryResistance": 0,
+            "secondaryResistance": 0,
+            "turnsRatio": 1
+          },
+          "couplingCoefficient": 0.99,
+          "label": "TX1",
+          "position": [0, 8],
+          "primaryInductance": 1e-3,
+          "primaryResistance": 0,
+          "secondaryResistance": 0,
+          "turnsRatio": 1
+        },
+        "rotation": 0,
+        "type": "Transformer"
+      },
+      {
+        "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        "position": { "x": 24, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 100 },
+          "label": "R_LOAD",
+          "position": [0, 16],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+        "position": { "x": 36, "y": 4 },
+        "properties": {
+          "label": "GND",
+          "position": [0, 24]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "transformer-temp-sweep",
+    "wires": [
+      { "points": [{ "x": 4, "y": 3 }, { "x": 5, "y": 3 }] },
+      { "points": [{ "x": 12, "y": 2 }, { "x": 11, "y": 2 }] },
+      { "points": [{ "x": 5, "y": 3 }, { "x": 8, "y": 3 }] },
+      { "points": [{ "x": 8, "y": 3 }, { "x": 8, "y": 2 }] },
+      { "points": [{ "x": 8, "y": 2 }, { "x": 11, "y": 2 }] },
+      { "points": [{ "x": 0, "y": 3 }, { "x": -1, "y": 3 }] },
+      { "points": [{ "x": 36, "y": 4 }, { "x": 36, "y": 3 }] },
+      { "points": [{ "x": -1, "y": 3 }, { "x": -2, "y": 3 }] },
+      { "points": [{ "x": -2, "y": 3 }, { "x": -2, "y": 7 }] },
+      { "points": [{ "x": -2, "y": 7 }, { "x": 12, "y": 7 }] },
+      { "points": [{ "x": 12, "y": 7 }, { "x": 18, "y": 7 }] },
+      { "points": [{ "x": 18, "y": 7 }, { "x": 18, "y": 8 }] },
+      { "points": [{ "x": 18, "y": 8 }, { "x": 24, "y": 8 }] },
+      { "points": [{ "x": 24, "y": 8 }, { "x": 30, "y": 8 }] },
+      { "points": [{ "x": 30, "y": 8 }, { "x": 30, "y": 3 }] },
+      { "points": [{ "x": 30, "y": 3 }, { "x": 36, "y": 3 }] },
+      { "points": [{ "x": 36, "y": 4 }, { "x": 36, "y": 3 }] },
+      { "points": [{ "x": 12, "y": 4 }, { "x": 11, "y": 4 }] },
+      { "points": [{ "x": 36, "y": 3 }, { "x": 38, "y": 3 }] },
+      { "points": [{ "x": 38, "y": 3 }, { "x": 38, "y": -2.375 }] },
+      { "points": [{ "x": 38, "y": -2.375 }, { "x": 10, "y": -2.375 }] },
+      { "points": [{ "x": 10, "y": -2.375 }, { "x": 10, "y": 4 }] },
+      { "points": [{ "x": 10, "y": 4 }, { "x": 11, "y": 4 }] },
+      { "points": [{ "x": 16, "y": 2 }, { "x": 17, "y": 2 }] },
+      { "points": [{ "x": 24, "y": 0 }, { "x": 23, "y": 0 }] },
+      { "points": [{ "x": 17, "y": 2 }, { "x": 20, "y": 2 }] },
+      { "points": [{ "x": 20, "y": 2 }, { "x": 20, "y": 0 }] },
+      { "points": [{ "x": 20, "y": 0 }, { "x": 23, "y": 0 }] },
+      { "points": [{ "x": 28, "y": 0 }, { "x": 29, "y": 0 }] },
+      { "points": [{ "x": 36, "y": 4 }, { "x": 36, "y": 3 }] },
+      { "points": [{ "x": 29, "y": 0 }, { "x": 33, "y": 0 }] },
+      { "points": [{ "x": 33, "y": 0 }, { "x": 33, "y": 3 }] },
+      { "points": [{ "x": 33, "y": 3 }, { "x": 36, "y": 3 }] },
+      { "points": [{ "x": 16, "y": 4 }, { "x": 17, "y": 4 }] },
+      { "points": [{ "x": 36, "y": 4 }, { "x": 36, "y": 3 }] },
+      { "points": [{ "x": 17, "y": 4 }, { "x": 24, "y": 4 }] },
+      { "points": [{ "x": 24, "y": 4 }, { "x": 31, "y": 4 }] },
+      { "points": [{ "x": 31, "y": 4 }, { "x": 31, "y": 3 }] },
+      { "points": [{ "x": 31, "y": 3 }, { "x": 36, "y": 3 }] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

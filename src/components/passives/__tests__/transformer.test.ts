@@ -24,6 +24,9 @@ const DTS_AC_STEP_DOWN = path.resolve(
 const DTS_RL_PULSE = path.resolve(
   "src/components/passives/__tests__/fixtures/transformer-canon-rl-pulse.dts",
 );
+const DTS_TEMP_SWEEP = path.resolve(
+  "src/components/passives/__tests__/fixtures/transformer-temp-sweep.dts",
+);
 
 // ---------------------------------------------------------------------------
 // Programmatic builders (T1)
@@ -359,5 +362,68 @@ describe("Transformer parameter hot-load (T1)", () => {
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(s1Node);
     expect(after).not.toBeCloseTo(before, 3);
+  });
+});
+
+// ===========================================================================
+// Categories 3 / 5 — temp-sweep paired vs ngspice (T3)
+// One describe per ambient temperature: {300.15K, 350K, 400K}.
+// Fixture: 1:1 transformer (L1=L2=1mH, k=0.99), AC source (1V, 1kHz),
+// R_LOAD=100 ohm. Inductor computeTemperature uses ctx.cktTemp; with default
+// TC1=TC2=0 the effective inductance is unchanged at all three temperatures,
+// so parity holds bit-exact across the sweep.
+// ===========================================================================
+
+describeIfDll("Transformer temp-sweep 300.15K vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_TEMP_SWEEP, dllPath: DLL_PATH });
+    session.engine.setCircuitTemp(300.15);
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_temp_sweep_300_15K_paired", async () => {
+    await session.runTransient(0, 5e-3, 5e-6);
+    session.compareAllAttempts();
+  });
+});
+
+describeIfDll("Transformer temp-sweep 350K vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_TEMP_SWEEP, dllPath: DLL_PATH });
+    session.engine.setCircuitTemp(350);
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_temp_sweep_350K_paired", async () => {
+    await session.runTransient(0, 5e-3, 5e-6);
+    session.compareAllAttempts();
+  });
+});
+
+describeIfDll("Transformer temp-sweep 400K vs ngspice — paired (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({ dtsPath: DTS_TEMP_SWEEP, dllPath: DLL_PATH });
+    session.engine.setCircuitTemp(400);
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_temp_sweep_400K_paired", async () => {
+    await session.runTransient(0, 5e-3, 5e-6);
+    session.compareAllAttempts();
   });
 });

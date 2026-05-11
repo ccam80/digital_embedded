@@ -1,0 +1,147 @@
+{
+  "circuit": {
+    "description": "NPN common-emitter amplifier temperature sweep: 5V VCC, 1kΩ RC, 10kΩ RB, NPN BJT (default L0 params TEMP=300.15, TNOM=300.15) to ground. Used at T in {300.15K,350K,400K} to exercise BJT temperature pass (tSatCur, vt, Vcrit shifts); compareAllAttempts() per temperature.",
+    "elements": [
+      {
+        "id": "b1c2d3e4-f5a6-7890-bcde-f12345678901",
+        "position": { "x": 0, "y": 1 },
+        "properties": {
+          "_modelParams": { "voltage": 5 },
+          "label": "VCC",
+          "position": [0, 0],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b1c2d3e4-f5a6-7890-bcde-f12345678902",
+        "position": { "x": 0, "y": 10 },
+        "properties": {
+          "_modelParams": { "voltage": 0.7 },
+          "label": "VBB",
+          "position": [0, 8],
+          "voltage": 0.7
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b1c2d3e4-f5a6-7890-bcde-f12345678903",
+        "position": { "x": 12, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "RC",
+          "position": [0, 16],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "b1c2d3e4-f5a6-7890-bcde-f12345678904",
+        "position": { "x": 12, "y": 10 },
+        "properties": {
+          "_modelParams": { "resistance": 10000 },
+          "label": "RB",
+          "position": [0, 24],
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "b1c2d3e4-f5a6-7890-bcde-f12345678905",
+        "position": { "x": 24, "y": 4 },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "AREA": 1,
+            "BF": 100,
+            "BR": 1,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IKF": "_inf",
+            "IKR": "_inf",
+            "IS": 1e-16,
+            "ISC": 0,
+            "ISE": 0,
+            "ISS": 0,
+            "ITF": 0,
+            "KF": 0,
+            "MJC": 0.33,
+            "MJE": 0.33,
+            "MJS": 0,
+            "NC": 2,
+            "NE": 1.5,
+            "NF": 1,
+            "NK": 0.5,
+            "NR": 1,
+            "NS": 1,
+            "OFF": 0,
+            "PTF": 0,
+            "RB": 0,
+            "RBM": 0,
+            "RC": 0,
+            "RE": 0,
+            "TEMP": 300.15,
+            "TF": 0,
+            "TNOM": 300.15,
+            "TR": 0,
+            "VAF": "_inf",
+            "VAR": "_inf",
+            "VJC": 0.75,
+            "VJE": 0.75,
+            "VJS": 0.75,
+            "XCJC": 1,
+            "XTB": 0,
+            "XTF": 0,
+            "XTI": 3,
+            "CJC": 0,
+            "CJE": 0,
+            "CJS": 0
+          },
+          "label": "Q1",
+          "model": "simple",
+          "position": [0, 32]
+        },
+        "rotation": 0,
+        "type": "NpnBJT"
+      },
+      {
+        "id": "b1c2d3e4-f5a6-7890-bcde-f12345678906",
+        "position": { "x": 36, "y": 8 },
+        "properties": {
+          "label": "GND",
+          "position": [0, 40]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "bjt-canon-temp-sweep",
+    "wires": [
+      { "points": [ { "x": 4, "y": 1 }, { "x": 8, "y": 1 } ] },
+      { "points": [ { "x": 8, "y": 1 }, { "x": 8, "y": 0 } ] },
+      { "points": [ { "x": 8, "y": 0 }, { "x": 12, "y": 0 } ] },
+      { "points": [ { "x": 16, "y": 0 }, { "x": 20, "y": 0 } ] },
+      { "points": [ { "x": 20, "y": 0 }, { "x": 20, "y": 4 } ] },
+      { "points": [ { "x": 20, "y": 4 }, { "x": 24, "y": 4 } ] },
+      { "points": [ { "x": 4, "y": 10 }, { "x": 8, "y": 10 } ] },
+      { "points": [ { "x": 8, "y": 10 }, { "x": 12, "y": 10 } ] },
+      { "points": [ { "x": 16, "y": 10 }, { "x": 20, "y": 10 } ] },
+      { "points": [ { "x": 20, "y": 10 }, { "x": 20, "y": 6 } ] },
+      { "points": [ { "x": 20, "y": 6 }, { "x": 24, "y": 6 } ] },
+      { "points": [ { "x": 28, "y": 8 }, { "x": 32, "y": 8 } ] },
+      { "points": [ { "x": 32, "y": 8 }, { "x": 36, "y": 8 } ] },
+      { "points": [ { "x": 0, "y": 1 }, { "x": -2, "y": 1 } ] },
+      { "points": [ { "x": -2, "y": 1 }, { "x": -2, "y": 14 } ] },
+      { "points": [ { "x": -2, "y": 14 }, { "x": 36, "y": 14 } ] },
+      { "points": [ { "x": 36, "y": 14 }, { "x": 36, "y": 8 } ] },
+      { "points": [ { "x": 0, "y": 10 }, { "x": -1, "y": 10 } ] },
+      { "points": [ { "x": -1, "y": 10 }, { "x": -1, "y": 14 } ] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
