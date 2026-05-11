@@ -1,17 +1,4 @@
-/**
- * Tests for the DC operating point solver (Tasks 1.1.3 and 1.3.2).
- *
- * Every test routes through `buildFixture` or `ComparisonSession.createSelfCompare`
- * per the §4c / §3 poison-pattern contract. No `CKTCircuitContext` construction,
- * no `solveDcOperatingPoint` direct calls, no `makeCtx` helper, no hand-rolled
- * LoadContext / SetupContext / StatePool.
- *
- * Tests cover all four outcomes:
- *   - Direct NR convergence (Level 0)
- *   - Gmin stepping (Level 1)
- *   - Source stepping (Level 2)
- *   - Total failure with blame attribution (Level 3)
- */
+// Tests DC operating point solver convergence paths via buildFixture and ComparisonSession.
 
 import { describe, it, expect } from "vitest";
 import { ComparisonSession } from "./harness/comparison-session.js";
@@ -181,18 +168,6 @@ describe("DcOP", () => {
     expect(srcAttempt!.converged).toBe(true);
   });
 
-  // Deleted: numGminSteps_1_selects_dynamicGmin.
-  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession dcopGminDynamic phase check).
-  // Reason: requires ctx._onPhaseBegin hook on CKTCircuitContext — §3 poison (CKTCircuitContext construction banned in tests).
-
-  // Deleted: numGminSteps_10_selects_spice3Gmin.
-  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession dcopGminDynamic phase check).
-  // Reason: requires ctx._onPhaseBegin hook on CKTCircuitContext — §3 poison.
-
-  // Deleted: spice3Src_emits_uniform_phase_parameters.
-  // Coverage: dc-operating-point.test.ts source_stepping_fallback (ComparisonSession dcopSrcSweep phase check).
-  // Reason: requires ctx._onPhaseBegin + ctx._onPhaseEnd hooks on CKTCircuitContext — §3 poison.
-
   it("gshunt_zero_is_noop", () => {
     // gshunt=0 must not prevent DC-OP convergence on a resistive circuit.
     // Both default (no gshunt override) and explicit gshunt=0 must converge.
@@ -316,14 +291,6 @@ describe("DcOP", () => {
     }
   });
 
-  // Deleted: writes_into_ctx_dcopResult.
-  // Coverage: dc-operating-point.test.ts direct_success_emits_converged_info (coordinator.dcOperatingPoint() returns converged result).
-  // Reason: tests pointer equality ctx.dcopResult.nodeVoltages === ctx.dcopVoltages — CKT internals inaccessible from allowed surface.
-
-  // Deleted: zero_alloc_gmin_stepping.
-  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession verifies gmin path converges).
-  // Reason: patches globalThis.Float64Array and resets ctx.* fields directly — §3 poison (CKTCircuitContext construction banned).
-
   it("cktncDump_returns_empty_when_all_converged", () => {
     const v = new Float64Array([1.0, 2.5, 0.0]);
     const scratch: Array<{ node: number; delta: number; tol: number }> = [];
@@ -406,18 +373,6 @@ describe("DcOP", () => {
     expect(first).toBe(second);
   });
 
-  // Deleted: noncon_set_before_each_nr_call.
-  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness verifies noncon + diagGmin per NR call via ComparisonSession).
-  // Reason: requires vi.mock + CKTCircuitContext construction to intercept ctx.noncon — §3 poison.
-
-  // Deleted: dynamicGmin_initial_diagGmin_matches_ngspice.
-  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness captures diagGmin per NR attempt bit-exact vs ngspice).
-  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin on CKTCircuitContext — §3 poison.
-
-  // Deleted: dynamicGmin_factor_cap_uses_param.
-  // Coverage: dc-operating-point.test.ts gmin_stepping_fallback (ComparisonSession verifies gmin path exercises dcopGminDynamic).
-  // Reason: requires ctx._onPhaseBegin step-counting hook on CKTCircuitContext — §3 poison.
-
   it("dynamicGmin_clean_solve_uses_dcMaxIter", () => {
     // The final clean solve in dynamicGmin must use params.maxIterations (100),
     // not params.dcTrcvMaxIter (3). A diode circuit forces the dynamic-gmin path.
@@ -449,19 +404,4 @@ describe("DcOP", () => {
     expect(result!.method).not.toBe("direct");
   });
 
-  // Deleted: spice3Gmin_uses_gshunt_when_nonzero.
-  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness verifies diagGmin values per iteration vs ngspice).
-  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin hooks on CKTCircuitContext — §3 poison.
-
-  // Deleted: spice3Gmin_uses_gmin_when_gshunt_zero.
-  // Coverage: buckbjt-convergence.test.ts buckbjt_load_dcop_parity (harness verifies diagGmin values per iteration vs ngspice).
-  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin hooks on CKTCircuitContext — §3 poison.
-
-  // Deleted: spice3Src_no_extra_clean_solve.
-  // Coverage: dc-operating-point.test.ts source_stepping_fallback (ComparisonSession verifies dcopSrcSweep phase converges).
-  // Reason: requires ctx._onPhaseBegin + ctx.postIterationHook to count NR calls — §3 poison.
-
-  // Deleted: gillespieSrc_source_stepping_uses_gshunt.
-  // Coverage: dc-operating-point.test.ts method_reflects_last_strategy (verifies gillespie-src method on singular circuit).
-  // Reason: requires ctx.postIterationHook + ctx._onPhaseBegin to capture diagGmin per stepping loop call — §3 poison.
 });

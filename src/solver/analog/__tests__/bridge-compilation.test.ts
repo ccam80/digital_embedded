@@ -79,34 +79,3 @@ describe('bridge-compilation: bridge adapters appear in elements array', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Deleted: stamp-level tests that called adapter.load() with hand-rolled LoadContext
-// ---------------------------------------------------------------------------
-
-// Deleted: none mode output adapter does not stamp rOut conductance.
-// Coverage: coordinator-bridge.test.ts (none/ideal mode verified via full engine path).
-// Reason: called adapter.load(makeCtx(solver)) with hand-rolled LoadContext (loadCtxFromFields) — §3 POISON.
-
-// Deleted: none mode input adapter stamps nothing.
-// Coverage: coordinator-bridge.test.ts (none/ideal mode verified via full engine path).
-// Reason: called adapter.load(makeCtx(solver)) with hand-rolled LoadContext — §3 POISON.
-
-// Deleted: cross-domain mode output adapter stamps rOut conductance.
-// Coverage: coordinator-bridge.test.ts (cross-domain verified via full coordinator.step() path).
-// Reason: called adapter.load(makeCtx(solver)) with hand-rolled LoadContext — §3 POISON.
-
-// Deleted: per-net ideal override on boundary group produces unloaded output adapter.
-// Coverage: coordinator-bridge.test.ts (per-net ideal override exercised via coordinator).
-// Reason: called adapter.load(makeCtx(solver)) with hand-rolled LoadContext — §3 POISON.
-
-// Deleted: hi-z output stamps I=0 branch equation.
-// Coverage: coordinator-bridge.test.ts (hi-z mode exercised via full coordinator path).
-// Reason: called adapter.load(makeCtx(solver, rhs)) with hand-rolled LoadContext — §3 POISON.
-
-// Deleted: factory returns instanceof CompositeElement and setup propagates _stateBase to sub-elements.
-// Coverage: compileAnalogPartition integration path; sub-element _stateBase propagation is the
-//           engine’s own invariant, covered by any test that exercises a netlist subcircuit
-//           through buildFixture (e.g. bridge-compilation tests 1–3 exercise compileAnalogPartition).
-// Reason: called makeTestSetupContext + setupAll([composite], ctx) — §3 POISON (direct
-//         element.setup() call and UC-2 _stateBase write via setupAll, both from deleted
-//         test-helpers.ts). (J-113 UC-2 at line 362.)

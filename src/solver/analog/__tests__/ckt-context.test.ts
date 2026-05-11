@@ -1,9 +1,4 @@
-/**
- * Tests for CKTCircuitContext.
- *
- * CKTCircuitContext is engine-internal; direct construction is engine-impersonation.
- * All observable properties are asserted via buildFixture on public surfaces.
- */
+// Tests CKTCircuitContext observable properties via buildFixture on public surfaces.
 
 import { describe, it, expect } from "vitest";
 import { buildFixture } from "./fixtures/build-fixture.js";
@@ -52,45 +47,5 @@ describe("CKTCircuitContext", () => {
     expect(isFinite(vTop)).toBe(true);
   });
 
-  // Deleted: zero_allocations_on_reuse.
-  // Coverage: none; internal Float64Array allocation counter via Proxy install
-  //   (the `as unknown as typeof Float64Array` cast at old line 239) is the
-  //   §4g pre-existing smell identified in the mission brief. No observable
-  //   public surface exposes allocation counts.
-  // Reason: Engine-impersonation + eradicated Proxy-install cast per §4g Phase A.
-
-  // Deleted: loadCtx_fields_populated.
-  // Coverage: mna-end-to-end.test.ts covers DCOP convergence + field consistency
-  //   through the full pipeline.
-  // Reason: LoadContext fields are internal engine state with no public getter;
-  //   direct ctx.loadCtx access is engine-impersonation per §3 POISON.
-
-  // Deleted: deltaOld init / seeded_to_maxTimeStep.
-  // Coverage: integration.test.ts covers deltaOld seeding and integration coefficient
-  //   correctness through observable timestep / LTE behavior.
-  // Reason: ctx.loadCtx.deltaOld is internal; no public surface exposes the
-  //   raw 7-slot array contents per §3 POISON.
-
-  // Deleted: LoadContext defaults / bypass_defaults_to_false.
-  // Coverage: mna-end-to-end.test.ts (full pipeline reaches correct DCOP solution
-  //   whether bypass is true or false on the first iteration).
-  // Reason: ctx.loadCtx.bypass is an internal NR field; engine-impersonation per §3.
-
-  // Deleted: LoadContext defaults / voltTol_defaults_to_1e_minus_6.
-  // Coverage: convergence-regression.test.ts exercises convergence with tight voltTol
-  //   through observable DCOP convergence outcomes.
-  // Reason: ctx.loadCtx.voltTol is an internal NR field; engine-impersonation per §3.
 });
 
-// Deleted: DcOpResult / reset_preserves_array_identity.
-// Coverage: dc-operating-point.test.ts covers DcOpResult semantics via the full
-//   solveDcOperatingPoint() pipeline, which calls reset() internally.
-// Reason: ctx.dcopResult is an engine-internal mutable object; direct mutation and
-//   identity check requires engine-impersonation per §3 POISON.
-
-// Deleted: solver / single_allocation.
-// Coverage: sparse-solver.test.ts covers SparseSolver allocation and identity
-//   invariants. The CKTCircuitContext→solver plumbing is exercised by every
-//   buildFixture-based test (matrix stamps require ctx.solver).
-// Reason: ctx.solver getter/setter is internal engine wiring; cannot be observed
-//   through buildFixture public surface per §3 POISON.

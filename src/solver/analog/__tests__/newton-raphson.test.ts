@@ -146,10 +146,6 @@ describe("NR", () => {
     expect(result!.nodeVoltages.length).toBeGreaterThan(0);
   });
 
-  // Deleted: zero_allocations_in_nr_loop.
-  // Coverage: internal NR hot-path allocation tracking via ctx.rhs/rhsOld reset is not
-  //           observable from the public coordinator/engine surface.
-  // Reason: tests internal CKTCircuitContext buffer management; no public equivalent.
 
   // ---------------------------------------------------------------------------
   // Diode forward bias
@@ -188,16 +184,6 @@ describe("NR", () => {
     expect(result!.nodeVoltages[0]).not.toBeNaN();
   });
 
-  // Deleted: blame_scalars_populated.
-  // Coverage: ctx.enableBlameTracking / largestChangeNode / largestChangeElement are
-  //           internal CKTCircuitContext fields with no public coordinator/engine accessor.
-  // Reason: §3 POISON - requires direct CKTCircuitContext construction.
-
-  // Deleted: initial_guess_used.
-  // Coverage: ctx.rhsOld seeding is an internal NR warm-start detail; iteration count
-  //           delta from a good initial guess is not observable via coordinator.dcOperatingPoint().
-  // Reason: §3 POISON - requires direct CKTCircuitContext.rhsOld mutation.
-
   // ---------------------------------------------------------------------------
   // Nonlinear circuit: forced 2-iteration minimum
   // ---------------------------------------------------------------------------
@@ -227,15 +213,6 @@ describe("NR", () => {
     expect(result!.iterations).toBeGreaterThanOrEqual(2);
   });
 
-  // Deleted: initTran_transitions_to_initFloat_after_iteration_0.
-  // Coverage: cktMode INITF bit transitions (niiter.c:1070-1071) are internal engine state
-  //           not exposed on any public surface.
-  // Reason: §3 POISON - requires ctx.cktMode direct read/write.
-
-  // Deleted: initPred_transitions_to_initFloat_immediately.
-  // Coverage: same as initTran_transitions_to_initFloat - cktMode bits are internal.
-  // Reason: §3 POISON - requires ctx.cktMode direct read/write.
-
   it("transient_mode_allows_convergence", () => {
     // coordinator.step() runs the transient path and should converge on a simple
     // resistive circuit.
@@ -256,15 +233,6 @@ describe("NR", () => {
     expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
   });
-
-  // Deleted: uic_bypass_returns_converged_with_zero_iterations.
-  // Coverage: MODETRANOP|MODEUIC|MODEINITJCT requires direct ctx.cktMode injection.
-  //           The UIC path is exercised by coordinator.step() with uic:true param.
-  // Reason: §3 POISON - requires direct CKTCircuitContext.cktMode mutation.
-
-  // Deleted: uic_bypass_not_triggered_without_tranop.
-  // Coverage: same as above.
-  // Reason: §3 POISON - requires direct CKTCircuitContext.cktMode mutation.
 
 });
 
@@ -357,11 +325,6 @@ describe("fetlim ngspice-exact", () => {
 // ---------------------------------------------------------------------------
 
 describe("ipass hadNodeset gate", () => {
-  // Deleted: ipass_skipped_without_nodesets.
-  // Coverage: ctx.hadNodeset and ctx.nrModeLadder are internal CKTCircuitContext hooks
-  //           with no public accessor on coordinator or engine. The ipass gate behaviour
-  //           is covered by dc-operating-point.test.ts convergence assertions.
-  // Reason: §3 POISON - requires direct CKTCircuitContext construction and nrModeLadder injection.
 });
 
 // ---------------------------------------------------------------------------
@@ -369,20 +332,6 @@ describe("ipass hadNodeset gate", () => {
 // ---------------------------------------------------------------------------
 
 describe("NR singular retry", () => {
-  // Deleted: nr_retries_with_reorder_after_numerical_singular.
-  // Coverage: The E_SINGULAR retry path (niiter.c:881-902 else-arm) fires a forceReorder
-  //           and continues the NR loop. Observable convergence on a normal circuit
-  //           verifies the non-singular path. Singular-matrix diagnostic emission is
-  //           covered by nr_emits_singular_diagnostic_when_reorder_also_fails below.
-  //           Direct proxy-solver injection requires CKTCircuitContext construction (§3 POISON).
-  // Reason: §3 POISON - requires Proxy SparseSolver injection into ctx.solver.
-
-  // Deleted: nr_emits_singular_diagnostic_when_reorder_also_fails.
-  // Coverage: singular-matrix diagnostic emission requires injecting a solver that always
-  //           returns spSINGULAR, which requires CKTCircuitContext construction (§3 POISON).
-  //           coordinator.getRuntimeDiagnostics() would surface this if triggered by a
-  //           real circuit, but no standard circuit reliably triggers double-singular.
-  // Reason: §3 POISON - requires Proxy SparseSolver injection into ctx.solver.
 });
 
 // ---------------------------------------------------------------------------
@@ -390,16 +339,6 @@ describe("NR singular retry", () => {
 // ---------------------------------------------------------------------------
 
 describe("NR NISHOULDREORDER lifecycle", () => {
-  // Deleted: forceReorder_called_on_initJct_to_initFix.
-  // Coverage: The NISHOULDREORDER loop-top gate (niiter.c:856-859) is exercised on every
-  //           DCOP that starts from MODEINITJCT. Phase 3 coverage lives in
-  //           phase-3-nr-reorder.test.ts which also uses makeSimpleCtx (pending fix).
-  //           Proxy SparseSolver injection requires CKTCircuitContext construction (§3 POISON).
-  // Reason: §3 POISON - requires ctx.solver proxy injection and ctx.cktMode mutation.
-
-  // Deleted: forceReorder_called_on_initTran_first_iteration.
-  // Coverage: MODEINITTRAN forceReorder call (niiter.c:856-859) verified by same file.
-  // Reason: §3 POISON - requires ctx.solver proxy injection and ctx.cktMode mutation.
 });
 
 // ---------------------------------------------------------------------------
@@ -407,13 +346,4 @@ describe("NR NISHOULDREORDER lifecycle", () => {
 // ---------------------------------------------------------------------------
 
 describe("NR E_SINGULAR recovery via continue", () => {
-  // Deleted: e_singular_recovers_via_continue.
-  // Coverage: E_SINGULAR recovery path (niiter.c:881-902): forceReorder + continue to
-  //           re-execute cktLoad before re-factoring. Requires Proxy SparseSolver
-  //           injection which requires CKTCircuitContext construction (§3 POISON).
-  // Reason: §3 POISON - requires Proxy SparseSolver injection into ctx.solver.
-
-  // Deleted: e_singular_recovery_reloads_and_refactors.
-  // Coverage: Same as e_singular_recovers_via_continue.
-  // Reason: §3 POISON - requires Proxy SparseSolver injection into ctx.solver.
 });

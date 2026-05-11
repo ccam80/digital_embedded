@@ -1,52 +1,8 @@
-/**
- * Phase 3, Wave 3.1- NR loop-top forceReorder gate + citation hygiene.
- *
- * Task 3.1.1: ALL TESTS DELETED.
- *   Reason: every test constructed a CKTCircuitContext via the deleted
- *   makeSimpleCtx helper (test-helpers.ts) and spied on ctx.solver.forceReorder
- *   directly. This is engine-impersonation; direct context construction is not
- *   a sanctioned access pattern.
- *   There is no path to observe forceReorder call order or per-iteration INITF
- *   mode transitions through buildFixture or ComparisonSession public surfaces.
- *   See per-test deletion entries below.
- *
- * Task 3.1.2: Citation-hygiene tests RETAINED.
- *   These tests read newton-raphson.ts and dc-operating-point.ts source text
- *   to assert citation presence/absence. No engine construction required.
- */
+// Tests NR loop-top forceReorder citation hygiene in newton-raphson.ts and dc-operating-point.ts.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-
-// ---------------------------------------------------------------------------
-// Task 3.1.1 deletions
-// ---------------------------------------------------------------------------
-
-// Deleted: "fires forceReorder when cktMode has MODEINITJCT".
-// Coverage: buckbjt-convergence.test.ts exercises the full NR loop including
-//   the MODEINITJCT→MODEINITFIX reorder path via observable DCOP convergence.
-// Reason: Required makeSimpleCtx (deleted) + vi.spyOn(ctx.solver) — engine-
-//   impersonation with no public-surface equivalent per §3 POISON.
-
-// Deleted: "fires forceReorder only on iteration 0 when cktMode has MODEINITTRAN".
-// Coverage: buckbjt-convergence.test.ts covers MODEINITTRAN loop entry; harness
-//   comparison-session tests cover transient NR attempt counts via getStepShape.
-// Reason: Required makeSimpleCtx + ctx.postIterationHook direct write +
-//   vi.spyOn(ctx.solver) — engine-impersonation per §3 POISON.
-
-// Deleted: "does not fire forceReorder on MODEINITFLOAT or MODEINITFIX".
-// Coverage: buckbjt-convergence.test.ts and ngspice-parity tests exercise these
-//   modes via observable DCOP/transient convergence outcomes.
-// Reason: Required makeSimpleCtx + direct ctx.solver.forceReorder monkey-patch +
-//   call-stack inspection — engine-impersonation per §3 POISON.
-
-// Deleted: "precedes factor() in call order".
-// Coverage: buckbjt-convergence.test.ts covers forceReorder→factor ordering
-//   indirectly through successful DCOP convergence (factor must succeed for
-//   DCOP to converge, and forceReorder must precede it per the gate).
-// Reason: Required makeSimpleCtx + vi.spyOn(ctx.solver) invocationCallOrder —
-//   engine-impersonation per §3 POISON.
 
 // ---------------------------------------------------------------------------
 // Task 3.1.2- non-top-of-loop forceReorder citations

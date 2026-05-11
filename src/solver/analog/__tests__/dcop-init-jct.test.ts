@@ -1,11 +1,4 @@
-/**
- * Tests for the dcopInitJct junction-priming phase.
- *
- * The MODEINITJCT priming behavior is observable via DC-OP convergence from
- * cold-start: if priming is broken, Newton-Raphson fails to converge.
- * Internal flag-transition assertions are deleted per §3 disposition rule
- * (no convergence consequence, §3 POISON-PATTERN, §4c J-121).
- */
+// Tests dcopInitJct DC-OP convergence behavior via buildFixture.
 
 import { describe, it, expect } from "vitest";
 import { resolve } from "path";
@@ -17,42 +10,6 @@ import { buildFixture } from "./fixtures/build-fixture.js";
 // ---------------------------------------------------------------------------
 
 describe("dcopInitJct", () => {
-
-  // ── BJT priming tests ──────────────────────────────────────────────────
-
-  // Deleted: BJT simple (L0) primeJunctions — NPN: arms Vbe=tVcrit, Vbc=0 as per-device local override.
-  // Coverage: ngspice-parity/bjt-common-emitter.test.ts (dc_op_match)
-  // Reason: asserts internal MODEINITJCT flag transition with no convergence consequence; §3 POISON (direct element.load + hand-rolled LoadContext).
-
-  // Deleted: BJT simple (L0) primeJunctions — PNP: arms Vbe=+tVcrit, Vbc=0.
-  // Coverage: ngspice-parity/bjt-common-emitter.test.ts (dc_op_match)
-  // Reason: asserts internal MODEINITJCT flag transition; §3 POISON (direct element.load + initElement).
-
-  // Deleted: BJT simple (L0) primeJunctions — grounded collector (nodeC=0): priming is independent of node topology.
-  // Coverage: ngspice-parity/bjt-common-emitter.test.ts (dc_op_match)
-  // Reason: asserts internal MODEINITJCT flag transition; §3 POISON (direct element.load + initElement).
-
-  // ── BJT SPICE L1 priming tests ─────────────────────────────────────────
-
-  // Deleted: BJT SPICE L1 primeJunctions — NPN L1: arms Vbe=tVcrit, Vbc=0 as per-device local override.
-  // Coverage: ngspice-parity/bjt-common-emitter.test.ts (dc_op_match)
-  // Reason: asserts internal MODEINITJCT flag transition; §3 POISON (direct element.load + initElement).
-
-  // ── Diode priming tests ────────────────────────────────────────────────
-
-  // Deleted: Diode primeJunctions — arms Vd=tVcrit as per-device local override.
-  // Coverage: ngspice-parity/diode-resistor.test.ts (dc_op_pnjlim_match)
-  // Reason: asserts internal MODEINITJCT flag transition; §3 POISON (direct element.load + initElement).
-
-  // Deleted: Diode primeJunctions — grounded cathode: priming is independent of node topology.
-  // Coverage: ngspice-parity/diode-resistor.test.ts (dc_op_pnjlim_match)
-  // Reason: asserts internal MODEINITJCT flag transition; §3 POISON (direct element.load + initElement).
-
-  // ── dcopInitJct phase marker and iteration reduction ───────────────────
-
-  // Deleted: solveDcOperatingPoint phase — emits dcopInitJct phase marker before dcopInitFloat.
-  // Coverage: ngspice-parity/bjt-common-emitter.test.ts (dc_op_match), ngspice-parity/diode-resistor.test.ts (dc_op_pnjlim_match)
-  // Reason: calls makeSimpleCtx + solveDcOperatingPoint directly; §3 POISON (fake coordinator + direct solver-stage entry point).
 
   describe("solveDcOperatingPoint phase", () => {
     it("NPN CE circuit (fixtures/npn-ce-harness.dts): DC OP converges with priming", () => {

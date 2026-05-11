@@ -1,19 +1,4 @@
-/**
- * Tests for BridgeOutputDriverElement and BridgeInputDriverElement.
- *
- * Stamp-level tests (setup/load cycle) are deleted: they required
- * loadCtxFromFields + makeTestSetupContext + setupAll from the deleted
- * test-helpers.ts, which is §3 POISON (hand-rolled LoadContext/SetupContext /
- * direct element.setup() / element.load() calls banned by §3 poison-pattern
- * contract). Stamp behaviour is covered at the integration level by
- * coordinator-bridge.test.ts (full mixed-signal coordinator path) and
- * bridge-compilation.test.ts (compileAnalogPartition → adapter properties).
- *
- * Tests retained here exercise only the pure-logic / no-stamp surface:
- *  - readLogicLevel threshold detection
- *  - setParam hot-update of vIH / vIL thresholds
- *  - factory shape (setLogicLevel / setHighZ / readLogicLevel presence)
- */
+// Tests BridgeOutputDriverElement and BridgeInputDriverElement threshold logic and factory shape.
 
 import { describe, it, expect } from "vitest";
 import {
@@ -40,44 +25,6 @@ const CMOS_3V3: ResolvedPinElectrical = {
 
 const NODE = 1;
 const BRANCH_IDX = 2;
-
-// ---------------------------------------------------------------------------
-// Deleted: stamp-level tests that called element.setup() / element.load()
-// ---------------------------------------------------------------------------
-
-// Deleted: output adapter stamps ideal voltage source at vOL.
-// Coverage: bridge-compilation.test.ts cross-domain mode output adapter stamps rOut conductance;
-//           coordinator-bridge.test.ts full mixed-signal coordinator step.
-// Reason: called setupAll([adapter], setupCtx) + adapter.load(makeCtx(solver)) — §3 POISON
-//         (direct element.setup() + hand-rolled LoadContext via loadCtxFromFields).
-
-// Deleted: output adapter setLogicLevel(true) drives vOH.
-// Coverage: coordinator-bridge.test.ts drives logic level and reads node voltage.
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
-
-// Deleted: output adapter hi-z stamps I=0.
-// Coverage: bridge-compilation.test.ts hi-z mode stamps I=0 (compileAnalogPartition path).
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
-
-// Deleted: loaded output adapter stamps rOut conductance on node diagonal.
-// Coverage: bridge-compilation.test.ts cross-domain mode output adapter stamps rOut conductance.
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
-
-// Deleted: unloaded output adapter does not stamp rOut on node diagonal.
-// Coverage: bridge-compilation.test.ts none mode output adapter does not stamp rOut conductance.
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
-
-// Deleted: input adapter unloaded stamps nothing.
-// Coverage: bridge-compilation.test.ts none mode input adapter stamps nothing.
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
-
-// Deleted: input adapter loaded stamps rIn on node diagonal.
-// Coverage: bridge-compilation.test.ts cross-domain mode (rIn coverage via integration).
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
-
-// Deleted: setParam('rOut', 50) hot-updates output adapter conductance.
-// Coverage: coordinator-bridge.test.ts (setParam hot-update exercised via full engine path).
-// Reason: called setupAll + adapter.load(makeCtx(solver)) — §3 POISON.
 
 // ---------------------------------------------------------------------------
 // BridgeOutputDriverElement / BridgeInputDriverElement — threshold logic

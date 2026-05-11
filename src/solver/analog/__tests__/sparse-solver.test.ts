@@ -352,12 +352,6 @@ import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
 import type { PropertyValue } from "../../../core/properties.js";
 
-// makeTestSetupContext / setupAll / loadCtxFromFields (from deleted test-helpers.js) and
-// benchMakeResistor / benchMakeCapacitor / benchMakeDiode / benchMakeInductor / makeVsrc
-// (inline engine-impersonator factories) are all removed.
-// Coverage: The ComparisonSession-based DCOP + transient path below exercises the full pipeline.
-// Reason: direct element.setup()/element.load() calls are §3 POISON; observable correctness
-//   (solver factor returns 0, DCOP converges) is covered by the engine path.
 
 // ---------------------------------------------------------------------------
 // 50-node benchmark circuit expressed via facade.build
@@ -498,11 +492,6 @@ describe("SparseSolver real MNA circuit", () => {
     expect(engine.getState()).not.toBe(EngineState.ERROR);
     expect(transientSteps).toBe(100);
 
-    // Isolated-solver-timing benchmark deleted (§3 POISON eradication).
-    // Used loadCtxFromFields/makeTestSetupContext/setupAll from deleted test-helpers.js
-    // and inline benchMakeResistor/benchMakeCapacitor/benchMakeDiode/benchMakeInductor/makeVsrc
-    // engine-impersonator factories. Coverage: the ComparisonSession-based DCOP + transient
-    // path above already asserts tDcOp < 20 and tPerStep < 2 for the 52×52 matrix.
     // Performance targets for a 52ÃƒÆ’Ã¢â‚¬â€52 real MNA matrix:
     // DC OP: < 20ms (multiple NR iterations with 7 nonlinear diodes)
     // Per transient step: < 2ms

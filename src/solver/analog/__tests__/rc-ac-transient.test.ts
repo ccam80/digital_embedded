@@ -88,8 +88,7 @@ describe("RC lowpass AC transient", () => {
       params: { tStop: 0.1, maxTimeStep: 1e-5 },
     });
 
-    // Per J-175 labelToNodeId semantics: multi-pin labels register as "label:pinLabel".
-    // R1:neg = C1:pos = the filtered output node.
+    // Multi-pin labels register as "label:pinLabel"; R1:neg = C1:pos = the filtered output node.
     const outNodeId = fix.circuit.labelToNodeId.get("R1:neg")!;
     expect(outNodeId).toBeGreaterThan(0);
 
