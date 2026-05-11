@@ -1,9 +1,8 @@
 /**
- * Tests for CKTCircuitContext- Phase 1 Task 1.1.1
+ * Tests for CKTCircuitContext.
  *
- * Migrated per §3 POISON-PATTERN WARNING and §4 test-infrastructure rules:
- * - CKTCircuitContext is engine-internal; direct construction is engine-impersonation.
- * - All observable properties are now asserted via buildFixture on public surfaces.
+ * CKTCircuitContext is engine-internal; direct construction is engine-impersonation.
+ * All observable properties are asserted via buildFixture on public surfaces.
  */
 
 import { describe, it, expect } from "vitest";
@@ -12,8 +11,7 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // allocates_all_buffers_after_setup
-// Renamed from allocates_all_buffers_at_init per §3c ssB14 + Phase1 File 7.
-// Migration: internal buffer-length assertions replaced by public-surface checks:
+// Verifies via public-surface checks that buffers are allocated after setup:
 //   engine.solver.getCSCNonZeros().length > 0  (matrix allocated)
 //   pool.state0.length > 0                      (state pool allocated)
 // ---------------------------------------------------------------------------

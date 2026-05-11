@@ -22,7 +22,7 @@
  *          coordinator.* / engine.* / pool.state0/1. The Canon's Step 3
  *          patterns explicitly call out ComponentDefinition shape,
  *          modelRegistry / defaultModel inspection, and propertyDefs entry
- *          presence/absence as non-circuit DELETE-AND-RECORD.
+ *          presence/absence as non-circuit assertions not requiring it() blocks.
  *   6..15: gated on per-component capabilities (junction limiting, LTE
  *          rollback, breakpoints, digital pins, named-preset deltas, etc.).
  *          This file does not exercise any single component  it walks a
@@ -41,8 +41,7 @@
  *       * digital pin labels match input/outputSchema
  *
  * The original 60 it() instantiations (12 definitions  5 assertion shapes)
- * all duplicate that framework coverage on a per-definition basis. They are
- * recorded as DELETE-AND-RECORD non-circuit in the migration report; this
+ * all duplicate that framework coverage on a per-definition basis; this
  * file is intentionally empty of canonical it() blocks.
  */
 
@@ -55,7 +54,6 @@ import { describe, it } from "vitest";
 describe("spice-model-overrides-prop  canonical set (empty by capability gate)", () => {
   // No `it()` blocks: every Canon category is N/A for a multi-definition
   // registry-plumbing audit. See file header for the per-category gate
-  // decisions and the Step-3 sweep recording 60 DELETE-AND-RECORD
-  // dispositions in the migration report.
+  // decisions and the Step-3 sweep recording 60 non-circuit dispositions.
   void it;
 });

@@ -29,7 +29,7 @@ const DTS_RESISTIVE_DIVIDER = path.resolve(
   "src/solver/analog/__tests__/ngspice-parity/fixtures/resistive-divider.dts",
 );
 
-// Authored (this migration): 12V source + RL=470Ω to ground.
+// 12V source + RL=470Ω to ground.
 const DTS_DCVS_12V_LOAD = path.resolve(
   "src/components/sources/__tests__/fixtures/dc-voltage-source-canon-12v-load.dts",
 );

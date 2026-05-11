@@ -1,8 +1,8 @@
 /**
  * MCP-surface regression test for the buckbjt fixture.
  *
- * Verifies that the breakpoint-push-once migration (seed loop + iterator refill)
- * does not break the headless API surface used by the MCP server.
+ * Verifies that the breakpoint seed-loop and iterator-refill logic does not break
+ * the headless API surface used by the MCP server.
  *
  * Four regression cases:
  *   1. compile() does not throw

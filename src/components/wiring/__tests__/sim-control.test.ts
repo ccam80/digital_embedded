@@ -287,5 +287,4 @@ describe("Reset parameter hot-load (Cat 4)", () => {
 // compiler reads from the netlist during compilation. There is no labelled
 // drive port and no labelled observation port through which the sanctioned
 // canonical Cat 9 mechanic (writeByLabel / step / readByLabel) can exercise
-// a simulator observable. This category is BLOCKED and surfaced in the
-// Escalations section of the migration report.
+// a simulator observable. This category is BLOCKED.

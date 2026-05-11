@@ -1,9 +1,9 @@
 /**
  * `buildFixture` contract tests.
  *
- * Pins down what §4c migrations rely on: the fixture returns a fully
- * warm-started simulation whose public surface (node voltages, pool slots,
- * matrix stamps, element identities) carries correct, consistent values.
+ * Verifies the fixture contract: the fixture returns a fully warm-started
+ * simulation whose public surface (node voltages, pool slots, matrix stamps,
+ * element identities) carries correct, consistent values.
  *
  * Test circuit: VS=5V â†’ R=1kΩ â†’ C=1μF â†’ GND. In DC steady state the
  * capacitor holds 5V, no current flows. Every assertion below either reads

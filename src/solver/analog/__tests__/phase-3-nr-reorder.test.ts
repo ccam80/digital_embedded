@@ -4,7 +4,8 @@
  * Task 3.1.1: ALL TESTS DELETED.
  *   Reason: every test constructed a CKTCircuitContext via the deleted
  *   makeSimpleCtx helper (test-helpers.ts) and spied on ctx.solver.forceReorder
- *   directly. This is engine-impersonation per §3 POISON-PATTERN WARNING.
+ *   directly. This is engine-impersonation; direct context construction is not
+ *   a sanctioned access pattern.
  *   There is no path to observe forceReorder call order or per-iteration INITF
  *   mode transitions through buildFixture or ComparisonSession public surfaces.
  *   See per-test deletion entries below.

@@ -433,7 +433,7 @@ describe("BJT LTE rollback (T1)", () => {
 //      subsequent computeTemperature calls still respect the override.
 //   4. At cktTemp == TNOM (300.15 K), math is trivially identity
 //      (ratio1 = T/TNOM - 1 = 0, factor = 1): node voltages are bit-exact
-//      with the pre-migration values.
+//      with the baseline fixture values.
 // ---------------------------------------------------------------------------
 
 describe("BJT computeTemperature engine-driven path (T1)", () => {
@@ -587,7 +587,7 @@ describe("BJT computeTemperature engine-driven path (T1)", () => {
     // cite: bjttemp.c:167-171 — ratio1 = here->BJTtemp/model->BJTtnom - 1;
     //   factlog = ratio1*EG/vt + XTI*ratlog;  factor = exp(factlog);
     //   tSatCur = IS * factor;  (= IS when T == TNOM)
-    // Node voltages must be bit-exact with the pre-migration fixture result.
+    // Node voltages must be bit-exact with the baseline fixture result.
     const fixBase = buildCeNpn("simple");
     fixBase.coordinator.dcOperatingPoint();
     const vcNode = fixBase.circuit.labelToNodeId.get("Q1:C")!;

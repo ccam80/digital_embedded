@@ -765,7 +765,7 @@ const FRAMEWORK_KINDS: ReadonlySet<string> = new Set<string>([
 
 // ---------------------------------------------------------------------------
 // Property keys whose presence on any Definition's propertyDefs is a
-// regression of a completed migration. Future migrations append entries.
+// regression. Extend this set when keys are removed from definitions.
 // ---------------------------------------------------------------------------
 const REMOVED_PROPERTY_KEYS: ReadonlySet<string> = new Set<string>([
   "_spiceModelOverrides",
@@ -948,10 +948,10 @@ describe("Definition-shape parametric audit (every registered, non-internalOnly 
       // -- 8. propertyDefs omits removed legacy keys -------------------------
       //
       // Replaces per-component `expect(propertyDefs.find(p => p.key ===
-      // "_spiceModelOverrides")).toBeUndefined()` assertions wave-3 §3
-      // deleted from spice-model-overrides-prop.test.ts. Initial population
-      // of REMOVED_PROPERTY_KEYS is `_spiceModelOverrides`; future
-      // migrations append to the set at the top of this file.
+      // "_spiceModelOverrides")).toBeUndefined()` assertions deleted from
+      // spice-model-overrides-prop.test.ts. Initial population of
+      // REMOVED_PROPERTY_KEYS is `_spiceModelOverrides`; extend the set at
+      // the top of this file when additional keys are removed.
       it(`def_${def.name}_propertyDefs_omits_removed_legacy_keys`, () => {
         const offenders: string[] = [];
         for (const pd of def.propertyDefs) {

@@ -29,8 +29,8 @@
  * Not applicable:
  *   - Cat 3  / Cat 5: T3 harness only — ngspice has no native T-flip-flop
  *     primitive, so a paired comparison would require expanding the entire
- *     behavioural subcircuit into ngspice's primitive set, which is the
- *     migration's signal not its scope.
+ *     behavioural subcircuit into ngspice's primitive set, which is out of
+ *     scope for this driver's test coverage.
  *   - Cat 6  (limiting): driver carries no junctions; its `load()` does not
  *     call pnjlim / fetlim / devlim.
  *   - Cat 7  (LTE rollback): driver does not declare `getLteTimestep`.

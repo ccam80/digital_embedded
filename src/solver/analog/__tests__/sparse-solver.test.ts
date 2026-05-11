@@ -360,7 +360,7 @@ import type { PropertyValue } from "../../../core/properties.js";
 //   (solver factor returns 0, DCOP converges) is covered by the engine path.
 
 // ---------------------------------------------------------------------------
-// 50-node benchmark circuit expressed via facade.build for M1 migration
+// 50-node benchmark circuit expressed via facade.build
 // ---------------------------------------------------------------------------
 
 function build50NodeBenchmarkCircuit(registry: ComponentRegistry): Circuit {

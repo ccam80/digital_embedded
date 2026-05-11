@@ -14,8 +14,8 @@
  *   3. Multi-nonlinear convergence (series diodes, parallel diodes, diode clamp)
  *   4. Analytical verification (divider ratio, Shockley consistency, superposition)
  *
- * Migration shape M1: ComparisonSession.createSelfCompare({ buildCircuit, analysis }).
- * Engine acquired by the harness; results read via getStepEnd / getStepShape.
+ * Engine acquired via ComparisonSession.createSelfCompare({ buildCircuit, analysis });
+ * results read via getStepEnd / getStepShape.
  */
 
 import { describe, it, expect } from "vitest";
