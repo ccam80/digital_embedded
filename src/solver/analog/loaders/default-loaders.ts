@@ -1,11 +1,9 @@
 /**
  * Default per-instance family handlers.
  *
- * These three handlers implement the trivial per-instance walk that is
- * equivalent to the deleted flat loops in ckt-load.ts and ac-analysis.ts.
- * They are used as the `defaultHandler` fallback parameter in
- * `runByDeviceFamily` for any (family, callback) pair that has no registered
- * specialist handler in FAMILY_REGISTRY.
+ * Each handler implements a trivial per-instance walk used as the
+ * `defaultHandler` fallback in `runByDeviceFamily` for any (family, callback)
+ * pair without a registered specialist handler in FAMILY_REGISTRY.
  *
  * cite: cktload.c:61-75   -- per-type DEVload orchestration (default = per-instance walk)
  * cite: acan.c:409-414    -- per-type DEVacLoad orchestration (default = per-instance walk)
