@@ -1,5 +1,5 @@
 /**
- * Unit tests for the temperature pass wiring (Phase 3).
+ * Unit tests for the temperature pass wiring.
  *
  * Verifies that:
  *   1. _setup() invokes computeTemperature exactly once per element that

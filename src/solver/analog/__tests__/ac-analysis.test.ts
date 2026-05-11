@@ -494,11 +494,8 @@ describe("AC", () => {
 
 describe("AC- Task 0.4.4", () => {
   it("ac_sweep_caller_reuses_branch_handles_across_frequencies", () => {
-    // Tightened per Phase 0.4 review: exercise the actual AcAnalysis.run()
-    // production path with a real RC circuit and a spy injected through the
-    // solver-factory dep. The previous version re-implemented the sweep loop
-    // inline, making the assertions tautological against the test code rather
-    // than the production code.
+    // Exercises the actual AcAnalysis.run() production path with a real RC
+    // circuit and a spy injected through the solver-factory dep.
     const { ComplexSparseSolver: CSS } = ComplexSolverModule;
 
     const R = 1000;
@@ -545,10 +542,10 @@ describe("AC- Task 0.4.4", () => {
 
 describe("AC- Task 0.4.5", () => {
   it("ac_sweep_single_reorder_across_frequencies", () => {
-    // Tightened per Phase 0.4 review: run the real AcAnalysis.run() path and
-    // observe lastFactorUsedReorder on the solver that production actually
-    // uses. Injected via the solver-factory dep so the spy sees every factor()
-    // call from the real sweep loop.
+    // Runs the real AcAnalysis.run() path and observes lastFactorUsedReorder
+    // on the solver that production actually uses. Injected via the
+    // solver-factory dep so the spy sees every factor() call from the real
+    // sweep loop.
     const { ComplexSparseSolver: CSS } = ComplexSolverModule;
 
     const R = 1000;

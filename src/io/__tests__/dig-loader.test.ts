@@ -322,10 +322,6 @@ describe("DigLoader", () => {
     expect(circuit.wires).toHaveLength(14);
   });
 
-  // ---------------------------------------------------------------------------
-  // Phase 6.1.1 spec-named tests
-  // ---------------------------------------------------------------------------
-
   it("loadAndGate", () => {
     const xml = readCircuit("and-gate.dig");
     const registry = buildAndGateRegistry();

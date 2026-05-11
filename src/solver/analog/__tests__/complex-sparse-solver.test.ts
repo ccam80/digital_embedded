@@ -1,5 +1,5 @@
 /**
- * ComplexSparseSolver unit tests- Wave 0.4
+ * ComplexSparseSolver unit tests
  *
  * Task 0.4.1: Persistent linked-list complex matrix + handle-based stamp API
  * Task 0.4.2: Drop AMD/etree- Markowitz on original column order
@@ -612,10 +612,10 @@ describe("ComplexSparseSolver- Task 0.4.5", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave 1.5 tests- Complex solver mirror (F1.2, F1.3, F1.4)
+// Complex solver mirror tests (F1.2, F1.3, F1.4)
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver- Wave 1.5 (F1.2: invalidateTopology sets _needsReorderComplex)", () => {
+describe("ComplexSparseSolver- F1.2: invalidateTopology sets _needsReorderComplex", () => {
   it("invalidateTopology_sets_needsReorderComplex_so_next_factor_uses_reorder_path", () => {
     // Arrange: fully assembled and factored solver (no reorder needed for 2nd factor)
     const n = 2;
@@ -670,7 +670,7 @@ describe("ComplexSparseSolver- Wave 1.5 (F1.2: invalidateTopology sets _needsReo
   });
 });
 
-describe("ComplexSparseSolver- Wave 1.5 (F1.3: allocComplexElement sets _needsReorderComplex)", () => {
+describe("ComplexSparseSolver- F1.3: allocComplexElement sets _needsReorderComplex", () => {
   it("allocComplexElement_new_entry_triggers_reorder_on_next_factor", () => {
     // Arrange: assemble and factor 2×2 system to establish pivot order
     const n = 3;
@@ -716,7 +716,7 @@ describe("ComplexSparseSolver- Wave 1.5 (F1.3: allocComplexElement sets _needsRe
   });
 });
 
-describe("ComplexSparseSolver- Wave 1.5 (F1.4: threshold constants + per-instance tolerances)", () => {
+describe("ComplexSparseSolver- F1.4: threshold constants + per-instance tolerances", () => {
   it("setComplexPivotTolerances_method_exists_and_accepts_valid_values", () => {
     const solver = new ComplexSparseSolver();
     // Must exist and not throw

@@ -1,8 +1,8 @@
 /**
- * DIAGNOSTIC ONLY (delete after triage): transient parity sweep on the same
- * harness phase 10.2 used for DC-OP (diode + resistor). Phase 10.2 only ran
- * dc_op_pnjlim_match- this dumps the post-fix attempt structure on both
- * sides side-by-side and reports the FIRST per-attempt divergence.
+ * DIAGNOSTIC ONLY (delete after triage): transient parity sweep on the
+ * harness used for DC-OP (diode + resistor). Dumps the post-fix attempt
+ * structure on both sides side-by-side and reports the FIRST per-attempt
+ * divergence.
  */
 
 import { it } from "vitest";

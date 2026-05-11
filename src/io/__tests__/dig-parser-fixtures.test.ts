@@ -12,8 +12,7 @@ import { parseDigXml } from "../dig-parser.js";
 //
 // Per-library element counts and per-component shape assertions belong in
 // dedicated component or library-specific tests, not here. This file is the
-// canonical destination for the parser-shape smoke that used to live in
-// per-library tests (e.g. the deleted 74xx loadRepresentative checks).
+// canonical destination for the parser-shape smoke tests.
 //
 // Adding a new bundled .dig library directory? Add a row to LIBRARY_DIRS.
 // ---------------------------------------------------------------------------

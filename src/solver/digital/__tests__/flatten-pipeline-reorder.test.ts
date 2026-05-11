@@ -1,5 +1,5 @@
 ﻿/**
- * Tests for the pipeline-reorder changes introduced in Wave 2.1.
+ * Tests for the pipeline-reorder changes in flattenCircuit() and resolveModelAssignments.
  *
  * Covers flattenCircuit() unconditional inlining and resolveModelAssignments
  * model key validation:

@@ -17,7 +17,7 @@ import type { PropertyValue } from "../../../core/properties.js";
 // ---------------------------------------------------------------------------
 // Slot indices — resolved via stateSchema, never raw SLOT_* imports (B-3).
 //
-// After the Wave 1 refactor PolarizedCap is a kind:"netlist" subcircuit with
+// PolarizedCap is a kind:"netlist" subcircuit with
 // four canonical leaves (rEsr, rLeak, cBody, dClamp) and a parent-side
 // diagnostic observer. The cap-body charge slot (Q) now lives on the
 // `cap_cBody` Capacitor leaf, addressed by element label.

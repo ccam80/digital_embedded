@@ -1,5 +1,5 @@
 ﻿/**
- * Unit tests for compileUnified()- the Phase 3 unified compilation entry point.
+ * Unit tests for compileUnified()- the unified compilation entry point.
  *
  * Tests verify:
  * - Pure digital circuit compiles correctly (digital domain present, analog null)

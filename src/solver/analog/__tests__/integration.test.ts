@@ -38,7 +38,7 @@ describe("deleted_integrate_functions", () => {
   // deleted symbols. The runtime `toBeUndefined` checks above catch the case
   // where someone re-exports `integrateCapacitor` from `integration.ts`; this
   // check catches the case where a production file imports the symbol from a
-  // different module (regression class Phase 6 V-02).
+  // different module.
   const HERE = path.dirname(fileURLToPath(import.meta.url));
   const SRC_ROOT = path.resolve(HERE, "..", "..", "..");
 
@@ -367,7 +367,7 @@ describe("computeNIcomCof", () => {
 
 describe("gear_vandermonde_regression", () => {
   it("gear_vandermonde_flat_scratch_regression", () => {
-    // Regression test: Phase 1 converted solveGearVandermonde to use a flat scratch buffer.
+    // Regression test: solveGearVandermonde uses a flat scratch buffer.
     // This test verifies numerical correctness of GEAR order 4 coefficients.
     const h = 1e-6;
     const ag = new Float64Array(7);

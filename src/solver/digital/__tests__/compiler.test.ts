@@ -3,7 +3,7 @@
  * utilities (task 3.2.1 sub-components).
  *
  * Tests build minimal Circuit + ComponentRegistry instances in-process so
- * they do not depend on Phase 4 (.dig parser) or Phase 5 (full components).
+ * they do not depend on the .dig parser or full component registration.
  */
 
 import { describe, it, expect } from "vitest";

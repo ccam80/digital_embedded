@@ -485,11 +485,11 @@ describe("SwitchDT digital bridge (T1) — Cat 9", () => {
 // engine against a deep clone of itself), which validates shape, monotonicity,
 // and state evolution without requiring ngspice matrix structural parity.
 //
-// Per the Wave 3 spec: "Tests that toggle Class B switches mid-transient
-// migrate to createSelfCompare per-test (NOT as pairedSpiceEquivalent: false
-// on the component — that would exclude the static-deck tests too)."
-// Static-deck tests (closed=true or closed=false, no toggling) also use
-// createSelfCompare for the same structural reason.
+// Tests that toggle Class B switches mid-transient use createSelfCompare
+// per-test (NOT as pairedSpiceEquivalent: false on the component — that would
+// exclude the static-deck tests too). Static-deck tests (closed=true or
+// closed=false, no toggling) also use createSelfCompare for the same
+// structural reason.
 
 describeIfDll("Switch self-compare — SPST closed (T3)", () => {
   let session: ComparisonSession;

@@ -1,40 +1,7 @@
 /**
- * Wave C4 Task C4.3- buckbjt DC-OP convergence parity against ngspice.
- *
- * Spec (spec/phase-catchup.md:300-311):
- *   Compare every NR iteration's `rhsOld[]` + `noncon` + `diagGmin` +
- *   `srcFact` against ngspice for the BJT-based buck converter
- *   fixture. Bit-exact (`toBe` / `absDelta === 0`)- zero `toBeCloseTo`.
- *
- * Fixture: `fixtures/buckbjt.dts`- BJT-driven buck converter. A 10kHz
- * square wave feeds two BJT gate-driver stages (NPN/PNP) that switch
- * an NMOS into a diode freewheeling clamp and an L-C-R output
- * filter. Canonical multi-junction DC-OP convergence stress test.
- *
- * The test runs `ComparisonSession.runDcOp()` against the instrumented
- * ngspice DLL and asserts, for every NR iteration of the accepted
- * attempt of every step produced by our engine:
- *   1. `rhsOld[node]` (== preSolveRhs[node]) is bit-exact to ngspice.
- *   2. `noncon` convergence counter is bit-exact to ngspice.
- *   3. The attempt-level `diagGmin` (phaseParameter on
- *      dcopGminDynamic / dcopGminSpice3) is bit-exact to ngspice.
- *   4. The attempt-level `srcFact` (phaseParameter on dcopSrcSweep) is
- *      bit-exact to ngspice.
- *
- * Expected status: RED under current code. Phase 4 (DC-OP alignment)
- * and Phase 5 (transient step alignment) have not been executed, so
- * our DC-OP is not yet iteration-level aligned with ngspice. Per the
- * Wave C4 tests-red protocol this red signal is the test doing its
- * job- it MUST NOT be softened to `toBeCloseTo` or relaxed with
- * tolerances. The divergence is documented in
- * `spec/progress-catchup.md` for user adjudication.
- *
- * The long-running transient stagnation regression tests previously
- * colocated in this file were split into
- * `buckbjt-stagnation-regression.test.ts` per Wave C4 spec: a
- * stagnation-regression test is a different concern from an
- * iteration-level ngspice parity test and they do not belong in the
- * same file.
+ * Bit-exact DC-OP convergence parity tests for the buckbjt fixture against
+ * ngspice: compares every NR iteration's rhsOld[], noncon, diagGmin, and
+ * srcFact. Requires the instrumented ngspice DLL; gated on its presence.
  */
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'path';
