@@ -45,10 +45,15 @@ export interface SubcircuitWrapperOptions {
   /** Pin label -> MNA node ID, copied as the wrapper's `pinNodes`. */
   pinNodes: ReadonlyMap<string, number>;
   /**
-   * Position in the global ngspice load order. Architecturally arbitrary
-   * because the wrapper does no MNA work; the engine's NGSPICE_LOAD_ORDER
-   * sort still needs a numeric key. `expandCompositeInstance` passes
-   * `NGSPICE_LOAD_ORDER.VCVS` for parity with the controlled-source family.
+   * Position in the global ngspice load order. Load-bearing for parity:
+   * this value MUST equal `getNgspiceLoadOrderByTypeId(parentTypeId)` because
+   * `buildAnalogNodeMapFromPartition` walks components in that order to
+   * assign external node IDs, and the deck-emit walks the same sort to
+   * place the composite's sub-element lines. If the two disagree, ngspice's
+   * parser-time slot numbering drifts away from our node-ID assignment
+   * (e.g. a `Transformer` typed `IND` in the table but a wrapper typed
+   * `VCVS` here gives R_SER stamps at ours=(3,1)/theirs=(2,1) for the
+   * RL-pulse fixture). `expandCompositeInstance` passes the value through.
    */
   ngspiceLoadOrder: number;
   /** Direct sub-element children (one per netlist.elements entry). For

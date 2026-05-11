@@ -41,7 +41,7 @@ import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, Componen
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
 import { isPoolBacked, AnalogElement } from "./element.js";
-import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
+import { getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
@@ -241,6 +241,7 @@ function expandCompositeInstance(
   subcktParams: Map<string, number>,
   outerPinNodes: ReadonlyMap<string, number>,
   parentLabel: string,
+  parentTypeId: string,
   registry: ComponentRegistry,
   getTime: () => number,
   allocateNode: NodeAllocator,
@@ -430,6 +431,7 @@ function expandCompositeInstance(
         innerSubcktParams,
         subPinNodes,
         childLabel,
+        subEl.typeId,
         registry,
         getTime,
         allocateNode,
@@ -500,7 +502,7 @@ function expandCompositeInstance(
 
   const wrapper = new SubcircuitWrapperElement({
     pinNodes: outerPinNodes,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+    ngspiceLoadOrder: getNgspiceLoadOrderByTypeId(parentTypeId),
     subElements,
     leaves: allLeaves,
     bindings: { map: bindings },
@@ -1148,6 +1150,7 @@ export function compileAnalogPartition(
         subcktParams,
         pinNodes,
         resolvedLabel,
+        pc.element.typeId,
         registry,
         getTime,
         allocateCompositeNode,
