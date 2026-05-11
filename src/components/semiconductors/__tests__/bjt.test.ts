@@ -421,6 +421,206 @@ describe("BJT LTE rollback (T1)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Category 4 — computeTemperature engine-driven path (T1)
+//
+// BjtL0Element and BjtL1Element both declare computeTemperature(ctx).
+// The engine's defaultTemperatureHandler calls this via the optional-chaining
+// dispatch (element.computeTemperature?.(ctx)). Tests verify:
+//   1. Ambient temperature propagation: ctx.cktTemp changes the operating point.
+//   2. Per-instance TEMP override locks the operating temperature regardless of
+//      ambient (bjttemp.c:107-108 BJTtempGiven guard).
+//   3. setParam("TEMP", v) on the hot-load path keeps _tempGiven = true so
+//      subsequent computeTemperature calls still respect the override.
+//   4. At cktTemp == TNOM (300.15 K), math is trivially identity
+//      (ratio1 = T/TNOM - 1 = 0, factor = 1): node voltages are bit-exact
+//      with the pre-migration values.
+// ---------------------------------------------------------------------------
+
+describe("BJT computeTemperature engine-driven path (T1)", () => {
+  function buildCeNpn(modelKey: "simple" | "spice"): ReturnType<typeof buildFixture> {
+    return buildFixture({
+      build: (_r, f) => f.build({
+        components: [
+          { id: "vcc", type: "DcVoltageSource", props: { label: "Vcc", voltage: 5 } },
+          { id: "rc",  type: "Resistor",        props: { label: "Rc",  resistance: 1000 } },
+          { id: "rb",  type: "Resistor",        props: { label: "Rb",  resistance: 100000 } },
+          { id: "q1",  type: "NpnBJT",          props: { label: "Q1",  model: modelKey } },
+          { id: "gnd", type: "Ground",          props: { label: "GND" } },
+        ],
+        connections: [
+          ["vcc:pos", "rc:pos"],
+          ["rc:neg",  "q1:C"],
+          ["vcc:pos", "rb:pos"],
+          ["rb:neg",  "q1:B"],
+          ["q1:E",    "gnd:out"],
+          ["vcc:neg", "gnd:out"],
+        ],
+      }),
+    });
+  }
+
+  function buildCcPnp(modelKey: "simple" | "spice"): ReturnType<typeof buildFixture> {
+    return buildFixture({
+      build: (_r, f) => f.build({
+        components: [
+          { id: "vcc", type: "DcVoltageSource", props: { label: "Vcc", voltage: 5 } },
+          { id: "re",  type: "Resistor",        props: { label: "Re",  resistance: 1000 } },
+          { id: "rb",  type: "Resistor",        props: { label: "Rb",  resistance: 100000 } },
+          { id: "q1",  type: "PnpBJT",          props: { label: "Q1",  model: modelKey } },
+          { id: "gnd", type: "Ground",          props: { label: "GND" } },
+        ],
+        connections: [
+          ["vcc:pos", "re:pos"],
+          ["re:neg",  "q1:E"],
+          ["q1:B",    "rb:pos"],
+          ["rb:neg",  "gnd:out"],
+          ["q1:C",    "gnd:out"],
+          ["vcc:neg", "gnd:out"],
+        ],
+      }),
+    });
+  }
+
+  it("computeTemperature_l0_npn_ambient_propagates", () => {
+    // Build at 300.15 K (REFTEMP = TNOM), solve DCOP, record Vc.
+    const fixCold = buildCeNpn("simple");
+    fixCold.coordinator.dcOperatingPoint();
+    const vcNode = fixCold.circuit.labelToNodeId.get("Q1:C")!;
+    const vcCold = fixCold.engine.getNodeVoltage(vcNode);
+
+    // Build second fixture; raise ambient to 400 K via setCircuitTemp.
+    // cite: bjttemp.c:108 — if(!BJTtempGiven) here->BJTtemp = ckt->CKTtemp
+    // Raising T raises tSatCur exponentially → larger IC at same Vbe → Vc drops.
+    const fixHot = buildCeNpn("simple");
+    fixHot.facade.setCircuitTemp(400);
+    fixHot.coordinator.dcOperatingPoint();
+    const vcHot = fixHot.engine.getNodeVoltage(vcNode);
+
+    expect(vcHot).not.toBeCloseTo(vcCold, 6);
+    expect(vcHot).toBeLessThan(vcCold);
+  });
+
+  it("computeTemperature_l1_npn_ambient_propagates", () => {
+    // Same test as above but using L1 (full SPICE model).
+    const fixCold = buildCeNpn("spice");
+    fixCold.coordinator.dcOperatingPoint();
+    const vcNode = fixCold.circuit.labelToNodeId.get("Q1:C")!;
+    const vcCold = fixCold.engine.getNodeVoltage(vcNode);
+
+    const fixHot = buildCeNpn("spice");
+    fixHot.facade.setCircuitTemp(400);
+    fixHot.coordinator.dcOperatingPoint();
+    const vcHot = fixHot.engine.getNodeVoltage(vcNode);
+
+    expect(vcHot).not.toBeCloseTo(vcCold, 6);
+    expect(vcHot).toBeLessThan(vcCold);
+  });
+
+  it("computeTemperature_l0_pnp_ambient_propagates", () => {
+    // PNP polarity: computeTemperature uses the same math (bjttemp.c is
+    // polarity-agnostic). Raising T → larger tSatCur → larger IE at same Vbe
+    // → emitter node voltage (Q1:E) moves observably.
+    const fixCold = buildCcPnp("simple");
+    fixCold.coordinator.dcOperatingPoint();
+    const veNode = fixCold.circuit.labelToNodeId.get("Q1:E")!;
+    const veCold = fixCold.engine.getNodeVoltage(veNode);
+
+    const fixHot = buildCcPnp("simple");
+    fixHot.facade.setCircuitTemp(400);
+    fixHot.coordinator.dcOperatingPoint();
+    const veHot = fixHot.engine.getNodeVoltage(veNode);
+
+    expect(veHot).not.toBeCloseTo(veCold, 6);
+  });
+
+  it("computeTemperature_l0_npn_instance_override_respected", () => {
+    // Per-instance TEMP set via setParam locks operating temp regardless of
+    // ambient. cite: bjttemp.c:107 — BJTtempGiven guard.
+    const fix = buildCeNpn("simple");
+    const q1Idx = fix.circuit.elements.findIndex(
+      (_e, i) => fix.elementLabels.get(i) === "Q1",
+    );
+    const ce = fix.circuit.elementToCircuitElement.get(q1Idx)!;
+
+    // Pin per-instance TEMP at 400 K via setComponentProperty (routes to setParam).
+    fix.coordinator.setComponentProperty(ce, "TEMP", 400);
+    fix.coordinator.dcOperatingPoint();
+    const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
+    const vcAt400 = fix.engine.getNodeVoltage(vcNode);
+
+    // Now raise ambient to 500 K. With _tempGiven=true, computeTemperature
+    // must use the per-instance 400 K override, not ctx.cktTemp=500.
+    fix.facade.setCircuitTemp(500);
+    fix.coordinator.dcOperatingPoint();
+    const vcAfterAmbientRaise = fix.engine.getNodeVoltage(vcNode);
+
+    // If _tempGiven is correctly honored, the two DCOP results will be
+    // equivalent (same per-instance temp both times). A small numerical
+    // difference is allowed since NR iterates from a different init state,
+    // but the result must be the same operating point to within SPICE tol.
+    expect(Math.abs(vcAfterAmbientRaise - vcAt400)).toBeLessThan(1e-4);
+  });
+
+  it("computeTemperature_l1_npn_instance_override_respected", () => {
+    // Same guard test as above, L1 model.
+    const fix = buildCeNpn("spice");
+    const q1Idx = fix.circuit.elements.findIndex(
+      (_e, i) => fix.elementLabels.get(i) === "Q1",
+    );
+    const ce = fix.circuit.elementToCircuitElement.get(q1Idx)!;
+
+    fix.coordinator.setComponentProperty(ce, "TEMP", 400);
+    fix.coordinator.dcOperatingPoint();
+    const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
+    const vcAt400 = fix.engine.getNodeVoltage(vcNode);
+
+    fix.facade.setCircuitTemp(500);
+    fix.coordinator.dcOperatingPoint();
+    const vcAfterAmbientRaise = fix.engine.getNodeVoltage(vcNode);
+
+    expect(Math.abs(vcAfterAmbientRaise - vcAt400)).toBeLessThan(1e-4);
+  });
+
+  it("computeTemperature_at_tnom_is_identity_l0_npn", () => {
+    // At cktTemp = TNOM = REFTEMP = 300.15 K, the temperature math is
+    // trivially identity: ratio1 = T/TNOM - 1 = 0, factor = exp(0) = 1.
+    // cite: bjttemp.c:167-171 — ratio1 = here->BJTtemp/model->BJTtnom - 1;
+    //   factlog = ratio1*EG/vt + XTI*ratlog;  factor = exp(factlog);
+    //   tSatCur = IS * factor;  (= IS when T == TNOM)
+    // Node voltages must be bit-exact with the pre-migration fixture result.
+    const fixBase = buildCeNpn("simple");
+    fixBase.coordinator.dcOperatingPoint();
+    const vcNode = fixBase.circuit.labelToNodeId.get("Q1:C")!;
+    const vcBase = fixBase.engine.getNodeVoltage(vcNode);
+
+    const fixWithCall = buildCeNpn("simple");
+    // Explicitly trigger computeTemperature at TNOM (no-op mathematically).
+    fixWithCall.facade.setCircuitTemp(300.15);
+    fixWithCall.coordinator.dcOperatingPoint();
+    const vcWithCall = fixWithCall.engine.getNodeVoltage(vcNode);
+
+    // Bit-exact at TNOM (same floating-point path through computeBjtTempParams).
+    expect(vcWithCall).toBe(vcBase);
+  });
+
+  it("computeTemperature_at_tnom_is_identity_l1_npn", () => {
+    // Same identity check for L1 model.
+    // cite: bjttemp.c:167-171 — factor = exp(0) = 1 when T == TNOM.
+    const fixBase = buildCeNpn("spice");
+    fixBase.coordinator.dcOperatingPoint();
+    const vcNode = fixBase.circuit.labelToNodeId.get("Q1:C")!;
+    const vcBase = fixBase.engine.getNodeVoltage(vcNode);
+
+    const fixWithCall = buildCeNpn("spice");
+    fixWithCall.facade.setCircuitTemp(300.15);
+    fixWithCall.coordinator.dcOperatingPoint();
+    const vcWithCall = fixWithCall.engine.getNodeVoltage(vcNode);
+
+    expect(vcWithCall).toBe(vcBase);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category 2-numerical / 3 / 5 / 6-paired — Harness sessions (T3)
 // One describe()/session per .dts. Each session opens once in beforeAll,
 // reuses across categories that share that circuit, disposes in afterAll.

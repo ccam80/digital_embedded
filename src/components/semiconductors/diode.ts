@@ -53,6 +53,7 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants (ngspice const.h values)
@@ -135,27 +136,30 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
 /**
  * Compute junction depletion capacitance using the SPICE depletion formula.
  *
- * For reverse bias (Vd < FC*VJ):
- *   Cj = CJO / (1 - Vd/VJ)^M
- * For forward bias linearization (Vd >= FC*VJ):
- *   Cj = CJO / (1 - FC)^(1+M) * (1 - FC*(1+M) + M*Vd/VJ)
+ * For reverse bias (Vd < tDepCap = FC*tVJ):
+ *   Cj = tCJO / (1 - Vd/tVJ)^M
+ * For forward bias linearization (Vd >= tDepCap):
+ *   Cj = tCJO / tF2 * (tF3 + M*Vd/tVJ)
+ *
+ * tDepCap, tF2, tF3 are pre-computed by dioTemp() / computeTemperature().
+ * cite: dioload.c:321-342 — temperature-scaled cap formula uses DIOtDepCap, DIOtF2, DIOtF3.
  */
 export function computeJunctionCapacitance(
   vd: number,
-  CJO: number,
-  VJ: number,
+  tCJO: number,
+  tVJ: number,
   M: number,
-  FC: number,
+  tDepCap: number,
+  tF2: number,
+  tF3: number,
 ): number {
-  if (CJO <= 0) return 0;
-  const fcVj = FC * VJ;
-  if (vd < fcVj) {
-    const arg = 1 - vd / VJ;
+  if (tCJO <= 0) return 0;
+  if (vd < tDepCap) {
+    const arg = 1 - vd / tVJ;
     const safeArg = Math.max(arg, 1e-6);
-    return CJO / Math.pow(safeArg, M);
+    return tCJO / Math.pow(safeArg, M);
   } else {
-    const fac = Math.pow(1 - FC, 1 + M);
-    return (CJO / fac) * (1 - FC * (1 + M) + (M * vd) / VJ);
+    return (tCJO / tF2) * (tF3 + (M * vd) / tVJ);
   }
 }
 
@@ -164,61 +168,56 @@ export function computeJunctionCapacitance(
 // ---------------------------------------------------------------------------
 
 /**
- * Compute total junction charge  integral of C(V) dV  matching ngspice
+ * Compute total junction charge — integral of C(V) dV — matching ngspice
  * dioload.c:308-341.
  *
- * Depletion charge (reverse bias, vd < FC*VJ):
+ * Depletion charge (reverse bias, vd < tDepCap = FC*tVJ):
  *   dioload.c:312: deplcharge = tJctPot * czero * (1 - arg*sarg) / (1-M)
- *   where arg = 1 - vd/VJ, sarg = arg^(-M), so arg*sarg = (1-vd/VJ)^(1-M)
- *   => Q_depl = VJ * CJO * (1 - (1 - vd/VJ)^(1-M)) / (1-M)
- *   Special case M=1: Q_depl = -VJ * CJO * ln(1 - vd/VJ)
+ *   where arg = 1 - vd/tVJ, sarg = arg^(-M), so arg*sarg = (1-vd/tVJ)^(1-M)
+ *   => Q_depl = tVJ * tCJO * (1 - (1-vd/tVJ)^(1-M)) / (1-M)
+ *   Special case M=1: Q_depl = -tVJ * tCJO * ln(1-vd/tVJ)
  *
- * Depletion charge (forward bias, vd >= FC*VJ):
- *   dioload.c:316: deplcharge = F1*czero + czof2*(F3*(vd-depCap) + M/(2*VJ)*(vd^2-depCap^2))
- *   where F1 = VJ*(1-(1-FC)^(1-M))/(1-M), czof2 = CJO/(1-FC)^(1+M),
- *         F3 = 1-FC*(1+M), depCap = FC*VJ
+ * Depletion charge (forward bias, vd >= tDepCap):
+ *   dioload.c:316: deplcharge = tF1*tCJO + czof2*(tF3*(vd-tDepCap) + M/(2*tVJ)*(vd^2-tDepCap^2))
+ *   where czof2 = tCJO/tF2, tF1/tF2/tF3 pre-computed by dioTemp()
  *
  * Diffusion charge (dioload.c:333):
  *   diffcharge = TT * Id
- *   where Id = IS*(exp(vd/(N*Vt))-1) is the diode current
+ *   where Id is the GMIN-adjusted diode current from load()
+ *
+ * tF1, tF2, tF3, tDepCap are pre-computed by dioTemp() / computeTemperature().
+ * cite: dioload.c:308-341 — junction charge integral using DIOtF1/DIOtF2/DIOtF3/DIOtDepCap.
  */
 export function computeJunctionCharge(
   vd: number,
-  CJO: number,
-  VJ: number,
+  tCJO: number,
+  tVJ: number,
   M: number,
-  FC: number,
+  tDepCap: number,
+  tF1: number,
+  tF2: number,
+  tF3: number,
   TT: number,
   Id: number,
 ): number {
   let Q_depl = 0;
-  if (CJO > 0) {
-    const depCap = FC * VJ;
-    if (vd < depCap) {
-      // Reverse-bias depletion charge
-      const arg = Math.max(1 - vd / VJ, 1e-6);
+  if (tCJO > 0) {
+    if (vd < tDepCap) {
+      // cite: dioload.c:312 — reverse-bias depletion charge
+      const arg = Math.max(1 - vd / tVJ, 1e-6);
       if (Math.abs(M - 1) < 1e-10) {
-        // M=1 special case: integral of CJO/(1-vd/VJ) = -VJ*CJO*ln(1-vd/VJ)
-        Q_depl = -VJ * Math.log(arg);
+        Q_depl = -tVJ * tCJO * Math.log(arg);
       } else {
-        // dioload.c:312: VJ * CJO * (1 - (1-vd/VJ)^(1-M)) / (1-M)
-        Q_depl = VJ * CJO * (1 - Math.pow(arg, 1 - M)) / (1 - M);
+        Q_depl = tVJ * tCJO * (1 - Math.pow(arg, 1 - M)) / (1 - M);
       }
     } else {
-      // Forward-bias depletion charge (linearized region)
-      // dioload.c:316: F1*CJO + czof2*(F3*(vd-depCap) + M/(2*VJ)*(vd^2-depCap^2))
-      const xfc = Math.log(1 - FC);
-      const F1 = Math.abs(M - 1) < 1e-10
-        ? -VJ * Math.log(1 - FC)
-        : VJ * (1 - Math.exp((1 - M) * xfc)) / (1 - M);
-      const F2 = Math.exp((1 + M) * xfc);  // = (1-FC)^(1+M)
-      const F3 = 1 - FC * (1 + M);
-      const czof2 = CJO / F2;
-      Q_depl = CJO * F1 + czof2 * (F3 * (vd - depCap) + (M / (2 * VJ)) * (vd * vd - depCap * depCap));
+      // cite: dioload.c:316 — forward-bias linearized depletion charge
+      const czof2 = tCJO / tF2;
+      Q_depl = tCJO * tF1 + czof2 * (tF3 * (vd - tDepCap) + (M / (2 * tVJ)) * (vd * vd - tDepCap * tDepCap));
     }
   }
 
-  // Diffusion charge: dioload.c:333
+  // cite: dioload.c:333 — diffusion charge = TT * Id
   const Q_diff = TT * Id;
 
   return Q_depl + Q_diff;
@@ -233,16 +232,30 @@ export interface DioTempParams {
   vt: number;
   /** Nominal thermal voltage kT_nom/q at TNOM (diotemp.c vtnom) */
   vtnom: number;
-  /** Temperature-scaled saturation current (DIOtSatCur) */
+  /** Temperature-scaled saturation current (DIOtSatCur) — diotemp.c:152-156 */
   tIS: number;
-  /** Temperature-scaled junction potential (DIOtJctPot) */
+  /** Temperature-scaled sidewall saturation current (DIOtSatSWCur) — diotemp.c:157-161 */
+  tSatSWCur: number;
+  /** Temperature-scaled junction potential (DIOtJctPot) — diotemp.c:126 */
   tVJ: number;
-  /** Temperature-scaled zero-bias cap (DIOtJctCap) */
+  /** Temperature-scaled sidewall junction potential (DIOtJctSWPot) — diotemp.c:143 */
+  tJctSWPot: number;
+  /** Temperature-scaled zero-bias cap (DIOtJctCap) — diotemp.c:123-129 */
   tCJO: number;
-  /** Critical voltage for pnjlim (DIOtVcrit) */
+  /** Temperature-scaled sidewall zero-bias cap (DIOtJctSWCap) — diotemp.c:139-145 */
+  tJctSWCap: number;
+  /** Critical voltage for pnjlim (DIOtVcrit) — diotemp.c:187 */
   tVcrit: number;
-  /** Effective breakdown voltage after knee iteration (DIOtBrkdwnV) */
+  /** Effective breakdown voltage after knee iteration (DIOtBrkdwnV) — diotemp.c:244 */
   tBV: number;
+  /** F1 for forward-bias cap linearization (DIOtF1) — diotemp.c:176-178 */
+  tF1: number;
+  /** F2 = exp((1+M)*xfc) (DIOtF2) — diotemp.c:260 */
+  tF2: number;
+  /** F3 = 1 - FC*(1+M) (DIOtF3) — diotemp.c:261 */
+  tF3: number;
+  /** Temperature-scaled depletion cap threshold FC*tVJ (DIOtDepCap) — diotemp.c:180-181 */
+  tDepCap: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -267,49 +280,75 @@ export interface DioTempParams {
 export function dioTemp(p: {
   IS: number; N: number; VJ: number; CJO: number; M: number;
   BV: number; IBV: number; NBV: number; EG: number; XTI: number; TNOM: number;
+  ISW: number; NSW: number; FC: number;
+  VJS?: number; MS?: number;
 }, T: number): DioTempParams {
   const vt = T * CONSTboltz / CHARGE;
   const vtnom = p.TNOM * CONSTboltz / CHARGE;
 
+  // cite: diotemp.c:107-108
   const fact1 = p.TNOM / REFTEMP;
   const fact2 = T / REFTEMP;
 
-  // egfet at operating temperature T
+  // cite: diotemp.c:108-112: egfet at operating temperature T
   const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
   const arg = -egfet / (2 * CONSTboltz * T) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  // cite: diotemp.c:112: pbfact = -2*vt*(1.5*log(fact2)+CHARGE*arg)
   const pbfact = -2 * vt * (1.5 * Math.log(fact2) + CHARGE * arg);
 
-  // egfet at nominal temperature TNOM
+  // cite: diotemp.c:113-118: egfet at nominal temperature TNOM
   const egfet1 = 1.16 - (7.02e-4 * p.TNOM * p.TNOM) / (p.TNOM + 1108);
   const arg1 = -egfet1 / (2 * CONSTboltz * p.TNOM) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  // cite: diotemp.c:118: pbfact1 = -2*vtnom*(1.5*log(fact1)+CHARGE*arg1)
   const pbfact1 = -2 * vtnom * (1.5 * Math.log(fact1) + CHARGE * arg1);
 
-  // tIS: diotemp.c  IS * exp((T/TNOM - 1)*EG/(N*vt) + XTI/N * log(T/TNOM))
+  // cite: diotemp.c:152-156: tSatCur = IS * exp((T/TNOM-1)*EG/(N*vt) + XTI/N*log(T/TNOM))
   const ratlog = Math.log(T / p.TNOM);
   const ratio1 = T / p.TNOM - 1;
   const factlog = ratio1 * p.EG / (p.N * vt) + (p.XTI / p.N) * ratlog;
   const tIS = p.IS * Math.exp(factlog);
 
-  // tVJ: junction potential temperature scaling (diotemp.c)
+  // cite: diotemp.c:157-161: tSatSWCur — mirrors tSatCur with NSW emission coeff
+  const swFactlog = ratio1 * p.EG / (p.NSW * vt) + (p.XTI / p.NSW) * ratlog;
+  const tSatSWCur = p.ISW * Math.exp(swFactlog);
+
+  // cite: diotemp.c:120-129: tVJ (DIOtJctPot) — junction potential temperature scaling
   const pbo = (p.VJ - pbfact1) / fact1;
   const tVJ = fact2 * pbo + pbfact;
 
-  // tCJO: capacitance temperature scaling (diotemp.c)
+  // cite: diotemp.c:123-129: tCJO (DIOtJctCap) — capacitance temperature scaling
   let tCJO = p.CJO;
   if (p.CJO > 0 && p.VJ > 0) {
     const gmaold = (p.VJ - pbo) / pbo;
     const gmanew = (tVJ - pbo) / pbo;
+    // cite: diotemp.c:123-124: divide by (1 + M*(400e-6*(TNOM-REFTEMP) - gmaold))
+    // cite: diotemp.c:128-129: multiply by (1 + M*(400e-6*(T-REFTEMP) - gmanew))
     const capfact = (1 + p.M * (4e-4 * (p.TNOM - REFTEMP) - gmaold)) /
                     (1 + p.M * (4e-4 * (T - REFTEMP) - gmanew));
     tCJO = p.CJO * capfact;
   }
 
-  // tVcrit: critical voltage for pnjlim (diotemp.c)
+  // cite: diotemp.c:136-145: sidewall junction potential + capacitance scaling
+  // VJS defaults to VJ, MS defaults to M when not given.
+  const VJS = p.VJS ?? p.VJ;
+  const MS  = p.MS  ?? p.M;
+  const pboSW = (VJS - pbfact1) / fact1;
+  const tJctSWPot = fact2 * pboSW + pbfact;
+  let tJctSWCap = 0;
+  if (p.CJO > 0 && VJS > 0) {
+    // cite: diotemp.c:139-141: DIOtJctSWCap — sidewall zero-bias cap temperature scaling
+    const gmaSWold = (VJS - pboSW) / pboSW;
+    const gmaSWnew = (tJctSWPot - pboSW) / pboSW;
+    const capfactSW = (1 + MS * (4e-4 * (p.TNOM - REFTEMP) - gmaSWold)) /
+                      (1 + MS * (4e-4 * (T - REFTEMP) - gmaSWnew));
+    tJctSWCap = p.CJO * capfactSW;
+  }
+
+  // cite: diotemp.c:185-187: vte = N*vt; DIOtVcrit = vte*log(vte/(CONSTroot2*DIOtSatCur))
   const nVt = p.N * vt;
   const tVcrit = nVt * Math.log(nVt / (tIS * Math.SQRT2));
 
-  // tBV: Newton-iterate to find effective breakdown voltage
-  // diotemp.c: xbv = BV - vt*log(1 + cbv/IS)  (cbv = IBV, using NBV emission)
+  // cite: diotemp.c:208-244: breakdown voltage iteration
   let tBV = p.BV;
   if (isFinite(p.BV)) {
     const nbvVt = p.NBV * vt;
@@ -324,7 +363,31 @@ export function dioTemp(p: {
     tBV = xbv;
   }
 
-  return { vt, vtnom, tIS, tVJ, tCJO, tVcrit, tBV };
+  // cite: diotemp.c:176-178: DIOtF1 = tVJ*(1 - exp((1-M)*xfc)) / (1-M)
+  // where xfc = log(1 - FC)
+  const xfc = Math.log(1 - p.FC);
+  const tF1 = Math.abs(p.M - 1) < 1e-10
+    ? -tVJ * Math.log(1 - p.FC)
+    : tVJ * (1 - Math.exp((1 - p.M) * xfc)) / (1 - p.M);
+
+  // cite: diotemp.c:260: DIOtF2 = exp((1+M)*xfc) = (1-FC)^(1+M)
+  // Use Math.pow to preserve bit-exact parity with the original per-call computation.
+  const tF2 = Math.pow(1 - p.FC, 1 + p.M);
+
+  // cite: diotemp.c:261: DIOtF3 = 1 - FC*(1+M)
+  const tF3 = 1 - p.FC * (1 + p.M);
+
+  // cite: diotemp.c:180-181: DIOtDepCap = FC * tVJ
+  const tDepCap = p.FC * tVJ;
+
+  return {
+    vt, vtnom,
+    tIS, tSatSWCur,
+    tVJ, tJctSWPot,
+    tCJO, tJctSWCap,
+    tVcrit, tBV,
+    tF1, tF2, tF3, tDepCap,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -420,31 +483,43 @@ export function createDiodeElement(
   if (params.RS > 0) params.RS /= params.AREA;
   params.CJO *= params.AREA;
 
-  // Mutable temperature-scaled working values  recomputed when params change.
-  let tIS: number;
-  let tVJ: number;
-  let tCJO: number;
-  let tVcrit: number;
-  let tBV: number;
+  // Mutable temperature-scaled working values — recomputed by computeTemperature().
+  // Names mirror DIOtemp() output fields from diotemp.c.
+  let tIS: number;        // DIOtSatCur — diotemp.c:152
+  let tSatSWCur: number;  // DIOtSatSWCur — diotemp.c:157
+  let tVJ: number;        // DIOtJctPot — diotemp.c:126
+  let tCJO: number;       // DIOtJctCap — diotemp.c:123
+  let tVcrit: number;     // DIOtVcrit — diotemp.c:187
+  let tBV: number;        // DIOtBrkdwnV — diotemp.c:244
+  let tF1: number;        // DIOtF1 — diotemp.c:176
+  let tF2: number;        // DIOtF2 — diotemp.c:260
+  let tF3: number;        // DIOtF3 — diotemp.c:261
+  let tDepCap: number;    // DIOtDepCap — diotemp.c:180
   let vt: number;
   let nVt: number;
 
-  function recomputeTemp(): void {
-    const tp = dioTemp({
-      IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
-      BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
-      XTI: params.XTI, TNOM: params.TNOM,
-    }, params.TEMP);
-    tIS = tp.tIS;
-    tVJ = tp.tVJ;
-    tCJO = tp.tCJO;
-    tVcrit = tp.tVcrit;
-    tBV = tp.tBV;
-    vt = tp.vt;
-    nVt = params.N * vt;
+  function applyDioTempResult(tp: DioTempParams): void {
+    tIS       = tp.tIS;
+    tSatSWCur = tp.tSatSWCur;
+    tVJ       = tp.tVJ;
+    tCJO      = tp.tCJO;
+    tVcrit    = tp.tVcrit;
+    tBV       = tp.tBV;
+    tF1       = tp.tF1;
+    tF2       = tp.tF2;
+    tF3       = tp.tF3;
+    tDepCap   = tp.tDepCap;
+    vt        = tp.vt;
+    nVt       = params.N * vt;
   }
 
-  recomputeTemp();
+  // Initial temperature pass at construction — uses params.TEMP as the device temperature.
+  applyDioTempResult(dioTemp({
+    IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
+    BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
+    XTI: params.XTI, TNOM: params.TNOM,
+    ISW: params.ISW, NSW: params.NSW, FC: params.FC,
+  }, params.TEMP));
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
@@ -620,9 +695,10 @@ export function createDiodeElement(
 
       // D-W3-6: sidewall current block  dioload.c:209-243.
       // cite: dioload.c:209 `if (model->DIOsatSWCurGiven)`
+      // Use temperature-scaled tSatSWCur (DIOtSatSWCur) per diotemp.c:157-161.
       let cdsw = 0;
       let gdsw = 0;
-      const csatsw = params.ISW;
+      const csatsw = tSatSWCur;
       if (csatsw > 0) {
         if (params.NSW !== params.N) {
           // cite: dioload.c:211-235: sidewall has its own emission coefficient
@@ -735,13 +811,13 @@ export function createDiodeElement(
         // cite: dioload.c:351: diffcap = TT * gdb  (pre-IKF gd from bottom current alone)
         // We use gd (full GMIN-adjusted gd including sidewall) to match ngspice:
         //   diffcap = TT * gdb (bottom) + TT * gdsw (sidewall) per dioload.c:352
-        const Cj = computeJunctionCapacitance(vdLimited, tCJO, tVJ, params.M, params.FC);
+        const Cj = computeJunctionCapacitance(vdLimited, tCJO, tVJ, params.M, tDepCap, tF2, tF3);
         const Ct = params.TT * gd;  // dioload.c:351-352: diffcap + diffcapSW
         const Ctotal = Cj + Ct;
 
         // cite: dioload.c:346: diffcharge = TT * cdb (bottom current, pre-GMIN-adj)
-        // Pass cd (GMIN-adjusted)  consistent with ngspice storing GMIN-adjusted pair.
-        const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, params.FC, params.TT, cd);
+        // Pass cd (GMIN-adjusted) — consistent with ngspice storing GMIN-adjusted pair.
+        const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, tDepCap, tF1, tF2, tF3, params.TT, cd);
         let q1 = s1[base + SLOT_Q];
         const q2 = s2[base + SLOT_Q];
         const q3 = s3[base + SLOT_Q];
@@ -853,10 +929,51 @@ export function createDiodeElement(
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
     }
 
+    /**
+     * computeTemperature — engine-driven temperature pass per ckttemp.c:28-33.
+     *
+     * Resolves effective operating temperature T:
+     *   - Per-instance TEMP override (params.TEMP) takes precedence.
+     *   - Falls back to ctx.cktTemp (circuit ambient temperature) when
+     *     params.TEMP equals the construction default (REFTEMP = 300.15 K).
+     *
+     * cite: diotemp.c:82-86 —
+     *   if(!here->DIOtempGiven) here->DIOtemp = ckt->CKTtemp + here->DIOdtemp;
+     *   (when DIOtempGiven is false, use CKTtemp; otherwise use DIOtemp)
+     *
+     * Updates all temperature-derived state in-place (matching DIOtemp() output):
+     *   tIS, tSatSWCur, tVJ, tJctSWPot, tCJO, tJctSWCap, tVcrit, tBV,
+     *   tF1, tF2, tF3, tDepCap, vt, nVt.
+     */
+    computeTemperature(ctx: TempContext): void {
+      // cite: diotemp.c:84-85 — DIOtempGiven ? DIOtemp : CKTtemp + DIOdtemp
+      // We model DIOtempGiven as: params.TEMP was explicitly set (differs from REFTEMP default),
+      // but since we cannot distinguish "set to 300.15" from "never set", we use ctx.cktTemp
+      // when params.TEMP equals REFTEMP exactly (the only way to detect the unset case).
+      // In practice, any explicit setParam("TEMP", v) stores v into params.TEMP before
+      // calling computeTemperature, so the per-instance override is always honoured.
+      const T = params.TEMP !== REFTEMP ? params.TEMP : ctx.cktTemp;
+      applyDioTempResult(dioTemp({
+        IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
+        BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
+        XTI: params.XTI, TNOM: params.TNOM,
+        ISW: params.ISW, NSW: params.NSW, FC: params.FC,
+      }, T));
+    }
+
     setParam(key: string, value: number): void {
       if (key in params) {
         params[key] = value;
-        recomputeTemp();
+        if (key === "TEMP") {
+          // cite: diotemp.c:82-87 — per-instance TEMP triggers DIOtemp() recompute.
+          // Route through computeTemperature so the engine dispatch path and the
+          // hot-load path share identical logic.
+          this.computeTemperature({ cktTemp: value, cktNomTemp: params.TNOM });
+        } else {
+          // All other param changes also require a temperature recompute because
+          // IS, VJ, CJO, EG, XTI, etc. feed directly into the dioTemp() formulas.
+          this.computeTemperature({ cktTemp: params.TEMP, cktNomTemp: params.TNOM });
+        }
       }
     }
   }

@@ -40,6 +40,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { createDiodeElement } from "./diode.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants (ngspice ngspice.h / const.h values)
@@ -190,6 +191,11 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   private readonly _params: Record<string, number>;
   private readonly _nodeCathode: number;
   private _tp: ZenerTp;
+
+  // cite: diotemp.c:84-85 — tracks whether TEMP was explicitly overridden per-instance.
+  // When false, computeTemperature(ctx) propagates ctx.cktTemp as the operating temperature.
+  // When true, the per-instance override supplied via setParam("TEMP", v) is preserved.
+  private _tempGiven = false;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
   private _pnjlimLimited = false;
@@ -501,9 +507,30 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     return [id, -id];
   }
 
+  /**
+   * Engine-driven temperature callback — called by defaultTemperatureHandler on
+   * every cktTemp(ctx) pass (end of _setup() and on setCircuitTemp()).
+   *
+   * cite: diotemp.c:84-85 — if(!DIOtempGiven) here->DIOtemp = ckt->CKTtemp + here->DIOdtemp
+   * When no per-instance TEMP override is active (_tempGiven==false), propagate
+   * ctx.cktTemp as the operating temperature and recompute all derived parameters.
+   * When _tempGiven==true (user called setParam("TEMP", v)), the override is preserved.
+   */
+  computeTemperature(ctx: TempContext): void {
+    // cite: diotemp.c:84-85 — per-instance TEMP takes precedence over circuit ambient
+    if (!this._tempGiven) {
+      this._params["TEMP"] = ctx.cktTemp;
+      this._tp = this._computeZenerTp();
+    }
+  }
+
   setParam(key: string, value: number): void {
     if (key in this._params) {
       this._params[key] = value;
+      if (key === "TEMP") {
+        // cite: diotemp.c:84 — DIOtempGiven marks an explicit per-instance override
+        this._tempGiven = true;
+      }
       this._tp = this._computeZenerTp();
     }
   }

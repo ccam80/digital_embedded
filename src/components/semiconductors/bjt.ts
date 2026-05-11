@@ -43,6 +43,7 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -523,6 +524,11 @@ function _createBjtElementWithPolarity(
     ICVCE: props.getModelParam<number>("ICVCE"),
   };
 
+  // cite: bjttemp.c:107 — BJTtempGiven: true only when per-instance TEMP was explicitly
+  // set via setParam("TEMP", v). The default value seeded from model params does NOT
+  // count as "given" — at that point ctx.cktTemp (ambient) is used instead.
+  let _tempGiven = false;
+
   function makeTp(): BjtTempParams {
     return computeBjtTempParams({
       IS: params.IS, BF: params.BF, BR: params.BR,
@@ -995,8 +1001,55 @@ function _createBjtElementWithPolarity(
       return [ib, ic, ie];
     }
 
+    /**
+     * computeTemperature — engine-driven temperature pass for the BJT L0 model.
+     *
+     * cite: bjttemp.c:107-108 — if(!here->BJTtempGiven) here->BJTtemp = ckt->CKTtemp + here->BJTdtemp;
+     * Resolve effective T: per-instance TEMP given → use params.TEMP; else use ctx.cktTemp.
+     * cite: bjttemp.c:158-260 — per-instance temperature math (vt, tSatCur, tBetaF/R, leakage, caps).
+     * PNP polarity uses the same temperature math as NPN (bjttemp.c is polarity-agnostic;
+     * polarity affects junction voltage sign in bjtload.c, not bjttemp.c).
+     */
+    computeTemperature(ctx: TempContext): void {
+      // cite: bjttemp.c:107-108 — if(!here->BJTtempGiven) here->BJTtemp = ckt->CKTtemp + here->BJTdtemp;
+      const effectiveT = _tempGiven ? params.TEMP : ctx.cktTemp;
+      tp = computeBjtTempParams({
+        IS: params.IS, BF: params.BF, BR: params.BR,
+        ISE: params.ISE, ISC: params.ISC,
+        NE: params.NE, NC: params.NC, EG: 1.11, XTI: 3, XTB: 0,
+        IKF: params.IKF, IKR: params.IKR,
+        RC: 0, RE: 0, RB: 0, RBM: 0, IRB: 0,
+        CJE: 0, VJE: 0.75, MJE: 0.33,
+        CJC: 0, VJC: 0.75, MJC: 0.33,
+        CJS: 0, VJS: 0.75, MJS: 0,
+        FC: 0.5, AREA: params.AREA, TNOM: params.TNOM,
+        VAF: params.VAF, VAR: params.VAR,
+        PTF: 0, TF: 0, TR: 0,
+        ISS: 0, TEMP: effectiveT,
+      }, effectiveT);
+    }
+
     setParam(key: string, value: number): void {
-      if (key in params) {
+      if (key === "TEMP") {
+        params.TEMP = value;
+        _tempGiven = true;
+        // cite: bjttemp.c:107-110 — per-instance TEMP given overrides circuit temp.
+        // Re-run temperature math at the new per-instance temperature.
+        tp = computeBjtTempParams({
+          IS: params.IS, BF: params.BF, BR: params.BR,
+          ISE: params.ISE, ISC: params.ISC,
+          NE: params.NE, NC: params.NC, EG: 1.11, XTI: 3, XTB: 0,
+          IKF: params.IKF, IKR: params.IKR,
+          RC: 0, RE: 0, RB: 0, RBM: 0, IRB: 0,
+          CJE: 0, VJE: 0.75, MJE: 0.33,
+          CJC: 0, VJC: 0.75, MJC: 0.33,
+          CJS: 0, VJS: 0.75, MJS: 0,
+          FC: 0.5, AREA: params.AREA, TNOM: params.TNOM,
+          VAF: params.VAF, VAR: params.VAR,
+          PTF: 0, TF: 0, TR: 0,
+          ISS: 0, TEMP: value,
+        }, value);
+      } else if (key in params) {
         params[key] = value;
         tp = makeTp();
       }
@@ -1151,6 +1204,11 @@ export function createSpiceL1BjtElement(
     ICVBE: props.getModelParam<number>("ICVBE"),
     ICVCE: props.getModelParam<number>("ICVCE"),
   };
+
+  // cite: bjttemp.c:107 — BJTtempGiven: true only when per-instance TEMP was explicitly
+  // set via setParam("TEMP", v). The default value seeded from model params does NOT
+  // count as "given" — at that point ctx.cktTemp (ambient) is used instead.
+  let _tempGiven = false;
 
   function makeTp(): BjtTempParams {
     return computeBjtTempParams({
@@ -2105,8 +2163,56 @@ export function createSpiceL1BjtElement(
       return [ib, ic, ie];
     }
 
+    /**
+     * computeTemperature — engine-driven temperature pass for the BJT L1 model.
+     *
+     * cite: bjttemp.c:107-108 — if(!here->BJTtempGiven) here->BJTtemp = ckt->CKTtemp + here->BJTdtemp;
+     * Resolve effective T: per-instance TEMP given → use params.TEMP; else use ctx.cktTemp.
+     * cite: bjttemp.c:158-260 — per-instance temperature math (vt, tSatCur, tBetaF/R, leakage,
+     * junction caps tBEcap/tBCcap, built-in potentials tBEpot/tBCpot, tDepCap, tVcrit, etc.).
+     * PNP polarity uses the same temperature math as NPN (bjttemp.c is polarity-agnostic;
+     * polarity affects junction voltage sign in bjtload.c, not bjttemp.c).
+     */
+    computeTemperature(ctx: TempContext): void {
+      // cite: bjttemp.c:107-108 — if(!here->BJTtempGiven) here->BJTtemp = ckt->CKTtemp + here->BJTdtemp;
+      const effectiveT = _tempGiven ? params.TEMP : ctx.cktTemp;
+      tp = computeBjtTempParams({
+        IS: params.IS, BF: params.BF, BR: params.BR,
+        ISE: params.ISE, ISC: params.ISC,
+        NE: params.NE, NC: params.NC, EG: params.EG, XTI: params.XTI, XTB: params.XTB,
+        IKF: params.IKF, IKR: params.IKR,
+        RC: params.RC, RE: params.RE, RB: params.RB, RBM: params.RBM, IRB: params.IRB,
+        CJE: params.CJE, VJE: params.VJE, MJE: params.MJE,
+        CJC: params.CJC, VJC: params.VJC, MJC: params.MJC,
+        CJS: params.CJS, VJS: params.VJS, MJS: params.MJS,
+        FC: params.FC, AREA: params.AREA, TNOM: params.TNOM,
+        VAF: params.VAF, VAR: params.VAR,
+        PTF: params.PTF, TF: params.TF, TR: params.TR,
+        ISS: params.ISS, TEMP: effectiveT,
+      }, effectiveT);
+    }
+
     setParam(key: string, value: number): void {
-      if (key in params) {
+      if (key === "TEMP") {
+        params.TEMP = value;
+        _tempGiven = true;
+        // cite: bjttemp.c:107-110 — per-instance TEMP given overrides circuit temp.
+        // Re-run temperature math at the new per-instance temperature.
+        tp = computeBjtTempParams({
+          IS: params.IS, BF: params.BF, BR: params.BR,
+          ISE: params.ISE, ISC: params.ISC,
+          NE: params.NE, NC: params.NC, EG: params.EG, XTI: params.XTI, XTB: params.XTB,
+          IKF: params.IKF, IKR: params.IKR,
+          RC: params.RC, RE: params.RE, RB: params.RB, RBM: params.RBM, IRB: params.IRB,
+          CJE: params.CJE, VJE: params.VJE, MJE: params.MJE,
+          CJC: params.CJC, VJC: params.VJC, MJC: params.MJC,
+          CJS: params.CJS, VJS: params.VJS, MJS: params.MJS,
+          FC: params.FC, AREA: params.AREA, TNOM: params.TNOM,
+          VAF: params.VAF, VAR: params.VAR,
+          PTF: params.PTF, TF: params.TF, TR: params.TR,
+          ISS: params.ISS, TEMP: value,
+        }, value);
+      } else if (key in params) {
         params[key] = value;
         tp = makeTp();
       }

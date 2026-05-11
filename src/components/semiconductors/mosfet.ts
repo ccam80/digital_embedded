@@ -53,6 +53,7 @@ import {
   MODEINITTRAN, MODEINITPRED, MODETRAN, MODETRANOP, MODEUIC,
   MODEDCOP, MODEDCTRANCURVE,
 } from "../../solver/analog/ckt-mode.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
 
 // Phase 5 precondition: compile error if LoadContext is missing bypass or voltTol.
 export type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
@@ -815,6 +816,13 @@ function _createMosfetElementWithPolarity(
   // For PMOS, VTO is typically negative (e.g., -1.0). computeTempParams applies
   // polarity at the tVbi/tVto evaluation sites per mos1temp.c:170-176.
 
+  // cite: mos1temp.c:44-289 — instance temperature pass; seeded at REFTEMP here,
+  // updated by computeTemperature() before each analysis run and by setParam("TEMP").
+  let tp = computeTempParams(params, polarity);
+  params._tKP  = tp.tTransconductance;
+  params._tPhi = tp.tPhi;
+  params._tVto = tp.tVto;
+
   // Derived reactive detection (mirrors ngspice's cap-companion gate bitmask).
   const ld = params.LD;
   const effectiveLength = params.L - 2 * ld;
@@ -855,8 +863,40 @@ function _createMosfetElementWithPolarity(
     private _mode = 0;
     private _von  = 0;
 
+    // cite: mos1temp.c:129-133 — MOS1tempGiven flag; when false, instance temp = ckt->CKTtemp.
+    private _tempGiven = false;
+    // Last TempContext received from engine; used by setParam("TEMP") hot-load path.
+    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM };
+
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);
+    }
+
+    /**
+     * computeTemperature — engine-driven per-instance MOSFET temperature pass.
+     *
+     * cite: mos1temp.c:129-133 — if(!here->MOS1tempGiven) { here->MOS1temp = ckt->CKTtemp + here->MOS1dtemp; }
+     * cite: mos1temp.c:135    — vt = here->MOS1temp * CONSTKoverQ
+     * cite: mos1temp.c:136    — ratio = here->MOS1temp / model->MOS1tnom
+     * cite: mos1temp.c:137    — fact2 = here->MOS1temp / REFTEMP
+     * cite: mos1temp.c:165-166 — ratio4 = ratio * sqrt(ratio); tTransconductance = KP / ratio4
+     * cite: mos1temp.c:168-169 — phio = (PHI - pbfact1) / fact1; tPhi = fact2 * phio + pbfact
+     * cite: mos1temp.c:170-176 — tVbi, tVto
+     * cite: mos1temp.c:177-178 — tSatCur, tSatCurDens
+     * cite: mos1temp.c:181-201 — tBulkPot, tCbd, tCbs, tCj, tCjsw, tDepCap
+     * cite: mos1temp.c:202-216 — drainVcrit, sourceVcrit
+     * cite: mos1temp.c:218-289 — f2d/f3d/f4d/f2s/f3s/f4s junction cap linearization
+     */
+    computeTemperature(ctx: TempContext): void {
+      this._lastCtx = ctx;
+      // cite: mos1temp.c:132-133 — use per-instance TEMP if given, else ckt->CKTtemp.
+      if (!this._tempGiven) {
+        params.TEMP = ctx.cktTemp;
+      }
+      tp = computeTempParams(params, polarity);
+      params._tKP  = tp.tTransconductance;
+      params._tPhi = tp.tPhi;
+      params._tVto = tp.tVto;
     }
 
     get _p(): ResolvedMosfetParams {
@@ -1738,10 +1778,11 @@ function _createMosfetElementWithPolarity(
     setParam(key: string, value: number): void {
       if (key in params) {
         params[key] = value;
-        tp = computeTempParams(params, polarity);
-        params._tKP = tp.tTransconductance;
-        params._tPhi = tp.tPhi;
-        params._tVto = tp.tVto;
+        // cite: mos1temp.c:129-133 — track whether a per-instance TEMP was given.
+        if (key === "TEMP") {
+          this._tempGiven = true;
+        }
+        this.computeTemperature(this._lastCtx);
       }
     }
 

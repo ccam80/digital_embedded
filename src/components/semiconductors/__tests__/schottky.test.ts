@@ -184,6 +184,67 @@ describe("Schottky parameter hot-load (T1)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Category 4 — computeTemperature engine-driven path (T1)
+//
+// SchottkyElement delegates to createDiodeElement (schottky.ts:74-80). The
+// produced DiodeAnalogElement receives computeTemperature(ctx) from task 5.1.3.
+// No override is needed in schottky.ts — inheritance is the contract.
+//
+// cite: diotemp.c:84-85 — if(!DIOtempGiven) here->DIOtemp = ckt->CKTtemp
+// The engine-driven path updates tIS/tVJ/tCJO/tVcrit/tBV when ctx.cktTemp
+// differs from 300.15 K (REFTEMP), producing measurably different node voltages.
+// ---------------------------------------------------------------------------
+
+describe("Schottky computeTemperature engine-driven path (T1)", () => {
+  it("computeTemperature_ambient_propagates_to_vf", () => {
+    // Build at default temperature (300.15 K). Run DCOP. Record Vf.
+    const fixCold = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    fixCold.coordinator.dcOperatingPoint();
+    const vfCold =
+      fixCold.engine.getNodeVoltage(fixCold.circuit.labelToNodeId.get("D1:A")!) -
+      fixCold.engine.getNodeVoltage(fixCold.circuit.labelToNodeId.get("D1:K")!);
+
+    // Build a second fixture; raise ambient temperature via setCircuitTemp.
+    // This triggers the engine-driven computeTemperature pass on the DIO element
+    // (DiodeAnalogElement.computeTemperature — provided by task 5.1.3).
+    const fixHot = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    fixHot.facade.setCircuitTemp(400);
+    fixHot.coordinator.dcOperatingPoint();
+    const vfHot =
+      fixHot.engine.getNodeVoltage(fixHot.circuit.labelToNodeId.get("D1:A")!) -
+      fixHot.engine.getNodeVoltage(fixHot.circuit.labelToNodeId.get("D1:K")!);
+
+    // Raising T raises tIS exponentially → at the same current Vf drops.
+    expect(vfHot).not.toBeCloseTo(vfCold, 6);
+    expect(vfHot).toBeLessThan(vfCold);
+  });
+
+  it("computeTemperature_per_instance_override_wins_over_ambient", () => {
+    // Per-instance TEMP set via setParam must not be overwritten by the
+    // engine-driven computeTemperature pass (diotemp.c:84 DIOtempGiven guard).
+    const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
+    const { ce } = findD1(fix);
+
+    // Set per-instance TEMP override to 450 K.
+    fix.coordinator.setComponentProperty(ce, "TEMP", 450);
+    fix.coordinator.dcOperatingPoint();
+    const vfOverride =
+      fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!) -
+      fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+
+    // Now set ambient back to default. The override must win.
+    fix.facade.setCircuitTemp(300.15);
+    fix.coordinator.step();
+    const vfAfter =
+      fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!) -
+      fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+
+    // Vf must remain near the 450 K operating point (not revert to cooler default).
+    expect(vfAfter).toBeLessThan(vfOverride + 0.05);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category 6 — Limiting events (T1, own engine)
 // pnjlim fires on the diode AK junction during DCOP NR. Drive a forward-biased
 // Schottky and read fix.coordinator.getLimitingEvents().

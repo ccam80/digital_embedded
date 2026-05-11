@@ -247,6 +247,89 @@ describe("Zener parameter hot-load (T1)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Category 4 — computeTemperature engine-driven path (T1)
+//
+// ZenerAnalogElement.computeTemperature(ctx) is the engine-driven DEVtemperature
+// callback (ckttemp.c:28-33 orchestration). It propagates ctx.cktTemp to the
+// zener's operating temperature when no per-instance TEMP override is active
+// (diotemp.c:84-85: if(!DIOtempGiven) here->DIOtemp = ckt->CKTtemp).
+// ---------------------------------------------------------------------------
+
+describe("Zener computeTemperature engine-driven path (T1)", () => {
+  it("computeTemperature_ambient_propagates_to_vf", () => {
+    // Build at default temperature (300.15 K). Run DCOP. Record Vf.
+    const fixCold = buildFixture({ build: (_r, f) => buildZenerForward(f) });
+    fixCold.coordinator.dcOperatingPoint();
+    const vAnodeCold = fixCold.engine.getNodeVoltage(fixCold.circuit.labelToNodeId.get("D1:A")!);
+    const vCathCold  = fixCold.engine.getNodeVoltage(fixCold.circuit.labelToNodeId.get("D1:K")!);
+    const vfCold = vAnodeCold - vCathCold;
+
+    // Build a second fixture; call setCircuitTemp(400) to trigger the
+    // engine-driven computeTemperature pass on all DIO elements.
+    const fixHot = buildFixture({ build: (_r, f) => buildZenerForward(f) });
+    fixHot.facade.setCircuitTemp(400);
+    fixHot.coordinator.dcOperatingPoint();
+    const vAnodeHot = fixHot.engine.getNodeVoltage(fixHot.circuit.labelToNodeId.get("D1:A")!);
+    const vCathHot  = fixHot.engine.getNodeVoltage(fixHot.circuit.labelToNodeId.get("D1:K")!);
+    const vfHot = vAnodeHot - vCathHot;
+
+    // Raising T raises tIS exponentially → at the same current Vf drops.
+    expect(vfHot).not.toBeCloseTo(vfCold, 6);
+    expect(vfHot).toBeLessThan(vfCold);
+  });
+
+  it("computeTemperature_respects_per_instance_override", () => {
+    // Per-instance TEMP set via setParam must not be overwritten by the
+    // engine-driven computeTemperature pass (diotemp.c:84 DIOtempGiven guard).
+    const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
+    const { idx } = findZenerAnalog(fix);
+    const ce = fix.circuit.elementToCircuitElement.get(idx)!;
+
+    // Set per-instance TEMP override to 500 K.
+    fix.coordinator.setComponentProperty(ce, "TEMP", 500);
+    fix.coordinator.dcOperatingPoint();
+    const vAnode500 = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vCath500  = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+    const vf500 = vAnode500 - vCath500;
+
+    // Now push a lower ambient via setCircuitTemp. The per-instance override
+    // must win — result must not revert to the ambient-temperature Vf.
+    fix.facade.setCircuitTemp(300.15);
+    fix.coordinator.step();
+    const vAnodeAfter = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
+    const vCathAfter  = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
+    const vfAfter = vAnodeAfter - vCathAfter;
+
+    // The Vf must remain near the 500 K operating point (lower than default).
+    // It should not jump to a higher (cooler) value.
+    expect(vfAfter).toBeLessThan(vf500 + 0.05);
+  });
+
+  it("computeTemperature_breakdown_tBV_shifts_with_ambient", () => {
+    // In breakdown regime: tBV is derived from BV, IBV, TCV and temperature.
+    // Raising circuit temperature via setCircuitTemp must shift the breakdown
+    // clamp compared with the default-temperature operating point.
+    // cite: diotemp.c:208-244 — tBreakdownVoltage = BV - TCV * dt
+    const fixCold = buildFixture({ build: (_r, f) => buildZenerBreakdown(f) });
+    fixCold.coordinator.dcOperatingPoint();
+    const vdCold =
+      fixCold.engine.getNodeVoltage(fixCold.circuit.labelToNodeId.get("D1:A")!) -
+      fixCold.engine.getNodeVoltage(fixCold.circuit.labelToNodeId.get("D1:K")!);
+
+    const fixHot = buildFixture({ build: (_r, f) => buildZenerBreakdown(f) });
+    fixHot.facade.setCircuitTemp(400);
+    fixHot.coordinator.dcOperatingPoint();
+    const vdHot =
+      fixHot.engine.getNodeVoltage(fixHot.circuit.labelToNodeId.get("D1:A")!) -
+      fixHot.engine.getNodeVoltage(fixHot.circuit.labelToNodeId.get("D1:K")!);
+
+    // At higher temperature tIS grows, causing the NR solution to shift.
+    // The two results must differ measurably.
+    expect(vdHot).not.toBeCloseTo(vdCold, 4);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Category 6 — Limiting events (T1, own engine)
 // pnjlim fires on the AK junction during DCOP NR. Drive a forward-biased
 // zener and read fix.coordinator.getLimitingEvents().

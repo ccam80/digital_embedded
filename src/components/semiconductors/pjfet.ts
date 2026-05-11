@@ -38,6 +38,7 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -263,6 +264,9 @@ class PJfetAnalogElement extends PoolBackedAnalogElement {
 
   // Ephemeral per-iteration icheck flag (jfetload.c:500-508 CKTnoncon bump).
   private _icheckLimited = false;
+
+  // cite: jfettemp.c:83-88 — JFETtempGiven flag; false until setParam("TEMP") called.
+  private _tempGiven = false;
 
   // Internal nodes allocated during setup()- jfetset.c:115-158
   private _sourcePrimeNode = -1;
@@ -807,8 +811,30 @@ class PJfetAnalogElement extends PoolBackedAnalogElement {
     return [ig, id, iS];
   }
 
+  /**
+   * computeTemperature — engine-driven temperature pass for PJFET.
+   *
+   * cite: jfettemp.c:83-88 —
+   *   if(!here->JFETtempGiven) here->JFETtemp = ckt->CKTtemp + here->JFETdtemp;
+   *   vt = here->JFETtemp * CONSTKoverQ;
+   * Resolve effective T: per-instance TEMP given → use params.TEMP; else ctx.cktTemp.
+   * cite: jfettemp.c:89-112 — per-instance temperature math (tSatCur, caps, tThreshold, tBeta).
+   * Temperature math is polarity-agnostic (jfettemp.c shared by NJF and PJF).
+   */
+  computeTemperature(ctx: TempContext): void {
+    // cite: jfettemp.c:83-88 — if(!JFETtempGiven) JFETtemp = CKTtemp + JFETdtemp
+    const effectiveT = this._tempGiven ? this._params.TEMP : ctx.cktTemp;
+    this._params.TEMP = effectiveT;
+    this._tp = computePjfetTempParams(this._params);
+  }
+
   setParam(key: string, value: number): void {
-    if (key in this._params) {
+    if (key === "TEMP") {
+      this._params.TEMP = value;
+      this._tempGiven = true;
+      // cite: jfettemp.c:83-88 — per-instance TEMP given overrides circuit temp.
+      this._tp = computePjfetTempParams(this._params);
+    } else if (key in this._params) {
       this._params[key] = value;
       this._tp = computePjfetTempParams(this._params);
     }
