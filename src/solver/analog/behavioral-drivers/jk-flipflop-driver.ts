@@ -9,8 +9,7 @@
  *   J=1, K=1 â†’ toggle (q = 1-q)
  *
  * Per Composite M18 (phase-composite-architecture.md), J-148
- * (contracts_group_10.md). Behavior migrated from
- * `.recovery/behavioral-flipflop-jk.ts.orig`'s `BehavioralJKFlipflopElement`.
+ * (contracts_group_10.md).
  */
 
 import {

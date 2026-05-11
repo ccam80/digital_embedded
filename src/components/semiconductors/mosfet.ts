@@ -816,12 +816,9 @@ function _createMosfetElementWithPolarity(
   // For PMOS, VTO is typically negative (e.g., -1.0). computeTempParams applies
   // polarity at the tVbi/tVto evaluation sites per mos1temp.c:170-176.
 
-  // cite: mos1temp.c:44-289 — instance temperature pass; seeded at REFTEMP here,
-  // updated by computeTemperature() before each analysis run and by setParam("TEMP").
-  let tp = computeTempParams(params, polarity);
-  params._tKP  = tp.tTransconductance;
-  params._tPhi = tp.tPhi;
-  params._tVto = tp.tVto;
+  // tp is set by computeTemperature() (cite: mos1temp.c:44-289) before the
+  // first NR iteration and on every setParam("TEMP") hot-load call.
+  let tp: MosfetTempParams = {} as MosfetTempParams;
 
   // Derived reactive detection (mirrors ngspice's cap-companion gate bitmask).
   const ld = params.LD;

@@ -13,8 +13,7 @@
  *              for diagnostic emission is not described).
  *
  * Per Composite M16 (phase-composite-architecture.md), J-156
- * (contracts_group_10.md). Behavior migrated from
- * `.recovery/behavioral-flipflop-rs.ts.orig`'s `BehavioralRSFlipflopElement`.
+ * (contracts_group_10.md).
  */
 
 import {

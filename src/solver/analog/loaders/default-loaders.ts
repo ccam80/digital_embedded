@@ -36,7 +36,6 @@ export interface AcHandlerCtx {
 /**
  * Default load handler -- trivial per-instance walk.
  *
- * Mirrors the deleted flat loop in ckt-load.ts (lines 87-96 pre-Phase-0).
  * For every element in the bucket, calls `el.load(ctx)`.
  *
  * cite: cktload.c:61-75 -- `for (i = 0; i < DEVmaxnum; i++) DEVices[i]->DEVload(ckt)`
@@ -54,7 +53,6 @@ export const defaultLoadHandler: FamilyHandler = {
 /**
  * Default AC stamp handler -- trivial per-instance walk.
  *
- * Mirrors the deleted flat loop in ac-analysis.ts (line 240 pre-Phase-0).
  * For every element in the bucket, calls `el.stampAc?.(solver, omega, loadCtx)`.
  * The `stampAc` method is optional on AnalogElement; elements that do not
  * implement it are silently skipped (no-op), matching ngspice's NULL function-

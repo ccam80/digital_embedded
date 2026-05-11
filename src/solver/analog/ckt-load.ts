@@ -32,12 +32,12 @@ const CKTNS_PIN = 1e10;
 /**
  * Per-element load with CKTtroubleNode tracking.
  *
- * Mirrors the deleted flat walk in pre-Phase-0 ckt-load.ts (lines 87-96),
- * preserving per-element granularity for trouble-node assignment.
+ * Per-element load with CKTtroubleNode tracking.
+ *
+ * Preserves per-element granularity for trouble-node assignment.
  * Passed as the `defaultHandler` to `runByDeviceFamily` so that every
- * bucket without a registered specialist handler (all families in Phase 2)
- * executes the identical `el.load(ctx)` + noncon-check body as the
- * original flat loop.
+ * bucket without a registered specialist handler executes the
+ * `el.load(ctx)` + noncon-check body.
  *
  * cite: cktload.c:61-75 -- per-type DEVload loop.
  * cite: cktload.c:64-65 -- CKTtroubleNode reset when noncon rises.
@@ -118,7 +118,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // In Phase 2 all families fall through to the default handler; no specialist
   // handlers are registered yet (Phase 4 registers IND_FAMILY). The default
   // handler here is a locally-constructed wrapper that preserves the per-element
-  // CKTtroubleNode tracking from the deleted flat walk (cktload.c:64-65).
+  // CKTtroubleNode tracking per cktload.c:64-65.
   runByDeviceFamily(ctx.elementsByFamily, "load", ctx.loadCtx, makeTroubleTrackingHandler(ctx));
 
   // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.
