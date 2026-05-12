@@ -81,15 +81,14 @@ function canonicalizeSpiceLabel(rawLabel: string, requiredPrefix: string): strin
 // ---------------------------------------------------------------------------
 
 /**
- * Throw if a sub-element parameter uses siblingBranch / siblingState. Sibling
- * refs reach into a peer leaf's pool slot or branch row at every cktLoad-
- * they're a digiTS-specific state-coupling mechanism with no SPICE-syntax
- * equivalent. Their presence on a sub-element means the parent composite is
- * non-SPICE-faithful as currently factored. Author must either fuse the
- * coupled leaves into a single SPICE-primitive device (e.g. relay's
- * Switch+RelayCoupling collapse into one current-controlled-switch leaf
- * mapping to ngspice's W element) or mark the parent component
- * pairedSpiceEquivalent: false on its definition.
+ * Throw if a sub-element parameter uses siblingBranch. Sibling-branch refs
+ * reach into a peer leaf's branch row at every cktLoad- they're a digiTS-
+ * specific state-coupling mechanism with no SPICE-syntax equivalent (except
+ * via the MutualInductor K-element exemption below). Their presence on a
+ * sub-element means the parent composite is non-SPICE-faithful as currently
+ * factored. Author must either fuse the coupled leaves into a single SPICE-
+ * primitive device or mark the parent component pairedSpiceEquivalent:
+ * false on its definition.
  *
  * Exemption: `MutualInductor` sub-elements are permitted to use
  * `siblingBranch` on `L1_branch` / `L2_branch` because they map directly to
@@ -109,7 +108,7 @@ function assertNoSiblingRefs(
   for (const key of Object.keys(params)) {
     const v = params[key];
     if (typeof v === "object" && v !== null && "kind" in v &&
-        (v.kind === "siblingBranch" || v.kind === "siblingState")) {
+        v.kind === "siblingBranch") {
       if (sub.typeId === "MutualInductor" &&
           v.kind === "siblingBranch" &&
           (key === "L1_branch" || key === "L2_branch")) {

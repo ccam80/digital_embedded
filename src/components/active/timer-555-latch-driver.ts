@@ -4,9 +4,7 @@
  * Consumed by `buildTimer555Netlist` in `timer-555.ts` as the `latchDrv`
  * sub-element of the 555-timer composite. Reads comparator outputs, drives
  * latch state, stamps the discharge transistor's base voltage via a
- * (disBase, disBase) conductance, and emits the OUT pin's logic level via
- * the `OUTPUT_LOGIC_LEVEL` slot (consumed by the sibling
- * `DigitalOutputPinLoaded` via `siblingState`).
+ * (disBase, disBase) conductance.
  *
  * ngspice peer: bsrcload.c (behavioural source).
  *
@@ -35,14 +33,9 @@ const SCHEMA: StateSchema = defineStateSchema("Timer555LatchDriver", [
     name: "LATCH_Q",
     doc: "RS latch output (0 = reset, 1 = set). Updated each iteration from comparator outputs and RST pin.",
   },
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Mirrors LATCH_Q; consumed via siblingState by the OUT pin's BehavioralOutputDriver sub-element.",
-  },
 ]);
 
 const SLOT_LATCH_Q      = SCHEMA.indexOf.get("LATCH_Q")!;
-const SLOT_OUTPUT_LEVEL = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -120,7 +113,6 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
     ctx.rhs[this.pinNodes.get("disBase")!] += targetV * G_base;
 
     s0[base + SLOT_LATCH_Q]      = q;
-    s0[base + SLOT_OUTPUT_LEVEL] = q;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

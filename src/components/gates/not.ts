@@ -254,7 +254,7 @@ export const { paramDefs: NOT_BEHAVIORAL_PARAM_DEFS, defaults: NOT_BEHAVIORAL_DE
 // Sub-elements:
 //   drv    : BehavioralNotDriver  (1-bit pure-truth-function leaf, N=1 fixed)
 //   inPin_1: DigitalInputPin{Loaded|Unloaded}
-//   outPin : DigitalOutputPin{Loaded|Unloaded}  (consumes drv OUTPUT_LOGIC_LEVEL)
+//   outPin : DigitalOutputPin{Loaded|Unloaded}
 // ---------------------------------------------------------------------------
 
 export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
@@ -270,7 +270,7 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  // Driver leaf.
   elements.push({
     typeId: "BehavioralNotDriver",
     modelRef: "default",
@@ -290,7 +290,6 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push([0, gndIdx]); // in=0, gnd=gndIdx
 
-  // Output pin- siblingState consumes the driver's OUTPUT_LOGIC_LEVEL slot.
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -300,8 +299,6 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL" },
     },
   });
   netlist.push([outIdx, gndIdx]);

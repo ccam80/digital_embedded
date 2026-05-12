@@ -97,9 +97,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
       subElementName: `outPin_${i}`,
-      params: {
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_LOGIC_LEVEL_${i}` },
-      },
+      params: {},
     });
     netlist.push([netOutBase + i, netGnd]);
   }
@@ -108,9 +106,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
     typeId: "DigitalOutputPinLoaded",
     modelRef: "default",
     subElementName: "ovfPin",
-    params: {
-      inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_OVF" },
-    },
+    params: {},
   });
   netlist.push([netOvf, netGnd]);
 
@@ -207,17 +203,13 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
       subElementName: "outPin",
-      params: {
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_OUT" },
-      },
+      params: {},
     },
     {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
       subElementName: "ovfPin",
-      params: {
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_OVF" },
-      },
+      params: {},
     },
   ];
 
@@ -301,9 +293,7 @@ export function buildRegisterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
       subElementName: "qPin",
-      params: {
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_Q" },
-      },
+      params: {},
     },
   ];
 

@@ -4,8 +4,7 @@
  *
  * Bus-pin shape: the "in" and "out" ports each carry a packed N-bit integer
  * on a single analog node (not N separate 1-bit nodes). The driver reads
- * rhsOld[inNode] as a packed integer and writes COUNT (packed integer) to
- * OUTPUT_LOGIC_LEVEL_OUT, consumed by a single DigitalOutputPinLoaded sibling.
+ * rhsOld[inNode] as a packed integer.
  *
  * Schema is fixed at 4 slots regardless of bitWidth (contrast with
  * counter-driver.ts which uses 2N+2 slots). The bitWidth value parameterises
@@ -38,8 +37,6 @@ import { detectRisingEdge, logicLevel } from "./edge-detect.js";
 // Slot layout (indices 0-3, fixed regardless of bitWidth):
 //   [0] LAST_CLOCK           - clock voltage at prior accepted step (NaN sentinel)
 //   [1] COUNT                - latched count as packed integer
-//   [2] OUTPUT_LOGIC_LEVEL_OUT - packed integer count; consumed by outPin sibling
-//   [3] OUTPUT_LOGIC_LEVEL_OVF - 1-bit overflow flag; consumed by ovfPin sibling
 
 const COUNTER_PRESET_SCHEMAS = new Map<number, StateSchema>();
 
@@ -54,15 +51,7 @@ function getCounterPresetSchema(bitWidth: number): StateSchema {
     },
     {
       name: "COUNT",
-      doc: "Latched count as packed integer. Read-modify-written each load(); separated from OUTPUT_LOGIC_LEVEL_OUT per d-flipflop latch-vs-output convention.",
-    },
-    {
-      name: "OUTPUT_LOGIC_LEVEL_OUT",
-      doc: "Packed integer count output; consumed via siblingState by the outPin DigitalOutputPinLoaded sub-element.",
-    },
-    {
-      name: "OUTPUT_LOGIC_LEVEL_OVF",
-      doc: "Overflow flag (1 when at overflow condition and en high); consumed via siblingState by the ovfPin DigitalOutputPinLoaded sub-element.",
+      doc: "Latched count as packed integer. Read-modify-written each load();.",
     },
   ];
 
@@ -102,8 +91,6 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
   private readonly _maxValue: number;
   private readonly _slotLastClock: number;
   private readonly _slotCount: number;
-  private readonly _slotOut: number;
-  private readonly _slotOvf: number;
   private readonly _enNode: number;
   private readonly _cNode: number;
   private readonly _dirNode: number;
@@ -125,8 +112,6 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
     this.stateSize = this.stateSchema.size;
     this._slotLastClock = this.stateSchema.indexOf.get("LAST_CLOCK")!;
     this._slotCount     = this.stateSchema.indexOf.get("COUNT")!;
-    this._slotOut       = this.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL_OUT")!;
-    this._slotOvf       = this.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL_OVF")!;
 
     this._enNode  = pinNodes.get("en")!;
     this._cNode   = pinNodes.get("C")!;
@@ -198,13 +183,9 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
 
     this._firstSample = false;
 
-    const atOverflow = dir ? count === 0 : count === this._maxValue;
-    const ovf = (atOverflow && en) ? 1 : 0;
 
     s0[base + this._slotLastClock] = vClock;
     s0[base + this._slotCount]     = count;
-    s0[base + this._slotOut]       = count;
-    s0[base + this._slotOvf]       = ovf;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

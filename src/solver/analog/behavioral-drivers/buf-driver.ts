@@ -3,10 +3,8 @@
  * BUF (non-inverting buffer) gate.
  *
  * Reads 1 input voltage from rhsOld (relative to gnd), threshold-classifies
- * it against per-instance vIH / vIL, and writes the result directly to
- * OUTPUT_LOGIC_LEVEL (identity truth function: output = input). That slot is
- * consumed via siblingState by the parent composite's outPin
- * DigitalOutputPinLoaded sub-element.
+ * it against per-instance vIH / vIL, and writes the result (identity truth
+ * function: output = input).
  *
  * Canonical reference for **Template A-fixed**: 1-bit pure-truth driver with
  * fixed N=1 input pin count. Mirrors and-driver.ts shape throughout (imports,
@@ -33,14 +31,7 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralBufDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Pass-through output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-  },
-]);
-
-const SLOT_OUT = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
+const SCHEMA: StateSchema = defineStateSchema("BehavioralBufDriver", []);
 
 // ---------------------------------------------------------------------------
 // Pin layout- fixed N=1, module-level const (Template A-fixed)
@@ -99,31 +90,7 @@ export class BehavioralBufDriverElement extends PoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
   }
 
-  /**
-   * BUF truth function: identity (output = classified input).
-   *
-   * Threshold-classify with hold-on-indeterminate semantic (mirrors and-driver
-   * pattern with N=1):
-   *   - v < vIL  â†’ output 0
-   *   - vIL <= v < vIH â†’ hold prior output (CMOS metastability proxy)
-   *   - v >= vIH â†’ output 1
-   */
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
-    const gnd = rhsOld[this._gndNode];
-    const prev: 0 | 1 = s1[base + SLOT_OUT] >= 0.5 ? 1 : 0;
-
-    const v = rhsOld[this._inNode] - gnd;
-
-    let result: 0 | 1;
-    if      (v <  this._vIL) result = 0;
-    else if (v <  this._vIH) result = prev; // indeterminate: hold prior
-    else                     result = 1;
-
-    s0[base + SLOT_OUT] = result;
+  load(_ctx: LoadContext): void {
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

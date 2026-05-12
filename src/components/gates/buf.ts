@@ -119,7 +119,7 @@ export const { paramDefs: BUF_BEHAVIORAL_PARAM_DEFS, defaults: BUF_BEHAVIORAL_DE
 // Sub-elements:
 //   drv    : BehavioralBufDriver (1-bit identity driver, N=1 fixed)
 //   inPin_1: DigitalInputPin{Loaded|Unloaded}
-//   outPin : DigitalOutputPin{Loaded|Unloaded} (consumes drv OUTPUT_LOGIC_LEVEL)
+//   outPin : DigitalOutputPin{Loaded|Unloaded}
 // ---------------------------------------------------------------------------
 
 export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
@@ -135,7 +135,7 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  // Driver leaf.
   elements.push({
     typeId: "BehavioralBufDriver",
     modelRef: "default",
@@ -156,7 +156,6 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push([0, gndIdx]);
 
-  // Output pin- siblingState consumes driver's OUTPUT_LOGIC_LEVEL slot.
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -166,8 +165,6 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL" },
     },
   });
   netlist.push([outIdx, gndIdx]);

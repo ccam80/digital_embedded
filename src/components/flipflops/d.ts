@@ -68,8 +68,8 @@ export const { paramDefs: D_FF_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_BEHAVIORAL_
 // Ports: D, C, Q, ~Q, gnd (indices 0..4)
 // Sub-elements:
 //   drv  : BehavioralDFlipflopDriver  (1-bit pure-truth-function leaf)
-//   qPin : DigitalOutputPinLoaded     (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
-//   nqPin: DigitalOutputPinLoaded     (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//   qPin : DigitalOutputPinLoaded     (drives Q)
+//   nqPin: DigitalOutputPinLoaded     (drives ~Q)
 //
 // Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
 // bit-width replication is composite-expansion infrastructure and is not
@@ -99,8 +99,6 @@ export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
         },
       },
       {
@@ -112,8 +110,6 @@ export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
         },
       },
     ],

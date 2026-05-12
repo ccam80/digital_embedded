@@ -2,13 +2,11 @@
  * BehavioralButtonLEDDriverElement- pure threshold-classification driver leaf
  * for the ButtonLED component.
  *
- * Reads the LED input voltage (relative to gnd) from rhsOld, threshold-
+ * Reads the LED input voltage (relative to gnd) from rhsOld and threshold-
  * classifies it against per-instance vIH / vIL with hysteresis (hold-on-
- * indeterminate), and writes the result to OUTPUT_LOGIC_LEVEL. That slot is
- * consumed via siblingState by the parent composite's outPin
- * DigitalOutputPinLoaded sub-element.
+ * indeterminate).
  *
- * No MNA stamps. Template A (3-pin, 1-slot, fixed pin count).
+ * No MNA stamps. Template A (3-pin, fixed pin count).
  *
  * Pin layout (MUST match the drv connectivity row in buildButtonLEDNetlist):
  *   out(0)  - button output net (included for parent-port symmetry; not read)
@@ -29,20 +27,12 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { logicLevel } from "./edge-detect.js";
 
 // ---------------------------------------------------------------------------
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralButtonLEDDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Threshold-classified LED input level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-  },
-]);
-
-const SLOT_OUT = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
+const SCHEMA: StateSchema = defineStateSchema("BehavioralButtonLEDDriver", []);
 
 // ---------------------------------------------------------------------------
 // Pin layout- fixed 3-pin (Template A), module-level const
@@ -105,18 +95,7 @@ export class BehavioralButtonLEDDriverElement extends PoolBackedAnalogElement {
    *   v <  vIL  â†’ output 0
    *   otherwise â†’ hold prior output
    */
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
-
-    const vIn = rhsOld[this._inNode] - rhsOld[this._gndNode];
-    const prev: 0 | 1 = s1[base + SLOT_OUT] >= 0.5 ? 1 : 0;
-
-    const level = logicLevel(vIn, this._vIH, this._vIL, prev);
-
-    s0[base + SLOT_OUT] = level;
+  load(_ctx: LoadContext): void {
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

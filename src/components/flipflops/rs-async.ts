@@ -67,8 +67,8 @@ export const { paramDefs: RS_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: RS_FF_AS_BEH
 // Ports: S, R, Q, ~Q, gnd (indices 0..4) -- level-sensitive, no clock
 // Sub-elements:
 //   drv  : BehavioralRSAsyncLatchDriver  (1-bit pure-truth-function leaf)
-//   qPin : DigitalOutputPinLoaded        (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
-//   nqPin: DigitalOutputPinLoaded        (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//   qPin : DigitalOutputPinLoaded        (drives Q)
+//   nqPin: DigitalOutputPinLoaded        (drives ~Q)
 //
 // Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
 // bit-width replication is composite-expansion infrastructure.
@@ -97,8 +97,6 @@ export function buildRSAsyncLatchNetlist(params: PropertyBag): MnaSubcircuitNetl
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
         },
       },
       {
@@ -110,8 +108,6 @@ export function buildRSAsyncLatchNetlist(params: PropertyBag): MnaSubcircuitNetl
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
         },
       },
     ],

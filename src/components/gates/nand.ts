@@ -220,8 +220,6 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL" },
     },
   });
   netlist.push([outIdx, gndIdx]);

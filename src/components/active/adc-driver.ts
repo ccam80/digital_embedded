@@ -2,9 +2,7 @@
  * ADCDriverElement- internal-only behavioral driver leaf for the N-bit ADC
  * composite. Reads one analog input (VIN), a clock (CLK), and a reference
  * voltage (VREF) relative to GND; runs an SAR or instant-conversion FSM
- * advanced by rising CLK edges; writes OUTPUT_EOC and OUTPUT_D0..OUTPUT_D(N-1)
- * slots consumed via siblingState by the parent ADC composite's
- * DigitalOutputPinLoaded siblings.
+ * advanced by rising CLK edges.
  *
  * Per Composite (phase-composite-architecture.md), J-018
  * (contracts_group_01.md). Canonical shape: Template A-multi-bit-schema
@@ -54,8 +52,6 @@ import { detectRisingEdge } from "../../solver/analog/behavioral-drivers/edge-de
 //   [2]          SAR_BITS             (packed bitmask, internal SAR register)
 //   [3]          SAR_BIT_INDEX        (current bit-under-test in convert phase)
 //   [4]          OUTPUT_CODE          (latched final code)
-//   [5]          OUTPUT_EOC           (end-of-conversion, consumed by eocPin)
-//   [6..5+N]     OUTPUT_D0..OUTPUT_D(N-1) (per-bit outputs, consumed by dPin siblings)
 
 const ADC_SCHEMAS = new Map<number, StateSchema>();
 
@@ -84,18 +80,7 @@ function getAdcSchema(bits: number): StateSchema {
       name: "OUTPUT_CODE",
       doc: "Latched final conversion code. Written when FSM transitions to ready; held until the next conversion completes.",
     },
-    {
-      name: "OUTPUT_EOC",
-      doc: "End-of-conversion flag (1 when FSM_PHASE==3/ready, 0 otherwise). Consumed via siblingState by the parent ADC composite's eocPin DigitalOutputPinLoaded sub-element.",
-    },
   ];
-
-  for (let i = 0; i < bits; i++) {
-    slots.push({
-      name: `OUTPUT_D${i}`,
-      doc: `Output bit ${i} of the latched code (LSB=0). Consumed via siblingState by the parent ADC composite's dPin${i} DigitalOutputPinLoaded sub-element.`,
-    });
-  }
 
   const schema = defineStateSchema(`ADCDriver_${bits}b`, slots);
   ADC_SCHEMAS.set(bits, schema);
@@ -104,8 +89,6 @@ function getAdcSchema(bits: number): StateSchema {
 
 // ---------------------------------------------------------------------------
 // Pin layout- fixed input-only: VIN, CLK, VREF, GND.
-// Output bits hang off sibling DigitalOutputPinLoaded sub-elements that read
-// OUTPUT_D0..OUTPUT_D(N-1) and OUTPUT_EOC via siblingState.
 // Order MUST match the parent's buildAdcNetlist connectivity row for drv
 // (compiler.ts:465: iterates min(pinLayout.length, connectivity.length)).
 // ---------------------------------------------------------------------------
@@ -138,8 +121,6 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
   private readonly _slotSarBits:     number;
   private readonly _slotSarBitIndex: number;
   private readonly _slotOutputCode:  number;
-  private readonly _slotOutputEoc:   number;
-  private readonly _slotOutBase:     number; // OUTPUT_D0 index
   private readonly _vinNode:  number;
   private readonly _clkNode:  number;
   private readonly _vrefNode: number;
@@ -163,8 +144,6 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     this._slotSarBits     = this.stateSchema.indexOf.get("SAR_BITS")!;
     this._slotSarBitIndex = this.stateSchema.indexOf.get("SAR_BIT_INDEX")!;
     this._slotOutputCode  = this.stateSchema.indexOf.get("OUTPUT_CODE")!;
-    this._slotOutputEoc   = this.stateSchema.indexOf.get("OUTPUT_EOC")!;
-    this._slotOutBase     = this.stateSchema.indexOf.get("OUTPUT_D0")!;
 
     this._vinNode  = pinNodes.get("VIN")!;
     this._clkNode  = pinNodes.get("CLK")!;
@@ -210,7 +189,7 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     let sarBits     = s1[base + this._slotSarBits];
     let sarBitIndex = s1[base + this._slotSarBitIndex];
     let outputCode  = s1[base + this._slotOutputCode];
-    let outputEoc   = s1[base + this._slotOutputEoc];
+    let outputEoc   = 0;
 
     const edge = !this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH);
     this._firstSample = false;
@@ -280,11 +259,7 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     s0[base + this._slotSarBits]     = sarBits;
     s0[base + this._slotSarBitIndex] = sarBitIndex;
     s0[base + this._slotOutputCode]  = outputCode;
-    s0[base + this._slotOutputEoc]   = outputEoc;
 
-    for (let i = 0; i < this._bits; i++) {
-      s0[base + this._slotOutBase + i] = (outputCode >>> i) & 1;
-    }
   }
 
   /**

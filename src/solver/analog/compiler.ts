@@ -40,7 +40,7 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
-import { isPoolBacked, AnalogElement } from "./element.js";
+import { AnalogElement } from "./element.js";
 import { getNgspiceLoadOrderByTypeId, getDeviceFamilyByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import {
@@ -276,7 +276,7 @@ function expandCompositeInstance(
     }
   }
 
-  // Build elementsByName index for siblingBranch / siblingState resolution.
+  // Build elementsByName index for siblingBranch resolution.
   const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
   for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
     const subEl = netlist.elements[elIdx]!;
@@ -370,49 +370,10 @@ function expandCompositeInstance(
             // Parent label is known at compile time; resolve immediately
             // instead of deferring to a patcher leaf at engine setup time.
             subProps.set(paramKey, `${parentLabel}:${ref.subElementName}`);
-          } else if (tag === "siblingState") {
-            const ref = v as {
-              kind: "siblingState";
-              subElementName: string;
-              slotName: string;
-            };
-            const sibling = elementsByName.get(ref.subElementName);
-            if (!sibling) {
-              throw new Error(`siblingState: unknown element "${ref.subElementName}"`);
-            }
-            const siblingDef = registry.get(sibling.typeId);
-            if (!siblingDef) {
-              throw new Error(
-                `siblingState: registry has no definition for typeId "${sibling.typeId}"`,
-              );
-            }
-            const siblingEl = constructedByName.get(ref.subElementName);
-            if (siblingEl === undefined) {
-              throw new Error(
-                `siblingState: sibling "${ref.subElementName}" not yet constructed ` +
-                  `when consumer needs slot "${ref.slotName}". Reorder ` +
-                  `netlist.elements so the sibling appears first.`,
-              );
-            }
-            const siblingSchema = isPoolBacked(siblingEl)
-              ? siblingEl.stateSchema
-              : undefined;
-            const slotIdx = siblingSchema?.indexOf.get(ref.slotName) ?? -1;
-            if (slotIdx < 0) {
-              throw new Error(
-                `siblingState: unknown slot "${ref.slotName}" on "${ref.subElementName}"`,
-              );
-            }
-            subProps.set(paramKey, {
-              kind: "poolSlotRef",
-              element: siblingEl,
-              slotIdx,
-            });
           } else {
             throw new Error(
               "Unsupported SubcircuitElementParam discriminator. " +
-                "Cross-leaf coupling MUST go through pool slots (siblingState) " +
-                "to preserve StatePool rollback. See composite-architecture-job.md ss11.2.",
+                "Allowed shapes: number, string, { kind: 'siblingBranch', subElementName }.",
             );
           }
         }

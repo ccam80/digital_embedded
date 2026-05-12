@@ -68,8 +68,6 @@ export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist 
     [9, 10, 6, 3, 7, 11, 5],          // latchDrv: comp1Out, comp2Out, rst, vcc, gnd, disBase, out
   ];
 
-  // OUT-pin handling- append DigitalOutputPinLoaded driven by latchDrv
-  // OUTPUT_LOGIC_LEVEL slot via siblingState.
   elements.push({
     typeId: "DigitalOutputPinLoaded",
     modelRef: "default",
@@ -79,8 +77,6 @@ export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist 
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState", subElementName: "latchDrv",
-                    slotName: "OUTPUT_LOGIC_LEVEL" },
     },
   });
   netlist.push([5 /* OUT port */, 7 /* GND port */]);

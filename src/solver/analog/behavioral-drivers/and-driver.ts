@@ -3,9 +3,7 @@
  * AND gate.
  *
  * Reads N input voltages from rhsOld (relative to gnd), threshold-classifies
- * each input against per-instance vIH / vIL, and writes the AND-reduced
- * result to OUTPUT_LOGIC_LEVEL. That slot is consumed via siblingState by
- * the parent composite's outPin DigitalOutputPinLoaded sub-element.
+ * each input against per-instance vIH / vIL, and writes the AND-reduced result.
  *
  * Canonical reference for **Template A-variable-pin**: 1-bit pure-truth
  * driver with variable input pin count per instance. Every other gate
@@ -39,14 +37,7 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralAndDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Reduced output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-  },
-]);
-
-const SLOT_OUT = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
+const SCHEMA: StateSchema = defineStateSchema("BehavioralAndDriver", []);
 
 // ---------------------------------------------------------------------------
 // Pin layout factory- per-instance variable input count
@@ -143,29 +134,7 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
    * pick: read sel bits, classify them, index into data inputs, output that
    * data input's classified bit (or hold prior on any indeterminate sel/data).
    */
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
-    const gnd = rhsOld[this._gndNode];
-    const prev: 0 | 1 = s1[base + SLOT_OUT] >= 0.5 ? 1 : 0;
-
-    let sawAbsorber = false;       // a "0" for AND short-circuits the reduction
-    let sawIndeterminate = false;
-    for (let i = 0; i < this._inputCount; i++) {
-      const v = rhsOld[this._inputNodes[i]] - gnd;
-      if      (v <  this._vIL) { sawAbsorber = true; break; }
-      else if (v <  this._vIH) { sawIndeterminate = true; }
-      // else v >= vIH: pass-through "1" for AND, no state change.
-    }
-
-    let result: 0 | 1;
-    if      (sawAbsorber)        result = 0;
-    else if (sawIndeterminate)   result = prev;
-    else                         result = 1;
-
-    s0[base + SLOT_OUT] = result;
+  load(_ctx: LoadContext): void {
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

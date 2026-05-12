@@ -138,9 +138,6 @@ function getTFFElement(fix: ReturnType<typeof buildFixture>): CircuitElement {
 
 describe("BehavioralTFlipflopDriver init (Cat 1)", () => {
   it("withEnable=true: post-warm-start Q=0, ~Q=1 with no prior clock activity", () => {
-    // Driver's initState seeds Q=0 → OUTPUT_LOGIC_LEVEL_Q=0,
-    // OUTPUT_LOGIC_LEVEL_NQ=1. The qPin / nqPin sub-elements drive the
-    // labelled Q / ~Q outputs from those slots.
     const fix = buildFixture({ build: buildTFFCircuit({ withEnable: true }) });
     expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);
     expect(fix.facade.readSignal(fix.coordinator, "QB")).toBe(1);

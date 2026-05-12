@@ -4,9 +4,7 @@
  *
  * Reads clock and D voltages from rhsOld, detects rising clock edge against
  * s1[LAST_CLOCK], samples D on the edge using vIH/vIL hysteresis, and writes
- * the latched Q value (and its complement) to OUTPUT_LOGIC_LEVEL_Q /
- * OUTPUT_LOGIC_LEVEL_NQ. Those slots are consumed via siblingState by the
- * D-FF netlist's qPin / nqPin DigitalOutputPinLoaded sub-elements.
+ * the latched Q value to LAST_CLOCK and Q slots.
  *
  * Strictly 1-bit. Multi-bit D-FF composites instantiate N driver leaves;
  * bit-width scaling is the parent composite's responsibility, not this
@@ -50,20 +48,10 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralDFlipflopDriver", [
     name: "Q",
     doc: "Latched output bit (0 or 1). Updated only on a rising clock edge from the D input.",
   },
-  {
-    name: "OUTPUT_LOGIC_LEVEL_Q",
-    doc: "Q output level (0 or 1) consumed via siblingState by the qPin DigitalOutputPinLoaded sub-element.",
-  },
-  {
-    name: "OUTPUT_LOGIC_LEVEL_NQ",
-    doc: "~Q output level (1 - Q) consumed via siblingState by the nqPin DigitalOutputPinLoaded sub-element.",
-  },
 ]);
 
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
-const SLOT_OUT_Q      = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_Q")!;
-const SLOT_OUT_NQ     = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_NQ")!;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -74,11 +62,6 @@ const SLOT_OUT_NQ     = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_NQ")!;
 // pinLayout[i].label and stores it in pinNodes against the resolved node
 // from connectivity[i] (compiler.ts:443-446).
 //
-// Q and ~Q pins are connected to the parent composite's Q / ~Q nets so the
-// driver could observe them, but load() does not stamp- the qPin / nqPin
-// DigitalOutputPinLoaded sub-elements consume the OUTPUT_LOGIC_LEVEL_*
-// slots via siblingState and own the actual VSRC stamps.
-
 const D_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "D",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
@@ -137,8 +120,6 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
     // exactly once (no pre-stamp s0 mutations).
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
-    s0[base + SLOT_OUT_Q]      = q;
-    s0[base + SLOT_OUT_NQ]     = 1 - q;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

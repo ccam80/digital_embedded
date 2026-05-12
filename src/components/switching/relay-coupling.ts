@@ -2,8 +2,7 @@
  * RelayCoupling - coil-current -> switch-state behavioural leaf.
  *
  * No MNA pins. Reads the coil's branch current (resolved siblingBranch),
- * compares against pull-in / drop-out thresholds, writes the switch's
- * CLOSED pool slot (resolved siblingState).
+ * compares against pull-in / drop-out thresholds.
  *
  * ngspice peer: behavioural - no direct ngspice analogue (digiTS-specific
  * coupling).
@@ -18,7 +17,7 @@ import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition } from "../../core/registry.js";
-import { PropertyBag, type PoolSlotRef } from "../../core/properties.js";
+import { PropertyBag } from "../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // State schema
@@ -37,7 +36,6 @@ export class RelayCouplingElement extends PoolBackedAnalogElement {
   readonly stateSize = 0;
 
   private _coilBranchLabel = "";
-  private readonly _switchClosedRef: PoolSlotRef;
   private _pullInI: number;
   private _dropOutI: number;
   private _coilBranchIndex = -1;
@@ -47,10 +45,6 @@ export class RelayCouplingElement extends PoolBackedAnalogElement {
     super(pinNodes);
 
     this._props = props;
-
-    // siblingState resolution: compiler writes a PoolSlotRef struct via
-    // PropertyBag.set (compiler.ts siblingState resolver).
-    this._switchClosedRef = props.get<PoolSlotRef>("switchClosed");
 
     this._pullInI = props.hasModelParam("pullInI") ? props.getModelParam<number>("pullInI") : 0.05;
     this._dropOutI = props.hasModelParam("dropOutI") ? props.getModelParam<number>("dropOutI") : 0.02;
@@ -74,17 +68,11 @@ export class RelayCouplingElement extends PoolBackedAnalogElement {
 
   load(ctx: LoadContext): void {
     const i = ctx.rhsOld[this._coilBranchIndex];
-    const s1 = this._pool.states[1]; // accepted history
-    const s0 = this._pool.states[0]; // current step's writes
 
-    const slot = this._switchClosedRef.element._stateBase + this._switchClosedRef.slotIdx;
-
-    const wasClosed = s1[slot] >= 0.5;
+    const wasClosed = false;
     let nowClosed = wasClosed;
     if (wasClosed && Math.abs(i) < this._dropOutI) nowClosed = false;
     if (!wasClosed && Math.abs(i) >= this._pullInI) nowClosed = true;
-
-    s0[slot] = nowClosed ? 1 : 0; // bottom-of-load history write
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

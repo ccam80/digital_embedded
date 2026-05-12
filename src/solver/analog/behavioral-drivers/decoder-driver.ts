@@ -4,10 +4,7 @@
  *
  * Reads K selector bit-voltages from rhsOld (relative to gnd), threshold-
  * classifies each with vIH / vIL hysteresis, assembles them into an integer
- * `sel`, and writes a one-hot pattern to OUTPUT_LOGIC_LEVEL_BIT0 ..
- * _BIT(N-1) (N = 2^K) where only OUTPUT_LOGIC_LEVEL_BIT${sel} is 1. Those
- * slots are consumed via siblingState by N sibling DigitalOutputPinLoaded
- * sub-elements in the parent decoder composite.
+ * `sel`.
  *
  * Hold-on-indeterminate is *whole-vector*: if ANY selector bit lands in
  * the indeterminate band (vIL <= v < vIH), every output slot copies its
@@ -48,11 +45,6 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // Memoised arity-indexed schema factory
 // ---------------------------------------------------------------------------
 //
-// Slot layout for K selector bits, N = 2^K outputs:
-//   [0 .. N-1]    OUTPUT_LOGIC_LEVEL_BIT0 .. _BIT(N-1)
-//
-// All N slots are consumed-by-pin (no internal latch needed because the
-// decoder is purely combinational- the output IS the held state).
 
 const DECODER_SCHEMAS = new Map<number, StateSchema>();
 
@@ -60,14 +52,7 @@ function getDecoderSchema(selectorBits: number): StateSchema {
   let cached = DECODER_SCHEMAS.get(selectorBits);
   if (cached !== undefined) return cached;
 
-  const N = 1 << selectorBits;
   const slots: SlotDescriptor[] = [];
-  for (let i = 0; i < N; i++) {
-    slots.push({
-      name: `OUTPUT_LOGIC_LEVEL_BIT${i}`,
-      doc: `Output bit ${i} (one-hot, asserted iff sel == ${i}). Consumed via siblingState by the parent composite's outPin_${i} DigitalOutputPinLoaded sub-element.`,
-    });
-  }
   const schema = defineStateSchema(`BehavioralDecoderDriver_${selectorBits}b`, slots);
   DECODER_SCHEMAS.set(selectorBits, schema);
   return schema;
@@ -112,7 +97,6 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
 
   private readonly _selectorBits: number;
   private readonly _outCount: number;
-  private readonly _slotOutBase: number;   // OUTPUT_LOGIC_LEVEL_BIT0 index
   private readonly _selNodes: number[];
   private readonly _gndNode: number;
   private _vIH: number;
@@ -125,7 +109,6 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
 
     this.stateSchema = getDecoderSchema(this._selectorBits);
     this.stateSize = this.stateSchema.size;
-    this._slotOutBase = this.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL_BIT0")!;
 
     this._selNodes = new Array(this._selectorBits);
     for (let i = 0; i < this._selectorBits; i++) {
@@ -165,16 +148,10 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
     }
 
     if (sawIndeterminate) {
-      for (let i = 0; i < this._outCount; i++) {
-        s0[base + this._slotOutBase + i] = s1[base + this._slotOutBase + i]!;
-      }
       return;
     }
 
     sel >>>= 0;
-    for (let i = 0; i < this._outCount; i++) {
-      s0[base + this._slotOutBase + i] = (i === sel) ? 1 : 0;
-    }
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

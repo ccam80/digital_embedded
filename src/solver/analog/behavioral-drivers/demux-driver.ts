@@ -4,11 +4,7 @@
  *
  * Reads K selector bit-voltages and one data input voltage from rhsOld
  * (relative to gnd), threshold-classifies each with vIH / vIL hysteresis,
- * assembles the selector into an integer `sel`, and writes the routing
- * pattern to OUTPUT_LOGIC_LEVEL_BIT0 .. _BIT(N-1) (N = 2^K) where only
- * OUTPUT_LOGIC_LEVEL_BIT${sel} = data and the others are 0. Those slots
- * are consumed via siblingState by N sibling DigitalOutputPinLoaded
- * sub-elements in the parent demux composite.
+ * assembles the selector into an integer `sel`.
  *
  * Hold-on-indeterminate is *whole-vector*: if ANY selector bit OR the data
  * input is indeterminate, every output slot copies its prior value
@@ -46,8 +42,6 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // Memoised arity-indexed schema factory
 // ---------------------------------------------------------------------------
 //
-// Slot layout for K selector bits, N = 2^K outputs:
-//   [0 .. N-1]    OUTPUT_LOGIC_LEVEL_BIT0 .. _BIT(N-1)
 
 const DEMUX_SCHEMAS = new Map<number, StateSchema>();
 
@@ -55,14 +49,7 @@ function getDemuxSchema(selectorBits: number): StateSchema {
   let cached = DEMUX_SCHEMAS.get(selectorBits);
   if (cached !== undefined) return cached;
 
-  const N = 1 << selectorBits;
   const slots: SlotDescriptor[] = [];
-  for (let i = 0; i < N; i++) {
-    slots.push({
-      name: `OUTPUT_LOGIC_LEVEL_BIT${i}`,
-      doc: `Output bit ${i} (carries data when sel == ${i}, else 0). Consumed via siblingState by the parent composite's outPin_${i} DigitalOutputPinLoaded sub-element.`,
-    });
-  }
   const schema = defineStateSchema(`BehavioralDemuxDriver_${selectorBits}b`, slots);
   DEMUX_SCHEMAS.set(selectorBits, schema);
   return schema;
@@ -111,7 +98,6 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
 
   private readonly _selectorBits: number;
   private readonly _outCount: number;
-  private readonly _slotOutBase: number;
   private readonly _selNodes: number[];
   private readonly _inNode: number;
   private readonly _gndNode: number;
@@ -125,7 +111,6 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
 
     this.stateSchema = getDemuxSchema(this._selectorBits);
     this.stateSize = this.stateSchema.size;
-    this._slotOutBase = this.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL_BIT0")!;
 
     this._selNodes = new Array(this._selectorBits);
     for (let i = 0; i < this._selectorBits; i++) {
@@ -177,16 +162,10 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
     }
 
     if (sawIndeterminate) {
-      for (let i = 0; i < this._outCount; i++) {
-        s0[base + this._slotOutBase + i] = s1[base + this._slotOutBase + i]!;
-      }
       return;
     }
 
     sel >>>= 0;
-    for (let i = 0; i < this._outCount; i++) {
-      s0[base + this._slotOutBase + i] = (i === sel) ? data : 0;
-    }
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

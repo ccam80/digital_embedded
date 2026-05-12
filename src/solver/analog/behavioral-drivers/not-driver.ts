@@ -3,9 +3,7 @@
  * NOT gate.
  *
  * Reads 1 input voltage from rhsOld (relative to gnd), threshold-classifies
- * it against per-instance vIH / vIL, and writes the NOT result to
- * OUTPUT_LOGIC_LEVEL. That slot is consumed via siblingState by the parent
- * composite's outPin DigitalOutputPinLoaded sub-element.
+ * it against per-instance vIH / vIL, and writes the NOT result.
  *
  * Per Composite M10 (phase-composite-architecture.md), J-152
  * (contracts_group_10.md). N=1 fixed; truth function: 1 - inputs[0].
@@ -27,14 +25,7 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralNotDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Inverted output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-  },
-]);
-
-const SLOT_OUT = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
+const SCHEMA: StateSchema = defineStateSchema("BehavioralNotDriver", []);
 
 // ---------------------------------------------------------------------------
 // Pin layout- N=1 fixed, module-level const
@@ -91,28 +82,7 @@ export class BehavioralNotDriverElement extends PoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
   }
 
-  /**
-   * Threshold-classify the single input with hold-on-indeterminate semantic,
-   * then invert: output = 1 - level.
-   *
-   *   - v >= vIH (logic "1") â†’ output 0 (NOT of 1).
-   *   - v <  vIL (logic "0") â†’ output 1 (NOT of 0).
-   *   - vIL <= v < vIH (indeterminate) â†’ hold prior output.
-   */
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
-    const v = rhsOld[this._inputNode] - rhsOld[this._gndNode];
-    const prev: 0 | 1 = s1[base + SLOT_OUT] >= 0.5 ? 1 : 0;
-
-    let result: 0 | 1;
-    if      (v >= this._vIH)  result = 0;    // input is "1" â†’ NOT outputs 0
-    else if (v <  this._vIL)  result = 1;    // input is "0" â†’ NOT outputs 1
-    else                       result = prev; // indeterminate â†’ hold prior
-
-    s0[base + SLOT_OUT] = result;
+  load(_ctx: LoadContext): void {
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

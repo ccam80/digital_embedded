@@ -213,13 +213,11 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 // Elements (NFET path FIRST per PB-TRANSGATE TSTALLOC ordering):
 //   nfetDrv (BehavioralFETDriver, isNType=1): pins (G=p1, D=out1, S=out2),
 //        on-condition vGS = V(p1) - V(out2) > Vth.
-//   nfetSW  (FetSW, invertCtrl=0): pins (D=out1, S=out2), reads
-//        nfetDrv.OUTPUT_LOGIC_LEVEL via siblingState.
+//   nfetSW  (FetSW, invertCtrl=0): pins (D=out1, S=out2).
 //
 //   pfetDrv (BehavioralFETDriver, isNType=0): pins (G=p2, D=out1, S=out2),
 //        on-condition vGS = V(p2) - V(out2) < -Vth.
-//   pfetSW  (FetSW, invertCtrl=0): pins (D=out1, S=out2), reads
-//        pfetDrv.OUTPUT_LOGIC_LEVEL via siblingState.
+//   pfetSW  (FetSW, invertCtrl=0): pins (D=out1, S=out2).
 // ---------------------------------------------------------------------------
 
 export const buildTransGateNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
@@ -245,7 +243,6 @@ export const buildTransGateNetlist = (params: PropertyBag): MnaSubcircuitNetlist
           Ron: ron,
           Roff: roff,
           invertCtrl: 0,
-          inputLogic: { kind: "siblingState", subElementName: "nfetDrv", slotName: "OUTPUT_LOGIC_LEVEL" },
         },
       },
       // PFET path- emitted second.
@@ -263,7 +260,6 @@ export const buildTransGateNetlist = (params: PropertyBag): MnaSubcircuitNetlist
           Ron: ron,
           Roff: roff,
           invertCtrl: 0,
-          inputLogic: { kind: "siblingState", subElementName: "pfetDrv", slotName: "OUTPUT_LOGIC_LEVEL" },
         },
       },
     ],

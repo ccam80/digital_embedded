@@ -11,15 +11,7 @@
  * wiring components.
  *
  * Both builders emit one BehavioralXxxDriver leaf + per-port loaded/unloaded
- * input pins + per-output loaded/unloaded output pins. Each output pin
- * consumes its own `OUTPUT_LOGIC_LEVEL_BIT${i}` slot from the driver via
- * siblingState (multi-port multi-slot pattern; mirrors `buildSplitterNetlist`
- * in `behavioral-remaining.ts` and `buildCounterNetlist` in
- * `behavioral-sequential.ts`).
- *
- * Per Cluster M11 follow-up (j-070-recluster.md), J-143 / J-144
- * (contracts_group_10.md). Authored directly per the user's
- * "non-agent precursor" decision.
+ * input pins + per-output loaded/unloaded output pins.
  */
 
 import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
@@ -32,13 +24,9 @@ import type { PropertyBag } from "../../core/properties.js";
 // Ports: sel_0..sel_{K-1}, out_0..out_{N-1}, gnd      (N = 2^K)
 //
 // Sub-elements:
-//   drv          : BehavioralDecoderDriver (K selector pins + gnd; no driver-
-//                  side output pins because outputs are owned by the sibling
-//                  outPin sub-elements that consume per-bit slots)
+//   drv          : BehavioralDecoderDriver (K selector pins + gnd)
 //   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded} per selector bit
-//   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per decoded output bit;
-//                  consumes driver slot OUTPUT_LOGIC_LEVEL_BIT${i} via
-//                  siblingState.
+//   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per decoded output bit
 
 export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const K        = params.getModelParam<number>("selectorBits");
@@ -96,8 +84,7 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     netlist.push([selPortBase + i, gndPortIdx]);
   }
 
-  // Output pins- one per decoded output bit. Each consumes the driver's
-  // per-bit OUTPUT_LOGIC_LEVEL_BIT${i} slot via siblingState.
+  // Output pins- one per decoded output bit.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: outputPinType,
@@ -108,8 +95,6 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         cOut: params.getModelParam<number>("cOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),
-        inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                      slotName: `OUTPUT_LOGIC_LEVEL_BIT${i}` },
       },
     });
     netlist.push([outPortBase + i, gndPortIdx]);
@@ -133,8 +118,7 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 //   drv          : BehavioralDemuxDriver (K selector pins + 1 data pin + gnd)
 //   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded} per selector bit
 //   inPin_in     : DigitalInputPin{Loaded|Unloaded} for data input
-//   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per output port; consumes
-//                  driver slot OUTPUT_LOGIC_LEVEL_BIT${i} via siblingState.
+//   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per output port
 //
 // Analog model treats data as 1-bit (matches mux's analog-model limitation:
 // multi-bit data falls through to the digital path).
@@ -216,8 +200,6 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         cOut: params.getModelParam<number>("cOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),
-        inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                      slotName: `OUTPUT_LOGIC_LEVEL_BIT${i}` },
       },
     });
     netlist.push([outPortBase + i, gndPortIdx]);

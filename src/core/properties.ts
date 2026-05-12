@@ -18,26 +18,6 @@ export const enum PropertyType {
 }
 
 // ---------------------------------------------------------------------------
-// PoolSlotRef- compile-time-resolved cross-element state-pool reference.
-//
-// The compiler writes one of these into a sub-element's PropertyBag when it
-// resolves a `{ kind: "siblingState", subElementName, slotName }` netlist
-// param (compiler.ts siblingState resolver). The receiving leaf reads it via
-// `props.get<PoolSlotRef>(paramKey)` and computes a flat pool index in
-// load() as `ref.element._stateBase + ref.slotIdx`.
-//
-// The `element` field is typed structurally (`{ _stateBase: number }`) to
-// avoid a properties.ts -> solver/analog/element.ts import cycle. Consumers
-// that need the full AnalogElement shape intersect at the use site.
-// ---------------------------------------------------------------------------
-
-export interface PoolSlotRef {
-  kind: "poolSlotRef";
-  element: { _stateBase: number };
-  slotIdx: number;
-}
-
-// ---------------------------------------------------------------------------
 // PropertyValue- the union of all valid property value types
 // ---------------------------------------------------------------------------
 
@@ -58,8 +38,7 @@ export type PropertyValue =
   | number[]
   | Record<string, number>
   | Record<string, unknown>
-  | ReadonlyMap<string, unknown>
-  | PoolSlotRef;
+  | ReadonlyMap<string, unknown>;
 
 // ---------------------------------------------------------------------------
 // PropertyDefinition- static description of one property slot
@@ -261,21 +240,11 @@ export type SerializedPropertyBag = Record<string, number | string | boolean | n
  * Serialize a PropertyBag to a plain object suitable for JSON.stringify.
  * bigint values are encoded as "0n<digits>" strings.
  */
-export function isPoolSlotRef(v: PropertyValue): v is PoolSlotRef {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-    && 'kind' in v && (v as { kind: unknown }).kind === 'poolSlotRef';
-}
-
 export function propertyBagToJson(bag: PropertyBag): SerializedPropertyBag {
   const out: SerializedPropertyBag = {};
   for (const [k, v] of bag.entries()) {
     if (typeof v === 'bigint') {
       out[k] = `0n${v.toString()}`;
-    } else if (isPoolSlotRef(v)) {
-      // PoolSlotRef holds a runtime element reference and is re-resolved by
-      // the compiler on every expansion. Skip serialisation — re-emit by
-      // re-running the compiler.
-      continue;
     } else if (v instanceof Map) {
       // ReadonlyMap sidecars (compiler-built per-pin loading / electrical
       // tables, etc.) are runtime-only and re-derived from the compiled

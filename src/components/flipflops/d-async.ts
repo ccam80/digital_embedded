@@ -65,8 +65,8 @@ export const { paramDefs: D_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_AS_BEHAV
 // Sub-elements:
 //   drv  : BehavioralDAsyncFlipflopDriver  (1-bit pure-truth-function leaf,
 //          handles edge-triggered D latch + async Set/Clr override)
-//   qPin : DigitalOutputPinLoaded          (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
-//   nqPin: DigitalOutputPinLoaded          (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//   qPin : DigitalOutputPinLoaded          (drives Q)
+//   nqPin: DigitalOutputPinLoaded          (drives ~Q)
 //
 // Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
 // bit-width replication is composite-expansion infrastructure.
@@ -95,8 +95,6 @@ export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNe
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
         },
       },
       {
@@ -108,8 +106,6 @@ export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNe
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
         },
       },
     ],

@@ -24,41 +24,16 @@ const DIGITAL_OUTPUT_PIN_LOADED_PIN_LAYOUT: PinDeclaration[] = [
 ];
 
 /**
- * DigitalOutputPinLoaded- behaviourally-driven analog output port with RC load.
- *
- * Topology after the Norton refactor (see behavioral-output-driver.ts):
- *   drv  : BehavioralOutputDriver(pos=node, neg=gnd)
- *           - stamps Norton-equivalent (current source + shunt 1/rOut conductance)
- *             directly at the external node
- *           - when its optional `enableLogic` siblingState ref reads disabled,
- *             swaps to a 1 GΩ shunt with zero current → effective tri-state
- *   cOut : Capacitor(pos=node, neg=gnd) → output load capacitance for RC dynamics
- *
- * Tri-state plumbing: the parent composite (e.g. Driver / DriverInvSel) wires
- * `enableLogic: { kind: "siblingState", subElementName: "drv", slotName:
- * "OUTPUT_LOGIC_LEVEL_ENABLE" }` in this subcircuit's params; the compiler's
- * siblingState resolver writes the resolved PoolSlotRef into the inner drv's
- * PropertyBag, where BehavioralOutputDriver picks it up. Non-tri-state
- * consumers (gates, flipflops, mux, counter, register, etc.) omit the
- * enableLogic param entirely- driver defaults to permanently enabled.
- *
- * Parent composite's behavioural driver leaf must expose a stateSchema slot
- * named OUTPUT_LOGIC_LEVEL (single-bit) or a packed multi-bit value slot
- * (multi-bit). Parent's netlist injects the resolved siblingState ref for
- * `inputLogic` (and optionally `enableLogic`).
- *
- * bitIndex (per A1, defaults to 0): selects which bit of the sibling slot's
- * value this pin represents. Single-bit drivers leave it at 0 and write
- * 0.0/1.0 to the slot. Multi-bit drivers (counter, register, seven-seg)
- * write a packed integer; the parent emits N pin instances with bitIndex:
- * 0..N-1, each binding to the same sibling slot.
+ * DigitalOutputPinLoaded — behaviourally-driven analog output port with RC load.
+ * Inner sub-elements: BehavioralOutputDriver (Norton at node→gnd) + Capacitor (RC).
+ * Phase 3 reshapes this to 3-port (node, gnd, ctrl) and wires drv.ctrl ← composite.ctrl.
  */
 export const DIGITAL_OUTPUT_PIN_LOADED_NETLIST: MnaSubcircuitNetlist = {
   ports: ["node", "gnd"],
-  params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0, bitIndex: 0 },
+  params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0 },
   elements: [
     { typeId: "BehavioralOutputDriver", modelRef: "default", subElementName: "drv",
-      params: { vOH: "vOH", vOL: "vOL", rOut: "rOut", bitIndex: "bitIndex" /* inputLogic + optional enableLogic injected by parent */ } },
+      params: { vOH: "vOH", vOL: "vOL", rOut: "rOut" } },
     { typeId: "Capacitor", modelRef: "behavioral", subElementName: "cOut", params: { capacitance: "cOut" } },
   ],
   internalNetCount: 0,
@@ -82,11 +57,8 @@ export const DigitalOutputPinLoadedDefinition: ComponentDefinition = {
         { key: "cOut",     default: 1e-12 },
         { key: "vOH",      default: 5 },
         { key: "vOL",      default: 0 },
-        { key: "bitIndex", default: 0 },
-        // `inputLogic` and (optional) `enableLogic` are siblingState ref objects
-        // wired by the parent composite; not numeric ParamDefs.
       ],
-      params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0, bitIndex: 0 },
+      params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0 },
     },
   },
   defaultModel: "default",

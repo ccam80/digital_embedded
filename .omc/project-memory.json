@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json > C:/local_working_projects/digital_in_browser/.tmp_tsc_out.txt 2>&1; echo done",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && npm run test:q -- src/components/semiconductors/__tests__/jfet.test.ts 2>&1 | tail -3; echo \"===JFET FAILURES===\"; node -e \"const f=require('./.vitest-failures.json');f.failures.forEach((x,i)=>console.log(i,'msg:',x.message.slice(0,200),'\\nloc:',x.locations?.[0]?.test))\" 2>&1",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json 2>&1 | head -30",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && npx vitest run src/solver/analog/__tests__/_dump-audit.test.ts --reporter=verbose 2>&1 | tail -40",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -293,14 +293,14 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 123,
-      "lastAccessed": 1778576114955,
+      "accessCount": 125,
+      "lastAccessed": 1778579964063,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 57,
-      "lastAccessed": 1778563627832,
+      "accessCount": 62,
+      "lastAccessed": 1778580216384,
       "type": "file"
     },
     {
@@ -313,6 +313,12 @@
       "path": "src\\headless\\auto-layout.ts",
       "accessCount": 25,
       "lastAccessed": 1778547158717,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\schottky.ts",
+      "accessCount": 18,
+      "lastAccessed": 1778579151812,
       "type": "file"
     },
     {
@@ -331,12 +337,6 @@
       "path": "src\\compile\\compile.ts",
       "accessCount": 15,
       "lastAccessed": 1778443695154,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\schottky.ts",
-      "accessCount": 15,
-      "lastAccessed": 1778576090027,
       "type": "file"
     },
     {

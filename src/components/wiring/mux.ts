@@ -301,7 +301,7 @@ export const { paramDefs: MUX_BEHAVIORAL_PARAM_DEFS, defaults: MUX_BEHAVIORAL_DE
 //   drv       : BehavioralMuxDriver  (selector-indexed pick leaf)
 //   inPin_data_i : DigitalInputPin{Loaded|Unloaded}  (one per data port)
 //   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded}  (one per sel port)
-//   outPin    : DigitalOutputPin{Loaded|Unloaded}  (consumes drv OUTPUT_LOGIC_LEVEL)
+//   outPin    : DigitalOutputPin{Loaded|Unloaded}
 // ---------------------------------------------------------------------------
 
 export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
@@ -332,7 +332,7 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  // Driver leaf.
   // Pin order in driver: data_0..data_{N-1}, sel_0..sel_{K-1}, out, gnd
   const driverPins: number[] = [];
   for (let i = 0; i < N; i++) driverPins.push(i);
@@ -370,7 +370,7 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     netlist.push([N + i, gndPortIdx]);
   }
 
-  // Output pin- siblingState consumes the driver's OUTPUT_LOGIC_LEVEL slot.
+  // Output pin.
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -380,8 +380,6 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL" },
     },
   });
   netlist.push([outPortIdx, gndPortIdx]);

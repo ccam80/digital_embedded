@@ -392,7 +392,7 @@ describeIfDll("Zener forward bias paired vs ngspice (T3)", () => {
   });
 
   it("limiting_paired_forward", () => {
-    const cmp = session.getLimitingComparison("Z1", 0, 0);
+    const cmp = session.getLimitingComparison("D1", 0, 0);
     for (const j of cmp.junctions) {
       expect(j.limitingDiff).toBe(0);
     }
@@ -435,7 +435,7 @@ describeIfDll("Zener breakdown paired vs ngspice (T3)", () => {
   });
 
   it("limiting_paired_breakdown", () => {
-    const cmp = session.getLimitingComparison("Z1", 0, 0);
+    const cmp = session.getLimitingComparison("D1", 0, 0);
     for (const j of cmp.junctions) {
       expect(j.limitingDiff).toBe(0);
     }

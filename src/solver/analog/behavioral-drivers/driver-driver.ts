@@ -3,21 +3,7 @@
  * Driver tri-state buffer.
  *
  * Reads `in` and `sel` voltages from rhsOld (relative to gnd), threshold-
- * classifies each against per-instance vIH / vIL with hold-on-indeterminate,
- * and writes:
- *   - OUTPUT_LOGIC_LEVEL        â† pass-through of `in` (0/1)
- *   - OUTPUT_LOGIC_LEVEL_ENABLE â† `sel` (0/1, active-high enable)
- *
- * The two slots are consumed via siblingState by the parent composite's
- * outPin DigitalOutputPinLoaded sub-element- `inputLogic` selects which
- * voltage to drive, `enableLogic` switches the Norton conductance between
- * 1/rOut (active) and 1 GΩ (high-Z) so the pin disconnects from the shared
- * net when sel is low.
- *
- * Per Composite M13 (phase-composite-architecture.md), J-145
- * (contracts_group_10.md). Tri-state mechanism is the (b1) sibling-state
- * + Norton-skip approach- see j-070-recluster.md "Tri-state mechanism"
- * decision and behavioral-output-driver.ts for the receiver side.
+ * classifies each against per-instance vIH / vIL with hold-on-indeterminate.
  *
  * DriverInvSel uses a sibling driver (driver-inv-driver.ts) with inverted
  * sel polarity; the rest of the shape is identical.
@@ -40,19 +26,8 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralDriverDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Pass-through of `in` (0 or 1) consumed via siblingState by the parent's outPin.inputLogic.",
-  },
-  {
-    name: "OUTPUT_LOGIC_LEVEL_ENABLE",
-    doc: "Tri-state enable bit (0 = high-Z, 1 = drive) consumed via siblingState by the parent's outPin.enableLogic. Active-high: derived from sel >= vIH.",
-  },
-]);
+const SCHEMA: StateSchema = defineStateSchema("BehavioralDriverDriver", []);
 
-const SLOT_OUT    = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
-const SLOT_ENABLE = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_ENABLE")!;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -106,14 +81,6 @@ export class BehavioralDriverDriverElement extends PoolBackedAnalogElement {
     const vIn  = rhsOld[this.pinNodes.get("in")!]  - gnd;
     const vSel = rhsOld[this.pinNodes.get("sel")!] - gnd;
 
-    const prevOut    = (s1[base + SLOT_OUT]    >= 0.5 ? 1 : 0) as 0 | 1;
-    const prevEnable = (s1[base + SLOT_ENABLE] >= 0.5 ? 1 : 0) as 0 | 1;
-
-    const out    = logicLevel(vIn,  this._vIH, this._vIL, prevOut);
-    const enable = logicLevel(vSel, this._vIH, this._vIL, prevEnable);
-
-    s0[base + SLOT_OUT]    = out;
-    s0[base + SLOT_ENABLE] = enable;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

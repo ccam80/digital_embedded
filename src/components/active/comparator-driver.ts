@@ -26,8 +26,7 @@
  *
  * Schema source: `COMPARATOR_SCHEMA` is owned by the parent (the
  * comparator's hysteresis is a chip-level property); this driver imports
- * it. Slot names `OUTPUT_LATCH` / `OUTPUT_WEIGHT` are authoritative; the
- * J-020 spec text "OUTPUT_LOGIC_LEVEL" predates the schema split.
+ * it. Slot names `OUTPUT_LATCH` / `OUTPUT_WEIGHT` are authoritative.
  */
 
 import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";

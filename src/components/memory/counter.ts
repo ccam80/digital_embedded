@@ -243,9 +243,7 @@ const COUNTER_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 //
 // bitWidth: structural; per-instance N output bits. Defaults to 4 to match
-//   the user-facing default. The behavioural driver builds an arity-indexed
-//   schema with COUNT_BIT0..BIT(N-1) + OUTPUT_LOGIC_LEVEL_BIT0..BIT(N-1) +
-//   OUTPUT_LOGIC_LEVEL_OVF slots, plus LAST_CLOCK.
+//   the user-facing default.
 // loaded: 1 = loaded input/output pin variants; 0 = unloaded (high-Z, no VSRC).
 // vIH/vIL: per-instance CMOS thresholds, consumed by BehavioralCounterDriver.
 // rOut/cOut/vOH/vOL: per-output drive params, consumed by each outBit / ovf
@@ -268,12 +266,10 @@ export const { paramDefs: COUNTER_BEHAVIORAL_PARAM_DEFS, defaults: COUNTER_BEHAV
 //
 // Ports: en, C, clr, out_bit0..out_bit(N-1), ovf, gnd  (variable count)
 // Sub-elements:
-//   drv         : BehavioralCounterDriver  (control inputs only; writes
-//                                           OUTPUT_LOGIC_LEVEL_BITi + _OVF)
+//   drv         : BehavioralCounterDriver  (control inputs only)
 //   inPin_*     : DigitalInputPin{Loaded|Unloaded}  (one per control input)
-//   outBit{i}   : DigitalOutputPin{Loaded|Unloaded}  (one per output bit;
-//                                                     siblingState OUTPUT_LOGIC_LEVEL_BITi)
-//   ovfPin      : DigitalOutputPin{Loaded|Unloaded}  (siblingState OUTPUT_LOGIC_LEVEL_OVF)
+//   outBit{i}   : DigitalOutputPin{Loaded|Unloaded}  (one per output bit)
+//   ovfPin      : DigitalOutputPin{Loaded|Unloaded}
 // ---------------------------------------------------------------------------
 
 export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
@@ -296,7 +292,7 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL_BITi + _OVF via siblingState.
+  // Driver leaf.
   // Driver pinLayout order: [en, C, clr, gnd] (see counter-driver.ts).
   elements.push({
     typeId: "BehavioralCounterDriver",
@@ -319,10 +315,7 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     netlist.push([idx, gndIdx]);
   }
 
-  // Output bit pins- one per bit, each consuming the matching driver slot.
-  // `kind: "siblingState" as const` narrows the literal so it satisfies
-  // SubcircuitElementParam's discriminated union; without `as const` the
-  // kind widens to `string` and "doesn't sufficiently overlap" any union arm.
+  // Output bit pins- one per bit.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: outputPinType,
@@ -333,14 +326,12 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         cOut: params.getModelParam<number>("cOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),
-        inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                      slotName: `OUTPUT_LOGIC_LEVEL_BIT${i}` },
       },
     });
     netlist.push([outBitBase + i, gndIdx]);
   }
 
-  // Overflow pin- siblingState consumes OUTPUT_LOGIC_LEVEL_OVF.
+  // Overflow pin.
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -350,8 +341,6 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL_OVF" },
     },
   });
   netlist.push([ovfIdx, gndIdx]);

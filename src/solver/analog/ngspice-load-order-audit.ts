@@ -1,0 +1,64 @@
+import type { ComponentRegistry } from "../../core/registry.js";
+import {
+  TYPE_ID_TO_NGSPICE_LOAD_ORDER,
+  TYPE_ID_TO_DEVICE_FAMILY,
+  TYPE_ID_TO_DECK_PIN_LABEL_ORDER,
+  type DeviceFamily,
+} from "./ngspice-load-order.js";
+
+const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>([
+  "RES",
+  "CAP",
+  "IND",
+  "VSRC",
+  "ISRC",
+  "DIO",
+  "BJT",
+  "MOS",
+  "JFET",
+]);
+
+export function auditNgspiceLoadOrderTables(registry: ComponentRegistry): void {
+  const inLoadOrder = new Set(Object.keys(TYPE_ID_TO_NGSPICE_LOAD_ORDER));
+  const inFamily = new Set(Object.keys(TYPE_ID_TO_DEVICE_FAMILY));
+  const inDeckPins = new Set(Object.keys(TYPE_ID_TO_DECK_PIN_LABEL_ORDER));
+  const union = new Set<string>([...inLoadOrder, ...inFamily, ...inDeckPins]);
+
+  const errors: string[] = [];
+
+  for (const typeId of union) {
+    if (!inLoadOrder.has(typeId)) {
+      errors.push(`typeId "${typeId}" missing from TYPE_ID_TO_NGSPICE_LOAD_ORDER`);
+    }
+    if (!inFamily.has(typeId)) {
+      errors.push(`typeId "${typeId}" missing from TYPE_ID_TO_DEVICE_FAMILY`);
+    }
+
+    const family = TYPE_ID_TO_DEVICE_FAMILY[typeId];
+    const isDeckEmitting = family !== undefined && DECK_EMITTING_FAMILIES.has(family);
+
+    if (isDeckEmitting && !inDeckPins.has(typeId)) {
+      errors.push(
+        `typeId "${typeId}" (family "${family}") missing from TYPE_ID_TO_DECK_PIN_LABEL_ORDER`,
+      );
+    }
+    if (!isDeckEmitting && inDeckPins.has(typeId)) {
+      errors.push(
+        `typeId "${typeId}" is in TYPE_ID_TO_DECK_PIN_LABEL_ORDER but family "${family ?? "<unset>"}" is not deck-emitting`,
+      );
+    }
+
+    if (registry.get(typeId) === undefined) {
+      errors.push(
+        `typeId "${typeId}" appears in ngspice-load-order tables but is not a registered component`,
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `ngspice-load-order audit failed:\n  - ${errors.join("\n  - ")}\n` +
+        `Fix the affected keys in src/solver/analog/ngspice-load-order.ts.`,
+    );
+  }
+}

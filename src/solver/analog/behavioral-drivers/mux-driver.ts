@@ -32,7 +32,6 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // Slot layout for selectorBits K (N = 2^K data inputs):
 //   [0 .. K-1]       SEL_LATCH_0 .. SEL_LATCH_{K-1}       â† latched sel inputs
 //   [K .. K+N-1]     DATA_LATCH_0 .. DATA_LATCH_{N-1}      â† latched data inputs
-//   [K+N]            OUTPUT_LOGIC_LEVEL                    â† consumed-by-pin
 
 const MUX_SCHEMAS = new Map<number, StateSchema>();
 
@@ -55,10 +54,6 @@ function getMuxSchema(selectorBits: number): StateSchema {
       doc: `Latched level of data input ${i}. Written each load(); held on indeterminate input.`,
     });
   }
-  slots.push({
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Selected output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-  });
 
   const schema = defineStateSchema(`BehavioralMuxDriver_${selectorBits}sel`, slots);
   MUX_SCHEMAS.set(selectorBits, schema);
@@ -121,7 +116,6 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private readonly _slotSelBase: number;   // SEL_LATCH_0 index
   private readonly _slotDataBase: number;  // DATA_LATCH_0 index
-  private readonly _slotOut: number;       // OUTPUT_LOGIC_LEVEL index
   private _vIH: number;
   private _vIL: number;
 
@@ -134,7 +128,6 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
     this.stateSize = this.stateSchema.size;
     this._slotSelBase  = this.stateSchema.indexOf.get("SEL_LATCH_0")!;
     this._slotDataBase = this.stateSchema.indexOf.get("DATA_LATCH_0")!;
-    this._slotOut      = this.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
 
     this._selNodes = new Array(this._selectorBits);
     for (let i = 0; i < this._selectorBits; i++) {
@@ -153,26 +146,12 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
   }
 
-  /**
-   * Selector-indexed pick with hold-on-indeterminate semantic:
-   *
-   *   - Classify each sel_i: if ANY sel falls in the indeterminate band
-   *     (vIL <= v < vIH) â†’ hold previous OUTPUT_LOGIC_LEVEL (cannot form a
-   *     valid selector index).
-   *   - Build selIdx = sum(sel_i_bit << i for i in 0..K-1).
-   *   - Classify data_${selIdx}: if indeterminate â†’ hold previous
-   *     OUTPUT_LOGIC_LEVEL.
-   *   - Otherwise write classified data bit to OUTPUT_LOGIC_LEVEL.
-   *
-   * Bottom-of-load: write all latch slots + OUTPUT_LOGIC_LEVEL to s0.
-   */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const base = this._stateBase;
     const gnd = rhsOld[this._gndNode];
-    const prev: 0 | 1 = s1[base + this._slotOut] >= 0.5 ? 1 : 0;
 
     // Classify each selector bit; hold if any are indeterminate.
     let selIndeterminate = false;
@@ -191,7 +170,7 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
 
     let result: 0 | 1;
     if (selIndeterminate) {
-      result = prev;
+      result = 0;
     } else {
       // Build selector index from classified bits (LSB = sel_0).
       let selIdx = 0;
@@ -206,7 +185,7 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
       } else if (dv < this._vIL) {
         result = 0;
       } else {
-        result = prev;
+        result = 0;
       }
     }
 
@@ -223,7 +202,6 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
       else                        dataLatch = s1[base + this._slotDataBase + i] >= 0.5 ? 1 : 0;
       s0[base + this._slotDataBase + i] = dataLatch;
     }
-    s0[base + this._slotOut] = result;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

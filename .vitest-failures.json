@@ -1,129 +1,21 @@
 {
   "summary": {
-    "passed": 10,
-    "failed": 13,
+    "passed": 1,
+    "failed": 1,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 3
+    "durationSeconds": 2.9
   },
   "failures": [
     {
-      "message": "Analog engine stagnation: simTime stuck at 0.000001s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+      "message": "expected [Function] to not throw an error but 'Error: ngspice-load-order audit faile…' was thrown",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "lte_rollback_state_invariant",
-          "line": 250,
-          "column": 13
-        }
-      ]
-    },
-    {
-      "message": "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_njfet_cs",
-          "line": 3006,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_njfet_cutoff",
-          "line": 3006,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_pjfet_cs",
-          "line": 3006,
-          "column": 11
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient_step_end_paired_pjfet_cutoff",
-          "line": 3006,
-          "column": 11
-        }
-      ]
-    },
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_njfet_cs",
-          "line": 458,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_njfet_cutoff",
-          "line": 494,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_pjfet_cs",
-          "line": 530,
-          "column": 28
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-          "test": "dcop_paired_pjfet_cutoff",
-          "line": 566,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=5.9999999399 ngspice=10 absDelta=4.0000000601: expected 1070 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_njfet_cs",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=9.999999869900002 ngspice=10 absDelta=1.300999983300244e-7: expected 1070 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_njfet_cutoff",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "1498 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0000000600999999 ngspice=0 absDelta=1.0000000600999999: expected 1498 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_pjfet_cs",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "1177 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0009999899667418e-7 ngspice=0 absDelta=1.0009999899667418e-7: expected 1177 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_pjfet_cutoff",
-          "line": 63,
-          "column": 31
+          "file": "src\\solver\\analog\\__tests__\\ngspice-load-order-audit.test.ts",
+          "test": "passes against the canonical default registry",
+          "line": 9,
+          "column": 47
         }
       ]
     }

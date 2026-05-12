@@ -3,14 +3,6 @@
  *
  * Reads D (packed bus integer), C, and en from rhsOld (relative to gnd).
  * On rising clock edge when en is high: samples D bus into STORED_VALUE.
- * Q (OUTPUT_LOGIC_LEVEL_Q) combinationally mirrors STORED_VALUE every step.
- *
- * STORED_VALUE and OUTPUT_LOGIC_LEVEL_Q are packed N-bit integers (one slot
- * regardless of bitWidth). The single OUTPUT_LOGIC_LEVEL_Q slot is consumed
- * via siblingState by the parent composite's qPin DigitalOutputPinLoaded
- * sub-element (bitIndex defaults to 0, yielding the full packed value for
- * single-output-pin variants; multi-bit parents emit N qPin instances each
- * with a distinct bitIndex).
  *
  * Canonical reference for bus-pin shape: counter-driver.ts (memoised
  * arity-indexed schema factory). Load() semantic reference: d-flipflop-driver.ts
@@ -43,7 +35,6 @@ import { detectRisingEdge, logicLevel } from "./edge-detect.js";
 // Slot layout:
 //   [0] LAST_CLOCK          - clock voltage at last accepted timestep
 //   [1] STORED_VALUE        - packed N-bit integer latch
-//   [2] OUTPUT_LOGIC_LEVEL_Q- packed integer mirror; consumed-by-pin
 
 const REGISTER_SCHEMAS = new Map<number, StateSchema>();
 
@@ -59,10 +50,6 @@ function getRegisterSchema(bitWidth: number): StateSchema {
     {
       name: "STORED_VALUE",
       doc: "Packed N-bit integer latch. Updated on rising clock edge when en is high by sampling the D bus.",
-    },
-    {
-      name: "OUTPUT_LOGIC_LEVEL_Q",
-      doc: "Packed integer mirror of STORED_VALUE; consumed via siblingState by the parent composite's qPin DigitalOutputPinLoaded sub-element.",
     },
   ];
 
@@ -98,7 +85,6 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
   private readonly _mask: number;
   private readonly _slotLastClock: number;
   private readonly _slotStoredValue: number;
-  private readonly _slotOutQ: number;
   private readonly _dNode: number;
   private readonly _cNode: number;
   private readonly _enNode: number;
@@ -117,7 +103,6 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
     this.stateSize = this.stateSchema.size;
     this._slotLastClock  = this.stateSchema.indexOf.get("LAST_CLOCK")!;
     this._slotStoredValue = this.stateSchema.indexOf.get("STORED_VALUE")!;
-    this._slotOutQ       = this.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL_Q")!;
 
     this._dNode   = pinNodes.get("D")!;
     this._cNode   = pinNodes.get("C")!;
@@ -133,7 +118,6 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
 
   /**
    * Rising-edge detect on C; on edge with en high, sample D bus into STORED_VALUE.
-   * Q (OUTPUT_LOGIC_LEVEL_Q) combinationally mirrors STORED_VALUE every step.
    *
    * D bus read: decode bit-by-bit using vIH/vIL hysteresis (logicLevel), then
    * pack into an integer masked to bitWidth bits. This matches executeRegister's
@@ -180,7 +164,6 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
 
     s0[base + this._slotLastClock]   = vClock;
     s0[base + this._slotStoredValue] = stored;
-    s0[base + this._slotOutQ]        = stored;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

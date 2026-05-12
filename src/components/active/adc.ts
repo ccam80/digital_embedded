@@ -187,7 +187,6 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
       rHiZ: "rHiZ",
       vOH: "vOH",
       vOL: "vOL",
-      inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_EOC" },
     },
   });
   netlist.push([4 /* EOC */, 3 /* GND */]);
@@ -203,7 +202,6 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
         rHiZ: "rHiZ",
         vOH: "vOH",
         vOL: "vOL",
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_D${i}` },
       },
     });
     netlist.push([5 + i /* D_i */, 3 /* GND */]);

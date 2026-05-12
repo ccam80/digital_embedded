@@ -3,13 +3,10 @@
  * combinational splitter / bus-splitter.
  *
  * Reads N input voltages (relative to gnd), threshold-classifies each,
- * and writes M OUTPUT_LOGIC_LEVEL_<i> slots consumed via siblingState by
- * M sibling DigitalOutputPinLoaded sub-elements in the parent composite.
  *
  * Pin order MUST match buildSplitterNetlist drvNets:
  *   [in_0..in_{N-1}, out_0..out_{M-1}, gnd]
  *
- * Variable-arity schema: one OUTPUT_LOGIC_LEVEL_<i> slot per output port.
  * Schema is memoised by (inputCount, outputCount) key via module-scope Map.
  *
  * Canonical shape reference: counter-driver.ts (A-multi-bit-schema).
@@ -38,8 +35,6 @@ import { logicLevel } from "./edge-detect.js";
 // ---------------------------------------------------------------------------
 //
 // Key: `${inputCount}:${outputCount}`.
-// Slot layout for N inputs, M outputs:
-//   [0 .. M-1]   OUTPUT_LOGIC_LEVEL_0 .. OUTPUT_LOGIC_LEVEL_{M-1}   â† consumed-by-pin
 
 const SPLITTER_SCHEMAS = new Map<string, StateSchema>();
 
@@ -49,13 +44,6 @@ function getSplitterSchema(inputCount: number, outputCount: number): StateSchema
   if (cached !== undefined) return cached;
 
   const slots: SlotDescriptor[] = [];
-  for (let i = 0; i < outputCount; i++) {
-    slots.push({
-      name: `OUTPUT_LOGIC_LEVEL_${i}`,
-      doc: `Output logic level for output port ${i}; consumed via siblingState by the parent composite's outPin_${i} DigitalOutputPinLoaded sub-element.`,
-    });
-  }
-
   const schema = defineStateSchema(`BehavioralSplitterDriver_${inputCount}i_${outputCount}o`, slots);
   SPLITTER_SCHEMAS.set(key, schema);
   return schema;
@@ -151,8 +139,7 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
   }
 
   /**
-   * Classify input voltages and write OUTPUT_LOGIC_LEVEL_<i> slots, mirroring
-   * executeSplitter's three-mode logic (splitter.ts).
+   * Classify input voltages, mirroring executeSplitter's three-mode logic (splitter.ts).
    *
    * Split  (inputCount === 1, outputCount >= 1):
    *   in_0 carries a packed integer bus voltage. Extract bit i from the
@@ -187,7 +174,6 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
       for (let i = 0; i < this._outputCount; i++) {
         const bitVoltage = (packed >>> i) & 1;
         const prev = s1[base + i] >= 0.5 ? 1 : 0;
-        s0[base + i] = logicLevel(bitVoltage, vIH, vIL, prev);
       }
     } else if (this._outputCount === 1 && this._inputCount >= 1) {
       // Merge mode: classify each narrow input and pack into slot 0.
@@ -198,14 +184,12 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
         const bit = logicLevel(vIn, vIH, vIL, prev as 0 | 1);
         packed |= bit << i;
       }
-      s0[base] = packed >>> 0;
     } else {
       // Passthrough mode: classify in_i â†’ slot i directly.
       const n = Math.min(this._inputCount, this._outputCount);
       for (let i = 0; i < n; i++) {
         const vIn = rhsOld[this._inNodes[i]] - gnd;
         const prev = s1[base + i] >= 0.5 ? 1 : 0;
-        s0[base + i] = logicLevel(vIn, vIH, vIL, prev);
       }
     }
   }

@@ -59,15 +59,13 @@ function findTimer555Ce(fix: Fixture, label: string): CircuitElement {
 // ---------------------------------------------------------------------------
 // Category 1 — Initialization (T1)
 // Composite Timer555 expands to a latch-driver leaf. After warm-start, the
-// LATCH_Q slot must hold a valid logic level (0 or 1) and OUTPUT_LOGIC_LEVEL
-// must mirror it.
+// LATCH_Q slot must hold a valid logic level (0 or 1).
 // ---------------------------------------------------------------------------
 
 describe("Timer555 initialization (T1)", () => {
   it("init_latch_q_and_output_level_quiescent_low", () => {
     // TRIG = 4V (above 1/3 VCC = 1.667V) and THR = 1V (below 2/3 VCC = 3.333V):
-    // both comparators inactive, RS-latch holds whatever the warm-start lands
-    // on, and OUTPUT_LOGIC_LEVEL must mirror LATCH_Q.
+    // both comparators inactive, RS-latch holds whatever the warm-start lands on.
     const VCC = 5;
     const fix = buildFixture({
       build: (_r, facade) =>
@@ -100,16 +98,11 @@ describe("Timer555 initialization (T1)", () => {
 
     const drv = findLatchDriver(fix.circuit.elements);
     const slotQ      = drv.stateSchema.indexOf.get("LATCH_Q")!;
-    const slotLevel  = drv.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
     const q     = fix.pool.state0[drv._stateBase + slotQ];
-    const level = fix.pool.state0[drv._stateBase + slotLevel];
 
     expect(Number.isFinite(q)).toBe(true);
-    expect(Number.isFinite(level)).toBe(true);
     // LATCH_Q is binary (0 or 1) by composite contract.
     expect(q === 0 || q === 1).toBe(true);
-    // OUTPUT_LOGIC_LEVEL mirrors LATCH_Q.
-    expect(level).toBe(q);
 
     // Internal R-divider sets CTRL ≈ 2/3 VCC after warm-start.
     const ctrlNode = fix.circuit.labelToNodeId.get("t:CTRL");

@@ -1,13 +1,13 @@
 /**
- * Sub-element parameter value. CLOSED 4-arm union- no other shapes permitted.
+ * Sub-element parameter value. CLOSED 3-arm union- no other shapes permitted.
  *
  * - `number`: literal scalar (resistance, capacitance, gain, flag-as-0/1).
  * - `string`: lookup key into the enclosing subcircuit's `params` map; the
  *   compiler resolves it to a `number` at netlist-instantiation time.
- * - `siblingBranch` / `siblingState`: cross-leaf coupling references. The
- *   compiler resolves these to a concrete branch index / pool slot ref so
- *   StatePool rollback semantics are preserved across NR retries and LTE
- *   rejections.
+ * - `siblingBranch`: cross-leaf branch reference (resolves to a branch index;
+ *   ngspice F/H controlled-source VNAME analogue). The compiler resolves these
+ *   to a concrete branch index so StatePool rollback semantics are preserved
+ *   across NR retries and LTE rejections.
  *
  * **Flags / booleans MUST be encoded as `0`/`1` numbers**, matching ngspice's
  * `IFvalue.iValue` convention (booleans are ints in the device-param ABI).
@@ -18,15 +18,14 @@
 export type SubcircuitElementParam =
   | number
   | string
-  | { kind: "siblingBranch"; subElementName: string }
-  | { kind: "siblingState"; subElementName: string; slotName: string };
+  | { kind: "siblingBranch"; subElementName: string };
 
 export interface SubcircuitElement {
   /** Component type (NMOS, PMOS, Resistor, Diode, etc.) */
   typeId: string;
   /** Named .MODEL reference- resolved at compile time. */
   modelRef?: string;
-  /** Stable name used by sibling-coupling references (`siblingBranch` / `siblingState`). */
+  /** Stable name used by sibling-coupling references (`siblingBranch`). */
   subElementName?: string;
   /** Element-level parameter overrides. String values reference subcircuit params by name; object values are cross-leaf coupling refs. */
   params?: Record<string, SubcircuitElementParam>;

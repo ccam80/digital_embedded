@@ -25,16 +25,12 @@ import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralJKFlipflopDriver", [
-  { name: "LAST_CLOCK",            doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample skips edge detection." },
-  { name: "Q",                     doc: "Latched output bit." },
-  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin." },
-  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin." },
+  { name: "LAST_CLOCK", doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample skips edge detection." },
+  { name: "Q",          doc: "Latched output bit." },
 ]);
 
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
-const SLOT_OUT_Q      = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_Q")!;
-const SLOT_OUT_NQ     = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_NQ")!;
 
 // Pin order matches buildJKFlipflopNetlist drv row [0,1,2,3,4,5] = J,C,K,Q,~Q,gnd.
 const JK_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
@@ -107,8 +103,6 @@ export class BehavioralJKFlipflopDriverElement extends PoolBackedAnalogElement {
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
-    s0[base + SLOT_OUT_Q]      = q;
-    s0[base + SLOT_OUT_NQ]     = 1 - q;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

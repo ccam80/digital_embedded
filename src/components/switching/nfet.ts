@@ -13,9 +13,8 @@
  *
  * Analog model (kind: "netlist"):
  *   drv (BehavioralFETDriver, polarity n): reads V(G) - V(S), classifies
- *        against Vth, writes OUTPUT_LOGIC_LEVEL slot.
- *   sw  (FetSW): reads drv.OUTPUT_LOGIC_LEVEL via siblingState, stamps the
- *        2x2 (D, S) admittance with gOn or gOff based on the classified level.
+ *        against Vth.
+ *   sw  (FetSW): stamps the 2x2 (D, S) admittance with gOn or gOff.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -189,10 +188,9 @@ export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Arr
 // Ports: G=0, D=1, S=2
 //
 // Elements:
-//   drv (BehavioralFETDriver, isNType=1): reads V(G) - V(S), writes
-//        OUTPUT_LOGIC_LEVEL based on Vth threshold.
-//   sw  (FetSW, invertCtrl=0): consumes drv.OUTPUT_LOGIC_LEVEL via
-//        siblingState, stamps the 2x2 (D, S) admittance.
+//   drv (BehavioralFETDriver, isNType=1): reads V(G) - V(S), classifies
+//        against Vth threshold.
+//   sw  (FetSW, invertCtrl=0): stamps the 2x2 (D, S) admittance.
 // ---------------------------------------------------------------------------
 
 export const buildNfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
@@ -217,7 +215,6 @@ export const buildNfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
           Ron: ron,
           Roff: roff,
           invertCtrl: 0,
-          inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
         },
       },
     ],

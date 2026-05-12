@@ -26,7 +26,7 @@ const DTS_MONOSTABLE = path.resolve(
 // ---------------------------------------------------------------------------
 // Helper: locate the Timer555LatchDriver leaf element in a compiled circuit.
 // Composite Timer555 expands to several leaves; the latch driver owns the
-// LATCH_Q / OUTPUT_LOGIC_LEVEL state slots. Match by stateSchema.owner.
+// LATCH_Q state slot. Match by stateSchema.owner.
 // ---------------------------------------------------------------------------
 
 function findLatchDriver(
@@ -85,7 +85,7 @@ function buildQuiescentFixture(VCC = 5) {
 // After buildFixture's warm-start step, verify:
 //   (a) The CTRL pin sits at 2/3 VCC from the internal R-divider.
 //   (b) The Timer555LatchDriver leaf exists and its pool slots are initialised
-//       (LATCH_Q ∈ {0,1}, OUTPUT_LOGIC_LEVEL mirrors LATCH_Q).
+//       (LATCH_Q ∈ {0,1}).
 // ---------------------------------------------------------------------------
 
 describe("Timer555 initialization (T1)", () => {
@@ -103,23 +103,16 @@ describe("Timer555 initialization (T1)", () => {
 
   it("init_latch_driver_pool_slots_valid", () => {
     // After warm-start the latch leaf exists and its state pool slots are
-    // initialised to consistent values (LATCH_Q ∈ {0,1}, OUTPUT_LOGIC_LEVEL
-    // mirrors LATCH_Q). Resolve slot indices via the schema (no SLOT_*
-    // constant import) and read pool state via fix.pool.state0.
+    // initialised to consistent values (LATCH_Q ∈ {0,1}). Resolve slot indices
+    // via the schema (no SLOT_* constant import) and read pool state via fix.pool.state0.
     const fix = buildQuiescentFixture();
     const drv = findLatchDriver(fix.circuit.elements);
     const slotQ      = drv.stateSchema.indexOf.get("LATCH_Q")!;
-    const slotLevel  = drv.stateSchema.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
     expect(slotQ).toBeGreaterThanOrEqual(0);
-    expect(slotLevel).toBeGreaterThanOrEqual(0);
 
     const q   = fix.pool.state0[drv._stateBase + slotQ];
-    const out = fix.pool.state0[drv._stateBase + slotLevel];
-    // Both slots must be 0 or 1 (logic levels).
+    // LATCH_Q must be 0 or 1 (logic level).
     expect([0, 1]).toContain(Math.round(q));
-    expect([0, 1]).toContain(Math.round(out));
-    // OUTPUT_LOGIC_LEVEL must mirror LATCH_Q.
-    expect(Math.round(out)).toBe(Math.round(q));
   });
 });
 
@@ -410,8 +403,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
 // Category 9 — Digital interaction / bridge (T1)
 // ---------------------------------------------------------------------------
 // Timer555 has all-analog inputs (VCC, GND, TRIG, THR, CTRL, RST, DIS) and a
-// single digital OUT pin (driven by DigitalOutputPinLoaded with the latch's
-// OUTPUT_LOGIC_LEVEL slot). Cat 9 is one-way: analog input → digital output
+// single digital OUT pin. Cat 9 is one-way: analog input → digital output
 // read via coordinator.readByLabel("t:OUT").value. Drive TRIG/THR to known
 // states that force latch SET vs RESET, step, observe digital output level.
 // ---------------------------------------------------------------------------

@@ -6,21 +6,12 @@
  * relative to gnd, threshold-classifies each against vIH/vIL hysteresis, and
  * writes the resulting logic level to the corresponding SEG_* observation slot.
  * Those slots are consumed by the parent composite's draw() function to
- * determine which segments to illuminate â€” they are NOT consumed via
- * siblingState by any DigitalOutputPinLoaded sub-element (no electrical output
- * pins exist on this component; the display itself is the consumer).
+ * determine which segments to illuminate; no electrical output pins exist on
+ * this component (the display itself is the consumer).
  *
- * Diverges from the d-flipflop canonical in:
- *   - pinLayout: 8 INPUT-only segment pins + 1 INPUT gnd (no OUTPUT pins)
- *   - schema: 8 observation-only SEG_* slots (no OUTPUT_LOGIC_LEVEL_* consumer slots)
- *   - load(): 8 independent threshold classifications, no edge detection, no latching
- *   - no siblingState consumer-side handling in the parent netlist
- *
- * Per Composite M13 (phase-composite-architecture.md), J-157
- * (contracts_group_10.md). Math migrated line-for-line from the old
- * SevenSegAnalogElement.load() in behavioral-remaining.ts (the composite read
- * each segment node voltage and classified it; here we do the same with pool
- * slots instead of sub-element delegation).
+ * pinLayout: 8 INPUT-only segment pins + 1 INPUT gnd (no OUTPUT pins).
+ * schema: 8 observation-only SEG_* slots.
+ * load(): 8 independent threshold classifications, no edge detection, no latching.
  */
 
 import {

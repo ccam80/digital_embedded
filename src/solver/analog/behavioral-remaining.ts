@@ -51,15 +51,10 @@ export const { paramDefs: DRIVER_BEHAVIORAL_PARAM_DEFS, defaults: DRIVER_BEHAVIO
  * Port order: in(0), sel(1), out(2), gnd(3).
  *
  * Sub-elements:
- *   drv    - BehavioralDriverDriver (writes OUTPUT_LOGIC_LEVEL + OUTPUT_LOGIC_LEVEL_ENABLE)
+ *   drv    - BehavioralDriverDriver.
  *   inPin  - Digital input pin (loaded or unloaded) on `in`
  *   selPin - Digital input pin (loaded or unloaded) on `sel`
- *   outPin - DigitalOutputPinLoaded on `out`; consumes both:
- *              inputLogic  ← drv.OUTPUT_LOGIC_LEVEL        (data passes through)
- *              enableLogic ← drv.OUTPUT_LOGIC_LEVEL_ENABLE (active-high enable)
- *            When the enable slot reads < 0.5 the inner Norton conductance
- *            collapses to 1 GΩ → high-Z; other drivers on the shared net
- *            dominate.
+ *   outPin - DigitalOutputPinLoaded on `out`.
  */
 export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const loaded        = params.getModelParam<number>("loaded") >= 0.5;
@@ -97,17 +92,11 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         cOut: params.getModelParam<number>("cOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),
-        inputLogic:  { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
-        enableLogic: { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_ENABLE" },
       },
     },
   ];
 
   // Net indices: in=0, sel=1, out=2, gnd=3
-  // drv pins: in, sel, out, gnd
-  // inPin pins: node=in, gnd=gnd
-  // selPin pins: node=sel, gnd=gnd
-  // outPin pins: pos=out, neg=gnd
   const netlist: number[][] = [
     [0, 1, 2, 3], // drv
     [0, 3],       // inPin
@@ -128,15 +117,7 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 // ---------------------------------------------------------------------------
 
 /**
- * Function-form netlist builder for the behavioural inverting tri-state
- * buffer (DriverInvSel- active-LOW enable).
- *
- * Same port shape as Driver. The only behavioural difference is that the
- * driver leaf (BehavioralDriverInvDriver) inverts sel before writing
- * OUTPUT_LOGIC_LEVEL_ENABLE, so the outPin's enableLogic sees enable=1
- * when sel is asserted LOW.
- *
- * Port order: in(0), sel(1), out(2), gnd(3).
+ * DriverInvSel - inverting tri-state buffer (Phase 4 supplies the new wiring).
  */
 export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const loaded        = params.getModelParam<number>("loaded") >= 0.5;
@@ -174,8 +155,6 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
         cOut: params.getModelParam<number>("cOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),
-        inputLogic:  { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
-        enableLogic: { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_ENABLE" },
       },
     },
   ];
@@ -295,9 +274,7 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
       subElementName: `outPin_${i}`,
-      params: {
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_LOGIC_LEVEL_${i}` },
-      },
+      params: {},
     });
     netlist.push([inputCount + i, netGnd]);
   }
@@ -396,9 +373,7 @@ export function buildButtonLEDNetlist(): MnaSubcircuitNetlist {
       typeId: "DigitalOutputPinLoaded",
       modelRef: "default",
       subElementName: "outPin",
-      params: {
-        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
-      },
+      params: {},
     },
   ];
 

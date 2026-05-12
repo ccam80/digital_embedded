@@ -3,9 +3,7 @@
  * XNOR gate.
  *
  * Reads N input voltages from rhsOld (relative to gnd), threshold-classifies
- * each input against per-instance vIH / vIL, and writes the XNOR-reduced
- * result to OUTPUT_LOGIC_LEVEL. That slot is consumed via siblingState by
- * the parent composite's outPin DigitalOutputPinLoaded sub-element.
+ * each input against per-instance vIH / vIL, and writes the XNOR-reduced result.
  *
  * Canonical reference for **Template A-variable-pin**: 1-bit pure-truth
  * driver with variable input pin count per instance. Mirrors and-driver.ts
@@ -31,14 +29,7 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralXnorDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Reduced output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-  },
-]);
-
-const SLOT_OUT = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
+const SCHEMA: StateSchema = defineStateSchema("BehavioralXnorDriver", []);
 
 // ---------------------------------------------------------------------------
 // Pin layout factory- per-instance variable input count
@@ -108,31 +99,7 @@ export class BehavioralXnorDriverElement extends PoolBackedAnalogElement {
     this._stateBase = ctx.allocStates(this.stateSize);
   }
 
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
-    const gnd = rhsOld[this._gndNode];
-    const prev: 0 | 1 = s1[base + SLOT_OUT] >= 0.5 ? 1 : 0;
-
-    let sawIndeterminate = false;
-    const inputs: number[] = [];
-    for (let i = 0; i < this._inputCount; i++) {
-      const v = rhsOld[this._inputNodes[i]] - gnd;
-      if      (v >= this._vIH) { inputs.push(1); }
-      else if (v <  this._vIL) { inputs.push(0); }
-      else                     { sawIndeterminate = true; break; }
-    }
-
-    let result: 0 | 1;
-    if (sawIndeterminate) {
-      result = prev;
-    } else {
-      result = (1 - inputs.reduce((a, b) => a ^ b, 0)) as 0 | 1;
-    }
-
-    s0[base + SLOT_OUT] = result;
+  load(_ctx: LoadContext): void {
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

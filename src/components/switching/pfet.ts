@@ -14,11 +14,10 @@
  * Analog model (kind: "netlist"):
  *   drv (BehavioralFETDriver, polarity p): reads V(G) - V(S), classifies
  *        on as `vGS < -Vth` (active-low gate semantics for P-channel).
- *   sw  (FetSW, invertCtrl=1): the driver writes 1 to OUTPUT_LOGIC_LEVEL
- *        when the channel should be on; sw passes that through unchanged.
- *        invertCtrl=1 is preserved here for symmetry with the TransGate
- *        PFET path where invertCtrl is the natural way to express
- *        active-low control of an on/off switch.
+ *   sw  (FetSW, invertCtrl=1): the driver signals on when the channel
+ *        should be on; sw passes that through unchanged. invertCtrl=1 is
+ *        preserved here for symmetry with the TransGate PFET path where
+ *        invertCtrl is the natural way to express active-low control.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -192,11 +191,8 @@ export function executePFET(index: number, state: Uint32Array, highZs: Uint32Arr
 // Ports: G=0, D=1, S=2
 //
 // Elements:
-//   drv (BehavioralFETDriver, isNType=0): on-condition is `vGS < -Vth`,
-//        writes 1 to OUTPUT_LOGIC_LEVEL when the channel should conduct.
-//   sw  (FetSW, invertCtrl=0): consumes drv.OUTPUT_LOGIC_LEVEL via
-//        siblingState. The driver already encodes "on" as logic=1, so the
-//        switch reads the slot directly without inversion.
+//   drv (BehavioralFETDriver, isNType=0): on-condition is `vGS < -Vth`.
+//   sw  (FetSW, invertCtrl=0): stamps the 2x2 (D, S) admittance.
 // ---------------------------------------------------------------------------
 
 export const buildPfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
@@ -221,7 +217,6 @@ export const buildPfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
           Ron: ron,
           Roff: roff,
           invertCtrl: 0,
-          inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
         },
       },
     ],

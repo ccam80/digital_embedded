@@ -66,8 +66,8 @@ export const { paramDefs: JK_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: JK_FF_AS_BEH
 // Sub-elements:
 //   drv  : BehavioralJKAsyncFlipflopDriver  (1-bit pure-truth-function leaf,
 //          edge-triggered JK + async Set/Clr override)
-//   qPin : DigitalOutputPinLoaded           (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
-//   nqPin: DigitalOutputPinLoaded           (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//   qPin : DigitalOutputPinLoaded           (drives Q)
+//   nqPin: DigitalOutputPinLoaded           (drives ~Q)
 //
 // Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
 // bit-width replication is composite-expansion infrastructure.
@@ -96,8 +96,6 @@ export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitN
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
         },
       },
       {
@@ -109,8 +107,6 @@ export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitN
           cOut: params.getModelParam<number>("cOut"),
           vOH:  params.getModelParam<number>("vOH"),
           vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
         },
       },
     ],

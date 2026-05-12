@@ -6,6 +6,7 @@
  */
 
 import { ComponentRegistry } from "@/core/registry";
+import { auditNgspiceLoadOrderTables } from "../solver/analog/ngspice-load-order-audit.js";
 
 // Gates
 import { AndDefinition } from "./gates/and.js";
@@ -553,6 +554,8 @@ export function createDefaultRegistry(
 
   // Mutual inductor sub-element (internalOnly — used by Transformer composites)
   registry.register(MutualInductorDefinition);
+
+  auditNgspiceLoadOrderTables(registry);
 
   return registry;
 }

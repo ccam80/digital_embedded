@@ -82,8 +82,8 @@ export const { paramDefs: T_FF_BEHAVIORAL_PARAM_DEFS, defaults: T_FF_BEHAVIORAL_
 //
 // Sub-elements (both variants):
 //   drv  : BehavioralTFlipflopDriver  (1-bit pure-truth-function leaf)
-//   qPin : DigitalOutputPinLoaded     (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
-//   nqPin: DigitalOutputPinLoaded     (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//   qPin : DigitalOutputPinLoaded     (drives Q)
+//   nqPin: DigitalOutputPinLoaded     (drives ~Q)
 //
 // Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit.
 // ---------------------------------------------------------------------------
@@ -109,8 +109,6 @@ export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState", subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL_Q" },
     },
   };
   const nqPinSubElement = {
@@ -122,8 +120,6 @@ export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState", subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
     },
   };
 

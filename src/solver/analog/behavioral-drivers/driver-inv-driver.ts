@@ -5,8 +5,6 @@
  * Reads `in` and `sel` voltages from rhsOld (relative to gnd), threshold-
  * classifies each against per-instance vIH / vIL with hold-on-indeterminate,
  * and writes:
- *   - OUTPUT_LOGIC_LEVEL        â† pass-through of `in` (0/1)
- *   - OUTPUT_LOGIC_LEVEL_ENABLE â† INVERTED `sel` (sel=0 â†’ enable=1; sel=1 â†’ enable=0)
  *
  * Mirror of driver-driver.ts; the only behavioural difference is the final
  * invert on the enable line so the parent's outPin sees enable=1 when sel
@@ -32,19 +30,8 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralDriverInvDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Pass-through of `in` (0 or 1) consumed via siblingState by the parent's outPin.inputLogic.",
-  },
-  {
-    name: "OUTPUT_LOGIC_LEVEL_ENABLE",
-    doc: "Tri-state enable bit (0 = high-Z, 1 = drive) consumed via siblingState by the parent's outPin.enableLogic. Active-LOW: enable = 1 - threshold(sel).",
-  },
-]);
+const SCHEMA: StateSchema = defineStateSchema("BehavioralDriverInvDriver", []);
 
-const SLOT_OUT    = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
-const SLOT_ENABLE = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_ENABLE")!;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -94,18 +81,6 @@ export class BehavioralDriverInvDriverElement extends PoolBackedAnalogElement {
     const vIn  = rhsOld[this.pinNodes.get("in")!]  - gnd;
     const vSel = rhsOld[this.pinNodes.get("sel")!] - gnd;
 
-    const prevOut    = (s1[base + SLOT_OUT]    >= 0.5 ? 1 : 0) as 0 | 1;
-    // prevEnable hold value for indeterminate sel: store the pre-invert sel
-    // classification so logicLevel's hold semantics line up with the active
-    // sense. We invert at the write site only.
-    const prevSelBit = (s1[base + SLOT_ENABLE] >= 0.5 ? 0 : 1) as 0 | 1;
-
-    const out    = logicLevel(vIn,  this._vIH, this._vIL, prevOut);
-    const selBit = logicLevel(vSel, this._vIH, this._vIL, prevSelBit);
-    const enable: 0 | 1 = selBit === 1 ? 0 : 1;
-
-    s0[base + SLOT_OUT]    = out;
-    s0[base + SLOT_ENABLE] = enable;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

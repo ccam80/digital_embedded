@@ -1,11 +1,6 @@
 ﻿/**
  * BehavioralFETDriver- behavioral driver leaf for the NFET / PFET / TransGate
- * composites. Reads V(G) - V(S), thresholds against Vth, and writes the
- * classified logic level (0 or 1) into its own OUTPUT_LOGIC_LEVEL pool slot.
- *
- * The slot is consumed via siblingState by the parent composite's FetSW
- * sub-element; FetSW translates the slot value to gOn / gOff conductance
- * and stamps the 2x2 admittance at (D, S).
+ * composites. Reads V(G) - V(S), thresholds against Vth, and classifies the gate logic level.
  *
  * Polarity:
  *   "n" (NFET):  on-condition is `vGS > Vth` (gate-source voltage exceeds threshold).
@@ -17,7 +12,7 @@
  * Pins: G (gate), D (drain, unused for control), S (source).
  *
  * Per Composite recipe: pure behavioural classifier writing
- * OUTPUT_LOGIC_LEVEL at bottom of load(), no MNA stamps.
+ * No MNA stamps.
  */
 
 import {
@@ -36,14 +31,8 @@ import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralFETDriver", [
-  {
-    name: "OUTPUT_LOGIC_LEVEL",
-    doc: "Classified gate logic level (0 or 1) consumed via siblingState by the parent composite's FetSW sub-element.",
-  },
-]);
+const SCHEMA: StateSchema = defineStateSchema("BehavioralFETDriver", []);
 
-const SLOT_OUT = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL")!;
 
 // ---------------------------------------------------------------------------
 // Param defs
@@ -122,7 +111,6 @@ export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
     // P-channel: on when vGS < -Vth (gate lower than source by threshold).
     const on = this._isNType ? vGS > this._vth : vGS < -this._vth;
 
-    s0[this._stateBase + SLOT_OUT] = on ? 1 : 0;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

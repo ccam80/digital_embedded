@@ -158,6 +158,15 @@ export class TimestepController {
   currentOrder: number = 1;
 
   /**
+   * Public accessor for CKTminBreak — used by element acceptStep() bodies
+   * that need ngspice's break-deduplication threshold (e.g. TRA, where the
+   * history-table grow predicate at traaccept.c:49 reads CKTminBreak).
+   */
+  get minBreak(): number {
+    return this._minBreak;
+  }
+
+  /**
    * Shift the deltaOld history ring. Called by the engine BEFORE the for(;;)
    * retry loop (ngspice dctran.c:704-706).
    */

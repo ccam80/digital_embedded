@@ -191,7 +191,7 @@ export const { paramDefs: NOR_BEHAVIORAL_PARAM_DEFS, defaults: NOR_BEHAVIORAL_DE
 // Sub-elements:
 //   drv     : BehavioralNorDriver  (1-bit pure-truth-function leaf, N inputs)
 //   inPin_i : DigitalInputPin{Loaded|Unloaded}  (one per input port)
-//   outPin  : DigitalOutputPin{Loaded|Unloaded}  (consumes drv OUTPUT_LOGIC_LEVEL)
+//   outPin  : DigitalOutputPin{Loaded|Unloaded}
 // ---------------------------------------------------------------------------
 
 export function buildNorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
@@ -209,7 +209,7 @@ export function buildNorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  // Driver leaf.
   const driverPins: number[] = [];
   for (let i = 0; i < N; i++) driverPins.push(i);
   driverPins.push(outIdx, gndIdx);
@@ -235,7 +235,6 @@ export function buildNorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     netlist.push([i, gndIdx]);
   }
 
-  // Output pin- siblingState consumes the driver's OUTPUT_LOGIC_LEVEL slot.
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -245,8 +244,6 @@ export function buildNorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       cOut: params.getModelParam<number>("cOut"),
       vOH:  params.getModelParam<number>("vOH"),
       vOL:  params.getModelParam<number>("vOL"),
-      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
-                    slotName: "OUTPUT_LOGIC_LEVEL" },
     },
   });
   netlist.push([outIdx, gndIdx]);

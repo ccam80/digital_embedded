@@ -251,14 +251,12 @@ export const RELAY_DT_NETLIST: MnaSubcircuitNetlist = {
     { typeId: "RelayCoupling", modelRef: "default", subElementName: "couplingNO",
       params: {
         coilBranch:   { kind: "siblingBranch", subElementName: "coilL" },
-        switchClosed: { kind: "siblingState",  subElementName: "contactNO", slotName: "CLOSED" },
         pullInI:  "pullInI",
         dropOutI: "dropOutI",
       } },
     { typeId: "RelayCoupling", modelRef: "default", subElementName: "couplingNC",
       params: {
         coilBranch:   { kind: "siblingBranch", subElementName: "coilL" },
-        switchClosed: { kind: "siblingState",  subElementName: "contactNC", slotName: "CLOSED" },
         pullInI:  "dropOutI",
         dropOutI: "pullInI",
       } },

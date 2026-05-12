@@ -10,10 +10,6 @@
  *                 T input is ignored; the parent netlist wires T to gnd as a
  *                 placeholder so the pin layout stays uniform.
  *
- * Q / ~Q levels are written to OUTPUT_LOGIC_LEVEL_Q / OUTPUT_LOGIC_LEVEL_NQ
- * for siblingState consumption by the qPin / nqPin DigitalOutputPinLoaded
- * sub-elements.
- *
  * Per Composite M15 (phase-composite-architecture.md), J-159.
  */
 
@@ -31,16 +27,12 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { detectRisingEdge } from "./edge-detect.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralTFlipflopDriver", [
-  { name: "LAST_CLOCK",            doc: "Clock voltage at last accepted timestep. NaN sentinel on the first sample skips edge detection." },
-  { name: "Q",                     doc: "Latched output bit (0 or 1)." },
-  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin." },
-  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin." },
+  { name: "LAST_CLOCK", doc: "Clock voltage at last accepted timestep. NaN sentinel on the first sample skips edge detection." },
+  { name: "Q",          doc: "Latched output bit (0 or 1)." },
 ]);
 
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
-const SLOT_OUT_Q      = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_Q")!;
-const SLOT_OUT_NQ     = SCHEMA.indexOf.get("OUTPUT_LOGIC_LEVEL_NQ")!;
 
 const T_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "T",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -100,8 +92,6 @@ export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
-    s0[base + SLOT_OUT_Q]      = q;
-    s0[base + SLOT_OUT_NQ]     = 1 - q;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
