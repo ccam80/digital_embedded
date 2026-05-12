@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json 2>&1 | head -30",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --reporter=verbose \"src/solver/analog/behavioral-drivers/__tests__/gate-driver-params.test.ts\" 2>&1 | tail -50",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && node -e \"const f=require('./.vitest-failures.json');f.failures.forEach(x=>console.log(x.locations?.[0]?.test,'|',x.message.slice(0,180)))\"",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -293,8 +293,8 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 125,
-      "lastAccessed": 1778579964063,
+      "accessCount": 128,
+      "lastAccessed": 1778583806593,
       "type": "file"
     },
     {
@@ -352,6 +352,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\wiring\\splitter.ts",
+      "accessCount": 10,
+      "lastAccessed": 1778583736795,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
       "accessCount": 9,
       "lastAccessed": 1778476011023,
@@ -373,12 +379,6 @@
       "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
       "accessCount": 8,
       "lastAccessed": 1778582497526,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\wiring\\splitter.ts",
-      "accessCount": 8,
-      "lastAccessed": 1778582589405,
       "type": "file"
     },
     {

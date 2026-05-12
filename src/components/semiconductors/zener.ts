@@ -115,7 +115,7 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
   { name: "ID",   doc: "GMIN-adjusted diode current — diodefs.h DIOcurrent (DIOstate+1)" },
   { name: "GEQ",  doc: "GMIN-adjusted junction conductance — diodefs.h DIOconduct (DIOstate+2)" },
   { name: "Q",    doc: "Junction charge (unused by zener) — diodefs.h DIOcapCharge (DIOstate+3)" },
-  { name: "CCAP", doc: "NIintegrate companion current (unused by zener) — diodefs.h DIOcapCurrent (DIOstate+4)" },
+  { name: "CAP_CURRENT", doc: "NIintegrate companion current (unused by zener) — diodefs.h DIOcapCurrent (DIOstate+4)" },
 ]);
 
 // ---------------------------------------------------------------------------

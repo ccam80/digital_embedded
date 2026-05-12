@@ -84,7 +84,7 @@ export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
   { name: "ID",   doc: "Diode current at operating point — diodefs.h DIOcurrent (DIOstate+1)" },
   { name: "GEQ",  doc: "NR companion conductance — diodefs.h DIOconduct (DIOstate+2)" },
   { name: "Q",    doc: "Junction charge — diodefs.h DIOcapCharge (DIOstate+3)" },
-  { name: "CCAP", doc: "MODETRAN: NIintegrate companion current iqcap; MODEINITSMSIG: capd (F) per dioload.c:363 — diodefs.h DIOcapCurrent (DIOstate+4)" },
+  { name: "CAP_CURRENT", doc: "MODETRAN: NIintegrate companion current iqcap; MODEINITSMSIG: capd (F) per dioload.c:363 — diodefs.h DIOcapCurrent (DIOstate+4)" },
 ]);
 
 const SLOT_VD   = 0;

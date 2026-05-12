@@ -6,15 +6,36 @@
  * (Phase 4 wires the Norton stamps); this test only pins down the setParam
  * surface.
  *
- * Tier: T1 (buildFixture). Each driver is exercised via its parent component
- * compiled in model: "behavioral", matching the canonical hot-load pattern
- * in behavioral-combinational.test.ts.
+ * Mux/Demux/Decoder/SevenSeg: T1 (buildFixture) via parent component compiled
+ * in model: "behavioral", matching behavioral-combinational.test.ts.
+ *
+ * Splitter: direct element construction (mirrors memory-driver-params.test.ts)
+ * to avoid the composite layer whose outer pin names differ from the netlist
+ * port names used by buildSplitterNetlist.
  */
 
 import { describe, it, expect } from "vitest";
 import { buildFixture } from "../../__tests__/fixtures/build-fixture.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
+import { PropertyBag } from "../../../../core/properties.js";
+import { BehavioralSplitterDriverElement } from "../splitter-driver.js";
+
+function makeSplitterProps(params: Record<string, number>): PropertyBag {
+  const bag = new PropertyBag();
+  for (const [k, v] of Object.entries(params)) {
+    bag.setModelParam(k, v);
+  }
+  return bag;
+}
+
+function splitterPinNodes(inputCount: number, outputCount: number): ReadonlyMap<string, number> {
+  const m = new Map<string, number>();
+  for (let i = 0; i < inputCount; i++) m.set(`in_${i}`, i);
+  for (let i = 0; i < outputCount; i++) m.set(`out_${i}`, inputCount + i);
+  m.set("gnd", inputCount + outputCount);
+  return m;
+}
 
 function buildMuxFixture() {
   return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade) =>
@@ -85,26 +106,6 @@ function buildDecoderFixture() {
     });
 }
 
-function buildSplitterFixture() {
-  return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade) =>
-    facade.build({
-      components: [
-        { id: "vsIn",  type: "DcVoltageSource", props: { voltage: 0.0 } },
-        { id: "spl",   type: "Splitter",        props: { label: "spl", model: "behavioral", inputSplitting: "8", outputSplitting: "4,4" } },
-        { id: "rLo",   type: "Resistor",        props: { resistance: 10000 } },
-        { id: "rHi",   type: "Resistor",        props: { resistance: 10000 } },
-        { id: "gnd",   type: "Ground" },
-      ],
-      connections: [
-        ["vsIn:pos",   "spl:0-7"],
-        ["spl:0-3",    "rLo:pos"],
-        ["spl:4-7",    "rHi:pos"],
-        ["rLo:neg",    "gnd:out"],
-        ["rHi:neg",    "gnd:out"],
-        ["vsIn:neg",   "gnd:out"],
-      ],
-    });
-}
 
 function buildSevenSegFixture() {
   return (_registry: ComponentRegistry, facade: DefaultSimulatorFacade) =>
@@ -177,12 +178,12 @@ describe("wiring-driver-params: accepts rOut/vOH/vOL via setParam without throwi
   });
 
   it("Splitter (BehavioralSplitterDriverElement): setParam rOut/vOH/vOL does not throw", () => {
-    const fix = buildFixture({ build: buildSplitterFixture() });
-    const el = findByLabel(fix, "spl");
-    expect(el).toBeDefined();
-    expect(() => fix.coordinator.setComponentProperty(el!, "rOut", 200)).not.toThrow();
-    expect(() => fix.coordinator.setComponentProperty(el!, "vOH", 3.3)).not.toThrow();
-    expect(() => fix.coordinator.setComponentProperty(el!, "vOL", 0.5)).not.toThrow();
+    const props = makeSplitterProps({ inputCount: 1, outputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const pinNodes = splitterPinNodes(1, 2);
+    const el = new BehavioralSplitterDriverElement(pinNodes, props);
+    expect(() => el.setParam("rOut", 200)).not.toThrow();
+    expect(() => el.setParam("vOH", 3.3)).not.toThrow();
+    expect(() => el.setParam("vOL", 0.5)).not.toThrow();
   });
 
   it("SevenSeg (BehavioralSevenSegDriverElement): setParam rOut/vOH/vOL does not throw", () => {

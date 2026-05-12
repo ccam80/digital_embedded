@@ -231,6 +231,14 @@ class TransmissionLineAnalogElement extends AnalogElement {
     if (mode & MODEDC) {
       // cite: traload.c:53-59 — MODEDC bridge stamps couple ports directly
       // with a -(1 - gmin)*Z entry on the branch-row diagonals.
+      // cite: traload.c:56 — `(1 - ckt->CKTgmin) * here->TRAimped`. ngspice
+      // reads the static circuit-wide gmin (CKTgmin, default 1e-12) here,
+      // NOT the gmin-stepping active value (CKTdiagGmin). digiTS's ctx.gmin
+      // maps to CKTdiagGmin per ckt-load.ts:93, so reading it directly
+      // produces -Z0 (with diagGmin=0) instead of -(1 - 1e-12)*Z0. That is
+      // an upstream LoadContext-naming divergence; surfacing it here in the
+      // bridge-stamp matrix delta rather than papering it over with a
+      // hardcoded literal.
       const dcZ = (1 - ctx.gmin) * Z0;
       s.stampElement(this._hIbr1Pos2, -1);
       s.stampElement(this._hIbr1Neg2, +1);
@@ -306,15 +314,24 @@ class TransmissionLineAnalogElement extends AnalogElement {
   }
 
   acceptStep(simTime: number, addBreakpoint: (t: number) => void, _atBreakpoint: boolean): void {
-    // cite: traaccept.c — runs once per accepted timestep.
-    if (this._rhsOldRef === null || this._deltaOldRef === null) {
-      // load() never ran (or only DC-OP) — no history to maintain.
-      return;
-    }
-    // DC-OP-only paths never run MODEINITTRAN, so _delays stays empty.
-    // traaccept.c reads delays[6] (= delays[2].t in our object layout)
-    // unconditionally; guard against that index before the table is seeded.
-    if (this._sizeDelay < 2) return;
+    // cite: traaccept.c — runs once per accepted transient timestep.
+    //
+    // ngspice's CKTaccept is invoked AFTER a transient NR convergence, so by
+    // the time this code runs, MODEINITTRAN has fired in traload.c and the
+    // delays table is seeded (sizeDelay >= 2). digiTS's engine invokes
+    // acceptStep at the TOP of every step() — including step 0 with
+    // simTime=0, before any MODEINITTRAN — to let PULSE-style sources
+    // register their first edge as a breakpoint. That timing is a
+    // pre-existing engine-level divergence from ngspice's CKTaccept.
+    //
+    // No element-level guard belongs here. If this method runs before the
+    // delays table is seeded, the unguarded index access surfaces the
+    // calling-convention mismatch loudly — see analog-engine.ts:311-324
+    // and the comment block there for the engine-side rationale. The
+    // architectural fix lives upstream in MNAEngine (or in
+    // spec/architectural-alignment.md if it's an accepted divergence),
+    // not in TRA.
+    if (this._rhsOldRef === null || this._deltaOldRef === null) return;
     const rhsOld = this._rhsOldRef;
     const deltaOld = this._deltaOldRef;
     const td = this._td;
