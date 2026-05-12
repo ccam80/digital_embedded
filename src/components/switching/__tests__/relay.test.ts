@@ -9,10 +9,30 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { createDefaultRegistry } from "../../register-all.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { SwitchAnalogElement, SWITCH_SCHEMA } from "../switch.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
+
+const SLOT_CLOSED = SWITCH_SCHEMA.indexOf.get("CLOSED")!;
+
+/**
+ * Locate a Switch sub-element inside the expanded RelayDT composite by its
+ * fully-qualified label (e.g. "relayDT:contactNO"). Walks `fix.circuit.elements`
+ * for a SwitchAnalogElement instance with the matching `label`.
+ */
+function findContactByName(fix: Fixture, label: string): SwitchAnalogElement {
+  for (const el of fix.circuit.elements) {
+    if (el instanceof SwitchAnalogElement && el.label === label) {
+      return el;
+    }
+  }
+  throw new Error(
+    `Switch sub-element with label '${label}' not found in compiled circuit; ` +
+      `the RelayDT netlist composite did not expand correctly.`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // .dts fixture paths (T3 harness) — authored under fixtures/
@@ -478,6 +498,49 @@ describe("RelayDT parameter hot-load (T1) — inductance", () => {
     // coil current crossing pullInI; the slow fixture lags the fast one.
     expect(vbSlow).not.toBeCloseTo(vbFast, 2);
     expect(vbSlow).toBeLessThan(vbFast);
+  });
+});
+
+// ===========================================================================
+// RelayDT ctrlBranch path (Wave 2.3) — T1 cases against existing fixtures.
+//
+// The Wave 2.3 contract: both contactNO and contactNC Switch sub-elements
+// read the coilSense V-source's branch current via the ngspice CSW path.
+// contactNO has normallyClosed=false (closes when energised); contactNC has
+// normallyClosed=true + closed=true (closed at rest, opens when energised).
+// ===========================================================================
+
+describe("RelayDT ctrlBranch path (Wave 2.3)", () => {
+  it("contactNO closes when energised", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 10, vTest: 1, rLoad: 100 }),
+    });
+    const contactNO = findContactByName(fix, "relayDT:contactNO");
+    expect(fix.pool.state1[contactNO._stateBase + SLOT_CLOSED]).toBe(1);
+  });
+
+  it("contactNC opens when energised", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 10, vTest: 1, rLoad: 100 }),
+    });
+    const contactNC = findContactByName(fix, "relayDT:contactNC");
+    expect(fix.pool.state1[contactNC._stateBase + SLOT_CLOSED]).toBe(0);
+  });
+
+  it("contactNO opens when de-energised", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 0, vTest: 1, rLoad: 100 }),
+    });
+    const contactNO = findContactByName(fix, "relayDT:contactNO");
+    expect(fix.pool.state1[contactNO._stateBase + SLOT_CLOSED]).toBe(0);
+  });
+
+  it("contactNC closes when de-energised", () => {
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 0, vTest: 1, rLoad: 100 }),
+    });
+    const contactNC = findContactByName(fix, "relayDT:contactNC");
+    expect(fix.pool.state1[contactNC._stateBase + SLOT_CLOSED]).toBe(1);
   });
 });
 

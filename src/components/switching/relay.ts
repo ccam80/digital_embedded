@@ -228,14 +228,20 @@ export function executeRelay(index: number, state: Uint32Array, _highZs: Uint32A
 // ---------------------------------------------------------------------------
 // RELAY_NETLIST- MnaSubcircuitNetlist for the relay analog model
 //
-// Ports: in1, in2, A1, B1
-// Internal net: coilMid (index 4)
+// Ports: in1, in2, A1, B1                            (indices 0..3)
+// Internal nets: coilMid (4), coilSenseMid (5)
 //
 // Elements:
-//   0: Inductor (coilL): pos=in1(0), neg=coilMid(4)
-//   1: Resistor (coilR): pos=coilMid(4), neg=in2(1)
-//   2: Switch (contactSW):   A1(2) â†” B1(3)
-//   3: RelayCoupling:        no MNA pins
+//   0: Inductor (coilL):     pos=in1(0),          neg=coilMid(4)
+//   1: Voltage (coilSense):  neg=coilSenseMid(5), pos=coilMid(4)  (0V sense, branchCount=1)
+//   2: Resistor (coilR):     pos=coilSenseMid(5), neg=in2(1)
+//   3: Switch (contactSW):   A1(2) ↔ B1(3), ctrlBranch -> coilSense (ngspice CSW)
+//
+// coilSense pin assignment: neg=coilSenseMid, pos=coilMid. Current flows from
+// in1 through coilL into coilMid (pos terminal of coilSense), through the
+// sense source, out at coilSenseMid (neg terminal), then through coilR to in2.
+// This makes branchIndex current positive (i_k = I_coil > 0) when the coil
+// is energised — matching ngspice CSW i_ctrl sign convention (cswload.c).
 // ---------------------------------------------------------------------------
 
 export const RELAY_NETLIST: MnaSubcircuitNetlist = {
@@ -243,23 +249,25 @@ export const RELAY_NETLIST: MnaSubcircuitNetlist = {
   params: { inductance: 0.05, coilResistance: 100,
             pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
   elements: [
-    { typeId: "Inductor",  modelRef: "behavioral", subElementName: "coilL", branchCount: 1, params: { inductance: "inductance" } },
-    { typeId: "Resistor",  modelRef: "behavioral", subElementName: "coilR",                params: { resistance: "coilResistance" } },
-    { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactSW",              params: { Ron: "Ron", Roff: "Roff" } },
-    { typeId: "RelayCoupling", modelRef: "default", subElementName: "coupling",
+    { typeId: "Inductor",        modelRef: "behavioral", subElementName: "coilL",     branchCount: 1, params: { inductance: "inductance" } },
+    { typeId: "DcVoltageSource", modelRef: "behavioral", subElementName: "coilSense", branchCount: 1, params: { voltage: 0 } },
+    { typeId: "Resistor",        modelRef: "behavioral", subElementName: "coilR",                     params: { resistance: "coilResistance" } },
+    { typeId: "Switch",          modelRef: "behavioral", subElementName: "contactSW",
       params: {
-        coilBranch:    { kind: "siblingBranch", subElementName: "coilL" },
+        Ron: "Ron",
+        Roff: "Roff",
+        ctrlBranch: { kind: "siblingBranch", subElementName: "coilSense" },
         pullInI: "pullInI",
         dropOutI: "dropOutI",
       } },
   ],
-  internalNetCount: 1,
-  internalNetLabels: ["coilMid"],
+  internalNetCount: 2,
+  internalNetLabels: ["coilMid", "coilSenseMid"],
   netlist: [
-    [0, 4],   // coilL: in1, coilMid
-    [4, 1],   // coilR: coilMid, in2
-    [2, 3],   // contactSW: A1, B1
-    [],       // RelayCoupling: no MNA pins
+    [0, 4],   // coilL:     in1,          coilMid
+    [5, 4],   // coilSense: neg=coilSenseMid, pos=coilMid  (i_k > 0 when I_coil > 0)
+    [5, 1],   // coilR:     coilSenseMid, in2
+    [2, 3],   // contactSW: A1,           B1
   ],
 };
 
@@ -337,7 +345,14 @@ export const RelayDefinition: StandaloneComponentDefinition = {
     "behavioral": {
       kind: "netlist",
       netlist: RELAY_NETLIST,
-      paramDefs: [],
+      paramDefs: [
+        { key: "inductance",     default: 0.05 },
+        { key: "coilResistance", default: 100 },
+        { key: "pullInI",        default: 0.05 },
+        { key: "dropOutI",       default: 0.02 },
+        { key: "Ron",            default: 0.01 },
+        { key: "Roff",           default: 1e9 },
+      ],
       params: { inductance: 0.05, coilResistance: 100,
                 pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
     },

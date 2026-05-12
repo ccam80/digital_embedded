@@ -115,6 +115,15 @@ function assertNoSiblingRefs(
           (key === "L1_branch" || key === "L2_branch")) {
         continue;
       }
+      // ngspice CSW (W element): Switch's `ctrlBranch` siblingBranch resolves
+      // to a Vsense source name on the emitted W device line. The sibling is
+      // a primitive Voltage source whose canonicalized SPICE label is the
+      // value the W device references for its controlling-branch current.
+      // Same semantic as the MutualInductor K exemption: a digiTS sibling
+      // ref that maps directly to ngspice's name-based cross-element lookup.
+      if (sub.typeId === "Switch" && v.kind === "siblingBranch" && key === "ctrlBranch") {
+        continue;
+      }
       throw new Error(
         `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
         `of ${parentTypeId} '${parentLabel}' uses ${v.kind} on param '${key}'. ` +
@@ -147,6 +156,7 @@ function resolveSubElementProps(
   sub: SubcircuitElement,
   subcktParams: Record<string, number> | undefined,
   parentProps: PropertyBag,
+  parentRawLabel: string,
 ): PropertyBag {
   const bag = new PropertyBag();
   if (sub.modelRef !== undefined) bag.set("model", sub.modelRef);
@@ -168,10 +178,37 @@ function resolveSubElementProps(
           `params nor the subcircuit's defaults define a value for that key.`
         );
       }
+    } else if (typeof v === "object" && v !== null && "kind" in v && v.kind === "siblingBranch") {
+      // ngspice CSW (W element) passthrough: Switch's `ctrlBranch` siblingBranch
+      // resolves to the SPICE label of the sibling V-source. The Switch emit
+      // branch reads the resolved label from the regular property partition
+      // and emits it as the Vsense reference on the W device line. Same
+      // resolution shape the MutualInductor K-element uses; the assertion
+      // exemption in assertNoSiblingRefs gates which (typeId, key) pairs are
+      // permitted to flow through.
+      if (sub.typeId === "Switch" && subKey === "ctrlBranch") {
+        const ref = v as { kind: "siblingBranch"; subElementName: string };
+        // The sibling sub-element's V-source line is emitted with the raw
+        // label `${parentRawLabel}_${sub.subElementName}` which is then
+        // canonicalized to a "V"-prefixed identifier at emit time. We mirror
+        // that canonicalization here so the W device line references the
+        // exact same identifier.
+        const senseRawLabel = `${parentRawLabel}_${ref.subElementName}`;
+        const senseSpiceLabel = canonicalizeSpiceLabel(senseRawLabel, "V");
+        bag.set(subKey, senseSpiceLabel);
+        continue;
+      }
+      // Sibling refs not on the (typeId, key) exemption list reach here
+      // because assertNoSiblingRefs has already thrown; if we get here the
+      // exemption table drifted.
+      throw new Error(
+        `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
+        `param '${subKey}' is a siblingBranch ref that assertNoSiblingRefs ` +
+        `exempted but resolveSubElementProps does not know how to translate.`
+      );
     } else {
-      // Sibling refs are handled by assertNoSiblingRefs; reaching here means
-      // a new SubcircuitElementParam shape was added without updating this
-      // generator. Throw rather than silently swallow.
+      // Reaching here means a new SubcircuitElementParam shape was added
+      // without updating this generator. Throw rather than silently swallow.
       throw new Error(
         `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
         `param '${subKey}' has unrecognized SubcircuitElementParam shape ` +
@@ -394,7 +431,7 @@ function emitElement(
         subPinNodesByLabel.set(pinLabel, outer);
       }
 
-      const subProps = resolveSubElementProps(sub, subckt.params, props);
+      const subProps = resolveSubElementProps(sub, subckt.params, props, rawLabel);
       const subRawLabel = `${rawLabel}_${sub.subElementName ?? `e${i}`}`;
       const subModelKey = sub.modelRef ?? subDef.defaultModel ?? "";
 
@@ -623,22 +660,55 @@ function emitPrimitive(
   }
 
   if (typeId === "Switch") {
-    // Class B: manual click-toggle. pinLayout: [A1, B1] (switch.ts:507).
-    // Synthesize an internal ctrl net + 0V/+1V V-source snapshotting `closed` at deck-build time.
-    // SPICE:
+    const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
+    const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
+    const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
+    const roff = requireParam(props, def, modelKey, "Roff", rawLabel);
+
+    if (props.has("ctrlBranch")) {
+      // ngspice CSW (W element) path: Switch's ctrlBranch resolves to the
+      // sibling V-source's canonicalized SPICE label (written by
+      // resolveSubElementProps). The W device samples that V-source's branch
+      // current per NR iteration and applies pull-in / drop-out hysteresis
+      // via the CSW .model card.
+      //
+      // Model card (cswparam.c / cswload.c):
+      //   .model {modelName} CSW (IT={iThreshold} IH={iHysteresis} RON={ron} ROFF={roff})
+      // ngspice CSW->digiTS mapping:
+      //   CSWiThreshold  = (pullInI + dropOutI) / 2
+      //   CSWiHysteresis = (pullInI - dropOutI) / 2
+      // NC switches additionally emit the `ON` keyword per cswparam.c:27-30
+      // (CSW_IC_ON case sets CSWzero_stateGiven), pinning the CSWITCH's
+      // initial state to closed and matching digiTS's `closed: true` initial.
+      const pullInI  = requireParam(props, def, modelKey, "pullInI",  rawLabel);
+      const dropOutI = requireParam(props, def, modelKey, "dropOutI", rawLabel);
+      const iThreshold  = (pullInI + dropOutI) / 2;
+      const iHysteresis = (pullInI - dropOutI) / 2;
+      const senseLabel = props.get<string>("ctrlBranch");
+      const wLabel = canonicalizeSpiceLabel(rawLabel, "W");
+      const modelName = `CSWMODEL_${wLabel}`;
+      const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+      if (!modelCards.has(modelName)) {
+        modelCards.set(modelName, `.model ${modelName} CSW (IT=${iThreshold} IH=${iHysteresis} RON=${ron} ROFF=${roff})`);
+      }
+      const onKeyword = normallyClosed ? " ON" : "";
+      return [
+        `${wLabel} ${a1Node} ${b1Node} ${senseLabel} ${modelName}${onKeyword}`,
+      ];
+    }
+
+    // Class B (manual click-toggle): no ctrlBranch wired. Synthesize an
+    // internal ctrl net + 0V/+1V V-source snapshotting `closed` at deck-build
+    // time. SPICE:
     //   V{label}_ctrl  {ctrlNet} 0  DC {closed ? 1 : 0}
     //   S{label}       {a1} {b1} {ctrlNet} 0  SWMODEL_{label}
     //   .model SWMODEL_{label} SW (VT=0 VH=0 RON={ron} ROFF={roff})
     // Model card constants VT=0 VH=0 verified per swsetup.c:28-33 and swload.c:108-116.
-    const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
-    const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
     const ctrlNet = allocateInternalNet(ctx);
     const closed = props.has("closed") ? !!props.get<boolean>("closed") : false;
     const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
     const effectivelyClosed = normallyClosed ? !closed : closed;
     const ctrlV = effectivelyClosed ? 1 : 0;
-    const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
-    const roff = requireParam(props, def, modelKey, "Roff", rawLabel);
     const modelName = `SWMODEL_${label}`;
     const vCtrlLabel = canonicalizeSpiceLabel(`${rawLabel}_ctrl`, "V");
     if (!modelCards.has(modelName)) {

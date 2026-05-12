@@ -227,16 +227,26 @@ export function executeRelayDT(index: number, state: Uint32Array, _highZs: Uint3
 // ---------------------------------------------------------------------------
 // RELAY_DT_NETLIST- MnaSubcircuitNetlist for the relay-dt analog model
 //
-// Ports: in1, in2, A1, B1, C1
-// Internal net: coilMid (index 5)
+// Ports: in1, in2, A1, B1, C1                              (indices 0..4)
+// Internal nets: coilMid (5), coilSenseMid (6)
 //
 // Elements:
-//   0: Inductor (coilL):    pos=in1(0), neg=coilMid(5)
-//   1: Resistor (coilR):    pos=coilMid(5), neg=in2(1)
-//   2: Switch (contactNO):       A1(2) â†” B1(3)   (normally-open: closes when energised)
-//   3: Switch (contactNC):       A1(2) â†” C1(4)   (normally-closed: opens when energised)
-//   4: RelayCoupling (couplingNO): no MNA pins- writes NO contact CLOSED slot
-//   5: RelayCoupling (couplingNC): no MNA pins- writes NC contact CLOSED slot (inverted)
+//   0: Inductor (coilL):       pos=in1(0),          neg=coilMid(5)
+//   1: Voltage (coilSense):    neg=coilSenseMid(6), pos=coilMid(5)  (0V sense, branchCount=1)
+//   2: Resistor (coilR):       pos=coilSenseMid(6), neg=in2(1)
+//   3: Switch (contactNO):     A1(2) ↔ B1(3)   (normally-open:   closes when energised)
+//   4: Switch (contactNC):     A1(2) ↔ C1(4)   (normally-closed: opens  when energised)
+//
+// coilSense pin assignment: neg=coilSenseMid, pos=coilMid. Current flows from
+// in1 through coilL into coilMid (pos terminal of coilSense), through the
+// sense source, out at coilSenseMid (neg terminal), then through coilR to in2.
+// This makes branchIndex current positive (i_k = I_coil > 0) when the coil
+// is energised — matching ngspice CSW i_ctrl sign convention (cswload.c).
+// Both Switch rows reference coilSense.branchIndex via the ngspice CSW path:
+// each Switch reads ctx.rhsOld[coilSense.branchIndex] (the coil current)
+// per NR iteration and applies pull-in / drop-out hysteresis matching
+// cswload.c. contactNC additionally sets normallyClosed:true and closed:true
+// so the rest-state is CLOSED.
 // ---------------------------------------------------------------------------
 
 export const RELAY_DT_NETLIST: MnaSubcircuitNetlist = {
@@ -244,32 +254,36 @@ export const RELAY_DT_NETLIST: MnaSubcircuitNetlist = {
   params: { inductance: 0.05, coilResistance: 100,
             pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
   elements: [
-    { typeId: "Inductor",  modelRef: "behavioral", subElementName: "coilL", branchCount: 1, params: { inductance: "inductance" } },
-    { typeId: "Resistor",  modelRef: "behavioral", subElementName: "coilR",                params: { resistance: "coilResistance" } },
-    { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactNO",                params: { Ron: "Ron", Roff: "Roff" } },
-    { typeId: "Switch",        modelRef: "behavioral", subElementName: "contactNC",                params: { Ron: "Ron", Roff: "Roff" } },
-    { typeId: "RelayCoupling", modelRef: "default", subElementName: "couplingNO",
+    { typeId: "Inductor",        modelRef: "behavioral", subElementName: "coilL",     branchCount: 1, params: { inductance: "inductance" } },
+    { typeId: "DcVoltageSource", modelRef: "behavioral", subElementName: "coilSense", branchCount: 1, params: { voltage: 0 } },
+    { typeId: "Resistor",        modelRef: "behavioral", subElementName: "coilR",                     params: { resistance: "coilResistance" } },
+    { typeId: "Switch",          modelRef: "behavioral", subElementName: "contactNO",
       params: {
-        coilBranch:   { kind: "siblingBranch", subElementName: "coilL" },
-        pullInI:  "pullInI",
+        Ron: "Ron",
+        Roff: "Roff",
+        ctrlBranch: { kind: "siblingBranch", subElementName: "coilSense" },
+        pullInI: "pullInI",
         dropOutI: "dropOutI",
       } },
-    { typeId: "RelayCoupling", modelRef: "default", subElementName: "couplingNC",
+    { typeId: "Switch",          modelRef: "behavioral", subElementName: "contactNC",
       params: {
-        coilBranch:   { kind: "siblingBranch", subElementName: "coilL" },
-        pullInI:  "dropOutI",
-        dropOutI: "pullInI",
+        Ron: "Ron",
+        Roff: "Roff",
+        ctrlBranch: { kind: "siblingBranch", subElementName: "coilSense" },
+        pullInI: "pullInI",
+        dropOutI: "dropOutI",
+        normallyClosed: 1,
+        closed: 1,
       } },
   ],
-  internalNetCount: 1,
-  internalNetLabels: ["coilMid"],
+  internalNetCount: 2,
+  internalNetLabels: ["coilMid", "coilSenseMid"],
   netlist: [
-    [0, 5],   // coilL: in1, coilMid
-    [5, 1],   // coilR: coilMid, in2
-    [2, 3],   // contactNO: A1, B1
-    [2, 4],   // contactNC: A1, C1
-    [],       // couplingNO: no MNA pins
-    [],       // couplingNC: no MNA pins
+    [0, 5],   // coilL:     in1,          coilMid
+    [6, 5],   // coilSense: neg=coilSenseMid, pos=coilMid  (i_k > 0 when I_coil > 0)
+    [6, 1],   // coilR:     coilSenseMid, in2
+    [2, 3],   // contactNO: A1,           B1
+    [2, 4],   // contactNC: A1,           C1
   ],
 };
 
@@ -339,7 +353,14 @@ export const RelayDTDefinition: StandaloneComponentDefinition = {
     "behavioral": {
       kind: "netlist",
       netlist: RELAY_DT_NETLIST,
-      paramDefs: [],
+      paramDefs: [
+        { key: "inductance",     default: 0.05 },
+        { key: "coilResistance", default: 100 },
+        { key: "pullInI",        default: 0.05 },
+        { key: "dropOutI",       default: 0.02 },
+        { key: "Ron",            default: 0.01 },
+        { key: "Roff",           default: 1e9 },
+      ],
       params: { inductance: 0.05, coilResistance: 100,
                 pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
     },

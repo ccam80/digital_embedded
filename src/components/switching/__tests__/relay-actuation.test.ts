@@ -141,11 +141,11 @@ function buildDigitalRelayCircuit(facade: DefaultSimulatorFacade): Circuit {
 // ===========================================================================
 //
 // Post-warm-start observable: the engine has compiled the relay composite
-// (Inductor coilL + Resistor coilR + Switch contactSW +
-// RelayCoupling). With vSrc=10V across the 100Ω coil the steady-state coil
-// current is 0.1A, above pullInI=0.05A, so by the end of the first
-// coordinator.step() the RelayCoupling has written CLOSED=1 into the
-// Switch's pool slot.
+// (Inductor coilL + Voltage coilSense + Resistor coilR + Switch contactSW).
+// With vSrc=10V across the 100Ω coil the steady-state coil current is 0.1A,
+// above pullInI=0.05A, so by the end of the first coordinator.step() the
+// Switch contactSW has written CLOSED=1 into its pool slot via the ngspice
+// CSW hysteresis path.
 
 describe("Relay initialization (T1)", () => {
   it("init_pull_in_seeds_contact_slot_closed", () => {
@@ -234,7 +234,7 @@ describe("Relay parameter hot-load (T1) — coilResistance", () => {
 
     fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "coilResistance", 1000);
     // Step a few times so the inductor's branch current settles to the new
-    // V/R steady state and the RelayCoupling sees |I| < dropOutI.
+    // V/R steady state and the CSW hysteresis sees |I| < dropOutI.
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
 
@@ -252,11 +252,11 @@ describe("Relay parameter hot-load (T1) — pullInI", () => {
     // Default pullInI = 0.05A — contact closes during warm-start.
     // After  setComponentProperty(relay, "pullInI", 1.0): the threshold is
     // above the 0.1A steady-state current, so even after stepping the
-    // RelayCoupling never re-asserts CLOSED. With dropOutI default = 0.02A
+    // CSW hysteresis never re-asserts CLOSED. With dropOutI default = 0.02A
     // also below 0.1A, the contact stays in whatever state s1[CLOSED] was
     // when the threshold changed — but at the start of the next NR iter
-    // wasClosed=true, |I|=0.1A > dropOutI=0.02A → stays closed; |I| not >=
-    // pullInI=1.0 so no re-pull. CLOSED stays at 1. The visible signal of
+    // |I|=0.1A > dropOutI=0.02A → stays in HYST_ON; |I| not >=
+    // pullInI=1.0 so no REALLY_ON. CLOSED stays at 1. The visible signal of
     // the param change is that LOWERING pullInI to 0 also leaves the
     // contact closed — directionally identical. We instead lower dropOutI
     // dependently against pullInI: assert that raising pullInI to a value
@@ -298,7 +298,7 @@ describe("Relay parameter hot-load (T1) — dropOutI", () => {
   it("hotload_dropOutI_above_steady_state_coil_current_drops_contact", () => {
     // vCoil=10V, coilResistance=100Ω → I_coil = 0.1A. Default thresholds
     // pull in (0.1A > pullInI=0.05A) and stay in (0.1A > dropOutI=0.02A).
-    // Raising dropOutI above 0.1A makes the RelayCoupling drop the contact
+    // Raising dropOutI above 0.1A makes the CSW hysteresis drop the contact
     // on the next iter even though the coil current is unchanged.
     const fix = buildFixture({
       build: (_r, facade) => buildRelayBench(facade, { vCoil: 10, vTest: 1, rLoad: 100 }),
@@ -550,6 +550,55 @@ describe("Relay digital bridge (T1) — Cat 9", () => {
     coordinator.writeByLabel("DIN", digital(1));
     coordinator.step();
     expect(coordinator.readByLabel("DOUT")).toMatchObject({ type: "digital", value: 0 });
+  });
+});
+
+// ===========================================================================
+// Switch.ctrlBranch path (Wave 2.1) — T1 cases against existing fixtures.
+//
+// The Wave 2.1 contract: when the Switch sub-element's `ctrlBranch` is wired
+// to a sibling V-source's branch (the coilSense in the rewired RELAY_NETLIST),
+// the ngspice CSW hysteresis on the coil current is the sole driver of the
+// contact state. The user-API `setClosed` becomes a no-op so that direct
+// API calls cannot override the coil-current-driven state.
+// ===========================================================================
+
+describe("Switch.ctrlBranch path (Wave 2.1)", () => {
+  it("contactSW closes when |i_coil| > pullInI", () => {
+    // vCoil=10V across the 100Ω coil → I_coil=0.1A > pullInI=0.05A. After
+    // warm-start the Switch sub-element's CSW state is REALLY_ON and its
+    // SLOT_CLOSED is 1.
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayBench(facade, { vCoil: 10 }),
+    });
+    const sw = findContactSwitch(fix);
+    expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(1);
+  });
+
+  it("contactSW stays open when |i_coil| < dropOutI", () => {
+    // 0V across coil → I_coil=0A < dropOutI=0.02A — contact stays OPEN.
+    // The CSW state is REALLY_OFF and SLOT_CLOSED is 0.
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayBench(facade, { vCoil: 0 }),
+    });
+    const sw = findContactSwitch(fix);
+    expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(0);
+  });
+
+  it("setClosed becomes no-op when ctrlBranch is wired", () => {
+    // Build the energised relay (I_coil=0.1A > pullInI=0.05A); CSW state is
+    // REALLY_ON, SLOT_CLOSED=1. Call setParam("closed", 0) on the wrapper —
+    // which routes via setComponentProperty → contactSW.setParam — and step.
+    // The CSW hysteresis on the coil current is unchanged, so SLOT_CLOSED
+    // stays at 1.
+    const fix = buildFixture({
+      build: (_r, facade) => buildRelayBench(facade, { vCoil: 10 }),
+    });
+    const sw = findContactSwitch(fix);
+    expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(1);
+    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "closed", 0);
+    fix.coordinator.step();
+    expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(1);
   });
 });
 

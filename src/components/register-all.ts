@@ -211,9 +211,6 @@ import { Timer555LatchDriverDefinition } from "./active/timer-555-latch-driver.j
 
 // Transmission-line segment sub-elements (internalOnly)
 
-// Relay sub-elements (internalOnly)
-import { RelayCouplingDefinition } from "./switching/relay-coupling.js";
-
 // Floating-gate FET blown drivers (internalOnly)
 import { FGNFETBlownDriverDefinition } from "./switching/fgnfet-blown-driver.js";
 import { FGPFETBlownDriverDefinition } from "./switching/fgpfet-blown-driver.js";
@@ -494,9 +491,6 @@ export function createDefaultRegistry(
 
   // Timer 555 latch driver (internalOnly)
   registry.register(Timer555LatchDriverDefinition);
-
-  // Relay sub-elements (internalOnly)
-  registry.register(RelayCouplingDefinition);
 
   // Floating-gate FET blown drivers (internalOnly)
   registry.register(FGNFETBlownDriverDefinition);
