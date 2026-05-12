@@ -144,6 +144,7 @@ export function buildDirectNodeMapping(
   ngTopology: NgspiceTopology,
   elements: readonly AnalogElement[],
   elementLabels: Map<number, string>,
+  nodeTable?: readonly { name: string; number: number; type: "voltage" | "current" }[],
 ): NodeMapping[] {
   const mappings: NodeMapping[] = [];
 
@@ -194,6 +195,37 @@ export function buildDirectNodeMapping(
       label,
       ngspiceName: ngBranchName,
     });
+  }
+
+  // 3. Element-internal nodes (TRA int1/int2, TRA i1/i2, opamp/MOSFET/BJT
+  //    internals, etc.). Populated by `ctx.makeVolt(label, suffix)` /
+  //    `ctx.makeCur(label, suffix)` during setup() — every entry has name
+  //    `${label}#${suffix}` (analog-engine.ts:_makeNode), exactly matching
+  //    ngspice's `CKTmkVolt`/`CKTmkCur` output (e.g. `tl1#int1`).
+  //
+  //    Without this pass, internal slots end up unmapped and
+  //    reindexNgspiceSession fills them with NaN — the source of the
+  //    "ngspice=NaN" symptom seen on the TRA matched-load parity tests
+  //    (where ngspice perfectly resolved tl1#int1/int2/i1/i2 but the
+  //    mapping table just couldn't find them).
+  if (nodeTable) {
+    const claimed = new Set<number>();
+    for (const m of mappings) claimed.add(m.ourIndex);
+    for (const entry of nodeTable) {
+      if (claimed.has(entry.number)) continue;
+      const ngName = entry.name.toLowerCase();
+      const ngspiceIndex = ngTopology.nodeNames.get(ngName);
+      if (ngspiceIndex === undefined) continue;
+      const label = ourTopology.nodeLabels.get(entry.number)
+        ?? entry.name.replace("#", ":");
+      mappings.push({
+        ourIndex: entry.number,
+        ngspiceIndex,
+        label,
+        ngspiceName: ngName,
+      });
+      claimed.add(entry.number);
+    }
   }
 
   return mappings;

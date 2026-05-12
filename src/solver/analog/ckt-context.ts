@@ -59,7 +59,8 @@ export class LoadCtxImpl implements LoadContext {
   noncon!: { value: number };
   limitingCollector!: LimitingEvent[] | null;
   convergenceCollector!: ConvergenceEvent[] | null;
-  gmin!: number;
+  cktGmin!: number;
+  diagGmin!: number;
   reltol!: number;
   iabstol!: number;
   temp!: number;
@@ -732,7 +733,8 @@ export class CKTCircuitContext {
       noncon: nonconRef,
       limitingCollector: null,
       convergenceCollector: null,
-      gmin: params.gmin ?? 1e-12,
+      cktGmin: params.gmin ?? 1e-12,
+      diagGmin: params.diagGmin ?? 0,
       reltol: params.reltol,
       iabstol: params.abstol,
       temp: ctxTemp,
@@ -879,7 +881,8 @@ export class CKTCircuitContext {
     // Load-context scalars derived from params
     this.loadCtx.reltol = params.reltol;
     this.loadCtx.iabstol = params.abstol;
-    this.loadCtx.gmin = params.gmin ?? 1e-12;
+    this.loadCtx.cktGmin = params.gmin ?? 1e-12;
+    // diagGmin is refreshed per-NR-iteration by ckt-load from diagonalGmin.
 
     // Keep the full params reference in sync so downstream readers
     // (e.g. solveDcOperatingPoint) see the new values.

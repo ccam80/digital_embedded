@@ -3051,7 +3051,10 @@ export class ComparisonSession {
     const ngTopo = bridge.getTopology();
     if (ngTopo) {
       this._ngTopology = ngTopo;
-      this._nodeMap = buildDirectNodeMapping(this._ourTopology, ngTopo, this._engine.elements, this._elementLabels);
+      this._nodeMap = buildDirectNodeMapping(
+        this._ourTopology, ngTopo, this._engine.elements, this._elementLabels,
+        this._engine.getNodeTable(),
+      );
     }
   }
 

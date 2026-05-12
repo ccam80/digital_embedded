@@ -18,7 +18,8 @@
  *   CKTdeltaOld -> deltaOld
  *   CKTsrcFact  -> srcFact
  *   CKTnoncon   -> noncon.value
- *   CKTgmin     -> gmin
+ *   CKTgmin     -> cktGmin    (static base, default 1e-12)
+ *   CKTdiagGmin -> diagGmin   (gmin-stepping active value; 0 outside stepping)
  *   CKTreltol   -> reltol
  *   CKTabstol   -> iabstol
  *   CKTtemp     -> temp
@@ -102,8 +103,20 @@ export interface LoadContext {
    * element checkConvergence() runs. Synced by cktLoad / NR per-iteration.
    */
   convergenceCollector: ConvergenceEvent[] | null;
-  /** Diagonal conductance added for numerical stability (CKTgmin). */
-  gmin: number;
+  /**
+   * Static circuit-wide minimum conductance (ngspice CKTgmin, default 1e-12).
+   * Set once at construction from params.gmin; constant for the engine
+   * lifetime. Devices that need ngspice's CKTgmin literal (e.g. TRA's MODEDC
+   * bridge stamp at traload.c:56) read this field.
+   */
+  cktGmin: number;
+  /**
+   * Gmin-stepping active conductance (ngspice CKTdiagGmin). Set per-NR-
+   * iteration by ckt-load.ts from CKTCircuitContext.diagonalGmin. Equals 0
+   * outside gmin-stepping phases. Devices that participate in gmin-stepping
+   * (e.g. diodes, BJTs adding to junction conductances) read this field.
+   */
+  diagGmin: number;
   /** Relative convergence tolerance (CKTreltol). */
   reltol: number;
   /** Absolute current tolerance (CKTabstol). */

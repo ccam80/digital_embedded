@@ -73,7 +73,8 @@ function makeTroubleTrackingHandler(
  *   CKTag[]       -> ctx.loadCtx.ag        (set by engine via computeNIcomCof)
  *   CKTnoncon     -> ctx.loadCtx.noncon.value  (mutable ref -- elements increment)
  *   CKTsrcFact    -> ctx.loadCtx.srcFact
- *   CKTgmin       -> ctx.loadCtx.gmin
+ *   CKTgmin       -> ctx.loadCtx.cktGmin   (static; set once at construction)
+ *   CKTdiagGmin   -> ctx.loadCtx.diagGmin  (gmin-stepping active value)
  *   CKTtroubleNode-> ctx.troubleNode      (zeroed each time noncon rises)
  */
 export function cktLoad(ctx: CKTCircuitContext): void {
@@ -90,7 +91,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // Step 2: propagate per-call context scalars to loadCtx.
   ctx.loadCtx.cktMode  = ctx.cktMode;   // single source of truth (F3/F4).
   ctx.loadCtx.srcFact  = ctx.srcFact;
-  ctx.loadCtx.gmin     = ctx.diagonalGmin;
+  ctx.loadCtx.diagGmin = ctx.diagonalGmin;
   // H1 (Phase 2.5 W2.2): sync the limiting-event collector into the device-
   // facing LoadContext on every cktLoad call. Devices push into
   // ctx.limitingCollector (the LoadContext param they receive) when they

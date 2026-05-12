@@ -4,7 +4,7 @@
  * Maps function-by-function to ref/ngspice/src/spicelib/devices/tra/*:
  *   setup()       → trasetup.c
  *   load()        → traload.c
- *   acceptStep()  → traaccept.c
+ *   acceptStep()  → traacct.c
  *   setParam()    → traparam.c
  *
  * ngspice → digiTS variable mapping:
@@ -115,7 +115,20 @@ class TransmissionLineAnalogElement extends AnalogElement {
   private _hPos2Pos2 = -1;
 
   // History table (ngspice TRAdelays). Grows by 1 per accepted timestep.
-  private _delays: DelaySample[] = [];
+  //
+  // ngspice pre-allocates this in trasetup.c:62 as `TMALLOC(double, 15)`
+  // (5 entries × 3 doubles, zero-initialized). The first CKTaccept (post-
+  // DCOP, simTime=0, sizeDelay=0) reads delays[0].t and delays[2].t (=
+  // delays+6) — both 0 from TMALLOC — and the shift / append predicates
+  // both no-op (0-0 is not > minBreak, -td is not > 0). digiTS needs the
+  // same zero-initialized contents at index 0 (and indices 1-2 for the
+  // shift block to read safely once sizeDelay grows ≥ 2 pre-MODEINITTRAN).
+  // Seed with three zero samples to match ngspice's behavior bit-for-bit.
+  private _delays: DelaySample[] = [
+    { t: 0, v1: 0, v2: 0 },
+    { t: 0, v1: 0, v2: 0 },
+    { t: 0, v1: 0, v2: 0 },
+  ];
   // Index of last valid entry (ngspice TRAsizeDelay; 2 after MODEINITTRAN seed).
   private _sizeDelay = 0;
 
@@ -230,16 +243,10 @@ class TransmissionLineAnalogElement extends AnalogElement {
 
     if (mode & MODEDC) {
       // cite: traload.c:53-59 — MODEDC bridge stamps couple ports directly
-      // with a -(1 - gmin)*Z entry on the branch-row diagonals.
-      // cite: traload.c:56 — `(1 - ckt->CKTgmin) * here->TRAimped`. ngspice
-      // reads the static circuit-wide gmin (CKTgmin, default 1e-12) here,
-      // NOT the gmin-stepping active value (CKTdiagGmin). digiTS's ctx.gmin
-      // maps to CKTdiagGmin per ckt-load.ts:93, so reading it directly
-      // produces -Z0 (with diagGmin=0) instead of -(1 - 1e-12)*Z0. That is
-      // an upstream LoadContext-naming divergence; surfacing it here in the
-      // bridge-stamp matrix delta rather than papering it over with a
-      // hardcoded literal.
-      const dcZ = (1 - ctx.gmin) * Z0;
+      // with a -(1 - CKTgmin)*Z entry on the branch-row diagonals.
+      // cite: traload.c:56 reads ckt->CKTgmin (static, default 1e-12) — NOT
+      // CKTdiagGmin. ctx.cktGmin carries that exact value.
+      const dcZ = (1 - ctx.cktGmin) * Z0;
       s.stampElement(this._hIbr1Pos2, -1);
       s.stampElement(this._hIbr1Neg2, +1);
       s.stampElement(this._hIbr1Ibr2, -dcZ);
@@ -289,8 +296,12 @@ class TransmissionLineAnalogElement extends AnalogElement {
         let f1 = (target - t2) * (target - t3);
         let f2 = (target - t1) * (target - t3);
         let f3 = (target - t1) * (target - t2);
-        // c:102-125 — redundantly-guarded denominator chain. Mirror verbatim
-        // including the apparent typo at c:115 (f3 /= (t2-t3) appears twice).
+        // c:102-125 — Lagrange weights f_i = prod_{j≠i}(u-t_j) / prod_{j≠i}(t_i-t_j).
+        // Each (t_a-t_b) denominator factor is applied in whichever sign the
+        // surrounding (t_a-t_b)==0 guard chose, so f3's two factors land as
+        // (t2-t3) and (t1-t3) instead of the textbook (t3-t2)(t3-t1). Both
+        // signs flip ⇒ the product is the correct (t3-t2)(t3-t1). Bit-correct
+        // to ngspice, not a typo.
         if ((t2 - t1) === 0) { f1 = 0; f2 = 0; }
         else { f1 /= (t1 - t2); f2 /= (t2 - t1); }
         if ((t3 - t2) === 0) { f2 = 0; f3 = 0; }
@@ -314,31 +325,21 @@ class TransmissionLineAnalogElement extends AnalogElement {
   }
 
   acceptStep(simTime: number, addBreakpoint: (t: number) => void, _atBreakpoint: boolean): void {
-    // cite: traaccept.c — runs once per accepted transient timestep.
-    //
-    // ngspice's CKTaccept is invoked AFTER a transient NR convergence, so by
-    // the time this code runs, MODEINITTRAN has fired in traload.c and the
-    // delays table is seeded (sizeDelay >= 2). digiTS's engine invokes
-    // acceptStep at the TOP of every step() — including step 0 with
-    // simTime=0, before any MODEINITTRAN — to let PULSE-style sources
-    // register their first edge as a breakpoint. That timing is a
-    // pre-existing engine-level divergence from ngspice's CKTaccept.
-    //
-    // No element-level guard belongs here. If this method runs before the
-    // delays table is seeded, the unguarded index access surfaces the
-    // calling-convention mismatch loudly — see analog-engine.ts:311-324
-    // and the comment block there for the engine-side rationale. The
-    // architectural fix lives upstream in MNAEngine (or in
-    // spec/architectural-alignment.md if it's an accepted divergence),
-    // not in TRA.
-    if (this._rhsOldRef === null || this._deltaOldRef === null) return;
-    const rhsOld = this._rhsOldRef;
-    const deltaOld = this._deltaOldRef;
+    // cite: traacct.c — runs once per accepted timestep, at the top of the
+    // nextTime: iteration body (dctran.c:410). analog-engine.ts:311-324
+    // dispatches at the same structural point. On the first call
+    // (post-DCOP, simTime=0, _sizeDelay=0, MODEINITTRAN not yet run) both
+    // the shift and append predicates evaluate false against the three
+    // zero-initialized samples seeded in _delays, matching ngspice's
+    // TMALLOC(15)-backed no-op exactly. _rhsOldRef / _deltaOldRef are
+    // guaranteed non-null here because load() ran during DCOP first.
+    const rhsOld = this._rhsOldRef!;
+    const deltaOld = this._deltaOldRef!;
     const td = this._td;
     const Z0 = this._Z0;
     const minBreak = this._minBreak;
 
-    // cite: traaccept.c:34-48 — shift the table left to discard stale entries.
+    // cite: traacct.c:34-48 — shift the table left to discard stale entries.
     // ngspice: `if (CKTtime - TRAtd > delays[6])` where delays[6] = delays[2].t
     // (third sample's timestamp).
     if (this._sizeDelay >= 2 && (simTime - td) > this._delays[2]!.t) {
@@ -354,7 +355,7 @@ class TransmissionLineAnalogElement extends AnalogElement {
       this._sizeDelay -= i;
     }
 
-    // cite: traaccept.c:49-50 — append a new sample if the gap since the last
+    // cite: traacct.c:49-50 — append a new sample if the gap since the last
     // sample exceeds CKTminBreak. The `<=` predicate in dctran's pop dedup
     // matches this `>` predicate here.
     if (simTime - this._delays[this._sizeDelay]!.t > minBreak) {
@@ -365,7 +366,7 @@ class TransmissionLineAnalogElement extends AnalogElement {
       const newV2 = (rhsOld[this._posNode1]! - rhsOld[this._negNode1]!) + rhsOld[this._ibr1]! * Z0;
       this._delays[this._sizeDelay] = { t: simTime, v1: newV1, v2: newV2 };
 
-      // cite: traaccept.c:94-123 — second-derivative breakpoint test (the
+      // cite: traacct.c:94-123 — second-derivative breakpoint test (the
       // #ifndef NOTDEF branch is the live one). Schedule a breakpoint at
       // (previous sample's t + td) if either v1 or v2 derivative is changing
       // beyond the per-instance reltol/abstol thresholds.

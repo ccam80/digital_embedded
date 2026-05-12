@@ -22,9 +22,6 @@ import type { PropertyValue } from "../../../core/properties.js";
 const DTS_MATCHED_LOAD = path.resolve(
   "src/components/passives/__tests__/fixtures/transmission-line-canon-matched-load.dts",
 );
-const DTS_LOSSY_OPEN_END = path.resolve(
-  "src/components/passives/__tests__/fixtures/transmission-line-canon-lossy-open-end.dts",
-);
 
 // ---------------------------------------------------------------------------
 // Programmatic builders (T1)
@@ -203,40 +200,6 @@ describeIfDll("TransmissionLine matched-load vs ngspice — paired (T3)", () => 
   });
 
   it("full_iteration_paired_matched_load", () => {
-    session.compareAllAttempts();
-  });
-});
-
-// The lossy_open_end fixture uses lossPerMeter > 0. The verbatim TRA port
-// only models the lossless line; LTRA (ngspice 'O' element) is the lossy
-// device and is not yet ported. ComparisonSession.create() throws at
-// construction when the fixture's TransmissionLine factory rejects the
-// lossy params, so the suite is gated to skip entirely until LTRA lands.
-describe.skip("TransmissionLine lossy open-end vs ngspice — paired (T3) [BLOCKED: requires LTRA]", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_LOSSY_OPEN_END, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_lossy_open_end", async () => {
-    await session.runTransient(0, 5e-7, 5e-10);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_lossy_open_end", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-    for (const [, comp] of Object.entries(stepEnd.components)) {
-      for (const [, cv] of Object.entries(comp.slots ?? {})) expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_lossy_open_end", () => {
     session.compareAllAttempts();
   });
 });
