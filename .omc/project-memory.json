@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json 2>&1 | head -30",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && npx vitest run src/solver/analog/__tests__/_dump-audit.test.ts --reporter=verbose 2>&1 | tail -40",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && node -e \"const f=require('./.vitest-failures.json');console.log('count',f.failures.length);f.failures.forEach((x,i)=>console.log(i,'loc:',x.locations?.[0]?.test?.slice(0,80),'\\nmsg:',x.message.slice(0,180),'\\n'))\"",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {

@@ -18,6 +18,11 @@ const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>(
   "JFET",
 ]);
 
+const MULTI_LINE_COMPOSITES: ReadonlySet<string> = new Set<string>([
+  "Transformer",
+  "TappedTransformer",
+]);
+
 export function auditNgspiceLoadOrderTables(registry: ComponentRegistry): void {
   const inLoadOrder = new Set(Object.keys(TYPE_ID_TO_NGSPICE_LOAD_ORDER));
   const inFamily = new Set(Object.keys(TYPE_ID_TO_DEVICE_FAMILY));
@@ -36,8 +41,9 @@ export function auditNgspiceLoadOrderTables(registry: ComponentRegistry): void {
 
     const family = TYPE_ID_TO_DEVICE_FAMILY[typeId];
     const isDeckEmitting = family !== undefined && DECK_EMITTING_FAMILIES.has(family);
+    const isMultiLineComposite = MULTI_LINE_COMPOSITES.has(typeId);
 
-    if (isDeckEmitting && !inDeckPins.has(typeId)) {
+    if (isDeckEmitting && !isMultiLineComposite && !inDeckPins.has(typeId)) {
       errors.push(
         `typeId "${typeId}" (family "${family}") missing from TYPE_ID_TO_DECK_PIN_LABEL_ORDER`,
       );
@@ -45,6 +51,11 @@ export function auditNgspiceLoadOrderTables(registry: ComponentRegistry): void {
     if (!isDeckEmitting && inDeckPins.has(typeId)) {
       errors.push(
         `typeId "${typeId}" is in TYPE_ID_TO_DECK_PIN_LABEL_ORDER but family "${family ?? "<unset>"}" is not deck-emitting`,
+      );
+    }
+    if (isMultiLineComposite && inDeckPins.has(typeId)) {
+      errors.push(
+        `typeId "${typeId}" is a multi-line composite but appears in TYPE_ID_TO_DECK_PIN_LABEL_ORDER; remove it (sub-elements supply their own pin order)`,
       );
     }
 
