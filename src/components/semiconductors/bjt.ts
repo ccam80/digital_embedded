@@ -524,10 +524,7 @@ function _createBjtElementWithPolarity(
     ICVCE: props.getModelParam<number>("ICVCE"),
   };
 
-  // cite: bjttemp.c:107 — BJTtempGiven: true only when per-instance TEMP was explicitly
-  // set via setParam("TEMP", v) OR loaded from a .dts _modelParams block that
-  // included TEMP. Registry-default seeding does NOT count as "given" — at that
-  // point ctx.cktTemp (ambient) is used instead.
+  // cite: bjttemp.c:107 — BJTtempGiven mirrors PropertyBag givenness for TEMP.
   let _tempGiven = props.isModelParamGiven("TEMP");
 
   function makeTp(): BjtTempParams {
@@ -609,7 +606,7 @@ function _createBjtElementWithPolarity(
       nodeE = emitNode;
 
       // State slots- bjtsetup.c:366-367
-      this._stateBase = ctx.allocStates(24);
+      this._stateBase = ctx.allocStates(this.stateSize);
 
       // L0 has no resistors- prime nodes alias external nodes; ngspice gates
       // the prime-side TSTALLOC entries on `model.RC > 0` etc. (bjtsetup.c).
@@ -1206,10 +1203,7 @@ export function createSpiceL1BjtElement(
     ICVCE: props.getModelParam<number>("ICVCE"),
   };
 
-  // cite: bjttemp.c:107 — BJTtempGiven: true only when per-instance TEMP was explicitly
-  // set via setParam("TEMP", v) OR loaded from a .dts _modelParams block that
-  // included TEMP. Registry-default seeding does NOT count as "given" — at that
-  // point ctx.cktTemp (ambient) is used instead.
+  // cite: bjttemp.c:107 — BJTtempGiven mirrors PropertyBag givenness for TEMP.
   let _tempGiven = props.isModelParamGiven("TEMP");
 
   function makeTp(): BjtTempParams {
@@ -1308,7 +1302,7 @@ export function createSpiceL1BjtElement(
       nodeE_ext = emitNode;
 
       // State slots- bjtsetup.c:366-367
-      this._stateBase = ctx.allocStates(24);
+      this._stateBase = ctx.allocStates(this.stateSize);
 
       // Internal nodes- bjtsetup.c:372-428
       internalLabels.length = 0;

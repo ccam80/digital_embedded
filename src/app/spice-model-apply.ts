@@ -70,10 +70,7 @@ export function applySpiceImportResult(
   circuit.metadata.models[element.typeId]![result.modelName] = entry;
 
   element.getProperties().set("model", result.modelName);
-  // Two-step write so user-supplied overrides land as *Given while the
-  // base-model defaults stay ungiven (registry-default semantics):
-  //   1. seed with named-model defaults (replaceModelParams, no mark)
-  //   2. overlay user overrides via setModelParam (marks given)
+  // Defaults seed the bag (not given); user overrides mark given.
   const bag = element.getProperties();
   bag.replaceModelParams({ ...baseEntry.params });
   for (const [k, v] of Object.entries(result.overrides)) {

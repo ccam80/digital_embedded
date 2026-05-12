@@ -158,6 +158,13 @@ export abstract class PoolBackedAnalogElement extends AnalogElement {
   protected _pool!: StatePoolRef;
 
   initState(pool: StatePoolRef): void {
+    if (this.stateSize !== this.stateSchema.size) {
+      throw new Error(
+        `PoolBackedAnalogElement ${this.label || "?"} (${this.stateSchema.owner}): ` +
+        `stateSize=${this.stateSize} drifted from stateSchema.size=${this.stateSchema.size}. ` +
+        `These must match; declare 'readonly stateSize = <SCHEMA>.size'.`,
+      );
+    }
     this._pool = pool;
   }
 }

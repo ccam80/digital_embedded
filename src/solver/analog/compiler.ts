@@ -587,9 +587,7 @@ function runPassA_partition(
           for (const k of props.getModelParamKeys()) {
             merged[k] = props.getModelParam<number>(k);
           }
-          // preserveGivenness: a runtime setParam("TEMP", v) marks the key
-          // given on the bag; a recompile must not wipe that flag when it
-          // re-merges defaults around the existing values.
+          // preserveGivenness so recompile doesn't wipe a runtime setParam.
           props.replaceModelParams(merged, { preserveGivenness: true });
         }
         elementMeta.push({ pc, route });

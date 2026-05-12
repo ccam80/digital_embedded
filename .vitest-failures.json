@@ -1,117 +1,129 @@
 {
   "summary": {
-    "passed": 4,
-    "failed": 10,
+    "passed": 10,
+    "failed": 13,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 4
+    "durationSeconds": 3
   },
   "failures": [
     {
-      "message": "step 0 node X1:p0/X10:p0/X11:p1: ours=0.49999999999999994 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
+      "message": "Analog engine stagnation: simTime stuck at 0.000001s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_matched_load",
-          "line": 29,
-          "column": 9
+          "file": "src\\solver\\coordinator.ts",
+          "test": "lte_rollback_state_invariant",
+          "line": 250,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_njfet_cs",
+          "line": 3006,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_njfet_cutoff",
+          "line": 3006,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_pjfet_cs",
+          "line": 3006,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_pjfet_cutoff",
+          "line": 3006,
+          "column": 11
         }
       ]
     },
     {
       "message": "expected false to be true // Object.is equality",
-      "count": 2,
+      "count": 4,
       "locations": [
         {
-          "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-          "test": "dcop_paired_matched_load",
-          "line": 199,
-          "column": 78
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_njfet_cs",
+          "line": 458,
+          "column": 28
         },
         {
-          "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-          "test": "dcop_paired_lossy_open_end",
-          "line": 230,
-          "column": 78
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_njfet_cutoff",
+          "line": 494,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_pjfet_cs",
+          "line": 530,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
+          "test": "dcop_paired_pjfet_cutoff",
+          "line": 566,
+          "column": 28
         }
       ]
     },
     {
-      "message": "101124 per-iteration divergence(s); first: voltage step 0/iter 0 X9:p0/X18:p0/X19:p1 ours=0.4999999999999999 ngspice=0.5 absDelta=1.1102230246251565e-16: expected 101124 to be +0 // Object.is equality",
+      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=5.9999999399 ngspice=10 absDelta=4.0000000601: expected 1070 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_matched_load",
+          "test": "full_iteration_paired_njfet_cs",
           "line": 63,
           "column": 31
         }
       ]
     },
     {
-      "message": "step 0 node X1:p0/X7:p1/X12:p0: ours=0.6745266046109515 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality",
+      "message": "1070 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=9.999999869900002 ngspice=10 absDelta=1.300999983300244e-7: expected 1070 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_lossy_open_end",
-          "line": 29,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "87348 per-iteration divergence(s); first: voltage step 0/iter 0 X5:p0/X11:p1/X20:p0 ours=0.7146255563167445 ngspice=NaN absDelta=NaN: expected 87348 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_lossy_open_end",
+          "test": "full_iteration_paired_njfet_cutoff",
           "line": 63,
           "column": 31
         }
       ]
     },
     {
-      "message": "expected 0.7960329437084814 to not be close to 0.7960329437084814, received difference is 0, but expected 0.0005",
+      "message": "1498 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0000000600999999 ngspice=0 absDelta=1.0000000600999999: expected 1498 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
-          "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-          "test": "hotload_lossPerMeter_drops_vp2b_under_lossy_bench",
-          "line": 283,
-          "column": 23
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_pjfet_cs",
+          "line": 63,
+          "column": 31
         }
       ]
     },
     {
-      "message": "expected 0.6354355635875524 to not be close to 0.6354355635875524, received difference is 0, but expected 0.0005",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-          "test": "hotload_impedance_changes_vp2b_under_lossy_bench",
-          "line": 304,
-          "column": 23
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-          "test": "hotload_length_changes_vp2b_under_lossy_bench",
-          "line": 376,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 0.4999999999999997 to not be close to 0.4999999999999998, received difference is 5.551115123125783e-17, but expected 0.0005",
+      "message": "1177 per-iteration divergence(s); first: voltage step 0/iter 0 J1:G/Vg:pos ours=1.0009999899667418e-7 ngspice=0 absDelta=1.0009999899667418e-7: expected 1177 to be +0 // Object.is equality",
       "count": 1,
       "locations": [
         {
-          "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
-          "test": "hotload_delay_changes_transient_observable",
-          "line": 327,
-          "column": 23
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_pjfet_cutoff",
+          "line": 63,
+          "column": 31
         }
       ]
     }

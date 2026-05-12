@@ -269,7 +269,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     const negNode = pinNodes.get("neg")!;  // INDnegNode
 
     // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
-    this._stateBase = ctx.allocStates(2);
+    this._stateBase = ctx.allocStates(this.stateSize);
 
     // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
     if (this.branchIndex === -1) {

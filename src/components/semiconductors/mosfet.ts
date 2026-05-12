@@ -846,10 +846,8 @@ function _createMosfetElementWithPolarity(
     private _mode = 0;
     private _von  = 0;
 
-    // cite: mos1temp.c:129-133 — MOS1tempGiven flag; when false, instance temp = ckt->CKTtemp.
-    // Seeded from PropertyBag givenness via the enclosing factory closure: a
-    // .dts that supplied per-instance TEMP starts given; defaults-only starts
-    // ungiven so .options TEMP=<celsius> drives uniformly.
+    // cite: mos1temp.c:129-133 — MOS1tempGiven mirrors PropertyBag givenness
+    // for TEMP. When false, instance temp = ckt->CKTtemp.
     private _tempGiven = props.isModelParamGiven("TEMP");
     // Last TempContext received from engine; used by setParam("TEMP") hot-load path.
     private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM };

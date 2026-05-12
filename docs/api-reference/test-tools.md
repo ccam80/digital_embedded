@@ -658,8 +658,38 @@ ComparisonSession.createSelfCompare(opts);  // see §4
 | `nodeMap` | `NodeMapping[]`. |
 | `ourTopology` | `TopologySnapshot` after most recent run. |
 | `engine` | Wrapped `MNAEngine`. |
+| `getNgspiceDeck(opts?)` | The SPICE deck as fed to `NgspiceBridge.loadNetlist`. See below. |
 
 Tests can walk these directly when query methods don't expose what's needed (e.g. `session.ourSession!.steps[i].attempts[j].iterations[k]`).
+
+#### `getNgspiceDeck(opts?: { raw?: boolean }): string`
+
+Returns the exact text passed to ngspice for the current session.
+
+| Session mode | `getNgspiceDeck()` returns |
+|---|---|
+| `cirPath` supplied | The .cir contents with the `.control` block stripped (the harness drives ngspice imperatively, not via netlist commands). Author owns `.options TEMP`. |
+| Auto-generated (no `cirPath`) | `generateSpiceNetlist(compiled, registry, elementLabels)` output, with `.options TEMP=<celsius>` injected after the title line when `engine.circuitTemp` differs from ngspice's 300.15 K default. |
+| `selfCompare: true` | `""` (no ngspice side). |
+
+Must be called after `init()`. Pass `{ raw: true }` to get `_cirClean` (pre-`_materializeCir()` form, no TEMP injection) — useful for inspecting the auto-emitter output without temperature-card noise.
+
+```ts
+const session = await ComparisonSession.create({ dtsPath: DTS, dllPath: DLL });
+await session.runDcOp();
+
+// Exact deck loaded into ngspice for this run:
+const deck = session.getNgspiceDeck();
+console.log(deck);
+
+// Auto-generated emitter output before TEMP injection:
+const rawDeck = session.getNgspiceDeck({ raw: true });
+```
+
+Use this when:
+- Diagnosing why ngspice and digiTS disagree on a fixture you generated programmatically (read the deck, confirm the device cards, model cards, and node names are what you expect).
+- Asserting in a test that the auto-generated netlist contains a specific element line / model card (golden-file style).
+- Capturing the deck to a `.cir` file for standalone replay outside the harness (e.g. when handing off a parity bug to ngspice tooling).
 
 ### MCP tool surface
 

@@ -292,9 +292,7 @@ class NJFETElement extends PoolBackedAnalogElement {
   // Ephemeral per-iteration icheck flag (jfetload.c:500-508 CKTnoncon bump).
   private _icheckLimited = false;
 
-  // cite: jfettemp.c:83-88 — JFETtempGiven flag; false until per-instance TEMP
-  // was explicitly given (.dts _modelParams TEMP entry, or runtime setParam("TEMP")).
-  // Initialised in the constructor from props.isModelParamGiven("TEMP").
+  // cite: jfettemp.c:83-88 — JFETtempGiven mirrors PropertyBag givenness for TEMP.
   private _tempGiven: boolean;
 
   // Internal nodes allocated during setup()- jfetset.c:115-158
@@ -355,7 +353,7 @@ class NJFETElement extends PoolBackedAnalogElement {
     const drainNode  = this.pinNodes.get("D")!;
 
     // State slots- jfetset.c:112-113
-    this._stateBase = ctx.allocStates(13);
+    this._stateBase = ctx.allocStates(this.stateSize);
 
     // Internal nodes- jfetset.c:115-158
     // Source prime BEFORE drain prime (ngspice order)

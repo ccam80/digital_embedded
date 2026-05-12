@@ -115,12 +115,8 @@ export interface PropertyDefinition {
 export class PropertyBag {
   private readonly _map: Map<string, PropertyValue>;
   private readonly _mparams: Map<string, PropertyValue> = new Map();
-  // ngspice-style *Given tracking: which model params were set by user action
-  // (setModelParam / runtime setParam / explicit markGiven) vs seeded as
-  // registry defaults (replaceModelParams without opts). Mirrors per-instance
-  // *Given flags in ngspice (e.g. DIOtempGiven, BJTtempGiven). The netlist
-  // generator emits per-instance overrides only for given keys so .options
-  // TEMP=<celsius> can drive cktTemp uniformly across both engines.
+  // Mirrors ngspice per-instance *Given flags (e.g. DIOtempGiven). Tracks
+  // which model params were set by user action vs seeded as registry defaults.
   private readonly _mparamsGiven: Set<string> = new Set();
 
   constructor(entries?: Iterable<readonly [string, PropertyValue]>) {
@@ -191,15 +187,11 @@ export class PropertyBag {
 
   /**
    * Replace the entire model-param partition. By default, written keys are
-   * NOT marked given — they represent registry defaults.
+   * NOT marked given (registry-default semantics).
    *
-   * Options:
-   * - `markGiven: true` — mark every written key as given (e.g. .dts loader
-   *   re-hydrating user-supplied _modelParams).
-   * - `preserveGivenness: true` — snapshot the existing _mparamsGiven set
-   *   before clearing, then re-mark any key from that snapshot that is still
-   *   present in the new params (e.g. the analog compiler re-merging defaults
-   *   while a runtime setParam("TEMP", v) is in effect).
+   * `markGiven: true` — mark every written key as given.
+   * `preserveGivenness: true` — re-mark any key whose previous givenness
+   * survives in the new params.
    */
   replaceModelParams(
     params: Record<string, PropertyValue>,
@@ -226,16 +218,11 @@ export class PropertyBag {
     return this._mparams.has(key);
   }
 
-  /** Mirror of ngspice per-instance *Given flags (e.g. DIOtempGiven). True iff
-   * the value was set by user action (setModelParam, runtime setParam, or
-   * loaded from a .dts _modelParams block); false when seeded as a registry
-   * default via replaceModelParams. */
+  /** Mirror of ngspice per-instance *Given flags (e.g. DIOtempGiven). */
   isModelParamGiven(key: string): boolean {
     return this._mparamsGiven.has(key);
   }
 
-  /** Keys whose values were explicitly set by user action. Used by the
-   * netlist generator and .dts serializer to emit only user-given values. */
   getGivenModelParamKeys(): string[] {
     return Array.from(this._mparamsGiven);
   }

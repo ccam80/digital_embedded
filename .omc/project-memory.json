@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit --project tsconfig.json 2>&1 | head -40",
-    "testCommand": "git show HEAD:.vitest-failures.json 2>&1 | head -200",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json > C:/local_working_projects/digital_in_browser/.tmp_tsc_out.txt 2>&1; echo done",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && npm run test:q -- src/components/semiconductors/__tests__/jfet.test.ts 2>&1 | tail -3; echo \"===JFET FAILURES===\"; node -e \"const f=require('./.vitest-failures.json');f.failures.forEach((x,i)=>console.log(i,'msg:',x.message.slice(0,200),'\\nloc:',x.locations?.[0]?.test))\" 2>&1",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -293,8 +293,8 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 115,
-      "lastAccessed": 1778563893901,
+      "accessCount": 123,
+      "lastAccessed": 1778576114955,
       "type": "file"
     },
     {
@@ -335,8 +335,8 @@
     },
     {
       "path": "src\\components\\semiconductors\\schottky.ts",
-      "accessCount": 14,
-      "lastAccessed": 1778564024781,
+      "accessCount": 15,
+      "lastAccessed": 1778576090027,
       "type": "file"
     },
     {

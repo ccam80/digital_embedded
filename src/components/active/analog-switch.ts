@@ -275,8 +275,8 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    // swsetup.c:47-48 — allocate 2 state slots (SW_NUM_STATES = 2)
-    this._stateBase = ctx.allocStates(2);
+    // swsetup.c:47-48 — allocate state slots (SW_NUM_STATES = 2)
+    this._stateBase = ctx.allocStates(this.stateSize);
 
     // swsetup.c:59-62 — TSTALLOC sequence line-for-line
     this._hPP = ctx.solver.allocElement(this._nIn,  this._nIn);   // SWposPosptr
@@ -384,15 +384,16 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    // COM-NO path: swsetup.c:47-48 (allocStates) + swsetup.c:59-62 (TSTALLOC)
-    this._stateBase = ctx.allocStates(2);
+    // SPDT reserves all SW paths' slots in one alloc; NC path uses _stateBase + 2.
+    this._stateBase = ctx.allocStates(this.stateSize);
+
+    // COM-NO path: swsetup.c:59-62 (TSTALLOC)
     this._hNO_PP = ctx.solver.allocElement(this._nCom, this._nCom);  // SWposPosptr (swNO)
     this._hNO_PN = ctx.solver.allocElement(this._nCom, this._nNO);   // SWposNegptr (swNO)
     this._hNO_NP = ctx.solver.allocElement(this._nNO,  this._nCom);  // SWnegPosptr (swNO)
     this._hNO_NN = ctx.solver.allocElement(this._nNO,  this._nNO);   // SWnegNegptr (swNO)
 
-    // COM-NC path: swsetup.c:47-48 (allocStates) + swsetup.c:59-62 (TSTALLOC)
-    ctx.allocStates(2);
+    // COM-NC path: swsetup.c:59-62 (TSTALLOC)
     this._hNC_PP = ctx.solver.allocElement(this._nCom, this._nCom);  // SWposPosptr (swNC)
     this._hNC_PN = ctx.solver.allocElement(this._nCom, this._nNC);   // SWposNegptr (swNC)
     this._hNC_NP = ctx.solver.allocElement(this._nNC,  this._nCom);  // SWnegPosptr (swNC)

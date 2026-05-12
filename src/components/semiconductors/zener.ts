@@ -32,6 +32,7 @@ import {
   MODEINITFIX,
   MODEINITSMSIG,
   MODEINITTRAN,
+  MODEINITPRED,
   MODETRANOP,
   MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
@@ -193,11 +194,8 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
   private readonly _nodeCathode: number;
   private _tp: ZenerTp;
 
-  // cite: diotemp.c:84-85 — tracks whether TEMP was explicitly overridden per-instance.
-  // When false, computeTemperature(ctx) propagates ctx.cktTemp as the operating temperature.
-  // When true, the per-instance override supplied via setParam("TEMP", v) OR
-  // loaded from a .dts _modelParams block is preserved.
-  // Initialised in the constructor from props.isModelParamGiven("TEMP").
+  // cite: diotemp.c:84-85 — DIOtempGiven mirrors PropertyBag givenness for TEMP.
+  // When false, computeTemperature(ctx) uses ctx.cktTemp.
   private _tempGiven: boolean;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
@@ -259,8 +257,8 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     const posNode = this.pinNodes.get("A")!;
     const negNode = this.pinNodes.get("K")!;
 
-    // State slots- diosetup.c:198-199
-    this._stateBase = ctx.allocStates(4);
+    // State slots- diosetup.c:198-199 (*states += 5 unconditionally)
+    this._stateBase = ctx.allocStates(this.stateSize);
 
     // Internal node- diosetup.c:204-224
     // ngspice gating: RS > 0 â†’ allocate anode-prime node
@@ -291,6 +289,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     // Direct state-array access per call  no cached Float64Array refs.
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
     const base = this._stateBase;
 
     const voltages = ctx.rhsOld;
@@ -351,6 +350,13 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
       // dioload.c:137-138: MODEINITFIX && DIOoff  vd = 0
       vdRaw = 0;
+    } else if (mode & MODEINITPRED) {
+      // cite: dioload.c:141-148
+      s0[base + SLOT_VD]  = s1[base + SLOT_VD];
+      s0[base + SLOT_ID]  = s1[base + SLOT_ID];
+      s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
+      const xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
+      vdRaw = (1 + xfact) * s1[base + SLOT_VD] - xfact * s2[base + SLOT_VD];
     } else {
       // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
       const va = voltages[this._posPrimeNode];

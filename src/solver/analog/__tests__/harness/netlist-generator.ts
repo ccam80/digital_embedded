@@ -741,10 +741,7 @@ function instanceParamSuffix(
 
   for (const def of paramDefs) {
     if (def.partition !== "instance") continue;
-    // ngspice *Given semantics: per-instance overrides are emitted only when
-    // the user actually set the value (setModelParam / runtime setParam / .dts
-    // _modelParams entry). Registry defaults stay implicit so .options
-    // TEMP=<celsius> can drive ctx.cktTemp uniformly across both engines.
+    // ngspice *Given semantics: emit only user-set per-instance overrides.
     if (!props.isModelParamGiven(def.key)) continue;
     const raw = props.getModelParam<number>(def.key);
     if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
@@ -798,8 +795,6 @@ function modelCardSuffix(
         `only instance partition supports flag/group emission today`,
       );
     }
-    // Same *Given gate as instanceParamSuffix: only emit user-given model-card
-    // params; registry defaults stay implicit.
     if (!props.isModelParamGiven(def.key)) continue;
     const raw = props.getModelParam<number>(def.key);
     if (typeof raw !== "number" || !Number.isFinite(raw)) continue;

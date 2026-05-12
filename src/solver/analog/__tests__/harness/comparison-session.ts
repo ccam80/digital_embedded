@@ -561,24 +561,19 @@ export class ComparisonSession {
   /**
    * Materialize the netlist deck to load into ngspice. For auto-generated decks,
    * injects `.options TEMP=<celsius>` after the title so the engine's current
-   * circuitTemp drives ngspice CKTtemp uniformly.
-   *
-   * After the *Given migration (Layer 1 — PropertyBag, Layers 3–4 — DTS / netlist
-   * generator), the auto-generated deck no longer carries per-instance TEMP=Y
-   * on device cards unless the user explicitly set TEMP via isModelParamGiven.
-   * So the prior regex workaround that rewrote per-instance TEMP= to match
-   * circuitTemp is no longer needed: the options card alone now drives the
-   * device temperature wherever the user didn't override it. The model-card
-   * `TNOM=...` is the reference temperature at which params were extracted
-   * and stays unchanged — both engines adjust from TNOM to the current
-   * operating temp via their respective temp passes.
-   *
-   * For cirPath-loaded decks, returns the deck verbatim — the author owns TEMP.
+   * circuitTemp drives ngspice CKTtemp. For cirPath-loaded decks, returns the
+   * deck verbatim — the author owns TEMP.
    */
   private _materializeCir(): string {
     if (!this._cirClean) return "";
     if (this._opts.cirPath) return this._cirClean;
     const K = this._engine.circuitTemp;
+    // ngspice's default operating temperature is 27 degC = 300.15 K (CKTtemp
+    // initialisation in CKTinit.c). At the default, injecting an explicit
+    // .options TEMP=27 card perturbs ngspice's setup ordering by ~1 ULP
+    // versus no card at all; skip injection at default to preserve bit-exact
+    // parity for fixtures running at the default temperature.
+    if (Math.abs(K - 300.15) < 1e-12) return this._cirClean;
     const celsius = K - 273.15;
     // generateSpiceNetlist puts the title on line 0; inject the options card
     // immediately after so it precedes every device card.
@@ -2669,6 +2664,32 @@ export class ComparisonSession {
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get ourTopology(): TopologySnapshot { return this._ourTopology; }
   get engine(): MNAEngine { return this._engine; }
+
+  /**
+   * Return the SPICE deck as actually loaded into ngspice by NgspiceBridge.
+   *
+   * - For cirPath-supplied sessions: the .cir contents with the `.control`
+   *   block stripped (verbatim otherwise — author owns TEMP).
+   * - For auto-generated decks (no cirPath): the output of
+   *   `generateSpiceNetlist(compiled, registry, elementLabels)` with a
+   *   `.options TEMP=<celsius>` card injected after the title line when the
+   *   engine's `circuitTemp` differs from ngspice's 300.15 K default.
+   * - For `selfCompare` sessions: empty string (no ngspice side).
+   *
+   * Call after `init()`. The deck is what `NgspiceBridge.loadNetlist` consumes
+   * during `runDcOp()` / `runTransient()`, so this is the exact text fed to
+   * ngspice for the current run. The `cirPath` form omits the `.control`
+   * block (the harness drives ngspice imperatively, not via netlist commands).
+   *
+   * @param opts.raw - When `true`, return the pre-materialised `_cirClean`
+   *   (no TEMP injection). Use to inspect the auto-generated emitter output
+   *   without the temperature card noise. Default `false`.
+   */
+  getNgspiceDeck(opts?: { raw?: boolean }): string {
+    this._ensureInited();
+    if (opts?.raw) return this._cirClean;
+    return this._materializeCir();
+  }
 
   // ---------------------------------------------------------------------------
   // Internal helpers

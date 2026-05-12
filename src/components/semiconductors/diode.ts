@@ -527,9 +527,7 @@ export function createDiodeElement(
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
-  // cite: diotemp.c — DIOtempGiven: true iff user explicitly set per-instance TEMP.
-  // Seeded from PropertyBag givenness so a .dts that did NOT supply TEMP in
-  // _modelParams (defaults-only) starts ungiven; ngspice CKTtemp drives.
+  // cite: diotemp.c — DIOtempGiven mirrors PropertyBag givenness for TEMP.
   let _tempGiven = props.isModelParamGiven("TEMP");
 
   // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
