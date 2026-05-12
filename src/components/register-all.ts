@@ -199,6 +199,8 @@ import { DigitalInputPinLoadedDefinition } from "./digital-pins/digital-input-pi
 import { DigitalInputPinUnloadedDefinition } from "./digital-pins/digital-input-pin-unloaded.js";
 import { DigitalOutputPinLoadedDefinition } from "./digital-pins/digital-output-pin-loaded.js";
 import { DigitalOutputPinUnloadedDefinition } from "./digital-pins/digital-output-pin-unloaded.js";
+import { DigitalOutputPinTriStateLoadedDefinition } from "./digital-pins/digital-output-pin-tristate-loaded.js";
+import { DigitalOutputPinTriStateUnloadedDefinition } from "./digital-pins/digital-output-pin-tristate-unloaded.js";
 
 // Behavioral output driver (internalOnly)
 import { BehavioralOutputDriverDefinition, BehavioralOutputDriverTriStateDefinition } from "../solver/analog/behavioral-output-driver.js";
@@ -482,6 +484,8 @@ export function createDefaultRegistry(
   registry.register(DigitalInputPinUnloadedDefinition);
   registry.register(DigitalOutputPinLoadedDefinition);
   registry.register(DigitalOutputPinUnloadedDefinition);
+  registry.register(DigitalOutputPinTriStateLoadedDefinition);
+  registry.register(DigitalOutputPinTriStateUnloadedDefinition);
 
   // Behavioral output driver (internalOnly)
   registry.register(BehavioralOutputDriverDefinition);
