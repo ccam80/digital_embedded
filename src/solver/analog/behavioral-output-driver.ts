@@ -13,6 +13,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "./ngspice-load-order.js";
 import { PoolBackedAnalogElement, type AnalogElement } from "./element.js";
 import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
+import { allocNortonStamp } from "./stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -63,16 +64,12 @@ export class BehavioralOutputDriverElement extends PoolBackedAnalogElement {
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private readonly _vOH: number;
-  private readonly _vOL: number;
-  private readonly _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
+  private _rOut: number;
 
-  // Norton conductance stamp handles- 2x2 conductance matrix at (pos, neg).
-  // Same incidence pattern as a 2-terminal resistor (relay-resistor.ts shape).
-  private _hPP = -1; // (pos, pos)
-  private _hNN = -1; // (neg, neg)
-  private _hPN = -1; // (pos, neg)
-  private _hNP = -1; // (neg, pos)
+  // Norton conductance stamp handles- 4-tuple [hPP, hNN, hPN, hNP] at (pos, neg).
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -82,21 +79,23 @@ export class BehavioralOutputDriverElement extends PoolBackedAnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    const solver = ctx.solver;
     const posNode = this.pinNodes.get("pos")!;
     const negNode = this.pinNodes.get("neg")!;
 
     this._stateBase = ctx.allocStates(this.stateSize);
 
     // Norton stamp- 4 conductance entries (no branch row needed).
-    this._hPP = solver.allocElement(posNode, posNode);
-    this._hNN = solver.allocElement(negNode, negNode);
-    this._hPN = solver.allocElement(posNode, negNode);
-    this._hNP = solver.allocElement(negNode, posNode);
+    this._handles = allocNortonStamp(ctx.solver, posNode, negNode);
   }
 
-  setParam(_key: string, _value: number): void {
-    // No hot-loadable params- vOH/vOL/rOut are construction-time.
+  setParam(key: string, value: number): void {
+    if (key === "rOut") {
+      this._rOut = value;
+    } else if (key === "vOH") {
+      this._vOH = value;
+    } else if (key === "vOL") {
+      this._vOL = value;
+    }
   }
 
   load(_ctx: LoadContext): void {

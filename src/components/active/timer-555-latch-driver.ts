@@ -66,6 +66,9 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
   readonly stateSize = SCHEMA.size;
 
   private _vDrop: number;
+  private _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
   // TSTALLOC handle for the (disBase, disBase) conductance stamp.
   private _hDisDis = -1;
 
@@ -74,6 +77,9 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
     this._vDrop = props.hasModelParam("vDrop")
       ? props.getModelParam<number>("vDrop")
       : 1.5;
+    this._rOut = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : 100;
+    this._vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : 5;
+    this._vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : 0;
   }
 
   setup(ctx: SetupContext): void {
@@ -121,6 +127,9 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
 
   setParam(key: string, value: number): void {
     if (key === "vDrop") this._vDrop = value;
+    else if (key === "rOut") this._rOut = value;
+    else if (key === "vOH") this._vOH = value;
+    else if (key === "vOL") this._vOL = value;
   }
 }
 
@@ -138,8 +147,11 @@ export const Timer555LatchDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [
         { key: "vDrop", default: 1.5 },
+        { key: "rOut", default: 100 },
+        { key: "vOH", default: 5 },
+        { key: "vOL", default: 0 },
       ],
-      params: { vDrop: 1.5 },
+      params: { vDrop: 1.5, rOut: 100, vOH: 5, vOL: 0 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new Timer555LatchDriverElement(pinNodes, props),
     },

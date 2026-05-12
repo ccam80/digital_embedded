@@ -55,6 +55,7 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   SwitchSPDT:      { prefix: "S", modelType: "SW" },
   Switch:          { prefix: "S", modelType: "SW" },
   SwitchDT:        { prefix: "S", modelType: "SW" },
+  TransmissionLine: { prefix: "T" },
   LDR:             { prefix: "R" },
   VariableRail:    { prefix: "V" },
   Clock:           { prefix: "V" },
@@ -684,6 +685,15 @@ function emitPrimitive(
   // analysis (DC-OP, .tran with no mid-transient parameter changes); tests
   // that drive runtime parameter changes must use createSelfCompare.
   // ---------------------------------------------------------------------------
+
+  if (typeId === "TransmissionLine") {
+    // ngspice T card: T<name> A+ A- B+ B- Z0=<z> TD=<td>
+    // Our pinLayout is [P1b, P2b, P1a, P2a] = [pos1, pos2, neg1, neg2];
+    // emit in ngspice order [pos1, neg1, pos2, neg2] = nodes[0, 2, 1, 3].
+    const z0 = requireParam(props, def, modelKey, "impedance", rawLabel);
+    const td = requireParam(props, def, modelKey, "delay", rawLabel);
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "P1b")} ${nodeAt(nodes, 2, rawLabel, "P1a")} ${nodeAt(nodes, 1, rawLabel, "P2b")} ${nodeAt(nodes, 3, rawLabel, "P2a")} Z0=${z0} TD=${td}`];
+  }
 
   if (typeId === "LDR") {
     // LDR resistance follows a power law:

@@ -436,6 +436,10 @@ export class MNAEngine implements AnalogEngine {
       // under order 1), producing catastrophic companion-current errors.
       ctx.loadCtx.order = this._timestep.currentOrder;
       ctx.loadCtx.method = this._timestep.currentMethod;
+      // CKTminBreak — bound once at top-of-step alongside order/method;
+      // updateParams() refreshes _minBreak inside the controller. Read by
+      // TRA acceptStep (traaccept.c:49 history-table grow predicate).
+      ctx.loadCtx.minBreak = this._timestep.minBreak;
       ctx.maxIterations = params.transientMaxIterations;
       ctx.enableBlameTracking = logging;
       ctx.postIterationHook = this.postIterationHook;

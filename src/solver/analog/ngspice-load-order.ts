@@ -228,4 +228,7 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   // J name D G S model
   NJFET:           ["D", "G", "S"],
   PJFET:           ["D", "G", "S"],
+  // T name pos1 neg1 pos2 neg2 Z0=... TD=...
+  // ngspice TRAnames (tra.c:32-37): ["P1+","P1-","P2+","P2-"] → digiTS [P1b,P1a,P2b,P2a].
+  TransmissionLine: ["P1b", "P1a", "P2b", "P2a"],
 };

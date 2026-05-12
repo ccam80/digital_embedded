@@ -95,6 +95,9 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   private readonly _clrNode: number;
   private readonly _gndNode: number;
   private _vIH: number;
+  private _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
   private _firstSample: boolean = true;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
@@ -111,7 +114,10 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
     this._cNode   = pinNodes.get("C")!;
     this._clrNode = pinNodes.get("clr")!;
     this._gndNode = pinNodes.get("gnd")!;
-    this._vIH = props.getModelParam<number>("vIH");
+    this._vIH  = props.getModelParam<number>("vIH");
+    this._rOut = props.getModelParam<number>("rOut");
+    this._vOH  = props.getModelParam<number>("vOH");
+    this._vOL  = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -178,6 +184,9 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
 
   setParam(key: string, value: number): void {
     if (key === "vIH") this._vIH = value;
+    else if (key === "rOut") this._rOut = value;
+    else if (key === "vOH") this._vOH = value;
+    else if (key === "vOL") this._vOL = value;
     // bitWidth is structural (allocates schema, slot indices, _maxValue);
     // not setParam-able.
   }
@@ -196,10 +205,13 @@ export const BehavioralCounterDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: [
-        { key: "bitWidth", default: 4 },
+        { key: "bitWidth", default: 4   },
         { key: "vIH",      default: 2.0 },
+        { key: "rOut",     default: 100 },
+        { key: "vOH",      default: 5   },
+        { key: "vOL",      default: 0   },
       ],
-      params: { bitWidth: 4, vIH: 2.0 },
+      params: { bitWidth: 4, vIH: 2.0, rOut: 100, vOH: 5, vOL: 0 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralCounterDriverElement(pinNodes, props),
     },

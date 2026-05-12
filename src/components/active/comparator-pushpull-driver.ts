@@ -62,6 +62,7 @@ const COMPARATOR_PUSHPULL_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "responseTime", default: 1e-6 },
   { key: "vOH",          default: 3.3 },
   { key: "vOL",          default: 0 },
+  { key: "rOut",         default: 100 },
 ];
 
 const COMPARATOR_PUSHPULL_DRIVER_DEFAULTS: Record<string, number> = {
@@ -71,6 +72,7 @@ const COMPARATOR_PUSHPULL_DRIVER_DEFAULTS: Record<string, number> = {
   responseTime: 1e-6,
   vOH: 3.3,
   vOL: 0,
+  rOut: 100,
 };
 
 const MIN_RSAT = 1e-9;
@@ -92,6 +94,7 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
   private _tau: number;
   private _vOH: number;
   private _vOL: number;
+  private _rOut: number;
 
   // Single matrix handle: (out, out). Push-pull always stamps the full
   // 1/rSat conductance; the latch/weight steers the RHS injection.
@@ -105,6 +108,7 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     this._tau        = Math.max(props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["responseTime"]!, MIN_TAU);
     this._vOH        = props.hasModelParam("vOH")          ? props.getModelParam<number>("vOH")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vOH"]!;
     this._vOL        = props.hasModelParam("vOL")          ? props.getModelParam<number>("vOL")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vOL"]!;
+    this._rOut       = props.hasModelParam("rOut")         ? props.getModelParam<number>("rOut")         : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["rOut"]!;
   }
 
   setup(ctx: SetupContext): void {
@@ -122,6 +126,7 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
       case "responseTime": this._tau = Math.max(value, MIN_TAU); break;
       case "vOH":          this._vOH = value; break;
       case "vOL":          this._vOL = value; break;
+      case "rOut":         this._rOut = value; break;
     }
   }
 

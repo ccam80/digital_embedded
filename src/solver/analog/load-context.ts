@@ -113,6 +113,13 @@ export interface LoadContext {
   /** Thermal voltage in volts (ngspice CKTvt = k * temp / q). */
   vt: number;
   /**
+   * Break-deduplication threshold in seconds (ngspice CKTminBreak).
+   * Synced once per NR iteration from TimestepController.minBreak.
+   * Devices that grow history tables in acceptStep() (TRA, LTRA) gate
+   * append against this threshold per traaccept.c:49.
+   */
+  minBreak: number;
+  /**
    * Fix-limit mode flag (ngspice CKTfixLimit per cktdefs.h).
    * When true, the reverse-mode limvds guard in MOSFET load is skipped.
    * Default false- matches ngspice's default (CKTfixLimit not set).

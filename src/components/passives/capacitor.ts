@@ -31,7 +31,7 @@ import {
   MODETRAN, MODEAC, MODETRANOP, MODEDC,
   MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { allocNortonStamp, stampNortonAt } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import {
   defineStateSchema,
@@ -180,11 +180,9 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
   private _SCALE: number;
   private _M: number;
 
-  // Cached matrix-entry handles- allocated in setup() per capsetup.c:114-117.
-  private _hPP: number = -1;
-  private _hNN: number = -1;
-  private _hPN: number = -1;
-  private _hNP: number = -1;
+  // Cached Norton-stamp handles [hPP, hNN, hPN, hNP] allocated in setup()
+  // per capsetup.c:114-117 (TSTALLOC sequence).
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -210,14 +208,11 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
     // per niinteg.c:15).
     this._stateBase = ctx.allocStates(this.stateSize);
 
-    // capsetup.c:114-117  TSTALLOC sequence, line-for-line. ngspice
-    // makes these allocations unconditionally (TSTALLOC has no ground
-    // guard); allocElement(0,X) / allocElement(X,0) returns the
-    // TrashCan handle 0, whose elVal[0] is zeroed every NR iter.
-    this._hPP = ctx.solver.allocElement(posNode, posNode);
-    this._hNN = ctx.solver.allocElement(negNode, negNode);
-    this._hPN = ctx.solver.allocElement(posNode, negNode);
-    this._hNP = ctx.solver.allocElement(negNode, posNode);
+    // capsetup.c:114-117  TSTALLOC sequence. ngspice makes these
+    // allocations unconditionally (TSTALLOC has no ground guard);
+    // allocElement(0,X) / allocElement(X,0) returns the TrashCan handle
+    // 0, whose elVal[0] is zeroed every NR iter.
+    this._handles = allocNortonStamp(ctx.solver, posNode, negNode);
   }
 
   setParam(key: string, value: number): void {
@@ -257,7 +252,7 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
    * source). Matches the Appendix D2 reference pattern.
    */
   load(ctx: LoadContext): void {
-    const { solver, rhsOld: voltages, ag, cktMode: mode } = ctx;
+    const { rhsOld: voltages, ag, cktMode: mode } = ctx;
     const n0 = this.pinNodes.get("pos")!;
     const n1 = this.pinNodes.get("neg")!;
     const C = this.C;
@@ -327,12 +322,9 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
       // Stamp companion model (capload.c:74-79  all entries scaled by m = CAPm).
       // ngspice writes unconditionally; ground rows/cols land in the TrashCan
       // (matrix) or rhs[0] (post-solve cleared). No caller-side ground guards.
-      solver.stampElement(this._hPP, m * geq);
-      solver.stampElement(this._hNN, m * geq);
-      solver.stampElement(this._hPN, -m * geq);
-      solver.stampElement(this._hNP, -m * geq);
-      stampRHS(ctx.rhs, n0, -m * ceq);
-      stampRHS(ctx.rhs, n1,  m * ceq);
+      // capload.c:78-79 writes `-ceq` at posNode and `+ceq` at negNode; passing
+      // I = -m*ceq to stampNortonAt yields rhs[n0] += -m*ceq, rhs[n1] += m*ceq.
+      stampNortonAt(ctx, this._handles, n0, n1, m * geq, -m * ceq);
     } else {
       // DC operating point — just store charge, no matrix stamp (capload.c:80-81).
       s0[base + SLOT_Q] = C * vcap;

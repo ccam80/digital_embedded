@@ -67,6 +67,7 @@ export class LoadCtxImpl implements LoadContext {
   cktFixLimit!: boolean;
   bypass!: boolean;
   voltTol!: number;
+  minBreak!: number;
 
   /**
    * Live ring reference. Identity is stable for the lifetime of the engine
@@ -739,6 +740,11 @@ export class CKTCircuitContext {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
+      // ngspice dctran.c:154 (XSPICE) — CKTminBreak = 10 * CKTdelmin where
+      // CKTdelmin = 1e-11 * CKTmaxStep (traninit.c:34). Bound to 0 at
+      // construction; engine syncs from TimestepController.minBreak each NR
+      // iteration before load() (see analog-engine.ts).
+      minBreak: 0,
     });
 
     // Tolerances

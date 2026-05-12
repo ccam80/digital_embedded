@@ -101,6 +101,9 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private _vIH: number;
   private _vIL: number;
+  private _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -118,6 +121,9 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
 
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
+    this._rOut = props.getModelParam<number>("rOut");
+    this._vOH  = props.getModelParam<number>("vOH");
+    this._vOL  = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -161,6 +167,9 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
   setParam(key: string, value: number): void {
     if      (key === "vIH") this._vIH = value;
     else if (key === "vIL") this._vIL = value;
+    else if (key === "rOut") this._rOut = value;
+    else if (key === "vOH") this._vOH = value;
+    else if (key === "vOL") this._vOL = value;
     // selectorBits is structural (allocates schema, slot indices, _selNodes,
     // _outCount); not setParam-able.
   }
@@ -182,8 +191,11 @@ export const BehavioralDecoderDriverDefinition: ComponentDefinition = {
         { key: "selectorBits", default: 1 },
         { key: "vIH",          default: 2.0 },
         { key: "vIL",          default: 0.8 },
+        { key: "rOut",         default: 100 },
+        { key: "vOH",          default: 5 },
+        { key: "vOL",          default: 0 },
       ],
-      params: { selectorBits: 1, vIH: 2.0, vIL: 0.8 },
+      params: { selectorBits: 1, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralDecoderDriverElement(pinNodes, props),
     },

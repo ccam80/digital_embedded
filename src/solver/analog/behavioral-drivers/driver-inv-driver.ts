@@ -60,11 +60,17 @@ export class BehavioralDriverInvDriverElement extends PoolBackedAnalogElement {
 
   private _vIH: number;
   private _vIL: number;
+  private _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
     this._vIL = props.hasModelParam("vIL") ? props.getModelParam<number>("vIL") : 0.8;
+    this._rOut = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : 100;
+    this._vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : 5;
+    this._vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : 0;
   }
 
   setup(ctx: SetupContext): void {
@@ -90,6 +96,9 @@ export class BehavioralDriverInvDriverElement extends PoolBackedAnalogElement {
   setParam(key: string, value: number): void {
     if      (key === "vIH") this._vIH = value;
     else if (key === "vIL") this._vIL = value;
+    else if (key === "rOut") this._rOut = value;
+    else if (key === "vOH") this._vOH = value;
+    else if (key === "vOL") this._vOL = value;
   }
 }
 
@@ -108,8 +117,11 @@ export const BehavioralDriverInvDriverDefinition: ComponentDefinition = {
       paramDefs: [
         { key: "vIH", default: 2.0 },
         { key: "vIL", default: 0.8 },
+        { key: "rOut", default: 100 },
+        { key: "vOH", default: 5 },
+        { key: "vOL", default: 0 },
       ],
-      params: { vIH: 2.0, vIL: 0.8 },
+      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralDriverInvDriverElement(pinNodes, props),
     },

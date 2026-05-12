@@ -53,6 +53,8 @@ import { buildFixture } from "../../__tests__/fixtures/build-fixture.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
 import type { CircuitElement } from "../../../../core/element.js";
+import { PropertyBag } from "../../../../core/properties.js";
+import { BehavioralTFlipflopDriverElement } from "../t-flipflop-driver.js";
 
 // ---------------------------------------------------------------------------
 // Topology builders.
@@ -316,5 +318,28 @@ describe("BehavioralTFlipflopDriver parameter hot-load (Cat 4)", () => {
     const fixForce = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
     pulseClock(fixForce, "C");
     expect(fixForce.facade.readSignal(fixForce.coordinator, "Q")).toBe(1);
+  });
+});
+
+// ===========================================================================
+// setParam — rOut / vOH / vOL hot-loadability (Phase 1 param declaration)
+// ===========================================================================
+
+describe("BehavioralTFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
+  it("accepts rOut/vOH/vOL via setParam without throwing", () => {
+    const props = new PropertyBag();
+    props.setModelParam("vIH", 2.0);
+    props.setModelParam("vIL", 0.8);
+    props.setModelParam("forceToggle", 0);
+    props.setModelParam("rOut", 100);
+    props.setModelParam("vOH", 5);
+    props.setModelParam("vOL", 0);
+    const pinNodes = new Map<string, number>([
+      ["T", 1], ["C", 2], ["Q", 3], ["~Q", 4], ["gnd", 0],
+    ]);
+    const el = new BehavioralTFlipflopDriverElement(pinNodes, props);
+    expect(() => el.setParam("rOut", 200)).not.toThrow();
+    expect(() => el.setParam("vOH", 3.3)).not.toThrow();
+    expect(() => el.setParam("vOL", 0.5)).not.toThrow();
   });
 });

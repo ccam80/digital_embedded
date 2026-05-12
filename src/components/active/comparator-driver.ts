@@ -67,6 +67,9 @@ const COMPARATOR_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "vos",          default: 0.001 },
   { key: "rSat",         default: 50 },
   { key: "responseTime", default: 1e-6 },
+  { key: "rOut",         default: 100 },
+  { key: "vOH",          default: 5 },
+  { key: "vOL",          default: 0 },
 ];
 
 const COMPARATOR_DRIVER_DEFAULTS: Record<string, number> = {
@@ -74,6 +77,9 @@ const COMPARATOR_DRIVER_DEFAULTS: Record<string, number> = {
   vos: 0.001,
   rSat: 50,
   responseTime: 1e-6,
+  rOut: 100,
+  vOH: 5,
+  vOL: 0,
 };
 
 const MIN_RSAT = 1e-9;
@@ -93,6 +99,9 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
   private _vos: number;
   private _rSat: number;
   private _tau: number;
+  private _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
 
   // Single matrix handle: (out, out). Open-collector model stamps the
   // weighted conductance on the output diagonal only- no cross-coupling
@@ -105,6 +114,9 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
     this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_DRIVER_DEFAULTS["vos"]!;
     this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
     this._tau        = Math.max(props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_DRIVER_DEFAULTS["responseTime"]!, MIN_TAU);
+    this._rOut       = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : COMPARATOR_DRIVER_DEFAULTS["rOut"]!;
+    this._vOH        = props.hasModelParam("vOH")  ? props.getModelParam<number>("vOH")  : COMPARATOR_DRIVER_DEFAULTS["vOH"]!;
+    this._vOL        = props.hasModelParam("vOL")  ? props.getModelParam<number>("vOL")  : COMPARATOR_DRIVER_DEFAULTS["vOL"]!;
   }
 
   setup(ctx: SetupContext): void {
@@ -120,6 +132,9 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
       case "vos":          this._vos = value; break;
       case "rSat":         this._rSat = Math.max(value, MIN_RSAT); break;
       case "responseTime": this._tau = Math.max(value, MIN_TAU); break;
+      case "rOut":         this._rOut = value; break;
+      case "vOH":          this._vOH = value; break;
+      case "vOL":          this._vOL = value; break;
     }
   }
 

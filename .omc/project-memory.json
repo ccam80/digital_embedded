@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json 2>&1 | head -30",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && node -e \"const f=require('./.vitest-failures.json');console.log('count',f.failures.length);f.failures.forEach((x,i)=>console.log(i,'loc:',x.locations?.[0]?.test?.slice(0,80),'\\nmsg:',x.message.slice(0,180),'\\n'))\"",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --reporter=verbose \"src/solver/analog/behavioral-drivers/__tests__/gate-driver-params.test.ts\" 2>&1 | tail -50",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -370,6 +370,18 @@
       "type": "directory"
     },
     {
+      "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1778582497526,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\splitter.ts",
+      "accessCount": 8,
+      "lastAccessed": 1778582589405,
+      "type": "file"
+    },
+    {
       "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
       "accessCount": 7,
       "lastAccessed": 1778213674737,
@@ -379,12 +391,6 @@
       "path": "src\\headless\\__tests__\\default-facade.test.ts",
       "accessCount": 7,
       "lastAccessed": 1778219295882,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\wiring\\__tests__\\wiring.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1778237862523,
       "type": "file"
     },
     {
@@ -427,12 +433,6 @@
       "path": "src\\compile\\partition.ts",
       "accessCount": 5,
       "lastAccessed": 1778547200760,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\wiring\\splitter.ts",
-      "accessCount": 4,
-      "lastAccessed": 1778237861930,
       "type": "file"
     },
     {

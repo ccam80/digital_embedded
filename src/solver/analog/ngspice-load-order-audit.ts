@@ -16,6 +16,7 @@ const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>(
   "BJT",
   "MOS",
   "JFET",
+  "TRA",
 ]);
 
 const MULTI_LINE_COMPOSITES: ReadonlySet<string> = new Set<string>([

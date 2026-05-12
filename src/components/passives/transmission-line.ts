@@ -43,8 +43,8 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { createTransmissionLineElement } from "./transmission-line-element.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -61,10 +61,6 @@ export const { paramDefs: TRANSMISSION_LINE_PARAM_DEFS, defaults: TRANSMISSION_L
     segments:     { default: 10,    description: "Number of lumped RLCG segments (more segments = more accurate, slower)", min: 2, max: 100 },
   },
 });
-
-// Aliases used within buildTransmissionLineNetlist
-const TLINE_PARAM_DEFS = TRANSMISSION_LINE_PARAM_DEFS;
-const TLINE_PARAM_DEFAULTS = TRANSMISSION_LINE_DEFAULTS;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -171,87 +167,6 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
   }
 
 }
-
-// ---------------------------------------------------------------------------
-// buildTransmissionLineNetlist  function-form netlist (Composite M6)
-// ---------------------------------------------------------------------------
-
-/**
- * Builds the MNA subcircuit netlist for a lossy transmission line.
- *
- * Per-segment R/L/G/C derivation verbatim from
- * TransmissionLineElement constructor (transmission-line.ts:775-786).
- *
- * Ports: ["P1a", "P1b", "P2a", "P2b"] â†’ indices 0, 1, 2, 3
- * Internal nets:
- *   rlMid0..rlMid(N-2): indices 4..4+(N-2)          (N-1 nodes)
- *   junc0..junc(N-2):   indices 4+(N-1)..4+2(N-1)-1  (N-1 nodes)
- * Total internal nets: 2*(N-1)
- */
-export const buildTransmissionLineNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
-  const N = params.getModelParam<number>("segments");
-  const Z0 = params.getModelParam<number>("impedance");
-  const delay = params.getModelParam<number>("delay");
-  const lossDb = params.getModelParam<number>("lossPerMeter");
-  const length = params.getModelParam<number>("length");
-
-  // Per-segment R/L/G/C derivation- verbatim from
-  // TransmissionLineElement constructor (transmission-line.ts:775-786).
-  const lSeg = (Z0 * delay) / N;
-  const cSeg = delay / (Z0 * N);
-  let rSeg = 0;
-  let gSeg = 0;
-  if (lossDb > 0) {
-    const alphaNpPerM = (lossDb * Math.LN10) / 20;
-    rSeg = (2 * alphaNpPerM * Z0 * length) / N;
-    gSeg = (2 * alphaNpPerM * length) / (Z0 * N);
-  }
-
-  const ports = ["P1a", "P1b", "P2a", "P2b"];
-  const hasRlMid = rSeg > 0;
-
-  // Internal net layout:
-  //   When hasRlMid: rlMid0..rlMid(N-1) (N nodes) then junc0..junc(N-2) (N-1 nodes), total 2*N-1.
-  //   When !hasRlMid: junc0..junc(N-2) only (N-1 nodes); the inductor connects inputNet → outputNet directly.
-  const internalNetLabels: string[] = [];
-  if (hasRlMid) {
-    for (let k = 0; k < N; k++) internalNetLabels.push(`rlMid${k}`);
-  }
-  for (let k = 0; k < N - 1; k++) internalNetLabels.push(`junc${k}`);
-  const internalNetCount = hasRlMid ? (2 * N - 1) : (N - 1);
-
-  const rlMidIndex = (k: number): number => 4 + k;
-  const juncIndex  = (k: number): number => hasRlMid ? (4 + N + k) : (4 + k);
-
-  const elements: SubcircuitElement[] = [];
-  const netlist: number[][] = [];
-  for (let k = 0; k < N; k++) {
-    const inputNet = (k === 0) ? 1 /* P1b */ : juncIndex(k - 1);
-    const outputNet = (k < N - 1) ? juncIndex(k) : 3 /* P2b */;
-
-    if (hasRlMid) {
-      const rlMidK = rlMidIndex(k);
-      elements.push({ typeId: "Resistor", modelRef: "behavioral", subElementName: `seg${k}_R`, params: { resistance: rSeg } });
-      netlist.push([inputNet, rlMidK]);
-      elements.push({ typeId: "Inductor", modelRef: "behavioral", subElementName: `seg${k}_L`, branchCount: 1, params: { inductance: lSeg } });
-      netlist.push([rlMidK, outputNet]);
-    } else {
-      elements.push({ typeId: "Inductor", modelRef: "behavioral", subElementName: `seg${k}_L`, branchCount: 1, params: { inductance: lSeg } });
-      netlist.push([inputNet, outputNet]);
-    }
-
-    if (k < N - 1) {
-      if (gSeg > 0) {
-        elements.push({ typeId: "Resistor", modelRef: "behavioral", subElementName: `seg${k}_G`, params: { resistance: 1 / gSeg } });
-        netlist.push([outputNet, 0]);
-      }
-      elements.push({ typeId: "Capacitor", modelRef: "behavioral", subElementName: `seg${k}_C`, params: { capacitance: cSeg } });
-      netlist.push([outputNet, 0]);
-    }
-  }
-
-  return { ports, elements, internalNetCount, internalNetLabels, netlist };
-};
 
 // ---------------------------------------------------------------------------
 // Property definitions
@@ -364,10 +279,10 @@ export const TransmissionLineDefinition: StandaloneComponentDefinition = {
   models: {},
   modelRegistry: {
     "default": {
-      kind: "netlist",
-      netlist: buildTransmissionLineNetlist,
-      paramDefs: TLINE_PARAM_DEFS,
-      params: TLINE_PARAM_DEFAULTS,
+      kind: "inline",
+      factory: createTransmissionLineElement,
+      paramDefs: TRANSMISSION_LINE_PARAM_DEFS,
+      params: TRANSMISSION_LINE_DEFAULTS,
     },
   },
   defaultModel: "default",

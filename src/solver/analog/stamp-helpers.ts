@@ -13,6 +13,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
+import type { LoadContext } from "./load-context.js";
 
 /** Stamp a conductance value into the G sub-matrix at (row, col). */
 export function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
@@ -28,4 +29,72 @@ export function stampG(solver: SparseSolver, row: number, col: number, val: numb
  */
 export function stampRHS(rhs: Float64Array, row: number, val: number): void {
   rhs[row] += val;
+}
+
+/**
+ * Allocate the 4 conductance matrix handles for a 2-terminal Norton port
+ * at (posNode, negNode). Returns the tuple [hPP, hNN, hPN, hNP] (source
+ * spec §6.8; call sites behavioral-output-driver.ts:166-212 and
+ * capacitor.ts:217-220).
+ */
+export function allocNortonStamp(
+  solver: SparseSolver,
+  posNode: number,
+  negNode: number,
+): readonly [number, number, number, number] {
+  const hPP = solver.allocElement(posNode, posNode);
+  const hNN = solver.allocElement(negNode, negNode);
+  const hPN = solver.allocElement(posNode, negNode);
+  const hNP = solver.allocElement(negNode, posNode);
+  return [hPP, hNN, hPN, hNP];
+}
+
+/**
+ * Stamp a Norton-equivalent (G in parallel with current source I) at the
+ * pre-allocated 4 conductance handles and add `+I` / `-I` to rhs[posNode]
+ * / rhs[negNode]. Always stamps RHS — no skip (source spec §6.8; pattern
+ * matches capacitor.ts:330-335).
+ */
+export function stampNortonAt(
+  ctx: LoadContext,
+  handles: readonly [number, number, number, number],
+  posNode: number,
+  negNode: number,
+  G: number,
+  I: number,
+): void {
+  const solver = ctx.solver;
+  solver.stampElement(handles[0],  G);
+  solver.stampElement(handles[1],  G);
+  solver.stampElement(handles[2], -G);
+  solver.stampElement(handles[3], -G);
+  ctx.rhs[posNode] += I;
+  ctx.rhs[negNode] -= I;
+}
+
+/**
+ * Stamp a Thévenin-form Norton port: `G = 1 / rOut`, `I = G * vTarget`.
+ * Stamps the four ±G conductance entries unconditionally and the two RHS
+ * entries only when `I !== 0` (preserves the existing
+ * behavioral-output-driver.ts:206-209 skip). Source spec §6.8.
+ */
+export function stampNortonValue(
+  ctx: LoadContext,
+  handles: readonly [number, number, number, number],
+  posNode: number,
+  negNode: number,
+  rOut: number,
+  vTarget: number,
+): void {
+  const G = 1 / rOut;
+  const I = G * vTarget;
+  const solver = ctx.solver;
+  solver.stampElement(handles[0],  G);
+  solver.stampElement(handles[1],  G);
+  solver.stampElement(handles[2], -G);
+  solver.stampElement(handles[3], -G);
+  if (I !== 0) {
+    ctx.rhs[posNode] += I;
+    ctx.rhs[negNode] -= I;
+  }
 }
