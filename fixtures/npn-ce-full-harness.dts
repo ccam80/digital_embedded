@@ -183,6 +183,7 @@
             "XTI": 3
           },
           "label": "Q1",
+          "model": "spice",
           "position": [
             24,
             7

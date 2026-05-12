@@ -329,10 +329,30 @@ function emitElement(
       return n;
     });
 
-    // Allocate fresh node IDs for internal nets (one per subckt internal net).
-    const internalNets: number[] = [];
-    for (let k = 0; k < subckt.internalNetCount; k++) {
-      internalNets.push(allocateInternalNet(ctx));
+    // Allocate internal-net IDs in ngspice INPpas2 / INPtermInsert order:
+    // walk elements in deck order, walk each element's connectivity in pin
+    // order, allocate on first encounter of an internal-net index. Mirrors
+    // compiler.ts:248-277 and cktnewn.c:23 + inpsymt.c:43 first-encounter-
+    // wins semantics. Straggler pass covers any declared net never referenced.
+    const internalNets: number[] = new Array(subckt.internalNetCount);
+    const portCount = subckt.ports.length;
+    for (let elIdx = 0; elIdx < subckt.elements.length; elIdx++) {
+      const connectivity = subckt.netlist[elIdx] ?? [];
+      for (let pi = 0; pi < connectivity.length; pi++) {
+        const netIdx = connectivity[pi];
+        if (netIdx === undefined || netIdx < portCount) continue;
+        const slot = netIdx - portCount;
+        if (internalNets[slot] !== undefined) continue;
+        internalNets[slot] = allocateInternalNet(ctx);
+      }
+    }
+    // Straggler pass: any internal net never referenced by a sub-element pin
+    // gets allocated in declared order, preserving the contract that every
+    // declared internal net has an ID.
+    for (let slot = 0; slot < subckt.internalNetCount; slot++) {
+      if (internalNets[slot] === undefined) {
+        internalNets[slot] = allocateInternalNet(ctx);
+      }
     }
 
     const lines: string[] = [];
@@ -435,7 +455,7 @@ function emitPrimitive(
       throw new Error(`netlist-generator: typeId "${typeId}" has no modelRegistry["${modelKey}"]`);
     }
     paramDefs = modelEntry.paramDefs;
-    emission = modelEntry.spice;
+    emission = modelEntry.kind === "netlist" ? modelEntry.spice : undefined;
   }
 
   const label = canonicalizeSpiceLabel(rawLabel, spec.prefix);
@@ -721,7 +741,11 @@ function instanceParamSuffix(
 
   for (const def of paramDefs) {
     if (def.partition !== "instance") continue;
-    if (!props.hasModelParam(def.key)) continue;
+    // ngspice *Given semantics: per-instance overrides are emitted only when
+    // the user actually set the value (setModelParam / runtime setParam / .dts
+    // _modelParams entry). Registry defaults stay implicit so .options
+    // TEMP=<celsius> can drive ctx.cktTemp uniformly across both engines.
+    if (!props.isModelParamGiven(def.key)) continue;
     const raw = props.getModelParam<number>(def.key);
     if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
     const v = def.spiceConverter ? def.spiceConverter(raw) : raw;
@@ -774,7 +798,9 @@ function modelCardSuffix(
         `only instance partition supports flag/group emission today`,
       );
     }
-    if (!props.hasModelParam(def.key)) continue;
+    // Same *Given gate as instanceParamSuffix: only emit user-given model-card
+    // params; registry defaults stay implicit.
+    if (!props.isModelParamGiven(def.key)) continue;
     const raw = props.getModelParam<number>(def.key);
     if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
     const v = def.spiceConverter ? def.spiceConverter(raw) : raw;

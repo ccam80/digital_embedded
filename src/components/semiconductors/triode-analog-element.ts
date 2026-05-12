@@ -12,10 +12,10 @@
  *
  * Pin labels (3): P (plate / anode), G (grid), K (cathode).
  *
- * 6 TSTALLOC handles, allocated unconditionally in setup() in the same
- * order the original closure-bound composite issued them via the inner
- * VCCS sub-element + 2 own gds entries:
- *   (P,G) +gm   (P,K) -gm   (K,G) -gm   (K,K) +gm   (P,P) +gds   (K,P) -gds
+ * 6 TSTALLOC handles. (P,K) and (K,K) carry the combined gm+gds
+ * coefficients required by the Jacobian of I_plate(V_P, V_G, V_K):
+ *   (P,G) +gm   (P,K) -(gm+gds)   (K,G) -gm   (K,K) +(gm+gds)
+ *   (P,P) +gds  (K,P) -gds
  *
  * Pool-backed (`PoolBackedAnalogElement`): per-NR state lives in
  * the shared StatePool so NR rollback recovers `_vgk` and the cached
@@ -287,15 +287,15 @@ export class TriodeAnalogElement extends PoolBackedAnalogElement {
 
     const solver = ctx.solver;
 
-    // Transconductance gm stamps:
-    //   (P,G) +gm   (P,K) -gm   (K,G) -gm   (K,K) +gm
+    // Jacobian of I_plate = ip + gm*(V_G - V_K - vgkOp) + gds*(V_P - V_K - vpkOp):
+    //   d/dV_P = +gds, d/dV_G = +gm, d/dV_K = -(gm + gds).
+    // KCL at P contributes +I_plate; KCL at K contributes -I_plate.
+    //   (P,P) +gds   (P,G) +gm   (P,K) -(gm+gds)
+    //   (K,P) -gds   (K,G) -gm   (K,K) +(gm+gds)
     solver.stampElement(this._hPG, +gm);
-    solver.stampElement(this._hPK, -gm);
+    solver.stampElement(this._hPK, -(gm + gds));
     solver.stampElement(this._hKG, -gm);
-    solver.stampElement(this._hKK, +gm);
-
-    // Output conductance gds stamps:
-    //   (P,P) +gds   (K,P) -gds
+    solver.stampElement(this._hKK, +(gm + gds));
     solver.stampElement(this._hPP_gds, +gds);
     solver.stampElement(this._hKP_gds, -gds);
 

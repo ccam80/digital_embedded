@@ -239,8 +239,9 @@ describe("Schottky computeTemperature engine-driven path (T1)", () => {
       fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!) -
       fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
 
-    // Vf must remain near the 450 K operating point (not revert to cooler default).
-    expect(vfAfter).toBeLessThan(vfOverride + 0.05);
+    // Vf must remain at the 450 K operating point to NR convergence tolerance.
+    // It should not change when ambient is reset (override holds).
+    expect(vfAfter).toBeCloseTo(vfOverride, 6);
   });
 });
 

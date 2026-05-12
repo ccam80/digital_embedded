@@ -370,7 +370,7 @@ describe("BJT limiting events own-engine (T1)", () => {
 // charge slots. Slots are non-zero only when caps (CJE / CJC / CJS / TF) are
 // enabled. Topology: forward-biased NPN with caps activated. State1 / state0
 // rotation invariant after the warm-start step is the rollback gate — the
-// rolled charge slot must preserve the previously-accepted value pattern.
+// rolled charge slot must preserve the accepted-state value pattern.
 // ---------------------------------------------------------------------------
 
 describe("BJT LTE rollback (T1)", () => {
@@ -408,7 +408,7 @@ describe("BJT LTE rollback (T1)", () => {
     const log = fix.coordinator.getConvergenceLog();
     expect(log).not.toBeNull();
     // The rollback invariant: at any step boundary post-warm-start, accepted
-    // state0 and previously accepted state1 are populated (rotation occurred)
+    // state0 and state1 are populated (rotation has run)
     // and remain finite for the rolled QBE charge slot. cktTerr / LTE
     // proposals fire only when these slots carry meaningful values.
     const idx = fix.circuit.elements.findIndex(
@@ -558,7 +558,7 @@ describe("BJT computeTemperature engine-driven path (T1)", () => {
     // equivalent (same per-instance temp both times). A small numerical
     // difference is allowed since NR iterates from a different init state,
     // but the result must be the same operating point to within SPICE tol.
-    expect(Math.abs(vcAfterAmbientRaise - vcAt400)).toBeLessThan(1e-4);
+    expect(Math.abs(vcAfterAmbientRaise - vcAt400)).toBeLessThan(1e-6);
   });
 
   it("computeTemperature_l1_npn_instance_override_respected", () => {
@@ -578,7 +578,7 @@ describe("BJT computeTemperature engine-driven path (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const vcAfterAmbientRaise = fix.engine.getNodeVoltage(vcNode);
 
-    expect(Math.abs(vcAfterAmbientRaise - vcAt400)).toBeLessThan(1e-4);
+    expect(Math.abs(vcAfterAmbientRaise - vcAt400)).toBeLessThan(1e-6);
   });
 
   it("computeTemperature_at_tnom_is_identity_l0_npn", () => {

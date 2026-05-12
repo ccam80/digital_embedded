@@ -269,6 +269,7 @@
             }
           },
           "label": "Q1",
+          "model": "spice",
           "position": [
             0,
             40

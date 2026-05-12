@@ -142,6 +142,48 @@ export function getNgspiceLoadOrderByTypeId(typeId: string): number {
 }
 
 /**
+ * Per-`typeId` DeviceFamily lookup, derived from the same DEVices[] position
+ * mapping as TYPE_ID_TO_NGSPICE_LOAD_ORDER.
+ */
+export const TYPE_ID_TO_DEVICE_FAMILY: Readonly<Record<string, DeviceFamily>> = {
+  // Primitives
+  Resistor:        "RES",
+  Capacitor:       "CAP",
+  PolarizedCap:    "CAP",
+  Inductor:        "IND",
+  MutualInductor:  "IND",
+  Transformer:     "IND",
+  TappedTransformer: "IND",
+  TransmissionLine: "TRA",
+  DcVoltageSource: "VSRC",
+  AcVoltageSource: "VSRC",
+  CurrentSource:   "ISRC",
+  Diode:           "DIO",
+  ZenerDiode:      "DIO",
+  VaractorDiode:   "DIO",
+  Schottky:        "DIO",
+  NpnBJT:          "BJT",
+  PnpBJT:          "BJT",
+  NMOS:            "MOS",
+  PMOS:            "MOS",
+  NJFET:           "JFET",
+  PJFET:           "JFET",
+  // Behavioral / controlled sources
+  VCCS:            "VCCS",
+  VCVS:            "VCVS",
+  CCCS:            "CCCS",
+  CCVS:            "CCVS",
+};
+
+/**
+ * Look up DeviceFamily by typeId. Returns "BEHAVIORAL" for unknown / composite
+ * typeIds so they sort to the BEHAVIORAL bucket.
+ */
+export function getDeviceFamilyByTypeId(typeId: string): DeviceFamily {
+  return TYPE_ID_TO_DEVICE_FAMILY[typeId] ?? "BEHAVIORAL";
+}
+
+/**
  * Per-`typeId` SPICE deck pin-emission order.
  *
  * Each entry lists the digiTS pin labels in the order their corresponding

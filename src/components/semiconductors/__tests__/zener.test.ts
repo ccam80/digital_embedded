@@ -300,9 +300,9 @@ describe("Zener computeTemperature engine-driven path (T1)", () => {
     const vCathAfter  = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:K")!);
     const vfAfter = vAnodeAfter - vCathAfter;
 
-    // The Vf must remain near the 500 K operating point (lower than default).
-    // It should not jump to a higher (cooler) value.
-    expect(vfAfter).toBeLessThan(vf500 + 0.05);
+    // The Vf must remain at the 500 K operating point to NR convergence tolerance.
+    // It should not change when ambient is altered (override holds).
+    expect(vfAfter).toBeCloseTo(vf500, 6);
   });
 
   it("computeTemperature_breakdown_tBV_shifts_with_ambient", () => {

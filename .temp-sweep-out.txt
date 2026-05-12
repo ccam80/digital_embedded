@@ -1,0 +1,28 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/semiconductors/__tests__/bjt-canon-temp-sweep.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[90m 99[2mms[22m[39m
+[31m   [31m×[31m NPN common-emitter temperature sweep 300.15 K paired vs ngspice (T3)[2m > [22mtemp_300_15K_compareAllAttempts[90m 8[2mms[22m[31m[39m
+[31m     → 23 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/RC:neg ours=-5.063811150524606e-90 ngspice=-5.9895915657580464e-102 absDelta=5.063811150518616e-90: expected 23 to be +0 // Object.is equality[39m
+[31m   [31m×[31m NPN common-emitter temperature sweep 350 K paired vs ngspice (T3)[2m > [22mtemp_350K_compareAllAttempts[90m 1[2mms[22m[31m[39m
+[31m     → 37 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/RC:neg ours=-4.443546703045251e-66 ngspice=-4.443546705757501e-66 absDelta=2.7122497740535016e-75: expected 37 to be +0 // Object.is equality[39m
+[31m   [31m×[31m NPN common-emitter temperature sweep 400 K paired vs ngspice (T3)[2m > [22mtemp_400K_compareAllAttempts[90m 1[2mms[22m[31m[39m
+[31m     → 23 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/RC:neg ours=-1.1635330597768272e-47 ngspice=-1.163533103174627e-47 absDelta=4.3397799709685255e-55: expected 23 to be +0 // Object.is equality[39m
+ [31m❯[39m src/components/semiconductors/__tests__/mosfet-canon-temp-sweep.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[90m 114[2mms[22m[39m
+[31m   [31m×[31m NMOS common-source temperature sweep 300.15 K paired vs ngspice (T3)[2m > [22mtemp_300_15K_compareAllAttempts[90m 7[2mms[22m[31m[39m
+[31m     → 20 per-iteration divergence(s); first: voltage step 0/iter 0 M1:G/VGS:pos ours=-0.009999999999999957 ngspice=0 absDelta=0.009999999999999957: expected 20 to be +0 // Object.is equality[39m
+[31m   [31m×[31m NMOS common-source temperature sweep 350 K paired vs ngspice (T3)[2m > [22mtemp_350K_compareAllAttempts[90m 1[2mms[22m[31m[39m
+[31m     → 20 per-iteration divergence(s); first: voltage step 0/iter 0 M1:G/VGS:pos ours=-7.402886443470914 ngspice=0 absDelta=7.402886443470914: expected 20 to be +0 // Object.is equality[39m
+[31m   [31m×[31m NMOS common-source temperature sweep 400 K paired vs ngspice (T3)[2m > [22mtemp_400K_compareAllAttempts[90m 1[2mms[22m[31m[39m
+[31m     → 21 per-iteration divergence(s); first: voltage step 0/iter 0 M1:G/VGS:pos ours=-1024 ngspice=0 absDelta=1024: expected 21 to be +0 // Object.is equality[39m
+ [31m❯[39m src/components/semiconductors/__tests__/diode-canon-temp-sweep.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[90m 127[2mms[22m[39m
+[31m   [31m×[31m Diode temperature sweep 300.15 K paired vs ngspice (T3)[2m > [22mtemp_300_15K_compareAllAttempts[90m 9[2mms[22m[31m[39m
+[31m     → 4 per-iteration divergence(s); first: rhs step 0/iter 0 rhs[0] ours=-0.008647662705740902 ngspice=-0.0086476627057409 absDelta=1.734723475976807e-18: expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m Diode temperature sweep 400 K paired vs ngspice (T3)[2m > [22mtemp_400K_compareAllAttempts[90m 3[2mms[22m[31m[39m
+[31m     → 464 per-iteration divergence(s); first: voltage step 2/iter 0 R1:pos/V1:pos ours=0.4532614898636812 ngspice=0.45326148986368114 absDelta=5.551115123125783e-17: expected 464 to be +0 // Object.is equality[39m
+
+[2m Test Files [22m [1m[31m3 failed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m8 failed[39m[22m[2m | [22m[33m1 skipped[39m[90m (9)[39m
+[2m   Start at [22m 12:30:36
+[2m   Duration [22m 3.45s[2m (transform 1.90s, setup 8.63s, collect 57ms, tests 340ms, environment 1ms, prepare 475ms)[22m
+

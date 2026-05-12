@@ -426,6 +426,12 @@ export interface AnalogEngine extends Engine {
    */
   setCircuitTemp(K: number): void;
 
+  /**
+   * Current circuit operating temperature in Kelvin. Default 300.15 K
+   * (REFTEMP); reflects the value last passed to `setCircuitTemp`.
+   */
+  readonly circuitTemp: number;
+
   // -------------------------------------------------------------------------
   // Diagnostics
   // -------------------------------------------------------------------------

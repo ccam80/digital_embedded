@@ -70,7 +70,15 @@ export function applySpiceImportResult(
   circuit.metadata.models[element.typeId]![result.modelName] = entry;
 
   element.getProperties().set("model", result.modelName);
-  element.getProperties().replaceModelParams({ ...baseEntry.params, ...result.overrides });
+  // Two-step write so user-supplied overrides land as *Given while the
+  // base-model defaults stay ungiven (registry-default semantics):
+  //   1. seed with named-model defaults (replaceModelParams, no mark)
+  //   2. overlay user overrides via setModelParam (marks given)
+  const bag = element.getProperties();
+  bag.replaceModelParams({ ...baseEntry.params });
+  for (const [k, v] of Object.entries(result.overrides)) {
+    bag.setModelParam(k, v);
+  }
 }
 
 /** The result produced by the .SUBCKT import dialog. */

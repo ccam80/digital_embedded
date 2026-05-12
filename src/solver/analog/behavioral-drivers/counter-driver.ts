@@ -52,7 +52,7 @@ import {
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -135,6 +135,7 @@ const COUNTER_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 
 export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   // Per-instance schema- the only Template-A shape diff. The schema is still
   // a frozen module-scope object (just one per bitWidth instead of one for
   // all instances).

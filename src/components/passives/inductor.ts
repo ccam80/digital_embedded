@@ -236,16 +236,6 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    */
   _mutSiblings: MutSiblingNotifiable[] = [];
 
-  /**
-   * Set to true by loadFluxInit() when called explicitly by the IND_FAMILY
-   * handler (IndFamilyLoadHandler, task 4.2.1) as Pass 1 before MUT coupling.
-   * load() checks this flag: if true, skips its own internal flux-init (to
-   * preserve MUT's augmentation from Pass 2) and resets the flag to false.
-   * If false (default handler path — no MUT), load() calls loadFluxInit()
-   * itself to maintain backward-compatible standalone behaviour.
-   */
-  _fluxPreInitialized = false;
-
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._nominalL = props.getModelParam<number>("inductance");
@@ -255,14 +245,11 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     this._TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
     this._SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
     this._M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
-    this._effectiveL = this._computeEffectiveL();
-  }
-
-  private _computeEffectiveL(): number {
-    const T = this._pool?.temperature ?? 300.15;
-    const dT = T - this._TNOM;
-    const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
-    return this._nominalL * factor * this._SCALE / this._M;
+    // cite: indtemp.c:55-72 — initial effective L at construction uses TNOM as
+    // the reference temperature (difference = 0), so factor = 1 and
+    // _effectiveL = _nominalL * SCALE / M. computeTemperature() will update
+    // this before load() runs.
+    this._effectiveL = this._nominalL * this._SCALE / this._M;
   }
 
   /**
@@ -341,7 +328,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   setParam(key: string, value: number): void {
     if (key === "inductance" || key === "L") {
       this._nominalL = value;
-      this._effectiveL = this._computeEffectiveL();
+      this._effectiveL = this._nominalL * this._SCALE / this._M;
       // Cascade to MUT siblings so MUTfactor = k·√(L1·L2) stays current.
       // cite: muttemp.c:35-41 — MUTfactor depends on both partner INDinduct values.
       for (const m of this._mutSiblings) {
@@ -351,19 +338,16 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
       this._IC = value;
     } else if (key === "TC1") {
       this._TC1 = value;
-      this._effectiveL = this._computeEffectiveL();
     } else if (key === "TC2") {
       this._TC2 = value;
-      this._effectiveL = this._computeEffectiveL();
     } else if (key === "TNOM") {
       this._TNOM = value;
-      this._effectiveL = this._computeEffectiveL();
     } else if (key === "SCALE") {
       this._SCALE = value;
-      this._effectiveL = this._computeEffectiveL();
+      this._effectiveL = this._nominalL * this._SCALE / this._M;
     } else if (key === "M") {
       this._M = value;
-      this._effectiveL = this._computeEffectiveL();
+      this._effectiveL = this._nominalL * this._SCALE / this._M;
     }
   }
 
@@ -379,9 +363,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    * so the INITPRED copy in load() Pass 3 can propagate s1→s0 correctly.
    *
    * Called by IndFamilyLoadHandler before the MUT pass (Pass 2) so that MUT
-   * can augment s0[INDflux] with M·i_partner via augmentFlux(). Sets
-   * _fluxPreInitialized = true so load() skips its own internal flux-init and
-   * preserves any MUT augmentation from Pass 2.
+   * can augment s0[INDflux] with M·i_partner via augmentFlux().
    */
   loadFluxInit(ctx: LoadContext): void {
     const { rhsOld, cktMode: mode } = ctx;
@@ -400,9 +382,6 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
         s0[base + _SLOT_PHI] = L * rhsOld[b];
       }
     }
-    // Signal load() that flux was pre-initialized (and possibly MUT-augmented)
-    // so it must not overwrite s0[PHI] again.
-    this._fluxPreInitialized = true;
   }
 
   /**
@@ -425,17 +404,10 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   /**
    * load — Pass 3 of the IND_FAMILY 3-pass load: NIintegrate + 5-stamp.
    *
-   * When called by the IND_FAMILY handler (IndFamilyLoadHandler, task 4.2.1),
-   * s0[PHI] has already been set by loadFluxInit() (Pass 1) and augmented by
-   * MUT coupling (Pass 2). _fluxPreInitialized is true in that case and this
-   * method skips its own flux-init to preserve the MUT-augmented value.
-   *
-   * When called by the default load handler (no IND_FAMILY handler registered),
-   * _fluxPreInitialized is false and load() calls loadFluxInit(ctx) itself to
-   * maintain correct standalone behaviour for non-MUT inductors.
+   * s0[PHI] has been set by loadFluxInit() (Pass 1) and augmented by MUT
+   * coupling (Pass 2) before this method runs.
    *
    * cite: indload.c:88-125 —
-   *   indload.c:43-51    flux-from-current (handled by loadFluxInit or fallback below)
    *   indload.c:88-90    DC path: req=0, veq=0.
    *   indload.c:93-104   (#ifndef PREDICTOR): MODEINITPRED copies s1→s0 PHI;
    *                        MODEINITTRAN copies s0→s1 PHI before NIintegrate.
@@ -445,16 +417,6 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    *   indload.c:119-123  unconditional 5-stamp sequence.
    */
   load(ctx: LoadContext): void {
-    // Standalone path (default handler, no IND_FAMILY orchestration):
-    // perform flux init here if loadFluxInit() was not called externally.
-    // cite: indload.c:43-51 — flux-from-current init (Pass 1 in family context).
-    if (!this._fluxPreInitialized) {
-      this.loadFluxInit(ctx);
-      // loadFluxInit sets _fluxPreInitialized = true; reset immediately since
-      // this IS the same call site — we don't need the guard for this iteration.
-    }
-    this._fluxPreInitialized = false;
-
     const { solver, ag, cktMode: mode } = ctx;
     const b = this.branchIndex;
     const L = this._effectiveL;

@@ -46,10 +46,9 @@
  * simulation observable that would let an EXTEND attempt land a `.dts`
  * driving the same assertion through a sanctioned canonical path. They are
  * registry-plumbing / pin-shape / serializer-roundtrip / pipeline-helper
- * tests, not per-component canonical tests; per the prompt's Step-3
- * disposition table they are DELETE-AND-RECORD with CONSIDER CANONISE
- * recommendations elsewhere in the suite (registry-shape framework tests,
- * generic dig-roundtrip framework tests, generic pin-derivation tests).
+ * tests, not per-component canonical tests; coverage for those patterns
+ * belongs in registry-shape framework tests, generic dig-roundtrip framework
+ * tests, and generic pin-derivation tests.
  *
  * The canonical set for Port is therefore intentionally empty. The file
  * exists to satisfy the staging-path contract and to compile cleanly
@@ -59,16 +58,11 @@
  * correct canonical outcome for Port.
  */
 
-import { describe, it } from "vitest";
+import { describe } from "vitest";
 
-// Vitest requires at least one test for a test file to register cleanly under
-// the runner's collection step. A single `describe` containing one `it.skip`
-// gated on an always-false predicate is banned by B-4 (no `it.skip`). Instead,
-// the file declares an empty `describe` block; vitest treats this as "no
+// The file declares an empty `describe` block; vitest treats this as "no
 // tests" without raising a collection error.
 describe("Port  canonical set (empty by capability gate)", () => {
   // No `it()` blocks: every Canon category is N/A for a model-less interface
-  // marker. See file header for the per-category gate decisions and the
-  // Step-3 sweep recording 13 DELETE-AND-RECORD dispositions in the report.
-  void it;
+  // marker. See file header for the per-category gate decisions.
 });

@@ -17,6 +17,7 @@ import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import { AnalogElement } from '../analog/element.js';
+import type { DeviceFamily } from '../analog/ngspice-load-order.js';
 import type { ComplexSparseSolverStamp as ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { SetupContext } from '../analog/setup-context.js';
@@ -29,6 +30,7 @@ import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stub
 
 class SpeedTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(_v: Float64Array): number[] { return [0]; }
@@ -37,6 +39,7 @@ class SpeedTestGroundEl extends AnalogElement {
 
 class SpeedTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   private readonly _n1: number;
   private readonly _n2: number;
   private readonly _resistance: number;

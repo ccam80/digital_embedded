@@ -61,6 +61,8 @@ import type { TempContext } from "../../solver/analog/temp-context.js";
 
 const CONSTboltz = 1.3806226e-23;
 const CHARGE = 1.6021918e-19;
+// ngspice main.c:515 — precomputed to match diotemp.c:104 vt ordering
+const CONSTKoverQ = CONSTboltz / CHARGE;
 const REFTEMP = 300.15;
 
 /** Minimum conductance for numerical stability (GMIN). */
@@ -283,8 +285,8 @@ export function dioTemp(p: {
   ISW: number; NSW: number; FC: number;
   VJS?: number; MS?: number;
 }, T: number): DioTempParams {
-  const vt = T * CONSTboltz / CHARGE;
-  const vtnom = p.TNOM * CONSTboltz / CHARGE;
+  const vt = CONSTKoverQ * T;
+  const vtnom = CONSTKoverQ * p.TNOM;
 
   // cite: diotemp.c:107-108
   const fact1 = p.TNOM / REFTEMP;
@@ -525,6 +527,10 @@ export function createDiodeElement(
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
+  // cite: diotemp.c — DIOtempGiven: true iff user explicitly set per-instance TEMP.
+  // Seeded from PropertyBag givenness so a .dts that did NOT supply TEMP in
+  // _modelParams (defaults-only) starts ungiven; ngspice CKTtemp drives.
+  let _tempGiven = props.isModelParamGiven("TEMP");
 
   // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
   let _posPrimeNode = nodeAnode;
@@ -947,12 +953,7 @@ export function createDiodeElement(
      */
     computeTemperature(ctx: TempContext): void {
       // cite: diotemp.c:84-85 — DIOtempGiven ? DIOtemp : CKTtemp + DIOdtemp
-      // We model DIOtempGiven as: params.TEMP was explicitly set (differs from REFTEMP default),
-      // but since we cannot distinguish "set to 300.15" from "never set", we use ctx.cktTemp
-      // when params.TEMP equals REFTEMP exactly (the only way to detect the unset case).
-      // In practice, any explicit setParam("TEMP", v) stores v into params.TEMP before
-      // calling computeTemperature, so the per-instance override is always honoured.
-      const T = params.TEMP !== REFTEMP ? params.TEMP : ctx.cktTemp;
+      const T = _tempGiven ? params.TEMP : ctx.cktTemp;
       applyDioTempResult(dioTemp({
         IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
         BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
@@ -965,6 +966,7 @@ export function createDiodeElement(
       if (key in params) {
         params[key] = value;
         if (key === "TEMP") {
+          _tempGiven = true;
           // cite: diotemp.c:82-87 — per-instance TEMP triggers DIOtemp() recompute.
           // Route through computeTemperature so the engine dispatch path and the
           // hot-load path share identical logic.

@@ -335,9 +335,6 @@ function buildMulMultiOutFixture(bitWidth: number, signed: boolean): DigitalFixt
 }
 
 describe("Mul multi-output (Cat 11)", () => {
-  // Original test (Wave-3 Batch 1, deleted CONSIDER CANONISE): "Mul > unsigned multiplication >
-  // 16-bit unsigned large product uses output slot". Cat 11 multi-output observability:
-  // wire a labelled Out per declared output pin and assert each independently after one step().
   it("16-bit unsigned 0xFFFF*0xFFFF: low word 0x0001, high word 0xFFFE on independent output pins", () => {
     // 0xFFFF * 0xFFFF = 0xFFFE_0001; with bitWidth=16, lo word = 0x0001, hi word = 0xFFFE.
     const fix = buildMulMultiOutFixture(16, false);
@@ -346,9 +343,6 @@ describe("Mul multi-output (Cat 11)", () => {
     expect(read(fix, "OUT_HI")).toBe(0xFFFE);
   });
 
-  // Original test (Wave-3 Batch 1, deleted CONSIDER CANONISE): "Mul > unsigned multiplication >
-  // 32-bit unsigned: large overflow goes into high slot". Cat 11 multi-output observability:
-  // each output pin is observed independently; do NOT collapse into a concatenated value.
   it("32-bit unsigned 0x80000000*2: low word 0, high word 1 on independent output pins", () => {
     // 0x80000000 * 2 = 0x1_00000000; with bitWidth=32, lo word = 0x00000000, hi word = 0x00000001.
     const fix = buildMulMultiOutFixture(32, false);

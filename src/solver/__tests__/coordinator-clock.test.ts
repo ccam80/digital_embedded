@@ -19,6 +19,7 @@ import { ComponentCategory } from '../../core/registry.js';
 import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { AnalogElement } from '../analog/element.js';
+import type { DeviceFamily } from '../analog/ngspice-load-order.js';
 import type { SetupContext } from '../analog/setup-context.js';
 import type { LoadContext } from '../analog/load-context.js';
 
@@ -28,6 +29,7 @@ import type { LoadContext } from '../analog/load-context.js';
 
 class ClockTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(_v: Float64Array): number[] { return [0]; }
@@ -36,6 +38,7 @@ class ClockTestGroundEl extends AnalogElement {
 
 class ClockTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   private readonly _nodeA: number;
   private readonly _nodeB: number;
   private readonly _g: number;

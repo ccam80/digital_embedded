@@ -2,11 +2,13 @@
 import { defineModelParams } from "../core/model-params.js";
 import type { AnalogFactory, ModelEntry } from "../core/registry.js";
 import { AnalogElement } from "../solver/analog/element.js";
+import type { DeviceFamily } from "../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../solver/analog/setup-context.js";
 import type { LoadContext } from "../solver/analog/load-context.js";
 
 class StubAnalogElement extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(_rhs: Float64Array): number[] { return []; }

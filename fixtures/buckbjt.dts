@@ -84,7 +84,8 @@
               "vOH": 3.3,
               "vOL": 0
             }
-          }
+          },
+          "model": "spice"
         },
         "rotation": 0,
         "type": "NpnBJT"
@@ -172,7 +173,8 @@
               "vOH": 3.3,
               "vOL": 0
             }
-          }
+          },
+          "model": "spice"
         },
         "rotation": 0,
         "type": "PnpBJT"

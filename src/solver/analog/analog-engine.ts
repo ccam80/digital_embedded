@@ -43,6 +43,8 @@ import {
   MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
 import { cktTemp } from "./ckt-temp.js";
+import { runByDeviceFamily } from "./family-dispatch.js";
+import { assertPoolIsSoleMutableState } from "./state-schema.js";
 
 // ---------------------------------------------------------------------------
 // MNAEngine
@@ -750,6 +752,7 @@ export class MNAEngine implements AnalogEngine {
 
   private _measurementObservers: MeasurementObserver[] = [];
   private _stepCount: number = 0;
+  private _devProbeRan: boolean = false;
   /** Register an observer to receive step/reset notifications. */
   addMeasurementObserver(observer: MeasurementObserver): void {
     if (!this._measurementObservers.includes(observer)) {
@@ -1321,6 +1324,10 @@ export class MNAEngine implements AnalogEngine {
     cktTemp(ctx, compiled.elementsByFamily);
   }
 
+  get circuitTemp(): number {
+    return this._ctx?.cktTemp ?? 300.15;
+  }
+
   // -------------------------------------------------------------------------
   // Setup-phase implementation (A4.2)
   // -------------------------------------------------------------------------
@@ -1333,6 +1340,7 @@ export class MNAEngine implements AnalogEngine {
    *  per-row buffers to the now-known solver._size. */
   private _setup(): void {
     if (this._isSetup) return;
+    this._devProbeRan = false;
     const setupCtx = this._buildSetupContext();
     for (const el of this._elements) {  // already NGSPICE_LOAD_ORDER-sorted
       el.setup(setupCtx);
@@ -1359,11 +1367,28 @@ export class MNAEngine implements AnalogEngine {
 
     // Initial temperature pass — cite: ckttemp.c:28-33 (DEVtemperature called
     // once after CKTsetup completes, before the first NR iteration).
-    // All elements with computeTemperature?(ctx) see ctx.cktTemp = 300.15 K
-    // (REFTEMP) on this first pass. Phase 5 populates concrete semiconductor
-    // computeTemperature implementations; for now the default handler is a
-    // no-op so this call is observable but inert.
+    // Runs every element's `computeTemperature?` once with cktTemp = 300.15 K
+    // (REFTEMP) so temperature-dependent parameters are initialised before
+    // the first NR iteration.
     cktTemp(this._ctx!, cac.elementsByFamily);
+
+    if (import.meta.env?.DEV) {
+      if (!this._devProbeRan) {
+        runByDeviceFamily(
+          cac.elementsByFamily,
+          "load",
+          this._ctx!.loadCtx,
+          {
+            run(_ctx: unknown, instances: readonly import("./element.js").AnalogElement[]): void {
+              for (const el of instances) {
+                assertPoolIsSoleMutableState(el.label, el, () => {});
+              }
+            },
+          },
+        );
+        this._devProbeRan = true;
+      }
+    }
 
     this._isSetup = true;
   }

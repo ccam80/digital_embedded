@@ -123,7 +123,7 @@ function getTransformerCe(fix: Fixture) {
 // ===========================================================================
 // Category 1 — Initialization (T1)
 // Post-warm-start: the netlist composite expands to 2 inductors (L1, L2) +
-// 1 transformer-coupling (MUT). With P2 and S2 both grounded and inductors
+// 1 MutualInductor (MUT). With P2 and S2 both grounded and inductors
 // behaving as DC shorts, the post-warm-start V(P1) and V(S1) sit at their
 // DCOP values. With external R_SER on the primary and R_LOAD on the
 // secondary, V(P1) ≈ 0V (primary inductor shorts to grounded P2) and V(S1)

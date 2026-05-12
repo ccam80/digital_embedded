@@ -9,7 +9,7 @@
  *   3. ctx.cktTemp reflects the new temperature after setCircuitTemp(350).
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { buildFixture } from "./fixtures/build-fixture.js";
 import { AnalogElement } from "../element.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
@@ -18,7 +18,7 @@ import type { LoadContext } from "../load-context.js";
 import type { TempContext } from "../temp-context.js";
 import { ComponentCategory, type StandaloneComponentDefinition } from "../../../core/registry.js";
 import { AbstractCircuitElement } from "../../../core/element.js";
-import { PropertyBag } from "../../../core/properties.js";
+import { PropertyBag, PropertyType } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 
 // ---------------------------------------------------------------------------
@@ -122,15 +122,6 @@ class ObservableElement extends AnalogElement {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Shared invocation log -- reset in afterEach
-// ---------------------------------------------------------------------------
-
-let invocations: TempContext[] = [];
-
-afterEach(() => {
-  invocations = [];
-});
 
 // ---------------------------------------------------------------------------
 // Helper: build a minimal component definition for ObservableElement
@@ -166,7 +157,7 @@ function makeProbeDefinition(
       },
     ],
     propertyDefs: [
-      { key: "label", label: "Label", type: "string" as const, defaultValue: "", description: "" },
+      { key: "label", label: "Label", type: PropertyType.STRING, defaultValue: "", description: "" },
     ],
     attributeMap: [],
     category: ComponentCategory.MISC,
@@ -221,7 +212,12 @@ describe("ckt-temp -- temperature pass observability", () => {
     // Each ObservableElement.computeTemperature is called once per cktTemp().
     expect(capturedInvocations.length).toBe(N);
 
-    invocations = capturedInvocations;
+    // Each invocation must carry the default circuit temperature (REFTEMP = 300.15 K).
+    for (let i = 0; i < N; i++) {
+      expect(capturedInvocations[i].cktTemp).toBe(300.15);
+      expect(capturedInvocations[i].cktNomTemp).toBe(300.15);
+    }
+
     void fix.coordinator;
   });
 
@@ -256,7 +252,6 @@ describe("ckt-temp -- temperature pass observability", () => {
     fix.facade.setCircuitTemp(350);
     expect(capturedInvocations.length).toBe(2 * N);
 
-    invocations = capturedInvocations;
     void fix.coordinator;
   });
 
@@ -287,7 +282,6 @@ describe("ckt-temp -- temperature pass observability", () => {
     fix.facade.setCircuitTemp(350);
     expect(capturedInvocations[1]?.cktTemp).toBe(350);
 
-    invocations = capturedInvocations;
     void fix.coordinator;
   });
 });

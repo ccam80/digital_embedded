@@ -80,7 +80,10 @@ function restoreProperties(record: Record<string, unknown>): PropertyBag {
     entries.push([key, restorePropertyValue(raw)]);
   }
   const bag = new PropertyBag(entries);
-  if (modelParams) bag.replaceModelParams(decodeModelParams(modelParams));
+  // Keys present in the .dts _modelParams block are user-given (the serializer
+  // only emits given keys). Mark them given so isModelParamGiven gates the
+  // netlist generator and engine *Given flags downstream.
+  if (modelParams) bag.replaceModelParams(decodeModelParams(modelParams), { markGiven: true });
   return bag;
 }
 
@@ -244,8 +247,16 @@ function createElement(
     const { model: modelKey, params: deltaParams } = savedEl.modelParamDeltas;
     const entry = circuitModels[savedEl.type]?.[modelKey];
     if (entry !== undefined) {
-      const merged: Record<string, number> = { ...entry.params, ...decodeModelParams(deltaParams) };
-      props.replaceModelParams(merged);
+      // Named-model defaults seed the bag (not given); delta keys are user
+      // overrides (marked given). preserveGivenness keeps any prior givenness
+      // from the _modelParams block at restoreProperties() for keys that survive
+      // into the merged set.
+      const decodedDeltas = decodeModelParams(deltaParams);
+      const merged: Record<string, number> = { ...entry.params, ...decodedDeltas };
+      props.replaceModelParams(merged, { preserveGivenness: true });
+      for (const [k, v] of Object.entries(decodedDeltas)) {
+        props.setModelParam(k, v);
+      }
     }
   }
 

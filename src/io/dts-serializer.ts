@@ -112,9 +112,13 @@ function elementToDtsElement(
   circuitModels?: Record<string, Record<string, ModelEntry>>,
 ): DtsElement {
   const bag = element.getProperties();
+  // Emit only user-given model params (ngspice *Given semantics). Registry-
+  // default values stay implicit so per-instance TEMP=Y is emitted on the .dts
+  // only when the user actually overrode it; otherwise .options TEMP=<celsius>
+  // drives uniformly through CKTtemp.
   const props = serializeProperties(
     bag.entries() as IterableIterator<[string, unknown]>,
-    bag.getModelParamKeys(),
+    bag.getGivenModelParamKeys(),
     (k) => bag.getModelParam<number>(k),
   );
   const result: DtsElement = {
@@ -229,6 +233,9 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
  */
 function serializeModelEntry(entry: ModelEntry): DtsSerializedModelEntry {
   if (entry.kind === 'inline') {
+    return { kind: 'inline', params: encodeModelParams(entry.params) as Record<string, number> };
+  }
+  if (entry.kind !== 'netlist') {
     return { kind: 'inline', params: encodeModelParams(entry.params) as Record<string, number> };
   }
   const rawNetlist = entry.netlist;

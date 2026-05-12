@@ -41,15 +41,13 @@ import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, Componen
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
 import { isPoolBacked, AnalogElement } from "./element.js";
-import { getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
+import { getNgspiceLoadOrderByTypeId, getDeviceFamilyByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
   runCompileTimeDetectors,
 } from "./topology-diagnostics.js";
 import { SubcircuitWrapperElement } from "./subcircuit-wrapper-element.js";
-import { AnalogInductorElement } from "../../components/passives/inductor.js";
-import { MutualInductorElement } from "../../components/passives/mutual-inductor.js";
 
 // ---------------------------------------------------------------------------
 // Component routing- shared decision logic for Pass A and Pass B
@@ -247,13 +245,35 @@ function expandCompositeInstance(
   allocateNode: NodeAllocator,
   hook?: import("../../core/registry.js").AnalogWrapperHook,
 ): { wrapper: SubcircuitWrapperElement; allLeaves: AnalogElement[] } {
-  // Pre-allocate one MNA node per declared internal net.
-  const internalNetIds: number[] = [];
-  const internalNetLabels: string[] = [];
-  for (let i = 0; i < netlist.internalNetCount; i++) {
-    const suffix = netlist.internalNetLabels?.[i] ?? `int${i}`;
-    internalNetIds.push(allocateNode(parentLabel, suffix));
-    internalNetLabels.push(suffix);
+  // Allocate internal-net IDs in ngspice INPpas2 / INPtermInsert order:
+  // walk `netlist.elements` in deck order, walk each element's
+  // connectivity in pin order, allocate on first encounter of an
+  // internal-net index. Mirrors cktnewn.c:23 + inpsymt.c:43 first-
+  // encounter-wins semantics over the parser's left-to-right card walk.
+  const internalNetIds: number[] = new Array(netlist.internalNetCount);
+  const internalNetLabels: string[] = new Array(netlist.internalNetCount);
+  const portCount = netlist.ports.length;
+  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+    const connectivity = netlist.netlist[elIdx]!;
+    for (let pi = 0; pi < connectivity.length; pi++) {
+      const netIdx = connectivity[pi];
+      if (netIdx === undefined || netIdx < portCount) continue;
+      const slot = netIdx - portCount;
+      if (internalNetIds[slot] !== undefined) continue;
+      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
+      internalNetIds[slot] = allocateNode(parentLabel, suffix);
+      internalNetLabels[slot] = suffix;
+    }
+  }
+  // Straggler pass: any internal net never referenced by a sub-element pin
+  // is unreachable; the current contract requires every declared internal
+  // net to have an ID, so fill stragglers in declared order for symmetry.
+  for (let slot = 0; slot < netlist.internalNetCount; slot++) {
+    if (internalNetIds[slot] === undefined) {
+      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
+      internalNetIds[slot] = allocateNode(parentLabel, suffix);
+      internalNetLabels[slot] = suffix;
+    }
   }
 
   // Build elementsByName index for siblingBranch / siblingState resolution.
@@ -503,6 +523,7 @@ function expandCompositeInstance(
   const wrapper = new SubcircuitWrapperElement({
     pinNodes: outerPinNodes,
     ngspiceLoadOrder: getNgspiceLoadOrderByTypeId(parentTypeId),
+    deviceFamily: getDeviceFamilyByTypeId(parentTypeId),
     subElements,
     leaves: allLeaves,
     bindings: { map: bindings },
@@ -515,70 +536,6 @@ function expandCompositeInstance(
   return { wrapper, allLeaves };
 }
 
-// ---------------------------------------------------------------------------
-// Pin-to-node resolution helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Given a CircuitElement, look up the MNA node IDs for each of its pins by
- * matching pin world positions to wire endpoints in the node map.
- *
- * Returns an array of node IDs in pin order. Pins not connected to any wire
- * receive node ID -1 (unconnected).
- */
-/**
- * Resolve each pin of `el` to its MNA node ID by matching pin world positions
- * to wire endpoints (within 0.5-unit tolerance). Unconnected pins
- * receive node ID -1.
- *
- * When `vertexOut` is provided, also records the matched wire vertex position
- * for each pin. The resolver uses these to place current injections at exact
- * wire graph vertices without re-doing spatial matching.
- */
-function resolveElementNodes(
-  el: CircuitElement,
-  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
-  circuit: Circuit,
-  vertexOut?: Array<{ x: number; y: number } | null>,
-  positionToNodeId?: Map<string, number>,
-): number[] {
-  const pins = el.getPins();
-  const result: number[] = new Array(pins.length).fill(-1);
-
-  for (let i = 0; i < pins.length; i++) {
-    // getPins() returns LOCAL coordinates (rotation/mirror not applied).
-    // Use pinWorldPosition() to get the actual world-space position that
-    // matches wire endpoints in the circuit.
-    const pinPos = pinWorldPosition(el, pins[i]);
-    for (const wire of circuit.wires) {
-      const matchStart =
-        Math.abs(wire.start.x - pinPos.x) <= 0.5 &&
-        Math.abs(wire.start.y - pinPos.y) <= 0.5;
-      const matchEnd =
-        Math.abs(wire.end.x - pinPos.x) <= 0.5 &&
-        Math.abs(wire.end.y - pinPos.y) <= 0.5;
-      if (matchStart || matchEnd) {
-        const nodeId = wireToNodeId.get(wire);
-        if (nodeId !== undefined) {
-          result[i] = nodeId;
-          if (vertexOut) vertexOut[i] = matchStart ? wire.start : wire.end;
-          break;
-        }
-      }
-    }
-    // Secondary: look up by position (handles pin-overlap without a wire)
-    if (result[i] === -1 && positionToNodeId) {
-      const key = `${pinPos.x},${pinPos.y}`;
-      const nodeId = positionToNodeId.get(key);
-      if (nodeId !== undefined) {
-        result[i] = nodeId;
-        if (vertexOut) vertexOut[i] = { x: pinPos.x, y: pinPos.y };
-      }
-    }
-  }
-
-  return result;
-}
 
 // ---------------------------------------------------------------------------
 // Pipeline stage helpers
@@ -630,7 +587,10 @@ function runPassA_partition(
           for (const k of props.getModelParamKeys()) {
             merged[k] = props.getModelParam<number>(k);
           }
-          props.replaceModelParams(merged);
+          // preserveGivenness: a runtime setParam("TEMP", v) marks the key
+          // given on the bag; a recompile must not wipe that flag when it
+          // re-merges defaults around the existing values.
+          props.replaceModelParams(merged, { preserveGivenness: true });
         }
         elementMeta.push({ pc, route });
         continue;
@@ -648,7 +608,7 @@ function runPassA_partition(
         for (const k of props.getModelParamKeys()) {
           merged[k] = props.getModelParam<number>(k);
         }
-        props.replaceModelParams(merged);
+        props.replaceModelParams(merged, { preserveGivenness: true });
         elementMeta.push({ pc, route });
         continue;
       }
@@ -970,14 +930,6 @@ export function compileAnalogPartition(
   };
 
   // Build a minimal circuit-like wire lookup for resolveElementNodes.
-  // We need to pass wireToNodeId and a circuit object. We create a minimal
-  // stub that provides circuit.wires for pin position matching.
-  // resolveElementNodes needs (el, wireToNodeId, circuit, vertexOut?, positionToNodeId?)
-  // where circuit is used for circuit.wires iteration.
-  // We collect all wires from the partition's groups.
-  const allWires = partition.groups.flatMap((g) => g.wires);
-  const partitionCircuitStub = { wires: allWires } as import("../../core/circuit.js").Circuit;
-
   const analogElements: import("./element.js").AnalogElement[] = [];
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
@@ -1002,12 +954,30 @@ export function compileAnalogPartition(
     const def = pc.definition;
     const props = el.getProperties();
 
-    // Resolve pin â†’ node ID bindings.
+    // Resolve pin → node ID bindings.
+    //
+    // Use the partition's authoritative per-pin resolution (`pc.resolvedPins`)
+    // rather than spatial wire-walking on `circuit.wires`. The spec-mode
+    // partition assigned each pin to its correct connectivity group based on
+    // the SpecConnection list; the wire-walk fallback breaks at auto-layout
+    // corner collisions where two routed wires from distinct nets share an
+    // endpoint coordinate. `positionToNodeId` is keyed by pin world-position
+    // and carries the spec-derived group nodeId for each pin position, which
+    // is the same lookup `labelToNodeId` uses (see line ~905 above).
     const livePins = el.getPins();
     const pinVertices: Array<{ x: number; y: number } | null> = new Array(
       livePins.length,
     ).fill(null);
-    const pinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, pinVertices, positionToNodeId);
+    const pinNodeIds: number[] = new Array(livePins.length).fill(-1);
+    for (const rp of pc.resolvedPins) {
+      if (rp.pinIndex < 0 || rp.pinIndex >= livePins.length) continue;
+      const key = `${rp.worldPosition.x},${rp.worldPosition.y}`;
+      const nodeId = positionToNodeId.get(key);
+      if (nodeId !== undefined) {
+        pinNodeIds[rp.pinIndex] = nodeId;
+        pinVertices[rp.pinIndex] = rp.wireVertex ?? { x: rp.worldPosition.x, y: rp.worldPosition.y };
+      }
+    }
 
     const pinLabelList = livePins.map((p) => p.label);
     let hasUnconnectedPin = false;

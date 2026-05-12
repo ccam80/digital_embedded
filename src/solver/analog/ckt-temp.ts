@@ -9,14 +9,11 @@
  *
  * Instead of a flat device walk, the dispatcher iterates family buckets in
  * ascending min(ngspiceLoadOrder) order and dispatches each bucket to its
- * registered handler or the defaultTemperatureHandler fallback (which performs
- * the per-instance optional-call walk matching ngspice's NULL function-pointer
- * guard at ckttemp.c:29).
- *
- * Phase 5 populates `computeTemperature?` on semiconductors; until then the
- * default handler is a no-op for every bucket (elements without the optional
- * method are silently skipped), so this pass costs only the dispatcher
- * iteration — no element computation occurs.
+ * registered handler or the defaultTemperatureHandler (which performs the
+ * per-instance optional-call walk matching ngspice's NULL function-pointer
+ * guard at ckttemp.c:29). Elements without `computeTemperature?` are silently
+ * skipped, so the pass costs only the dispatcher iteration when no elements
+ * opt in.
  */
 
 import type { CKTCircuitContext } from "./ckt-context.js";

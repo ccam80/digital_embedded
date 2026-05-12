@@ -945,13 +945,10 @@ describe("Definition-shape parametric audit (every registered, non-internalOnly 
         }
       }
 
-      // -- 8. propertyDefs omits removed legacy keys -------------------------
+      // -- 8. propertyDefs omits removed keys --------------------------------
       //
-      // Replaces per-component `expect(propertyDefs.find(p => p.key ===
-      // "_spiceModelOverrides")).toBeUndefined()` assertions deleted from
-      // spice-model-overrides-prop.test.ts. Initial population of
-      // REMOVED_PROPERTY_KEYS is `_spiceModelOverrides`; extend the set at
-      // the top of this file when additional keys are removed.
+      // Asserts that no definition exposes a key listed in REMOVED_PROPERTY_KEYS.
+      // Extend that set at the top of this file when additional keys are removed.
       it(`def_${def.name}_propertyDefs_omits_removed_legacy_keys`, () => {
         const offenders: string[] = [];
         for (const pd of def.propertyDefs) {

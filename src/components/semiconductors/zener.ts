@@ -48,6 +48,8 @@ import type { TempContext } from "../../solver/analog/temp-context.js";
 
 const CONSTboltz = 1.3806226e-23;
 const CHARGE = 1.6021918e-19;
+// ngspice main.c:515 — precomputed to match diotemp.c:104 vt ordering
+const CONSTKoverQ = CONSTboltz / CHARGE;
 const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
 const REFTEMP = 300.15;         // 27 °C reference temperature
 
@@ -145,22 +147,21 @@ function computeTBV(
 ): number {
   if (!isFinite(BV) || BV >= 1e99) return Infinity;
 
-  // cite: diotemp.c:209-210 (DIOtlev==0 path)
   const tBreakdownVoltage = BV - TCV * dt;
-
   let cbv = IBV;
-  // cite: diotemp.c:219-220: ensure cbv is not unreasonably small
+  let xbv: number;
+
   if (cbv < IS * tBreakdownVoltage / vt) {
     cbv = IS * tBreakdownVoltage / vt;
-  }
-
-  // cite: diotemp.c:229-244: iterative xbv refinement
-  const tol = 1e-3 * cbv;  // CKTreltol * cbv (using 1e-3 = default reltol)
-  let xbv = tBreakdownVoltage - NBV * vt * Math.log(1 + cbv / IS);
-  for (let iter = 0; iter < 25; iter++) {
-    xbv = tBreakdownVoltage - NBV * vt * Math.log(cbv / IS + 1 - xbv / vt);
-    const xcbv = IS * (Math.exp((tBreakdownVoltage - xbv) / (NBV * vt)) - 1 + xbv / vt);
-    if (Math.abs(xcbv - cbv) <= tol) break;
+    xbv = tBreakdownVoltage;
+  } else {
+    const tol = 1e-3 * cbv;
+    xbv = tBreakdownVoltage - NBV * vt * Math.log(1 + cbv / IS);
+    for (let iter = 0; iter < 25; iter++) {
+      xbv = tBreakdownVoltage - NBV * vt * Math.log(cbv / IS + 1 - xbv / vt);
+      const xcbv = IS * (Math.exp((tBreakdownVoltage - xbv) / (NBV * vt)) - 1 + xbv / vt);
+      if (Math.abs(xcbv - cbv) <= tol) break;
+    }
   }
   return xbv;
 }
@@ -194,8 +195,10 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
 
   // cite: diotemp.c:84-85 — tracks whether TEMP was explicitly overridden per-instance.
   // When false, computeTemperature(ctx) propagates ctx.cktTemp as the operating temperature.
-  // When true, the per-instance override supplied via setParam("TEMP", v) is preserved.
-  private _tempGiven = false;
+  // When true, the per-instance override supplied via setParam("TEMP", v) OR
+  // loaded from a .dts _modelParams block is preserved.
+  // Initialised in the constructor from props.isModelParamGiven("TEMP").
+  private _tempGiven: boolean;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
   private _pnjlimLimited = false;
@@ -217,6 +220,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
+    this._tempGiven = props.isModelParamGiven("TEMP");
     const params: Record<string, number> = { ...ZENER_PARAM_DEFAULTS };
     for (const key of props.getModelParamKeys()) {
       params[key] = props.getModelParam<number>(key);
@@ -234,7 +238,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     // cite: dioload.c / diotemp.c  per-instance TEMP (maps to ngspice DIOtemp)
     const circuitTemp = params.TEMP;
     const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
-    const vt = (CONSTboltz * circuitTemp) / CHARGE;
+    const vt = CONSTKoverQ * circuitTemp;
     const nVt = params.N * vt;
     const nbvVt = params.NBV * vt;
     // tVcrit: DIOtVcrit = vt * ln(vt / (IS * sqrt(2)))  cite: diotemp.c

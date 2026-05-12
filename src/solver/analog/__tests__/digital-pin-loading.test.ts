@@ -33,6 +33,7 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
 import type { ExecuteFunction } from "../../../core/registry.js";
 import { AnalogElement } from "../element.js";
+import type { DeviceFamily } from "../ngspice-load-order.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
@@ -47,6 +48,7 @@ import type { CompiledAnalogCircuit } from "../../../core/analog-engine-interfac
 
 class PinLoadingTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(_v: Float64Array): number[] { return []; }
@@ -56,6 +58,7 @@ class PinLoadingTestGroundEl extends AnalogElement {
 
 class PinLoadingTestStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }
@@ -117,7 +120,7 @@ function buildRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes) => new PinLoadingTestGroundEl(pinNodes), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes) => new PinLoadingTestGroundEl(pinNodes)) as import("../../../core/registry.js").AnalogFactory, paramDefs: [], params: {} },
     },
   });
 
@@ -196,7 +199,7 @@ function buildRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes) => makeStubAnalogElement(pinNodes), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: ((pinNodes) => makeStubAnalogElement(pinNodes)) as import("../../../core/registry.js").AnalogFactory, paramDefs: [], params: {} },
     },
   });
 

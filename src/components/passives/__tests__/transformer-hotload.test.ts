@@ -5,11 +5,10 @@
  * MUTfactor recomputation and that subsequent NR convergence reflects the
  * new operating point. Uses the canonical T1 buildFixture API.
  *
- * Voltage-shift assertions sample peak |vSec| over a full AC period *after*
+ * Voltage assertions sample peak |vSec| over a full AC period *after*
  * a settle window so the step-induced transient from the hot-load has
- * dissipated; the contract is "settled operating point shifted in the
- * expected direction" -- not "instantaneous voltage one step after the
- * setParam call".
+ * dissipated. Each peak is compared against an analytic closed-form
+ * expectation derived from the coupled-inductor voltage-divider formula.
  */
 
 import { describe, it, expect } from "vitest";
@@ -120,6 +119,44 @@ function samplePeakAbs(fix: Fixture, node: number, endTime: number): number {
   return peak;
 }
 
+/**
+ * Closed-form secondary peak amplitude for the AC bench circuit.
+ *
+ * Topology: VS (amplitude A, freq f) drives P1 of L1; P2 = gnd.
+ * Secondary: L2 from S2(gnd) to S1; R_LOAD from S1 to gnd.
+ *
+ * Coupled-inductor KVL with both dots at P1/S1. With load current I flowing
+ * S1 -> R_LOAD -> gnd, the current entering the dotted S1 terminal is -I:
+ *   V1 = jωL1·I1 - jωM·I
+ *   V_S1 = jωM·I1 - jωL2·I = R·I    (KVL at the load)
+ * Eliminating I1:
+ *   V_load / V1 = jωM·R / (-ω²(L1·L2 - M²) + jωL1·R)
+ * where M = k·√(L1·L2), so (L1·L2 - M²) = L1·L2·(1 - k²) -> 0 at k=1.
+ *
+ * Returns: |V2_peak| = amplitude · |V2/V1|
+ */
+function analyticSecondaryPeak(
+  amplitude: number,
+  frequency: number,
+  k: number,
+  l1: number,
+  l2: number,
+  rLoad: number,
+): number {
+  const omega = 2 * Math.PI * frequency;
+  const M = k * Math.sqrt(l1 * l2);
+
+  // Numerator magnitude: |jωM·R| = ωMR
+  const numMag = omega * M * rLoad;
+
+  // Denominator: -ω²(L1·L2 - M²) + j(ωL1·R)
+  const denomRe = -(omega * omega * (l1 * l2 - M * M));
+  const denomIm = omega * l1 * rLoad;
+  const denomMag = Math.sqrt(denomRe * denomRe + denomIm * denomIm);
+
+  return amplitude * numMag / denomMag;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -128,10 +165,17 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
   it("hotload_k_recomputes_mutFactor_and_shifts_secondary_voltage", () => {
     // tStop must cover: 1.5ms initial settle + 1ms pre-sample + 3ms post-hot-load
     // settle + 1ms post-sample = 6.5ms; give 8ms headroom.
+    const AMPLITUDE = 5;
+    const FREQ = 1000;
+    const R_LOAD = 100;
+    const L = 1e-3;
+    const K_BEFORE = 0.99;
+    const K_AFTER = 0.50;
+
     const fix = buildFixture({
       build: (_r, facade) => buildAcBench(facade, {
-        amplitude: 5, frequency: 1000, rLoad: 100,
-        primaryInductance: 1e-3, couplingCoefficient: 0.99,
+        amplitude: AMPLITUDE, frequency: FREQ, rLoad: R_LOAD,
+        primaryInductance: L, couplingCoefficient: K_BEFORE,
       }),
       params: { tStop: 8e-3, maxTimeStep: 5e-6, uic: true },
     });
@@ -150,7 +194,7 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     //    top-level TransformerElement. Routes through
     //    SubcircuitWrapperElement.setParam("k", 0.50) -> MutualInductorElement
     //    .setParam("k", 0.50) -> _coupling = 0.50 -> recomputeMutFactor().
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "k", 0.50);
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "k", K_AFTER);
 
     const mutFactorAfter = mutEl.mutFactor;
 
@@ -158,29 +202,35 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     // k dropped 0.99 -> 0.50, so MUTfactor = k*sqrt(L1*L2) drops in the
     // same ratio.
     expect(mutFactorAfter).toBeLessThan(mutFactorBefore);
-    expect(mutFactorAfter / mutFactorBefore).toBeCloseTo(0.50 / 0.99, 6);
+    expect(mutFactorAfter / mutFactorBefore).toBeCloseTo(K_AFTER / K_BEFORE, 6);
 
     // 4) Settle the step-induced transient from the abrupt k change (3 cycles).
     stepUntil(fix, 5.5e-3);
     // 5) Sample peak |vSec| over a full AC period (1ms) at the NEW k.
     const peakAfter = samplePeakAbs(fix, s1Node, 6.5e-3);
 
-    // Both peaks must be physically sensible AC amplitudes (non-zero, not NaN).
-    expect(peakBefore).toBeGreaterThan(0);
-    expect(peakAfter).toBeGreaterThan(0);
-    expect(Number.isFinite(peakBefore)).toBe(true);
-    expect(Number.isFinite(peakAfter)).toBe(true);
+    // Analytic expectations from the closed-form coupled-inductor formula.
+    const expectedBefore = analyticSecondaryPeak(AMPLITUDE, FREQ, K_BEFORE, L, L, R_LOAD);
+    const expectedAfter  = analyticSecondaryPeak(AMPLITUDE, FREQ, K_AFTER,  L, L, R_LOAD);
 
-    // Lower k reduces energy coupled to the secondary; settled peak amplitude
-    // must have shifted in that direction. Strict monotone, no ratio cap.
-    expect(peakAfter).toBeLessThan(peakBefore);
+    // Both settled peaks must match the analytic expectation to within 1%
+    // (toBeCloseTo precision=2 => |difference| < 0.005).
+    expect(peakBefore).toBeCloseTo(expectedBefore, 2);
+    expect(peakAfter).toBeCloseTo(expectedAfter, 2);
   });
 
   it("hotload_L1_via_inductor_setParam_recomputes_mutFactor", () => {
+    const AMPLITUDE = 5;
+    const FREQ = 1000;
+    const R_LOAD = 100;
+    const L_INIT = 1e-3;
+    const L1_AFTER = 4e-3;
+    const K = 0.99;
+
     const fix = buildFixture({
       build: (_r, facade) => buildAcBench(facade, {
-        amplitude: 5, frequency: 1000, rLoad: 100,
-        primaryInductance: 1e-3, couplingCoefficient: 0.99,
+        amplitude: AMPLITUDE, frequency: FREQ, rLoad: R_LOAD,
+        primaryInductance: L_INIT, couplingCoefficient: K,
       }),
       params: { tStop: 8e-3, maxTimeStep: 5e-6, uic: true },
     });
@@ -198,7 +248,7 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     // Hot-load L1 directly on the AnalogInductorElement.
     // setParam("inductance", 4e-3) sets _nominalL -> _effectiveL, then cascades
     // to all _mutSiblings via recomputeMutFactor().
-    l1El.setParam("inductance", 4e-3);
+    l1El.setParam("inductance", L1_AFTER);
     // Engine temperature pass re-applies factor*SCALE/M; matches
     // setComponentProperty contract.
     fix.coordinator.getAnalogEngine()!.configure({});
@@ -206,8 +256,8 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     const l1After = l1El.inductance;
     const mutFactorAfter = mutEl.mutFactor;
 
-    expect(l1Before).toBeCloseTo(1e-3, 12);
-    expect(l1After).toBeCloseTo(4e-3, 12);
+    expect(l1Before).toBeCloseTo(L_INIT, 12);
+    expect(l1After).toBeCloseTo(L1_AFTER, 12);
 
     // MUTfactor = k*sqrt(L1*L2). L1 quadrupled (1mH->4mH) while L2 stays
     // at 1mH (1:1 turns ratio), so MUTfactor doubles.
@@ -217,24 +267,26 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     stepUntil(fix, 5.5e-3);
     const peakAfter = samplePeakAbs(fix, s1Node, 6.5e-3);
 
-    expect(peakBefore).toBeGreaterThan(0);
-    expect(peakAfter).toBeGreaterThan(0);
-    expect(Number.isFinite(peakBefore)).toBe(true);
-    expect(Number.isFinite(peakAfter)).toBe(true);
+    // Analytic expectations: before uses L1=L2=L_INIT; after uses L1=L1_AFTER, L2=L_INIT.
+    const expectedBefore = analyticSecondaryPeak(AMPLITUDE, FREQ, K, L_INIT,   L_INIT, R_LOAD);
+    const expectedAfter  = analyticSecondaryPeak(AMPLITUDE, FREQ, K, L1_AFTER, L_INIT, R_LOAD);
 
-    // Operating point shifted: settled peak amplitude is not equal to the
-    // pre-hot-load peak. No magnitude-direction claim here -- doubling
-    // MUTfactor by raising L1 affects the secondary amplitude through both
-    // ideal transformer ratio and finite-Q impedance, and the net direction
-    // depends on circuit Q which is not the spec contract for this test.
-    expect(peakAfter).not.toBeCloseTo(peakBefore, 6);
+    expect(peakBefore).toBeCloseTo(expectedBefore, 2);
+    expect(peakAfter).toBeCloseTo(expectedAfter, 2);
   });
 
   it("hotload_L2_via_inductor_setParam_recomputes_mutFactor", () => {
+    const AMPLITUDE = 5;
+    const FREQ = 1000;
+    const R_LOAD = 100;
+    const L_INIT = 1e-3;
+    const L2_AFTER = 4e-3;
+    const K = 0.99;
+
     const fix = buildFixture({
       build: (_r, facade) => buildAcBench(facade, {
-        amplitude: 5, frequency: 1000, rLoad: 100,
-        primaryInductance: 1e-3, couplingCoefficient: 0.99,
+        amplitude: AMPLITUDE, frequency: FREQ, rLoad: R_LOAD,
+        primaryInductance: L_INIT, couplingCoefficient: K,
       }),
       params: { tStop: 8e-3, maxTimeStep: 5e-6, uic: true },
     });
@@ -249,14 +301,14 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     stepUntil(fix, 1.5e-3);
     const peakBefore = samplePeakAbs(fix, s1Node, 2.5e-3);
 
-    l2El.setParam("inductance", 4e-3);
+    l2El.setParam("inductance", L2_AFTER);
     fix.coordinator.getAnalogEngine()!.configure({});
 
     const l2After = l2El.inductance;
     const mutFactorAfter = mutEl.mutFactor;
 
-    expect(l2Before).toBeCloseTo(1e-3, 12);
-    expect(l2After).toBeCloseTo(4e-3, 12);
+    expect(l2Before).toBeCloseTo(L_INIT, 12);
+    expect(l2After).toBeCloseTo(L2_AFTER, 12);
 
     // MUTfactor doubles: sqrt(1e-3 * 4e-3) vs sqrt(1e-3 * 1e-3).
     expect(mutFactorAfter).toBeCloseTo(mutFactorBefore * 2, 6);
@@ -264,21 +316,30 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     stepUntil(fix, 5.5e-3);
     const peakAfter = samplePeakAbs(fix, s1Node, 6.5e-3);
 
-    expect(peakBefore).toBeGreaterThan(0);
-    expect(peakAfter).toBeGreaterThan(0);
-    expect(Number.isFinite(peakBefore)).toBe(true);
-    expect(Number.isFinite(peakAfter)).toBe(true);
+    // Analytic expectations: before uses L1=L2=L_INIT; after uses L1=L_INIT, L2=L2_AFTER.
+    const expectedBefore = analyticSecondaryPeak(AMPLITUDE, FREQ, K, L_INIT, L_INIT,   R_LOAD);
+    const expectedAfter  = analyticSecondaryPeak(AMPLITUDE, FREQ, K, L_INIT, L2_AFTER, R_LOAD);
 
-    expect(peakAfter).not.toBeCloseTo(peakBefore, 6);
+    expect(peakBefore).toBeCloseTo(expectedBefore, 2);
+    expect(peakAfter).toBeCloseTo(expectedAfter, 2);
   });
 
   it("hotload_k_then_L1_then_L2_in_sequence_each_shifts_mutFactor", () => {
     // Sequential hot-loads: each one needs its own settle+sample window.
     // 1.5ms initial settle + 1ms sample + 3 * (3ms settle + 1ms sample) = 14.5ms.
+    const AMPLITUDE = 5;
+    const FREQ = 1000;
+    const R_LOAD = 100;
+    const K0 = 0.99;
+    const K1 = 0.50;
+    const L_INIT = 1e-3;
+    const L1_NEW = 2e-3;
+    const L2_NEW = 2e-3;
+
     const fix = buildFixture({
       build: (_r, facade) => buildAcBench(facade, {
-        amplitude: 5, frequency: 1000, rLoad: 100,
-        primaryInductance: 1e-3, couplingCoefficient: 0.99,
+        amplitude: AMPLITUDE, frequency: FREQ, rLoad: R_LOAD,
+        primaryInductance: L_INIT, couplingCoefficient: K0,
       }),
       params: { tStop: 16e-3, maxTimeStep: 5e-6, uic: true },
     });
@@ -292,42 +353,52 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     const peak0 = samplePeakAbs(fix, s1Node, 2.5e-3);
     const mutFactor0 = mutEl.mutFactor;
 
+    // Baseline peak matches analytic expectation at initial operating point.
+    const expectedPeak0 = analyticSecondaryPeak(AMPLITUDE, FREQ, K0, L_INIT, L_INIT, R_LOAD);
+    expect(peak0).toBeCloseTo(expectedPeak0, 2);
+
     // Step 1: hot-load k from 0.99 to 0.50
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "k", 0.50);
+    fix.coordinator.setComponentProperty(getTransformerCe(fix), "k", K1);
     const mutFactor1 = mutEl.mutFactor;
     stepUntil(fix, 5.5e-3);
     const peak1 = samplePeakAbs(fix, s1Node, 6.5e-3);
 
+    // MUTfactor after k change: K1*sqrt(L_INIT*L_INIT) — bit-exact computable.
+    const expectedMutFactor1 = K1 * Math.sqrt(L_INIT * L_INIT);
+    expect(mutFactor1).toBeCloseTo(expectedMutFactor1, 10);
     expect(mutFactor1).not.toBeCloseTo(mutFactor0, 6);
-    expect(peak1).not.toBeCloseTo(peak0, 6);
+    // Secondary peak matches analytic expectation at this operating point.
+    const expectedPeak1 = analyticSecondaryPeak(AMPLITUDE, FREQ, K1, L_INIT, L_INIT, R_LOAD);
+    expect(peak1).toBeCloseTo(expectedPeak1, 2);
 
     // Step 2: hot-load L1 from 1mH to 2mH
-    l1El.setParam("inductance", 2e-3);
+    l1El.setParam("inductance", L1_NEW);
     fix.coordinator.getAnalogEngine()!.configure({});
     const mutFactor2 = mutEl.mutFactor;
     stepUntil(fix, 9.5e-3);
     const peak2 = samplePeakAbs(fix, s1Node, 10.5e-3);
 
+    // MUTfactor after L1 change: K1*sqrt(L1_NEW*L_INIT) — bit-exact computable.
+    const expectedMutFactor2 = K1 * Math.sqrt(L1_NEW * L_INIT);
+    expect(mutFactor2).toBeCloseTo(expectedMutFactor2, 10);
     expect(mutFactor2).not.toBeCloseTo(mutFactor1, 6);
-    expect(peak2).not.toBeCloseTo(peak1, 6);
+    // Secondary peak matches analytic expectation.
+    const expectedPeak2 = analyticSecondaryPeak(AMPLITUDE, FREQ, K1, L1_NEW, L_INIT, R_LOAD);
+    expect(peak2).toBeCloseTo(expectedPeak2, 2);
 
     // Step 3: hot-load L2 from 1mH to 2mH
-    l2El.setParam("inductance", 2e-3);
+    l2El.setParam("inductance", L2_NEW);
     fix.coordinator.getAnalogEngine()!.configure({});
     const mutFactor3 = mutEl.mutFactor;
     stepUntil(fix, 13.5e-3);
     const peak3 = samplePeakAbs(fix, s1Node, 14.5e-3);
 
+    // Final MUTfactor = K1 * sqrt(L1_NEW * L2_NEW) = 0.50 * sqrt(2e-3 * 2e-3) = 1e-3.
+    const expectedMutFactor3 = K1 * Math.sqrt(L1_NEW * L2_NEW);
+    expect(mutFactor3).toBeCloseTo(expectedMutFactor3, 10);
     expect(mutFactor3).not.toBeCloseTo(mutFactor2, 6);
-    expect(peak3).not.toBeCloseTo(peak2, 6);
-
-    // Final MUTfactor = 0.50 * sqrt(2e-3 * 2e-3) = 0.50 * 2e-3 = 1e-3
-    expect(mutFactor3).toBeCloseTo(0.50 * Math.sqrt(2e-3 * 2e-3), 10);
-
-    // All sampled peaks are physically sensible AC amplitudes.
-    for (const p of [peak0, peak1, peak2, peak3]) {
-      expect(p).toBeGreaterThan(0);
-      expect(Number.isFinite(p)).toBe(true);
-    }
+    // Secondary peak matches analytic expectation.
+    const expectedPeak3 = analyticSecondaryPeak(AMPLITUDE, FREQ, K1, L1_NEW, L2_NEW, R_LOAD);
+    expect(peak3).toBeCloseTo(expectedPeak3, 2);
   });
 });

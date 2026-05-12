@@ -29,6 +29,7 @@ import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
 import type { AnalogWrapperHook } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
 
 export interface SubcircuitWrapperBindings {
   /**
@@ -44,6 +45,12 @@ export interface SubcircuitWrapperBindings {
 export interface SubcircuitWrapperOptions {
   /** Pin label -> MNA node ID, copied as the wrapper's `pinNodes`. */
   pinNodes: ReadonlyMap<string, number>;
+  /**
+   * Device family for the wrapped parent typeId. Must match the family that
+   * `getDeviceFamilyByTypeId(parentTypeId)` returns — i.e. the same bucket
+   * as `ngspiceLoadOrder`.
+   */
+  deviceFamily: DeviceFamily;
   /**
    * Position in the global ngspice load order. Load-bearing for parity:
    * this value MUST equal `getNgspiceLoadOrderByTypeId(parentTypeId)` because
@@ -84,6 +91,7 @@ export interface SubcircuitWrapperOptions {
 
 export class SubcircuitWrapperElement extends AnalogElement {
   readonly ngspiceLoadOrder: number;
+  readonly deviceFamily: DeviceFamily;
   readonly _subcircuitLeaves: readonly AnalogElement[];
 
   private readonly _subElements: readonly AnalogElement[];
@@ -98,6 +106,7 @@ export class SubcircuitWrapperElement extends AnalogElement {
   constructor(opts: SubcircuitWrapperOptions) {
     super(opts.pinNodes);
     this.ngspiceLoadOrder = opts.ngspiceLoadOrder;
+    this.deviceFamily = opts.deviceFamily;
     this._subcircuitLeaves = opts.leaves;
     this._subElements = opts.subElements;
     this._bindings = opts.bindings;

@@ -15,7 +15,6 @@ import {
   defaultTemperatureHandler,
   type AcHandlerCtx,
 } from "../loaders/default-loaders.js";
-import type { FamilyHandler } from "../family-registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal stub helpers -- structural types only, no engine imports
@@ -37,11 +36,6 @@ function makeElement(overrides: Record<string, unknown> = {}): object {
 // ---------------------------------------------------------------------------
 
 describe("defaultLoadHandler", () => {
-  it("has a run method (FamilyHandler shape)", () => {
-    const h: FamilyHandler = defaultLoadHandler;
-    expect(typeof h.run).toBe("function");
-  });
-
   it("calls el.load(ctx) for every element in the bucket", () => {
     const ctx = makeLoadCtx();
     const el1 = makeElement();
@@ -65,11 +59,6 @@ describe("defaultLoadHandler", () => {
 // ---------------------------------------------------------------------------
 
 describe("defaultStampAcHandler", () => {
-  it("has a run method (FamilyHandler shape)", () => {
-    const h: FamilyHandler = defaultStampAcHandler;
-    expect(typeof h.run).toBe("function");
-  });
-
   it("calls el.stampAc(solver, omega, loadCtx) for elements that implement it", () => {
     const solver = {};
     const omega = 6283.185;
@@ -125,11 +114,6 @@ describe("defaultStampAcHandler", () => {
 // ---------------------------------------------------------------------------
 
 describe("defaultTemperatureHandler", () => {
-  it("has a run method (FamilyHandler shape)", () => {
-    const h: FamilyHandler = defaultTemperatureHandler;
-    expect(typeof h.run).toBe("function");
-  });
-
   it("calls el.computeTemperature(ctx) for elements that implement it", () => {
     const ctx = { cktTemp: 300.15, cktNomTemp: 300.15 };
     const computeTemperature = vi.fn();

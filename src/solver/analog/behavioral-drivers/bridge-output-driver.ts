@@ -41,7 +41,7 @@
  */
 
 import { defineStateSchema, type StateSchema } from "../state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
 import { PoolBackedAnalogElement } from "../element.js";
 import type { StatePoolRef } from "../state-pool.js";
 import type { SetupContext } from "../setup-context.js";
@@ -58,6 +58,7 @@ const BRIDGE_OUTPUT_SCHEMA: StateSchema = defineStateSchema("BridgeOutputDriver"
 export class BridgeOutputDriverElement extends PoolBackedAnalogElement {
   // ---------- AnalogElement contract ----------
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
 
   // ---------- PoolBackedAnalogElement contract ----------
   readonly stateSchema = BRIDGE_OUTPUT_SCHEMA;

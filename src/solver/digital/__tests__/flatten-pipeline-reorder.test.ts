@@ -26,6 +26,7 @@ import {
 } from "@/test-fixtures/subcircuit-elements";
 import { noopExecFn } from "@/test-fixtures/execute-stubs";
 import { AnalogElement } from "@/solver/analog/element";
+import type { DeviceFamily } from "@/solver/analog/ngspice-load-order";
 import type { LoadContext } from "@/solver/analog/load-context";
 import type { SetupContext } from "@/solver/analog/setup-context";
 
@@ -35,6 +36,7 @@ import type { SetupContext } from "@/solver/analog/setup-context";
 
 class FlattenNoopEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(): number[] { return []; }

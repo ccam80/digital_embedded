@@ -27,6 +27,7 @@ import {
 } from "../parameter-sweep.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { StatePool } from "../state-pool.js";
+import type { DeviceFamily } from "../ngspice-load-order.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../../components/passives/resistor.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
@@ -89,6 +90,7 @@ function buildDividerCircuit(
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: 2,
     elements: [vs, r1El, r2El],
+    elementsByFamily: new Map<DeviceFamily, readonly AnalogElement[]>(),
     labelToNodeId,
     wireToNodeId: new Map(),
     models: new Map(),
@@ -121,6 +123,7 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
     return new ConcreteCompiledAnalogCircuit({
       nodeCount: 2,
       elements: [vs, r1El, r2El],
+      elementsByFamily: new Map<DeviceFamily, readonly AnalogElement[]>(),
       labelToNodeId,
       wireToNodeId: new Map(),
       models: new Map(),
@@ -165,6 +168,7 @@ function buildRcSweepFactory(_c: number = 1e-9): SweepCircuitFactory {
     return new ConcreteCompiledAnalogCircuit({
       nodeCount: 2,
       elements: [vs, rEl, r2El],
+      elementsByFamily: new Map<DeviceFamily, readonly AnalogElement[]>(),
       labelToNodeId,
       wireToNodeId: new Map(),
       models: new Map(),

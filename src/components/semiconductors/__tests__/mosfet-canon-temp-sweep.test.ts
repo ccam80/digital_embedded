@@ -1,4 +1,4 @@
-import { describe, it, beforeAll, afterAll } from "vitest";
+import { it, beforeAll, afterAll } from "vitest";
 import path from "node:path";
 
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";

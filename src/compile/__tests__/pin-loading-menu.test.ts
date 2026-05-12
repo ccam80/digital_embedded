@@ -26,6 +26,7 @@ import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
 import { AnalogElement } from '../../solver/analog/element.js';
+import type { DeviceFamily } from '../../solver/analog/ngspice-load-order.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SetupContext } from '../../solver/analog/setup-context.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
@@ -37,6 +38,7 @@ import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 class PinLoadingMenuTestEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void { /* no-op for static test fixture */ }
   stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}

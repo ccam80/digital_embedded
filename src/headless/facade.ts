@@ -157,6 +157,13 @@ export interface SimulatorFacade {
    */
   readAllSignals(coordinator: SimulationCoordinator): Record<string, number>;
 
+  /**
+   * Set the circuit ambient temperature in kelvin and trigger a temperature-pass recompute.
+   *
+   * @param K - Temperature in kelvin
+   */
+  setCircuitTemp(K: number): void;
+
   // ============================================
   // Testing: Run automated test vectors
   // ============================================

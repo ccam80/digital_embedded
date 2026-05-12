@@ -131,10 +131,10 @@ export abstract class AnalogElement {
   /** Labels for internal nodes allocated in setup(), in allocation order. */
   getInternalNodeLabels?(): readonly string[];
 
-  /** Per-temperature-sweep callback. Concrete subclasses opt in starting Phase 5. */
+  /** Per-temperature-sweep callback. Concrete subclasses opt in. */
   computeTemperature?(ctx: TempContext): void;
 
-  /** Flux initialisation pass for inductive elements. Consumed by IND_FAMILY in Phase 4. */
+  /** Flux initialisation pass for inductive elements. Consumed by IND_FAMILY. */
   loadFluxInit?(ctx: LoadContext): void;
 }
 

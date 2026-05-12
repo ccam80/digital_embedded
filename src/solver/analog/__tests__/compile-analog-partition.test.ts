@@ -16,6 +16,7 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
 import { AnalogElement, PoolBackedAnalogElement, isPoolBacked } from "../element.js";
+import type { DeviceFamily } from "../ngspice-load-order.js";
 import { defineStateSchema } from "../state-schema.js";
 import type { SetupContext } from "../setup-context.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
@@ -41,6 +42,7 @@ const PARTITION_STATEFUL_SCHEMA = defineStateSchema("PartitionStatefulEl", [
 
 class PartitionStatefulEl extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema = PARTITION_STATEFUL_SCHEMA;
   readonly stateSize = this.stateSchema.size;
 
@@ -115,6 +117,7 @@ function makeStubElement(nodeIds: number[]): AnalogElement {
   const pinNodes = new Map(pinEntries);
   class StubElement extends AnalogElement {
     readonly ngspiceLoadOrder = 0;
+    readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
     setup(_ctx: import("../setup-context.js").SetupContext): void { /* no-op */ }
     load(_ctx: LoadContext): void { /* no-op */ }
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ }

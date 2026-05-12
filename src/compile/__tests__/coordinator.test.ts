@@ -18,6 +18,7 @@ import type { MeasurementObserver } from '../../core/engine-interface.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import { AnalogElement } from '../../solver/analog/element.js';
+import type { DeviceFamily } from '../../solver/analog/ngspice-load-order.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SetupContext } from '../../solver/analog/setup-context.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
@@ -32,6 +33,7 @@ import { buildFixture } from '../../solver/analog/__tests__/fixtures/build-fixtu
 
 class CoordinatorTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   private readonly _resistance: number;
   private readonly _n1: number;
   private readonly _n2: number;
@@ -82,6 +84,7 @@ class CoordinatorTestResistorEl extends AnalogElement {
 
 class CoordinatorTestGroundStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(_v: Float64Array): number[] { return [0]; }

@@ -1,0 +1,30 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/semiconductors/__tests__/zener.test.ts [2m([22m[2m20 tests[22m[2m | [22m[31m10 failed[39m[2m)[22m[90m 117[2mms[22m[39m
+[31m   [31m×[31m Zener parameter hot-load (T1)[2m > [22mhotload_TEMP_changes_vf_forward[90m 6[2mms[22m[31m[39m
+[31m     → expected 0.8148882772563919 to be less than 0.6294240905881262[39m
+[31m   [31m×[31m Zener computeTemperature engine-driven path (T1)[2m > [22mcomputeTemperature_ambient_propagates_to_vf[90m 4[2mms[22m[31m[39m
+[31m     → expected 0.8148882770634118 to be less than 0.6294240905882188[39m
+[31m   [31m×[31m Zener forward bias paired vs ngspice (T3)[2m > [22mtransient_step_end_paired_forward[90m 38[2mms[22m[31m[39m
+[31m     → step 0 node Z1:K/R1:pos: ours=0.3705759094118738 ngspice=0.3705759094118739 absDelta=1.1102230246251565e-16: expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Zener forward bias paired vs ngspice (T3)[2m > [22mdcop_paired_forward[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Zener forward bias paired vs ngspice (T3)[2m > [22mfull_iteration_paired_forward[90m 2[2mms[22m[31m[39m
+[31m     → 567 per-iteration divergence(s); first: voltage step 0/iter 0 node_2 ours=0.3705759094118738 ngspice=0.3705759094118739 absDelta=1.1102230246251565e-16: expected 567 to be +0 // Object.is equality[39m
+[31m   [31m×[31m Zener forward bias paired vs ngspice (T3)[2m > [22mlimiting_paired_forward[90m 1[2mms[22m[31m[39m
+[31m     → expected NaN to be +0 // Object.is equality[39m
+[31m   [31m×[31m Zener breakdown paired vs ngspice (T3)[2m > [22mtransient_step_end_paired_breakdown[90m 20[2mms[22m[31m[39m
+[31m     → step 0 Z1.VD: ours=-5.127293305849111 ngspice=NaN absDelta=NaN: expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Zener breakdown paired vs ngspice (T3)[2m > [22mdcop_paired_breakdown[90m 0[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Zener breakdown paired vs ngspice (T3)[2m > [22mfull_iteration_paired_breakdown[90m 1[2mms[22m[31m[39m
+[31m     → 741 per-iteration divergence(s); first: rhs step 1/iter 0 rhs[1] ours=-0.5666101125942706 ngspice=-0.566610156479408 absDelta=4.388513741293565e-8: expected 741 to be +0 // Object.is equality[39m
+[31m   [31m×[31m Zener breakdown paired vs ngspice (T3)[2m > [22mlimiting_paired_breakdown[90m 0[2mms[22m[31m[39m
+[31m     → expected NaN to be +0 // Object.is equality[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m10 failed[39m[22m[2m | [22m[1m[32m10 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 11:11:34
+[2m   Duration [22m 3.76s[2m (transform 2.18s, setup 3.16s, collect 25ms, tests 117ms, environment 0ms, prepare 170ms)[22m
+

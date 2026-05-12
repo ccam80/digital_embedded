@@ -15,7 +15,7 @@ import {
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -110,6 +110,7 @@ function buildMuxDriverPinLayout(props: PropertyBag): PinDeclaration[] {
 
 export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
 

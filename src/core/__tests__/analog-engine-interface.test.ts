@@ -219,6 +219,7 @@ describe("AnalogEngineTypes", () => {
       getElementPinCurrents(_elementId: number): number[] { return []; },
       setSimTime(_t: number): void {},
       setCircuitTemp(_K: number): void {},
+      circuitTemp: 300.15,
     };
 
     // Assignment to Engine base must be valid

@@ -5,15 +5,12 @@
  * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
  * Cap companions lump inline into the gpi/gmu-analog MOS stamps per `mos1load.c:900-end`.
  *
- * Invented cross-method slots deleted per Phase 2.5 Wave 1.3 A1 (11 cap+Q
- * slots cited in C-AUD-6). Only slots with direct ngspice MOS1state<n>
- * correspondence in `mos1defs.h:269-291` survive.
+ * Only slots with direct ngspice MOS1state<n> correspondence in
+ * `mos1defs.h:269-291` survive.
  *
- * G1  Sign convention (Phase 2.5 W1.3 ruling 2026-04-21): digiTS now uses
- * ngspice's VBS / VBD convention  `vbs = vb - vs`, `vbd = vb - vd`. Prior
- * code used VSB/VBD with an opposite sign; every site  limiting,
- * cap-voltage updates, current evaluation, stamps  is ported from
- * `mos1load.c:150-250` verbatim with the ngspice convention.
+ * digiTS uses ngspice's VBS/VBD convention  `vbs = vb - vs`, `vbd = vb - vd`.
+ * Every site  limiting, cap-voltage updates, current evaluation, stamps  is
+ * ported from `mos1load.c:150-250` verbatim with the ngspice convention.
  *
  * PMOS is the NMOS model with polarity=-1, matching ngspice `MOS1type`.
  * All junction voltages are polarity-signed at the vbs/vgs/vds read site
@@ -55,7 +52,7 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
 
-// Phase 5 precondition: compile error if LoadContext is missing bypass or voltTol.
+// Compile error if LoadContext is missing bypass or voltTol.
 export type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
 
 // ---------------------------------------------------------------------------
@@ -759,8 +756,10 @@ function _createMosfetElementWithPolarity(
   let nodeS_ext = -1;
   let nodeD_ext = -1;
 
-  // 3-terminal MOSFET: bulk = source (no separate bulk pin).
-  const nodeB = nodeS_ext;
+  // 3-terminal MOSFET: bulk = source (no separate bulk pin). Assigned in
+  // setup() once `nodeS_ext` resolves to a real node; capturing here would
+  // freeze the value at -1 before setup runs.
+  let nodeB = -1;
 
   // Internal drain/source prime nodes- allocated in setup() via ctx.makeVolt().
   // Initialised to external nodes here; setup() overwrites when RD/RS > 0.
@@ -816,20 +815,7 @@ function _createMosfetElementWithPolarity(
   // For PMOS, VTO is typically negative (e.g., -1.0). computeTempParams applies
   // polarity at the tVbi/tVto evaluation sites per mos1temp.c:170-176.
 
-  // tp is set by computeTemperature() (cite: mos1temp.c:44-289) before the
-  // first NR iteration and on every setParam("TEMP") hot-load call.
   let tp: MosfetTempParams = {} as MosfetTempParams;
-
-  // Derived reactive detection (mirrors ngspice's cap-companion gate bitmask).
-  const ld = params.LD;
-  const effectiveLength = params.L - 2 * ld;
-  const oxideCapProbe = params.TOX > 0 ? (EPS_OX * EPS0 / params.TOX) * effectiveLength * params.W : 0;
-  // hasCapacitance: latent-stamp-gap- computed but not yet used to gate cap-companion
-  // stamps. Preserved per ssA.20 (TS6133 surfaced, not deleted).
-  void (params.CBD > 0 || params.CBS > 0
-    || params.CJ > 0 || params.CJSW > 0
-    || params.CGDO > 0 || params.CGSO > 0 || params.CGBO > 0
-    || oxideCapProbe > 0);
 
   class MosfetAnalogElement extends PoolBackedAnalogElement {
     readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MOS;
@@ -861,7 +847,10 @@ function _createMosfetElementWithPolarity(
     private _von  = 0;
 
     // cite: mos1temp.c:129-133 — MOS1tempGiven flag; when false, instance temp = ckt->CKTtemp.
-    private _tempGiven = false;
+    // Seeded from PropertyBag givenness via the enclosing factory closure: a
+    // .dts that supplied per-instance TEMP starts given; defaults-only starts
+    // ungiven so .options TEMP=<celsius> drives uniformly.
+    private _tempGiven = props.isModelParamGiven("TEMP");
     // Last TempContext received from engine; used by setParam("TEMP") hot-load path.
     private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM };
 
@@ -911,10 +900,11 @@ function _createMosfetElementWithPolarity(
       nodeG     = this.pinNodes.get("G")!;
       nodeS_ext = this.pinNodes.get("S")!;
       nodeD_ext = this.pinNodes.get("D")!;
+      nodeB     = nodeS_ext;  // 3-terminal: body tied to source
       const gNode  = nodeG;
       const sNode  = nodeS_ext;
       const dNode  = nodeD_ext;
-      const bNode  = sNode;   // 3-terminal: body tied to source
+      const bNode  = sNode;
 
       // State slots- mos1set.c:96-97 (MOS1numStates=17) plus digiTS DC-op scalars (slots 17-27).
       this._stateBase = ctx.allocStates(MOSFET_SCHEMA.size);

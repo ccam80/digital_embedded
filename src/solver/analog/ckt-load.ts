@@ -32,8 +32,6 @@ const CKTNS_PIN = 1e10;
 /**
  * Per-element load with CKTtroubleNode tracking.
  *
- * Per-element load with CKTtroubleNode tracking.
- *
  * Preserves per-element granularity for trouble-node assignment.
  * Passed as the `defaultHandler` to `runByDeviceFamily` so that every
  * bucket without a registered specialist handler executes the
@@ -115,10 +113,8 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // Step 3: per-type device load (ngspice cktload.c:61-75).
   // runByDeviceFamily iterates family buckets in ascending min(ngspiceLoadOrder)
   // order, matching ngspice's `for i in DEVmaxnum: DEVices[i]->DEVload(ckt)`.
-  // In Phase 2 all families fall through to the default handler; no specialist
-  // handlers are registered yet (Phase 4 registers IND_FAMILY). The default
-  // handler here is a locally-constructed wrapper that preserves the per-element
-  // CKTtroubleNode tracking per cktload.c:64-65.
+  // The default handler here is a locally-constructed wrapper that preserves
+  // the per-element CKTtroubleNode tracking per cktload.c:64-65.
   runByDeviceFamily(ctx.elementsByFamily, "load", ctx.loadCtx, makeTroubleTrackingHandler(ctx));
 
   // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.

@@ -223,7 +223,8 @@
             "VAF": "_inf",
             "VAR": "_inf"
           },
-          "label": "Q1"
+          "label": "Q1",
+          "model": "spice"
         },
         "rotation": 0,
         "type": "NpnBJT"

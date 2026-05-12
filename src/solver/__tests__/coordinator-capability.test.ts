@@ -23,6 +23,7 @@ import { GroundDefinition } from '../../components/io/ground.js';
 import type { Pin } from '../../core/pin.js';
 import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import { AnalogElement } from '../analog/element.js';
+import type { DeviceFamily } from '../analog/ngspice-load-order.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { SetupContext } from '../analog/setup-context.js';
 import type { ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
@@ -38,6 +39,7 @@ import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 class CapabilityTestGroundEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   getPinCurrents(_v: Float64Array): number[] { return [0]; }
@@ -51,6 +53,7 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pinDescs: { x:
 
 class CapabilityTestResistorEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "RES";
   private readonly _nodeA: number;
   private readonly _nodeB: number;
   private readonly _g: number;

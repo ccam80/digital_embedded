@@ -46,17 +46,6 @@ import { AnalogInductorElement } from "../../../components/passives/inductor.js"
 import { MutualInductorElement } from "../../../components/passives/mutual-inductor.js";
 
 /**
- * Shape of MutualInductorElement after task 4.1.2 adds loadCouplingPass().
- * Used for the instanceof-narrowed cast in Pass 2 so this file compiles
- * independently of wave-4.1 task ordering.
- *
- * cite: indload.c:64-76 -- MUT coupling pass called from IndFamilyLoadHandler.
- */
-interface MutWithCouplingPass extends MutualInductorElement {
-  loadCouplingPass(ctx: LoadContext): void;
-}
-
-/**
  * IND_FAMILY specialist load handler implementing the 3-pass indload.c
  * structure. Registered in FAMILY_REGISTRY by task 4.3.1.
  *
@@ -91,7 +80,7 @@ export const IndFamilyLoadHandler: FamilyHandler = {
       if (el instanceof AnalogInductorElement) {
         // cite: indload.c:43-50 -- flux-from-current init, gated on
         //   !(MODEDC|MODEINITPRED). Extracted into loadFluxInit() by task 4.1.1.
-        el.loadFluxInit?.(lctx);
+        el.loadFluxInit(lctx);
       }
     }
 
@@ -108,13 +97,12 @@ export const IndFamilyLoadHandler: FamilyHandler = {
     //
     // IND elements are skipped in this pass.
     // The flux augmentation (guarded) and matrix stamps (unconditional) are
-    // both encapsulated in MutualInductorElement.loadCouplingPass() added by
-    // task 4.1.2. Cast to MutWithCouplingPass for type-safe dispatch.
+    // both encapsulated in MutualInductorElement.loadCouplingPass().
     // ------------------------------------------------------------------
     for (const el of elements) {
       if (el instanceof MutualInductorElement) {
         // cite: indload.c:64-76 -- MUT coupling pass.
-        (el as MutWithCouplingPass).loadCouplingPass(lctx);
+        el.loadCouplingPass(lctx);
       }
     }
 

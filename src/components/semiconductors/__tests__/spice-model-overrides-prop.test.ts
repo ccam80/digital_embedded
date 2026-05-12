@@ -45,15 +45,12 @@
  * file is intentionally empty of canonical it() blocks.
  */
 
-import { describe, it } from "vitest";
+import { describe } from "vitest";
 
-// Vitest requires a non-empty test file to register cleanly under the runner's
-// collection step. A single `describe` with no `it()` blocks is the documented
+// A single `describe` with no `it()` blocks is the documented
 // "empty by capability gate" shape (see src/components/io/__tests__/port.test.ts);
 // vitest treats this as "no tests" without raising a collection error.
 describe("spice-model-overrides-prop  canonical set (empty by capability gate)", () => {
   // No `it()` blocks: every Canon category is N/A for a multi-definition
-  // registry-plumbing audit. See file header for the per-category gate
-  // decisions and the Step-3 sweep recording 60 non-circuit dispositions.
-  void it;
+  // registry-plumbing audit. See file header for the per-category gate decisions.
 });

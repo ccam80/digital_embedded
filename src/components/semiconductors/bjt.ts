@@ -525,9 +525,10 @@ function _createBjtElementWithPolarity(
   };
 
   // cite: bjttemp.c:107 — BJTtempGiven: true only when per-instance TEMP was explicitly
-  // set via setParam("TEMP", v). The default value seeded from model params does NOT
-  // count as "given" — at that point ctx.cktTemp (ambient) is used instead.
-  let _tempGiven = false;
+  // set via setParam("TEMP", v) OR loaded from a .dts _modelParams block that
+  // included TEMP. Registry-default seeding does NOT count as "given" — at that
+  // point ctx.cktTemp (ambient) is used instead.
+  let _tempGiven = props.isModelParamGiven("TEMP");
 
   function makeTp(): BjtTempParams {
     return computeBjtTempParams({
@@ -1206,9 +1207,10 @@ export function createSpiceL1BjtElement(
   };
 
   // cite: bjttemp.c:107 — BJTtempGiven: true only when per-instance TEMP was explicitly
-  // set via setParam("TEMP", v). The default value seeded from model params does NOT
-  // count as "given" — at that point ctx.cktTemp (ambient) is used instead.
-  let _tempGiven = false;
+  // set via setParam("TEMP", v) OR loaded from a .dts _modelParams block that
+  // included TEMP. Registry-default seeding does NOT count as "given" — at that
+  // point ctx.cktTemp (ambient) is used instead.
+  let _tempGiven = props.isModelParamGiven("TEMP");
 
   function makeTp(): BjtTempParams {
     return computeBjtTempParams({

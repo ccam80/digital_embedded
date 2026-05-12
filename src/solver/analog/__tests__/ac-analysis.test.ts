@@ -379,8 +379,14 @@ describe("AC", () => {
     expect(result.length).toBe(60);
 
     // First point should be fStart
-
-    // Points should be log-spaced
+    expect(result[0]).toBeCloseTo(1, 10);
+    // Points should be log-spaced — ratio of consecutive points is constant
+    const ratio0 = result[1] / result[0];
+    const ratio1 = result[2] / result[1];
+    expect(ratio0).toBeCloseTo(ratio1, 10);
+    // Verify the analytic log-spacing ratio: r = 10^(1/pointsPerDecade)
+    const expectedRatio = Math.pow(10, 1 / 10);
+    expect(ratio0).toBeCloseTo(expectedRatio, 10);
   });
 
   it("linear_sweep_points- type='lin', numPoints=100, 0 to 1kHz; 100 equally-spaced points", () => {
@@ -396,8 +402,13 @@ describe("AC", () => {
     expect(result.length).toBe(100);
 
     // First and last points
-
-    // Equally spaced
+    expect(result[0]).toBeCloseTo(0, 10);
+    expect(result[result.length - 1]).toBeCloseTo(1000, 10);
+    // Equally spaced — consecutive differences are constant
+    const step0 = result[1] - result[0];
+    const step1 = result[2] - result[1];
+    expect(step0).toBeCloseTo(step1, 10);
+    expect(step0).toBeCloseTo((1000 - 0) / (result.length - 1), 10);
   });
 
   it("opamp_gain_bandwidth- inverting amplifier gain × bandwidth = GBW", () => {

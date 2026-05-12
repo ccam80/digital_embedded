@@ -18,7 +18,7 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../state-schema.js";
-import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
@@ -51,6 +51,7 @@ const D_AS_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 
 export class BehavioralDAsyncFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 

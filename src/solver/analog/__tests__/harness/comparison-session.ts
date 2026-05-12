@@ -351,7 +351,12 @@ export class ComparisonSession {
   // Step capture hook (one instance per session, cleared per run)
   protected _stepCapture!: ReturnType<typeof createStepCaptureHook>;
 
-  // ngspice bridge artifacts
+  // ngspice bridge artifacts.
+  // _cirClean is the base netlist (cirPath-stripped or auto-generated at init).
+  // The deck actually loaded into ngspice is _materializeCir(), which injects
+  // a `.options TEMP=<celsius>` line reflecting the engine's current circuitTemp
+  // for auto-generated decks- this keeps the ngspice side in lock-step with
+  // setCircuitTemp() calls made after init.
   protected _cirClean: string = "";
 
   // Capture sessions
@@ -553,6 +558,35 @@ export class ComparisonSession {
    * can address them all at once rather than rediscovering the next one on
    * each rerun.
    */
+  /**
+   * Materialize the netlist deck to load into ngspice. For auto-generated decks,
+   * injects `.options TEMP=<celsius>` after the title so the engine's current
+   * circuitTemp drives ngspice CKTtemp uniformly.
+   *
+   * After the *Given migration (Layer 1 — PropertyBag, Layers 3–4 — DTS / netlist
+   * generator), the auto-generated deck no longer carries per-instance TEMP=Y
+   * on device cards unless the user explicitly set TEMP via isModelParamGiven.
+   * So the prior regex workaround that rewrote per-instance TEMP= to match
+   * circuitTemp is no longer needed: the options card alone now drives the
+   * device temperature wherever the user didn't override it. The model-card
+   * `TNOM=...` is the reference temperature at which params were extracted
+   * and stays unchanged — both engines adjust from TNOM to the current
+   * operating temp via their respective temp passes.
+   *
+   * For cirPath-loaded decks, returns the deck verbatim — the author owns TEMP.
+   */
+  private _materializeCir(): string {
+    if (!this._cirClean) return "";
+    if (this._opts.cirPath) return this._cirClean;
+    const K = this._engine.circuitTemp;
+    const celsius = K - 273.15;
+    // generateSpiceNetlist puts the title on line 0; inject the options card
+    // immediately after so it precedes every device card.
+    const lines = this._cirClean.split("\n");
+    lines.splice(1, 0, `.options TEMP=${celsius}`);
+    return lines.join("\n");
+  }
+
   private _assertAllComponentsPairedSpiceEquivalent(
     compiled: ConcreteCompiledAnalogCircuit,
   ): void {
@@ -634,7 +668,7 @@ export class ComparisonSession {
       const bridge = new NgspiceBridge(this._dllPath);
       try {
         await bridge.init();
-        bridge.loadNetlist(this._cirClean);
+        bridge.loadNetlist(this._materializeCir());
         bridge.runDcOp();
         this._ngSession = bridge.getCaptureSession();
         this._buildNodeMapping(bridge);
@@ -773,7 +807,7 @@ export class ComparisonSession {
       const bridge = new NgspiceBridge(this._dllPath);
       try {
         await bridge.init();
-        bridge.loadNetlist(this._cirClean);
+        bridge.loadNetlist(this._materializeCir());
         bridge.runTran(stopStr, stepStr, tMaxStr);
         this._ngSession = bridge.getCaptureSession();
         this._buildNodeMapping(bridge);

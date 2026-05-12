@@ -24,6 +24,7 @@ import { PinDirection } from "../../../core/pin.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { AnalogElement } from "../element.js";
+import type { DeviceFamily } from "../ngspice-load-order.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
@@ -40,6 +41,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 
 class SpiceImportTestStubEl extends AnalogElement {
   readonly ngspiceLoadOrder = 0;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   setup(_ctx: SetupContext): void {}
   load(_ctx: LoadContext): void {}
   stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {}

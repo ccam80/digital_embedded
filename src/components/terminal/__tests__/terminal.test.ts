@@ -39,13 +39,9 @@
  * in the canon's sense - skipped per the Canon's "trivially coupled"
  * exclusion.
  *
- * Note (file-level vitest 2.1.9): an earlier draft contained a
- * `describe("Terminal - canonical set (empty by capability gate)") { void it; }`
- * block to advertise the empty-by-gate fact. vitest 2.1.9 raises a
- * file-level "No test found in suite" error on any describe with zero
- * `it()` children, so the rationale for that suite has been folded into
- * this header instead. Cat 16 now provides real `it()` content for the
- * Terminal panel-bridge contract.
+ * The terminal component has no canonical-suite tests for categories 1-15 —
+ * its property set is empty by capability gate. Cat 16 provides the
+ * `it()` content for the Terminal panel-bridge contract.
  */
 
 import { describe, it, expect } from "vitest";
