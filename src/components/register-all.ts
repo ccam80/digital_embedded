@@ -201,7 +201,7 @@ import { DigitalOutputPinLoadedDefinition } from "./digital-pins/digital-output-
 import { DigitalOutputPinUnloadedDefinition } from "./digital-pins/digital-output-pin-unloaded.js";
 
 // Behavioral output driver (internalOnly)
-import { BehavioralOutputDriverDefinition } from "../solver/analog/behavioral-output-driver.js";
+import { BehavioralOutputDriverDefinition, BehavioralOutputDriverTriStateDefinition } from "../solver/analog/behavioral-output-driver.js";
 
 // Optocoupler internal sub-elements (internalOnly)
 import { InternalCccsDefinition } from "./active/internal-cccs.js";
@@ -485,6 +485,7 @@ export function createDefaultRegistry(
 
   // Behavioral output driver (internalOnly)
   registry.register(BehavioralOutputDriverDefinition);
+  registry.register(BehavioralOutputDriverTriStateDefinition);
 
   // Optocoupler internal sub-elements (internalOnly)
   registry.register(InternalCccsDefinition);
