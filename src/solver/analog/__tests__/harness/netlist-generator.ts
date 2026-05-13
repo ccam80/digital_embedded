@@ -194,10 +194,48 @@ function resolveSubElementProps(
  */
 interface EmitCtx {
   nextInternalNet: number;
+  /**
+   * Pre-allocated composite-internal nodes, keyed by `${parentLabel}#${suffix}`.
+   * The compiler runs `expandCompositeInstance` (compiler.ts) and assigns
+   * each composite-internal net a node ID via the `allocateCompositeNode`
+   * threaded into the recursion. Those IDs land in compiled.preAllocatedNodes.
+   *
+   * The deck emitter MUST reuse those IDs rather than allocate fresh ones,
+   * because the harness's node-mapping looks up ngspice node names by their
+   * digiTS node ID as a decimal string — if the deck emits a composite
+   * internal net at deck node "7" while digiTS calls it node 5, the harness
+   * cannot correlate the two and treats the value as missing (null) on the
+   * ngspice side.
+   */
+  preAllocatedNodes: ReadonlyMap<string, number>;
 }
 
 function allocateInternalNet(ctx: EmitCtx): number {
   return ctx.nextInternalNet++;
+}
+
+/**
+ * Resolve a composite-internal net to its compiled node ID. Throws if the
+ * (parentLabel, suffix) pair was not pre-allocated by the compiler — every
+ * MnaSubcircuitNetlist internal net is assigned an ID by
+ * `expandCompositeInstance` (compiler.ts), so a miss is a generator bug.
+ */
+function resolveCompositeInternalNet(
+  ctx: EmitCtx,
+  parentLabel: string,
+  suffix: string,
+): number {
+  const key = `${parentLabel}#${suffix}`;
+  const id = ctx.preAllocatedNodes.get(key);
+  if (id === undefined) {
+    throw new Error(
+      `netlist-generator: composite-internal net '${key}' not present in ` +
+      `compiled.preAllocatedNodes. expandCompositeInstance should have ` +
+      `allocated it; check that compileAnalog ran with the same ` +
+      `MnaSubcircuitNetlist that emitElement is recursing into.`
+    );
+  }
+  return id;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,11 +273,20 @@ export function generateSpiceNetlist(
       bucketStart = i;
     }
   }
-  // Emit-context: subcircuit recursion allocates fresh internal-net IDs
-  // starting just past the highest outer node already in use. ngspice parses
-  // node IDs as opaque names, so the exact integers don't matter as long as
-  // they're consistent within this deck and don't collide with outer pins.
-  const emitCtx: EmitCtx = { nextInternalNet: compiled.nodeCount + 1 };
+  // Emit-context: subcircuit recursion reuses compiler-assigned IDs for
+  // composite-internal nets when present (so the deck names match digiTS
+  // node IDs and the harness's nodeMap correlates them by stringified id).
+  // Fresh IDs are allocated past compiled.nodeCount only for emit-time-only
+  // nets (e.g. synthesised switch control-V-source mid-rails) that the
+  // compiler did not pre-allocate.
+  const preAllocatedByName = new Map<string, number>();
+  for (const entry of compiled.preAllocatedNodes) {
+    preAllocatedByName.set(entry.name, entry.number);
+  }
+  const emitCtx: EmitCtx = {
+    nextInternalNet: compiled.nodeCount + 1,
+    preAllocatedNodes: preAllocatedByName,
+  };
 
   for (const i of emitOrder) {
     const el = compiled.elements[i]!;
@@ -332,30 +379,17 @@ function emitElement(
       return n;
     });
 
-    // Allocate internal-net IDs in ngspice INPpas2 / INPtermInsert order:
-    // walk elements in deck order, walk each element's connectivity in pin
-    // order, allocate on first encounter of an internal-net index. Mirrors
-    // compiler.ts:248-277 and cktnewn.c:23 + inpsymt.c:43 first-encounter-
-    // wins semantics. Straggler pass covers any declared net never referenced.
+    // Internal-net IDs reuse what `expandCompositeInstance` (compiler.ts)
+    // pre-allocated for this composite instance — keyed by ${rawLabel}#${suffix}
+    // in compiled.preAllocatedNodes. Falling back to allocateInternalNet would
+    // give the deck a fresh ID that doesn't match digiTS's node ID, breaking
+    // the harness's nodeMap correlation. Walks elements in deck order so that
+    // ngspice's first-encounter parser semantics still produce the same hash
+    // insertion order as our compile-time allocation.
     const internalNets: number[] = new Array(subckt.internalNetCount);
-    const portCount = subckt.ports.length;
-    for (let elIdx = 0; elIdx < subckt.elements.length; elIdx++) {
-      const connectivity = subckt.netlist[elIdx] ?? [];
-      for (let pi = 0; pi < connectivity.length; pi++) {
-        const netIdx = connectivity[pi];
-        if (netIdx === undefined || netIdx < portCount) continue;
-        const slot = netIdx - portCount;
-        if (internalNets[slot] !== undefined) continue;
-        internalNets[slot] = allocateInternalNet(ctx);
-      }
-    }
-    // Straggler pass: any internal net never referenced by a sub-element pin
-    // gets allocated in declared order, preserving the contract that every
-    // declared internal net has an ID.
     for (let slot = 0; slot < subckt.internalNetCount; slot++) {
-      if (internalNets[slot] === undefined) {
-        internalNets[slot] = allocateInternalNet(ctx);
-      }
+      const suffix = subckt.internalNetLabels?.[slot] ?? `int${slot}`;
+      internalNets[slot] = resolveCompositeInternalNet(ctx, rawLabel, suffix);
     }
 
     const lines: string[] = [];
