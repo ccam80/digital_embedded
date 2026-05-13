@@ -20,9 +20,15 @@
  *   wNew = wOld + (dt / (tau + dt)) * (target - wOld)
  *   where tau = responseTime, target = latch. At dt=0 (DC) wNew = wOld.
  *
- * Stamp: G_eff = s1[OUTPUT_WEIGHT] / rOut at (out, out); no RHS (output
- * sinks to GND through rOut when latch=1; otherwise high-Z requires
- * external pull-up).
+ * Stamp: Norton at (ctrl_out, gnd) with G = 1/rOut and a weight-blended
+ * Thévenin target vTarget = (1 - w) * vOH + w * vOL. At w=0 the driver
+ * pushes vOH on the internal ctrl_out handshake net; at w=1 it pulls toward
+ * vOL. The external "out" pin's open-collector character (if any) is the
+ * outPin sub-element's concern; this driver writes a clean smoothed target
+ * to ctrl_out so the matrix stays well-conditioned regardless of latch.
+ * (The docstring previously specified G_eff = w/rOut with no RHS; that model
+ * leaves ctrl_out high-Z when w=0, making the MNA matrix singular because
+ * ctrl_out is an internal net with no external pull-up.)
  *
  * Schema source: `COMPARATOR_SCHEMA` is owned by the parent (the
  * comparator's hysteresis is a chip-level property); this driver imports
@@ -33,6 +39,7 @@ import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
+import { MODEDC } from "../../solver/analog/ckt-mode.js";
 import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -161,17 +168,33 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
     if (latchOld === 0 && vPlus >= vTh)      latchNew = 1;
     else if (latchOld === 1 && vPlus < vTl)  latchNew = 0;
 
-    // Weight integration- J-021 trapezoidal recurrence.
-    // alpha = dt / (tau + dt); wNew = wOld + alpha * (target - wOld).
-    // dt = 0 (DC) -> alpha = 0 -> wNew = wOld (weight held; latch still updates).
+    // Weight integration. In transient, the J-021 trapezoidal recurrence:
+    //   alpha = dt / (tau + dt); wNew = wOld + alpha * (latchNew - wOld)
+    // stamps from s1 (wOld). In DC-family modes (MODEDCOP / MODETRANOP /
+    // MODEDCTRANCURVE) the filter's time-derivative term goes to zero, so the
+    // RC sits at its steady-state response w=latch — ngspice's capacitor and
+    // inductor stamps do the same DC degeneration. Without this branch the
+    // recurrence freezes at the all-zeros pool init and DCOP can't reach
+    // the converged operating point.
     const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    const dt = ctx.dt;
-    const alpha = dt > 0 ? dt / (this._tau + dt) : 0;
-    const wNew = wOld + alpha * (latchNew - wOld);
+    let wNew: number;
+    let wForStamp: number;
+    if ((ctx.cktMode & MODEDC) !== 0) {
+      wNew = latchNew;
+      wForStamp = latchNew;
+    } else {
+      const dt = ctx.dt;
+      const alpha = dt / (this._tau + dt);
+      wNew = wOld + alpha * (latchNew - wOld);
+      wForStamp = wOld;
+    }
 
-    // Norton stamp at ctrl_out: drive latched output level.
-    const target = latchNew ? this._vOH : this._vOL;
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    // Norton stamp at ctrl_out: weight-blended Thévenin target.
+    // vTarget = (1 - w) * vOH + w * vOL. At w=0 pushes vOH on the internal
+    // ctrl_out net; at w=1 pulls toward vOL. The outPin sub-element
+    // re-quantizes ctrl_out into the external "out" stamp.
+    const vTarget = (1 - wForStamp) * this._vOH + wForStamp * this._vOL;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, vTarget);
 
     // Bottom-of-load writes- every slot mutated this step writes to s0
     // exactly once.
@@ -181,10 +204,10 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
 
   getPinCurrents(rhs: Float64Array): number[] {
     const ctrlOutNode = this.pinNodes.get("ctrl_out")!;
-    const G = 1 / this._rOut;
     const s1 = this._pool.states[1];
-    const latchOld = s1[this._stateBase + SLOT_OUTPUT_LATCH] >= 0.5 ? 1 : 0;
-    const vTarget = latchOld ? this._vOH : this._vOL;
+    const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
+    const G = 1 / this._rOut;
+    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
     const I = G * (rhs[ctrlOutNode] - vTarget);
     return [0, 0, I];
   }

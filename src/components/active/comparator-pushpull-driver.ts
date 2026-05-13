@@ -27,6 +27,7 @@ import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
+import { MODEDC } from "../../solver/analog/ckt-mode.js";
 import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -145,15 +146,29 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     if (latchOld === 0 && vPlus >= vTh)      latchNew = 1;
     else if (latchOld === 1 && vPlus < vTl)  latchNew = 0;
 
-    // Weight integration- trapezoidal recurrence shared with open-collector.
+    // Weight integration- trapezoidal recurrence in transient, DC steady
+    // state in DC-family modes. Mirrors comparator-driver.ts:144-160; the
+    // filter's time derivative collapses at DCOP just like a capacitor's
+    // dv/dt term, so w follows latch directly.
     const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    const dt = ctx.dt;
-    const alpha = dt > 0 ? dt / (this._tau + dt) : 0;
-    const wNew = wOld + alpha * (latchNew - wOld);
+    let wNew: number;
+    let wForStamp: number;
+    if ((ctx.cktMode & MODEDC) !== 0) {
+      wNew = latchNew;
+      wForStamp = latchNew;
+    } else {
+      const dt = ctx.dt;
+      const alpha = dt / (this._tau + dt);
+      wNew = wOld + alpha * (latchNew - wOld);
+      wForStamp = wOld;
+    }
 
-    // Norton stamp at ctrl_out: drive latched output level.
-    const target = latchNew ? this._vOH : this._vOL;
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    // Push-pull Norton stamp: fixed G=1/rOut, vTarget blended by weight.
+    // vTarget = (1-w)*vOH + w*vOL: at w=0 (inactive) drives vOH, at w=1
+    // (asserted) drives vOL. Smooth ramp between rails via the trapezoidal
+    // recurrence above, time-constant responseTime.
+    const vTarget = (1 - wForStamp) * this._vOH + wForStamp * this._vOL;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, vTarget);
 
     // Bottom-of-load writes.
     s0[base + SLOT_OUTPUT_LATCH]  = latchNew;
@@ -163,9 +178,9 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
   getPinCurrents(rhs: Float64Array): number[] {
     const ctrlOutNode = this.pinNodes.get("ctrl_out")!;
     const s1 = this._pool.states[1];
-    const latchOld = s1[this._stateBase + SLOT_OUTPUT_LATCH] >= 0.5 ? 1 : 0;
+    const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
     const G = 1 / this._rOut;
-    const vTarget = latchOld ? this._vOH : this._vOL;
+    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
     const I = G * (rhs[ctrlOutNode] - vTarget);
     return [0, 0, I];
   }
