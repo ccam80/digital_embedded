@@ -30,7 +30,7 @@ describe("ngspiceLoadOrder per-factory ordinals", () => {
     const props = new PropertyBag();
     props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance: 1000 });
     const el = getFactory(ResistorDefinition)(
-      new Map([["A", 1], ["B", 2]]),
+      new Map([["pos", 1], ["neg", 2]]),
       props,
       () => 0,
     );

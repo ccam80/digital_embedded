@@ -273,6 +273,7 @@ export const RELAY_DT_NETLIST: MnaSubcircuitNetlist = {
         pullInI: "pullInI",
         dropOutI: "dropOutI",
         normallyClosed: 1,
+        closed: 1,
       } },
   ],
   internalNetCount: 2,

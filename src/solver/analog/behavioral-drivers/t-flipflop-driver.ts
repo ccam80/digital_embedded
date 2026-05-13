@@ -1,14 +1,13 @@
-﻿/**
- * BehavioralTFlipflopDriverElement- pure-truth-function driver leaf for the
- * edge-triggered T flip-flop.
+/**
+ * BehavioralTFlipflopDriverElement — pure-truth-function driver leaf for the
+ * edge-triggered T flip-flop. See and-driver.ts for the normalized-bit
+ * driver-chain architecture.
  *
- * Two modes, selected by the `forceToggle` param:
+ * Two modes selected by `forceToggle`:
  *   forceToggle=0 (default, withEnable=true): on rising clock edge, toggle Q
- *                 when T >= vIH (high), hold when T < vIL (low). Indeterminate
- *                 T holds Q.
- *   forceToggle=1 (withEnable=false): on rising clock edge, ALWAYS toggle Q.
- *                 T input is ignored; the parent netlist wires T to gnd as a
- *                 placeholder so the pin layout stays uniform.
+ *                 when T high (≥ 0.5), hold when T low.
+ *   forceToggle=1 (withEnable=false): unconditionally toggle on every rising
+ *                 clock edge. T is ignored.
  *
  * Per Composite M15 (phase-composite-architecture.md), J-159.
  */
@@ -49,11 +48,7 @@ export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private _vIH: number;
   private readonly _forceToggle: 0 | 1;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
   private _firstSample: boolean = true;
 
@@ -65,13 +60,9 @@ export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._vIH = props.getModelParam<number>("vIH");
     this._forceToggle = props.hasModelParam("forceToggle")
       ? (props.getModelParam<number>("forceToggle") >= 0.5 ? 1 : 0)
       : 0;
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -96,20 +87,15 @@ export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
-      if (this._forceToggle === 1) {
-        // withEnable=false: unconditionally toggle on every rising edge.
-        q = 1 - q;
-      } else if (vT >= this._vIH) {
-        // withEnable=true: T high → toggle. T low (vT < vIL) and T
-        // indeterminate (vIL <= vT < vIH) both hold q (no else branch).
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
+      if (this._forceToggle === 1 || vT >= 0.5) {
         q = 1 - q;
       }
     }
     this._firstSample = false;
 
-    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
@@ -119,11 +105,8 @@ export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params; forceToggle is structural.
   }
 }
 
@@ -136,14 +119,9 @@ export const BehavioralTFlipflopDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: [
-        { key: "vIH",         default: 2.0 },
-        { key: "vIL",         default: 0.8 },
         { key: "forceToggle", default: 0 },
-        { key: "rOut", default: 100 },
-        { key: "vOH", default: 5 },
-        { key: "vOL", default: 0 },
       ],
-      params: { vIH: 2.0, vIL: 0.8, forceToggle: 0, rOut: 100, vOH: 5, vOL: 0 },
+      params: { forceToggle: 0 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralTFlipflopDriverElement(pinNodes, props),
     },

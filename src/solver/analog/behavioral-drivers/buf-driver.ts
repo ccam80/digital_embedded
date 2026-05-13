@@ -1,15 +1,10 @@
-﻿/**
- * BehavioralBufDriverElement- pure-truth-function driver leaf for the 1-input
- * BUF (non-inverting buffer) gate.
- *
- * Reads 1 input voltage from rhsOld (relative to gnd), threshold-classifies
- * it against per-instance vIH / vIL, and writes the result (identity truth
- * function: output = input).
+/**
+ * BehavioralBufDriverElement — pure-truth-function driver leaf for the 1-input
+ * BUF (non-inverting buffer) gate. See and-driver.ts for the normalized-bit
+ * driver-chain architecture.
  *
  * Canonical reference for **Template A-fixed**: 1-bit pure-truth driver with
- * fixed N=1 input pin count. Mirrors and-driver.ts shape throughout (imports,
- * class layout, schema/load() placement, modelRegistry) with the truth function
- * substituted to identity and pin layout hardcoded as a module-level const.
+ * fixed N=1 input pin count.
  *
  * Per Composite M10 (phase-composite-architecture.md), J-137
  * (contracts_group_09.md).
@@ -28,20 +23,7 @@ import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
-// ---------------------------------------------------------------------------
-// State schema
-// ---------------------------------------------------------------------------
-
 const SCHEMA: StateSchema = defineStateSchema("BehavioralBufDriver", []);
-
-// ---------------------------------------------------------------------------
-// Pin layout- fixed N=1, module-level const (Template A-fixed)
-// ---------------------------------------------------------------------------
-//
-// Order MUST match the parent's connectivity row for this sub-element. The
-// parent emits `[in_1_net, ctrl_out_net, gnd_net]` and the compiler stores
-// each pin label against the resolved node from the matching connectivity
-// index (compiler.ts:447-462).
 
 const BUF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   {
@@ -61,10 +43,6 @@ const BUF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// BehavioralBufDriverElement
-// ---------------------------------------------------------------------------
-
 export class BehavioralBufDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
@@ -75,22 +53,12 @@ export class BehavioralBufDriverElement extends PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private readonly _ctrlOutNode: number;
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
     this._inNode      = pinNodes.get("in_1")!;
     this._gndNode     = pinNodes.get("gnd")!;
     this._ctrlOutNode = pinNodes.get("ctrl_out")!;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -102,36 +70,18 @@ export class BehavioralBufDriverElement extends PoolBackedAnalogElement {
     const rhsOld = ctx.rhsOld;
     const gndV = rhsOld[this._gndNode];
     const v = rhsOld[this._inNode] - gndV;
-
-    let target: number;
-    if (v >= this._vIH) {
-      target = this._vOH;
-    } else if (v < this._vIL) {
-      target = this._vOL;
-    } else {
-      const mid = (this._vOH + this._vOL) / 2;
-      target = rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL;
-    }
-
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    const result = v >= 0.5 ? 1 : 0;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
-
-// ---------------------------------------------------------------------------
-// ComponentDefinition
-// ---------------------------------------------------------------------------
 
 export const BehavioralBufDriverDefinition: ComponentDefinition = {
   name: "BehavioralBufDriver",
@@ -141,14 +91,8 @@ export const BehavioralBufDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH",  default: 2.0 },
-        { key: "vIL",  default: 0.8 },
-        { key: "rOut", default: 100 },
-        { key: "vOH",  default: 5 },
-        { key: "vOL",  default: 0 },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralBufDriverElement(pinNodes, props),
     },

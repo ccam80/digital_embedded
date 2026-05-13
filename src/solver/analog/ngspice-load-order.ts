@@ -238,4 +238,12 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   // T name pos1 neg1 pos2 neg2 Z0=... TD=...
   // ngspice TRAnames (tra.c:32-37): ["P1+","P1-","P2+","P2-"] → digiTS [P1b,P1a,P2b,P2a].
   TransmissionLine: ["P1b", "P1a", "P2b", "P2a"],
+  // F/H sense-via-label: only out pins appear on the deck card; the sense
+  // V-source is referenced by device name. Deck: `F/Hname out+ out- VSENSE gain`.
+  CCCS:            ["out+", "out-"],
+  CCVS:            ["out+", "out-"],
+  // E/G ctrl-as-nodes: ctrl pins follow out pins on the deck card.
+  // Deck: `E/Gname out+ out- ctrl+ ctrl- gain`.
+  VCCS:            ["out+", "out-", "ctrl+", "ctrl-"],
+  VCVS:            ["out+", "out-", "ctrl+", "ctrl-"],
 };

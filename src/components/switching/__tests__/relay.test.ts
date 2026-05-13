@@ -9,27 +9,28 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { createDefaultRegistry } from "../../register-all.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { SwitchAnalogElement, SWITCH_SCHEMA } from "../switch.js";
+import { CurrentControlledSwitchAnalogElement, CSW_SCHEMA } from "../current-controlled-switch.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
 
-const SLOT_CLOSED = SWITCH_SCHEMA.indexOf.get("CLOSED")!;
+const SLOT_CLOSED = CSW_SCHEMA.indexOf.get("CLOSED")!;
 
 /**
- * Locate a Switch sub-element inside the expanded RelayDT composite by its
- * fully-qualified label (e.g. "relayDT:contactNO"). Walks `fix.circuit.elements`
- * for a SwitchAnalogElement instance with the matching `label`.
+ * Locate a CurrentControlledSwitchAnalogElement sub-element inside the expanded
+ * RelayDT composite by its fully-qualified label (e.g. "relayDT:contactNO").
+ * Walks `fix.circuit.elements` for a CurrentControlledSwitchAnalogElement instance
+ * with the matching `label`.
  */
-function findContactByName(fix: Fixture, label: string): SwitchAnalogElement {
+function findContactByName(fix: Fixture, label: string): CurrentControlledSwitchAnalogElement {
   for (const el of fix.circuit.elements) {
-    if (el instanceof SwitchAnalogElement && el.label === label) {
+    if (el instanceof CurrentControlledSwitchAnalogElement && el.label === label) {
       return el;
     }
   }
   throw new Error(
-    `Switch sub-element with label '${label}' not found in compiled circuit; ` +
+    `CurrentControlledSwitchAnalogElement sub-element with label '${label}' not found in compiled circuit; ` +
       `the RelayDT netlist composite did not expand correctly.`,
   );
 }

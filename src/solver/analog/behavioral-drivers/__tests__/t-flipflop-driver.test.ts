@@ -163,7 +163,6 @@ describe("BehavioralTFlipflopDriver DCOP (Cat 2 analytical)", () => {
     fix.facade.setSignal(fix.coordinator, "T", 0);
     fix.facade.setSignal(fix.coordinator, "C", 0);
     const result = fix.coordinator.dcOperatingPoint();
-    expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
     fix.coordinator.step();
     // Closed-form: with C held LOW (no rising edge), Q stays at the
@@ -176,7 +175,6 @@ describe("BehavioralTFlipflopDriver DCOP (Cat 2 analytical)", () => {
     const fix = buildFixture({ build: buildTFFCircuit({ withEnable: false }) });
     fix.facade.setSignal(fix.coordinator, "C", 0);
     const result = fix.coordinator.dcOperatingPoint();
-    expect(result).not.toBeNull();
     expect(result!.converged).toBe(true);
     fix.coordinator.step();
     expect(fix.facade.readSignal(fix.coordinator, "Q")).toBe(0);

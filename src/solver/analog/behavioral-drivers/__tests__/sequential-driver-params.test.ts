@@ -20,7 +20,7 @@ describe("BehavioralDFlipflopDriver accepts rOut/vOH/vOL via setParam without th
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
-      ["D", 1], ["C", 2], ["Q", 3], ["~Q", 4], ["gnd", 0],
+      ["D", 1], ["C", 2], ["ctrl_q", 3], ["ctrl_nq", 4], ["gnd", 0],
     ]);
     const el = new BehavioralDFlipflopDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -38,7 +38,7 @@ describe("BehavioralJKFlipflopDriver accepts rOut/vOH/vOL via setParam without t
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
-      ["J", 1], ["C", 2], ["K", 3], ["Q", 4], ["~Q", 5], ["gnd", 0],
+      ["J", 1], ["C", 2], ["K", 3], ["ctrl_q", 4], ["ctrl_nq", 5], ["gnd", 0],
     ]);
     const el = new BehavioralJKFlipflopDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -56,7 +56,7 @@ describe("BehavioralRSFlipflopDriver accepts rOut/vOH/vOL via setParam without t
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
-      ["S", 1], ["C", 2], ["R", 3], ["Q", 4], ["~Q", 5], ["gnd", 0],
+      ["S", 1], ["C", 2], ["R", 3], ["ctrl_q", 4], ["ctrl_nq", 5], ["gnd", 0],
     ]);
     const el = new BehavioralRSFlipflopDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -74,7 +74,7 @@ describe("BehavioralDAsyncFlipflopDriver accepts rOut/vOH/vOL via setParam witho
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
-      ["Set", 1], ["D", 2], ["C", 3], ["Clr", 4], ["Q", 5], ["~Q", 6], ["gnd", 0],
+      ["Set", 1], ["D", 2], ["C", 3], ["Clr", 4], ["ctrl_q", 5], ["ctrl_nq", 6], ["gnd", 0],
     ]);
     const el = new BehavioralDAsyncFlipflopDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -92,7 +92,7 @@ describe("BehavioralJKAsyncFlipflopDriver accepts rOut/vOH/vOL via setParam with
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
-      ["Set", 1], ["J", 2], ["C", 3], ["K", 4], ["Clr", 5], ["Q", 6], ["~Q", 7], ["gnd", 0],
+      ["Set", 1], ["J", 2], ["C", 3], ["K", 4], ["Clr", 5], ["ctrl_q", 6], ["ctrl_nq", 7], ["gnd", 0],
     ]);
     const el = new BehavioralJKAsyncFlipflopDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -110,7 +110,7 @@ describe("BehavioralRSAsyncLatchDriver accepts rOut/vOH/vOL via setParam without
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
-      ["S", 1], ["R", 2], ["Q", 3], ["~Q", 4], ["gnd", 0],
+      ["S", 1], ["R", 2], ["ctrl_q", 3], ["ctrl_nq", 4], ["gnd", 0],
     ]);
     const el = new BehavioralRSAsyncLatchDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();

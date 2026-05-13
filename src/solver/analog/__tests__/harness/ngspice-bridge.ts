@@ -476,7 +476,17 @@ export class NgspiceBridge {
     const devices: NgspiceDeviceInfo[] = raw.devices.map(d => ({
       name: d.name, typeName: d.typeName, stateBase: d.stateBase, nodeIndices: d.nodeIndices,
     }));
-    return { matrixSize: raw.matrixSize, numStates: raw.numStates, nodeNames, devices };
+    // Normalize ngspice's matrixSize to our convention (raw active-equation
+    // count N). ngspice reports `CKTmaxEqNum + 1` = N + 2: cktinit.c:43 seeds
+    // CKTmaxEqNum at 1 (ground sentinel), cktlnkeq.c:32 post-increments on
+    // every CKTmkVolt/CKTmkCur (so after N allocs it sits at N+1, one past
+    // last), and the public matrixSize getter adds one more. Our sparse
+    // solver's `_size` (exposed via engine.matrixSize) is the raw N. Subtract
+    // 2 here so `NgspiceTopology.matrixSize` carries the same metric as
+    // `TopologySnapshot.matrixSize` and topologyDiff/_buildTopologySnapshot
+    // consumers see matching numbers when the physical matrices match.
+    const normalizedMatrixSize = raw.matrixSize > 0 ? raw.matrixSize - 2 : 0;
+    return { matrixSize: normalizedMatrixSize, numStates: raw.numStates, nodeNames, devices };
   }
 
   loadNetlist(netlist: string): void {
@@ -897,9 +907,20 @@ export class NgspiceBridge {
       pinNodeIds: d.nodeIndices as readonly number[],
     }));
 
+    // nodeNames includes both voltage-node entries (numeric names like "1",
+    // "2", ...) and branch-row entries that ngspice exposes as `<elem>#branch`
+    // (current-variable rows created via CKTmkCur — vsources, inductors, etc.).
+    // Our convention's `nodeCount` is voltage nodes ONLY (branches live in the
+    // matrix beyond `nodeCount` and `slice.ts:116` relies on that gating).
+    // Filter the branch rows out here so the snapshot's nodeCount lines up
+    // with what `captureTopology` produces for our engine.
+    let voltageNodeCount = 0;
+    this._topology.nodeNames.forEach((_, name) => {
+      if (!name.endsWith("#branch")) voltageNodeCount++;
+    });
     return {
       matrixSize: this._topology.matrixSize,
-      nodeCount: this._topology.nodeNames.size,
+      nodeCount: voltageNodeCount,
       elementCount: this._topology.devices.length,
       elements, nodeLabels, matrixRowLabels, matrixColLabels,
     };

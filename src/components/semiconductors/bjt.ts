@@ -1227,8 +1227,21 @@ export function createSpiceL1BjtElement(
   let nodeC_int = nodeC_ext;
   let nodeE_int = nodeE_ext;
 
-  // Substrate convention: NPN VERTICAL (+1) stamps on colPrime; PNP LATERAL (-1) on basePrime.
-  const subs = polarity > 0 ? 1 : -1;
+  // Substrate orientation: VERTICAL (+1) stamps on colPrime; LATERAL (-1) on
+  // basePrime. ngspice (bjtdefs.h:578-579) treats `BJTsubs` as an independent
+  // model parameter — it is NOT a function of BJTtype, even though ngspice's
+  // default is VERTICAL for NPN and LATERAL for PNP (bjtsetup.c:42-46) when
+  // unspecified. The caller threads that default in via `isLateral`, so the
+  // substrate orientation must derive from `isLateral` alone. Tying `subs` to
+  // `polarity` here couples two independent concepts and produces internally
+  // inconsistent stamps whenever the caller selects an orientation that
+  // disagrees with the polarity-derived default (e.g. NPN+LATERAL or
+  // PNP+VERTICAL): `substConNode` (used for the RHS stamp and the ceqsub
+  // current term) ends up pointing at a different prime node than the
+  // matrix-side `_hSubstConSubstCon` alias driven from `isLateral` in
+  // `setup()` — bjtsetup.c keeps both on the same node. cite: bjtdefs.h:578-579,
+  // bjtsetup.c:454-460, bjtload.c:799.
+  const subs = isLateral ? -1 : 1;
   let substConNode = subs > 0 ? nodeC_int : nodeB_int;
 
   const hasCapacitance = params.CJE > 0 || params.CJC > 0 || params.TF > 0 || params.TR > 0 || params.CJS > 0;
@@ -2526,9 +2539,14 @@ export const PnpBjtDefinition: StandaloneComponentDefinition = {
       paramDefs: BJT_PARAM_DEFS,
       params: BJT_PNP_DEFAULTS,
     },
+    // ngspice (bjtsetup.c:42-46) defaults BJTsubs to LATERAL for PNP when not
+    // explicitly given. The L1 PNP model registry mirrors that default — every
+    // entry below uses `isLateral=true` so that `"model": "spice"` matches
+    // ngspice's behavior bit-exact. NPN uses VERTICAL by the same convention
+    // (see NpnBjtDefinition above).
     "spice": {
       kind: "inline",
-      factory: createBjtL1Element(-1, false),
+      factory: createBjtL1Element(-1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: BJT_SPICE_L1_PNP_DEFAULTS,
     },
@@ -2540,25 +2558,25 @@ export const PnpBjtDefinition: StandaloneComponentDefinition = {
     },
     "2N3906": {
       kind: "inline",
-      factory: createBjtL1Element(-1, false),
+      factory: createBjtL1Element(-1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_2N3906,
     },
     "BC557B": {
       kind: "inline",
-      factory: createBjtL1Element(-1, false),
+      factory: createBjtL1Element(-1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_BC557B,
     },
     "2N2907A": {
       kind: "inline",
-      factory: createBjtL1Element(-1, false),
+      factory: createBjtL1Element(-1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_2N2907A,
     },
     "TIP32C": {
       kind: "inline",
-      factory: createBjtL1Element(-1, false),
+      factory: createBjtL1Element(-1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_TIP32C,
     },

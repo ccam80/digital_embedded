@@ -424,9 +424,7 @@ class TransmissionLineAnalogElement extends AnalogElement {
       }
       return;
     }
-    // segments / length are legacy LC-ladder properties; the verbatim
-    // port consumes only impedance and delay. Silently accept their writes
-    // so serialization round-trips don't throw.
+    throw new Error(`TransmissionLine '${this.label}': unknown param '${key}'`);
   }
 }
 

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import {
-  BehavioralOutputDriverTriStateElement,
-} from "../../../solver/analog/behavioral-output-driver.js";
+  buildDigitalOutputPinTriStateUnloadedNetlist,
+} from "../digital-output-pin-tristate-unloaded.js";
 import type { ComponentRegistry, StandaloneComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -12,7 +12,6 @@ import type { CircuitElement } from "../../../core/element.js";
 import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,6 +27,13 @@ function nodeOf(fix: Fixture, label: string): number {
 
 // ---------------------------------------------------------------------------
 // Thin test-wrapper for DigitalOutputPinTriStateUnloaded (internalOnly composite)
+//
+// Uses kind: "netlist" referencing buildDigitalOutputPinTriStateUnloadedNetlist so
+// the composite's port-to-pin mapping [0, 1, 2, 3] is verified through the compiler.
+//
+// en/ctrl carry NORMALIZED logic-level signals in {0, 1} V per the new
+// digital→analog pin-boundary architecture (see digital-output-pin-unloaded.ts
+// docblock).
 // ---------------------------------------------------------------------------
 
 let _pinGroupCounter = 0;
@@ -90,18 +96,20 @@ function makePinDecl(label: string, direction: PinDirection) {
   };
 }
 
-const TRISTATE_PIN_DECLS = [
-  { label: "pos",  direction: PinDirection.OUTPUT },
-  { label: "neg",  direction: PinDirection.INPUT  },
+const UNLOADED_TRISTATE_PIN_DECLS = [
+  { label: "node", direction: PinDirection.OUTPUT },
+  { label: "gnd",  direction: PinDirection.OUTPUT },
   { label: "ctrl", direction: PinDirection.INPUT  },
   { label: "en",   direction: PinDirection.INPUT  },
 ];
 
-function buildTriStateWrapperDef(): StandaloneComponentDefinition {
+const DEFAULT_RHIZ = 1e9;
+
+function buildUnloadedWrapperDef(): StandaloneComponentDefinition {
   return {
-    name: "_TestTriStateUnloadedDrv",
+    name: "_TestDigitalOutputPinTriStateUnloaded",
     typeId: -1,
-    pinLayout: TRISTATE_PIN_DECLS.map(p => makePinDecl(p.label, p.direction)),
+    pinLayout: UNLOADED_TRISTATE_PIN_DECLS.map(p => makePinDecl(p.label, p.direction)),
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
@@ -109,20 +117,19 @@ function buildTriStateWrapperDef(): StandaloneComponentDefinition {
     models: {},
     defaultModel: "default",
     factory: (props: PropertyBag): CircuitElement =>
-      makeTestCircuitElement("_TestTriStateUnloadedDrv", props, TRISTATE_PIN_DECLS),
+      makeTestCircuitElement("_TestDigitalOutputPinTriStateUnloaded", props, UNLOADED_TRISTATE_PIN_DECLS),
     modelRegistry: {
       default: {
-        kind: "inline",
+        kind: "netlist",
+        netlist: buildDigitalOutputPinTriStateUnloadedNetlist,
         paramDefs: [
-          { key: "vOH",  default: 5 },
-          { key: "vOL",  default: 0 },
-          { key: "rOut", default: 100 },
-          { key: "rHiZ", default: 1e9 },
+          { key: "rOut",  default: 100 },
+          { key: "vOH",   default: 5 },
+          { key: "vOL",   default: 0 },
+          { key: "rHiZ",  default: DEFAULT_RHIZ },
+          { key: "midEn", default: 0.5 },
         ],
-        params: { vOH: 5, vOL: 0, rOut: 100, rHiZ: 1e9 },
-        branchCount: 0,
-        factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
-          new BehavioralOutputDriverTriStateElement(pinNodes, props),
+        params: { rOut: 100, vOH: 5, vOL: 0, rHiZ: DEFAULT_RHIZ, midEn: 0.5 },
       },
     },
   };
@@ -139,26 +146,26 @@ function buildUnloadedFixture(
   rOut = 100,
   vOH = 5,
   vOL = 0,
-  rHiZ = 1e9,
+  rHiZ = DEFAULT_RHIZ,
 ) {
   return (registry: ComponentRegistry, facade: DefaultSimulatorFacade): Circuit => {
-    registry.register(buildTriStateWrapperDef());
+    registry.register(buildUnloadedWrapperDef());
     return facade.build({
       components: [
         { id: "vsCtrl", type: "DcVoltageSource", props: { label: "vsCtrl", voltage: vCtrl } },
         { id: "vsEn",   type: "DcVoltageSource", props: { label: "vsEn",   voltage: vEn   } },
-        { id: "drv",    type: "_TestTriStateUnloadedDrv",
-          props: { label: "drv", model: "default", vOH, vOL, rOut, rHiZ } },
+        { id: "pin",    type: "_TestDigitalOutputPinTriStateUnloaded",
+          props: { label: "pin", model: "default", vOH, vOL, rOut, rHiZ } },
         { id: "rLoad",  type: "Resistor", props: { label: "rLoad", resistance: rLoad } },
         { id: "gnd",    type: "Ground" },
       ],
       connections: [
-        ["vsCtrl:pos", "drv:ctrl"],
+        ["vsCtrl:pos", "pin:ctrl"],
         ["vsCtrl:neg", "gnd:out"],
-        ["vsEn:pos",   "drv:en"],
+        ["vsEn:pos",   "pin:en"],
         ["vsEn:neg",   "gnd:out"],
-        ["drv:neg",    "gnd:out"],
-        ["drv:pos",    "rLoad:pos"],
+        ["pin:gnd",    "gnd:out"],
+        ["pin:node",   "rLoad:pos"],
         ["rLoad:neg",  "gnd:out"],
       ],
     });
@@ -170,37 +177,37 @@ function buildUnloadedFixture(
 // ---------------------------------------------------------------------------
 
 describe("DigitalOutputPinTriStateUnloaded", () => {
-  it("en high ctrl high stamps vOH", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000, rHiZ = 1e9;
-    const fix = buildFixture({ build: buildUnloadedFixture(vOH, vOH, rLoad, rOut, vOH, vOL, rHiZ) });
+  it("en=1 ctrl=1 produces vOH at node", () => {
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
+    const fix = buildFixture({ build: buildUnloadedFixture(1, 1, rLoad, rOut, vOH, vOL) });
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN);
     const expected = vOH * rLoad / (rLoad + rOut);
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("en high ctrl low stamps vOL", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000, rHiZ = 1e9;
-    const fix = buildFixture({ build: buildUnloadedFixture(vOH, vOL, rLoad, rOut, vOH, vOL, rHiZ) });
+  it("en=1 ctrl=0 produces vOL at node", () => {
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
+    const fix = buildFixture({ build: buildUnloadedFixture(1, 0, rLoad, rOut, vOH, vOL) });
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN);
     const expected = vOL * rLoad / (rLoad + rOut);
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("en low isolates node", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1000, rHiZ = 1e9;
-    const fix = buildFixture({ build: buildUnloadedFixture(vOL, vOH, rLoad, rOut, vOH, vOL, rHiZ) });
+  it("en=0 isolates node (rHiZ)", () => {
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1000;
+    const fix = buildFixture({ build: buildUnloadedFixture(0, 1, rLoad, rOut, vOH, vOL) });
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = Math.abs(fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode));
-    // Bound: |vOut| < vOH * (1/rHiZ) * rLoad = 5 * (1/1e9) * 1000 = 5e-6 V
-    const bound = vOH * (1 / rHiZ) * rLoad;
-    expect(vOut).toBeLessThan(bound + 1e-9);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = Math.abs(fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN));
+    // Bound: |vOut| < vOH · rLoad / rHiZ = 5 · 1000 / 1e9 = 5e-6 V
+    const bound = vOH * (1 / DEFAULT_RHIZ) * rLoad;
+    expect(vOut).toBeLessThan(bound);
   });
 });

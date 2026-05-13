@@ -615,16 +615,24 @@ describe("AttributeMapping parametric audit (every registered component)", () =>
 
   for (const def of definitions) {
     describe(def.name, () => {
-      const seenXmlNames = new Map<string, number>();
+      // A single XML attribute may legitimately fan out to multiple
+      // PropertyBag keys (e.g. LED's "Color" populates both `color` and
+      // `model`). The AttributeMapping interface places no structural ban on
+      // duplicate xmlNames; the parser applies each entry in order. What we
+      // DO want to forbid is two entries claiming the same
+      // (xmlName, propertyKey) pair — that's a redundant/contradictory
+      // registration. So the audit pairs both halves of the mapping.
+      const seenPairs = new Map<string, number>();
       for (const mapping of def.attributeMap) {
-        const count = seenXmlNames.get(mapping.xmlName) ?? 0;
-        seenXmlNames.set(mapping.xmlName, count + 1);
+        const key = `${mapping.xmlName}→${mapping.propertyKey}`;
+        const count = seenPairs.get(key) ?? 0;
+        seenPairs.set(key, count + 1);
       }
 
-      it("attributeMap xmlNames are unique within the component", () => {
-        const duplicates = [...seenXmlNames.entries()]
+      it("attributeMap (xmlName, propertyKey) pairs are unique within the component", () => {
+        const duplicates = [...seenPairs.entries()]
           .filter(([, n]) => n > 1)
-          .map(([name]) => name);
+          .map(([pair]) => pair);
         expect(duplicates).toEqual([]);
       });
 
@@ -921,46 +929,44 @@ describe("Definition-shape parametric audit (every registered, non-internalOnly 
         expect(offenders).toEqual([]);
       });
 
-      // -- 6. modelRegistry default-entry kind tag is framework-supported -----
+      // -- 6. modelRegistry entry kind tag is framework-supported ------------
       //
-      // Replaces per-component `expect(entry.kind).toBe("inline" | "netlist")`
-      // assertions wave-3 §3 deleted from spice-model-overrides-prop.test.ts.
-      // Skips definitions with no modelRegistry or an empty modelRegistry-
-      // pure digital components have no analog ModelEntry to audit. Surfaces
-      // a missing default entry, an unrecognised kind, or a non-string kind
-      // as a per-definition it() failure.
+      // Every analog ModelEntry must advertise a framework-supported `kind`.
+      // Iterates each entry independently — `defaultModel` is NOT a valid
+      // lookup key into modelRegistry (per CLAUDE.md: it is only the initial
+      // property-bag value at placement time, and may legitimately reference a
+      // pure-digital model in `models.digital` that has no modelRegistry entry).
       if (def.modelRegistry !== undefined && Object.keys(def.modelRegistry).length > 0) {
-        it(`def_${def.name}_default_modelRegistry_entry_kind_is_framework_supported`, () => {
-          const defaultModel = def.defaultModel;
-          expect(typeof defaultModel).toBe("string");
-          const entry = def.modelRegistry![defaultModel as string];
-          expect(entry).toBeDefined();
-          expect(typeof entry.kind).toBe("string");
-          expect(FRAMEWORK_KINDS.has(entry.kind as string)).toBe(true);
-        });
+        for (const [modelKey, entry] of Object.entries(def.modelRegistry)) {
+          it(`def_${def.name}_modelRegistry_${modelKey}_kind_is_framework_supported`, () => {
+            expect(typeof entry.kind).toBe("string");
+            expect(FRAMEWORK_KINDS.has(entry.kind as string)).toBe(true);
+          });
+        }
       }
 
-      // -- 7. junction-bearing ModelEntry default params carry positive TEMP --
+      // -- 7. junction-bearing ModelEntry TEMP overrides are well-formed ----
       //
-      // Replaces per-component `expect(params.TEMP).toBeGreaterThan(0)`
-      // assertions wave-3 §3 deleted from spice-model-overrides-prop.test.ts.
-      // Junction-bearing predicate is programmatic via the existing
-      // ComponentCategory.SEMICONDUCTORS gate (BJT, FET, Diode, Schottky,
-      // Zener, SCR, Triac, Diac, Triode); no hard-coded definition list and
-      // no new field on any model. A definition under SEMICONDUCTORS whose
-      // modelRegistry has no default entry is skipped silently- the entry
-      // shape is the subject under test and audit #6 above already surfaces
-      // missing default entries.
-      if (def.category === ComponentCategory.SEMICONDUCTORS) {
-        const entryForTemp = def.modelRegistry?.[def.defaultModel ?? ""];
-        if (entryForTemp !== undefined) {
-          it(`def_${def.name}_default_modelRegistry_params_carry_positive_TEMP`, () => {
-            const params = (entryForTemp as { params?: Record<string, number> }).params;
-            expect(params).toBeDefined();
-            expect(typeof params!.TEMP).toBe("number");
-            expect(Number.isFinite(params!.TEMP)).toBe(true);
-            expect(params!.TEMP).toBeGreaterThan(0);
-          });
+      // SPICE-correct: `params.TEMP` on a modelRegistry entry is a per-preset
+      // override (mirrors ngspice's BJTtempGiven / DIOtempGiven mechanic).
+      // Presets that omit TEMP correctly inherit `ctx.cktTemp` at the engine's
+      // temperature pass (loaders/default-loaders.ts; ckt-temp.ts), which
+      // re-runs each element's `computeTemperature(ctx)` with `effectiveT =
+      // _tempGiven ? params.TEMP : ctx.cktTemp` (cite: bjttemp.c:107-108).
+      //
+      // We only audit presets that *explicitly* set TEMP — guards against
+      // typos like `TEMP: -1` or `TEMP: NaN` without forbidding the
+      // cktTemp-inheriting shape.
+      if (def.category === ComponentCategory.SEMICONDUCTORS && def.modelRegistry !== undefined) {
+        for (const [modelKey, entry] of Object.entries(def.modelRegistry)) {
+          const params = (entry as { params?: Record<string, number> }).params;
+          if (params !== undefined && "TEMP" in params) {
+            it(`def_${def.name}_modelRegistry_${modelKey}_TEMP_override_is_positive_finite`, () => {
+              expect(typeof params.TEMP).toBe("number");
+              expect(Number.isFinite(params.TEMP)).toBe(true);
+              expect(params.TEMP).toBeGreaterThan(0);
+            });
+          }
         }
       }
 

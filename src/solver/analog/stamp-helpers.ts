@@ -53,7 +53,7 @@ export function allocNortonStamp(
  * Stamp a Norton-equivalent (G in parallel with current source I) at the
  * pre-allocated 4 conductance handles and add `+I` / `-I` to rhs[posNode]
  * / rhs[negNode]. Always stamps RHS — no skip (source spec §6.8; pattern
- * matches capacitor.ts:330-335).
+ * matches capacitor.ts:217-220).
  */
 export function stampNortonAt(
   ctx: LoadContext,

@@ -1,12 +1,9 @@
-﻿/**
- * BehavioralNotDriverElement- pure-truth-function driver leaf for the 1-input
- * NOT gate.
- *
- * Reads 1 input voltage from rhsOld (relative to gnd), threshold-classifies
- * it against per-instance vIH / vIL, and writes the NOT result.
+/**
+ * BehavioralNotDriverElement — pure-truth-function driver leaf for the 1-input
+ * NOT gate. See and-driver.ts for the normalized-bit driver-chain architecture.
  *
  * Per Composite M10 (phase-composite-architecture.md), J-152
- * (contracts_group_10.md). N=1 fixed; truth function: 1 - inputs[0].
+ * (contracts_group_10.md). N=1 fixed; truth function: 1 - input.
  */
 
 import {
@@ -22,19 +19,7 @@ import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
-// ---------------------------------------------------------------------------
-// State schema
-// ---------------------------------------------------------------------------
-
 const SCHEMA: StateSchema = defineStateSchema("BehavioralNotDriver", []);
-
-// ---------------------------------------------------------------------------
-// Pin layout- N=1 fixed, module-level const
-// ---------------------------------------------------------------------------
-//
-// Order MUST match the parent's connectivity row for this sub-element. The
-// parent emits [in_1_net, ctrl_out_net, gnd_net] and the compiler stores each
-// pin label against the resolved node from the matching connectivity index.
 
 const NOT_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   {
@@ -54,10 +39,6 @@ const NOT_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// BehavioralNotDriverElement
-// ---------------------------------------------------------------------------
-
 export class BehavioralNotDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
@@ -68,22 +49,12 @@ export class BehavioralNotDriverElement extends PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private readonly _ctrlOutNode: number;
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
     this._inputNode = pinNodes.get("in_1")!;
     this._gndNode = pinNodes.get("gnd")!;
     this._ctrlOutNode = pinNodes.get("ctrl_out")!;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -95,36 +66,18 @@ export class BehavioralNotDriverElement extends PoolBackedAnalogElement {
     const rhsOld = ctx.rhsOld;
     const gndV = rhsOld[this._gndNode];
     const v = rhsOld[this._inputNode] - gndV;
-
-    let target: number;
-    if (v >= this._vIH) {
-      target = this._vOL;
-    } else if (v < this._vIL) {
-      target = this._vOH;
-    } else {
-      const mid = (this._vOH + this._vOL) / 2;
-      target = rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL;
-    }
-
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    const result = v >= 0.5 ? 0 : 1;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
-
-// ---------------------------------------------------------------------------
-// ComponentDefinition
-// ---------------------------------------------------------------------------
 
 export const BehavioralNotDriverDefinition: ComponentDefinition = {
   name: "BehavioralNotDriver",
@@ -134,14 +87,8 @@ export const BehavioralNotDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH",  default: 2.0 },
-        { key: "vIL",  default: 0.8 },
-        { key: "rOut", default: 100 },
-        { key: "vOH",  default: 5 },
-        { key: "vOL",  default: 0 },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralNotDriverElement(pinNodes, props),
     },

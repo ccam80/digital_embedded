@@ -653,8 +653,12 @@ export function createDiodeElement(
       // Apply pnjlim  dioload.c:180-204.
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) {
-        // dioload.c:126-138: these phases set vd directly  no pnjlim.
+      // dioload.c:126-138: MODEINITSMSIG/MODEINITTRAN/MODEINITJCT(+sub-cases) and
+      // MODEINITFIX+DIOoff all terminate the if-else chain BEFORE the pnjlim
+      // call in the trailing `else {}` block (dioload.c:139). Mirror the full
+      // dispatch here so digiTS never calls pnjlim where ngspice doesn't.
+      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) ||
+          ((mode & MODEINITFIX) && params.OFF)) {
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else if (isFinite(params.BV) && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {

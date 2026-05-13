@@ -1159,3 +1159,123 @@ export interface SessionReport {
     }>;
   }>;
 }
+
+// ---------------------------------------------------------------------------
+// Diff reports (harness_topology_diff / harness_matrix_diff / harness_first_divergence)
+// ---------------------------------------------------------------------------
+
+/**
+ * Classification of the matrix-entry diff at one iteration.
+ *
+ * - `match`: identical (row, col) sets AND identical values.
+ * - `value-only`: identical (row, col) sets; ≥1 cell with differing values AND
+ *   value multisets DIFFER. Genuine arithmetic divergence at aligned cells.
+ * - `value-permutation`: identical (row, col) sets; ≥1 cell with differing
+ *   values BUT value multisets match. Same numbers landed at different cells
+ *   - a load-order / internal-node-allocation permutation.
+ * - `coord-set-differs`: (row, col) sets differ. Per-cell pairing past this
+ *   point is undefined — agents should call `harness_topology_diff` to inspect
+ *   which elements / nodes are missing or reordered.
+ */
+export type MatrixDiffClassification =
+  | "match"
+  | "value-only"
+  | "value-permutation"
+  | "coord-set-differs";
+
+export interface MatrixDiffCell {
+  /** 0-based row in our matrix coordinate space (after ngspice→ours reindex for the ngspice side). */
+  row: number;
+  /** 0-based col in our matrix coordinate space. */
+  col: number;
+  rowLabel: string;
+  colLabel: string;
+  /** Our cell value at the reference iteration; null when absent from ours. */
+  ours: number | null;
+  /** ngspice cell value at the reference iteration; null when absent from ngspice. */
+  ngspice: number | null;
+  absDelta: number;
+  /** First (step, iter) where the cell first diverged across the session. null when never. */
+  firstDivergentStep: number | null;
+  firstDivergentIteration: number | null;
+}
+
+export interface MatrixDiffReport {
+  /** Reference step used to classify and pick the example cells. */
+  stepIndex: number;
+  /** Reference iteration index within the accepted attempt. */
+  iterationIndex: number;
+  classification: MatrixDiffClassification;
+  ourCellCount: number;
+  ngspiceCellCount: number;
+  /** Cells present in our matrix at reference but missing from ngspice's. */
+  oursOnly: MatrixDiffCell[];
+  /** Cells present in ngspice's matrix at reference but missing from ours. */
+  ngspiceOnly: MatrixDiffCell[];
+  /** Cells present in both but with differing values. Sorted by absDelta desc. */
+  valueMismatches: MatrixDiffCell[];
+}
+
+export type TopologyElementDiffReason =
+  | "ours-only"
+  | "ngspice-only"
+  | "type-mismatch";
+
+export interface TopologyElementDiff {
+  ourLabel: string | null;
+  ngspiceLabel: string | null;
+  ourType: string | null;
+  ngspiceType: string | null;
+  reason: TopologyElementDiffReason;
+}
+
+export interface TopologyOrderingDiff {
+  label: string;
+  ourSlotIndex: number;
+  ngspiceSlotIndex: number;
+  kind: "node" | "branch";
+}
+
+export interface TopologyDiffReport {
+  ourElementCount: number;
+  ngspiceElementCount: number;
+  ourNodeCount: number;
+  ngspiceNodeCount: number;
+  ourMatrixSize: number;
+  ngspiceMatrixSize: number;
+  /** Per-element correspondence issues (ours-only, ngspice-only, type-mismatch). */
+  elementDiffs: TopologyElementDiff[];
+  /** Nodes/branches where the matched 1-based slot index differs between sides. */
+  orderingDiffs: TopologyOrderingDiff[];
+  /** ngspice nodes with no entry in the node mapping (often composite-internal). */
+  unmappedNgspiceNodes: Array<{ ngspiceName: string; ngspiceIndex: number }>;
+  /**
+   * Findings deferred from `_assertMatrixStructuralParity`. Present when the
+   * session was created with `deferStructuralAsserts: true` — populated only
+   * after `harness_run`. Used so MCP investigation tools can surface the same
+   * verdict the assertion would normally throw.
+   */
+  structuralFindings: Array<{ kind: string; message: string }>;
+}
+
+export type DivergenceSignalClass = "voltage" | "matrix" | "state" | "shape";
+
+export interface FirstDivergenceSignal {
+  signalClass: DivergenceSignalClass;
+  stepIndex: number;
+  iterationIndex: number;
+  /** Free-form description of the divergent attribute. */
+  attribute: string;
+  ours: number | string;
+  ngspice: number | string;
+  absDelta: number;
+}
+
+export interface FirstDivergenceReport {
+  voltage: FirstDivergenceSignal | null;
+  matrix: FirstDivergenceSignal | null;
+  state: FirstDivergenceSignal | null;
+  shape: FirstDivergenceSignal | null;
+  /** Earliest divergence across all classes (lowest stepIndex, then iterationIndex). */
+  earliest: FirstDivergenceSignal | null;
+}

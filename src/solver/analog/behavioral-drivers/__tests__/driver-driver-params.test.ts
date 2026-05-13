@@ -4,8 +4,7 @@
  * BehavioralDriverInvDriverElement.
  *
  * Asserts that setParam("rOut", 200), setParam("vOH", 3.3), and
- * setParam("vOL", 0.5) do not throw. Phase 1 does not wire these params
- * into load(); that is Phase 4's job.
+ * setParam("vOL", 0.5) do not throw.
  */
 
 import { describe, it, expect } from "vitest";
@@ -28,18 +27,19 @@ function makeProps(params: Record<string, number>): PropertyBag {
 
 function buttonLedPinNodes(): ReadonlyMap<string, number> {
   return new Map<string, number>([
-    ["out", 1],
-    ["in",  2],
-    ["gnd", 0],
+    ["ctrl_out", 1],
+    ["in",       2],
+    ["gnd",      0],
   ]);
 }
 
 function driverDriverPinNodes(): ReadonlyMap<string, number> {
   return new Map<string, number>([
-    ["in",  1],
-    ["sel", 2],
-    ["out", 3],
-    ["gnd", 0],
+    ["in",       1],
+    ["sel",      2],
+    ["ctrl_out", 3],
+    ["ctrl_en",  4],
+    ["gnd",      0],
   ]);
 }
 

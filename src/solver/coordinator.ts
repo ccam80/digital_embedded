@@ -228,8 +228,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     // the first transient iteration on the first call after init/reset, then
     // skips the DCOP on subsequent calls. The coordinator is the digital/
     // analog bridge layer and has no ngspice analog here.
-    const analogTimeBefore = this._analog?.simTime ?? 0;
-
     if (this._analog !== null && this._analysisPhase === "dcop") {
       this._analysisPhase = "tranInit";
     }
@@ -242,17 +240,10 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       this._analog.step();
     }
 
-    // Stagnation guard: if the analog engine completed step() but simTime
-    // did not advance, all internal retries were exhausted- the engine
-    // cannot make progress from this state. Fail immediately rather than
-    // burning CPU repeating identical failures.
-    if (this._analog !== null && this._analog.simTime === analogTimeBefore) {
-      throw new Error(
-        `Analog engine stagnation: simTime stuck at ${this._analog.simTime}s. ` +
-        `The engine exhausted all internal retries without advancing. ` +
-        `Check convergence log for details.`,
-      );
-    }
+    // Convergence failures are reported by the engine itself: it emits a
+    // structured `convergence-failed` Diagnostic into the shared collector
+    // and transitions to EngineState.ERROR before returning. Callers query
+    // those (state + getRuntimeDiagnostics()) — no exception path here.
 
     // ngspice clears MODEINITTRAN after the first accepted transient step,
     // regardless of integration order.  Our tranInit→tranFloat transition

@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import {
-  BehavioralOutputDriverTriStateElement,
-} from "../../../solver/analog/behavioral-output-driver.js";
+  buildDigitalOutputPinTriStateLoadedNetlist,
+} from "../digital-output-pin-tristate-loaded.js";
 import type { ComponentRegistry, StandaloneComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -12,7 +12,6 @@ import type { CircuitElement } from "../../../core/element.js";
 import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -27,13 +26,10 @@ function nodeOf(fix: Fixture, label: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Thin test-wrapper for DigitalOutputPinTriStateLoaded (internalOnly composite)
+// Thin test-wrapper for DigitalOutputPinTriStateLoaded (internalOnly composite).
 //
-// The composite wraps BehavioralOutputDriverTriState + Capacitor. Rather than
-// trying to instantiate the internalOnly composite directly, we drive the
-// underlying leaf element through a thin StandaloneComponentDefinition so the
-// same AnalogElement class is exercised without modifying any production
-// definition.
+// en/ctrl carry NORMALIZED logic-level signals in {0, 1} V per the new
+// digital→analog pin-boundary architecture.
 // ---------------------------------------------------------------------------
 
 let _pinGroupCounter = 0;
@@ -96,18 +92,21 @@ function makePinDecl(label: string, direction: PinDirection) {
   };
 }
 
-const TRISTATE_PIN_DECLS = [
-  { label: "pos",  direction: PinDirection.OUTPUT },
-  { label: "neg",  direction: PinDirection.INPUT  },
+const LOADED_TRISTATE_PIN_DECLS = [
+  { label: "node", direction: PinDirection.OUTPUT },
+  { label: "gnd",  direction: PinDirection.OUTPUT },
   { label: "ctrl", direction: PinDirection.INPUT  },
   { label: "en",   direction: PinDirection.INPUT  },
 ];
 
-function buildTriStateWrapperDef(): StandaloneComponentDefinition {
+const DEFAULT_CAP = 1e-12;
+const DEFAULT_RHIZ = 1e9;
+
+function buildLoadedWrapperDef(): StandaloneComponentDefinition {
   return {
-    name: "_TestTriStateLoadedDrv",
+    name: "_TestDigitalOutputPinTriStateLoaded",
     typeId: -1,
-    pinLayout: TRISTATE_PIN_DECLS.map(p => makePinDecl(p.label, p.direction)),
+    pinLayout: LOADED_TRISTATE_PIN_DECLS.map(p => makePinDecl(p.label, p.direction)),
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
@@ -115,20 +114,20 @@ function buildTriStateWrapperDef(): StandaloneComponentDefinition {
     models: {},
     defaultModel: "default",
     factory: (props: PropertyBag): CircuitElement =>
-      makeTestCircuitElement("_TestTriStateLoadedDrv", props, TRISTATE_PIN_DECLS),
+      makeTestCircuitElement("_TestDigitalOutputPinTriStateLoaded", props, LOADED_TRISTATE_PIN_DECLS),
     modelRegistry: {
       default: {
-        kind: "inline",
+        kind: "netlist",
+        netlist: buildDigitalOutputPinTriStateLoadedNetlist,
         paramDefs: [
-          { key: "vOH",  default: 5 },
-          { key: "vOL",  default: 0 },
-          { key: "rOut", default: 100 },
-          { key: "rHiZ", default: 1e9 },
+          { key: "rOut",  default: 100 },
+          { key: "cOut",  default: DEFAULT_CAP },
+          { key: "vOH",   default: 5 },
+          { key: "vOL",   default: 0 },
+          { key: "rHiZ",  default: DEFAULT_RHIZ },
+          { key: "midEn", default: 0.5 },
         ],
-        params: { vOH: 5, vOL: 0, rOut: 100, rHiZ: 1e9 },
-        branchCount: 0,
-        factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag): AnalogElement =>
-          new BehavioralOutputDriverTriStateElement(pinNodes, props),
+        params: { rOut: 100, cOut: DEFAULT_CAP, vOH: 5, vOL: 0, rHiZ: DEFAULT_RHIZ, midEn: 0.5 },
       },
     },
   };
@@ -145,30 +144,27 @@ function buildLoadedFixture(
   rOut = 100,
   vOH = 5,
   vOL = 0,
-  rHiZ = 1e9,
+  rHiZ = DEFAULT_RHIZ,
 ) {
   return (registry: ComponentRegistry, facade: DefaultSimulatorFacade): Circuit => {
-    registry.register(buildTriStateWrapperDef());
+    registry.register(buildLoadedWrapperDef());
     return facade.build({
       components: [
         { id: "vsCtrl", type: "DcVoltageSource", props: { label: "vsCtrl", voltage: vCtrl } },
         { id: "vsEn",   type: "DcVoltageSource", props: { label: "vsEn",   voltage: vEn   } },
-        { id: "drv",    type: "_TestTriStateLoadedDrv",
-          props: { label: "drv", model: "default", vOH, vOL, rOut, rHiZ } },
+        { id: "pin",    type: "_TestDigitalOutputPinTriStateLoaded",
+          props: { label: "pin", model: "default", vOH, vOL, rOut, rHiZ } },
         { id: "rLoad",  type: "Resistor", props: { label: "rLoad", resistance: rLoad } },
-        { id: "cOut",   type: "Capacitor", props: { label: "cOut", capacitance: 1e-12 } },
         { id: "gnd",    type: "Ground" },
       ],
       connections: [
-        ["vsCtrl:pos", "drv:ctrl"],
+        ["vsCtrl:pos", "pin:ctrl"],
         ["vsCtrl:neg", "gnd:out"],
-        ["vsEn:pos",   "drv:en"],
+        ["vsEn:pos",   "pin:en"],
         ["vsEn:neg",   "gnd:out"],
-        ["drv:neg",    "gnd:out"],
-        ["drv:pos",    "rLoad:pos"],
-        ["drv:pos",    "cOut:pos"],
+        ["pin:gnd",    "gnd:out"],
+        ["pin:node",   "rLoad:pos"],
         ["rLoad:neg",  "gnd:out"],
-        ["cOut:neg",   "gnd:out"],
       ],
     });
   };
@@ -179,58 +175,54 @@ function buildLoadedFixture(
 // ---------------------------------------------------------------------------
 
 describe("DigitalOutputPinTriStateLoaded", () => {
-  it("en high ctrl high stamps vOH at node", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000, rHiZ = 1e9;
-    const fix = buildFixture({ build: buildLoadedFixture(vOH, vOH, rLoad, rOut, vOH, vOL, rHiZ) });
+  it("en=1 ctrl=1 produces vOH at node", () => {
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
+    const fix = buildFixture({ build: buildLoadedFixture(1, 1, rLoad, rOut, vOH, vOL) });
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN);
     const expected = vOH * rLoad / (rLoad + rOut);
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("en high ctrl low stamps vOL at node", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000, rHiZ = 1e9;
-    const fix = buildFixture({ build: buildLoadedFixture(vOH, vOL, rLoad, rOut, vOH, vOL, rHiZ) });
+  it("en=1 ctrl=0 produces vOL at node", () => {
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
+    const fix = buildFixture({ build: buildLoadedFixture(1, 0, rLoad, rOut, vOH, vOL) });
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN);
     const expected = vOL * rLoad / (rLoad + rOut);
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("en low isolates node (high-Z, external pull dominates)", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1000, rHiZ = 1e9;
-    const fix = buildFixture({ build: buildLoadedFixture(vOL, vOH, rLoad, rOut, vOH, vOL, rHiZ) });
+  it("en=0 isolates node (rHiZ)", () => {
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1000;
+    const fix = buildFixture({ build: buildLoadedFixture(0, 1, rLoad, rOut, vOH, vOL) });
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = Math.abs(fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode));
-    // Bound: |vOut| < vOH * (1/rHiZ) * rLoad = 5 * (1/1e9) * 1000 = 5e-6 V
-    const bound = vOH * (1 / rHiZ) * rLoad;
-    expect(vOut).toBeLessThan(bound + 1e-9);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = Math.abs(fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN));
+    const bound = vOH * (1 / DEFAULT_RHIZ) * rLoad;
+    expect(vOut).toBeLessThan(bound);
   });
 
   it("cOut RC charges node after en flips high", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000, rHiZ = 1e9;
-    const cOut = 1e-12;
-    // Start en=high, ctrl=high — after a warm-start step the node should be charged
-    const tRC = 5 * cOut * rOut; // 500 ps
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
+    const tRC = 5 * DEFAULT_CAP * rOut; // 500 ps
     const fix = buildFixture({
-      build: buildLoadedFixture(vOH, vOH, rLoad, rOut, vOH, vOL, rHiZ),
+      build: buildLoadedFixture(1, 1, rLoad, rOut, vOH, vOL),
       params: { tStop: tRC * 10, maxTimeStep: tRC },
     });
 
-    // Step forward through 5*tau
     for (let i = 0; i < 10; i++) {
       fix.coordinator.step();
     }
 
-    const posNode = nodeOf(fix, "drv:pos");
-    const negNode = nodeOf(fix, "drv:neg");
-    const vOut = fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode);
+    const nodeN = nodeOf(fix, "pin:node");
+    const gndN  = nodeOf(fix, "pin:gnd");
+    const vOut = fix.engine.getNodeVoltage(nodeN) - fix.engine.getNodeVoltage(gndN);
     expect(vOut).toBeGreaterThan(0.95 * vOH);
   });
 });

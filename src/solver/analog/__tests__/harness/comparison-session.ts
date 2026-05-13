@@ -31,6 +31,7 @@ import { NgspiceBridge } from "./ngspice-bridge.js";
 import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
 import { matchSlotPattern } from "./glob.js";
+import { installUcrtLibmShim, uninstallUcrtLibmShim } from "./ucrt-libm-shim.js";
 import type {
   CaptureSession,
   TopologySnapshot,
@@ -79,6 +80,14 @@ import type {
   IterationSideData,
   AttemptDetail,
   AttemptQuery,
+  MatrixDiffReport,
+  MatrixDiffCell,
+  MatrixDiffClassification,
+  TopologyDiffReport,
+  TopologyElementDiff,
+  TopologyOrderingDiff,
+  FirstDivergenceReport,
+  FirstDivergenceSignal,
 } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
 import type { IntegrationMethod } from "../../integration.js";
@@ -120,8 +129,16 @@ function _computeLinearSystemData(
   residualInfinityNorm: number;
   matrix: number[] | null;
 } {
-  const n = matrixSize;
-  const rhs = Array.from(iter.preSolveRhs.subarray(0, n));
+  // `matrixSize` is the snapshot's equation-count metric (ngspice
+  // CKTmaxEqNum+1, our engine reports voltages.length+1; see types.ts:971-976
+  // for the contract). By that convention it is always one larger than the
+  // actual rhs/prevVoltages allocation (rhsBufSize), so iterating rows up to
+  // matrixSize unconditionally reads one past the end and writes NaN at the
+  // trailing slot. Earlier consumers happened to ignore that slot; the harness
+  // null-audit surfaces it. Clamp n to the real buffer length.
+  const n = Math.min(matrixSize, iter.preSolveRhs.length, iter.prevVoltages.length);
+  const rhs = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) rhs[i] = iter.preSolveRhs[i] ?? 0;
 
   // Build full dense matrix (row-major) from sparse entries
   let denseA: number[] | null = null;
@@ -240,6 +257,20 @@ export interface ComparisonSessionOptions {
   maxOurSteps?: number;
   /** When true, skip ngspice and compare our engine against a deep clone of itself. */
   selfCompare?: boolean;
+  /**
+   * When true, structural-parity assertions
+   * (`_assertMatrixStructuralParity` / `_assertFirstIterationMatrixEntriesMatch`)
+   * record their findings on the session rather than throwing. Used by the MCP
+   * investigation tools (`harness_topology_diff`, `harness_matrix_diff`,
+   * `harness_first_divergence`) so an agent can inspect what diverged even
+   * when matrixSize or coord-set parity is broken — the whole point of the
+   * investigation surface. Default `false` preserves the fail-fast behaviour
+   * for in-repo tests that depend on it.
+   *
+   * Intra-side drift (matrixSize changing within one engine during one run)
+   * is unaffected: that is a hard internal invariant and continues to throw.
+   */
+  deferStructuralAsserts?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,20 +338,27 @@ interface RhsLabeledResult {
 interface ToJSONOpts { includeAllSteps?: boolean }
 
 // ---------------------------------------------------------------------------
-// L2 norm helpers (file-scoped)
+// Norm helpers (file-scoped)
+//
+// `divergenceNorm` uses absolute L1 (Σ|a[i]-b[i]|), not L2: 1-ULP deltas
+// squared land at ~1e-38, sqrt at ~1e-19, which is indistinguishable from 0
+// in any human-facing display. L1 preserves the per-row absolute deltas
+// so a single 1-ULP slot still surfaces a non-zero norm.
+//
+// `_vectorL2` is unchanged- callers (endNodeNorm/endBranchNorm) want the
+// Euclidean magnitude of one side's solution vector, not a delta.
 // ---------------------------------------------------------------------------
 
-/** L2 norm of (a[start..end) - b[start..end)). NaN if either undefined. */
-function _l2Norm(a: Float64Array | undefined, b: Float64Array | undefined, start: number, end: number): number {
+/** Absolute L1 norm of (a[start..end) - b[start..end)). NaN if either undefined. */
+function _l1NormDiff(a: Float64Array | undefined, b: Float64Array | undefined, start: number, end: number): number {
   if (!a || !b) return NaN;
   const n = Math.min(a.length, b.length, end);
   if (n <= start) return NaN;
   let s = 0;
   for (let i = start; i < n; i++) {
-    const d = a[i] - b[i];
-    s += d * d;
+    s += Math.abs(a[i] - b[i]);
   }
-  return Math.sqrt(s);
+  return s;
 }
 
 /** L2 norm of v[start..end). NaN if undefined or empty range. */
@@ -374,6 +412,14 @@ export class ComparisonSession {
   protected _ngspiceOnlyRows: number[] = [];
   protected _ngspiceOnlyRowLabels: Map<number, string> = new Map();
 
+  /**
+   * Findings deferred from `_assertMatrixStructuralParity` /
+   * `_assertFirstIterationMatrixEntriesMatch` when
+   * `deferStructuralAsserts: true`. Reset at the start of every `runDcOp` /
+   * `runTransient` call and surfaced through `topologyDiff()`.
+   */
+  protected _structuralFindings: Array<{ kind: string; message: string }> = [];
+
   // Comparison results (lazily cached)
   protected _comparisons: ComparisonResult[] | null = null;
 
@@ -385,6 +431,10 @@ export class ComparisonSession {
 
   // Whether init() has completed
   protected _inited: boolean = false;
+
+  // Whether this session installed the ucrt libm shim — dispose() uses this
+  // to balance the install with a matching uninstall (refcounted in shim).
+  protected _libmShimInstalled: boolean = false;
 
   // Whether runDcOp()/runTransient() has completed
   protected _hasRun: boolean = false;
@@ -446,6 +496,14 @@ export class ComparisonSession {
    * and close the boot step directly into _stepCapture.
    */
   async init(): Promise<void> {
+    // Install the ucrt libm shim so digiTS uses the same `exp`/`log`
+    // implementations ngspice.dll statically embeds. Eliminates the V8 vs
+    // ucrt 1-ULP transcendental disagreement across the dcop_paired_*
+    // cluster (see memory/reference_libm_log_one_ulp.md). selfCompare
+    // sessions deliberately skip this — they compare ours-vs-ours, so
+    // ucrt-flavoured Math would skew them away from the JS baseline.
+    this._libmShimInstalled = installUcrtLibmShim();
+
     this._registry = createDefaultRegistry();
     this._facade = new DefaultSimulatorFacade(this._registry);
 
@@ -549,14 +607,16 @@ export class ComparisonSession {
 
   /**
    * Reject paired comparison when any component in the compiled circuit has
-   * declared `pairedSpiceEquivalent: false`. Such components either have no
-   * SPICE-primitive equivalent (behavioural macromodels), use sibling-ref
-   * coupling between sub-elements (non-SPICE-faithful factoring), or hold
-   * expression-driven controlled sources that cannot be emitted bit-exact.
-   * Tests for these components must use `ComparisonSession.createSelfCompare`
-   * instead. Throws an aggregated error listing every offender so the author
-   * can address them all at once rather than rediscovering the next one on
-   * each rerun.
+   * declared `pairedSpiceEquivalent: false`. The flag means the digiTS model
+   * is not yet emittable as a SPICE-faithful subcircuit (behavioural
+   * macromodel held in TS, or expression-driven controlled source the
+   * netlist generator cannot translate bit-exact). The real device class
+   * always has a SPICE reference (Boyle for op-amps, Koren for triodes,
+   * Joglekar for memristor, vendor .lib for the 555, etc.) — the model
+   * needs updating to compose canonical primitives that the generator can
+   * round-trip, not skipping. Until then, tests for these components must
+   * use `ComparisonSession.createSelfCompare`. Throws an aggregated error
+   * listing every offender so the author can address them all at once.
    */
   /**
    * Materialize the netlist deck to load into ngspice. For auto-generated decks,
@@ -604,9 +664,13 @@ export class ComparisonSession {
       `ComparisonSession: cannot run paired-with-ngspice comparison- the ` +
       `following component(s) have declared pairedSpiceEquivalent: false:\n` +
       `${list}\n` +
-      `These components either have no SPICE-primitive equivalent or use a ` +
-      `digiTS-specific factoring (sibling-ref coupling, behavioural macromodel, ` +
-      `expression-driven source) that cannot be emitted bit-exact. Use ` +
+      `The underlying device classes all have established SPICE references ` +
+      `(Boyle for op-amps, Koren for triodes, Joglekar for memristor, vendor ` +
+      `.lib subcircuits for the 555, etc.). The flag means the digiTS model ` +
+      `is currently held as a behavioural macromodel or expression-driven ` +
+      `source that the netlist generator cannot emit bit-exact, not that no ` +
+      `SPICE equivalent exists. The model needs updating to compose canonical ` +
+      `primitives the generator can round-trip. Until then, use ` +
       `ComparisonSession.createSelfCompare for tests of these components.`
     );
   }
@@ -630,6 +694,7 @@ export class ComparisonSession {
 
     this._analysis = "dcop";
     this._comparisons = null;
+    this._structuralFindings = [];
 
     // Run standalone .op on our engine. Capture hook accumulates iterations
     // into the pending step buffer; endStep() closes them as step 0.
@@ -702,6 +767,7 @@ export class ComparisonSession {
 
     this._analysis = "tran";
     this._comparisons = null;
+    this._structuralFindings = [];
 
     // ngspice CKTstep â†" our outputStep, ngspice CKTmaxStep â†" our maxTimeStep.
     // The two are independent ngspice .tran fields (TSTEP and TMAX) and govern
@@ -1683,7 +1749,7 @@ export class ComparisonSession {
         ...(ngIter.lteDt !== undefined ? { lteDt: ngIter.lteDt } : {}),
       } : null;
 
-      const divergenceNorm = _l2Norm(
+      const divergenceNorm = _l1NormDiff(
         ourIter?.voltages, ngIter?.voltages, 0, nodeCount,
       );
 
@@ -1717,9 +1783,15 @@ export class ComparisonSession {
 
   private _buildBranchValues(rhs: Float64Array, nodeCount: number): Record<string, number> {
     const result: Record<string, number> = {};
+    // matrixRowLabels uses 0-based matrix-row indexing (node N occupies row N-1);
+    // the voltages buffer is sized matrixSize+1 with a ground sentinel at slot 0,
+    // so matrix row R corresponds to voltages slot R+1. _buildNodeVoltages reads
+    // rhs[nodeId] which already happens to equal rhs[row+1] for nodes; mirror
+    // that here so branch rows index the right voltages slot.
     this._ourTopology.matrixRowLabels.forEach((label, row) => {
-      if (row >= nodeCount && row < rhs.length) {
-        result[label] = rhs[row];
+      const slot = row + 1;
+      if (row >= nodeCount && slot < rhs.length) {
+        result[label] = rhs[slot];
       }
     });
     return result;
@@ -1822,7 +1894,7 @@ export class ComparisonSession {
           // Paired row
           const ourLast = ourHead.a.iterations[ourHead.a.iterations.length - 1];
           const ngLast  = matchNg.a.iterations[matchNg.a.iterations.length - 1];
-          const divergenceNorm = _l2Norm(ourLast?.voltages, ngLast?.voltages, 0, nodeCount);
+          const divergenceNorm = _l1NormDiff(ourLast?.voltages, ngLast?.voltages, 0, nodeCount);
           result.push({
             phase: ourHead.a.phase,
             ...(ourHead.a.role !== undefined ? { role: ourHead.a.role } : {}),
@@ -1871,7 +1943,7 @@ export class ComparisonSession {
           // Paired row
           const ourLast = matchOurs.a.iterations[matchOurs.a.iterations.length - 1];
           const ngLast  = ngHead.a.iterations[ngHead.a.iterations.length - 1];
-          const divergenceNorm = _l2Norm(ourLast?.voltages, ngLast?.voltages, 0, nodeCount);
+          const divergenceNorm = _l1NormDiff(ourLast?.voltages, ngLast?.voltages, 0, nodeCount);
           result.push({
             phase: ngHead.a.phase,
             ...(ngHead.a.role !== undefined ? { role: ngHead.a.role } : {}),
@@ -2652,6 +2724,10 @@ export class ComparisonSession {
     this._ngSessionReindexed = null;
     this._comparisons = null;
     this._nodeMap = [];
+    if (this._libmShimInstalled) {
+      uninstallUcrtLibmShim();
+      this._libmShimInstalled = false;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -2850,7 +2926,7 @@ export class ComparisonSession {
     }
 
     const lacking = ourSize < ngSize ? "ours" : "ngspice";
-    throw new Error(
+    const message =
       `Matrix structural divergence (A1): equation counts differ between engines.\n` +
       `  ours.matrixSize = ${ourSize}\n` +
       `  ngspice.matrixSize = ${ngSize}\n` +
@@ -2859,8 +2935,11 @@ export class ComparisonSession {
       `golden reference; the fix direction is to modify our engine's equation ` +
       `allocation (likely CKTmkVolt/CKTmkCur equivalents in our setup path) so the ` +
       `equation count matches. Do NOT attempt to densify, pad, or otherwise reconcile ` +
-      `at the harness level.${detail}`
-    );
+      `at the harness level.${detail}`;
+    this._structuralFindings.push({ kind: "matrix-size-divergence", message });
+    if (!this._opts.deferStructuralAsserts) {
+      throw new Error(message);
+    }
   }
 
   /**
@@ -3029,7 +3108,16 @@ export class ComparisonSession {
       );
     }
     void isStructural;  // tracked above; retained for future logging hooks
-    throw new Error(lines.join("\n"));
+    const message = lines.join("\n");
+    const kind = coordSetDiffers
+      ? "first-iter-coord-set-differs"
+      : valuePermutation
+        ? "first-iter-value-permutation"
+        : "first-iter-value-only";
+    this._structuralFindings.push({ kind, message });
+    if (!this._opts.deferStructuralAsserts) {
+      throw new Error(message);
+    }
   }
 
   private _stepPresence(stepIndex: number): SidePresence {
@@ -3212,6 +3300,554 @@ export class ComparisonSession {
     if (phase === "tranInit") return "tranInit";
     if (phase === "tranFloat") return "tranFloat";
     return "dcop";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Diff / investigation API (consumed by harness_topology_diff,
+  // harness_matrix_diff, harness_first_divergence)
+  // ---------------------------------------------------------------------------
+
+  /** Findings deferred from the structural-parity asserts. Read-only snapshot. */
+  get structuralFindings(): ReadonlyArray<{ kind: string; message: string }> {
+    return this._structuralFindings;
+  }
+
+  /**
+   * Compare element-and-node topology between our compiled circuit and
+   * ngspice's deck. Does NOT require `runDcOp` / `runTransient` (but ngspice
+   * topology is only populated after a run, so element / ordering diffs are
+   * empty before that). Surfaces:
+   *
+   * - elementDiffs: components present on one side but not the other (matched
+   *   by lowercased label, with SPICE-prefix canonicalisation that mirrors
+   *   `generateSpiceNetlist` / `buildDirectNodeMapping`);
+   * - orderingDiffs: matched nodes/branches whose 1-based slot index differs
+   *   between sides — every entry is one element "allocated in a different
+   *   order";
+   * - unmappedNgspiceNodes: ngspice nodes that the node-mapping pass could not
+   *   resolve to one of our slots (typically composite-internal nodes whose
+   *   names didn't follow the conventions exhaustively in node-mapping.ts);
+   * - structuralFindings: deferred copies of the messages
+   *   `_assertMatrixStructuralParity` would have thrown.
+   */
+  topologyDiff(): TopologyDiffReport {
+    this._ensureInited();
+    const ourTopo = this._ourTopology;
+    const ngTopo = this._ngTopology;
+    const findings = this._structuralFindings.map(f => ({ kind: f.kind, message: f.message }));
+
+    if (!ngTopo) {
+      return {
+        ourElementCount: ourTopo.elementCount,
+        ngspiceElementCount: 0,
+        ourNodeCount: ourTopo.nodeCount,
+        ngspiceNodeCount: 0,
+        ourMatrixSize: ourTopo.matrixSize,
+        ngspiceMatrixSize: 0,
+        elementDiffs: [],
+        orderingDiffs: [],
+        unmappedNgspiceNodes: [],
+        structuralFindings: findings,
+      };
+    }
+
+    // Element correspondence by lowercased label, with prefix-augmented
+    // variants to cover the canonicalSpiceLabel transform applied by
+    // generateSpiceNetlist (a Capacitor labelled "Vc" gets emitted as "CVc").
+    // We compute candidate ngspice deck names per our element and check
+    // membership against the ngTopo.devices map.
+    const ngByName = new Map<string, typeof ngTopo.devices[number]>();
+    for (const d of ngTopo.devices) ngByName.set(d.name.toLowerCase(), d);
+
+    const matchedNgNames = new Set<string>();
+    const elementDiffs: TopologyElementDiff[] = [];
+
+    const prefixCandidates = ["v", "l", "e", "f", "h", "r", "c", "d", "q", "m", "j", "i", "g", "s", "w", "t"];
+    const candidatesFor = (label: string): string[] => {
+      const lower = label.toLowerCase();
+      const underscored = lower.replace(/:/g, "_");
+      const seen = new Set<string>();
+      const out: string[] = [];
+      const push = (s: string) => { if (!seen.has(s)) { seen.add(s); out.push(s); } };
+      push(lower);
+      push(underscored);
+      for (const p of prefixCandidates) {
+        push(`${p}${lower}`);
+        push(`${p}${underscored}`);
+      }
+      return out;
+    };
+
+    for (const el of ourTopo.elements) {
+      let matched: typeof ngTopo.devices[number] | null = null;
+      for (const cand of candidatesFor(el.label)) {
+        const d = ngByName.get(cand);
+        if (d) { matched = d; matchedNgNames.add(cand); break; }
+      }
+      if (!matched) {
+        elementDiffs.push({
+          ourLabel: el.label,
+          ngspiceLabel: null,
+          ourType: el.type,
+          ngspiceType: null,
+          reason: "ours-only",
+        });
+      }
+    }
+
+    for (const [name, dev] of ngByName) {
+      if (matchedNgNames.has(name)) continue;
+      // Already covered as ngspice-only? Track by ngspice name to dedupe across
+      // the multiple candidate-form lookups above.
+      elementDiffs.push({
+        ourLabel: null,
+        ngspiceLabel: dev.name,
+        ourType: null,
+        ngspiceType: dev.typeName,
+        reason: "ngspice-only",
+      });
+    }
+
+    // Ordering diffs: matched mappings where ourIndex !== ngspiceIndex.
+    // Skip ground (ourIndex === 0) — both sides reserve slot 0 unconditionally.
+    const orderingDiffs: TopologyOrderingDiff[] = [];
+    for (const m of this._nodeMap) {
+      if (m.ourIndex === 0) continue;
+      if (m.ourIndex !== m.ngspiceIndex) {
+        const isBranch = m.ourIndex > ourTopo.nodeCount;
+        orderingDiffs.push({
+          label: m.label,
+          ourSlotIndex: m.ourIndex,
+          ngspiceSlotIndex: m.ngspiceIndex,
+          kind: isBranch ? "branch" : "node",
+        });
+      }
+    }
+    orderingDiffs.sort((a, b) => a.ourSlotIndex - b.ourSlotIndex);
+
+    const mappedNg = new Set<number>(this._nodeMap.map(m => m.ngspiceIndex));
+    const unmappedNgspiceNodes: Array<{ ngspiceName: string; ngspiceIndex: number }> = [];
+    ngTopo.nodeNames.forEach((idx, name) => {
+      if (idx > 0 && !mappedNg.has(idx)) {
+        unmappedNgspiceNodes.push({ ngspiceName: name, ngspiceIndex: idx });
+      }
+    });
+    unmappedNgspiceNodes.sort((a, b) => a.ngspiceIndex - b.ngspiceIndex);
+
+    // ngTopo.nodeNames contains both voltage-node entries and branch-row
+    // entries (ngspice's `<elem>#branch` pseudonames created via CKTmkCur for
+    // vsources, inductors, etc.). Our convention's `nodeCount` is voltage
+    // nodes ONLY (branches live in the matrix past `nodeCount`). Filter the
+    // branch rows here so `ngspiceNodeCount` is comparable to `ourNodeCount`
+    // when the physical topologies match.
+    let ngVoltageNodeCount = 0;
+    ngTopo.nodeNames.forEach((_, name) => {
+      if (!name.endsWith("#branch")) ngVoltageNodeCount++;
+    });
+
+    return {
+      ourElementCount: ourTopo.elementCount,
+      ngspiceElementCount: ngTopo.devices.length,
+      ourNodeCount: ourTopo.nodeCount,
+      ngspiceNodeCount: ngVoltageNodeCount,
+      ourMatrixSize: ourTopo.matrixSize,
+      ngspiceMatrixSize: ngTopo.matrixSize,
+      elementDiffs,
+      orderingDiffs,
+      unmappedNgspiceNodes,
+      structuralFindings: findings,
+    };
+  }
+
+  /**
+   * Compute a matrix diff at one reference iteration AND scan the whole
+   * session to attribute each divergent cell to the (step, iter) where it
+   * first diverged. Reference defaults to (step 0, iter 0) — the same site
+   * `_assertFirstIterationMatrixEntriesMatch` classifies.
+   *
+   * Classification logic mirrors `_assertFirstIterationMatrixEntriesMatch`
+   * (coord-set-differs / value-permutation / value-only / match) so MCP
+   * consumers get the same verdict the assertion would have produced.
+   *
+   * ngspice cells are reindexed into our matrix coordinate space via
+   * `_ngMatrixRowMap` / `_ngMatrixColMap` so labels line up. Cells whose
+   * ngspice indices have no mapping are dropped from the comparison and
+   * surfaced via `harness_topology_diff` (`unmappedNgspiceNodes`) instead.
+   */
+  matrixDiff(opts?: { stepIndex?: number; iterationIndex?: number }): MatrixDiffReport {
+    this._ensureRun();
+    const stepIndex = opts?.stepIndex ?? 0;
+    const iterationIndex = opts?.iterationIndex ?? 0;
+
+    const ourSess = this._ourSession;
+    const ngSess = this._ngSessionAligned();
+    if (!ourSess || !ngSess) {
+      throw new Error("matrixDiff: no captured sessions");
+    }
+
+    const ourStep = ourSess.steps[stepIndex];
+    const ngStep = ngSess.steps[stepIndex];
+    if (!ourStep || !ngStep) {
+      throw new Error(`matrixDiff: step ${stepIndex} out of range`);
+    }
+
+    const pickIter = (step: StepSnapshot) => {
+      const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : 0;
+      const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+      return iters[iterationIndex] ?? null;
+    };
+    const ourIt = pickIter(ourStep);
+    const ngIt = pickIter(ngStep);
+    if (!ourIt || !ngIt) {
+      throw new Error(`matrixDiff: iteration ${iterationIndex} out of range at step ${stepIndex}`);
+    }
+
+    const identityMode = this._opts.selfCompare || this._ngMatrixRowMap.size === 0;
+    const buildOurMap = (iter: import("./types.js").IterationSnapshot): Map<string, number> => {
+      const m = new Map<string, number>();
+      for (const e of iter.matrix) m.set(`${e.row},${e.col}`, e.value);
+      return m;
+    };
+    const buildNgMap = (iter: import("./types.js").IterationSnapshot): Map<string, number> => {
+      const m = new Map<string, number>();
+      for (const e of iter.matrix) {
+        let r = e.row, c = e.col;
+        if (!identityMode) {
+          const mr = this._ngMatrixRowMap.get(e.row);
+          const mc = this._ngMatrixColMap.get(e.col);
+          if (mr === undefined || mc === undefined) continue;
+          r = mr; c = mc;
+        }
+        m.set(`${r},${c}`, e.value);
+      }
+      return m;
+    };
+
+    const ourMap = buildOurMap(ourIt);
+    const ngMap = buildNgMap(ngIt);
+
+    const labelFor = (r: number, c: number) => ({
+      rowLabel: this._ourTopology.matrixRowLabels.get(r) ?? `row${r}`,
+      colLabel: this._ourTopology.matrixColLabels.get(c) ?? `col${c}`,
+    });
+
+    const oursOnly: MatrixDiffCell[] = [];
+    const ngspiceOnly: MatrixDiffCell[] = [];
+    const valueMismatches: MatrixDiffCell[] = [];
+
+    const parseKey = (k: string): [number, number] => {
+      const idx = k.indexOf(",");
+      return [Number(k.slice(0, idx)), Number(k.slice(idx + 1))];
+    };
+
+    for (const [k, ours] of ourMap) {
+      const ng = ngMap.get(k);
+      const [r, c] = parseKey(k);
+      const { rowLabel, colLabel } = labelFor(r, c);
+      if (ng === undefined) {
+        oursOnly.push({
+          row: r, col: c, rowLabel, colLabel,
+          ours, ngspice: null,
+          absDelta: NaN,
+          firstDivergentStep: null, firstDivergentIteration: null,
+        });
+      } else if (ours !== ng) {
+        valueMismatches.push({
+          row: r, col: c, rowLabel, colLabel,
+          ours, ngspice: ng,
+          absDelta: Math.abs(ours - ng),
+          firstDivergentStep: null, firstDivergentIteration: null,
+        });
+      }
+    }
+    for (const [k, ng] of ngMap) {
+      if (ourMap.has(k)) continue;
+      const [r, c] = parseKey(k);
+      const { rowLabel, colLabel } = labelFor(r, c);
+      ngspiceOnly.push({
+        row: r, col: c, rowLabel, colLabel,
+        ours: null, ngspice: ng,
+        absDelta: NaN,
+        firstDivergentStep: null, firstDivergentIteration: null,
+      });
+    }
+
+    const coordSetDiffers = oursOnly.length > 0 || ngspiceOnly.length > 0;
+    let classification: MatrixDiffClassification;
+    if (coordSetDiffers) {
+      classification = "coord-set-differs";
+    } else if (valueMismatches.length === 0) {
+      classification = "match";
+    } else {
+      const ourVals = [...ourMap.values()].sort((a, b) => a - b);
+      const ngVals = [...ngMap.values()].sort((a, b) => a - b);
+      let multisetMatches = ourVals.length === ngVals.length;
+      if (multisetMatches) {
+        for (let i = 0; i < ourVals.length; i++) {
+          if (ourVals[i] !== ngVals[i]) { multisetMatches = false; break; }
+        }
+      }
+      classification = multisetMatches ? "value-permutation" : "value-only";
+    }
+
+    // First-divergent-step scan: only for cells already flagged divergent at
+    // the reference iteration. Single forward pass over paired accepted-attempt
+    // iterations; each cell key is removed from the remaining set as soon as
+    // it's resolved, so the cost is O((nSteps × nIters) × nNonzeros) only
+    // until every cell has been attributed.
+    const allDivergent: MatrixDiffCell[] = [...valueMismatches, ...oursOnly, ...ngspiceOnly];
+    if (allDivergent.length > 0) {
+      const byKey = new Map<string, MatrixDiffCell[]>();
+      for (const cell of allDivergent) {
+        const k = `${cell.row},${cell.col}`;
+        let bucket = byKey.get(k);
+        if (!bucket) { bucket = []; byKey.set(k, bucket); }
+        bucket.push(cell);
+      }
+      const remaining = new Set<string>(byKey.keys());
+      const stepCount = Math.min(ourSess.steps.length, ngSess.steps.length);
+      outer:
+      for (let si = 0; si < stepCount; si++) {
+        if (remaining.size === 0) break outer;
+        const ourStepN = ourSess.steps[si]!;
+        const ngStepN = ngSess.steps[si]!;
+        const ourAcc = ourStepN.acceptedAttemptIndex >= 0 ? ourStepN.acceptedAttemptIndex : 0;
+        const ngAcc = ngStepN.acceptedAttemptIndex >= 0 ? ngStepN.acceptedAttemptIndex : 0;
+        const ourIters = ourStepN.attempts[ourAcc]?.iterations ?? ourStepN.iterations;
+        const ngIters = ngStepN.attempts[ngAcc]?.iterations ?? ngStepN.iterations;
+        const iterCount = Math.min(ourIters.length, ngIters.length);
+        for (let ii = 0; ii < iterCount; ii++) {
+          if (remaining.size === 0) break outer;
+          const our = ourIters[ii]!;
+          const ng = ngIters[ii]!;
+          const oM = buildOurMap(our);
+          const nM = buildNgMap(ng);
+          for (const k of [...remaining]) {
+            const ov = oM.get(k);
+            const nv = nM.get(k);
+            const ovPresent = ov !== undefined;
+            const nvPresent = nv !== undefined;
+            const divergent = (ovPresent !== nvPresent) || (ovPresent && nvPresent && ov !== nv);
+            if (divergent) {
+              const bucket = byKey.get(k)!;
+              for (const cell of bucket) {
+                cell.firstDivergentStep = si;
+                cell.firstDivergentIteration = ii;
+              }
+              remaining.delete(k);
+            }
+          }
+        }
+      }
+    }
+
+    valueMismatches.sort((a, b) => b.absDelta - a.absDelta);
+    oursOnly.sort((a, b) => (a.row - b.row) || (a.col - b.col));
+    ngspiceOnly.sort((a, b) => (a.row - b.row) || (a.col - b.col));
+
+    return {
+      stepIndex,
+      iterationIndex,
+      classification,
+      ourCellCount: ourMap.size,
+      ngspiceCellCount: ngMap.size,
+      oursOnly,
+      ngspiceOnly,
+      valueMismatches,
+    };
+  }
+
+  /**
+   * Walk paired iterations in chronological order and return the first
+   * divergence in each of four signal classes:
+   *  - voltage: any node-voltage cell at iteration end differs;
+   *  - matrix: any (row, col) Jacobian cell differs (presence or value);
+   *  - state: any element-state slot differs;
+   *  - shape: per-step attempt count or accepted-attempt phase differs.
+   *
+   * `earliest` picks the lowest `(stepIndex, iterationIndex)` across all four.
+   * Agents start here to choose which axis to drill into before calling
+   * `harness_get_attempt` for a specific slice.
+   */
+  firstDivergence(): FirstDivergenceReport {
+    this._ensureRun();
+    const ourSess = this._ourSession;
+    const ngSess = this._ngSessionAligned();
+
+    let voltage: FirstDivergenceSignal | null = null;
+    let matrix: FirstDivergenceSignal | null = null;
+    let state: FirstDivergenceSignal | null = null;
+    let shape: FirstDivergenceSignal | null = null;
+
+    if (ourSess && ngSess) {
+      const stepCount = Math.min(ourSess.steps.length, ngSess.steps.length);
+      const identityMode = this._opts.selfCompare || this._ngMatrixRowMap.size === 0;
+
+      for (let si = 0; si < stepCount; si++) {
+        if (voltage && matrix && state && shape) break;
+
+        const ourStep = ourSess.steps[si]!;
+        const ngStep = ngSess.steps[si]!;
+
+        if (!shape) {
+          if (ourStep.attempts.length !== ngStep.attempts.length) {
+            shape = {
+              signalClass: "shape",
+              stepIndex: si, iterationIndex: 0,
+              attribute: "attemptCount",
+              ours: ourStep.attempts.length, ngspice: ngStep.attempts.length,
+              absDelta: Math.abs(ourStep.attempts.length - ngStep.attempts.length),
+            };
+          } else {
+            const ourAcc = ourStep.acceptedAttemptIndex;
+            const ngAcc = ngStep.acceptedAttemptIndex;
+            if (ourAcc !== ngAcc) {
+              shape = {
+                signalClass: "shape",
+                stepIndex: si, iterationIndex: 0,
+                attribute: "acceptedAttemptIndex",
+                ours: ourAcc, ngspice: ngAcc,
+                absDelta: Math.abs(ourAcc - ngAcc),
+              };
+            } else {
+              const ourPhase = ourStep.attempts[Math.max(0, ourAcc)]?.phase ?? "(none)";
+              const ngPhase = ngStep.attempts[Math.max(0, ngAcc)]?.phase ?? "(none)";
+              if (ourPhase !== ngPhase) {
+                shape = {
+                  signalClass: "shape",
+                  stepIndex: si, iterationIndex: 0,
+                  attribute: "acceptedPhase",
+                  ours: ourPhase, ngspice: ngPhase,
+                  absDelta: 1,
+                };
+              }
+            }
+          }
+        }
+
+        const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : 0;
+        const ngAccIdx = ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : 0;
+        const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+        const ngIters = ngStep.attempts[ngAccIdx]?.iterations ?? ngStep.iterations;
+        const iterCount = Math.min(ourIters.length, ngIters.length);
+
+        for (let ii = 0; ii < iterCount; ii++) {
+          if (voltage && matrix && state) break;
+          const ourIt = ourIters[ii]!;
+          const ngIt = ngIters[ii]!;
+
+          if (!voltage) {
+            const n = Math.min(ourIt.voltages.length, ngIt.voltages.length);
+            for (let nodeIdx = 1; nodeIdx < n; nodeIdx++) {
+              const ov = ourIt.voltages[nodeIdx];
+              const nv = ngIt.voltages[nodeIdx];
+              if (ov !== nv) {
+                const label = this._ourTopology.nodeLabels.get(nodeIdx)
+                  ?? this._ourTopology.matrixRowLabels.get(nodeIdx - 1)
+                  ?? `slot${nodeIdx}`;
+                voltage = {
+                  signalClass: "voltage",
+                  stepIndex: si, iterationIndex: ii,
+                  attribute: label,
+                  ours: ov, ngspice: nv,
+                  absDelta: Math.abs(ov - nv),
+                };
+                break;
+              }
+            }
+          }
+
+          if (!matrix) {
+            const ourMap = new Map<string, number>();
+            for (const e of ourIt.matrix) ourMap.set(`${e.row},${e.col}`, e.value);
+            const ngMap = new Map<string, number>();
+            for (const e of ngIt.matrix) {
+              let r = e.row, c = e.col;
+              if (!identityMode) {
+                const mr = this._ngMatrixRowMap.get(e.row);
+                const mc = this._ngMatrixColMap.get(e.col);
+                if (mr === undefined || mc === undefined) continue;
+                r = mr; c = mc;
+              }
+              ngMap.set(`${r},${c}`, e.value);
+            }
+            const labelKey = (r: number, c: number) =>
+              `(${this._ourTopology.matrixRowLabels.get(r) ?? `row${r}`},${this._ourTopology.matrixColLabels.get(c) ?? `col${c}`})`;
+            for (const [k, ov] of ourMap) {
+              const nv = ngMap.get(k);
+              if (nv === undefined || nv !== ov) {
+                const idx = k.indexOf(",");
+                const r = Number(k.slice(0, idx));
+                const c = Number(k.slice(idx + 1));
+                matrix = {
+                  signalClass: "matrix",
+                  stepIndex: si, iterationIndex: ii,
+                  attribute: labelKey(r, c),
+                  ours: ov,
+                  ngspice: nv ?? "(missing)",
+                  absDelta: nv !== undefined ? Math.abs(ov - nv) : Infinity,
+                };
+                break;
+              }
+            }
+            if (!matrix) {
+              for (const [k, nv] of ngMap) {
+                if (!ourMap.has(k)) {
+                  const idx = k.indexOf(",");
+                  const r = Number(k.slice(0, idx));
+                  const c = Number(k.slice(idx + 1));
+                  matrix = {
+                    signalClass: "matrix",
+                    stepIndex: si, iterationIndex: ii,
+                    attribute: labelKey(r, c),
+                    ours: "(missing)",
+                    ngspice: nv,
+                    absDelta: Infinity,
+                  };
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!state) {
+            for (const ourEs of ourIt.elementStates) {
+              const ngEs = ngIt.elementStates.find(
+                e => e.label.toUpperCase() === ourEs.label.toUpperCase(),
+              );
+              if (!ngEs) continue;
+              for (const [slot, value] of Object.entries(ourEs.slots)) {
+                const ngValue = ngEs.slots[slot];
+                if (ngValue === undefined) continue;
+                if (value !== ngValue) {
+                  state = {
+                    signalClass: "state",
+                    stepIndex: si, iterationIndex: ii,
+                    attribute: `${ourEs.label}.${slot}`,
+                    ours: value, ngspice: ngValue,
+                    absDelta: Math.abs(value - ngValue),
+                  };
+                  break;
+                }
+              }
+              if (state) break;
+            }
+          }
+        }
+      }
+    }
+
+    const all = [voltage, matrix, state, shape].filter(
+      (x): x is FirstDivergenceSignal => x !== null,
+    );
+    const earliest = all.length === 0
+      ? null
+      : all.reduce((best, cur) =>
+          cur.stepIndex < best.stepIndex
+          || (cur.stepIndex === best.stepIndex && cur.iterationIndex < best.iterationIndex)
+            ? cur : best);
+
+    return { voltage, matrix, state, shape, earliest };
   }
 }
 

@@ -1,6 +1,11 @@
-﻿/**
- * BehavioralCounterDriverElement- multi-bit driver leaf for the edge-triggered
- * up-counter with enable, clear, and overflow outputs.
+/**
+ * BehavioralCounterDriverElement — multi-bit driver leaf for the edge-triggered
+ * up-counter with enable, clear, and overflow outputs. See and-driver.ts for
+ * the normalized-bit driver-chain architecture.
+ *
+ * Control inputs (en, clr) and clock (C) are normalized {0, 1} V; edge
+ * detection uses 0.5 V as the rising-edge threshold. Output bits and ovf
+ * stamp at {0, 1} V.
  */
 
 import {
@@ -22,17 +27,9 @@ import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 // Memoised arity-indexed schema factory
 // ---------------------------------------------------------------------------
 //
-// Each distinct bitWidth value maps to exactly one frozen StateSchema. The
-// first time a bitWidth is observed (during a constructor call), the schema
-// is built via defineStateSchema() and cached. Subsequent constructions for
-// the same bitWidth reuse the cached schema by reference- preserves frozen-
-// schema identity invariants and lets the engine's diagnostics
-// (assertPoolIsSoleMutableState) treat all instances of the same bitWidth as
-// homogeneous.
-//
 // Slot layout for bitWidth N:
 //   [0]              LAST_CLOCK
-//   [1 .. N]         COUNT_BIT0 ..  COUNT_BIT(N-1)              â† internal latch
+//   [1 .. N]         COUNT_BIT0 ..  COUNT_BIT(N-1)              ← internal latch
 
 const COUNTER_SCHEMAS = new Map<number, StateSchema>();
 
@@ -43,7 +40,7 @@ function getCounterSchema(bitWidth: number): StateSchema {
   const slots: SlotDescriptor[] = [
     {
       name: "LAST_CLOCK",
-      doc: "Clock voltage at last accepted timestep- compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
+      doc: "Clock voltage at last accepted timestep — compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
     },
   ];
   for (let i = 0; i < bitWidth; i++) {
@@ -59,14 +56,8 @@ function getCounterSchema(bitWidth: number): StateSchema {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout factory- per-instance variable bit width
+// Pin layout factory — per-instance variable bit width
 // ---------------------------------------------------------------------------
-//
-// Order MUST match the parent's connectivity row for this sub-element:
-// [en, C, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
-//
-// ctrl_bit_i carry individual logic levels (vOH/vOL) for bit i of the count.
-// ctrl_ovf carries vOH/vOL for the overflow signal.
 
 export function buildCounterDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const N = props.getModelParam<number>("bitWidth");
@@ -91,33 +82,20 @@ export function buildCounterDriverPinLayout(props: PropertyBag): PinDeclaration[
   return decls;
 }
 
-// ---------------------------------------------------------------------------
-// BehavioralCounterDriverElement
-// ---------------------------------------------------------------------------
-
 export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
-  // Per-instance schema- the only Template-A shape diff. The schema is still
-  // a frozen module-scope object (just one per bitWidth instead of one for
-  // all instances).
   readonly stateSchema: StateSchema;
   readonly stateSize: number;
 
   private readonly _bitWidth: number;
   private readonly _maxValue: number;
-  // Slot indices into the per-instance schema. Cached at construction so
-  // load() does the indexOf lookups exactly once.
   private readonly _slotLastClock: number;
-  private readonly _slotCountBase: number;     // COUNT_BIT0 index
+  private readonly _slotCountBase: number;
   private readonly _enNode: number;
   private readonly _cNode: number;
   private readonly _clrNode: number;
   private readonly _gndNode: number;
-  private _vIH: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
   private _firstSample: boolean = true;
 
   private _handlesByBit: readonly (readonly [number, number, number, number])[] = [];
@@ -139,10 +117,6 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
     this._cNode   = pinNodes.get("C")!;
     this._clrNode = pinNodes.get("clr")!;
     this._gndNode = pinNodes.get("gnd")!;
-    this._vIH  = props.getModelParam<number>("vIH");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH  = props.getModelParam<number>("vOH");
-    this._vOL  = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -161,22 +135,6 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
     this._handlesOvf = allocNortonStamp(ctx.solver, this._ctrlOvfNode, this._gndNode);
   }
 
-  /**
-   * Edge-detect on C; on rising edge, clr (priority) or increment (when en).
-   *
-   * Control-input classification is simple-threshold (v >= vIH â†’ 1, else 0)
-   * rather than the held-indeterminate hysteresis used for edge-sampled data
-   * in d-flipflop. Reason: en / clr are slow-changing control signals where
-   * the metastability proxy is not load-bearing; the increment / clear
-   * decision is gated on a clean clock edge regardless. Derivative drivers
-   * (counter-preset, shift register) that need vIL hysteresis on data
-   * inputs add the field, the constructor read, and the setParam branch.
-   *
-   * COUNT_BITi slots store the latched count in bit form. load() assembles
-   * them into an integer for arithmetic, then writes the new value back as
-   * bits. OVF asserts when the post-update count is at
-   * maxValue AND en is high (matches `executeCounter` in counter.ts).
-   */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const s0 = this._pool.states[0];
@@ -187,27 +145,23 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
     const vEn    = rhsOld[this._enNode]  - gnd;
     const vClr   = rhsOld[this._clrNode] - gnd;
 
-    // Assemble integer count from N bit slots (s1 == prior step).
     let count = 0;
     for (let i = 0; i < this._bitWidth; i++) {
       const bit = s1[base + this._slotCountBase + i] >= 0.5 ? 1 : 0;
       count |= bit << i;
     }
-    count >>>= 0;  // unsigned 32-bit
+    count >>>= 0;
 
     const prevClock = s1[base + this._slotLastClock];
-    const en  = vEn  >= this._vIH ? 1 : 0;
-    const clr = vClr >= this._vIH ? 1 : 0;
+    const en  = vEn  >= 0.5 ? 1 : 0;
+    const clr = vClr >= 0.5 ? 1 : 0;
 
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
       if      (clr) count = 0;
       else if (en)  count = (count + 1) & this._maxValue;
     }
     this._firstSample = false;
 
-
-    // Bottom-of-load writes- every slot mutated this step writes to s0
-    // exactly once (no pre-stamp s0 mutations).
     s0[base + this._slotLastClock] = vClock;
     for (let i = 0; i < this._bitWidth; i++) {
       const bit = (count >>> i) & 1;
@@ -218,28 +172,19 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
 
     for (let i = 0; i < this._bitWidth; i++) {
       const bit = (count >>> i) & 1;
-      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, this._rOut, bit ? this._vOH : this._vOL);
+      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, bit);
     }
-    stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, this._rOut, ovf ? this._vOH : this._vOL);
+    stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, 1, ovf);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
-    // bitWidth is structural (allocates schema, slot indices, _maxValue);
-    // not setParam-able.
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params; bitWidth is structural.
   }
 }
-
-// ---------------------------------------------------------------------------
-// ComponentDefinition
-// ---------------------------------------------------------------------------
 
 export const BehavioralCounterDriverDefinition: ComponentDefinition = {
   name: "BehavioralCounterDriver",
@@ -250,17 +195,12 @@ export const BehavioralCounterDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: [
-        { key: "bitWidth", default: 4   },
-        { key: "vIH",      default: 2.0 },
-        { key: "rOut",     default: 100 },
-        { key: "vOH",      default: 5   },
-        { key: "vOL",      default: 0   },
+        { key: "bitWidth", default: 4 },
       ],
-      params: { bitWidth: 4, vIH: 2.0, rOut: 100, vOH: 5, vOL: 0 },
+      params: { bitWidth: 4 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralCounterDriverElement(pinNodes, props),
     },
   },
   defaultModel: "default",
 };
-

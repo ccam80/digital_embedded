@@ -30,18 +30,18 @@ function makeProps(params: Record<string, number>): PropertyBag {
 
 function multiInputPinNodes(): ReadonlyMap<string, number> {
   return new Map<string, number>([
-    ["In_1", 1],
-    ["In_2", 2],
-    ["out",  3],
-    ["gnd",  0],
+    ["In_1",    1],
+    ["In_2",    2],
+    ["ctrl_out", 3],
+    ["gnd",     0],
   ]);
 }
 
 function singleInputPinNodes(): ReadonlyMap<string, number> {
   return new Map<string, number>([
-    ["in_1", 1],
-    ["out",  2],
-    ["gnd",  0],
+    ["in_1",    1],
+    ["ctrl_out", 2],
+    ["gnd",     0],
   ]);
 }
 

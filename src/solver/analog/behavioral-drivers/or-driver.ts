@@ -1,13 +1,11 @@
-﻿/**
- * BehavioralOrDriverElement- pure-truth-function driver leaf for the N-input
+/**
+ * BehavioralOrDriverElement — pure-truth-function driver leaf for the N-input
  * OR gate.
  *
  * Reads N input voltages from rhsOld (relative to gnd), threshold-classifies
- * each input against per-instance vIH / vIL, and writes the OR-reduced result.
- *
- * Canonical reference for **Template A-variable-pin**: 1-bit pure-truth
- * driver with variable input pin count per instance. Mirrors and-driver.ts
- * shape exactly; only the reduction body differs.
+ * each input against the normalized logic midpoint (0.5 V), and stamps the
+ * OR-reduced result at ctrl_out as a {0, 1} V Norton source. See and-driver.ts
+ * for the architectural notes on the normalized-bit driver chain.
  *
  * Per Composite M10 (phase-composite-architecture.md), J-153
  * (contracts_group_10.md).
@@ -33,13 +31,8 @@ import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 const SCHEMA: StateSchema = defineStateSchema("BehavioralOrDriver", []);
 
 // ---------------------------------------------------------------------------
-// Pin layout factory- per-instance variable input count
+// Pin layout factory — per-instance variable input count
 // ---------------------------------------------------------------------------
-//
-// Order MUST match the parent's connectivity row for this sub-element. The
-// parent emits `[in_1_net, in_2_net, ..., in_N_net, ctrl_out_net, gnd_net]`
-// and the compiler stores each pin label against the resolved node from the
-// matching connectivity index (compiler.ts:447-462).
 
 function buildOrDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const N = props.getModelParam<number>("inputCount");
@@ -79,11 +72,6 @@ export class BehavioralOrDriverElement extends PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private readonly _ctrlOutNode: number;
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -94,11 +82,6 @@ export class BehavioralOrDriverElement extends PoolBackedAnalogElement {
     }
     this._gndNode = pinNodes.get("gnd")!;
     this._ctrlOutNode = pinNodes.get("ctrl_out")!;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -111,37 +94,23 @@ export class BehavioralOrDriverElement extends PoolBackedAnalogElement {
     const gndV = rhsOld[this._gndNode];
 
     let result = 0;
-    let indeterminate = false;
     for (let i = 0; i < this._inputCount; i++) {
       const v = rhsOld[this._inputNodes[i]] - gndV;
-      if (v >= this._vIH) {
+      if (v >= 0.5) {
         result = 1;
-        indeterminate = false;
         break;
-      } else if (v >= this._vIL) {
-        indeterminate = true;
       }
     }
 
-    const mid = (this._vOH + this._vOL) / 2;
-    const target = indeterminate
-      ? (rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL)
-      : (result ? this._vOH : this._vOL);
-
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
-    // inputCount is structural (allocates _inputNodes); not setParam-able.
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params; inputCount is structural.
   }
 }
 
@@ -159,13 +128,8 @@ export const BehavioralOrDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [
         { key: "inputCount", default: 2 },
-        { key: "vIH",        default: 2.0 },
-        { key: "vIL",        default: 0.8 },
-        { key: "rOut",       default: 100 },
-        { key: "vOH",        default: 5 },
-        { key: "vOL",        default: 0 },
       ],
-      params: { inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      params: { inputCount: 2 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralOrDriverElement(pinNodes, props),
     },

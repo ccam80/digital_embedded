@@ -38,7 +38,11 @@ const DTS_DE_ENERGISED = path.resolve(
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SLOT_CLOSED = CSW_SCHEMA.indexOf.get("CLOSED")!;
+const SLOT_CLOSED    = CSW_SCHEMA.indexOf.get("CLOSED")!;
+const SLOT_CSW_STATE = CSW_SCHEMA.indexOf.get("CSW_STATE")!;
+// ngspice CSW 4-state constants (cswload.c:28-30) — REALLY_ON=1, REALLY_OFF=0
+const REALLY_ON  = 1;
+const REALLY_OFF = 0;
 
 function digital(value: number): SignalValue {
   return { type: "digital", value };
@@ -566,38 +570,45 @@ describe("Relay digital bridge (T1) — Cat 9", () => {
 describe("Switch.ctrlBranch path (Wave 2.1)", () => {
   it("contactSW closes when |i_coil| > pullInI", () => {
     // vCoil=10V across the 100Ω coil → I_coil=0.1A > pullInI=0.05A. After
-    // warm-start the Switch sub-element's CSW state is REALLY_ON and its
-    // SLOT_CLOSED is 1.
+    // warm-start the CSW hysteresis is in REALLY_ON (not just HYST_ON):
+    // |I|=0.1A >= iT+iH = (0.05+0.02)/2 + (0.05-0.02)/2 = 0.05. Both the
+    // 4-state slot and the derived SLOT_CLOSED must reflect this.
     const fix = buildFixture({
       build: (_r, facade) => buildRelayBench(facade, { vCoil: 10 }),
     });
     const sw = findContactSwitch(fix);
+    expect(fix.pool.state1[sw._stateBase + SLOT_CSW_STATE]).toBe(REALLY_ON);
     expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(1);
   });
 
   it("contactSW stays open when |i_coil| < dropOutI", () => {
     // 0V across coil → I_coil=0A < dropOutI=0.02A — contact stays OPEN.
-    // The CSW state is REALLY_OFF and SLOT_CLOSED is 0.
+    // |I|=0A <= iT-iH = (0.05+0.02)/2 - (0.05-0.02)/2 = 0.02, so REALLY_OFF.
     const fix = buildFixture({
       build: (_r, facade) => buildRelayBench(facade, { vCoil: 0 }),
     });
     const sw = findContactSwitch(fix);
+    expect(fix.pool.state1[sw._stateBase + SLOT_CSW_STATE]).toBe(REALLY_OFF);
     expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(0);
   });
 
   it("setClosed becomes no-op when ctrlBranch is wired", () => {
-    // Build the energised relay (I_coil=0.1A > pullInI=0.05A); CSW state is
-    // REALLY_ON, SLOT_CLOSED=1. Call setParam("closed", 0) on the wrapper —
-    // which routes via setComponentProperty → contactSW.setParam — and step.
-    // The CSW hysteresis on the coil current is unchanged, so SLOT_CLOSED
-    // stays at 1.
+    // Build the energised relay (I_coil=0.1A > pullInI); CSW state is REALLY_ON,
+    // SLOT_CLOSED=1. CurrentControlledSwitchAnalogElement.setParam has no "closed"
+    // handler — the coil-current-driven CSW hysteresis is the sole state driver.
+    // After calling setComponentProperty("closed", 0) and stepping, the CSW
+    // hysteresis re-asserts REALLY_ON because |I_coil|=0.1A > pullInI=0.05A.
     const fix = buildFixture({
       build: (_r, facade) => buildRelayBench(facade, { vCoil: 10 }),
     });
     const sw = findContactSwitch(fix);
+    expect(fix.pool.state1[sw._stateBase + SLOT_CSW_STATE]).toBe(REALLY_ON);
     expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(1);
     fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "closed", 0);
     fix.coordinator.step();
+    // CSW_STATE must remain REALLY_ON (not HYST_ON, HYST_OFF, or REALLY_OFF):
+    // the "closed" param call was ignored; coil current still above iT+iH.
+    expect(fix.pool.state1[sw._stateBase + SLOT_CSW_STATE]).toBe(REALLY_ON);
     expect(fix.pool.state1[sw._stateBase + SLOT_CLOSED]).toBe(1);
   });
 });

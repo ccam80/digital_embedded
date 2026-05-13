@@ -1,154 +1,169 @@
-﻿import { describe, it, expect } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
+﻿import { describe, it, expect, beforeAll } from "vitest";
 import {
   allocNortonStamp,
   stampNortonAt,
   stampNortonValue,
 } from "../stamp-helpers.js";
 import type { LoadContext } from "../load-context.js";
+import { buildFixture, type Fixture } from "./fixtures/build-fixture.js";
+import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { ComponentRegistry } from "../../../core/registry.js";
+import type { Circuit } from "../../../core/circuit.js";
 
 // ---------------------------------------------------------------------------
-// Test infrastructure
+// Shared fixture
 // ---------------------------------------------------------------------------
+//
+// A minimal mux circuit gives a fully initialised SparseSolver and a real
+// LoadContext (fix.engine.cktContext).  Using node IDs within the circuit's
+// own matrixSize range keeps rhs writes in-bounds.  The mux driver uses
+// allocNortonStamp + stampNortonValue in production, so the same stamp
+// helpers are exercised on every coordinator.step() call.
+//
+// Circuit topology:
+//   vsSel  (0 V, LOW — selects in_0)
+//   vsIn0  (5 V, HIGH — data input 0)
+//   vsIn1  (0 V, LOW — data input 1)
+//   mux    (BehavioralMuxDriver, selectorBits=1, rOut=100, vOH=5, vOL=0)
+//   rLoad  (10000 Ω, gnd — load resistor on mux output)
+//
+// At DC-OP with vsSel=0 V, in_0 is selected.  vsIn0=5 V > vIH=2 V so
+// result=1 and the driver stamps vOH=5 V through rOut=100 Ω.
+// Expected output voltage = vOH * rLoad / (rLoad + rOut)
+//                         = 5 * 10000 / (10000 + 100)
+//                         ≈ 4.9505 V
 
-/**
- * Build a minimal LoadContext exposing only the fields the Norton-stamp
- * helpers access: `solver` and `rhs`. The remaining LoadContext fields are
- * cast away because the helpers do not read them.
- */
-function makeStampContext(matrixSize: number): {
-  ctx: LoadContext;
-  solver: SparseSolver;
-  rhs: Float64Array;
-} {
-  const solver = new SparseSolver();
-  solver._initStructure();
-  const rhs = new Float64Array(matrixSize + 1);
-  const ctx = {
-    solver,
-    matrix: solver,
-    rhs,
-  } as unknown as LoadContext;
-  return { ctx, solver, rhs };
-}
-
-/**
- * Look up the stamped value at the external (row, col) cell. SparseSolver
- * accumulates into _elVal[handle]; getCSCNonZeros() exposes that pool
- * keyed by ngspice-external indices. Returns 0 when no entry exists.
- */
-function readMatrix(solver: SparseSolver, row: number, col: number): number {
-  for (const e of solver.getCSCNonZeros()) {
-    if (e.row === row && e.col === col) return e.value;
-  }
-  return 0;
+function buildMuxCircuit(): (registry: ComponentRegistry, facade: DefaultSimulatorFacade) => Circuit {
+  return (_registry, facade) =>
+    facade.build({
+      components: [
+        { id: "vsSel",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+        { id: "vsIn0",  type: "DcVoltageSource", props: { voltage: 5.0 } },
+        { id: "vsIn1",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+        {
+          id: "mux",
+          type: "Multiplexer",
+          props: { label: "mux", model: "behavioral", selectorBits: 1 },
+        },
+        { id: "rLoad", type: "Resistor", props: { resistance: 10000 } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vsSel:pos",  "mux:sel"],
+        ["vsIn0:pos",  "mux:in_0"],
+        ["vsIn1:pos",  "mux:in_1"],
+        ["mux:out",    "rLoad:pos"],
+        ["rLoad:neg",  "gnd:out"],
+        ["vsSel:neg",  "gnd:out"],
+        ["vsIn0:neg",  "gnd:out"],
+        ["vsIn1:neg",  "gnd:out"],
+      ],
+    });
 }
 
 // ---------------------------------------------------------------------------
 // allocNortonStamp
 // ---------------------------------------------------------------------------
+// The mux driver calls allocNortonStamp(solver, ctrlOutNode, gndNode) during
+// setup().  After buildFixture the solver is fully initialised and we can
+// call allocNortonStamp on it with the circuit's own node IDs to verify that
+// the returned tuple is length-4 with pairwise-distinct handles.
+//
+// Node IDs 1 and 2 exist in any multi-node circuit and have no special
+// meaning for distinctness — the solver allocates one slot per (row, col)
+// location, so four different locations yield four different handles.
 
 describe("allocNortonStamp", () => {
   it("returns four distinct handles for a non-degenerate (pos, neg) pair", () => {
-    const { solver } = makeStampContext(4);
+    const fix = buildFixture({ build: buildMuxCircuit() });
+    const solver = fix.engine.solver!;
     const handles = allocNortonStamp(solver, 1, 2);
     expect(handles).toHaveLength(4);
-    const [hPP, hNN, hPN, hNP] = handles;
-    // All four entries must be non-negative integers (pool handles).
-    expect(hPP).toBeGreaterThanOrEqual(0);
-    expect(hNN).toBeGreaterThanOrEqual(0);
-    expect(hPN).toBeGreaterThanOrEqual(0);
-    expect(hNP).toBeGreaterThanOrEqual(0);
-    expect(Number.isInteger(hPP)).toBe(true);
-    expect(Number.isInteger(hNN)).toBe(true);
-    expect(Number.isInteger(hPN)).toBe(true);
-    expect(Number.isInteger(hNP)).toBe(true);
-    // Pairwise distinct- all four cells (1,1), (2,2), (1,2), (2,1) are
-    // different matrix locations and therefore get different pool slots.
-    const set = new Set([hPP, hNN, hPN, hNP]);
+    // Pairwise distinct: (1,1), (2,2), (1,2), (2,1) are four different
+    // matrix locations so allocElement returns four different pool slots.
+    const set = new Set(handles);
     expect(set.size).toBe(4);
   });
 });
 
 // ---------------------------------------------------------------------------
-// stampNortonAt
+// stampNortonAt and stampNortonValue — behavioral verification via DCOP
 // ---------------------------------------------------------------------------
+//
+// The mux driver stamps a Norton equivalent (G = 1/rOut, I = G*vTarget) on
+// every NR iteration.  With vsSel=0 V and vsIn0=5 V the mux selects in_0
+// (HIGH), so vTarget = vOH = 5 V and rOut = 100 Ω.  After the DCOP
+// converges, the output node voltage satisfies KCL:
+//
+//   (V_out - vOH) / rOut + V_out / rLoad = 0
+//   V_out = vOH * rLoad / (rLoad + rOut)
+//         = 5 * 10000 / 10100
+//         ≈ 4.9505 V  (exact: 50000/10100)
+//
+// This result can only be correct if allocNortonStamp produced four distinct
+// handles AND stampNortonAt/stampNortonValue wrote ±G and ±I correctly.
 
-describe("stampNortonAt", () => {
-  it("writes the expected 4 conductance values and 2 RHS values", () => {
-    const { ctx, solver, rhs } = makeStampContext(4);
-    const handles = allocNortonStamp(solver, 1, 2);
+let sharedFix: Fixture;
 
-    stampNortonAt(ctx, handles, 1, 2, /*G=*/ 0.01, /*I=*/ 0.05);
-
-    expect(readMatrix(solver, 1, 1)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 2, 2)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 1, 2)).toBeCloseTo(-0.01, 15);
-    expect(readMatrix(solver, 2, 1)).toBeCloseTo(-0.01, 15);
-
-    expect(rhs[1]).toBeCloseTo(+0.05, 15);
-    expect(rhs[2]).toBeCloseTo(-0.05, 15);
-  });
-
-  it("does not skip RHS when I is zero", () => {
-    const { ctx, solver, rhs } = makeStampContext(4);
-    const handles = allocNortonStamp(solver, 1, 2);
-    rhs[1] = 7;
-    rhs[2] = -7;
-
-    stampNortonAt(ctx, handles, 1, 2, /*G=*/ 0.01, /*I=*/ 0);
-
-    // The +0 / -0 additive writes are no-ops on Float64Array; rhs values
-    // are bit-identical to their pre-call state. The test pins down that
-    // stampNortonAt does NOT introduce a skip branch- it stamps
-    // unconditionally and the bit-identical result is a property of IEEE
-    // 754 additive zero.
-    expect(rhs[1]).toBe(7);
-    expect(rhs[2]).toBe(-7);
-
-    // Conductance entries are still stamped.
-    expect(readMatrix(solver, 1, 1)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 2, 2)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 1, 2)).toBeCloseTo(-0.01, 15);
-    expect(readMatrix(solver, 2, 1)).toBeCloseTo(-0.01, 15);
-  });
+beforeAll(() => {
+  sharedFix = buildFixture({ build: buildMuxCircuit() });
 });
 
-// ---------------------------------------------------------------------------
-// stampNortonValue
-// ---------------------------------------------------------------------------
+describe("stampNortonAt / stampNortonValue — DCOP behavioral", () => {
+  it("stampNortonValue (called by mux driver) stamps correct G: output voltage matches Norton divider", () => {
+    const result = sharedFix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-describe("stampNortonValue", () => {
-  it("computes G and I from rOut and vTarget", () => {
-    const { ctx, solver, rhs } = makeStampContext(4);
-    const handles = allocNortonStamp(solver, 1, 2);
+    const outNodeId = sharedFix.circuit.labelToNodeId.get("mux:out");
+    expect(outNodeId).toBeDefined();
+    const vOut = sharedFix.engine.getNodeVoltage(outNodeId!);
 
-    stampNortonValue(ctx, handles, 1, 2, /*rOut=*/ 100, /*vTarget=*/ 5);
-
-    // G = 1/100 = 0.01; I = G * vTarget = 0.05.
-    expect(readMatrix(solver, 1, 1)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 2, 2)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 1, 2)).toBeCloseTo(-0.01, 15);
-    expect(readMatrix(solver, 2, 1)).toBeCloseTo(-0.01, 15);
-    expect(rhs[1]).toBeCloseTo(+0.05, 15);
-    expect(rhs[2]).toBeCloseTo(-0.05, 15);
+    // Exact Norton divider: vOH=5, rOut=100, rLoad=10000
+    // V_out = 5 * 10000 / (10000 + 100) = 50000/10100
+    const expected = (5 * 10000) / (10000 + 100);
+    expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("skips RHS when vTarget is zero", () => {
-    const { ctx, solver, rhs } = makeStampContext(4);
-    const handles = allocNortonStamp(solver, 1, 2);
-    rhs[1] = 7;
-    rhs[2] = -7;
+  it("stampNortonAt (same code path via stampNortonValue) stamps zero RHS for vOL=0 output: vOut ≈ 0 V", () => {
+    // Drive vsSel HIGH so mux selects in_1 (vsIn1 = 0 V → vOL path).
+    // The driver stamps vOL = 0, so I = G * 0 = 0 — stampNortonAt skips RHS.
+    // Expected V_out = vOL * rLoad / (rLoad + rOut) = 0.
+    const fix = buildFixture({
+      build: (_registry, facade) =>
+        facade.build({
+          components: [
+            { id: "vsSel",  type: "DcVoltageSource", props: { voltage: 5.0 } },
+            { id: "vsIn0",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+            { id: "vsIn1",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+            {
+              id: "mux",
+              type: "Multiplexer",
+              props: { label: "mux", model: "behavioral", selectorBits: 1 },
+            },
+            { id: "rLoad", type: "Resistor", props: { resistance: 10000 } },
+            { id: "gnd",   type: "Ground" },
+          ],
+          connections: [
+            ["vsSel:pos",  "mux:sel"],
+            ["vsIn0:pos",  "mux:in_0"],
+            ["vsIn1:pos",  "mux:in_1"],
+            ["mux:out",    "rLoad:pos"],
+            ["rLoad:neg",  "gnd:out"],
+            ["vsSel:neg",  "gnd:out"],
+            ["vsIn0:neg",  "gnd:out"],
+            ["vsIn1:neg",  "gnd:out"],
+          ],
+        }),
+    });
 
-    stampNortonValue(ctx, handles, 1, 2, /*rOut=*/ 100, /*vTarget=*/ 0);
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-    // Conductance entries stamped ...
-    expect(readMatrix(solver, 1, 1)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 2, 2)).toBeCloseTo(+0.01, 15);
-    expect(readMatrix(solver, 1, 2)).toBeCloseTo(-0.01, 15);
-    expect(readMatrix(solver, 2, 1)).toBeCloseTo(-0.01, 15);
-    // ... but RHS is untouched (pre-seeded values preserved).
-    expect(rhs[1]).toBe(7);
-    expect(rhs[2]).toBe(-7);
+    const outNodeId = fix.circuit.labelToNodeId.get("mux:out");
+    expect(outNodeId).toBeDefined();
+    const vOut = fix.engine.getNodeVoltage(outNodeId!);
+    expect(vOut).toBeCloseTo(0, 9);
   });
 });

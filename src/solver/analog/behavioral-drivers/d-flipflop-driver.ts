@@ -1,25 +1,12 @@
-﻿/**
- * BehavioralDFlipflopDriverElement- pure-truth-function driver leaf for the
- * edge-triggered D flip-flop.
+/**
+ * BehavioralDFlipflopDriverElement — pure-truth-function driver leaf for the
+ * edge-triggered D flip-flop. See and-driver.ts for the normalized-bit
+ * driver-chain architecture.
  *
- * Reads clock and D voltages from rhsOld, detects rising clock edge against
- * s1[LAST_CLOCK], samples D on the edge using vIH/vIL hysteresis, and writes
- * the latched Q value to LAST_CLOCK and Q slots.
+ * Reads C and D as normalized {0, 1} V. Edge-detects on C against 0.5 V;
+ * on rising edge samples D into Q. Stamps ctrl_q at q, ctrl_nq at 1−q.
  *
- * Strictly 1-bit. Multi-bit D-FF composites instantiate N driver leaves;
- * bit-width scaling is the parent composite's responsibility, not this
- * leaf's.
- *
- * Canonical reference for pure-truth-function driver leaves: every other
- * gate / wiring / sequential / latch driver in this directory mirrors this
- * file's shape (imports, class layout, schema/pin/load() placement, model
- * registry). Only the schema slot list, pin layout, and load() body vary
- * between drivers.
- *
- * Per Composite M14 (phase-composite-architecture.md), J-142
- * (contracts_group_10.md). Threshold values come from per-instance vIH / vIL
- * params rather than the spec-skeleton 0.5 (user override- preserves the
- * recovered originals' CMOS-spec-driven thresholding fidelity).
+ * Per Composite M14 (phase-composite-architecture.md), J-142 (contracts_group_10.md).
  */
 
 import {
@@ -33,17 +20,13 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge, logicLevel } from "./edge-detect.js";
+import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
-
-// ---------------------------------------------------------------------------
-// State schema
-// ---------------------------------------------------------------------------
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralDFlipflopDriver", [
   {
     name: "LAST_CLOCK",
-    doc: "Clock voltage at last accepted timestep- compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
+    doc: "Clock voltage at last accepted timestep — compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
   },
   {
     name: "Q",
@@ -54,15 +37,6 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralDFlipflopDriver", [
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
 
-// ---------------------------------------------------------------------------
-// Pin layout
-// ---------------------------------------------------------------------------
-//
-// Order MUST match the buildDFlipflopNetlist drv connectivity row
-// `[0, 1, 5, 6, 4]` mapping to ports `[D, C, ctrl_q, ctrl_nq, gnd]`. The
-// compiler reads pinLayout[i].label and stores it in pinNodes against the
-// resolved node from connectivity[i] (compiler.ts:443-446).
-//
 const D_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "D",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "C",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
@@ -71,21 +45,11 @@ const D_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "gnd",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
-// ---------------------------------------------------------------------------
-// BehavioralDFlipflopDriverElement
-// ---------------------------------------------------------------------------
-
 export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
-
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
   private _firstSample: boolean = true;
 
@@ -95,13 +59,8 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
   private _handlesQ: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _handlesNq: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -126,19 +85,14 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q: 0 | 1 = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
-    // Rising-edge detect on clock; on edge, threshold-classify D with
-    // vIH/vIL hysteresis (logicLevel holds q when D sits in the indeterminate
-    // band). NaN-prev sentinel inside detectRisingEdge skips the first step.
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
-      q = logicLevel(vD, this._vIH, this._vIL, q);
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
+      q = vD >= 0.5 ? 1 : 0;
     }
     this._firstSample = false;
 
-    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
 
-    // Bottom-of-load writes- every slot mutated this step writes to s0
-    // exactly once (no pre-stamp s0 mutations).
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
   }
@@ -147,18 +101,10 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
-
-// ---------------------------------------------------------------------------
-// ComponentDefinition
-// ---------------------------------------------------------------------------
 
 export const BehavioralDFlipflopDriverDefinition: ComponentDefinition = {
   name: "BehavioralDFlipflopDriver",
@@ -168,14 +114,8 @@ export const BehavioralDFlipflopDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH", default: 2.0 },
-        { key: "vIL", default: 0.8 },
-        { key: "rOut", default: 100 },
-        { key: "vOH", default: 5 },
-        { key: "vOL", default: 0 },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralDFlipflopDriverElement(pinNodes, props),
     },

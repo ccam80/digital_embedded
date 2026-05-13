@@ -344,7 +344,7 @@ describe("probe — dump optocoupler internals", () => {
   });
 });
 
-describe.skip("probe — optocoupler stagnation root cause", () => {
+describe("probe — optocoupler stagnation root cause", () => {
   it("dumps DCOP convergence log", () => {
     const registry = createDefaultRegistry();
     const facade = new DefaultSimulatorFacade(registry);

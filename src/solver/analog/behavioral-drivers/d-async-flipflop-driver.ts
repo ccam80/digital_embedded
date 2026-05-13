@@ -1,17 +1,12 @@
-﻿/**
- * BehavioralDAsyncFlipflopDriverElement- pure-truth-function driver leaf for
- * the D flip-flop with asynchronous Set / Clr.
+/**
+ * BehavioralDAsyncFlipflopDriverElement — pure-truth-function driver leaf for
+ * the D flip-flop with asynchronous Set / Clr. See and-driver.ts for the
+ * normalized-bit driver-chain architecture.
  *
- * On rising clock edge: latch D (same as M14 D-FF).
+ * On rising clock edge: latch D. Async Set / Clr override every load() pass:
+ * Set first, Clr second — Clr wins when both are high.
  *
- * After the clocked update, async Set / Clr override the latched state every
- * load() pass. Collision policy preserved from
- * `.recovery/behavioral-flipflop-d-async.ts.orig`'s
- * `BehavioralDAsyncFlipflopElement.accept()`- Set runs first (Set high â†’ q=1),
- * Clr runs second (Clr high â†’ q=0). When both are high, **Clr wins**.
- *
- * Per Composite M20 (phase-composite-architecture.md), J-141
- * (contracts_group_10.md).
+ * Per Composite M20 (phase-composite-architecture.md), J-141 (contracts_group_10.md).
  */
 
 import {
@@ -25,6 +20,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralDAsyncFlipflopDriver", [
@@ -35,7 +31,6 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralDAsyncFlipflopDriver", 
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
 
-// Pin order matches buildDAsyncFlipflopNetlist drv row [0..6] = Set,D,C,Clr,ctrl_q,ctrl_nq,gnd.
 const D_AS_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "Set",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "D",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -52,12 +47,6 @@ export class BehavioralDAsyncFlipflopDriverElement extends PoolBackedAnalogEleme
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
-
   private _firstSample: boolean = true;
 
   private _ctrlQNode: number = 0;
@@ -66,13 +55,8 @@ export class BehavioralDAsyncFlipflopDriverElement extends PoolBackedAnalogEleme
   private _handlesQ: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _handlesNq: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -99,22 +83,17 @@ export class BehavioralDAsyncFlipflopDriverElement extends PoolBackedAnalogEleme
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
-    const risingEdge =
-      !this._firstSample &&
-      prevClock < this._vIH &&
-      vClock >= this._vIH;
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
+      q = vD >= 0.5 ? 1 : 0;
+    }
     this._firstSample = false;
 
-    if (risingEdge) {
-      if (vD >= this._vIH)     q = 1;
-      else if (vD < this._vIL) q = 0;
-    }
+    // Async Set then async Clr — Clr wins on collision.
+    if (vSet >= 0.5) q = 1;
+    if (vClr >= 0.5) q = 0;
 
-    if (vSet > this._vIH) q = 1;
-    if (vClr > this._vIH) q = 0;
-
-    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
@@ -124,12 +103,8 @@ export class BehavioralDAsyncFlipflopDriverElement extends PoolBackedAnalogEleme
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
 
@@ -141,14 +116,8 @@ export const BehavioralDAsyncFlipflopDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH", default: 2.0 },
-        { key: "vIL", default: 0.8 },
-        { key: "rOut", default: 100 },
-        { key: "vOH", default: 5 },
-        { key: "vOL", default: 0 },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralDAsyncFlipflopDriverElement(pinNodes, props),
     },

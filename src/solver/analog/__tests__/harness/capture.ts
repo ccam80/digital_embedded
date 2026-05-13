@@ -156,21 +156,22 @@ export function captureTopology(
     }
   });
 
-  const e2ce = compiled.elementToCircuitElement;
-  let branchOffset = 0;
+  // Branch rows: use each element's authoritative branchIndex (allocated by
+  // ctx.makeCur in setup()) as the sole gate. Any analog element with
+  // branchIndex > 0 owns a branch row, including composite sub-elements
+  // (e.g. Vtx_vSense inside the Optocoupler) whose elementToCircuitElement
+  // lookup returns undefined because they have no top-level CircuitElement.
+  // The label falls back to el.label, which expandCompositeInstance sets to
+  // ${parentLabel}:${subElementName} for sub-elements and user labels for
+  // top-level elements. el.branchIndex is 1-based post-sentinel; subtract 1
+  // for the 0-based matrix-row convention.
   for (let i = 0; i < compiled.elements.length; i++) {
-    const label = elementLabels?.get(i) ?? `element_${i}`;
-    const typeId = e2ce?.get(i)?.typeId ?? "";
-    const isBranchElement =
-      typeId === "DcVoltageSource" ||
-      typeId === "AcVoltageSource" ||
-      typeId === "Inductor";
-    if (isBranchElement) {
-      const branchRow = compiled.nodeCount + branchOffset;
-      matrixRowLabels.set(branchRow, `${label}:branch`);
-      matrixColLabels.set(branchRow, `${label}:branch`);
-      branchOffset++;
-    }
+    const el = compiled.elements[i];
+    if (el.branchIndex <= 0) continue;
+    const label = elementLabels?.get(i) ?? el.label ?? `element_${i}`;
+    const branchRow = el.branchIndex - 1;
+    matrixRowLabels.set(branchRow, `${label}:branch`);
+    matrixColLabels.set(branchRow, `${label}:branch`);
   }
 
   return {

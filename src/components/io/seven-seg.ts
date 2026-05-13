@@ -31,7 +31,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { buildSevenSegNetlist } from "../../solver/analog/behavioral-remaining.js";
+import { buildSevenSegNetlist, SEVEN_SEG_BEHAVIORAL_PARAM_DEFS, SEVEN_SEG_BEHAVIORAL_DEFAULTS } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -291,8 +291,8 @@ export const SevenSegDefinition: StandaloneComponentDefinition = {
   modelRegistry: {
     behavioral: {
       kind: "netlist",
-      paramDefs: [],
-      params: {},
+      paramDefs: SEVEN_SEG_BEHAVIORAL_PARAM_DEFS,
+      params: SEVEN_SEG_BEHAVIORAL_DEFAULTS,
       netlist: buildSevenSegNetlist,
     },
   },

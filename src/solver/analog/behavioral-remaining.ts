@@ -377,6 +377,16 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
 // buildSevenSegNetlist
 // ---------------------------------------------------------------------------
 
+export const { paramDefs: SEVEN_SEG_BEHAVIORAL_PARAM_DEFS, defaults: SEVEN_SEG_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH:  { default: 2.0,  unit: "V", description: "Input high threshold" },
+    vIL:  { default: 0.8,  unit: "V", description: "Input low threshold" },
+    rOut: { default: 100,  unit: "Ω", description: "Output drive resistance" },
+    vOH:  { default: 5.0,  unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0,  unit: "V", description: "Output low voltage" },
+  },
+});
+
 /**
  * Function-form netlist builder for the behavioral seven-segment display.
  *
@@ -386,7 +396,7 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
  *   drv     - BehavioralSevenSegDriver (driver leaf)
  *   aPin..dpPin - DigitalInputPinLoaded for each segment input
  */
-export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
+export function buildSevenSegNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const segmentLabels = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
   const drivenSegments = ["a", "b", "c", "d", "e", "f", "g"] as const;
   const ports: string[] = [...segmentLabels, "gnd"];
@@ -410,7 +420,13 @@ export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
       typeId: "BehavioralSevenSegDriver",
       modelRef: "default",
       subElementName: "drv",
-      params: {},
+      params: {
+        vIH:  params.getModelParam<number>("vIH"),
+        vIL:  params.getModelParam<number>("vIL"),
+        rOut: params.getModelParam<number>("rOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
+      },
     },
   ];
 

@@ -5,6 +5,7 @@ import {
   SCHEMA,
   BehavioralOutputDriverElement,
   BehavioralOutputDriverTriStateElement,
+  BehavioralOutputDriverTriStateDefinition,
 } from "../behavioral-output-driver.js";
 import type { ComponentRegistry, StandaloneComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
@@ -341,7 +342,8 @@ describe("tri-state BehavioralOutputDriverTriStateElement (4-port)", () => {
   });
 
   it("tri-state vEn low collapses to high-Z", () => {
-    const vOH = 5, vOL = 0, rLoad = 1000, rOut = 100, rHiZ = 1e9;
+    const vOH = 5, vOL = 0, rLoad = 1000, rOut = 100;
+    const rHiZ = (BehavioralOutputDriverTriStateDefinition.modelRegistry["default"] as { params: Record<string, number> }).params["rHiZ"]!;
     // en is low → high-Z stamp; rLoad pull-down to gnd
     // Bound: |vOut| < vOH * (1/rHiZ) * rLoad = 5e-6 V
     const fix = buildFixture({ build: buildTriState(vOH, vOL, rLoad, rOut, vOH, vOL, rHiZ) });
@@ -350,7 +352,7 @@ describe("tri-state BehavioralOutputDriverTriStateElement (4-port)", () => {
     const negNode = nodeOf(fix, "drv:neg");
     const vOut = Math.abs(fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode));
     const bound = vOH * (1 / rHiZ) * rLoad;
-    expect(vOut).toBeLessThan(bound + 1e-9);
+    expect(vOut).toBeLessThan(bound);
   });
 
   it("DRIVE_V slot reflects enabled+target post-step", () => {

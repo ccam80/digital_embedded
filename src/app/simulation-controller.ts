@@ -10,7 +10,7 @@ import type { AppContext } from './app-context.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import { EngineState } from '../core/engine-interface.js';
 import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
-import type { SignalValue } from '../compile/types.js';
+import type { SignalValue, Diagnostic } from '../compile/types.js';
 import { CurrentFlowAnimator } from '../editor/current-animation.js';
 import { VoltageRangeTracker } from '../editor/voltage-range.js';
 import { voltageToColor } from '../editor/voltage-color.js';
@@ -191,6 +191,36 @@ export function initSimulationController(
     }
 
     return raw;
+  }
+
+  // -------------------------------------------------------------------------
+  // Helper: surface the engine's most recent failure diagnostic
+  // -------------------------------------------------------------------------
+
+  function formatEngineErrorStatus(coord: SimulationCoordinator): string {
+    const diags: readonly Diagnostic[] = coord.getRuntimeDiagnostics();
+    let failure: Diagnostic | undefined;
+    for (let i = diags.length - 1; i >= 0; i--) {
+      const d = diags[i]!;
+      if (d.severity === 'error' && (
+        d.code === 'convergence-failed' ||
+        d.code === 'timestep-too-small' ||
+        d.code === 'singular-matrix'
+      )) {
+        failure = d;
+        break;
+      }
+    }
+    if (failure === undefined) {
+      return 'Simulation error: solver failed to converge.';
+    }
+    const tStr = failure.simTime !== undefined
+      ? ` at t=${failure.simTime.toExponential(3)}s`
+      : '';
+    const explanation = failure.explanation && failure.explanation.length > 0
+      ? ` — ${failure.explanation}`
+      : '';
+    return `Simulation error: ${failure.message}${tStr}.${explanation}`;
   }
 
   // -------------------------------------------------------------------------
@@ -498,11 +528,13 @@ export function initSimulationController(
             if (coordinator.getState() === EngineState.ERROR) {
               stopSimulation();
               const errCoord = ctx.facade.getCoordinator();
+              const msg = formatEngineErrorStatus(errCoord);
               const errRecords = errCoord.supportsConvergenceLog() ? errCoord.getConvergenceLog(1) : null;
               if (errRecords && errRecords.length > 0) {
                 import('./convergence-log-panel.js').then(m => m.autoOpenConvergenceLog(ctx));
+                ctx.showStatus(msg, true);
               } else {
-                ctx.showStatus('Simulation error: solver failed to converge. Enable Convergence Log from the Analysis menu and re-run to capture a trace.', true);
+                ctx.showStatus(`${msg} Enable Convergence Log from the Analysis menu and re-run to capture a trace.`, true);
               }
               return;
             }
@@ -524,17 +556,7 @@ export function initSimulationController(
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         stopSimulation();
-        if (msg.includes('stagnation')) {
-          const stagCoord = ctx.facade.getCoordinator();
-          const stagRecords = stagCoord.supportsConvergenceLog() ? stagCoord.getConvergenceLog(1) : null;
-          if (stagRecords && stagRecords.length > 0) {
-            import('./convergence-log-panel.js').then(m => m.autoOpenConvergenceLog(ctx));
-          } else {
-            ctx.showStatus(`Simulation error: ${msg}. Enable Convergence Log from the Analysis menu and re-run to capture a trace.`, true);
-          }
-        } else {
-          ctx.showStatus(`Simulation error: ${msg}`, true);
-        }
+        ctx.showStatus(`Simulation error: ${msg}`, true);
         return;
       }
 

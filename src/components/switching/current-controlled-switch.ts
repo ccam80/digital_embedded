@@ -84,6 +84,10 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
   private _ron: number;
   private _roff: number;
   private readonly _normallyClosed: boolean;
+  /** CSWzero_stateGiven — true when the netlist specifies `closed: 1` (maps to
+   *  the ngspice W-device `ON` keyword). Selects the HYST_ON cold-start branch
+   *  at MODEINITJCT/MODEINITFIX, mirroring cswload.c:49-56. */
+  private readonly _closedInitial: boolean;
   private _pullInI: number;
   private _dropOutI: number;
 
@@ -104,6 +108,7 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
     this._ron  = Math.max(readNumber(props, "Ron",  1),    1e-12);
     this._roff = Math.max(readNumber(props, "Roff", 1e9),  1e-12);
     this._normallyClosed = readBoolean(props, "normallyClosed", false);
+    this._closedInitial  = readBoolean(props, "closed", false);
     this._pullInI  = readNumber(props, "pullInI",  0.05);
     this._dropOutI = readNumber(props, "dropOutI", 0.02);
     this._ctrlBranchLabel = props.has("ctrlBranch") ? props.get<string>("ctrlBranch") : "";
@@ -166,7 +171,8 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
 
     if (ctx.cktMode & (MODEINITJCT | MODEINITFIX)) {
       // cswload.c:47-64 — cold-start: ignore previous state.
-      if (this._normallyClosed) {
+      // _closedInitial mirrors CSWzero_stateGiven (set by the W-device ON keyword).
+      if (this._closedInitial) {
         // cswload.c:49-56
         const onThresh = iH >= 0 ? iT + iH : iT - iH;
         newState = (i > onThresh) ? REALLY_ON : HYST_ON;

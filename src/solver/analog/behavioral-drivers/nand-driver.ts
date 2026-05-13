@@ -1,12 +1,6 @@
-﻿/**
- * BehavioralNandDriverElement- pure-truth-function driver leaf for the N-input
- * NAND gate.
- *
- * Reads N input voltages from rhsOld (relative to gnd), threshold-classifies
- * each input against per-instance vIH / vIL, and writes the NAND-reduced result.
- *
- * Template A-variable-pin shape mirror of and-driver.ts. Truth function:
- * `inputs.every((b) => b === 1) ? 0 : 1`.
+/**
+ * BehavioralNandDriverElement — pure-truth-function driver leaf for the N-input
+ * NAND gate. See and-driver.ts for the normalized-bit driver-chain architecture.
  *
  * Per Composite M10 (phase-composite-architecture.md), J-150
  * (contracts_group_10.md).
@@ -25,15 +19,7 @@ import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
-// ---------------------------------------------------------------------------
-// State schema
-// ---------------------------------------------------------------------------
-
 const SCHEMA: StateSchema = defineStateSchema("BehavioralNandDriver", []);
-
-// ---------------------------------------------------------------------------
-// Pin layout factory- per-instance variable input count
-// ---------------------------------------------------------------------------
 
 function buildNandDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const N = props.getModelParam<number>("inputCount");
@@ -58,10 +44,6 @@ function buildNandDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   return decls;
 }
 
-// ---------------------------------------------------------------------------
-// BehavioralNandDriverElement
-// ---------------------------------------------------------------------------
-
 export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
   readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
@@ -73,11 +55,6 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private readonly _ctrlOutNode: number;
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -88,11 +65,6 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
     }
     this._gndNode = pinNodes.get("gnd")!;
     this._ctrlOutNode = pinNodes.get("ctrl_out")!;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -105,43 +77,26 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
     const gndV = rhsOld[this._gndNode];
 
     let andResult = 1;
-    let indeterminate = false;
     for (let i = 0; i < this._inputCount; i++) {
       const v = rhsOld[this._inputNodes[i]] - gndV;
-      if (v < this._vIL) {
+      if (v < 0.5) {
         andResult = 0;
-        indeterminate = false;
         break;
-      } else if (v < this._vIH) {
-        indeterminate = true;
       }
     }
 
     const result = andResult ? 0 : 1;
-    const mid = (this._vOH + this._vOL) / 2;
-    const target = indeterminate
-      ? (rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL)
-      : (result ? this._vOH : this._vOL);
-
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params; inputCount is structural.
   }
 }
-
-// ---------------------------------------------------------------------------
-// ComponentDefinition
-// ---------------------------------------------------------------------------
 
 export const BehavioralNandDriverDefinition: ComponentDefinition = {
   name: "BehavioralNandDriver",
@@ -153,13 +108,8 @@ export const BehavioralNandDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [
         { key: "inputCount", default: 2 },
-        { key: "vIH",        default: 2.0 },
-        { key: "vIL",        default: 0.8 },
-        { key: "rOut",       default: 100 },
-        { key: "vOH",        default: 5 },
-        { key: "vOL",        default: 0 },
       ],
-      params: { inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      params: { inputCount: 2 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralNandDriverElement(pinNodes, props),
     },

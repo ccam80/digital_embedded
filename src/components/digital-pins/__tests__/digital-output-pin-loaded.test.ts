@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import {
-  DIGITAL_OUTPUT_PIN_LOADED_NETLIST,
+  buildDigitalOutputPinLoadedNetlist,
 } from "../digital-output-pin-loaded.js";
 import type { ComponentRegistry, StandaloneComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
@@ -87,7 +87,7 @@ function buildLoadedWrapperDef(): StandaloneComponentDefinition {
     modelRegistry: {
       default: {
         kind: "netlist",
-        netlist: DIGITAL_OUTPUT_PIN_LOADED_NETLIST,
+        netlist: buildDigitalOutputPinLoadedNetlist,
         paramDefs: [
           { key: "rOut", default: 100 },
           { key: "cOut", default: 1e-12 },
@@ -129,9 +129,9 @@ function buildLoaded(vCtrl: number, rLoad: number, vOH = 5, vOL = 0, rOut = 100)
 }
 
 describe("DigitalOutputPinLoaded (3-port composite)", () => {
-  it("ctrl high produces vOH at node", () => {
+  it("ctrl=1 (normalized high) produces vOH at node", () => {
     const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
-    const fix = buildFixture({ build: buildLoaded(vOH + 1, rLoad, vOH, vOL, rOut) });
+    const fix = buildFixture({ build: buildLoaded(1, rLoad, vOH, vOL, rOut) });
 
     const nodeN = nodeOf(fix, "pin:node");
     const gndN  = nodeOf(fix, "pin:gnd");
@@ -140,9 +140,9 @@ describe("DigitalOutputPinLoaded (3-port composite)", () => {
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("ctrl low produces vOL at node", () => {
+  it("ctrl=0 (normalized low) produces vOL at node", () => {
     const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
-    const fix = buildFixture({ build: buildLoaded(vOL - 1, rLoad, vOH, vOL, rOut) });
+    const fix = buildFixture({ build: buildLoaded(0, rLoad, vOH, vOL, rOut) });
 
     const nodeN = nodeOf(fix, "pin:node");
     const gndN  = nodeOf(fix, "pin:gnd");
@@ -151,20 +151,34 @@ describe("DigitalOutputPinLoaded (3-port composite)", () => {
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("cOut RC charges node from vOL to vOH after ctrl flip", () => {
+  it("cOut RC charges node from vOL to vOH after ctrl flip 0→1", () => {
     const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
-    // Start: ctrl at vOL → node settled near vOL
-    // Then flip ctrl to vOH and advance time > 5τ (τ = rOut × cOut = 100 ps)
-    // 5τ = 500 ps: step with maxTimeStep = 50e-12, take 15 steps → ~750 ps
+    // τ = rOut × cOut = 100 × 1e-12 = 100 ps; 5τ = 500 ps
+    const cOut = 1e-12;
+    const tau = rOut * cOut;          // 100 ps
+    const fiveTau = 5 * tau;          // 500 ps
+    const maxTimeStep = tau / 10;     // 10 ps — 10 steps per τ → 50 steps for 5τ
+
     const fix = buildFixture({
-      build: buildLoaded(vOH + 1, rLoad, vOH, vOL, rOut),
-      params: { maxTimeStep: 50e-12 },
+      build: buildLoaded(0, rLoad, vOH, vOL, rOut),
+      params: { maxTimeStep },
     });
 
-    // After warm-start with ctrl=vOH, node should be near vOH (fully charged).
-    // The RC should have settled: vNode > 0.95 × vOH.
-    // We verify by stepping further: take 15 more steps at 50 ps to reach > 5τ past boot.
-    for (let i = 0; i < 15; i++) {
+    // Warm-start has already run one step with ctrl=0; node is near vOL.
+    // Flip ctrl source to 1 by finding vsCtrl in elementToCircuitElement.
+    let vsCtrlEl: import("../../../core/element.js").CircuitElement | undefined;
+    for (const ce of fix.circuit.elementToCircuitElement.values()) {
+      if (ce.getProperties().getOrDefault<string>("label", "") === "vsCtrl") {
+        vsCtrlEl = ce;
+        break;
+      }
+    }
+    if (vsCtrlEl === undefined) throw new Error("vsCtrl not found in elementToCircuitElement");
+    fix.coordinator.setComponentProperty(vsCtrlEl, "voltage", 1);
+
+    // Step through 5τ (50 steps at maxTimeStep = 10 ps each).
+    const stepsFor5Tau = Math.ceil(fiveTau / maxTimeStep);
+    for (let i = 0; i < stepsFor5Tau; i++) {
       fix.coordinator.step();
     }
 

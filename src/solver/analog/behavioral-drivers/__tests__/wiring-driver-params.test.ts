@@ -143,38 +143,53 @@ function buildSevenSegFixture() {
     });
 }
 
-function findByLabel(fix: ReturnType<typeof buildFixture>, label: string) {
-  return fix.coordinator.compiled.allCircuitElements.find(
-    e => e.getProperties().getOrDefault<string>("label", "") === label,
-  );
-}
-
 describe("wiring-driver-params: accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("Multiplexer (BehavioralMuxDriverElement): setParam rOut/vOH/vOL does not throw", () => {
     const fix = buildFixture({ build: buildMuxFixture() });
-    const el = findByLabel(fix, "mux");
+    const el = fix.coordinator.compiled.labelToCircuitElement.get("mux");
     expect(el).toBeDefined();
+    expect(el!.typeId).toBe("Multiplexer");
+
     expect(() => fix.coordinator.setComponentProperty(el!, "rOut", 200)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("rOut")).toBe(200);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOH", 3.3)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOH")).toBe(3.3);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOL", 0.5)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOL")).toBe(0.5);
   });
 
   it("Demultiplexer (BehavioralDemuxDriverElement): setParam rOut/vOH/vOL does not throw", () => {
     const fix = buildFixture({ build: buildDemuxFixture() });
-    const el = findByLabel(fix, "demux");
+    const el = fix.coordinator.compiled.labelToCircuitElement.get("demux");
     expect(el).toBeDefined();
+    expect(el!.typeId).toBe("Demultiplexer");
+
     expect(() => fix.coordinator.setComponentProperty(el!, "rOut", 200)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("rOut")).toBe(200);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOH", 3.3)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOH")).toBe(3.3);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOL", 0.5)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOL")).toBe(0.5);
   });
 
   it("Decoder (BehavioralDecoderDriverElement): setParam rOut/vOH/vOL does not throw", () => {
     const fix = buildFixture({ build: buildDecoderFixture() });
-    const el = findByLabel(fix, "decoder");
+    const el = fix.coordinator.compiled.labelToCircuitElement.get("decoder");
     expect(el).toBeDefined();
+    expect(el!.typeId).toBe("Decoder");
+
     expect(() => fix.coordinator.setComponentProperty(el!, "rOut", 200)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("rOut")).toBe(200);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOH", 3.3)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOH")).toBe(3.3);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOL", 0.5)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOL")).toBe(0.5);
   });
 
   it("Splitter (BehavioralSplitterDriverElement): setParam rOut/vOH/vOL does not throw", () => {
@@ -182,16 +197,28 @@ describe("wiring-driver-params: accepts rOut/vOH/vOL via setParam without throwi
     const pinNodes = splitterPinNodes(1, 2);
     const el = new BehavioralSplitterDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
+    expect(el.getParam("rOut")).toBe(200);
+
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
+    expect(el.getParam("vOH")).toBe(3.3);
+
     expect(() => el.setParam("vOL", 0.5)).not.toThrow();
+    expect(el.getParam("vOL")).toBe(0.5);
   });
 
   it("SevenSeg (BehavioralSevenSegDriverElement): setParam rOut/vOH/vOL does not throw", () => {
     const fix = buildFixture({ build: buildSevenSegFixture() });
-    const el = findByLabel(fix, "seg");
+    const el = fix.coordinator.compiled.labelToCircuitElement.get("seg");
     expect(el).toBeDefined();
+    expect(el!.typeId).toBe("SevenSeg");
+
     expect(() => fix.coordinator.setComponentProperty(el!, "rOut", 200)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("rOut")).toBe(200);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOH", 3.3)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOH")).toBe(3.3);
+
     expect(() => fix.coordinator.setComponentProperty(el!, "vOL", 0.5)).not.toThrow();
+    expect(el!.getProperties().getModelParam<number>("vOL")).toBe(0.5);
   });
 });

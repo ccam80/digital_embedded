@@ -15,14 +15,6 @@
  *
  * Stamp pattern (unloaded): no-op (pure threshold-detection element).
  *
- * Per Composite M21 (phase-composite-architecture.md), J-135
- * (contracts_group_09.md). Logic migrated verbatim from the recovered
- * `DigitalInputPinModel.load()` and `readLogicLevel()` at
- * `.recovery/digital-pin-model.ts.orig:307-335`. Composite-class shape
- * (recovered `BridgeInputDriverElement`) replaced with direct
- * PoolBackedAnalogElement implementation- the deleted `extends
- * CompositeElement` is forbidden by ss0 hard rule #16.
- *
  * `readLogicLevel` is a stateless threshold-detection method, NOT a
  * truth-function-driver-leaf pattern. Bridges are pin-level elements at
  * engine boundaries- they expose the cross-engine signal interface as

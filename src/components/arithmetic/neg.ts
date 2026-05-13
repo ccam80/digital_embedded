@@ -71,8 +71,10 @@ export function executeNeg(index: number, state: Uint32Array, _highZs: Uint32Arr
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 1;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
   const val = state[wt[inBase]] >>> 0;
-  state[wt[outBase]] = (-val) >>> 0;
+  state[wt[outBase]] = ((-val) & mask) >>> 0;
 }
 
 export const NEG_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [

@@ -17,7 +17,7 @@
 import { Circuit } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
-import { resolvePinLayout, isStandalone } from "../../core/registry.js";
+import { resolvePinLayout } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
@@ -243,7 +243,8 @@ function expandCompositeInstance(
   registry: ComponentRegistry,
   getTime: () => number,
   allocateNode: NodeAllocator,
-  hook?: import("../../core/registry.js").AnalogWrapperHook,
+  hookFactory?: import("../../core/registry.js").AnalogWrapperHookFactory,
+  outerProps?: PropertyBag,
 ): { wrapper: SubcircuitWrapperElement; allLeaves: AnalogElement[] } {
   // Allocate internal-net IDs in ngspice INPpas2 / INPtermInsert order:
   // walk `netlist.elements` in deck order, walk each element's
@@ -449,6 +450,19 @@ function expandCompositeInstance(
       }
     }
   }
+
+  // Build the by-name index for the hook factory: parent-side hooks need to
+  // address specific sub-elements (e.g. write a derived `gain` to the inner
+  // VCVS when an outer `vOH` changes). Built from subElementLabelInfo so the
+  // names line up with `subElementName` in the netlist declaration.
+  const subElementsByName = new Map<string, AnalogElement>();
+  for (const { el, subElementName } of subElementLabelInfo) {
+    subElementsByName.set(subElementName, el);
+  }
+
+  const hook = hookFactory !== undefined && outerProps !== undefined
+    ? hookFactory(outerPinNodes, outerProps, getTime, subElementsByName)
+    : undefined;
 
   const wrapper = new SubcircuitWrapperElement({
     pinNodes: outerPinNodes,
@@ -703,13 +717,6 @@ function buildAnalogNodeMapFromPartition(
         const idx = labelToPinIdx.get(lbl);
         if (idx === undefined) continue;
         visitPin(pc.resolvedPins[idx]!);
-      }
-      // Walk any pinLayout-only pins (not listed in deckLabels) afterward-
-      // typically only digital-domain pins on cross-domain components, which
-      // never affect ngspice numbering.
-      for (let pi = 0; pi < pc.resolvedPins.length; pi++) {
-        const rp = pc.resolvedPins[pi]!;
-        if (!deckLabels.includes(rp.pinLabel)) visitPin(rp);
       }
     } else {
       // Unknown typeId (composite or non-ngspice element): fall back to
@@ -1039,9 +1046,10 @@ export function compileAnalogPartition(
       // load/setDiagnosticEmitter/setParam/acceptStep calls to the hook;
       // the existing RuntimeDiagnosticAware wiring in MNAEngine.init()
       // hooks the diagnostic emitter via the wrapper's setDiagnosticEmitter.
-      const hook = isStandalone(def) && def.analogWrapperHook
-        ? def.analogWrapperHook(pinNodes, props, getTime)
-        : undefined;
+      // The factory is invoked inside expandCompositeInstance after the
+      // sub-elements are built so the hook can address them by name (e.g.
+      // re-derive a VCVS gain when an outer vOH changes).
+      const hookFactory = def.analogWrapperHook;
       const expanded = expandCompositeInstance(
         netlist,
         subcktParams,
@@ -1051,7 +1059,8 @@ export function compileAnalogPartition(
         registry,
         getTime,
         allocateCompositeNode,
-        hook,
+        hookFactory,
+        props,
       );
       core = expanded.wrapper;
       core.label = resolvedLabel;

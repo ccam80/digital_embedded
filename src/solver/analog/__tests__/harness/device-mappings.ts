@@ -157,6 +157,9 @@ export const BJT_MAPPING: DeviceMapping = {
     GEQCB: 18,
     GCSUB: 19,
     GEQBX: 20,
+    VSUB: 21,
+    CDSUB: 22,
+    GDSUB: 23,
   },
   pinCurrents: {
     C: [{ slot: "CC", sign: 1 }],
@@ -185,6 +188,9 @@ export const BJT_MAPPING: DeviceMapping = {
     18: "GEQCB",
     19: "GCSUB",
     20: "GEQBX",
+    21: "VSUB",
+    22: "CDSUB",
+    23: "GDSUB",
   },
 };
 

@@ -32,6 +32,7 @@ import type {
   StepSnapshot,
 } from "./types.js";
 import type { AnalogElement } from "../../element.js";
+import { canonicalizeSpiceLabel } from "./netlist-generator.js";
 
 // ---------------------------------------------------------------------------
 // Canonicalization
@@ -175,25 +176,58 @@ export function buildDirectNodeMapping(
   // el.branchIndex is the 1-based MNA equation index allocated inside the
   // element's setup() via ctx.makeCur (VSRCsetup parity); consumers like
   // inductor.ts read voltages[branchIndex] directly, so this must remain 1-based.
+  //
+  // Name resolution against ngspice's nodeNames map has to handle three cases:
+  //   (a) Top-level vsource/inductor where elementLabels gives the user-facing
+  //       label (e.g. "vCC") and ngspice's deck name matches lower-cased
+  //       ("vcc#branch"). Direct lookup works.
+  //   (b) Composite-internal sub-element where elementLabels falls back to
+  //       auto-numbered "X4" but the netlist generator emitted a deck name
+  //       like "Vtx_vSense" (parent rawLabel + "_" + subElementName, plus
+  //       canonicalizeSpiceLabel's V/L prefix). For these, the AnalogElement's
+  //       intrinsic .label is the parent-pathed colon form ("tx:vSense");
+  //       replace ":" with "_" and run canonicalizeSpiceLabel with each
+  //       branch-element prefix (V, L, E, F, H) to reconstruct the ngspice
+  //       deck name without re-implementing the generator's logic.
+  //   (c) Top-level element whose deck label needed a prefix add (e.g. user
+  //       called it "myInductor"; netlist emitted "LmyInductor"). Same prefix-
+  //       loop covers it via case (b)'s path.
+  const branchPrefixCandidates = ["V", "L", "E", "F", "H"];
   for (let ei = 0; ei < elements.length; ei++) {
     const el = elements[ei];
     if (el.branchIndex < 0) continue;
 
-    const elLabel = elementLabels.get(ei);
-    if (!elLabel) continue;
+    const candidates: string[] = [];
+    const userLabel = elementLabels.get(ei);
+    if (userLabel) {
+      candidates.push(`${userLabel.toLowerCase()}#branch`);
+    }
+    const intrinsic = el.label;
+    if (intrinsic) {
+      const underscored = intrinsic.replace(/:/g, "_");
+      for (const prefix of branchPrefixCandidates) {
+        const canonical = canonicalizeSpiceLabel(underscored, prefix);
+        candidates.push(`${canonical.toLowerCase()}#branch`);
+      }
+    }
 
-    const ngBranchName = `${elLabel.toLowerCase()}#branch`;
-    const ngspiceIndex = ngTopology.nodeNames.get(ngBranchName);
+    let ngspiceIndex: number | undefined;
+    let resolvedName = "";
+    for (const cand of candidates) {
+      const idx = ngTopology.nodeNames.get(cand);
+      if (idx !== undefined) { ngspiceIndex = idx; resolvedName = cand; break; }
+    }
     if (ngspiceIndex === undefined) continue;
 
     const ourIndex = el.branchIndex;
+    const labelHint = userLabel ?? intrinsic ?? `element_${ei}`;
     const label = ourTopology.nodeLabels.get(-(el.branchIndex + 1))
-      ?? `${elLabel}:branch`;
+      ?? `${labelHint}:branch`;
     mappings.push({
       ourIndex,
       ngspiceIndex,
       label,
-      ngspiceName: ngBranchName,
+      ngspiceName: resolvedName,
     });
   }
 

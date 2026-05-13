@@ -963,6 +963,10 @@ export class PJfetElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function buildPJfetPinDeclarations(): PinDeclaration[] {
+  // pinLayout order [G, S, D] matches NJFET (njfet.ts) so the netlist-generator's
+  // positional J-card emit `J{label} nodes[2]=D nodes[0]=G nodes[1]=S model`
+  // produces the canonical SPICE J-card pin order (D G S). The physical pin
+  // positions are unchanged — only the array index of each label moves.
   return [
     {
       direction: PinDirection.INPUT,
@@ -974,19 +978,19 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       kind: "signal",
     },
     {
-      direction: PinDirection.OUTPUT,
-      label: "D",
+      direction: PinDirection.INPUT,
+      label: "S",
       defaultBitWidth: 1,
-      position: { x: 4, y: 1.0 },
+      position: { x: 4, y: -1.0 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
     },
     {
-      direction: PinDirection.INPUT,
-      label: "S",
+      direction: PinDirection.OUTPUT,
+      label: "D",
       defaultBitWidth: 1,
-      position: { x: 4, y: -1.0 },
+      position: { x: 4, y: 1.0 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",

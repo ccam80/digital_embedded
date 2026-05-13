@@ -50,6 +50,17 @@ Never propose "pragmatic", "simple", "fastest", or "minimal" solutions. Always i
 
 When implementing or fixing any SPICE-derived algorithm (convergence, stamps, limiting, integration), match the corresponding ngspice source function exactly (e.g., `BJTconvTest`, `DIOload`). Provide a mapping table from ngspice variables to ours.
 
+### Sparse Solver is Settled- Do Not Re-Investigate
+
+**Matrix ordering, Markowitz tie-break, and pivoting inside `src/solver/analog/sparse-solver.ts` are bit-identical to ngspice's `spMatrix` (Sparse 1.3a)** and have been verified by multiple prior investigations against `ref/ngspice/src/spicelib/sparse/*.c`. When you see a 1-ULP parity divergence after a bit-identical matrix + RHS at iter 0, the divergence is **not** in `spOrderAndFactor` / `spFactor` / `spSolve` and not in the per-bucket setup walk that feeds them.
+
+Look further upstream instead:
+- per-device `load()` accumulation order on a shared diagonal (multiple stamps `+=` into the same cell — order matters in floating point);
+- per-device `setup()` TSTALLOC sequence vs the corresponding `ref/ngspice/src/spicelib/devices/<dev>/<dev>setup.c` lines (a swapped pair of allocElement calls changes the matrix internal element-pool order and is structurally visible at the harness CSC dump);
+- composite-internal node-ID allocation order in `expandCompositeInstance` (compiler.ts) vs ngspice INPpas2 / INPtermInsert first-encounter order along the emitted deck.
+
+Do not re-derive Markowitz, do not add LU logging to "see if pivoting differs," do not propose rewriting the sparse solver as a fix path. If a fresh investigation conclusively contradicts this directive (with an evidenced diff against `ref/ngspice/src/spicelib/sparse/`), escalate — do not flip the directive silently.
+
 ### ngspice Parity Vocabulary- Banned Closing Verdicts
 
 When comparing digiTS against ngspice, the following words are banned as closing verdicts on any divergence:
@@ -68,16 +79,24 @@ Rationale: these words, used as closing verdicts, raised the tolerance floor acr
 
 ### ngspice Comparison Harness- First Tool for Numerical Issues
 
-For ANY numerical discrepancy, convergence failure, or model correctness question, the **first step** is to compare per-NR-iteration internal node/branch values against ngspice using the harness MCP tools. Do not theorize about code differences- run the comparison and find the exact iteration where values diverge.
+For ANY numerical discrepancy, convergence failure, or model correctness question, the **first step** is to compare per-NR-iteration internal node/branch values against ngspice using the harness MCP tools. Do not theorize about code differences, do not write `.mjs` probe scripts that copy values out of tool responses- the harness tools answer "where did this first go wrong" directly.
 
-Workflow via the `circuit-simulator` MCP server:
+**Triage path (use this order, do not skip steps):**
 
-1. `harness_start`- create a session against a `.dts` or `.dig` circuit; the session wraps both digiTS and the instrumented ngspice DLL.
+1. `harness_start`- create a session against a `.dts` or `.dig` circuit; the session wraps both digiTS and the instrumented ngspice DLL. Structural-parity asserts are deferred on the MCP path, so `harness_run` never short-circuits even on circuits with matrix-size or coord-set divergence — investigation always proceeds.
 2. `harness_run`- execute the analysis (DC-OP or transient).
-3. `harness_describe`- confirm topology mapping between digiTS and ngspice node IDs.
-4. `harness_get_step` / `harness_get_attempt`- read per-step / per-NR-attempt snapshots: voltages, device states (`CKTstate0`), matrix entries, RHS, convergence flags from both engines side-by-side.
-5. `harness_session_map` / `harness_export`- full session dump for offline diff.
-6. `harness_dispose`- release resources when done.
+3. **`harness_first_divergence`** - returns the earliest divergence in each of four signal classes (voltage / matrix / state / shape) plus `earliest` across all four. ALWAYS call this first after `harness_run`. Picks the axis you need to drill into.
+4. **`harness_topology_diff`** - returns elements present on one side but not the other, nodes/branches where the matched 1-based slot index differs between sides ("allocated in a different order"), unmapped ngspice nodes, and deferred messages from the structural-parity asserts. Call this when `firstDivergence.matrix` or `firstDivergence.shape` is non-null, or when `harness_run` reports any error.
+5. **`harness_matrix_diff`** - returns the verdict at one reference iteration (`match` / `value-only` / `value-permutation` / `coord-set-differs`), plus `oursOnly` / `ngspiceOnly` / `valueMismatches` cell lists with `firstDivergentStep` / `firstDivergentIteration` attached. Call this when `firstDivergence.matrix` is non-null. The per-cell `firstDivergentStep` tells you which step a specific Jacobian cell first went off — no need to scan steps yourself.
+6. `harness_get_attempt` (with `nodes` / `component` slice) - zoom in on the concrete (step, iter) the diff tools pointed at, sliced to the divergent rows/cols. This is the read-the-actual-numbers step; do not start here.
+7. `harness_get_step` / `harness_session_map` / `harness_export` - per-step summaries, shape, full-session dump for offline analysis.
+8. `harness_describe` - full topology metadata when you need pins-and-slots detail.
+9. `harness_dispose` - release resources when done.
+
+**Anti-patterns to avoid:**
+- Calling `harness_get_attempt` before the diff tools. The dense matrix dump is a zoom-in surface, not triage. If you don't already know which (row, col) cells diverge, the diff tools tell you in one call.
+- Copying numbers out of tool responses into `.mjs` probe scripts to compute deltas or first-divergent-step yourself — the diff tools already do this server-side.
+- Treating a `harness_run` error message as the whole answer. The matching `structuralFindings[]` (returned by `harness_topology_diff`) carries the same message in a machine-readable form alongside the rest of the diff data.
 
 The harness is the only sanctioned route to per-iteration / per-element-state / matrix data; do not reach into engine internals from tests or specs to do this work yourself.
 

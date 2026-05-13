@@ -45,8 +45,8 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   PnpBJT:          { prefix: "Q", modelType: "PNP" },
   NMOS:            { prefix: "M", modelType: "NMOS" },
   PMOS:            { prefix: "M", modelType: "PMOS" },
-  NJFET:           { prefix: "J", modelType: "NMF" },
-  PJFET:           { prefix: "J", modelType: "PMF" },
+  NJFET:           { prefix: "J", modelType: "NJF" },
+  PJFET:           { prefix: "J", modelType: "PJF" },
   VCVS:            { prefix: "E" },
   VCCS:            { prefix: "G" },
   CCVS:            { prefix: "H" },
@@ -77,7 +77,7 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
  * lines (the sense source is named via the user's senseSourceLabel, but the
  * emitted V-source line carries the canonicalized name).
  */
-function canonicalizeSpiceLabel(rawLabel: string, requiredPrefix: string): string {
+export function canonicalizeSpiceLabel(rawLabel: string, requiredPrefix: string): string {
   const upper = requiredPrefix.toUpperCase();
   return rawLabel.charAt(0).toUpperCase() === upper ? rawLabel : `${upper}${rawLabel}`;
 }

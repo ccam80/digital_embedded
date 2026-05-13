@@ -142,6 +142,12 @@ export function registerHarnessTools(
         dllPath: args.dllPath,
         tolerance: args.tolerance,
         maxOurSteps: args.maxOurSteps,
+        // Structural-parity asserts throw inside runDcOp/runTransient, which
+        // makes coord-set / matrix-size divergences fatal at the MCP layer
+        // — exactly the bugs the investigation tools below need to surface.
+        // Defer so harness_run never short-circuits; agents read the verdict
+        // through harness_topology_diff / harness_matrix_diff / structuralFindings.
+        deferStructuralAsserts: true,
       });
 
       try {
@@ -777,6 +783,115 @@ export function registerHarnessTools(
       }
 
       return JSON.stringify(output);
+    }),
+  );
+
+  // -------------------------------------------------------------------------
+  // harness_topology_diff
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_topology_diff",
+    {
+      title: "Topology Diff",
+      description:
+        "Compare element-and-node topology between our compiled circuit and the " +
+        "ngspice deck. Returns: " +
+        "(a) elementDiffs — components present on one side but not the other " +
+        "(matched by lowercased label with SPICE-prefix canonicalisation); " +
+        "(b) orderingDiffs — matched nodes/branches whose 1-based slot index " +
+        "differs between sides (each entry is one element 'allocated in a " +
+        "different order'); " +
+        "(c) unmappedNgspiceNodes — ngspice nodes the node-mapping pass could " +
+        "not resolve to one of our slots; " +
+        "(d) structuralFindings — deferred messages from the structural-parity " +
+        "asserts (matrix-size divergence, first-iter coord-set / value-permutation " +
+        "/ value-only). " +
+        "Does not require harness_run first, but ngspice-side fields are populated " +
+        "only after a run.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle from harness_start"),
+      }),
+    },
+    wrapTool("harness_topology_diff", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_topology_diff");
+      const report = entry.session.topologyDiff();
+      return JSON.stringify({ handle: args.handle, topologyDiff: report });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
+  // harness_matrix_diff
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_matrix_diff",
+    {
+      title: "Matrix Diff",
+      description:
+        "Compare the Jacobian matrix between our engine and ngspice at one " +
+        "reference iteration AND scan the whole session to attribute each " +
+        "divergent cell to the (step, iter) where it first diverged. Returns: " +
+        "(a) classification — 'match' / 'value-only' / 'value-permutation' / " +
+        "'coord-set-differs'; " +
+        "(b) oursOnly — cells in our matrix but not ngspice's; " +
+        "(c) ngspiceOnly — cells in ngspice's matrix but not ours; " +
+        "(d) valueMismatches — cells in both with differing values, sorted by " +
+        "absDelta desc; each carries firstDivergentStep / firstDivergentIteration " +
+        "so callers see which step the cell first went off (and don't need to " +
+        "scan every step manually). " +
+        "Reference defaults to (step 0, iter 0) — the same site the structural " +
+        "assertions classify.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle from harness_start"),
+        stepIndex: z.number().int().min(0).optional().describe(
+          "Reference step index. Default: 0.",
+        ),
+        iterationIndex: z.number().int().min(0).optional().describe(
+          "Reference iteration index within the accepted attempt. Default: 0.",
+        ),
+      }),
+    },
+    wrapTool("harness_matrix_diff", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_matrix_diff");
+      if (!entry.analysis) {
+        throw new Error("harness_matrix_diff: run harness_run first");
+      }
+      const report = entry.session.matrixDiff({
+        stepIndex: args.stepIndex,
+        iterationIndex: args.iterationIndex,
+      });
+      return JSON.stringify({ handle: args.handle, matrixDiff: report });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
+  // harness_first_divergence
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_first_divergence",
+    {
+      title: "First Divergence (multi-signal)",
+      description:
+        "Walk paired iterations in chronological order and return the first " +
+        "divergence in each of four signal classes: " +
+        "voltage (node-voltage cell), matrix (Jacobian cell), state " +
+        "(element-state slot), shape (attempt count / accepted-attempt phase). " +
+        "Plus `earliest`: the lowest (stepIndex, iterationIndex) across all four. " +
+        "Use this first to choose which axis to drill into before fetching a " +
+        "full attempt via harness_get_attempt with a slice.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle from harness_start"),
+      }),
+    },
+    wrapTool("harness_first_divergence", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_first_divergence");
+      if (!entry.analysis) {
+        throw new Error("harness_first_divergence: run harness_run first");
+      }
+      const report = entry.session.firstDivergence();
+      return JSON.stringify({ handle: args.handle, firstDivergence: report });
     }),
   );
 }

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import {
-  DIGITAL_OUTPUT_PIN_UNLOADED_NETLIST,
+  buildDigitalOutputPinUnloadedNetlist,
 } from "../digital-output-pin-unloaded.js";
 import type { ComponentRegistry, StandaloneComponentDefinition } from "../../../core/registry.js";
 import { ComponentCategory } from "../../../core/registry.js";
@@ -87,7 +87,7 @@ function buildUnloadedWrapperDef(): StandaloneComponentDefinition {
     modelRegistry: {
       default: {
         kind: "netlist",
-        netlist: DIGITAL_OUTPUT_PIN_UNLOADED_NETLIST,
+        netlist: buildDigitalOutputPinUnloadedNetlist,
         paramDefs: [
           { key: "rOut", default: 100 },
           { key: "vOH",  default: 5 },
@@ -128,9 +128,9 @@ function buildUnloaded(vCtrl: number, rLoad: number, vOH = 5, vOL = 0, rOut = 10
 }
 
 describe("DigitalOutputPinUnloaded (3-port composite)", () => {
-  it("ctrl high produces vOH at node", () => {
+  it("ctrl=1 (normalized high) produces vOH at node", () => {
     const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
-    const fix = buildFixture({ build: buildUnloaded(vOH + 1, rLoad, vOH, vOL, rOut) });
+    const fix = buildFixture({ build: buildUnloaded(1, rLoad, vOH, vOL, rOut) });
 
     const nodeN = nodeOf(fix, "pin:node");
     const gndN  = nodeOf(fix, "pin:gnd");
@@ -139,9 +139,9 @@ describe("DigitalOutputPinUnloaded (3-port composite)", () => {
     expect(vOut).toBeCloseTo(expected, 6);
   });
 
-  it("ctrl low produces vOL at node", () => {
+  it("ctrl=0 (normalized low) produces vOL at node", () => {
     const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
-    const fix = buildFixture({ build: buildUnloaded(vOL - 1, rLoad, vOH, vOL, rOut) });
+    const fix = buildFixture({ build: buildUnloaded(0, rLoad, vOH, vOL, rOut) });
 
     const nodeN = nodeOf(fix, "pin:node");
     const gndN  = nodeOf(fix, "pin:gnd");

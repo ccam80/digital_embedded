@@ -17,6 +17,13 @@ const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>(
   "MOS",
   "JFET",
   "TRA",
+  // Controlled sources emit F/H/E/G primitive cards via netlist-generator's
+  // emitPrimitive. Their pin-label-order entries gate compiler node-allocation
+  // walk parity with ngspice's INPpas2 first-encounter rule.
+  "CCCS",
+  "CCVS",
+  "VCCS",
+  "VCVS",
 ]);
 
 const MULTI_LINE_COMPOSITES: ReadonlySet<string> = new Set<string>([

@@ -83,7 +83,6 @@ describe("BehavioralButtonLEDDriver — ctrl_out Norton stamp (Cat 2 analytical)
   it("stamps vOH at ctrl_out when in voltage is above vIH (LED on)", () => {
     const fix = buildButtonLEDFixture(3.3);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["btnled:out"];
@@ -94,7 +93,6 @@ describe("BehavioralButtonLEDDriver — ctrl_out Norton stamp (Cat 2 analytical)
   it("stamps vOL at ctrl_out when in voltage is below vIL (LED off)", () => {
     const fix = buildButtonLEDFixture(0.0);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["btnled:out"];
@@ -106,7 +104,6 @@ describe("BehavioralDriverDriver — ctrl_out + ctrl_en Norton stamps (Cat 2 ana
   it("stamps vOH at out when in=HIGH and sel=HIGH (enabled, data high)", () => {
     const fix = buildDriverFixture(3.3, 3.3);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["drv:out"];
@@ -117,7 +114,6 @@ describe("BehavioralDriverDriver — ctrl_out + ctrl_en Norton stamps (Cat 2 ana
   it("stamps vOL at out when in=LOW and sel=HIGH (enabled, data low)", () => {
     const fix = buildDriverFixture(0.0, 3.3);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["drv:out"];
@@ -127,7 +123,6 @@ describe("BehavioralDriverDriver — ctrl_out + ctrl_en Norton stamps (Cat 2 ana
   it("output is pulled to near-zero by load when sel=LOW (high-Z: enable inactive)", () => {
     const fix = buildDriverFixture(3.3, 0.0);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["drv:out"];
@@ -139,7 +134,6 @@ describe("BehavioralDriverInvDriver — ctrl_out + ctrl_en with inverted sel (Ca
   it("stamps vOH at out when in=HIGH and sel=LOW (active-LOW enable asserted)", () => {
     const fix = buildDriverInvFixture(3.3, 0.0);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["drv:out"];
@@ -150,7 +144,6 @@ describe("BehavioralDriverInvDriver — ctrl_out + ctrl_en with inverted sel (Ca
   it("stamps vOL at out when in=LOW and sel=LOW (active-LOW enable asserted, data low)", () => {
     const fix = buildDriverInvFixture(0.0, 0.0);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["drv:out"];
@@ -160,7 +153,6 @@ describe("BehavioralDriverInvDriver — ctrl_out + ctrl_en with inverted sel (Ca
   it("output is pulled to near-zero by load when sel=HIGH (active-LOW enable not asserted: high-Z)", () => {
     const fix = buildDriverInvFixture(3.3, 3.3);
     const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
     fix.coordinator.step();
     const vOut = fix.facade.readAllSignals(fix.coordinator)["drv:out"];

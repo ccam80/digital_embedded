@@ -1022,8 +1022,17 @@ export class MNAEngine implements AnalogEngine {
   // AnalogEngine interface- Simulation time
   // -------------------------------------------------------------------------
 
-  /** MNA matrix dimension after _setup() has discovered all equations
-   *  (mirrors ngspice CKTmaxEqNum + 1). Returns 0 before init+setup runs. */
+  /**
+   * Number of active MNA equations (nodes + branches), excluding the
+   * ground-sentinel row/col. Returns 0 before init+setup runs. This is the
+   * sparse solver's raw `_size`, NOT the ngspice-style `CKTmaxEqNum + 1`
+   * metric. ngspice's public matrixSize is N + 2 (a CKTmaxEqNum counter that
+   * starts at 1 for the ground sentinel and is post-incremented past the
+   * last allocation); the per-iter snapshot convention in `capture.ts:407`
+   * (`rhs.length + 1`) also resolves to N + 2. The harness's
+   * `ngspice-bridge._parseTopology` subtracts 2 from the raw value so that
+   * topology-level matrixSize fields on both sides carry this same raw N.
+   */
   get matrixSize(): number {
     return this._solver.matrixSize;
   }

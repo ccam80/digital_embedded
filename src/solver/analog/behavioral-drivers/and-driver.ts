@@ -1,9 +1,16 @@
-﻿/**
- * BehavioralAndDriverElement- pure-truth-function driver leaf for the N-input
+/**
+ * BehavioralAndDriverElement — pure-truth-function driver leaf for the N-input
  * AND gate.
  *
  * Reads N input voltages from rhsOld (relative to gnd), threshold-classifies
- * each input against per-instance vIH / vIL, and writes the AND-reduced result.
+ * each input against the normalized logic midpoint (0.5 V), and stamps the
+ * AND-reduced result at the ctrl_out node as a {0, 1} V Norton source.
+ *
+ * Internal-chain contract: drivers communicate at normalized {0, 1} V; the
+ * digital→analog rail conversion happens at the pin boundary (DOPL etc.).
+ * The Norton stamp uses an implicit G = 1 S (rOut = 1 Ω) — irrelevant to the
+ * resulting voltage when downstream is voltage-sense-only (next driver or
+ * DOPL's eDrive VCVS), only there to keep the matrix row well-conditioned.
  *
  * Canonical reference for **Template A-variable-pin**: 1-bit pure-truth
  * driver with variable input pin count per instance. Every other gate
@@ -41,7 +48,7 @@ import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 const SCHEMA: StateSchema = defineStateSchema("BehavioralAndDriver", []);
 
 // ---------------------------------------------------------------------------
-// Pin layout factory- per-instance variable input count
+// Pin layout factory — per-instance variable input count
 // ---------------------------------------------------------------------------
 //
 // Order MUST match the parent's connectivity row for this sub-element. The
@@ -87,11 +94,6 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
   private _gndNode: number;
   private _ctrlOutNode: number;
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -99,11 +101,6 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
     this._inputNodes = new Array(this._inputCount).fill(-1);
     this._gndNode = -1;
     this._ctrlOutNode = -1;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -116,51 +113,30 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
     this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
-  /**
-   * Per-input threshold-classify with hold-on-indeterminate semantic:
-   *
-   *   - If any input falls below vIL (a "0" for AND) → output 0 immediately;
-   *     0 is the absorbing element for AND so further inputs do not matter.
-   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) →
-   *     hold prior output (CMOS metastability proxy).
-   *   - Else (all inputs >= vIH) → output 1.
-   */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const gndV = rhsOld[this._gndNode];
 
     let result = 1;
-    let indeterminate = false;
     for (let i = 0; i < this._inputCount; i++) {
       const v = rhsOld[this._inputNodes[i]] - gndV;
-      if (v < this._vIL) {
+      if (v < 0.5) {
         result = 0;
-        indeterminate = false;
         break;
-      } else if (v < this._vIH) {
-        indeterminate = true;
       }
     }
 
-    const mid = (this._vOH + this._vOL) / 2;
-    const target = indeterminate
-      ? (rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL)
-      : (result ? this._vOH : this._vOL);
-
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
-    // inputCount is structural (allocates _inputNodes); not setParam-able.
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params; inputCount is structural (allocates _inputNodes)
+    // and is not setParam-able. vIH/vIL/vOH/vOL/rOut were removed in the
+    // {0, 1} normalization pass — drivers are ideal and rail-agnostic.
   }
 }
 
@@ -178,13 +154,8 @@ export const BehavioralAndDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [
         { key: "inputCount", default: 2 },
-        { key: "vIH",        default: 2.0 },
-        { key: "vIL",        default: 0.8 },
-        { key: "rOut",       default: 100 },
-        { key: "vOH",        default: 5 },
-        { key: "vOL",        default: 0 },
       ],
-      params: { inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      params: { inputCount: 2 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralAndDriverElement(pinNodes, props),
     },

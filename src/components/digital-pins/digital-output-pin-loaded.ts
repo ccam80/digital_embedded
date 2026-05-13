@@ -1,21 +1,38 @@
 /**
- * DigitalOutputPinLoaded — 3-port behaviourally-driven analog output port with
- * RC load capacitor.
+ * DigitalOutputPinLoaded — 3-port linear Thevenin driver port + RC load cap.
  *
  * Outer ports: node (OUTPUT), gnd (OUTPUT), ctrl (INPUT).
- * Inner sub-elements:
- *   drv  — BehavioralOutputDriver (3-port Norton stamp, pos=node neg=gnd ctrl=ctrl)
- *   cOut — Capacitor (RC load, pos=node neg=gnd)
  *
- * The ctrl port is the node-voltage-driven control input that selects between
- * vOH and vOL targets inside the BehavioralOutputDriver leaf. Signal routing
- * is structural (net indices on the inner netlist rows).
+ * Architectural contract: the digital→analog rail-voltage translation lives
+ * HERE, at the pin boundary. The ctrl port carries a NORMALIZED logic-level
+ * signal in [0, 1] V; this composite maps that to the rail-level output via
+ * a linear Thevenin source. Upstream behavioural drivers (counter, register,
+ * gates, etc.) are migrating to stamp their bit nodes at {0, 1} V to feed
+ * this contract — see the "behavioural-driver-normalization" thread.
  *
- * Source spec: §6.4 (Phase 3 — Consumer Rewrite + DigitalOutputPin Variants).
+ * Inner topology (E+V+R+C, all SPICE-faithful primitives so the harness emits
+ * the deck bit-exact against ngspice):
+ *
+ *   vLowRail : DcVoltageSource pinning nLowRail at vOL relative to gnd.
+ *   eDrive   : VCVS sensing (ctrl − gnd) and driving (nDriveV − nLowRail)
+ *              with gain = (vOH − vOL). Closed-form output:
+ *                V(nDriveV) = vOL + V(ctrl) · (vOH − vOL).
+ *              ctrl = 0 → nDriveV = vOL;  ctrl = 1 → nDriveV = vOH.
+ *   rOut     : Thevenin output resistance from nDriveV to node.
+ *   cOut     : Load capacitance from node to gnd; forms an RC with rOut and
+ *              any external load.
+ *
+ * Hot-loadable params:
+ *   - rOut  → string-bound to Resistor.resistance.
+ *   - cOut  → string-bound to Capacitor.capacitance.
+ *   - vOL   → string-bound to DcVoltageSource.voltage.
+ *   - vOH   → not directly bound; the analogWrapperHook re-derives
+ *             gain = (vOH − vOL) on every setParam("vOH", …) / setParam("vOL", …)
+ *             and writes it to eDrive via setParam("gain", …).
  */
 
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
-import type { ComponentDefinition } from "../../core/registry.js";
+import type { ComponentDefinition, AnalogWrapperHookFactory } from "../../core/registry.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 
 const DIGITAL_OUTPUT_PIN_LOADED_PIN_LAYOUT: PinDeclaration[] = [
@@ -48,20 +65,77 @@ const DIGITAL_OUTPUT_PIN_LOADED_PIN_LAYOUT: PinDeclaration[] = [
   },
 ];
 
-export const DIGITAL_OUTPUT_PIN_LOADED_NETLIST: MnaSubcircuitNetlist = {
-  ports: ["node", "gnd", "ctrl"],
-  params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0 },
-  elements: [
-    { typeId: "BehavioralOutputDriver", modelRef: "default", subElementName: "drv",
-      params: { vOH: "vOH", vOL: "vOL", rOut: "rOut" } },
-    { typeId: "Capacitor", modelRef: "behavioral", subElementName: "cOut",
-      params: { capacitance: "cOut" } },
-  ],
-  internalNetCount: 0,
-  netlist: [
-    [0, 1, 2],   // drv:  pos=node, neg=gnd, ctrl=ctrl
-    [0, 1],      // cOut: pos=node, neg=gnd
-  ],
+export function buildDigitalOutputPinLoadedNetlist(
+  params: import("../../core/properties.js").PropertyBag,
+): MnaSubcircuitNetlist {
+  const vOH = params.hasModelParam("vOH") ? params.getModelParam<number>("vOH") : 5;
+  const vOL = params.hasModelParam("vOL") ? params.getModelParam<number>("vOL") : 0;
+  return {
+    ports: ["node", "gnd", "ctrl"],
+    params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0 },
+    elements: [
+      // Port indices: node=0, gnd=1, ctrl=2.  Internal nets: nDriveV=3, nLowRail=4.
+      {
+        typeId: "DcVoltageSource",
+        modelRef: "behavioral",
+        subElementName: "vLowRail",
+        branchCount: 1,
+        params: { voltage: "vOL" },
+      },
+      {
+        typeId: "VCVS",
+        modelRef: "behavioral",
+        subElementName: "eDrive",
+        branchCount: 1,
+        params: { gain: vOH - vOL },
+      },
+      {
+        typeId: "Resistor",
+        modelRef: "behavioral",
+        subElementName: "rOut",
+        params: { resistance: "rOut" },
+      },
+      {
+        typeId: "Capacitor",
+        modelRef: "behavioral",
+        subElementName: "cOut",
+        params: { capacitance: "cOut" },
+      },
+    ],
+    internalNetCount: 2,
+    internalNetLabels: ["nDriveV", "nLowRail"],
+    netlist: [
+      [1, 4],          // vLowRail: [neg, pos] → neg=gnd(1), pos=nLowRail(4)
+      [2, 1, 3, 4],    // eDrive: [ctrl+, ctrl-, out+, out-] → ctrl(2), gnd(1), nDriveV(3), nLowRail(4)
+      [3, 0],          // rOut: [pos, neg] → pos=nDriveV(3), neg=node(0)
+      [0, 1],          // cOut: [pos, neg] → pos=node(0), neg=gnd(1)
+    ],
+  };
+}
+
+const digitalOutputPinLoadedHook: AnalogWrapperHookFactory = (
+  _pinNodes,
+  props,
+  _getTime,
+  subElementsByName,
+) => {
+  let vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : 5;
+  let vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : 0;
+  const eDrive = subElementsByName.get("eDrive");
+  const writeGain = (): void => {
+    eDrive?.setParam("gain", vOH - vOL);
+  };
+  return {
+    setParam(key: string, value: number): void {
+      if (key === "vOH") {
+        vOH = value;
+        writeGain();
+      } else if (key === "vOL") {
+        vOL = value;
+        writeGain();
+      }
+    },
+  };
 };
 
 export const DigitalOutputPinLoadedDefinition: ComponentDefinition = {
@@ -72,7 +146,7 @@ export const DigitalOutputPinLoadedDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "netlist",
-      netlist: DIGITAL_OUTPUT_PIN_LOADED_NETLIST,
+      netlist: buildDigitalOutputPinLoadedNetlist,
       paramDefs: [
         { key: "rOut", default: 100 },
         { key: "cOut", default: 1e-12 },
@@ -83,4 +157,5 @@ export const DigitalOutputPinLoadedDefinition: ComponentDefinition = {
     },
   },
   defaultModel: "default",
+  analogWrapperHook: digitalOutputPinLoadedHook,
 };

@@ -66,6 +66,7 @@ export type AnalogWrapperHookFactory = (
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   getTime: () => number,
+  subElementsByName: ReadonlyMap<string, AnalogElement>,
 ) => AnalogWrapperHook;
 
 // ---------------------------------------------------------------------------
@@ -390,6 +391,23 @@ export interface ComponentDefinition {
    * model is available.
    */
   defaultModel?: string;
+  /**
+   * Optional parent-side runtime hook attached to the SubcircuitWrapperElement
+   * of a `kind: "netlist"` definition. Two canonical use cases:
+   *   - UI-only diagnostics that read parent-pin voltages but contribute
+   *     nothing to MNA (e.g. PolarizedCap reverse-bias warning).
+   *   - Cross-sub-element parameter derivation on hot-loaded setParam
+   *     (e.g. DigitalOutputPin* re-deriving gain = (vOH - vOL) for the inner
+   *     VCVS when an outer rail changes). The hook receives a by-name map of
+   *     sub-elements at construction so it can address them.
+   *
+   * Invoked once per parent-instance inside expandCompositeInstance, after
+   * sub-elements are built, with (pinNodes, props, getTime, subElementsByName).
+   * Returning an empty object is valid (no hooks fire). Only meaningful with
+   * a `kind: "netlist"` model entry. Applies to both user-facing and
+   * internal-only definitions.
+   */
+  analogWrapperHook?: AnalogWrapperHookFactory;
   /** Optional pin labels in netlist-connectivity-row order. Required for
    *  user-facing components (narrowed in StandaloneComponentDefinition).
    *  Optional for internal-only sub-elements- some drivers (e.g.
@@ -457,29 +475,17 @@ export interface StandaloneComponentDefinition extends ComponentDefinition {
   /**
    * When `false`, this component opts out of paired-with-ngspice comparison
    * (`ComparisonSession.create` rejects circuits containing it). Defaults to
-   * `true` (or absent). Use `false` for components whose digiTS factoring is
-   * non-SPICE-faithful (sibling-ref-coupled leaves, behavioural macromodels
-   * with no SPICE primitive equivalent, expression-driven sources, etc.).
-   * Tests for these components must use `ComparisonSession.createSelfCompare`
-   * instead.
+   * `true` (or absent). The flag means the digiTS model is currently a
+   * behavioural macromodel or expression-driven source the netlist generator
+   * cannot emit bit-exact — NOT that the device class lacks a SPICE
+   * reference. Every real device modelled here has an established SPICE
+   * recipe (Boyle, Koren, Joglekar, Biolek, vendor .lib subcircuits, etc.);
+   * the model needs updating to compose canonical primitives the generator
+   * can round-trip. Until then, tests must use
+   * `ComparisonSession.createSelfCompare`.
    */
   pairedSpiceEquivalent?: boolean;
-  /**
-   * Optional parent-side runtime hook attached to the SubcircuitWrapperElement
-   * of a `kind: "netlist"` component. The wrapper itself is already an
-   * AnalogElement in the engine's element walk and already receives
-   * `setDiagnosticEmitter` via the existing RuntimeDiagnosticAware wiring;
-   * the hook just lets the parent declare what to *do* during load() /
-   * acceptStep() / setParam() without becoming a sub-element in the SPICE
-   * deck. Use this for UI-only diagnostics that must read parent-pin
-   * voltages but contribute nothing to MNA.
-   *
-   * The factory is invoked once per parent-component instance with the
-   * parent's resolved `pinNodes` Map and `props` bag. Returning an empty
-   * object is valid (no hooks fire). Only valid alongside a `kind: "netlist"`
-   * model entry — the wrapper only exists for composite expansion.
-   */
-  analogWrapperHook?: AnalogWrapperHookFactory;
+  // analogWrapperHook is inherited from ComponentDefinition.
 }
 
 /** Type guard: narrows a definition to the user-facing extender. */

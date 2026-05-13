@@ -265,6 +265,11 @@ import { ComparatorDriverDefinition } from "./active/comparator-driver.js";
 import { ComparatorPushPullDriverDefinition } from "./active/comparator-pushpull-driver.js";
 import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.js";
 
+// Op-amp macromodel building blocks (internalOnly — Boyle/PSpice OpAmp form)
+import { BoyleInputStageDefinition } from "./active/boyle-input-stage.js";
+import { BoyleDominantPoleDefinition } from "./active/boyle-dominant-pole.js";
+import { BoyleOutputStageDefinition } from "./active/boyle-output-stage.js";
+
 // Triode analog leaf (internalOnly)
 import { TriodeAnalogDefinition } from "./semiconductors/triode-analog-element.js";
 
@@ -552,6 +557,11 @@ export function createDefaultRegistry(
   registry.register(ComparatorDriverDefinition);
   registry.register(ComparatorPushPullDriverDefinition);
   registry.register(SchmittTriggerDriverDefinition);
+
+  // Op-amp macromodel building blocks (internalOnly)
+  registry.register(BoyleInputStageDefinition);
+  registry.register(BoyleDominantPoleDefinition);
+  registry.register(BoyleOutputStageDefinition);
 
   // Triode analog leaf (internalOnly)
   registry.register(TriodeAnalogDefinition);

@@ -1,19 +1,15 @@
-﻿/**
- * BehavioralRSFlipflopDriverElement- pure-truth-function driver leaf for the
- * edge-triggered RS flip-flop.
+/**
+ * BehavioralRSFlipflopDriverElement — pure-truth-function driver leaf for the
+ * edge-triggered RS flip-flop. See and-driver.ts for the normalized-bit
+ * driver-chain architecture.
  *
  * On rising clock edge:
- *   S=0, R=0 â†’ hold previous Q
- *   S=1, R=0 â†’ q=1
- *   S=0, R=1 â†’ q=0
- *   S=1, R=1 â†’ forbidden- hold previous Q (the recovered original additionally
- *              emitted an "rs-flipflop-both-set" warning via instance-field
- *              `_diagnostics`; that path is not preserved- per the pool-backed
- *              architecture all state lives in slots, and the spec migration
- *              for diagnostic emission is not described).
+ *   S=0, R=0 → hold
+ *   S=1, R=0 → q=1
+ *   S=0, R=1 → q=0
+ *   S=1, R=1 → forbidden, hold (no diagnostic in pool-backed model)
  *
- * Per Composite M16 (phase-composite-architecture.md), J-156
- * (contracts_group_10.md).
+ * Per Composite M16 (phase-composite-architecture.md), J-156 (contracts_group_10.md).
  */
 
 import {
@@ -27,6 +23,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralRSFlipflopDriver", [
@@ -52,12 +49,6 @@ export class BehavioralRSFlipflopDriverElement extends PoolBackedAnalogElement {
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
-
   private _firstSample: boolean = true;
 
   private _ctrlQNode: number = 0;
@@ -66,13 +57,8 @@ export class BehavioralRSFlipflopDriverElement extends PoolBackedAnalogElement {
   private _handlesQ: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _handlesNq: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -98,35 +84,22 @@ export class BehavioralRSFlipflopDriverElement extends PoolBackedAnalogElement {
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
-    const risingEdge =
-      !this._firstSample &&
-      prevClock < this._vIH &&
-      vClock >= this._vIH;
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
+      const s = vS >= 0.5 ? 1 : 0;
+      const r = vR >= 0.5 ? 1 : 0;
+      if (s && r) {
+        // Forbidden — hold.
+      } else if (s) {
+        q = 1;
+      } else if (r) {
+        q = 0;
+      }
+      // both low → hold
+    }
     this._firstSample = false;
 
-    if (risingEdge) {
-      // Threshold-detect S and R with vIH/vIL hysteresis. Only act when both
-      // levels are determinate (matches recovered original’s
-      // `if (sLevel !== undefined && rLevel !== undefined)` guard).
-      const sHigh = vS >= this._vIH;
-      const sLow  = vS <  this._vIL;
-      const rHigh = vR >= this._vIH;
-      const rLow  = vR <  this._vIL;
-
-      if ((sHigh || sLow) && (rHigh || rLow)) {
-        if (sHigh && rHigh) {
-          // Forbidden — hold previous q (no diagnostic in pool-backed model).
-        } else if (sHigh) {
-          q = 1;
-        } else if (rHigh) {
-          q = 0;
-        }
-        // both low → hold
-      }
-    }
-
-    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
@@ -136,12 +109,8 @@ export class BehavioralRSFlipflopDriverElement extends PoolBackedAnalogElement {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
 
@@ -153,14 +122,8 @@ export const BehavioralRSFlipflopDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH", default: 2.0 },
-        { key: "vIL", default: 0.8 },
-        { key: "rOut", default: 100 },
-        { key: "vOH", default: 5 },
-        { key: "vOL", default: 0 },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralRSFlipflopDriverElement(pinNodes, props),
     },

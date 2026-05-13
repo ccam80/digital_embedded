@@ -1570,7 +1570,17 @@ function _createMosfetElementWithPolarity(
               if (ctx.order >= 2) ccap_gs += ag[2] * q2;
             }
             gcgs = ag[0] * capgs;
-            ceqgs = ccap_gs - gcgs * vgs + ag[0] * q0;
+            // ngspice mos1load.c:888-889 writes:
+            //   ceqgs = <NIintegrate's ceq> - gcgs*vgs + CKTag[0]*state0[qgs]
+            // where NIintegrate (niinteg.c:77) returns ceq = ccap_n - ag[0]*q_n.
+            // The +ag[0]*q_n in mos1load.c cancels the -ag[0]*q_n inside ceq,
+            // leaving the net companion-source value `ccap_n - gcgs*vgs`. Our
+            // `ccap_gs` already IS ccap_n (the full integrated cap current),
+            // not NIintegrate's already-decremented `ceq`, so we must NOT add
+            // ag[0]*q0 again — doing so double-counts ag[0]*q_n and stamps a
+            // spurious 2.3e-4-class current at every tranNR iteration where
+            // QGS is non-trivial.
+            ceqgs = ccap_gs - gcgs * vgs;
             s0[this._stateBase + SLOT_CQGS] = ccap_gs;
           }
           // Gate-drain cap companion.
@@ -1592,7 +1602,10 @@ function _createMosfetElementWithPolarity(
               if (ctx.order >= 2) ccap_gd += ag[2] * q2;
             }
             gcgd = ag[0] * capgd;
-            ceqgd = ccap_gd - gcgd * vgd + ag[0] * q0;
+            // See ceqgs comment above: `ccap_gd` is already ccap_n; the
+            // ag[0]*q0 term would double-count ag[0]*q_n (mos1load.c:890-891
+            // adds it back to NIintegrate's pre-decremented ceq).
+            ceqgd = ccap_gd - gcgd * vgd;
             s0[this._stateBase + SLOT_CQGD] = ccap_gd;
           }
           // Gate-bulk cap companion.
@@ -1615,7 +1628,10 @@ function _createMosfetElementWithPolarity(
             }
             gcgb = ag[0] * capgb;
             const vgb_now = vgs - vbs;
-            ceqgb = ccap_gb - gcgb * vgb_now + ag[0] * q0;
+            // See ceqgs comment above: ccap_gb is already ccap_n; ag[0]*q0
+            // would double-count ag[0]*q_n vs the ngspice net formula
+            // (mos1load.c:892-893 adds it back to NIintegrate's ceq).
+            ceqgb = ccap_gb - gcgb * vgb_now;
             s0[this._stateBase + SLOT_CQGB] = ccap_gb;
           }
         }

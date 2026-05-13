@@ -26,14 +26,6 @@
  * the StatePool covers the companion slots, and forwards setup() / load() /
  * initState() / getLteTimestep() to the child.
  *
- * Per Composite M21 (phase-composite-architecture.md), J-136
- * (contracts_group_09.md). Logic migrated verbatim from the recovered
- * `DigitalOutputPinModel.load()` (`role="branch"` path) at
- * `.recovery/digital-pin-model.ts.orig:147-198`. Composite-class shape
- * (recovered `BridgeOutputDriverElement`) replaced with direct PoolBackedAnalogElement
- * implementation- the deleted `extends CompositeElement` is forbidden by
- * ss0 hard rule #16.
- *
  * `setLogicLevel` / `setHighZ` are NOT part of the truth-function driver-leaf
  * pattern (those leaves read inputs and write slots only). Bridges are
  * pin-level elements at engine boundaries- they expose the cross-engine
