@@ -34,6 +34,7 @@ import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { detectRisingEdge, logicLevel } from "./edge-detect.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // State schema
@@ -58,16 +59,16 @@ const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
 // ---------------------------------------------------------------------------
 //
 // Order MUST match the buildDFlipflopNetlist drv connectivity row
-// `[0, 1, 2, 3, 4]` mapping to ports `[D, C, Q, ~Q, gnd]`. The compiler reads
-// pinLayout[i].label and stores it in pinNodes against the resolved node
-// from connectivity[i] (compiler.ts:443-446).
+// `[0, 1, 5, 6, 4]` mapping to ports `[D, C, ctrl_q, ctrl_nq, gnd]`. The
+// compiler reads pinLayout[i].label and stores it in pinNodes against the
+// resolved node from connectivity[i] (compiler.ts:443-446).
 //
 const D_FF_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT,  label: "D",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "Q",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "~Q",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "D",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "C",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_q",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_nq", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "gnd",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,12 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
 
   private _firstSample: boolean = true;
 
+  private _ctrlQNode: number = 0;
+  private _ctrlNqNode: number = 0;
+  private _gndNode: number = 0;
+  private _handlesQ: readonly [number, number, number, number] = [-1, -1, -1, -1];
+  private _handlesNq: readonly [number, number, number, number] = [-1, -1, -1, -1];
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._vIH = props.getModelParam<number>("vIH");
@@ -99,6 +106,11 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._ctrlQNode  = this.pinNodes.get("ctrl_q")!;
+    this._ctrlNqNode = this.pinNodes.get("ctrl_nq")!;
+    this._gndNode    = this.pinNodes.get("gnd")!;
+    this._handlesQ  = allocNortonStamp(ctx.solver, this._ctrlQNode,  this._gndNode);
+    this._handlesNq = allocNortonStamp(ctx.solver, this._ctrlNqNode, this._gndNode);
   }
 
   load(ctx: LoadContext): void {
@@ -107,9 +119,9 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
-    const vClock = rhsOld[this.pinNodes.get("C")!]   - gnd;
-    const vD     = rhsOld[this.pinNodes.get("D")!]   - gnd;
+    const gnd    = rhsOld[this._gndNode];
+    const vClock = rhsOld[this.pinNodes.get("C")!] - gnd;
+    const vD     = rhsOld[this.pinNodes.get("D")!] - gnd;
 
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q: 0 | 1 = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
@@ -121,6 +133,9 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
       q = logicLevel(vD, this._vIH, this._vIL, q);
     }
     this._firstSample = false;
+
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
 
     // Bottom-of-load writes- every slot mutated this step writes to s0
     // exactly once (no pre-stamp s0 mutations).

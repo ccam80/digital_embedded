@@ -278,22 +278,33 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port indices: en=0, C=1, clr=2, out_bit0=3 .. out_bit(N-1)=N+2, ovf=N+3, gnd=N+4
-  const ports: string[] = ["en", "C", "clr"];
-  for (let i = 0; i < N; i++) ports.push(`out_bit${i}`);
-  ports.push("ovf", "gnd");
+  // Port indices match the component-level pin labels:
+  // en=0, C=1, clr=2, out=3 (bus, multi-bit), ovf=4, gnd=5
+  const ports = ["en", "C", "clr", "out", "ovf", "gnd"];
   const enIdx  = 0;
   const cIdx   = 1;
   const clrIdx = 2;
-  const outBitBase = 3;
-  const ovfIdx = N + 3;
-  const gndIdx = N + 4;
+  const outIdx = 3;
+  const ovfIdx = 4;
+  const gndIdx = 5;
+
+  // Internal ctrl nets: P=6 ports; ctrl_bit_0..N-1 at P..P+N-1; ctrl_ovf at P+N
+  const P = 6;
+  const ctrlBitBase = P;
+  const ctrlOvfNet  = P + N;
+
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_bit_${i}`);
+  internalNetLabels.push("ctrl_ovf");
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf.
-  // Driver pinLayout order: [en, C, clr, gnd] (see counter-driver.ts).
+  // Driver leaf pin order: [en, C, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
+  const drvNets: number[] = [enIdx, cIdx, clrIdx, gndIdx];
+  for (let i = 0; i < N; i++) drvNets.push(ctrlBitBase + i);
+  drvNets.push(ctrlOvfNet);
+
   elements.push({
     typeId: "BehavioralCounterDriver",
     modelRef: "default",
@@ -303,7 +314,7 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vIH: params.getModelParam<number>("vIH"),
     },
   });
-  netlist.push([enIdx, cIdx, clrIdx, gndIdx]);
+  netlist.push(drvNets);
 
   // Control input pins.
   for (const [name, idx] of [["en", enIdx], ["C", cIdx], ["clr", clrIdx]] as const) {
@@ -315,7 +326,8 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     netlist.push([idx, gndIdx]);
   }
 
-  // Output bit pins- one per bit.
+  // Output bit pins- one per bit, all drive the single packed bus "out" node.
+  // Each gains its ctrl_bit_i net for the 3-port DigitalOutputPin shape.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: outputPinType,
@@ -328,10 +340,10 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         vOL:  params.getModelParam<number>("vOL"),
       },
     });
-    netlist.push([outBitBase + i, gndIdx]);
+    netlist.push([outIdx, gndIdx, ctrlBitBase + i]);
   }
 
-  // Overflow pin.
+  // Overflow pin gains ctrl_ovf net.
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -343,16 +355,13 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([ovfIdx, gndIdx]);
+  netlist.push([ovfIdx, gndIdx, ctrlOvfNet]);
 
-  // `params` is optional on MnaSubcircuitNetlist; under
-  // exactOptionalPropertyTypes, the field must be ABSENT (not explicitly
-  // assigned undefined) to satisfy the type. No cast needed when the literal
-  // shape matches.
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: N + 1,
+    internalNetLabels,
     netlist,
   };
 }

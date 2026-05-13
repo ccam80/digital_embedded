@@ -218,10 +218,12 @@ export const buildNfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
         },
       },
     ],
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_gate"],
+    // ports: G=0, D=1, S=2; ctrl_gate internal net=3
     netlist: [
-      [0, 1, 2], // drv: G, D, S
-      [1, 2],    // sw:  D, S
+      [0, 2, 3], // drv: G=0, S=2, ctrl_out=3
+      [1, 2, 3], // sw:  D=1, S=2, ctrl=3
     ],
   };
 };

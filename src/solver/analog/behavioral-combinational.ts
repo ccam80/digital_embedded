@@ -54,14 +54,20 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const outPortBase = K;
   const gndPortIdx  = K + N;
 
+  // Internal ctrl nets: ctrl_0..ctrl_{N-1} land at K+N+1..K+N+N.
+  const ctrlNetBase = K + N + 1;
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_${i}`);
+
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
   // Driver leaf- pin order MUST match buildDecoderDriverPinLayout
-  // (sel_0..sel_{K-1}, gnd).
+  // (sel_0..sel_{K-1}, gnd, ctrl_0..ctrl_{N-1}).
   const drvNets: number[] = [];
   for (let i = 0; i < K; i++) drvNets.push(selPortBase + i);
   drvNets.push(gndPortIdx);
+  for (let i = 0; i < N; i++) drvNets.push(ctrlNetBase + i);
   elements.push({
     typeId: "BehavioralDecoderDriver",
     modelRef: "default",
@@ -97,13 +103,14 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         vOL:  params.getModelParam<number>("vOL"),
       },
     });
-    netlist.push([outPortBase + i, gndPortIdx]);
+    netlist.push([outPortBase + i, gndPortIdx, ctrlNetBase + i]);
   }
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: N,
+    internalNetLabels,
     netlist,
   };
 }
@@ -151,14 +158,20 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const outPortBase = K + 1;
   const gndPortIdx  = K + 1 + N;
 
+  // Internal ctrl nets: ctrl_0..ctrl_{N-1} land at K+1+N+1..K+1+N+N.
+  const ctrlNetBase = K + 1 + N + 1;
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_${i}`);
+
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
   // Driver leaf- pin order MUST match buildDemuxDriverPinLayout
-  // (sel_0..sel_{K-1}, in, gnd).
+  // (sel_0..sel_{K-1}, in, gnd, ctrl_0..ctrl_{N-1}).
   const drvNets: number[] = [];
   for (let i = 0; i < K; i++) drvNets.push(selPortBase + i);
   drvNets.push(inPortIdx, gndPortIdx);
+  for (let i = 0; i < N; i++) drvNets.push(ctrlNetBase + i);
   elements.push({
     typeId: "BehavioralDemuxDriver",
     modelRef: "default",
@@ -202,13 +215,14 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
         vOL:  params.getModelParam<number>("vOL"),
       },
     });
-    netlist.push([outPortBase + i, gndPortIdx]);
+    netlist.push([outPortBase + i, gndPortIdx, ctrlNetBase + i]);
   }
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: N,
+    internalNetLabels,
     netlist,
   };
 }

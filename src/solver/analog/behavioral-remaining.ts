@@ -49,19 +49,23 @@ export const { paramDefs: DRIVER_BEHAVIORAL_PARAM_DEFS, defaults: DRIVER_BEHAVIO
  * Function-form netlist builder for the behavioural tri-state buffer (Driver).
  *
  * Port order: in(0), sel(1), out(2), gnd(3).
+ * Internal nets: ctrl_out(4), ctrl_en(5).
  *
  * Sub-elements:
- *   drv    - BehavioralDriverDriver.
+ *   drv    - BehavioralDriverDriver (stamps Norton at ctrl_out and ctrl_en).
  *   inPin  - Digital input pin (loaded or unloaded) on `in`
  *   selPin - Digital input pin (loaded or unloaded) on `sel`
- *   outPin - DigitalOutputPinLoaded on `out`.
+ *   outPin - DigitalOutputPinTriStateLoaded on `out` (4-port: node, gnd, ctrl, en).
  */
 export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
-  const loaded        = params.getModelParam<number>("loaded") >= 0.5;
-  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
-  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+  const loaded       = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType = loaded ? "DigitalInputPinLoaded" : "DigitalInputPinUnloaded";
 
   const ports = ["in", "sel", "out", "gnd"];
+
+  // Ports: in=0, sel=1, out=2, gnd=3. Internal: ctrl_out=4, ctrl_en=5.
+  const ctrlOutNet = 4;
+  const ctrlEnNet  = 5;
 
   const elements: SubcircuitElement[] = [
     {
@@ -69,8 +73,11 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: {
-        vIH: params.getModelParam<number>("vIH"),
-        vIL: params.getModelParam<number>("vIL"),
+        vIH:  params.getModelParam<number>("vIH"),
+        vIL:  params.getModelParam<number>("vIL"),
+        rOut: params.getModelParam<number>("rOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
       },
     },
     {
@@ -84,7 +91,7 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       subElementName: "selPin",
     },
     {
-      typeId: outputPinType,
+      typeId: "DigitalOutputPinTriStateLoaded",
       modelRef: "default",
       subElementName: "outPin",
       params: {
@@ -96,18 +103,22 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     },
   ];
 
-  // Net indices: in=0, sel=1, out=2, gnd=3
+  // drv pin order: in, sel, ctrl_out, ctrl_en, gnd => [0, 1, 4, 5, 3]
+  // inPin:  [node=in, gnd=gnd]    => [0, 3]
+  // selPin: [node=sel, gnd=gnd]   => [1, 3]
+  // outPin: [node=out, gnd=gnd, ctrl=ctrl_out, en=ctrl_en] => [2, 3, 4, 5]
   const netlist: number[][] = [
-    [0, 1, 2, 3], // drv
-    [0, 3],       // inPin
-    [1, 3],       // selPin
-    [2, 3],       // outPin
+    [0, 1, ctrlOutNet, ctrlEnNet, 3], // drv
+    [0, 3],                           // inPin
+    [1, 3],                           // selPin
+    [2, 3, ctrlOutNet, ctrlEnNet],    // outPin
   ];
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_out", "ctrl_en"],
     netlist,
   };
 }
@@ -117,14 +128,30 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 // ---------------------------------------------------------------------------
 
 /**
- * DriverInvSel - inverting tri-state buffer (Phase 4 supplies the new wiring).
+ * Function-form netlist builder for the behavioural inverting tri-state buffer (DriverInvSel).
+ *
+ * Port order: in(0), sel(1), out(2), gnd(3).
+ * Internal nets: ctrl_out(4), ctrl_en(5).
+ *
+ * The driver leaf inverts sel internally so ctrl_en is HIGH when sel is LOW
+ * (active-LOW enable). The outPin DigitalOutputPinTriStateLoaded sees
+ * enable=1 when sel is asserted LOW.
+ *
+ * Sub-elements:
+ *   drv    - BehavioralDriverInvDriver (stamps Norton at ctrl_out and ctrl_en).
+ *   inPin  - Digital input pin (loaded or unloaded) on `in`
+ *   selPin - Digital input pin (loaded or unloaded) on `sel`
+ *   outPin - DigitalOutputPinTriStateLoaded on `out` (4-port: node, gnd, ctrl, en).
  */
 export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist {
-  const loaded        = params.getModelParam<number>("loaded") >= 0.5;
-  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
-  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+  const loaded       = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType = loaded ? "DigitalInputPinLoaded" : "DigitalInputPinUnloaded";
 
   const ports = ["in", "sel", "out", "gnd"];
+
+  // Ports: in=0, sel=1, out=2, gnd=3. Internal: ctrl_out=4, ctrl_en=5.
+  const ctrlOutNet = 4;
+  const ctrlEnNet  = 5;
 
   const elements: SubcircuitElement[] = [
     {
@@ -132,8 +159,11 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
       modelRef: "default",
       subElementName: "drv",
       params: {
-        vIH: params.getModelParam<number>("vIH"),
-        vIL: params.getModelParam<number>("vIL"),
+        vIH:  params.getModelParam<number>("vIH"),
+        vIL:  params.getModelParam<number>("vIL"),
+        rOut: params.getModelParam<number>("rOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
       },
     },
     {
@@ -147,7 +177,7 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
       subElementName: "selPin",
     },
     {
-      typeId: outputPinType,
+      typeId: "DigitalOutputPinTriStateLoaded",
       modelRef: "default",
       subElementName: "outPin",
       params: {
@@ -159,18 +189,22 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
     },
   ];
 
-  // Net indices: in=0, sel=1, out=2, gnd=3
+  // drv pin order: in, sel, ctrl_out, ctrl_en, gnd => [0, 1, 4, 5, 3]
+  // inPin:  [node=in, gnd=gnd]    => [0, 3]
+  // selPin: [node=sel, gnd=gnd]   => [1, 3]
+  // outPin: [node=out, gnd=gnd, ctrl=ctrl_out, en=ctrl_en] => [2, 3, 4, 5]
   const netlist: number[][] = [
-    [0, 1, 2, 3], // drv
-    [0, 3],       // inPin
-    [1, 3],       // selPin
-    [2, 3],       // outPin
+    [0, 1, ctrlOutNet, ctrlEnNet, 3], // drv
+    [0, 3],                           // inPin
+    [1, 3],                           // selPin
+    [2, 3, ctrlOutNet, ctrlEnNet],    // outPin
   ];
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_out", "ctrl_en"],
     netlist,
   };
 }
@@ -180,27 +214,67 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
 // ---------------------------------------------------------------------------
 
 /**
- * Count splitter ports from a comma-separated splitting definition. Mirrors
- * the counting half of `parsePorts` in `components/wiring/splitter.ts`
- * without reaching into the components layer (solver code can't depend on
- * components by layering convention). Recognises plain widths (`"4"`),
- * repeat shorthand (`"4*2"` = two ports), and explicit ranges (`"4-7"`).
- *
- * Returns at least 1 -- matches `parsePorts`' empty-input default.
+ * Minimal port descriptor: bit position, width, and user-visible label.
+ * Mirrors `SplitterPort` in `components/wiring/splitter.ts` without importing
+ * from the components layer (solver code must not depend on components by
+ * layering convention).
  */
-function countSplitterPorts(definition: string): number {
-  let count = 0;
+interface SplitterPortDesc {
+  pos: number;
+  bits: number;
+  name: string;
+}
+
+/**
+ * Compute user-visible pin label for a splitter port.
+ * Mirrors `portName()` in `components/wiring/splitter.ts` exactly.
+ */
+function splitterPortName(pos: number, bits: number): string {
+  if (bits === 1) return `${pos}`;
+  if (bits === 2) return `${pos},${pos + 1}`;
+  return `${pos}-${pos + bits - 1}`;
+}
+
+/**
+ * Parse a comma-separated splitting definition into an ordered list of port
+ * descriptors. Mirrors the full `parsePorts` function from
+ * `components/wiring/splitter.ts` without importing from the components layer.
+ * Recognises plain widths (`"4"`), repeat shorthand (`"4*2"`), and explicit
+ * ranges (`"4-7"`). Returns at least one 1-bit port on empty input.
+ */
+function parseSplitterPortNames(definition: string): SplitterPortDesc[] {
+  const ports: SplitterPortDesc[] = [];
+  let runningPos = 0;
   const tokens = definition.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
   for (const token of tokens) {
     const starIdx = token.indexOf("*");
     if (starIdx >= 0) {
-      const repeat = parseInt(token.substring(starIdx + 1).trim(), 10);
-      count += Number.isFinite(repeat) && repeat > 0 ? repeat : 1;
+      const bits = parseInt(token.substring(0, starIdx).trim(), 10);
+      const count = parseInt(token.substring(starIdx + 1).trim(), 10);
+      for (let i = 0; i < count; i++) {
+        ports.push({ pos: runningPos, bits, name: splitterPortName(runningPos, bits) });
+        runningPos += bits;
+      }
     } else {
-      count += 1;
+      const dashIdx = token.indexOf("-");
+      if (dashIdx >= 0) {
+        let from = parseInt(token.substring(0, dashIdx).trim(), 10);
+        let to = parseInt(token.substring(dashIdx + 1).trim(), 10);
+        if (to < from) { const z = to; to = from; from = z; }
+        const bits = to - from + 1;
+        ports.push({ pos: from, bits, name: splitterPortName(from, bits) });
+        runningPos = from + bits;
+      } else {
+        const bits = parseInt(token, 10);
+        ports.push({ pos: runningPos, bits, name: splitterPortName(runningPos, bits) });
+        runningPos += bits;
+      }
     }
   }
-  return count > 0 ? count : 1;
+  if (ports.length === 0) {
+    ports.push({ pos: 0, bits: 1, name: "0" });
+  }
+  return ports;
 }
 
 /**
@@ -225,28 +299,38 @@ function countSplitterPorts(definition: string): number {
 export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
   const inputSplitting  = props.getOrDefault<string>("inputSplitting", "4,4");
   const outputSplitting = props.getOrDefault<string>("outputSplitting", "8");
-  const inputCount = countSplitterPorts(inputSplitting);
-  const outputCount = countSplitterPorts(outputSplitting);
+  const inputPorts  = parseSplitterPortNames(inputSplitting);
+  const outputPorts = parseSplitterPortNames(outputSplitting);
+  const inputCount  = inputPorts.length;
+  const outputCount = outputPorts.length;
 
-  const ports: string[] = [];
-  for (let i = 0; i < inputCount; i++) {
-    ports.push(`in_${i}`);
-  }
-  for (let i = 0; i < outputCount; i++) {
-    ports.push(`out_${i}`);
-  }
-  ports.push("gnd");
+  // Port names MUST match the Splitter component's user-visible pin labels
+  // (derived from portName() in splitter.ts). The compiler resolves netlist
+  // ports by looking up outerPinNodes.get(portLabel), where outerPinNodes is
+  // built from the component's getPins() labels.
+  const ports: string[] = [
+    ...inputPorts.map(p => p.name),
+    ...outputPorts.map(p => p.name),
+    "gnd",
+  ];
 
   const netGnd = inputCount + outputCount;
 
+  // Internal ctrl nets: ctrl_0..ctrl_{outputCount-1} land after all ports.
+  const ctrlNetBase = inputCount + outputCount + 1;
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < outputCount; i++) internalNetLabels.push(`ctrl_${i}`);
+
+  // Driver leaf pin order MUST match buildSplitterDriverPinLayout:
+  // in_0..in_{N-1}, gnd, ctrl_0..ctrl_{M-1}
   const drvNets: number[] = [];
   for (let i = 0; i < inputCount; i++) {
     drvNets.push(i);
   }
-  for (let i = 0; i < outputCount; i++) {
-    drvNets.push(inputCount + i);
-  }
   drvNets.push(netGnd);
+  for (let i = 0; i < outputCount; i++) {
+    drvNets.push(ctrlNetBase + i);
+  }
 
   const elements: SubcircuitElement[] = [
     {
@@ -276,14 +360,15 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       subElementName: `outPin_${i}`,
       params: {},
     });
-    netlist.push([inputCount + i, netGnd]);
+    netlist.push([inputCount + i, netGnd, ctrlNetBase + i]);
   }
 
   return {
     ports,
     params: {},
     elements,
-    internalNetCount: 0,
+    internalNetCount: outputCount,
+    internalNetLabels,
     netlist,
   };
 }
@@ -303,11 +388,22 @@ export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
  */
 export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
   const segmentLabels = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
+  const drivenSegments = ["a", "b", "c", "d", "e", "f", "g"] as const;
   const ports: string[] = [...segmentLabels, "gnd"];
   const netGnd = segmentLabels.length;
 
+  // Internal ctrl nets for the 7 driven segments (a..g, not dp).
+  // ctrl_a = netGnd+1, ctrl_b = netGnd+2, ..., ctrl_g = netGnd+7.
+  const ctrlNetBase = netGnd + 1;
+  const internalNetLabels: string[] = drivenSegments.map(s => `ctrl_${s}`);
+
+  // Driver leaf pin order MUST match SEVEN_SEG_DRIVER_PIN_LAYOUT:
+  // a, b, c, d, e, f, g, dp, gnd, ctrl_a, ctrl_b, ctrl_c, ctrl_d, ctrl_e, ctrl_f, ctrl_g
   const drvNets: number[] = segmentLabels.map((_, i) => i);
   drvNets.push(netGnd);
+  for (let i = 0; i < drivenSegments.length; i++) {
+    drvNets.push(ctrlNetBase + i);
+  }
 
   const elements: SubcircuitElement[] = [
     {
@@ -330,11 +426,25 @@ export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
     netlist.push([i, netGnd]);
   }
 
+  // Output pins for the 7 driven segments (a..g).
+  for (let i = 0; i < drivenSegments.length; i++) {
+    const seg = drivenSegments[i];
+    const outPortIdx = segmentLabels.indexOf(seg as typeof segmentLabels[number]);
+    elements.push({
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: `outPin_${seg}`,
+      params: {},
+    });
+    netlist.push([outPortIdx, netGnd, ctrlNetBase + i]);
+  }
+
   return {
     ports,
     params: {},
     elements,
-    internalNetCount: 0,
+    internalNetCount: 7,
+    internalNetLabels,
     netlist,
   };
 }
@@ -347,14 +457,18 @@ export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
  * Function-form netlist builder for the behavioral ButtonLED (button output + LED input).
  *
  * Port order: out(0), in(1), gnd(2).
+ * Internal nets: ctrl_out(3).
  *
  * Sub-elements:
- *   drv    - BehavioralButtonLEDDriver (driver leaf)
+ *   drv    - BehavioralButtonLEDDriver (driver leaf; stamps Norton at ctrl_out)
  *   inPin  - DigitalInputPinLoaded for LED in
- *   outPin - DigitalOutputPinLoaded for button out
+ *   outPin - DigitalOutputPinLoaded for button out (3-port: node, gnd, ctrl)
  */
 export function buildButtonLEDNetlist(): MnaSubcircuitNetlist {
   const ports = ["out", "in", "gnd"];
+
+  // Ports: out=0, in=1, gnd=2. Internal: ctrl_out=3.
+  const ctrlOutNet = 3;
 
   const elements: SubcircuitElement[] = [
     {
@@ -377,21 +491,21 @@ export function buildButtonLEDNetlist(): MnaSubcircuitNetlist {
     },
   ];
 
-  // Net indices: out=0, in=1, gnd=2
-  // drv pins: out, in, gnd
-  // inPin pins: node=in, gnd=gnd
-  // outPin pins: pos=out, neg=gnd
+  // drv pin order: ctrl_out, in, gnd => [3, 1, 2]
+  // inPin:  [node=in, gnd=gnd]       => [1, 2]
+  // outPin: [node=out, gnd=gnd, ctrl=ctrl_out] => [0, 2, 3]
   const netlist: number[][] = [
-    [0, 1, 2], // drv
-    [1, 2],    // inPin
-    [0, 2],    // outPin
+    [ctrlOutNet, 1, 2], // drv: ctrl_out, in, gnd
+    [1, 2],             // inPin
+    [0, 2, ctrlOutNet], // outPin
   ];
 
   return {
     ports,
     params: {},
     elements,
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_out"],
     netlist,
   };
 }

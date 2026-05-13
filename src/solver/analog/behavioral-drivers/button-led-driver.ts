@@ -4,14 +4,12 @@
  *
  * Reads the LED input voltage (relative to gnd) from rhsOld and threshold-
  * classifies it against per-instance vIH / vIL with hysteresis (hold-on-
- * indeterminate).
- *
- * No MNA stamps. Template A (3-pin, fixed pin count).
+ * indeterminate). Stamps a Norton source at ctrl_out encoding the button state.
  *
  * Pin layout (MUST match the drv connectivity row in buildButtonLEDNetlist):
- *   out(0)  - button output net (included for parent-port symmetry; not read)
- *   in(1)   - LED input net (voltage observed for threshold classification)
- *   gnd(2)  - ground reference
+ *   ctrl_out(0) - button output control net (Norton stamp target)
+ *   in(1)       - LED input net (voltage observed for threshold classification)
+ *   gnd(2)      - ground reference
  *
  * Per Composite M10 (phase-composite-architecture.md).
  */
@@ -20,6 +18,8 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../state-schema.js";
+import { logicLevel } from "./edge-detect.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
@@ -32,20 +32,25 @@ import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 // State schema
 // ---------------------------------------------------------------------------
 
-const SCHEMA: StateSchema = defineStateSchema("BehavioralButtonLEDDriver", []);
+const SCHEMA: StateSchema = defineStateSchema("BehavioralButtonLEDDriver", [
+  {
+    name: "LAST_OUT",
+    doc: "Held output bit (0 or 1) for hysteresis-on-indeterminate. Bottom-of-load write.",
+  },
+]);
+
+const SLOT_LAST_OUT = SCHEMA.indexOf.get("LAST_OUT")!;
 
 // ---------------------------------------------------------------------------
 // Pin layout- fixed 3-pin (Template A), module-level const
 // ---------------------------------------------------------------------------
 //
 // Order MUST match the drv connectivity row in buildButtonLEDNetlist:
-//   [out_net, in_net, gnd_net] => indices [0, 1, 2].
-//
-// "out" is included for parent-port symmetry. load() does not read it.
+//   [ctrl_out_net, in_net, gnd_net] => indices [0, 1, 2].
 
 const BUTTON_LED_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   {
-    direction: PinDirection.OUTPUT, label: "out",
+    direction: PinDirection.OUTPUT, label: "ctrl_out",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   },
@@ -73,35 +78,43 @@ export class BehavioralButtonLEDDriverElement extends PoolBackedAnalogElement {
 
   private readonly _inNode: number;
   private readonly _gndNode: number;
+  private readonly _ctrlOutNode: number;
   private _vIH: number;
   private _vIL: number;
   private _rOut: number;
   private _vOH: number;
   private _vOL: number;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._inNode  = pinNodes.get("in")!;
-    this._gndNode = pinNodes.get("gnd")!;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
+    this._ctrlOutNode = pinNodes.get("ctrl_out")!;
+    this._inNode      = pinNodes.get("in")!;
+    this._gndNode     = pinNodes.get("gnd")!;
+    this._vIH  = props.getModelParam<number>("vIH");
+    this._vIL  = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
+    this._vOH  = props.getModelParam<number>("vOH");
+    this._vOL  = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
-  /**
-   * Threshold-classify the LED input voltage with hold-on-indeterminate
-   * hysteresis (mirrors buf-driver / not-driver Template A pattern):
-   *   v >= vIH  â†’ output 1
-   *   v <  vIL  â†’ output 0
-   *   otherwise â†’ hold prior output
-   */
-  load(_ctx: LoadContext): void {
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const base = this._stateBase;
+
+    const vIn = rhsOld[this._inNode] - rhsOld[this._gndNode];
+    const prevOut = s1[base + SLOT_LAST_OUT] as 0 | 1;
+    const bit = logicLevel(vIn, this._vIH, this._vIL, prevOut);
+
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, bit ? this._vOH : this._vOL);
+    s0[base + SLOT_LAST_OUT] = bit;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

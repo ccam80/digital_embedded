@@ -75,7 +75,7 @@ export class NotElement extends AbstractCircuitElement {
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls: PinDeclaration[] = buildPinDeclarations(bitWidth, wideShape);
     const activeModel = this._properties.getOrDefault<string>("model", "");
-    if (activeModel && NotDefinition.modelRegistry?.[activeModel]) {
+    if (activeModel === "cmos") {
       const w = compWidth(wideShape);
       const centerX = w / 2;
       decls = [
@@ -262,15 +262,16 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // port indices: in=0, out=1, gnd=2
+  // port indices: in=0, out=1, gnd=2; ctrl_out internal net at index 3
   const ports = ["in", "out", "gnd"];
   const outIdx = 1;
   const gndIdx = 2;
+  const ctrlOutNet = 3;
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf.
+  // Driver leaf: in_1=0, ctrl_out=ctrlOutNet, gnd=gndIdx
   elements.push({
     typeId: "BehavioralNotDriver",
     modelRef: "default",
@@ -280,7 +281,7 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vIL: params.getModelParam<number>("vIL"),
     },
   });
-  netlist.push([0, outIdx, gndIdx]); // in_1=0, out=outIdx, gnd=gndIdx
+  netlist.push([0, ctrlOutNet, gndIdx]);
 
   // Input pin- one input port.
   elements.push({
@@ -288,8 +289,9 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     modelRef: "default",
     subElementName: "inPin_1",
   });
-  netlist.push([0, gndIdx]); // in=0, gnd=gndIdx
+  netlist.push([0, gndIdx]);
 
+  // Output pin: node=outIdx, gnd=gndIdx, ctrl=ctrlOutNet (3-port)
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -301,12 +303,13 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([outIdx, gndIdx]);
+  netlist.push([outIdx, gndIdx, ctrlOutNet]);
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_out"],
     netlist,
   };
 }

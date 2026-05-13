@@ -25,7 +25,8 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge, logicLevel } from "./edge-detect.js";
+import { detectRisingEdge } from "./edge-detect.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Memoised arity-indexed schema factory
@@ -61,21 +62,40 @@ function getCounterPresetSchema(bitWidth: number): StateSchema {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout- fixed 9 pins matching buildCounterPresetNetlist port order:
-// [en, C, dir, in, ld, clr, out, ovf, gnd]
+// Pin layout factory- per-instance variable bit width
 // ---------------------------------------------------------------------------
+//
+// Order MUST match the parent's connectivity row for this sub-element:
+// [en, C, dir, in, ld, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
+//
+// ctrl_bit_i carry individual logic levels (vOH/vOL) for bit i of the count.
+// ctrl_ovf carries vOH/vOL for the overflow signal.
 
-const COUNTER_PRESET_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT,  label: "en",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "dir", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "in",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "ld",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "clr", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "ovf", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-];
+export function buildCounterPresetDriverPinLayout(props: PropertyBag): PinDeclaration[] {
+  const N = props.getModelParam<number>("bitWidth");
+  const decls: PinDeclaration[] = [
+    { direction: PinDirection.INPUT,  label: "en",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "dir", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "in",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "ld",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "clr", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  ];
+  for (let i = 0; i < N; i++) {
+    decls.push({
+      direction: PinDirection.OUTPUT, label: `ctrl_bit_${i}`,
+      defaultBitWidth: 1, position: { x: 0, y: 0 },
+      isNegatable: false, isClockCapable: false, kind: "signal",
+    });
+  }
+  decls.push({
+    direction: PinDirection.OUTPUT, label: "ctrl_ovf",
+    defaultBitWidth: 1, position: { x: 0, y: 0 },
+    isNegatable: false, isClockCapable: false, kind: "signal",
+  });
+  return decls;
+}
 
 // ---------------------------------------------------------------------------
 // BehavioralCounterPresetDriverElement
@@ -106,6 +126,11 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
 
   private _firstSample: boolean = true;
 
+  private _handlesByBit: readonly (readonly [number, number, number, number])[] = [];
+  private _handlesOvf: readonly [number, number, number, number] = [-1, -1, -1, -1];
+  private _ctrlBitNodes: number[] = [];
+  private _ctrlOvfNode: number = -1;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
@@ -132,6 +157,18 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+
+    this._ctrlBitNodes = [];
+    const handles: (readonly [number, number, number, number])[] = [];
+    for (let i = 0; i < this._bitWidth; i++) {
+      const node = this.pinNodes.get(`ctrl_bit_${i}`)!;
+      this._ctrlBitNodes.push(node);
+      handles.push(allocNortonStamp(ctx.solver, node, this._gndNode));
+    }
+    this._handlesByBit = handles;
+
+    this._ctrlOvfNode = this.pinNodes.get("ctrl_ovf")!;
+    this._handlesOvf = allocNortonStamp(ctx.solver, this._ctrlOvfNode, this._gndNode);
   }
 
   /**
@@ -170,13 +207,11 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
       if (clr) {
         count = 0;
       } else if (ld) {
-        let loadVal = 0;
-        for (let i = 0; i < this._bitWidth; i++) {
-          const prevBit: 0 | 1 = ((s1[base + this._slotCount] >>> i) & 1) as 0 | 1;
-          const bitVoltage = (vIn >>> i) & 1;
-          const bit = logicLevel(bitVoltage, this._vIH, this._vIL, prevBit);
-          loadVal |= bit << i;
-        }
+        // vIn is a packed integer value on the analog node; extract directly.
+        // The extracted bits are already 0 or 1 — no logicLevel reclassification
+        // (analog hysteresis applies to bus-level voltages, not to bits already
+        // extracted from the packed integer).
+        const loadVal = (vIn >>> 0) >>> 0;
         count = (loadVal & this._maxValue) >>> 0;
       } else if (en) {
         if (dir) {
@@ -189,9 +224,20 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
 
     this._firstSample = false;
 
-
     s0[base + this._slotLastClock] = vClock;
     s0[base + this._slotCount]     = count;
+
+    const enHigh  = vEn  >= this._vIH ? 1 : 0;
+    const dirHigh = vDir >= this._vIH ? 1 : 0;
+    const ovf = (dirHigh
+      ? ((count >>> 0) === 0 && enHigh !== 0)
+      : ((count >>> 0) === this._maxValue && enHigh !== 0)) ? 1 : 0;
+
+    for (let i = 0; i < this._bitWidth; i++) {
+      const bit = (count >>> i) & 1;
+      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, this._rOut, bit ? this._vOH : this._vOL);
+    }
+    stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, this._rOut, ovf ? this._vOH : this._vOL);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
@@ -215,7 +261,7 @@ export const BehavioralCounterPresetDriverDefinition: ComponentDefinition = {
   name: "BehavioralCounterPresetDriver",
   typeId: -1,
   internalOnly: true,
-  pinLayout: COUNTER_PRESET_DRIVER_PIN_LAYOUT,
+  pinLayoutFactory: buildCounterPresetDriverPinLayout,
   modelRegistry: {
     default: {
       kind: "inline",
@@ -234,3 +280,4 @@ export const BehavioralCounterPresetDriverDefinition: ComponentDefinition = {
   },
   defaultModel: "default",
 };
+

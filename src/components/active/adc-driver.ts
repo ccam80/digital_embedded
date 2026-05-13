@@ -37,6 +37,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspi
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 import type { ComponentDefinition } from "../../core/registry.js";
 import type { PropertyBag } from "../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
@@ -88,17 +89,31 @@ function getAdcSchema(bits: number): StateSchema {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout- fixed input-only: VIN, CLK, VREF, GND.
-// Order MUST match the parent's buildAdcNetlist connectivity row for drv
-// (compiler.ts:465: iterates min(pinLayout.length, connectivity.length)).
+// Pin layout factory- inputs VIN, CLK, VREF, GND plus ctrl_d_0..ctrl_d_{N-1}.
+// Order MUST match the parent's buildAdcNetlist connectivity row for drv.
 // ---------------------------------------------------------------------------
 
-const ADC_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT, label: "VIN",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT, label: "CLK",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
-  { direction: PinDirection.INPUT, label: "VREF", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT, label: "GND",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-];
+function buildAdcDriverPinLayout(props: PropertyBag): PinDeclaration[] {
+  const bits = props.getOrDefault<number>("bits", 8);
+  const pins: PinDeclaration[] = [
+    { direction: PinDirection.INPUT, label: "VIN",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "CLK",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
+    { direction: PinDirection.INPUT, label: "VREF", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "GND",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  ];
+  for (let i = 0; i < bits; i++) {
+    pins.push({
+      direction: PinDirection.OUTPUT,
+      label: `ctrl_d_${i}`,
+      defaultBitWidth: 1,
+      position: { x: 0, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+      kind: "signal",
+    });
+  }
+  return pins;
+}
 
 // ---------------------------------------------------------------------------
 // ADCDriverElement
@@ -131,6 +146,8 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
   private _vOH: number;
   private _vOL: number;
   private _firstSample: boolean = true;
+  private _ctrlNodes: number[] = [];
+  private _handlesByBit: Array<readonly [number, number, number, number]> = [];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -161,6 +178,13 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._ctrlNodes = [];
+    this._handlesByBit = [];
+    for (let i = 0; i < this._bits; i++) {
+      const ctrlNode = this.pinNodes.get(`ctrl_d_${i}`)!;
+      this._ctrlNodes.push(ctrlNode);
+      this._handlesByBit.push(allocNortonStamp(ctx.solver, ctrlNode, this._gndNode));
+    }
   }
 
   /**
@@ -266,6 +290,12 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     s0[base + this._slotSarBitIndex] = sarBitIndex;
     s0[base + this._slotOutputCode]  = outputCode;
 
+    // Norton stamp at each ctrl_d_<i>: drive each bit of the output code.
+    for (let i = 0; i < this._bits; i++) {
+      const bit = (outputCode >> i) & 1;
+      const target = bit ? this._vOH : this._vOL;
+      stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, this._rOut, target);
+    }
   }
 
   /**
@@ -323,7 +353,7 @@ export const ADCDriverDefinition: ComponentDefinition = {
   name: "ADCDriver",
   typeId: -1,
   internalOnly: true,
-  pinLayout: ADC_DRIVER_PIN_LAYOUT,
+  pinLayoutFactory: buildAdcDriverPinLayout,
   modelRegistry: {
     default: {
       kind: "inline",

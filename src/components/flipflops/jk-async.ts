@@ -110,11 +110,12 @@ export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitN
         },
       },
     ],
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_q", "ctrl_nq"],
     netlist: [
-      [0, 1, 2, 3, 4, 5, 6, 7],   // drv: Set, J, C, K, Clr, Q, ~Q, gnd
-      [5, 7],                     // qPin:  Q  to gnd
-      [6, 7],                     // nqPin: ~Q to gnd
+      [0, 1, 2, 3, 4, 8, 9, 7],   // drv: Set, J, C, K, Clr, ctrl_q, ctrl_nq, gnd
+      [5, 7, 8],                  // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [6, 7, 9],                  // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }

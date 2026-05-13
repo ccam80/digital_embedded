@@ -153,16 +153,22 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   const N = params.getOrDefault<number>("bits", 8);
 
   // Port order: VIN, CLK, VREF, GND, EOC, D0..D(N-1)
+  // Port count P = N + 5.
   const ports = ["VIN", "CLK", "VREF", "GND", "EOC"];
   for (let i = 0; i < N; i++) ports.push(`D${i}`);
+  const P = ports.length; // N + 5
+
+  // Internal nets: ctrl_d_0..ctrl_d_{N-1} at indices P..P+N-1.
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_d_${i}`);
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // ADCDriver reads VIN(0), CLK(1), VREF(2), GND(3) and drives EOC + D0..D(N-1).
-  // Pin order for driver: VIN, CLK, VREF, GND, EOC, D0..D(N-1).
-  const drvPins = [0, 1, 2, 3, 4];
-  for (let i = 0; i < N; i++) drvPins.push(5 + i);
+  // ADCDriver reads VIN(0), CLK(1), VREF(2), GND(3) and stamps ctrl_d_0..ctrl_d_{N-1}.
+  // Pin order for driver: VIN, CLK, VREF, GND, ctrl_d_0..ctrl_d_{N-1}.
+  const drvPins = [0, 1, 2, 3];
+  for (let i = 0; i < N; i++) drvPins.push(P + i);
   elements.push({
     typeId: "ADCDriver",
     modelRef: "default",
@@ -177,7 +183,7 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   });
   netlist.push(drvPins);
 
-  // EOC digital output pin (port index 4, gnd = port index 3)
+  // EOC digital output pin (port index 4, gnd = port index 3, ctrl = GND -> vOL).
   elements.push({
     typeId: "DigitalOutputPinLoaded",
     modelRef: "default",
@@ -189,9 +195,9 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
       vOL: "vOL",
     },
   });
-  netlist.push([4 /* EOC */, 3 /* GND */]);
+  netlist.push([4 /* EOC */, 3 /* GND */, 3 /* ctrl = GND */]);
 
-  // D0..D(N-1) digital output pins
+  // D0..D(N-1) digital output pins — each gains its ctrl_d_i net.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: "DigitalOutputPinLoaded",
@@ -204,10 +210,10 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
         vOL: "vOL",
       },
     });
-    netlist.push([5 + i /* D_i */, 3 /* GND */]);
+    netlist.push([5 + i /* D_i */, 3 /* GND */, P + i /* ctrl_d_i */]);
   }
 
-  return { ports, elements, internalNetCount: 0, netlist };
+  return { ports, elements, internalNetCount: N, internalNetLabels, netlist };
 };
 
 // ---------------------------------------------------------------------------

@@ -128,11 +128,12 @@ export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
       ports: ["T", "C", "Q", "~Q", "gnd"],
       params: { ...T_FF_BEHAVIORAL_DEFAULTS },
       elements: [drvSubElement, qPinSubElement, nqPinSubElement],
-      internalNetCount: 0,
+      internalNetCount: 2,
+      internalNetLabels: ["ctrl_q", "ctrl_nq"],
       netlist: [
-        [0, 1, 2, 3, 4],   // drv: T, C, Q, ~Q, gnd
-        [2, 4],            // qPin:  Q  to gnd
-        [3, 4],            // nqPin: ~Q to gnd
+        [0, 1, 5, 6, 4],   // drv: T, C, ctrl_q, ctrl_nq, gnd
+        [2, 4, 5],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+        [3, 4, 6],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
       ],
     } as MnaSubcircuitNetlist;
   }
@@ -143,11 +144,12 @@ export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
     ports: ["C", "Q", "~Q", "gnd"],
     params: { ...T_FF_BEHAVIORAL_DEFAULTS },
     elements: [drvSubElement, qPinSubElement, nqPinSubElement],
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_q", "ctrl_nq"],
     netlist: [
-      [3, 0, 1, 2, 3],   // drv: T=gnd, C, Q, ~Q, gnd
-      [1, 3],            // qPin:  Q  to gnd
-      [2, 3],            // nqPin: ~Q to gnd
+      [3, 0, 4, 5, 3],   // drv: T=gnd, C, ctrl_q, ctrl_nq, gnd
+      [1, 3, 4],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [2, 3, 5],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }

@@ -55,7 +55,7 @@ export class XNOrElement extends AbstractCircuitElement {
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
     const activeModel = this._properties.getOrDefault<string>("model", "");
-    if (activeModel && XNOrDefinition.modelRegistry?.[activeModel]) {
+    if (activeModel === "cmos") {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }
@@ -216,14 +216,16 @@ export function buildXnorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
   ports.push("out", "gnd");
   const outIdx = N;
   const gndIdx = N + 1;
+  // ctrl_out internal net lands at index N+2
+  const ctrlOutNet = N + 2;
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf.
+  // Driver leaf: inputs + ctrl_out (internal) + gnd
   const driverPins: number[] = [];
   for (let i = 0; i < N; i++) driverPins.push(i);
-  driverPins.push(outIdx, gndIdx);
+  driverPins.push(ctrlOutNet, gndIdx);
   elements.push({
     typeId: "BehavioralXnorDriver",
     modelRef: "default",
@@ -247,6 +249,7 @@ export function buildXnorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
     netlist.push([i, gndIdx]);
   }
 
+  // Output pin: node=outIdx, gnd=gndIdx, ctrl=ctrlOutNet (3-port)
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -258,12 +261,13 @@ export function buildXnorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([outIdx, gndIdx]);
+  netlist.push([outIdx, gndIdx, ctrlOutNet]);
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_out"],
     netlist,
   };
 }

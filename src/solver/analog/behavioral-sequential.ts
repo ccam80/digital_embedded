@@ -34,29 +34,33 @@ import type { PropertyBag } from "../../core/properties.js";
 export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
   const bitWidth = props.getOrDefault<number>("bitWidth", 4);
 
-  const ports: string[] = ["en", "C", "clr"];
-  for (let i = 0; i < bitWidth; i++) {
-    ports.push(`out_${i}`);
-  }
-  ports.push("ovf");
-  ports.push("gnd");
+  // Port names MUST match component-level pin labels: en, C, clr, out (bus), ovf, gnd
+  const ports = ["en", "C", "clr", "out", "ovf", "gnd"];
 
-  // Net index helpers
-  const netEn = 0;
-  const netC = 1;
+  const netEn  = 0;
+  const netC   = 1;
   const netClr = 2;
-  const netOutBase = 3;
-  const netOvf = 3 + bitWidth;
-  const netGnd = 4 + bitWidth;
+  const netOut = 3;
+  const netOvf = 4;
+  const netGnd = 5;
 
-  // drv port order must match BehavioralCounterDriver pin declarations:
-  // en, C, clr, out_0..out_{N-1}, ovf, gnd
-  const drvNets: number[] = [netEn, netC, netClr];
+  // Internal ctrl nets: P=6 ports; ctrl_bit_0..N-1 at P..P+N-1; ctrl_ovf at P+N
+  const P = 6;
+  const ctrlBitBase = P;
+  const ctrlOvfNet  = P + bitWidth;
+
+  const internalNetLabels: string[] = [];
   for (let i = 0; i < bitWidth; i++) {
-    drvNets.push(netOutBase + i);
+    internalNetLabels.push(`ctrl_bit_${i}`);
   }
-  drvNets.push(netOvf);
-  drvNets.push(netGnd);
+  internalNetLabels.push("ctrl_ovf");
+
+  // drv port order: [en, C, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
+  const drvNets: number[] = [netEn, netC, netClr, netGnd];
+  for (let i = 0; i < bitWidth; i++) {
+    drvNets.push(ctrlBitBase + i);
+  }
+  drvNets.push(ctrlOvfNet);
 
   const elements: SubcircuitElement[] = [
     {
@@ -92,6 +96,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
     [netClr, netGnd],  // clrPin
   ];
 
+  // One outPin_i per bit — all drive the same packed bus "out" node; each gets its ctrl net.
   for (let i = 0; i < bitWidth; i++) {
     elements.push({
       typeId: "DigitalOutputPinLoaded",
@@ -99,7 +104,7 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       subElementName: `outPin_${i}`,
       params: {},
     });
-    netlist.push([netOutBase + i, netGnd]);
+    netlist.push([netOut, netGnd, ctrlBitBase + i]);
   }
 
   elements.push({
@@ -108,13 +113,14 @@ export function buildCounterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
     subElementName: "ovfPin",
     params: {},
   });
-  netlist.push([netOvf, netGnd]);
+  netlist.push([netOvf, netGnd, ctrlOvfNet]);
 
   return {
     ports,
     params: {},
     elements,
-    internalNetCount: 0,
+    internalNetCount: bitWidth + 1,
+    internalNetLabels,
     netlist,
   };
 }
@@ -155,6 +161,24 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
   const netOut = 6;
   const netOvf = 7;
   const netGnd = 8;
+
+  // Internal ctrl nets: P=9 ports, ctrl_bit_0..N-1 at 9..9+N-1, ctrl_ovf at 9+N
+  const P = 9;
+  const ctrlBitBase = P;
+  const ctrlOvfNet = P + bitWidth;
+
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < bitWidth; i++) {
+    internalNetLabels.push(`ctrl_bit_${i}`);
+  }
+  internalNetLabels.push("ctrl_ovf");
+
+  // drv port order: [en, C, dir, in, ld, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
+  const drvNets: number[] = [netEn, netC, netDir, netIn, netLd, netClr, netGnd];
+  for (let i = 0; i < bitWidth; i++) {
+    drvNets.push(ctrlBitBase + i);
+  }
+  drvNets.push(ctrlOvfNet);
 
   const elements: SubcircuitElement[] = [
     {
@@ -199,38 +223,44 @@ export function buildCounterPresetNetlist(props: PropertyBag): MnaSubcircuitNetl
       subElementName: "clrPin",
       params: {},
     },
-    {
-      typeId: "DigitalOutputPinLoaded",
-      modelRef: "default",
-      subElementName: "outPin",
-      params: {},
-    },
-    {
-      typeId: "DigitalOutputPinLoaded",
-      modelRef: "default",
-      subElementName: "ovfPin",
-      params: {},
-    },
   ];
 
-  // drv port order: en, C, dir, in, ld, clr, out, ovf, gnd
+  // drv connectivity row
   const netlist: number[][] = [
-    [netEn, netC, netDir, netIn, netLd, netClr, netOut, netOvf, netGnd], // drv
+    drvNets,           // drv
     [netEn, netGnd],   // enPin
     [netC, netGnd],    // clockPin
     [netDir, netGnd],  // dirPin
     [netIn, netGnd],   // inPin
     [netLd, netGnd],   // ldPin
     [netClr, netGnd],  // clrPin
-    [netOut, netGnd],  // outPin
-    [netOvf, netGnd],  // ovfPin
   ];
+
+  // One outPin_i per bit — each drives the packed bus output node with its ctrl_bit_i net
+  for (let i = 0; i < bitWidth; i++) {
+    elements.push({
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: `outPin_${i}`,
+      params: {},
+    });
+    netlist.push([netOut, netGnd, ctrlBitBase + i]);
+  }
+
+  elements.push({
+    typeId: "DigitalOutputPinLoaded",
+    modelRef: "default",
+    subElementName: "ovfPin",
+    params: {},
+  });
+  netlist.push([netOvf, netGnd, ctrlOvfNet]);
 
   return {
     ports,
     params: {},
     elements,
-    internalNetCount: 0,
+    internalNetCount: bitWidth + 1,
+    internalNetLabels,
     netlist,
   };
 }
@@ -264,6 +294,21 @@ export function buildRegisterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
   const netQ = 3;
   const netGnd = 4;
 
+  // Internal ctrl nets: P=5 ports, ctrl_bit_0..N-1 at 5..5+N-1
+  const P = 5;
+  const ctrlBitBase = P;
+
+  const internalNetLabels: string[] = [];
+  for (let i = 0; i < bitWidth; i++) {
+    internalNetLabels.push(`ctrl_bit_${i}`);
+  }
+
+  // drv port order: [D, C, en, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}]
+  const drvNets: number[] = [netD, netC, netEn, netGnd];
+  for (let i = 0; i < bitWidth; i++) {
+    drvNets.push(ctrlBitBase + i);
+  }
+
   const elements: SubcircuitElement[] = [
     {
       typeId: "BehavioralRegisterDriver",
@@ -289,28 +334,33 @@ export function buildRegisterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
       subElementName: "enPin",
       params: {},
     },
-    {
-      typeId: "DigitalOutputPinLoaded",
-      modelRef: "default",
-      subElementName: "qPin",
-      params: {},
-    },
   ];
 
-  // drv port order: D, C, en, Q, gnd
+  // drv connectivity row, then input pins
   const netlist: number[][] = [
-    [netD, netC, netEn, netQ, netGnd], // drv
-    [netD, netGnd],                    // dPin
-    [netC, netGnd],                    // clockPin
-    [netEn, netGnd],                   // enPin
-    [netQ, netGnd],                    // qPin
+    drvNets,            // drv
+    [netD, netGnd],     // dPin
+    [netC, netGnd],     // clockPin
+    [netEn, netGnd],    // enPin
   ];
+
+  // One outPin_i per bit — each drives the packed Q bus output node with its ctrl_bit_i net
+  for (let i = 0; i < bitWidth; i++) {
+    elements.push({
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: `outPin_${i}`,
+      params: {},
+    });
+    netlist.push([netQ, netGnd, ctrlBitBase + i]);
+  }
 
   return {
     ports,
     params: {},
     elements,
-    internalNetCount: 0,
+    internalNetCount: bitWidth,
+    internalNetLabels,
     netlist,
   };
 }

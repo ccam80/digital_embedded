@@ -127,15 +127,16 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port indices: In_1=0, out=1, gnd=2. `In_1` matches buildStandardPinDeclarations.
+  // Port indices: In_1=0, out=1, gnd=2. ctrl_out internal net at index 3.
   const ports: string[] = ["In_1", "out", "gnd"];
   const outIdx = 1;
   const gndIdx = 2;
+  const ctrlOutNet = 3;
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf.
+  // Driver leaf: in_1=0, ctrl_out=ctrlOutNet, gnd=gndIdx
   elements.push({
     typeId: "BehavioralBufDriver",
     modelRef: "default",
@@ -145,8 +146,7 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vIL: params.getModelParam<number>("vIL"),
     },
   });
-  // drv connectivity: [in_1(0), out(1), gnd(2)]
-  netlist.push([0, outIdx, gndIdx]);
+  netlist.push([0, ctrlOutNet, gndIdx]);
 
   // Input pin- port in_1 (index 0) to gnd (index 2)
   elements.push({
@@ -156,6 +156,7 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push([0, gndIdx]);
 
+  // Output pin: node=outIdx, gnd=gndIdx, ctrl=ctrlOutNet (3-port)
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -167,12 +168,13 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([outIdx, gndIdx]);
+  netlist.push([outIdx, gndIdx, ctrlOutNet]);
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_out"],
     netlist,
   };
 }

@@ -53,7 +53,7 @@ export class NAndElement extends AbstractCircuitElement {
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
     const activeModel = this._properties.getOrDefault<string>("model", "");
-    if (activeModel && NAndDefinition.modelRegistry?.[activeModel]) {
+    if (activeModel === "cmos") {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }
@@ -187,9 +187,12 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
+  // ctrl_out internal net lands at index N+2
+  const ctrlOutNet = N + 2;
+
   const driverPins: number[] = [];
   for (let i = 0; i < N; i++) driverPins.push(i);
-  driverPins.push(outIdx, gndIdx);
+  driverPins.push(ctrlOutNet, gndIdx);
   elements.push({
     typeId: "BehavioralNandDriver",
     modelRef: "default",
@@ -222,12 +225,13 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([outIdx, gndIdx]);
+  netlist.push([outIdx, gndIdx, ctrlOutNet]);
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_out"],
     netlist,
   };
 }

@@ -111,11 +111,12 @@ export function buildRSAsyncLatchNetlist(params: PropertyBag): MnaSubcircuitNetl
         },
       },
     ],
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_q", "ctrl_nq"],
     netlist: [
-      [0, 1, 2, 3, 4],   // drv: S, R, Q, ~Q, gnd
-      [2, 4],            // qPin:  Q  to gnd
-      [3, 4],            // nqPin: ~Q to gnd
+      [0, 1, 5, 6, 4],   // drv: S, R, ctrl_q, ctrl_nq, gnd
+      [2, 4, 5],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [3, 4, 6],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }

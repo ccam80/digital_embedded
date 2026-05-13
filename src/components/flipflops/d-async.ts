@@ -109,11 +109,12 @@ export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNe
         },
       },
     ],
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_q", "ctrl_nq"],
     netlist: [
-      [0, 1, 2, 3, 4, 5, 6],   // drv: Set, D, C, Clr, Q, ~Q, gnd
-      [4, 6],                  // qPin:  Q  to gnd
-      [5, 6],                  // nqPin: ~Q to gnd
+      [0, 1, 2, 3, 7, 8, 6],   // drv: Set, D, C, Clr, ctrl_q, ctrl_nq, gnd
+      [4, 6, 7],               // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [5, 6, 8],               // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }

@@ -65,7 +65,7 @@ export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist 
     [2, 4, 9, 7],                     // comp1: ctrl+ THR, ctrl- CTRL, out+ nComp1Out, out- GND
     [8, 1, 10, 7],                    // comp2: ctrl+ nLower, ctrl- TRIG, out+ nComp2Out, out- GND
     [11, 0, 7],                       // bjtDis: B=nDisBase, C=DIS, E=GND
-    [9, 10, 6, 3, 7, 11, 5],          // latchDrv: comp1Out, comp2Out, rst, vcc, gnd, disBase, out
+    [9, 10, 6, 3, 7, 11, 12],         // latchDrv: comp1Out, comp2Out, rst, vcc, gnd, disBase, ctrl_out
   ];
 
   elements.push({
@@ -79,14 +79,14 @@ export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist 
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([5 /* OUT port */, 7 /* GND port */]);
+  netlist.push([5 /* OUT port */, 7 /* GND port */, 12 /* ctrl_out net */]);
 
   return {
     ports: ["DIS", "TRIG", "THR", "VCC", "CTRL", "OUT", "RST", "GND"],
     params: { vDrop: 1.5, rDischarge: 100 },
     elements,
-    internalNetCount: 4,
-    internalNetLabels: ["nLower", "nComp1Out", "nComp2Out", "nDisBase"],
+    internalNetCount: 5,
+    internalNetLabels: ["nLower", "nComp1Out", "nComp2Out", "nDisBase", "ctrl_out"],
     netlist,
   };
 }

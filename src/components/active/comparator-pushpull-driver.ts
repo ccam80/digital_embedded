@@ -13,8 +13,8 @@
  *   The output is driven to a smoothed target between vOL and vOH, with
  *   the smoothing tracked by the existing `OUTPUT_WEIGHT` slot:
  *     vTarget = (1 - w) * vOH + w * vOL
- *   When latch=0 (v+ above threshold), w trends 0 and vTarget â†’ vOH.
- *   When latch=1 (v+ below threshold, asserted), w trends 1 and vTarget â†’ vOL.
+ *   When latch=0 (v+ above threshold), w trends 0 and vTarget -> vOH.
+ *   When latch=1 (v+ below threshold, asserted), w trends 1 and vTarget -> vOL.
  *   Latch semantic preserved from the open-collector path: latch=1 means
  *   "asserted/sinking" per the schema doc; in push-pull that maps to "drive
  *   the output low".
@@ -27,7 +27,7 @@ import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -46,9 +46,9 @@ const SLOT_OUTPUT_WEIGHT = COMPARATOR_SCHEMA.indexOf.get("OUTPUT_WEIGHT")!;
 // ---------------------------------------------------------------------------
 
 const COMPARATOR_PUSHPULL_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT,  label: "in+", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "in-", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "in+",      defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "in-",      defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -96,9 +96,9 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
   private _vOL: number;
   private _rOut: number;
 
-  // Single matrix handle: (out, out). Push-pull always stamps the full
-  // 1/rSat conductance; the latch/weight steers the RHS injection.
-  private _hOutOut = -1;
+  private _ctrlOutNode = -1;
+  private _gndNode = 0;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -113,9 +113,9 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-    const outNode = this.pinNodes.get("out")!;
-    // Unconditional - ground rows route to TrashCan handle 0.
-    this._hOutOut = ctx.solver.allocElement(outNode, outNode);
+    this._ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    this._gndNode = 0;
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
   setParam(key: string, value: number): void {
@@ -138,7 +138,6 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
 
     const vPlus  = rhsOld[this.pinNodes.get("in+")!];
     const vMinus = rhsOld[this.pinNodes.get("in-")!];
-    const outNode = this.pinNodes.get("out")!;
 
     // Hysteresis thresholds.
     const half = this._hysteresis * 0.5;
@@ -151,22 +150,15 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     if (latchOld === 0 && vPlus >= vTh)      latchNew = 1;
     else if (latchOld === 1 && vPlus < vTl)  latchNew = 0;
 
-    // Push-pull Norton stamp: G = 1/rSat always; RHS injects G*vTarget where
-    // vTarget is smoothed between vOH (latch=0, output high) and vOL
-    // (latch=1, output asserted low). Smoothing uses the prior-step weight
-    // (s1) per the StatePool migration convention.
-    const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    // Unconditional - handle was unconditionally allocated; ground row
-    // stamps land in the TrashCan / rhs[0] (cleared post-solve).
-    const G = 1 / this._rSat;
-    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
-    ctx.solver.stampElement(this._hOutOut, G);
-    stampRHS(ctx.rhs, outNode, G * vTarget);
-
     // Weight integration- trapezoidal recurrence shared with open-collector.
+    const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
     const dt = ctx.dt;
     const alpha = dt > 0 ? dt / (this._tau + dt) : 0;
     const wNew = wOld + alpha * (latchNew - wOld);
+
+    // Norton stamp at ctrl_out: drive latched output level.
+    const target = latchNew ? this._vOH : this._vOL;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
 
     // Bottom-of-load writes.
     s0[base + SLOT_OUTPUT_LATCH]  = latchNew;
@@ -174,13 +166,12 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const outNode = this.pinNodes.get("out")!;
+    const ctrlOutNode = this.pinNodes.get("ctrl_out")!;
     const s1 = this._pool.states[1];
-    const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
-    const G = 1 / this._rSat;
-    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
-    // Norton-equivalent current at the output port: I_out = G * (vNode - vTarget).
-    const I = G * (rhs[outNode] - vTarget);
+    const latchOld = s1[this._stateBase + SLOT_OUTPUT_LATCH] >= 0.5 ? 1 : 0;
+    const G = 1 / this._rOut;
+    const vTarget = latchOld ? this._vOH : this._vOL;
+    const I = G * (rhs[ctrlOutNode] - vTarget);
     return [0, 0, I];
   }
 }

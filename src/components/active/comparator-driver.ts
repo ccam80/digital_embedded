@@ -33,6 +33,7 @@ import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
+import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -51,9 +52,9 @@ const SLOT_OUTPUT_WEIGHT = COMPARATOR_SCHEMA.indexOf.get("OUTPUT_WEIGHT")!;
 // ---------------------------------------------------------------------------
 
 const COMPARATOR_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT,  label: "in+", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "in-", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "in+",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "in-",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -103,10 +104,9 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
   private _vOH: number;
   private _vOL: number;
 
-  // Single matrix handle: (out, out). Open-collector model stamps the
-  // weighted conductance on the output diagonal only- no cross-coupling
-  // to in+/in- (those are pure read-only inputs into the latch logic).
-  private _hOutOut = -1;
+  private _ctrlOutNode = -1;
+  private _gndNode = 0;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -121,9 +121,9 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-    const outNode = this.pinNodes.get("out")!;
-    // Unconditional - ground rows route to TrashCan handle 0.
-    this._hOutOut = ctx.solver.allocElement(outNode, outNode);
+    this._ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    this._gndNode = 0;
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
   setParam(key: string, value: number): void {
@@ -166,19 +166,17 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
     if (latchOld === 0 && vPlus >= vTh)      latchNew = 1;
     else if (latchOld === 1 && vPlus < vTl)  latchNew = 0;
 
-    // Stamp open-collector conductance using prior-step weight (s1).
-    // G_eff = w * (1/rSat) at (out, out); no RHS (pulls to GND via rSat).
-    // Unconditional - handle is always valid (ground -> TrashCan handle 0).
-    const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
-    const gEff = wOld / this._rSat;
-    ctx.solver.stampElement(this._hOutOut, gEff);
-
     // Weight integration- J-021 trapezoidal recurrence.
     // alpha = dt / (tau + dt); wNew = wOld + alpha * (target - wOld).
     // dt = 0 (DC) -> alpha = 0 -> wNew = wOld (weight held; latch still updates).
+    const wOld = s1[base + SLOT_OUTPUT_WEIGHT];
     const dt = ctx.dt;
     const alpha = dt > 0 ? dt / (this._tau + dt) : 0;
     const wNew = wOld + alpha * (latchNew - wOld);
+
+    // Norton stamp at ctrl_out: drive latched output level.
+    const target = latchNew ? this._vOH : this._vOL;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
 
     // Bottom-of-load writes- every slot mutated this step writes to s0
     // exactly once.
@@ -187,12 +185,12 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const outNode = this.pinNodes.get("out")!;
+    const ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    const G = 1 / this._rOut;
     const s1 = this._pool.states[1];
-    const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
-    const gEff = wOld / this._rSat;
-    const I = gEff * rhs[outNode];
-    // Inputs are pure reads (no current); output sinks I to ground when active.
+    const latchOld = s1[this._stateBase + SLOT_OUTPUT_LATCH] >= 0.5 ? 1 : 0;
+    const vTarget = latchOld ? this._vOH : this._vOL;
+    const I = G * (rhs[ctrlOutNode] - vTarget);
     return [0, 0, I];
   }
 }

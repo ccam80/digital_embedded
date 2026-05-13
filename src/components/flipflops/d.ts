@@ -113,11 +113,12 @@ export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
         },
       },
     ],
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_q", "ctrl_nq"],
     netlist: [
-      [0, 1, 2, 3, 4],   // drv: D, C, Q, ~Q, gnd
-      [2, 4],            // qPin:  Q  to gnd
-      [3, 4],            // nqPin: ~Q to gnd
+      [0, 1, 5, 6, 4],   // drv: D, C, ctrl_q, ctrl_nq, gnd
+      [2, 4, 5],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [3, 4, 6],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }
@@ -221,7 +222,7 @@ export class DElement extends AbstractCircuitElement {
       },
     ];
     const activeModel = this._properties.getOrDefault<string>("model", "");
-    if (activeModel && DDefinition.modelRegistry?.[activeModel]) {
+    if (activeModel === 'cmos') {
       decls = [
         ...decls,
         {
@@ -349,26 +350,26 @@ const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
   params: {},
   elements: [
     // Master TG1: passes D when C=1 (PMOS gate=C, NMOS gate=C)
-    { typeId: "PMOS", branchCount: 0 }, // m_tg1_p
-    { typeId: "NMOS", branchCount: 0 }, // m_tg1_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // m_tg1_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // m_tg1_n
     // Master inverter INV1 (PMOS + NMOS)
-    { typeId: "PMOS", branchCount: 0 }, // m_inv1_p
-    { typeId: "NMOS", branchCount: 0 }, // m_inv1_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // m_inv1_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // m_inv1_n
     // Master feedback INV2 (PMOS + NMOS)- closes the master latch
-    { typeId: "PMOS", branchCount: 0 }, // m_inv2_p
-    { typeId: "NMOS", branchCount: 0 }, // m_inv2_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // m_inv2_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // m_inv2_n
     // Slave TG2: passes master output when C=0 (PMOS gate=~C, NMOS gate=C)
-    { typeId: "PMOS", branchCount: 0 }, // s_tg2_p
-    { typeId: "NMOS", branchCount: 0 }, // s_tg2_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // s_tg2_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // s_tg2_n
     // Slave inverter INV3 (PMOS + NMOS)- drives Q
-    { typeId: "PMOS", branchCount: 0 }, // s_inv3_p
-    { typeId: "NMOS", branchCount: 0 }, // s_inv3_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // s_inv3_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // s_inv3_n
     // Slave feedback INV4 (PMOS + NMOS)- closes the slave latch
-    { typeId: "PMOS", branchCount: 0 }, // s_inv4_p
-    { typeId: "NMOS", branchCount: 0 }, // s_inv4_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // s_inv4_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // s_inv4_n
     // Clock buffer INV (PMOS + NMOS)- generates ~C
-    { typeId: "PMOS", branchCount: 0 }, // clk_inv_p
-    { typeId: "NMOS", branchCount: 0 }, // clk_inv_n
+    { typeId: "PMOS", branchCount: 0, modelRef: "spice-l1" }, // clk_inv_p
+    { typeId: "NMOS", branchCount: 0, modelRef: "spice-l1" }, // clk_inv_n
   ],
   // Internal nets (indices >= 6):
   //   6 = ~C (inverted clock)

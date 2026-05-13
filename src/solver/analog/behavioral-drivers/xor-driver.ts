@@ -24,6 +24,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // State schema
@@ -36,13 +37,9 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralXorDriver", []);
 // ---------------------------------------------------------------------------
 //
 // Order MUST match the parent's connectivity row for this sub-element. The
-// parent emits `[in_1_net, in_2_net, ..., in_N_net, out_net, gnd_net]` and
-// the compiler stores each pin label against the resolved node from the
+// parent emits `[in_1_net, in_2_net, ..., in_N_net, ctrl_out_net, gnd_net]`
+// and the compiler stores each pin label against the resolved node from the
 // matching connectivity index (compiler.ts:447-462).
-//
-// The "out" pin is included for parent-port symmetry (the parent's "out" port
-// is wired through this driver as well as through the outPin sibling that
-// owns the actual VSRC stamp). load() does not read it.
 
 function buildXorDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const N = props.getModelParam<number>("inputCount");
@@ -55,7 +52,7 @@ function buildXorDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     });
   }
   decls.push({
-    direction: PinDirection.OUTPUT, label: "out",
+    direction: PinDirection.OUTPUT, label: "ctrl_out",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   });
@@ -80,6 +77,8 @@ export class BehavioralXorDriverElement extends PoolBackedAnalogElement {
   private readonly _inputCount: number;
   private readonly _inputNodes: number[];
   private readonly _gndNode: number;
+  private readonly _ctrlOutNode: number;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _vIH: number;
   private _vIL: number;
   private _rOut: number;
@@ -94,6 +93,7 @@ export class BehavioralXorDriverElement extends PoolBackedAnalogElement {
       this._inputNodes[i] = pinNodes.get(`In_${i + 1}`)!;
     }
     this._gndNode = pinNodes.get("gnd")!;
+    this._ctrlOutNode = pinNodes.get("ctrl_out")!;
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
@@ -103,9 +103,33 @@ export class BehavioralXorDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
-  load(_ctx: LoadContext): void {
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
+    const gndV = rhsOld[this._gndNode];
+
+    let ones = 0;
+    let indeterminate = false;
+    for (let i = 0; i < this._inputCount; i++) {
+      const v = rhsOld[this._inputNodes[i]] - gndV;
+      if (v >= this._vIH) {
+        ones++;
+      } else if (v < this._vIL) {
+        // classified 0, no action
+      } else {
+        indeterminate = true;
+      }
+    }
+
+    const result = ones % 2;
+    const mid = (this._vOH + this._vOL) / 2;
+    const target = indeterminate
+      ? (rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL)
+      : (result ? this._vOH : this._vOL);
+
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

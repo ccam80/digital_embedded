@@ -25,6 +25,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js"
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
@@ -72,26 +73,26 @@ function buildSplitterDriverPinLayout(props: PropertyBag): PinDeclaration[] {
       kind: "signal",
     });
   }
+  decls.push({
+    direction: PinDirection.INPUT,
+    label: "gnd",
+    defaultBitWidth: 1,
+    position: { x: 0, y: inputCount },
+    isNegatable: false,
+    isClockCapable: false,
+    kind: "signal",
+  });
   for (let i = 0; i < outputCount; i++) {
     decls.push({
       direction: PinDirection.OUTPUT,
-      label: `out_${i}`,
+      label: `ctrl_${i}`,
       defaultBitWidth: 1,
-      position: { x: 0, y: inputCount + i },
+      position: { x: 0, y: inputCount + 1 + i },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
     });
   }
-  decls.push({
-    direction: PinDirection.INPUT,
-    label: "gnd",
-    defaultBitWidth: 1,
-    position: { x: 0, y: inputCount + outputCount },
-    isNegatable: false,
-    isClockCapable: false,
-    kind: "signal",
-  });
   return decls;
 }
 
@@ -108,13 +109,14 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
   private readonly _inputCount: number;
   private readonly _outputCount: number;
   private readonly _inNodes: number[];
-  private readonly _outNodes: number[];
   private readonly _gndNode: number;
   private _vIH: number;
   private _vIL: number;
   private _rOut: number;
   private _vOH: number;
   private _vOL: number;
+  private _ctrlNodes: number[];
+  private _handlesByBit: readonly [number, number, number, number][];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -128,11 +130,9 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
     for (let i = 0; i < this._inputCount; i++) {
       this._inNodes.push(pinNodes.get(`in_${i}`)!);
     }
-    this._outNodes = [];
-    for (let i = 0; i < this._outputCount; i++) {
-      this._outNodes.push(pinNodes.get(`out_${i}`)!);
-    }
     this._gndNode = pinNodes.get("gnd")!;
+    this._ctrlNodes = new Array(this._outputCount).fill(-1);
+    this._handlesByBit = [];
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
@@ -142,6 +142,12 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    const handles: [number, number, number, number][] = [];
+    for (let i = 0; i < this._outputCount; i++) {
+      this._ctrlNodes[i] = this.pinNodes.get(`ctrl_${i}`)!;
+      handles.push(allocNortonStamp(ctx.solver, this._ctrlNodes[i], this._gndNode));
+    }
+    this._handlesByBit = handles;
   }
 
   /**
@@ -166,7 +172,6 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
    */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const base = this._stateBase;
     const gnd = rhsOld[this._gndNode];
@@ -176,13 +181,16 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
     if (this._inputCount === 1 && this._outputCount >= 1) {
       // Split mode: unpack bit i from the wide bus voltage at in_0.
       const vIn = rhsOld[this._inNodes[0]] - gnd;
-      const packed = vIn >>> 0;  // ToUint32 truncation â€” matches bus-pin convention
+      const packed = vIn >>> 0;  // ToUint32 truncation — matches bus-pin convention
       for (let i = 0; i < this._outputCount; i++) {
         const bitVoltage = (packed >>> i) & 1;
         const prev = s1[base + i] >= 0.5 ? 1 : 0;
+        const bit = logicLevel(bitVoltage, 0.5, 0.5, prev as 0 | 1);
+        const target = bit ? this._vOH : this._vOL;
+        stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, this._rOut, target);
       }
     } else if (this._outputCount === 1 && this._inputCount >= 1) {
-      // Merge mode: classify each narrow input and pack into slot 0.
+      // Merge mode: classify each narrow input and pack into one output.
       let packed = 0;
       for (let i = 0; i < this._inputCount; i++) {
         const vIn = rhsOld[this._inNodes[i]] - gnd;
@@ -190,12 +198,17 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
         const bit = logicLevel(vIn, vIH, vIL, prev as 0 | 1);
         packed |= bit << i;
       }
+      const target = packed ? this._vOH : this._vOL;
+      stampNortonValue(ctx, this._handlesByBit[0]!, this._ctrlNodes[0]!, this._gndNode, this._rOut, target);
     } else {
-      // Passthrough mode: classify in_i â†’ slot i directly.
+      // Passthrough mode: classify in_i → ctrl_i directly.
       const n = Math.min(this._inputCount, this._outputCount);
       for (let i = 0; i < n; i++) {
         const vIn = rhsOld[this._inNodes[i]] - gnd;
         const prev = s1[base + i] >= 0.5 ? 1 : 0;
+        const bit = logicLevel(vIn, vIH, vIL, prev as 0 | 1);
+        const target = bit ? this._vOH : this._vOL;
+        stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, this._rOut, target);
       }
     }
   }

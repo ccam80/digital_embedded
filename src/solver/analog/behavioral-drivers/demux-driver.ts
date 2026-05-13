@@ -34,6 +34,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js"
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
@@ -65,6 +66,7 @@ function getDemuxSchema(selectorBits: number): StateSchema {
 
 function buildDemuxDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const K = props.getModelParam<number>("selectorBits");
+  const N = 1 << K;
   const decls: PinDeclaration[] = [];
   for (let i = 0; i < K; i++) {
     decls.push({
@@ -83,6 +85,13 @@ function buildDemuxDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   });
+  for (let i = 0; i < N; i++) {
+    decls.push({
+      direction: PinDirection.OUTPUT, label: `ctrl_${i}`,
+      defaultBitWidth: 1, position: { x: 0, y: 0 },
+      isNegatable: false, isClockCapable: false, kind: "signal",
+    });
+  }
   return decls;
 }
 
@@ -106,6 +115,8 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
   private _rOut: number;
   private _vOH: number;
   private _vOL: number;
+  private _ctrlNodes: number[];
+  private _handlesByBit: readonly [number, number, number, number][];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -121,6 +132,8 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
     }
     this._inNode  = pinNodes.get("in")!;
     this._gndNode = pinNodes.get("gnd")!;
+    this._ctrlNodes = new Array(this._outCount).fill(-1);
+    this._handlesByBit = [];
 
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
@@ -131,6 +144,12 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    const handles: [number, number, number, number][] = [];
+    for (let i = 0; i < this._outCount; i++) {
+      this._ctrlNodes[i] = this.pinNodes.get(`ctrl_${i}`)!;
+      handles.push(allocNortonStamp(ctx.solver, this._ctrlNodes[i], this._gndNode));
+    }
+    this._handlesByBit = handles;
   }
 
   /**
@@ -141,11 +160,8 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
    * and the route comes from `sel`; either being unknown makes the whole
    * pattern unknown.
    */
-  load(_ctx: LoadContext): void {
-    const rhsOld = _ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
     const gnd = rhsOld[this._gndNode];
 
     // Classify selector bits.
@@ -167,11 +183,13 @@ export class BehavioralDemuxDriverElement extends PoolBackedAnalogElement {
       else                       sawIndeterminate = true;
     }
 
-    if (sawIndeterminate) {
-      return;
-    }
-
     sel >>>= 0;
+
+    // Stamp Norton: selected output gets data level, all others get vOL.
+    for (let i = 0; i < this._outCount; i++) {
+      const target = (!sawIndeterminate && i === sel) ? (data ? this._vOH : this._vOL) : this._vOL;
+      stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, this._rOut, target);
+    }
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

@@ -32,6 +32,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // State schema
@@ -44,13 +45,9 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralAndDriver", []);
 // ---------------------------------------------------------------------------
 //
 // Order MUST match the parent's connectivity row for this sub-element. The
-// parent emits `[in_1_net, in_2_net, ..., in_N_net, out_net, gnd_net]` and
-// the compiler stores each pin label against the resolved node from the
+// parent emits `[in_1_net, in_2_net, ..., in_N_net, ctrl_out_net, gnd_net]`
+// and the compiler stores each pin label against the resolved node from the
 // matching connectivity index (compiler.ts:447-462).
-//
-// The "out" pin is included for parent-port symmetry (the parent's "out" port
-// is wired through this driver as well as through the outPin sibling that
-// owns the actual VSRC stamp). load() does not read it.
 
 function buildAndDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const N = props.getModelParam<number>("inputCount");
@@ -63,7 +60,7 @@ function buildAndDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     });
   }
   decls.push({
-    direction: PinDirection.OUTPUT, label: "out",
+    direction: PinDirection.OUTPUT, label: "ctrl_out",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   });
@@ -86,13 +83,10 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
   readonly stateSize = SCHEMA.size;
 
   private readonly _inputCount: number;
-  // Pin node IDs are populated in setup() once `this.pinNodes` is the active
-  // source of truth. (Under the compile-time-expansion architecture, pinNodes
-  // is already fully resolved at construction time; the deferred read pattern
-  // is retained as a sibling-driver convention rather than a correctness
-  // requirement.)
   private _inputNodes: number[];
   private _gndNode: number;
+  private _ctrlOutNode: number;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _vIH: number;
   private _vIL: number;
   private _rOut: number;
@@ -104,6 +98,7 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
     this._inputCount = props.getModelParam<number>("inputCount");
     this._inputNodes = new Array(this._inputCount).fill(-1);
     this._gndNode = -1;
+    this._ctrlOutNode = -1;
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
@@ -117,30 +112,42 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
       this._inputNodes[i] = this.pinNodes.get(`In_${i + 1}`)!;
     }
     this._gndNode = this.pinNodes.get("gnd")!;
+    this._ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
   /**
    * Per-input threshold-classify with hold-on-indeterminate semantic:
    *
-   *   - If any input falls below vIL (a "0" for AND) â†’ output 0 immediately;
+   *   - If any input falls below vIL (a "0" for AND) → output 0 immediately;
    *     0 is the absorbing element for AND so further inputs do not matter.
-   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) â†’
-   *     hold prior output (CMOS metastability proxy: indeterminate inputs
-   *     produce indeterminate output, modelled as steady-state retention).
-   *   - Else (all inputs >= vIH) â†’ output 1.
-   *
-   * Per-gate variation surface for OR / NAND / NOR / XOR / XNOR:
-   *   - OR:   absorber is "1" (v >= vIH), pass-through is "0", default 0.
-   *   - NAND: AND body, final invert (0 -> 1, 1 -> 0).
-   *   - NOR:  OR body, final invert.
-   *   - XOR:  count "1"s; if any indeterminate hold prior, else output (count % 2).
-   *   - XNOR: XOR body, final invert.
-   *
-   * Mux is the same shape but replaces the reduction with a selector-indexed
-   * pick: read sel bits, classify them, index into data inputs, output that
-   * data input's classified bit (or hold prior on any indeterminate sel/data).
+   *   - Else if any input is in the indeterminate band (vIL <= v < vIH) →
+   *     hold prior output (CMOS metastability proxy).
+   *   - Else (all inputs >= vIH) → output 1.
    */
-  load(_ctx: LoadContext): void {
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
+    const gndV = rhsOld[this._gndNode];
+
+    let result = 1;
+    let indeterminate = false;
+    for (let i = 0; i < this._inputCount; i++) {
+      const v = rhsOld[this._inputNodes[i]] - gndV;
+      if (v < this._vIL) {
+        result = 0;
+        indeterminate = false;
+        break;
+      } else if (v < this._vIH) {
+        indeterminate = true;
+      }
+    }
+
+    const mid = (this._vOH + this._vOL) / 2;
+    const target = indeterminate
+      ? (rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL)
+      : (result ? this._vOH : this._vOL);
+
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

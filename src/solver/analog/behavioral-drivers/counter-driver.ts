@@ -16,6 +16,7 @@ import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { detectRisingEdge } from "./edge-detect.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Memoised arity-indexed schema factory
@@ -58,18 +59,37 @@ function getCounterSchema(bitWidth: number): StateSchema {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout- fixed (control inputs + gnd; no output pins on the driver
+// Pin layout factory- per-instance variable bit width
 // ---------------------------------------------------------------------------
 //
-// Order MUST match the parent's connectivity row for this sub-element
-// (compiler.ts:447-462).
+// Order MUST match the parent's connectivity row for this sub-element:
+// [en, C, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
+//
+// ctrl_bit_i carry individual logic levels (vOH/vOL) for bit i of the count.
+// ctrl_ovf carries vOH/vOL for the overflow signal.
 
-const COUNTER_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT, label: "en",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT, label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
-  { direction: PinDirection.INPUT, label: "clr", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT, label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-];
+export function buildCounterDriverPinLayout(props: PropertyBag): PinDeclaration[] {
+  const N = props.getModelParam<number>("bitWidth");
+  const decls: PinDeclaration[] = [
+    { direction: PinDirection.INPUT,  label: "en",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "clr", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  ];
+  for (let i = 0; i < N; i++) {
+    decls.push({
+      direction: PinDirection.OUTPUT, label: `ctrl_bit_${i}`,
+      defaultBitWidth: 1, position: { x: 0, y: 0 },
+      isNegatable: false, isClockCapable: false, kind: "signal",
+    });
+  }
+  decls.push({
+    direction: PinDirection.OUTPUT, label: "ctrl_ovf",
+    defaultBitWidth: 1, position: { x: 0, y: 0 },
+    isNegatable: false, isClockCapable: false, kind: "signal",
+  });
+  return decls;
+}
 
 // ---------------------------------------------------------------------------
 // BehavioralCounterDriverElement
@@ -100,6 +120,11 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   private _vOL: number;
   private _firstSample: boolean = true;
 
+  private _handlesByBit: readonly (readonly [number, number, number, number])[] = [];
+  private _handlesOvf: readonly [number, number, number, number] = [-1, -1, -1, -1];
+  private _ctrlBitNodes: number[] = [];
+  private _ctrlOvfNode: number = -1;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
@@ -122,6 +147,18 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+
+    this._ctrlBitNodes = [];
+    const handles: (readonly [number, number, number, number])[] = [];
+    for (let i = 0; i < this._bitWidth; i++) {
+      const node = this.pinNodes.get(`ctrl_bit_${i}`)!;
+      this._ctrlBitNodes.push(node);
+      handles.push(allocNortonStamp(ctx.solver, node, this._gndNode));
+    }
+    this._handlesByBit = handles;
+
+    this._ctrlOvfNode = this.pinNodes.get("ctrl_ovf")!;
+    this._handlesOvf = allocNortonStamp(ctx.solver, this._ctrlOvfNode, this._gndNode);
   }
 
   /**
@@ -176,6 +213,14 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
       const bit = (count >>> i) & 1;
       s0[base + this._slotCountBase + i] = bit;
     }
+
+    const ovf = (count === this._maxValue && en !== 0) ? 1 : 0;
+
+    for (let i = 0; i < this._bitWidth; i++) {
+      const bit = (count >>> i) & 1;
+      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, this._rOut, bit ? this._vOH : this._vOL);
+    }
+    stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, this._rOut, ovf ? this._vOH : this._vOL);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
@@ -200,7 +245,7 @@ export const BehavioralCounterDriverDefinition: ComponentDefinition = {
   name: "BehavioralCounterDriver",
   typeId: -1,
   internalOnly: true,
-  pinLayout: COUNTER_DRIVER_PIN_LAYOUT,
+  pinLayoutFactory: buildCounterDriverPinLayout,
   modelRegistry: {
     default: {
       kind: "inline",
@@ -218,3 +263,4 @@ export const BehavioralCounterDriverDefinition: ComponentDefinition = {
   },
   defaultModel: "default",
 };
+

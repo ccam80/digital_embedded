@@ -37,6 +37,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js"
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
@@ -69,6 +70,7 @@ function getDecoderSchema(selectorBits: number): StateSchema {
 
 function buildDecoderDriverPinLayout(props: PropertyBag): PinDeclaration[] {
   const K = props.getModelParam<number>("selectorBits");
+  const N = 1 << K;
   const decls: PinDeclaration[] = [];
   for (let i = 0; i < K; i++) {
     decls.push({
@@ -82,6 +84,13 @@ function buildDecoderDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   });
+  for (let i = 0; i < N; i++) {
+    decls.push({
+      direction: PinDirection.OUTPUT, label: `ctrl_${i}`,
+      defaultBitWidth: 1, position: { x: 0, y: 0 },
+      isNegatable: false, isClockCapable: false, kind: "signal",
+    });
+  }
   return decls;
 }
 
@@ -104,6 +113,8 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
   private _rOut: number;
   private _vOH: number;
   private _vOL: number;
+  private _ctrlNodes: number[];
+  private _handlesByBit: readonly [number, number, number, number][];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -118,6 +129,8 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
       this._selNodes[i] = pinNodes.get(`sel_${i}`)!;
     }
     this._gndNode = pinNodes.get("gnd")!;
+    this._ctrlNodes = new Array(this._outCount).fill(-1);
+    this._handlesByBit = [];
 
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
@@ -128,20 +141,22 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    const handles: [number, number, number, number][] = [];
+    for (let i = 0; i < this._outCount; i++) {
+      this._ctrlNodes[i] = this.pinNodes.get(`ctrl_${i}`)!;
+      handles.push(allocNortonStamp(ctx.solver, this._ctrlNodes[i], this._gndNode));
+    }
+    this._handlesByBit = handles;
   }
 
   /**
-   * Threshold-classify each selector bit; assemble `sel`; one-hot write.
+   * Threshold-classify each selector bit; assemble `sel`; one-hot stamp.
    *
-   * If any selector bit is indeterminate, hold the entire output vector
-   * (s1 â†’ s0 copy on the output slots). The active bit depends on the
-   * whole sel value, so per-bit hold is incoherent.
+   * Selected output stamps vOH; all others stamp vOL.
+   * If any selector bit is indeterminate, all outputs stamp vOL (conservative).
    */
-  load(_ctx: LoadContext): void {
-    const rhsOld = _ctx.rhsOld;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const base = this._stateBase;
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
     const gnd = rhsOld[this._gndNode];
 
     let sel = 0;
@@ -153,11 +168,12 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
       else                     { sawIndeterminate = true; break; }
     }
 
-    if (sawIndeterminate) {
-      return;
-    }
-
     sel >>>= 0;
+
+    for (let i = 0; i < this._outCount; i++) {
+      const target = (!sawIndeterminate && i === sel) ? this._vOH : this._vOL;
+      stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, this._rOut, target);
+    }
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

@@ -16,6 +16,7 @@ import { NAndDefinition } from "./gates/nand.js";
 import { NOrDefinition } from "./gates/nor.js";
 import { XOrDefinition } from "./gates/xor.js";
 import { XNOrDefinition } from "./gates/xnor.js";
+import { BufDefinition } from "./gates/buf.js";
 
 // I/O
 import { InDefinition } from "./io/in.js";
@@ -270,6 +271,9 @@ import { TriodeAnalogDefinition } from "./semiconductors/triode-analog-element.j
 // Mutual inductor sub-element (internalOnly — used by Transformer composites)
 import { MutualInductorDefinition } from "./passives/mutual-inductor.js";
 
+// Current-controlled switch (internalOnly — used by Relay composite as ngspice CSW/W)
+import { CurrentControlledSwitchDefinition } from "./switching/current-controlled-switch.js";
+
 /**
  * Create a ComponentRegistry populated with every built-in component type.
  *
@@ -290,6 +294,7 @@ export function createDefaultRegistry(
   registry.register(NOrDefinition);
   registry.register(XOrDefinition);
   registry.register(XNOrDefinition);
+  registry.register(BufDefinition);
 
   // I/O
   registry.register(InDefinition);
@@ -553,6 +558,9 @@ export function createDefaultRegistry(
 
   // Mutual inductor sub-element (internalOnly — used by Transformer composites)
   registry.register(MutualInductorDefinition);
+
+  // Current-controlled switch (internalOnly — used by Relay composite)
+  registry.register(CurrentControlledSwitchDefinition);
 
   auditNgspiceLoadOrderTables(registry);
 

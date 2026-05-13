@@ -26,6 +26,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralJKAsyncFlipflopDriver", [
   { name: "LAST_CLOCK", doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample skips edge detection." },
@@ -35,16 +36,16 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralJKAsyncFlipflopDriver",
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
 
-// Pin order matches buildJKAsyncFlipflopNetlist drv row [0..7] = Set,J,C,K,Clr,Q,~Q,gnd.
+// Pin order matches buildJKAsyncFlipflopNetlist drv row [0..7] = Set,J,C,K,Clr,ctrl_q,ctrl_nq,gnd.
 const JK_AS_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
-  { direction: PinDirection.INPUT,  label: "Set", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "J",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "C",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "K",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "Clr", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "Q",   defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "~Q",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.INPUT,  label: "gnd", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "Set",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "J",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "C",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "K",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "Clr",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_q",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_nq", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.INPUT,  label: "gnd",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
 export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElement {
@@ -61,6 +62,12 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
 
   private _firstSample: boolean = true;
 
+  private _ctrlQNode: number = 0;
+  private _ctrlNqNode: number = 0;
+  private _gndNode: number = 0;
+  private _handlesQ: readonly [number, number, number, number] = [-1, -1, -1, -1];
+  private _handlesNq: readonly [number, number, number, number] = [-1, -1, -1, -1];
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._vIH = props.getModelParam<number>("vIH");
@@ -72,6 +79,11 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._ctrlQNode  = this.pinNodes.get("ctrl_q")!;
+    this._ctrlNqNode = this.pinNodes.get("ctrl_nq")!;
+    this._gndNode    = this.pinNodes.get("gnd")!;
+    this._handlesQ  = allocNortonStamp(ctx.solver, this._ctrlQNode,  this._gndNode);
+    this._handlesNq = allocNortonStamp(ctx.solver, this._ctrlNqNode, this._gndNode);
   }
 
   load(ctx: LoadContext): void {
@@ -80,7 +92,7 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
     const s1 = this._pool.states[1];
     const base = this._stateBase;
 
-    const gnd    = rhsOld[this.pinNodes.get("gnd")!];
+    const gnd    = rhsOld[this._gndNode];
     const vClock = rhsOld[this.pinNodes.get("C")!]   - gnd;
     const vJ     = rhsOld[this.pinNodes.get("J")!]   - gnd;
     const vK     = rhsOld[this.pinNodes.get("K")!]   - gnd;
@@ -108,11 +120,14 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
       }
     }
 
-    // Async Set then async Clr- Clr wins on collision (matches recovered
+    // Async Set then async Clr — Clr wins on collision (matches recovered
     // original's accept() ordering: setV check, then clrV check, with second
     // assignment overwriting first).
     if (vSet > this._vIH) q = 1;
     if (vClr > this._vIH) q = 0;
+
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;

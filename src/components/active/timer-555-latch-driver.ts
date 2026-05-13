@@ -1,5 +1,5 @@
 ﻿/**
- * Timer555LatchDriver â€” RS flip-flop + discharge-BJT base driver leaf.
+ * Timer555LatchDriver - RS flip-flop + discharge-BJT base driver leaf.
  *
  * Consumed by `buildTimer555Netlist` in `timer-555.ts` as the `latchDrv`
  * sub-element of the 555-timer composite. Reads comparator outputs, drives
@@ -20,6 +20,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspi
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 import type { ComponentDefinition } from "../../core/registry.js";
 import type { PropertyBag } from "../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
@@ -42,8 +43,8 @@ const SLOT_LATCH_Q      = SCHEMA.indexOf.get("LATCH_Q")!;
 // ---------------------------------------------------------------------------
 //
 // Order MUST match the buildTimer555Netlist latchDrv connectivity row
-// [9, 10, 6, 3, 7, 11, 5] mapping ports to:
-// comp1Out, comp2Out, rst, vcc, gnd, disBase, out.
+// [9, 10, 6, 3, 7, 11, 12] mapping ports to:
+// comp1Out, comp2Out, rst, vcc, gnd, disBase, ctrl_out.
 
 const TIMER_555_LATCH_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "comp1Out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -52,7 +53,7 @@ const TIMER_555_LATCH_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "vcc",      defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "gnd",      defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "disBase",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-  { direction: PinDirection.OUTPUT, label: "out",      defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+  { direction: PinDirection.OUTPUT, label: "ctrl_out", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,9 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
   private _vOL: number;
   // TSTALLOC handle for the (disBase, disBase) conductance stamp.
   private _hDisDis = -1;
+  private _ctrlOutNode = -1;
+  private _gndNode2 = 0;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -85,8 +89,11 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
     const disBase = this.pinNodes.get("disBase")!;
-    // TSTALLOC: (disBase, disBase) â€” conductance stamp for discharge-BJT base clamping.
+    // TSTALLOC: (disBase, disBase) - conductance stamp for discharge-BJT base clamping.
     this._hDisDis = ctx.solver.allocElement(disBase, disBase);
+    this._ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    this._gndNode2 = this.pinNodes.get("gnd")!;
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode2);
   }
 
   load(ctx: LoadContext): void {
@@ -118,7 +125,11 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
     ctx.solver.stampElement(this._hDisDis, G_base);
     ctx.rhs[this.pinNodes.get("disBase")!] += targetV * G_base;
 
-    s0[base + SLOT_LATCH_Q]      = q;
+    // Norton stamp at ctrl_out: drive latched output level.
+    const ctrlTarget = q ? this._vOH : this._vOL;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode2, this._rOut, ctrlTarget);
+
+    s0[base + SLOT_LATCH_Q] = q;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

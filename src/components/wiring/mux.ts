@@ -329,15 +329,18 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const outPortIdx = N + K;
   const gndPortIdx = N + K + 1;
 
+  // Internal net: ctrl_out lands at index N + K + 2 (first index after all ports).
+  const ctrlOutNet = N + K + 2;
+
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
   // Driver leaf.
-  // Pin order in driver: data_0..data_{N-1}, sel_0..sel_{K-1}, out, gnd
+  // Pin order in driver: data_0..data_{N-1}, sel_0..sel_{K-1}, ctrl_out, gnd
   const driverPins: number[] = [];
   for (let i = 0; i < N; i++) driverPins.push(i);
   for (let i = 0; i < K; i++) driverPins.push(N + i);
-  driverPins.push(outPortIdx, gndPortIdx);
+  driverPins.push(ctrlOutNet, gndPortIdx);
   elements.push({
     typeId: "BehavioralMuxDriver",
     modelRef: "default",
@@ -382,12 +385,13 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       vOL:  params.getModelParam<number>("vOL"),
     },
   });
-  netlist.push([outPortIdx, gndPortIdx]);
+  netlist.push([outPortIdx, gndPortIdx, ctrlOutNet]);
 
   return {
     ports,
     elements,
-    internalNetCount: 0,
+    internalNetCount: 1,
+    internalNetLabels: ["ctrl_out"],
     netlist,
   };
 }

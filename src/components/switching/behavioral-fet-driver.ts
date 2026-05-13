@@ -9,10 +9,11 @@
  * The polarity is encoded as a number per the SubcircuitElementParam
  * 4-arm union contract (booleans must be 0/1). 1 = N-channel, 0 = P-channel.
  *
- * Pins: G (gate), D (drain, unused for control), S (source).
+ * Pins: G (gate), S (source), ctrl_out (Norton output driving FetSW ctrl input).
  *
- * Per Composite recipe: pure behavioural classifier writing
- * No MNA stamps.
+ * Norton stamp at ctrl_out:
+ *   on  -> vTarget = vOH, G = 1/rOut, I = G * vOH
+ *   off -> vTarget = vOL, G = 1/rOut, I = G * vOL
  */
 
 import {
@@ -26,6 +27,7 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
+import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // State schema
@@ -41,11 +43,17 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralFETDriver", []);
 const BEHAVIORAL_FET_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "Vth",      default: 2.5 },
   { key: "isNType",  default: 1 }, // 1 = N-channel, 0 = P-channel
+  { key: "rOut",     default: 100 },
+  { key: "vOH",      default: 5.0 },
+  { key: "vOL",      default: 0.0 },
 ];
 
 const BEHAVIORAL_FET_DRIVER_DEFAULTS: Record<string, number> = {
   Vth: 2.5,
   isNType: 1,
+  rOut: 100,
+  vOH: 5.0,
+  vOL: 0.0,
 };
 
 // ---------------------------------------------------------------------------
@@ -59,12 +67,12 @@ const BEHAVIORAL_FET_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
     isNegatable: false, isClockCapable: false, kind: "signal",
   },
   {
-    direction: PinDirection.INPUT, label: "D",
+    direction: PinDirection.INPUT, label: "S",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   },
   {
-    direction: PinDirection.INPUT, label: "S",
+    direction: PinDirection.OUTPUT, label: "ctrl_out",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   },
@@ -84,6 +92,13 @@ export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
   private readonly _sourceNode: number;
   private _vth: number;
   private _isNType: boolean;
+  private _rOut: number;
+  private _vOH: number;
+  private _vOL: number;
+
+  private _ctrlOutNode = -1;
+  private _gndNode = 0;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -93,15 +108,23 @@ export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
       props.hasModelParam("Vth") ? props.getModelParam<number>("Vth") : BEHAVIORAL_FET_DRIVER_DEFAULTS["Vth"]!;
     this._isNType =
       (props.hasModelParam("isNType") ? props.getModelParam<number>("isNType") : BEHAVIORAL_FET_DRIVER_DEFAULTS["isNType"]!) !== 0;
+    this._rOut =
+      props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : BEHAVIORAL_FET_DRIVER_DEFAULTS["rOut"]!;
+    this._vOH =
+      props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : BEHAVIORAL_FET_DRIVER_DEFAULTS["vOH"]!;
+    this._vOL =
+      props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : BEHAVIORAL_FET_DRIVER_DEFAULTS["vOL"]!;
   }
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    this._gndNode = 0;
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
-    const s0 = this._pool.states[0];
 
     const vG = rhsOld[this._gateNode];
     const vS = rhsOld[this._sourceNode];
@@ -111,6 +134,8 @@ export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
     // P-channel: on when vGS < -Vth (gate lower than source by threshold).
     const on = this._isNType ? vGS > this._vth : vGS < -this._vth;
 
+    const vTarget = on ? this._vOH : this._vOL;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, vTarget);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
@@ -120,6 +145,9 @@ export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
   setParam(key: string, value: number): void {
     if (key === "Vth") this._vth = value;
     else if (key === "isNType") this._isNType = value !== 0;
+    else if (key === "rOut") this._rOut = value;
+    else if (key === "vOH") this._vOH = value;
+    else if (key === "vOL") this._vOL = value;
   }
 }
 

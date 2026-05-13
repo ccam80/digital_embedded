@@ -23,6 +23,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // State schema
@@ -45,7 +46,7 @@ function buildNandDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     });
   }
   decls.push({
-    direction: PinDirection.OUTPUT, label: "out",
+    direction: PinDirection.OUTPUT, label: "ctrl_out",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   });
@@ -70,6 +71,8 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
   private readonly _inputCount: number;
   private readonly _inputNodes: number[];
   private readonly _gndNode: number;
+  private readonly _ctrlOutNode: number;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _vIH: number;
   private _vIL: number;
   private _rOut: number;
@@ -84,6 +87,7 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
       this._inputNodes[i] = pinNodes.get(`In_${i + 1}`)!;
     }
     this._gndNode = pinNodes.get("gnd")!;
+    this._ctrlOutNode = pinNodes.get("ctrl_out")!;
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
@@ -93,9 +97,33 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
-  load(_ctx: LoadContext): void {
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
+    const gndV = rhsOld[this._gndNode];
+
+    let andResult = 1;
+    let indeterminate = false;
+    for (let i = 0; i < this._inputCount; i++) {
+      const v = rhsOld[this._inputNodes[i]] - gndV;
+      if (v < this._vIL) {
+        andResult = 0;
+        indeterminate = false;
+        break;
+      } else if (v < this._vIH) {
+        indeterminate = true;
+      }
+    }
+
+    const result = andResult ? 0 : 1;
+    const mid = (this._vOH + this._vOL) / 2;
+    const target = indeterminate
+      ? (rhsOld[this._ctrlOutNode] - gndV > mid ? this._vOH : this._vOL)
+      : (result ? this._vOH : this._vOL);
+
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, target);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

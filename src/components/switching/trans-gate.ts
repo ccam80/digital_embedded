@@ -263,12 +263,14 @@ export const buildTransGateNetlist = (params: PropertyBag): MnaSubcircuitNetlist
         },
       },
     ],
-    internalNetCount: 0,
+    internalNetCount: 2,
+    internalNetLabels: ["nfet_ctrl", "pfet_ctrl"],
+    // ports: p1=0, p2=1, out1=2, out2=3; nfet_ctrl=4, pfet_ctrl=5
     netlist: [
-      [0, 2, 3], // nfetDrv: G=p1, D=out1, S=out2
-      [2, 3],    // nfetSW:  D=out1, S=out2
-      [1, 2, 3], // pfetDrv: G=p2, D=out1, S=out2
-      [2, 3],    // pfetSW:  D=out1, S=out2
+      [0, 3, 4], // nfetDrv: G=p1, S=out2, ctrl_out=nfet_ctrl(4)
+      [2, 3, 4], // nfetSW:  D=out1, S=out2, ctrl=nfet_ctrl(4)
+      [1, 3, 5], // pfetDrv: G=p2, S=out2, ctrl_out=pfet_ctrl(5)
+      [2, 3, 5], // pfetSW:  D=out1, S=out2, ctrl=pfet_ctrl(5)
     ],
   };
 };

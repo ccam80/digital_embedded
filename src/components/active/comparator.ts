@@ -174,7 +174,7 @@ export class ComparatorElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
-  ports: ["in+", "in-", "out"],
+  ports: ["in+", "in-", "out", "gnd"],
   params: { ...COMPARATOR_DEFAULTS },
   elements: [
     {
@@ -188,15 +188,28 @@ export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
         responseTime: "responseTime",
       },
     },
+    {
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: "outPin",
+      params: {
+        rOut: "rOut",
+        vOH:  "vOH",
+        vOL:  "vOL",
+      },
+    },
   ],
-  internalNetCount: 0,
+  internalNetCount: 1,
+  internalNetLabels: ["ctrl_out"],
+  // ports: in+=0, in-=1, out=2, gnd=3 (auto-resolves to node 0); ctrl_out internal net=4
   netlist: [
-    [0, 1, 2], // drv: in+=0, in-=1, out=2
+    [0, 1, 4], // drv: in+=0, in-=1, ctrl_out=4
+    [2, 3, 4], // outPin: node=out(2), gnd=gnd(3), ctrl=ctrl_out(4)
   ],
 };
 
 export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
-  ports: ["in+", "in-", "out"],
+  ports: ["in+", "in-", "out", "gnd"],
   params: { ...COMPARATOR_DEFAULTS },
   elements: [
     {
@@ -212,10 +225,23 @@ export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
         vOL:          "vOL",
       },
     },
+    {
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: "outPin",
+      params: {
+        rOut: "rOut",
+        vOH:  "vOH",
+        vOL:  "vOL",
+      },
+    },
   ],
-  internalNetCount: 0,
+  internalNetCount: 1,
+  internalNetLabels: ["ctrl_out"],
+  // ports: in+=0, in-=1, out=2, gnd=3 (auto-resolves to node 0); ctrl_out internal net=4
   netlist: [
-    [0, 1, 2], // drv: in+=0, in-=1, out=2
+    [0, 1, 4], // drv: in+=0, in-=1, ctrl_out=4
+    [2, 3, 4], // outPin: node=out(2), gnd=gnd(3), ctrl=ctrl_out(4)
   ],
 };
 

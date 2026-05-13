@@ -19,6 +19,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js"
 import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
@@ -87,7 +88,7 @@ function buildMuxDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     });
   }
   decls.push({
-    direction: PinDirection.OUTPUT, label: "out",
+    direction: PinDirection.OUTPUT, label: "ctrl_out",
     defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   });
@@ -121,6 +122,8 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
   private _rOut: number;
   private _vOH: number;
   private _vOL: number;
+  private _ctrlOutNode: number;
+  private _handles: readonly [number, number, number, number];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -141,6 +144,8 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
       this._dataNodes[i] = pinNodes.get(`data_${i}`)!;
     }
     this._gndNode = pinNodes.get("gnd")!;
+    this._ctrlOutNode = pinNodes.get("ctrl_out")!;
+    this._handles = [-1, -1, -1, -1];
     this._vIH = props.getModelParam<number>("vIH");
     this._vIL = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
@@ -150,6 +155,8 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
+    this._ctrlOutNode = this.pinNodes.get("ctrl_out")!;
+    this._handles = allocNortonStamp(ctx.solver, this._ctrlOutNode, this._gndNode);
   }
 
   load(ctx: LoadContext): void {
@@ -208,6 +215,8 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
       else                        dataLatch = s1[base + this._slotDataBase + i] >= 0.5 ? 1 : 0;
       s0[base + this._slotDataBase + i] = dataLatch;
     }
+
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, result ? this._vOH : this._vOL);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
