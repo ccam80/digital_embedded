@@ -41,9 +41,6 @@ import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Minimum conductance for numerical stability. */
-const GMIN = 1e-12;
-
 /** Maximum V_GK step per NR iteration (prevents exponential overflow). */
 const VGK_MAX_STEP = 1.0;
 
@@ -125,8 +122,8 @@ function computeTriodeOp(
   // dI_P/dE1 = EX * (E1/K_G1)^(EX-1) / K_G1  when E1 > 0
   const dIpdE1 = e1 > 0 ? ex * Math.pow(e1 / kg1, ex - 1) / kg1 : 0;
 
-  const gm = dIpdE1 * dE1dVgk + GMIN;
-  const gds = dIpdE1 * dE1dVpk + GMIN;
+  const gm = dIpdE1 * dE1dVgk;
+  const gds = dIpdE1 * dE1dVpk;
 
   return { vgk, vpk, ip, gm, gds };
 }
@@ -281,7 +278,9 @@ export class TriodeAnalogElement extends PoolBackedAnalogElement {
       this._p.mu, this._p.kp, this._p.kvb, this._p.kg1, this._p.ex,
     );
 
-    const { ip, gm, gds } = op;
+    const { ip } = op;
+    const gm = op.gm + ctx.cktGmin;
+    const gds = op.gds + ctx.cktGmin;
     const vgkOp = op.vgk;
     const vpkOp = op.vpk;
 

@@ -59,9 +59,6 @@ export type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
 // Physical constants (ngspice const.h / defines.h values)
 // ---------------------------------------------------------------------------
 
-/** Minimum conductance for numerical stability (CKTgmin). */
-const GMIN = 1e-12;
-
 /** Boltzmann constant (CONSTboltz). */
 const CONSTboltz = 1.3806226e-23;
 /** Elementary charge (CHARGE). */
@@ -1308,20 +1305,20 @@ function _createMosfetElementWithPolarity(
       } else {
         // mos1load.c:453-468: bulk-source and bulk-drain junction currents.
         if (vbs <= -3 * vt) {
-          gbs = GMIN;
+          gbs = ctx.cktGmin;
           cbs = gbs * vbs - sourceSatCur;
         } else {
           const evbs = Math.exp(Math.min(MAX_EXP_ARG, vbs / vt));
-          gbs = sourceSatCur * evbs / vt + GMIN;
-          cbs = sourceSatCur * (evbs - 1) + GMIN * vbs;
+          gbs = sourceSatCur * evbs / vt + ctx.cktGmin;
+          cbs = sourceSatCur * (evbs - 1) + ctx.cktGmin * vbs;
         }
         if (vbd <= -3 * vt) {
-          gbd = GMIN;
+          gbd = ctx.cktGmin;
           cbd = gbd * vbd - drainSatCur;
         } else {
           const evbd = Math.exp(Math.min(MAX_EXP_ARG, vbd / vt));
-          gbd = drainSatCur * evbd / vt + GMIN;
-          cbd = drainSatCur * (evbd - 1) + GMIN * vbd;
+          gbd = drainSatCur * evbd / vt + ctx.cktGmin;
+          cbd = drainSatCur * (evbd - 1) + ctx.cktGmin * vbd;
         }
 
         // mos1load.c:483-546: Shichman-Hodges drain current evaluation.

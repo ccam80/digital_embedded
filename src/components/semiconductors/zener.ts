@@ -54,9 +54,6 @@ const CONSTKoverQ = CONSTboltz / CHARGE;
 const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
 const REFTEMP = 300.15;         // 27 °C reference temperature
 
-/** Minimum conductance for numerical stability (GMIN). */
-const GMIN = 1e-12;
-
 // ---------------------------------------------------------------------------
 // Model parameter declarations
 // ---------------------------------------------------------------------------
@@ -323,7 +320,7 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
       }
       // store capd (small-signal conductance)  dioload.c:363 stores capd here;
       // for a resistive zener (no cap), we store gd for any bypass/convergence use.
-      s0[base + SLOT_GEQ] = gdOp + GMIN;
+      s0[base + SLOT_GEQ] = gdOp + ctx.cktGmin;
       // cite: dioload.c:374: continue (skip stamps)
       return;
     }
@@ -438,8 +435,8 @@ class ZenerAnalogElement extends PoolBackedAnalogElement {
     // Z-W3-3: GMIN as Norton pair  cite: dioload.c:297-299, 310-311
     // Add GMIN to both gd and cd before ieq computation.
     // -----------------------------------------------------------------------
-    gd += GMIN;       // cite: dioload.c:298 (else branch: gd += CKTgmin)
-    cd += GMIN * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
+    gd += ctx.cktGmin;       // cite: dioload.c:298 (else branch: gd += CKTgmin)
+    cd += ctx.cktGmin * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
 
     // -----------------------------------------------------------------------
     // Z-W3-7: state0 writes  store GMIN-adjusted pair  cite: dioload.c:417-419

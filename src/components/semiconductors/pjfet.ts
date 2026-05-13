@@ -58,9 +58,6 @@ const CONSTKoverQ = CONSTboltz / CHARGE;
 const REFTEMP = 300.15;
 const CONSTroot2 = Math.SQRT2;
 
-/** Minimum conductance for numerical stability (CKTgmin). */
-const GMIN = 1e-12;
-
 // ---------------------------------------------------------------------------
 // Model parameter declarations
 // ---------------------------------------------------------------------------
@@ -556,24 +553,24 @@ class PJfetAnalogElement extends PoolBackedAnalogElement {
     if (vgs < -3 * vt_temp) {
       let arg = 3 * vt_temp / (vgs * Math.E);
       arg = arg * arg * arg;
-      cg = -csat * (1 + arg) + GMIN * vgs;
-      ggs = csat * 3 * arg / vgs + GMIN;
+      cg = -csat * (1 + arg) + ctx.cktGmin * vgs;
+      ggs = csat * 3 * arg / vgs + ctx.cktGmin;
     } else {
       const evgs = Math.exp(vgs / vt_temp);
-      ggs = csat * evgs / vt_temp + GMIN;
-      cg = csat * (evgs - 1) + GMIN * vgs;
+      ggs = csat * evgs / vt_temp + ctx.cktGmin;
+      cg = csat * (evgs - 1) + ctx.cktGmin * vgs;
     }
 
     // jfetload.c:261-270: gate-drain junction.
     if (vgd < -3 * vt_temp) {
       let arg = 3 * vt_temp / (vgd * Math.E);
       arg = arg * arg * arg;
-      cgd = -csat * (1 + arg) + GMIN * vgd;
-      ggd = csat * 3 * arg / vgd + GMIN;
+      cgd = -csat * (1 + arg) + ctx.cktGmin * vgd;
+      ggd = csat * 3 * arg / vgd + ctx.cktGmin;
     } else {
       const evgd = Math.exp(vgd / vt_temp);
-      ggd = csat * evgd / vt_temp + GMIN;
-      cgd = csat * (evgd - 1) + GMIN * vgd;
+      ggd = csat * evgd / vt_temp + ctx.cktGmin;
+      cgd = csat * (evgd - 1) + ctx.cktGmin * vgd;
     }
 
     // jfetload.c:272: cg = cg + cgd.

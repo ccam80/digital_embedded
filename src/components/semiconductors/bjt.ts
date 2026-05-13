@@ -49,9 +49,6 @@ import type { TempContext } from "../../solver/analog/temp-context.js";
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Minimum conductance for numerical stability (CKTgmin). */
-const GMIN = 1e-12;
-
 // ---------------------------------------------------------------------------
 // Model parameter declarations
 // ---------------------------------------------------------------------------
@@ -814,8 +811,8 @@ function _createBjtElementWithPolarity(
           gben = c2 * 3 * a / vbeLimited;
         }
         // bjtload.c:447-448
-        gben += GMIN;
-        cben += GMIN * vbeLimited;
+        gben += ctx.cktGmin;
+        cben += ctx.cktGmin * vbeLimited;
 
         // bjtload.c:452-461: reverse B-C junction current + conductance.
         let cbc: number, gbc: number;
@@ -844,8 +841,8 @@ function _createBjtElementWithPolarity(
           gbcn = c4 * 3 * a / vbcLimited;
         }
         // bjtload.c:477-478
-        gbcn += GMIN;
-        cbcn += GMIN * vbcLimited;
+        gbcn += ctx.cktGmin;
+        cbcn += ctx.cktGmin * vbcLimited;
 
         // bjtload.c:495-517: base charge qb (NKF=0.5  sqrt branch).
         const q1 = 1 / (1 - tinvEarlyVoltF * vbcLimited - tinvEarlyVoltR * vbeLimited);
@@ -946,7 +943,7 @@ function _createBjtElementWithPolarity(
       // ceqsub = polarity * subs * (state0[cqsub] + cdsub - vsub*geqsub) = 0
       // when csubsat=0 (cdsub = CKTgmin*vsub, the term cancels exactly).
       solver.stampElement(this._hCPCP, m * (gmu + go));        // bjtload.c:822
-      solver.stampElement(this._hSCSC, m * GMIN);              // bjtload.c:823 (geqsub = gdsub = GMIN)
+      solver.stampElement(this._hSCSC, m * ctx.cktGmin);       // bjtload.c:823 (geqsub = gdsub = CKTgmin)
       solver.stampElement(this._hBPBP, m * (gpi + gmu));       // bjtload.c:824
       solver.stampElement(this._hEPEP, m * (gpi + gm + go));   // bjtload.c:825
       solver.stampElement(this._hCPBP, m * (-gmu + gm));       // bjtload.c:830
@@ -1629,8 +1626,8 @@ export function createSpiceL1BjtElement(
           gben = c2 * 3 * a / vbeLimited;
         }
         // bjtload.c:447-448
-        gben += GMIN;
-        cben += GMIN * vbeLimited;
+        gben += ctx.cktGmin;
+        cben += ctx.cktGmin * vbeLimited;
 
         // bjtload.c:452-461: reverse B-C junction current + conductance.
         let cbc: number, gbc: number;
@@ -1659,8 +1656,8 @@ export function createSpiceL1BjtElement(
           gbcn = c4 * 3 * a / vbcLimited;
         }
         // bjtload.c:477-478
-        gbcn += GMIN;
-        cbcn += GMIN * vbcLimited;
+        gbcn += ctx.cktGmin;
+        cbcn += ctx.cktGmin * vbcLimited;
 
         // bjtload.c:482-491: substrate junction current/conductance (L1 only).
         const vts = vt * params.NS;
@@ -1668,19 +1665,19 @@ export function createSpiceL1BjtElement(
           if (vsubLimited <= -3 * vts) {
             let a = 3 * vts / (vsubLimited * Math.E);
             a = a * a * a;
-            gdsub = csubsat * 3 * a / vsubLimited + GMIN;
-            cdsub = -csubsat * (1 + a) + GMIN * vsubLimited;
+            gdsub = csubsat * 3 * a / vsubLimited + ctx.cktGmin;
+            cdsub = -csubsat * (1 + a) + ctx.cktGmin * vsubLimited;
           } else {
             // bjtload.c:488: exp arg clamped to MAX_EXP_ARG to prevent overflow
             // on paths (MODEINITSMSIG/MODEINITTRAN) that bypass pnjlim.
             const MAX_EXP_ARG = 709;
             const evsub = Math.exp(Math.min(MAX_EXP_ARG, vsubLimited / vts));
-            gdsub = csubsat * evsub / vts + GMIN;
-            cdsub = csubsat * (evsub - 1) + GMIN * vsubLimited;
+            gdsub = csubsat * evsub / vts + ctx.cktGmin;
+            cdsub = csubsat * (evsub - 1) + ctx.cktGmin * vsubLimited;
           }
         } else {
-          gdsub = GMIN;
-          cdsub = GMIN * vsubLimited;
+          gdsub = ctx.cktGmin;
+          cdsub = ctx.cktGmin * vsubLimited;
         }
 
         // bjtload.c:495-517: base charge qb. Default NKF (0.5)  sqrt branch;

@@ -65,9 +65,6 @@ const CHARGE = 1.6021918e-19;
 const CONSTKoverQ = CONSTboltz / CHARGE;
 const REFTEMP = 300.15;
 
-/** Minimum conductance for numerical stability (GMIN). */
-const GMIN = 1e-12;
-
 // ---------------------------------------------------------------------------
 // State schemas
 // ---------------------------------------------------------------------------
@@ -748,12 +745,12 @@ export function createDiodeElement(
           const ikf_area_m = params.IKF;
           const sqrt_ikf = Math.sqrt(cd / ikf_area_m);
           gd = ((1 + sqrt_ikf) * gd - cd * gd / (2 * sqrt_ikf * ikf_area_m)) /
-               (1 + 2 * sqrt_ikf + cd / ikf_area_m) + GMIN;
-          cd = cd / (1 + sqrt_ikf) + GMIN * vdLimited;
+               (1 + 2 * sqrt_ikf + cd / ikf_area_m) + ctx.cktGmin;
+          cd = cd / (1 + sqrt_ikf) + ctx.cktGmin * vdLimited;
         } else {
           // cite: dioload.c:298-299
-          gd = gd + GMIN;
-          cd = cd + GMIN * vdLimited;
+          gd = gd + ctx.cktGmin;
+          cd = cd + ctx.cktGmin * vdLimited;
         }
       } else {
         // cite: dioload.c:302  reverse region
@@ -762,12 +759,12 @@ export function createDiodeElement(
           const ikr_area_m = params.IKR;
           const sqrt_ikr = Math.sqrt(cd / (-ikr_area_m));
           gd = ((1 + sqrt_ikr) * gd + cd * gd / (2 * sqrt_ikr * ikr_area_m)) /
-               (1 + 2 * sqrt_ikr - cd / ikr_area_m) + GMIN;
-          cd = cd / (1 + sqrt_ikr) + GMIN * vdLimited;
+               (1 + 2 * sqrt_ikr - cd / ikr_area_m) + ctx.cktGmin;
+          cd = cd / (1 + sqrt_ikr) + ctx.cktGmin * vdLimited;
         } else {
           // cite: dioload.c:310-311
-          gd = gd + GMIN;
-          cd = cd + GMIN * vdLimited;
+          gd = gd + ctx.cktGmin;
+          cd = cd + ctx.cktGmin * vdLimited;
         }
       }
 
