@@ -338,15 +338,30 @@ describe("harness integration", () => {
     engine.stepPhaseHook = null;
     engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit, 3), steps: capture.getSteps() };
-    // Node 2 is the diode anode- it changes between NR iterations as the nonlinear diode converges.
-    const result = findLargestDelta(session, 2);
+
+    // The diode anode is the nonlinear hot spot — its voltage moves the most
+    // between NR iterations. Look it up from the compiled topology rather
+    // than hardcoding a node index, since compiler-side node-ID assignment
+    // is not part of this test's contract.
+    let diodeIdx = -1;
+    for (let i = 0; i < circuit.elements.length; i++) {
+      if (circuit.elementToCircuitElement.get(i)?.typeId === "Diode") {
+        diodeIdx = i;
+        break;
+      }
+    }
+    expect(diodeIdx).toBeGreaterThanOrEqual(0);
+    const diodeAnodeNode = circuit.elements[diodeIdx].pinNodes.get("A");
+    expect(diodeAnodeNode).toBeDefined();
+
+    const result = findLargestDelta(session, diodeAnodeNode!);
     expect(result).not.toBeNull();
     // stepIndex must be 0 (only one step- DCOP)
     expect(result!.stepIndex).toBe(0);
     // iterationIndex must be 0 (largest delta is always on the first NR iteration from zero initial conditions)
     expect(result!.iterationIndex).toBe(0);
-    // Node 2 (diode anode) starts at 0V; first iteration drives it toward the diode drop (~0.6â€“0.7V),
-    // so the largest delta is in the range (0, 5].
+    // The diode anode starts at 0V; first iteration drives it toward the
+    // diode drop (~0.6–0.7V), so the largest delta is in the range (0, 5].
     expect(result!.delta).toBeGreaterThan(0);
     expect(result!.delta).toBeLessThanOrEqual(5.0);
   });

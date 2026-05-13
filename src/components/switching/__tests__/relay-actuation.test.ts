@@ -9,7 +9,7 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { createDefaultRegistry } from "../../register-all.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { SwitchAnalogElement, SWITCH_SCHEMA } from "../switch.js";
+import { CurrentControlledSwitchAnalogElement, CSW_SCHEMA } from "../current-controlled-switch.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
@@ -38,7 +38,7 @@ const DTS_DE_ENERGISED = path.resolve(
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SLOT_CLOSED = SWITCH_SCHEMA.indexOf.get("CLOSED")!;
+const SLOT_CLOSED = CSW_SCHEMA.indexOf.get("CLOSED")!;
 
 function digital(value: number): SignalValue {
   return { type: "digital", value };
@@ -57,15 +57,15 @@ function ceByLabel(fix: Fixture, label: string): CircuitElement {
   throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
-/** Locate the Switch sub-element inside the expanded relay composite. */
-function findContactSwitch(fix: Fixture): SwitchAnalogElement {
+/** Locate the CurrentControlledSwitch sub-element inside the expanded relay composite. */
+function findContactSwitch(fix: Fixture): CurrentControlledSwitchAnalogElement {
   for (const el of fix.circuit.elements) {
-    if (el instanceof SwitchAnalogElement && el.label === "relay:contactSW") {
+    if (el instanceof CurrentControlledSwitchAnalogElement && el.label === "relay:contactSW") {
       return el;
     }
   }
   throw new Error(
-    "relay:contactSW SwitchAnalogElement not found in compiled circuit; " +
+    "relay:contactSW CurrentControlledSwitchAnalogElement not found in compiled circuit; " +
       "the Relay netlist composite did not expand correctly.",
   );
 }

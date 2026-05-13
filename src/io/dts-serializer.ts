@@ -232,9 +232,6 @@ function serializeModelEntry(entry: ModelEntry): DtsSerializedModelEntry {
   if (entry.kind === 'inline') {
     return { kind: 'inline', params: encodeModelParams(entry.params) as Record<string, number> };
   }
-  if (entry.kind !== 'netlist') {
-    return { kind: 'inline', params: encodeModelParams(entry.params) as Record<string, number> };
-  }
   const rawNetlist = entry.netlist;
   let resolvedNetlist;
   if (typeof rawNetlist === 'function') {

@@ -1,9 +1,9 @@
 {
   "circuit": {
-    "description": "Relay de-energised regime: both coil terminals tied to ground, I_coil=0A < dropOutI=0.02A; contact stays OPEN. vTest=1V probes the contact loop through rLoad=100Ohm; with contact OPEN (Roff=1e9) the A1/B1 net sits near 0V (rLoad/Roff divider).",
+    "description": "Relay de-energised regime: both coil terminals tied to ground, I_coil=0A < dropOutI=0.02A; contact stays OPEN.",
     "elements": [
       {
-        "id": "4eb71755-ce8c-45fa-b9bd-364728f587df",
+        "id": "737c82ef-fa61-400c-9db1-6fc37919ef0e",
         "position": {
           "x": 0,
           "y": 3
@@ -23,7 +23,7 @@
         "type": "DcVoltageSource"
       },
       {
-        "id": "d1f71190-737a-4fda-ab8d-66d0ae0f7a0b",
+        "id": "863be630-5fc0-44dc-a254-07e82293f0e5",
         "position": {
           "x": 32,
           "y": 3
@@ -43,7 +43,7 @@
         "type": "Resistor"
       },
       {
-        "id": "6186d834-8103-4345-abad-13d098490273",
+        "id": "07ab29c1-74e1-4aa3-a6bd-a340c14603e8",
         "position": {
           "x": 22,
           "y": 4
@@ -60,7 +60,7 @@
         "type": "Relay"
       },
       {
-        "id": "83b47d9f-2552-4089-b1b2-f7ac8a67ac3a",
+        "id": "19725994-2d2f-461b-80ce-ddef8ed70a5c",
         "position": {
           "x": 12,
           "y": 2
@@ -146,7 +146,7 @@
           },
           {
             "x": 12,
-            "y": 1
+            "y": 0
           }
         ]
       },
@@ -166,22 +166,22 @@
         "points": [
           {
             "x": 12,
-            "y": 1
+            "y": 0
           },
           {
-            "x": 19,
-            "y": 1
+            "x": 26,
+            "y": 0
           }
         ]
       },
       {
         "points": [
           {
-            "x": 19,
-            "y": 1
+            "x": 26,
+            "y": 0
           },
           {
-            "x": 19,
+            "x": 26,
             "y": 2
           }
         ]
@@ -189,7 +189,7 @@
       {
         "points": [
           {
-            "x": 19,
+            "x": 26,
             "y": 2
           },
           {
@@ -278,7 +278,7 @@
           },
           {
             "x": 12,
-            "y": 1
+            "y": -1
           }
         ]
       },
@@ -326,7 +326,7 @@
           },
           {
             "x": 10,
-            "y": 1
+            "y": -1
           }
         ]
       },
@@ -334,11 +334,11 @@
         "points": [
           {
             "x": 10,
-            "y": 1
+            "y": -1
           },
           {
             "x": 12,
-            "y": 1
+            "y": -1
           }
         ]
       },
@@ -373,7 +373,7 @@
             "y": 4
           },
           {
-            "x": 26,
+            "x": 27,
             "y": 4
           }
         ]
@@ -381,11 +381,11 @@
       {
         "points": [
           {
-            "x": 26,
+            "x": 27,
             "y": 4
           },
           {
-            "x": 26,
+            "x": 27,
             "y": -1
           }
         ]
@@ -393,7 +393,7 @@
       {
         "points": [
           {
-            "x": 26,
+            "x": 27,
             "y": -1
           },
           {
@@ -446,7 +446,7 @@
           },
           {
             "x": 12,
-            "y": 1
+            "y": -2
           }
         ]
       },
@@ -470,7 +470,7 @@
           },
           {
             "x": -2,
-            "y": 1
+            "y": -2
           }
         ]
       },
@@ -478,11 +478,11 @@
         "points": [
           {
             "x": -2,
-            "y": 1
+            "y": -2
           },
           {
             "x": 12,
-            "y": 1
+            "y": -2
           }
         ]
       }

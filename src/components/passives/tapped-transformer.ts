@@ -181,7 +181,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
  * Builds the MNA subcircuit netlist for a three-winding center-tapped
  * transformer. Emits three Inductor leaves (L1, L2, L3) and one
  * MutualInductor element that stamps the mutual-inductance terms
- * across the coil branch indices resolved via siblingBranch.
+ * across the coil branch indices resolved via `{ kind: "ref", name }`.
  *
  * Port order: P1=0, P2=1, S1=2, CT=3, S2=4 (no internal nets).
  *
@@ -236,8 +236,8 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         subElementName: "MUT12",
         params: {
           K: couplingCoefficient,
-          L1_branch: { kind: "siblingBranch", subElementName: "L1" },
-          L2_branch: { kind: "siblingBranch", subElementName: "L2" },
+          L1_branch: { kind: "ref", name: "L1" },
+          L2_branch: { kind: "ref", name: "L2" },
         },
       },
       {
@@ -246,8 +246,8 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         subElementName: "MUT13",
         params: {
           K: couplingCoefficient,
-          L1_branch: { kind: "siblingBranch", subElementName: "L1" },
-          L2_branch: { kind: "siblingBranch", subElementName: "L3" },
+          L1_branch: { kind: "ref", name: "L1" },
+          L2_branch: { kind: "ref", name: "L3" },
         },
       },
       {
@@ -256,8 +256,8 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         subElementName: "MUT23",
         params: {
           K: couplingCoefficient,
-          L1_branch: { kind: "siblingBranch", subElementName: "L2" },
-          L2_branch: { kind: "siblingBranch", subElementName: "L3" },
+          L1_branch: { kind: "ref", name: "L2" },
+          L2_branch: { kind: "ref", name: "L3" },
         },
       },
     ],

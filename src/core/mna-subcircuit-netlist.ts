@@ -1,13 +1,17 @@
 /**
- * Sub-element parameter value. CLOSED 3-arm union- no other shapes permitted.
+ * Sub-element parameter value. CLOSED 3-arm union — no other shapes permitted.
  *
  * - `number`: literal scalar (resistance, capacitance, gain, flag-as-0/1).
  * - `string`: lookup key into the enclosing subcircuit's `params` map; the
  *   compiler resolves it to a `number` at netlist-instantiation time.
- * - `siblingBranch`: cross-leaf branch reference (resolves to a branch index;
- *   ngspice F/H controlled-source VNAME analogue). The compiler resolves these
- *   to a concrete branch index so StatePool rollback semantics are preserved
- *   across NR retries and LTE rejections.
+ * - `{ kind: "ref"; name }`: reference to a peer sub-element by its
+ *   `subElementName`. The compiler resolves this to the flattened label string
+ *   `${parentLabel}:${name}` and writes it into the regular property partition.
+ *   The element's setup() then uses that string with `ctx.findBranch` /
+ *   `ctx.findDevice` (the ngspice CKTfndBranch / CKTfndDev analogues) to
+ *   resolve a branch index or peer AnalogElement at runtime. Used by CSW
+ *   (W-element ctrlBranch), CCCS/CCVS (F/H-element sense source), and MUT
+ *   (K-element L1/L2 coupling).
  *
  * **Flags / booleans MUST be encoded as `0`/`1` numbers**, matching ngspice's
  * `IFvalue.iValue` convention (booleans are ints in the device-param ABI).
@@ -18,16 +22,16 @@
 export type SubcircuitElementParam =
   | number
   | string
-  | { kind: "siblingBranch"; subElementName: string };
+  | { kind: "ref"; name: string };
 
 export interface SubcircuitElement {
   /** Component type (NMOS, PMOS, Resistor, Diode, etc.) */
   typeId: string;
   /** Named .MODEL reference- resolved at compile time. */
   modelRef?: string;
-  /** Stable name used by sibling-coupling references (`siblingBranch`). */
+  /** Stable name used by peer-element references (`{ kind: "ref", name }`). */
   subElementName?: string;
-  /** Element-level parameter overrides. String values reference subcircuit params by name; object values are cross-leaf coupling refs. */
+  /** Element-level parameter overrides. String values reference subcircuit params by name; `{ kind: "ref" }` values are cross-leaf references. */
   params?: Record<string, SubcircuitElementParam>;
   /** Number of MNA branch rows this element contributes (voltage sources, inductors = 1; MOSFETs, BJTs, resistors = 0). Defaults to 0. */
   branchCount?: number;

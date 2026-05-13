@@ -71,6 +71,7 @@ describe("ngspiceLoadOrder per-factory ordinals", () => {
     expect(NGSPICE_LOAD_ORDER.CAP).toBe(17);
     expect(NGSPICE_LOAD_ORDER.CCCS).toBe(18);
     expect(NGSPICE_LOAD_ORDER.CCVS).toBe(19);
+    expect(NGSPICE_LOAD_ORDER.CSW).toBe(21);
     expect(NGSPICE_LOAD_ORDER.DIO).toBe(22);
     expect(NGSPICE_LOAD_ORDER.IND).toBe(27);
     expect(NGSPICE_LOAD_ORDER.MUT).toBe(28);

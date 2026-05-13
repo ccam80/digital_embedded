@@ -1,9 +1,9 @@
 {
   "circuit": {
-    "description": "Relay pull-in regime: vSrc=10V across the 100Ohm coil drives I_coil=0.1A > pullInI=0.05A; contact closes. vTest=1V probes the contact loop through rLoad=100Ohm so the A1/B1 net is not floating.",
+    "description": "Relay pull-in regime: vSrc=10V across the 100Ohm coil drives I_coil=0.1A > pullInI=0.05A; contact closes.",
     "elements": [
       {
-        "id": "e8796867-3e49-4e0e-887d-b0ae26073549",
+        "id": "9be330ca-a874-4e8b-b44a-3858e2198cfc",
         "position": {
           "x": 0,
           "y": 6
@@ -23,7 +23,7 @@
         "type": "DcVoltageSource"
       },
       {
-        "id": "ce5e9cb0-cf33-4b0e-becc-d19594b25b35",
+        "id": "9e0aff6d-d968-480e-835f-cdde764824a6",
         "position": {
           "x": 22,
           "y": 0
@@ -43,7 +43,7 @@
         "type": "DcVoltageSource"
       },
       {
-        "id": "8876e212-a267-42c6-ae54-00ceaddd6325",
+        "id": "a2e50ff0-ca77-496e-8c31-585d1a4bb46e",
         "position": {
           "x": 22,
           "y": 5
@@ -63,7 +63,7 @@
         "type": "Resistor"
       },
       {
-        "id": "e7e7bba2-d880-469c-8504-54e4f603083b",
+        "id": "cba401e9-1a8f-4194-99ce-4bf8382e6b99",
         "position": {
           "x": 12,
           "y": 4
@@ -80,7 +80,7 @@
         "type": "Relay"
       },
       {
-        "id": "6a26a16b-3d99-4233-ab6f-356ba082f7f2",
+        "id": "8803b59e-2eca-461b-9434-2468b7d379e2",
         "position": {
           "x": 34,
           "y": 6
@@ -298,7 +298,7 @@
           },
           {
             "x": 34,
-            "y": 5
+            "y": 4
           }
         ]
       },
@@ -318,11 +318,11 @@
         "points": [
           {
             "x": 34,
-            "y": 5
+            "y": 4
           },
           {
             "x": 36,
-            "y": 5
+            "y": 4
           }
         ]
       },
@@ -330,7 +330,7 @@
         "points": [
           {
             "x": 36,
-            "y": 5
+            "y": 4
           },
           {
             "x": 36,
@@ -345,7 +345,7 @@
             "y": -3
           },
           {
-            "x": 12,
+            "x": 13,
             "y": -3
           }
         ]
@@ -353,11 +353,11 @@
       {
         "points": [
           {
-            "x": 12,
+            "x": 13,
             "y": -3
           },
           {
-            "x": 12,
+            "x": 13,
             "y": 2
           }
         ]
@@ -365,7 +365,7 @@
       {
         "points": [
           {
-            "x": 12,
+            "x": 13,
             "y": 2
           },
           {
@@ -454,7 +454,7 @@
           },
           {
             "x": 34,
-            "y": 5
+            "y": 3
           }
         ]
       },
@@ -465,8 +465,32 @@
             "y": 5
           },
           {
-            "x": 34,
+            "x": 31,
             "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 5
+          },
+          {
+            "x": 31,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 3
+          },
+          {
+            "x": 34,
+            "y": 3
           }
         ]
       },
@@ -537,7 +561,7 @@
             "y": 0
           },
           {
-            "x": 21,
+            "x": 20,
             "y": 0
           }
         ]
@@ -550,43 +574,31 @@
           },
           {
             "x": 34,
-            "y": 5
+            "y": 2
           }
         ]
       },
       {
         "points": [
           {
-            "x": 21,
+            "x": 20,
             "y": 0
           },
           {
-            "x": 28,
-            "y": 0
+            "x": 20,
+            "y": 2
           }
         ]
       },
       {
         "points": [
           {
-            "x": 28,
-            "y": 0
-          },
-          {
-            "x": 28,
-            "y": 5
-          }
-        ]
-      },
-      {
-        "points": [
-          {
-            "x": 28,
-            "y": 5
+            "x": 20,
+            "y": 2
           },
           {
             "x": 34,
-            "y": 5
+            "y": 2
           }
         ]
       }

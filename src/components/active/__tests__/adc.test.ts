@@ -85,7 +85,7 @@ function readLatchedCode(fix: ReturnType<typeof buildFixture>): number {
 
 function readEocActive(fix: ReturnType<typeof buildFixture>): boolean {
   const drv = findDriver(fix.circuit.elements);
-  const slot = drv.stateSchema.indexOf.get("OUTPUT_EOC")!;
+  const slot = drv.stateSchema.indexOf.get("EOC_LATCH")!;
   return fix.pool.state0[drv._stateBase + slot] !== 0;
 }
 
@@ -106,9 +106,9 @@ describe("ADC initialization (T1)", () => {
   it("init_state_pool_post_warm_start", () => {
     // After buildFixture's warm-start, the ADCDriver's PREV_CLK slot should
     // hold the warm-started clock voltage (CLK source at 0V → 0V), FSM_PHASE
-    // should still be 0 (idle), OUTPUT_CODE should be 0, OUTPUT_EOC 0, every
-    // OUTPUT_D{i} 0. The first sample suppresses any spurious rising-edge
-    // detection so no FSM advance has happened yet.
+    // should still be 0 (idle), OUTPUT_CODE should be 0, EOC_LATCH 0, SAR_BITS 0.
+    // The first sample suppresses any spurious rising-edge detection so no FSM
+    // advance has happened yet.
     const fix = buildFixture({
       build: (_r, facade) => buildAdcCircuit(facade, { vIn: V_REF / 2, vRef: V_REF }),
     });
@@ -118,15 +118,14 @@ describe("ADC initialization (T1)", () => {
     const base = drv._stateBase;
     const fsm = fix.pool.state0[base + sch.indexOf.get("FSM_PHASE")!];
     const code = fix.pool.state0[base + sch.indexOf.get("OUTPUT_CODE")!];
-    const eoc = fix.pool.state0[base + sch.indexOf.get("OUTPUT_EOC")!];
+    const eoc = fix.pool.state0[base + sch.indexOf.get("EOC_LATCH")!];
 
     expect(fsm).toBe(0);   // idle
     expect(code).toBe(0);  // no edge yet → no latched code
     expect(eoc).toBe(0);   // EOC inactive
-    for (let i = 0; i < BITS; i++) {
-      const d = fix.pool.state0[base + sch.indexOf.get(`OUTPUT_D${i}`)!];
-      expect(d).toBe(0);
-    }
+    // SAR_BITS zeroed on warm-start (no conversion has fired).
+    const sarBits = fix.pool.state0[base + sch.indexOf.get("SAR_BITS")!];
+    expect(sarBits).toBe(0);
 
     // VIN node should sit at the source's 2.5V (voltage divider through the
     // analog input impedance is dominated by rIn=10MΩ vs the source's ideal

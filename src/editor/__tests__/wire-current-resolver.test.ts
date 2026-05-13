@@ -28,7 +28,20 @@ function ctxOf(coordinator: DefaultSimulationCoordinator): CurrentResolverContex
   return ctx;
 }
 
-/** All wires belonging to the MNA node containing the given component pin. */
+/**
+ * Wires whose start or end endpoint coincides with the pin's world position.
+ *
+ * For a pin with a single wire terminating at its coordinate (the routine case
+ * — a stub from the auto-router), this returns exactly one wire. When two
+ * wires meet at the pin endpoint (a T-junction routed onto the pin), it
+ * returns both. The downstream KCL assertion uses `adj.length === 1` to
+ * gate "non-junction pin" — meaning a single wire enters here, so the wire
+ * current must equal the element current by KCL.
+ *
+ * (Note: this is intentionally narrower than "all wires on the same MNA
+ * node" — most pins live on multi-segment nets, but only the segment(s)
+ * actually touching the pin endpoint matter for the KCL gate.)
+ */
 function wiresAtPin(
   circuit: ConcreteCompiledAnalogCircuit,
   allWires: readonly Wire[],
@@ -38,23 +51,19 @@ function wiresAtPin(
   const pin = ce.getPins().find((p) => p.label === pinLabel);
   if (!pin) throw new Error(`pin ${pinLabel} not found on ${ce.instanceId}`);
   const pos = pinWorldPosition(ce, pin);
-  // The pin's node is whichever wire endpoint matches its world position.
-  let nodeId: number | undefined;
+  const touching: Wire[] = [];
   for (const w of allWires) {
-    const id = circuit.wireToNodeId.get(w);
-    if (id === undefined) continue;
-    if (
-      (Math.abs(w.start.x - pos.x) < 0.5 && Math.abs(w.start.y - pos.y) < 0.5) ||
-      (Math.abs(w.end.x - pos.x) < 0.5 && Math.abs(w.end.y - pos.y) < 0.5)
-    ) {
-      nodeId = id;
-      break;
-    }
+    if (circuit.wireToNodeId.get(w) === undefined) continue;
+    const startMatch =
+      Math.abs(w.start.x - pos.x) < 0.5 && Math.abs(w.start.y - pos.y) < 0.5;
+    const endMatch =
+      Math.abs(w.end.x - pos.x) < 0.5 && Math.abs(w.end.y - pos.y) < 0.5;
+    if (startMatch || endMatch) touching.push(w);
   }
-  if (nodeId === undefined) {
-    throw new Error(`no wire-mapped node found at pin ${ce.instanceId}:${pinLabel}`);
+  if (touching.length === 0) {
+    throw new Error(`no wire terminates at pin ${ce.instanceId}:${pinLabel}`);
   }
-  return allWires.filter((w) => circuit.wireToNodeId.get(w) === nodeId);
+  return touching;
 }
 
 /** Find the visual CircuitElement for a given component label. */
@@ -384,16 +393,23 @@ describe("WireCurrentResolver - AC transient RLC", () => {
 
 describe("WireCurrentResolver - RLC .dts real fixture", () => {
   it("non-junction pin wires carry the adjacent element's current", () => {
-    // The in-tree rlc-transient.dts fixture exercises the full deserialize ->
-    // compile path. The resolver must produce per-wire currents that match
-    // each element's current at non-junction pin vertices.
+    // The in-tree rlc-harness.dts fixture (5 kHz square-wave AC source driving
+    // R=50, L=1mH, C=100nF) exercises the full deserialize -> compile path
+    // and gives non-zero transient current to measure. A series-DC RLC fixture
+    // wouldn't work here — buildFixture warm-starts at DCOP where the cap
+    // blocks the loop, and "settling" past a zero never produces current.
+    //
+    // The first square-wave edge is at t = T/2 = 100 µs. We sample at 100.5 µs
+    // — 500 ns past the edge, when the cap is mid-discharge through R-L and
+    // every element in the loop carries the same physical current (no shunts).
+    // RC time constant is R*C = 5 µs, so at 100 ns past the edge the current
+    // is still close to its peak.
     const fix = buildFixture({
-      dtsPath: "fixtures/rlc-transient.dts",
-      params: { tStop: 0.001, maxTimeStep: 1e-5 },
+      dtsPath: "fixtures/rlc-harness.dts",
+      params: { tStop: 1e-3, maxTimeStep: 1e-6 },
     });
 
-    // Settle past the initial transient.
-    const settleTime = 1e-4;
+    const settleTime = 100.5e-6;
     let steps = 0;
     while ((fix.coordinator.simTime ?? 0) < settleTime && steps < 100_000) {
       fix.coordinator.step();

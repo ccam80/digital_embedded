@@ -22,9 +22,66 @@
  *   npm test -q src/solver/analog            # vitest only, path filter
  *   npm test -q e2e/gui/tutorial.spec.ts     # playwright only, path filter
  */
-import { spawnSync } from 'child_process';
+import { spawnSync, spawn } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { dirname, resolve } from 'path';
+
+// Sentinels emitted by scripts/vitest-compact-reporter.ts when
+// VITEST_TAG_OUTPUT=1. Lines that don't carry one of these prefixes are
+// dropped: that's how we hide ngspice DLL writes that bypass koffi's
+// SendChar callback and land directly on the worker's fd 1 / fd 2.
+const HB_PREFIX = '\x01H';
+const LN_PREFIX = '\x01L';
+
+function createOutputFilter(out) {
+  let buf = '';
+  return {
+    write(chunk) {
+      buf += chunk.toString();
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (line.startsWith(HB_PREFIX)) {
+          out.write(line.slice(HB_PREFIX.length));
+        } else if (line.startsWith(LN_PREFIX)) {
+          out.write(line.slice(LN_PREFIX.length) + '\n');
+        }
+        // else: untagged (ngspice, vitest internal, etc.) → drop
+      }
+    },
+    flush() {
+      if (buf.startsWith(HB_PREFIX)) out.write(buf.slice(HB_PREFIX.length));
+      else if (buf.startsWith(LN_PREFIX)) out.write(buf.slice(LN_PREFIX.length));
+      buf = '';
+    },
+  };
+}
+
+function runVitestFiltered(argv, spawnOpts, suiteTimeoutMs) {
+  return new Promise(resolveP => {
+    const child = spawn('npx', argv, spawnOpts);
+    const stdoutFilter = createOutputFilter(process.stdout);
+    const stderrFilter = createOutputFilter(process.stderr);
+    child.stdout.on('data', d => stdoutFilter.write(d));
+    child.stderr.on('data', d => stderrFilter.write(d));
+
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, suiteTimeoutMs);
+
+    child.on('exit', code => {
+      clearTimeout(timer);
+      stdoutFilter.flush();
+      stderrFilter.flush();
+      const error = timedOut ? Object.assign(new Error('Timed out'), { code: 'ETIMEDOUT' }) : null;
+      resolveP({ status: code, error });
+    });
+    child.on('error', err => {
+      clearTimeout(timer);
+      resolveP({ status: null, error: err });
+    });
+  });
+}
 
 const args = process.argv.slice(2);
 
@@ -65,13 +122,11 @@ const suiteTimeoutMs = suiteTimeoutSeconds * 1000;
 let vitest = null;
 if (runVitest) {
   const vitestArgv = ['vitest', 'run', `--test-timeout=${perTestTimeoutMs}`, ...vitestFilters];
-  vitest = spawnSync('npx', vitestArgv, {
-    stdio: 'inherit',
+  vitest = await runVitestFiltered(vitestArgv, {
+    stdio: ['inherit', 'pipe', 'pipe'],
     shell: true,
-    env,
-    timeout: suiteTimeoutMs,
-    killSignal: 'SIGKILL',
-  });
+    env: { ...env, VITEST_TAG_OUTPUT: '1' },
+  }, suiteTimeoutMs);
   if (vitest.error && vitest.error.code === 'ETIMEDOUT') {
     console.error(`[run-all-tests] vitest exceeded ${suiteTimeoutSeconds}s wall-clock timeout and was killed.`);
   }

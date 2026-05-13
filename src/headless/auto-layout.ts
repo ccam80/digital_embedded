@@ -786,21 +786,16 @@ function applyLayout(g: Graph, circuit: Circuit): void {
     layoutMaxY = Math.max(layoutMaxY, box.b);
   }
 
-  // Pin-coordinate index used to forbid Z-route corners from landing on
+  // Pin-coordinate index used to forbid route corners from landing on
   // foreign pins (which would create accidental electrical junctions in the
   // wire-graph position-merge connectivity path, and visually misleading
   // joins under spec-authoritative connectivity).
-  const pinPositionsByElement = new Map<string, Set<string>>();
   const allPinPositions = new Set<string>();
   for (const el of circuit.elements) {
-    const set = new Set<string>();
     for (const pin of el.getPins()) {
       const wp = pinWorldPosition(el, pin);
-      const key = `${wp.x},${wp.y}`;
-      set.add(key);
-      allPinPositions.add(key);
+      allPinPositions.add(`${wp.x},${wp.y}`);
     }
-    pinPositionsByElement.set(el.instanceId, set);
   }
 
   // Clear all wires
@@ -817,7 +812,16 @@ function applyLayout(g: Graph, circuit: Circuit): void {
   // Cumulative set of all wire endpoints emitted in this layout pass.
   // Subsequent connections treat these as forbidden corner positions so
   // their Z-route bends don't land on earlier connections' wire vertices.
+  // (Wire-graph net union in extract-connectivity.ts links wires by shared
+  // endpoint position only — interior points are not joined — so endpoint
+  // tracking is the necessary and sufficient invariant.)
   const emittedEndpoints = new Set<string>();
+
+  // Escape-channel allocator: when a Z-route cannot find a clean corner
+  // within the layout envelope, we route through a y-coordinate above
+  // layoutMaxY. Each escape gets its own y so escape corners themselves
+  // never collide.
+  const escapeState = { nextEscapeY: layoutMaxY + 5 };
 
   // Route each connection
   for (const conn of g.conns) {
@@ -833,13 +837,14 @@ function applyLayout(g: Graph, circuit: Circuit): void {
     const to = pinWorldPosition(dstEl, dstPin);
 
     // Build the per-connection forbidden-corner set: foreign pin positions
-    // plus all wire endpoints emitted so far, minus the current connection's
-    // own src/dst element pin positions (those are legitimate landing spots).
+    // plus all wire endpoints emitted so far, minus the two specific pins
+    // this connection terminates at. Only the connection's own from/to pin
+    // coordinates are legitimate landing spots — sibling pins on the same
+    // element belong to other nets, so landing a route corner on them would
+    // unify two distinct nets at wire-graph load time.
     const ownPins = new Set<string>();
-    const srcPinSet = pinPositionsByElement.get(conn.srcId);
-    const dstPinSet = pinPositionsByElement.get(conn.dstId);
-    if (srcPinSet) for (const k of srcPinSet) ownPins.add(k);
-    if (dstPinSet) for (const k of dstPinSet) ownPins.add(k);
+    ownPins.add(`${from.x},${from.y}`);
+    ownPins.add(`${to.x},${to.y}`);
     const forbiddenCorners = new Set<string>();
     for (const k of allPinPositions) if (!ownPins.has(k)) forbiddenCorners.add(k);
     for (const k of emittedEndpoints) if (!ownPins.has(k)) forbiddenCorners.add(k);
@@ -849,16 +854,13 @@ function applyLayout(g: Graph, circuit: Circuit): void {
     // Compute stub points: extend PIN_STUB grid units in the pin's exit
     // direction before any dogleg.  This guarantees that top/bottom pins
     // start with a vertical segment and left/right pins start horizontal.
+    // Extend further if the natural stub endpoint lands on a forbidden corner
+    // (foreign pin or prior wire vertex) — coincident-endpoint emission would
+    // unify two distinct nets at wire-graph load time.
     const srcDir = pinExitDelta(srcEl, srcPin);
     const dstDir = pinExitDelta(dstEl, dstPin);
-    const fromStub = {
-      x: from.x + srcDir.dx * PIN_STUB,
-      y: from.y + srcDir.dy * PIN_STUB,
-    };
-    const toStub = {
-      x: to.x + dstDir.dx * PIN_STUB,
-      y: to.y + dstDir.dy * PIN_STUB,
-    };
+    const fromStub = stubEndpoint(from, srcDir, forbiddenCorners);
+    const toStub = stubEndpoint(to, dstDir, forbiddenCorners);
 
     // Emit pin-to-stub wires (straight extension from pin)
     pushWire(circuit, from, fromStub);
@@ -879,8 +881,27 @@ function applyLayout(g: Graph, circuit: Circuit): void {
         feedbackAboveCount++;
       }
 
-      const exitX = Math.max(fromStub.x, from.x + FEEDBACK_EXIT);
-      const entryX = Math.min(toStub.x, to.x - FEEDBACK_EXIT);
+      // The four corner positions a feedback route lands on:
+      //   (exitX, fromStub.y), (exitX, routeY),
+      //   (entryX, routeY),    (entryX, toStub.y).
+      // routeY is in the escape envelope (outside layout extents) so its
+      // corners are intrinsically clean. The source-row and dest-row corners
+      // — (exitX, fromStub.y) and (entryX, toStub.y) — can land on foreign
+      // pins or wires, which causes the wire-graph union in
+      // extract-connectivity.ts to fuse distinct nets. Search a corner-clean
+      // exitX/entryX near the natural value before emitting.
+      const exitX = findCornerClearX(
+        Math.max(fromStub.x, from.x + FEEDBACK_EXIT),
+        fromStub.y,
+        routeY,
+        forbiddenCorners,
+      );
+      const entryX = findCornerClearX(
+        Math.min(toStub.x, to.x - FEEDBACK_EXIT),
+        toStub.y,
+        routeY,
+        forbiddenCorners,
+      );
 
       // fromStub → exit column → feedback channel → entry column → toStub
       pushWire(circuit, fromStub, { x: exitX, y: fromStub.y });
@@ -909,6 +930,7 @@ function applyLayout(g: Graph, circuit: Circuit): void {
           boxes,
           usedChannels,
           forbiddenCorners,
+          escapeState,
         );
       }
     }
@@ -933,6 +955,57 @@ function pushWire(
   circuit.wires.push(new Wire(a, b));
 }
 
+/**
+ * Compute the stub endpoint for a pin, extending PIN_STUB units in the pin's
+ * exit direction, then extending further until the endpoint is not at a
+ * forbidden corner (foreign pin or prior wire vertex). A stub endpoint that
+ * coincides with a foreign endpoint would unify two distinct nets at
+ * wire-graph load time (extract-connectivity.ts walks wires linked by shared
+ * endpoint positions), so the stub MUST land on a clean coordinate.
+ */
+function stubEndpoint(
+  pin: { x: number; y: number },
+  dir: { dx: number; dy: number },
+  forbiddenCorners: Set<string>,
+): { x: number; y: number } {
+  for (let k = PIN_STUB; k <= PIN_STUB + 500; k++) {
+    const candidate = { x: pin.x + dir.dx * k, y: pin.y + dir.dy * k };
+    if (!forbiddenCorners.has(`${candidate.x},${candidate.y}`)) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    `auto-layout: no corner-clean stub endpoint within 500 grid units of pin ` +
+    `(${pin.x},${pin.y}) along direction (${dir.dx},${dir.dy}). ` +
+    `forbiddenCorners is unexpectedly dense — investigate before relaxing.`,
+  );
+}
+
+/**
+ * Find a column x near `naturalX` whose corners at `(x, yA)` and `(x, yB)`
+ * are both clean of forbiddenCorners. Used by the feedback path to pick an
+ * exitX/entryX that doesn't land a corner on a foreign pin or wire vertex.
+ */
+function findCornerClearX(
+  naturalX: number,
+  yA: number,
+  yB: number,
+  forbiddenCorners: Set<string>,
+): number {
+  const clear = (x: number): boolean =>
+    !forbiddenCorners.has(`${x},${yA}`) &&
+    !forbiddenCorners.has(`${x},${yB}`);
+  if (clear(naturalX)) return naturalX;
+  for (let off = 1; off <= 500; off++) {
+    if (clear(naturalX + off)) return naturalX + off;
+    if (clear(naturalX - off)) return naturalX - off;
+  }
+  throw new Error(
+    `auto-layout: no corner-clean column within 500 of x=${naturalX} for ` +
+    `rows y=${yA} and y=${yB}. forbiddenCorners is unexpectedly dense.`,
+  );
+}
+
 /** An occupied vertical wire channel: x position with y-span. */
 interface VChannel {
   x: number;
@@ -950,6 +1023,12 @@ interface VChannel {
  * if they would land on a foreign pin or an already-emitted wire
  * vertex (via `forbiddenCorners`).
  */
+/** Mutable escape-channel allocator shared across routeSegmentSafe calls. */
+interface EscapeState {
+  /** Next available escape y-coordinate (above all bodies + prior escapes). */
+  nextEscapeY: number;
+}
+
 function routeSegmentSafe(
   circuit: Circuit,
   a: { x: number; y: number },
@@ -957,6 +1036,7 @@ function routeSegmentSafe(
   boxes: BBox[],
   usedChannels: VChannel[],
   forbiddenCorners: Set<string>,
+  escapeState: EscapeState,
 ): void {
   // --- Aligned vertical ---
   if (a.x === b.x) {
@@ -1023,10 +1103,32 @@ function routeSegmentSafe(
   const yMax = Math.max(a.y, b.y);
   let midX = Math.round((a.x + b.x) / 2);
 
+  // Corner-clearance is the hard invariant: emitting a wire endpoint at the
+  // same coordinate as a foreign-net wire endpoint (or foreign pin) causes
+  // extract-connectivity's wire-graph union to fuse two distinct nets. So
+  // the search MUST find a corner-clean midX — never silently emit a route
+  // that lands on a forbidden corner.
+  //
+  // Three escalating stages narrow constraints in priority order:
+  //   1. Full clearance (channel + body + corner).
+  //   2. Body + corner (channel overlap is purely visual).
+  //   3. Corner-only (body crossings are ugly but don't change topology).
+  //
+  // The natural search range is the layout extent. If none of those stages
+  // finds a clean corner, we escape via a U-route through a y-coordinate
+  // outside the layout envelope, guaranteeing a clean landing.
+  const cornerClear = (m: number): boolean =>
+    !forbiddenCorners.has(`${m},${a.y}`) &&
+    !forbiddenCorners.has(`${m},${b.y}`);
+
+  // Search radius wide enough to enumerate every column in the layout area.
+  // forbiddenCorners is finite — some sufficiently-distant column is always
+  // clean — so a generous fixed bound terminates the search.
+  const SEARCH_RADIUS = 500;
+
   if (!isZRouteClear(a.x, a.y, b.x, b.y, midX, boxes, usedChannels, forbiddenCorners)) {
-    const limit = Math.abs(b.x - a.x) + 5;
     let found = false;
-    for (let offset = 1; offset <= limit; offset++) {
+    for (let offset = 1; offset <= SEARCH_RADIUS && !found; offset++) {
       const xp = midX + offset;
       if (isZRouteClear(a.x, a.y, b.x, b.y, xp, boxes, usedChannels, forbiddenCorners)) {
         midX = xp;
@@ -1040,45 +1142,50 @@ function routeSegmentSafe(
         break;
       }
     }
-    // Two-stage relaxation if no fully-clean midX exists:
-    //
-    //   A. Drop the channel constraint but keep body + corner. Channel
-    //      overlap is purely visual; corners protect connectivity.
-    //   B. Drop the body constraint but keep corner. Crossing a body looks
-    //      ugly but does not change the netlist; landing a corner on a
-    //      foreign pin or wire vertex DOES, so the corner constraint is
-    //      the last one we relax.
     if (!found) {
-      midX = Math.round((a.x + b.x) / 2);
       // Stage A: body + corner (no channel)
+      midX = Math.round((a.x + b.x) / 2);
       if (!isZRouteBodyClear(a.x, a.y, b.x, b.y, midX, boxes, forbiddenCorners)) {
-        let relaxed = false;
-        for (let offset = 1; offset <= limit; offset++) {
+        for (let offset = 1; offset <= SEARCH_RADIUS && !found; offset++) {
           if (isZRouteBodyClear(a.x, a.y, b.x, b.y, midX + offset, boxes, forbiddenCorners)) {
             midX = midX + offset;
-            relaxed = true;
+            found = true;
             break;
           }
           if (isZRouteBodyClear(a.x, a.y, b.x, b.y, midX - offset, boxes, forbiddenCorners)) {
             midX = midX - offset;
-            relaxed = true;
+            found = true;
             break;
           }
         }
-        // Stage B: corner-only (drop body too)
-        if (!relaxed) {
-          midX = Math.round((a.x + b.x) / 2);
-          const cornerClear = (m: number): boolean =>
-            !forbiddenCorners.has(`${m},${a.y}`) &&
-            !forbiddenCorners.has(`${m},${b.y}`);
-          if (!cornerClear(midX)) {
-            for (let offset = 1; offset <= limit; offset++) {
-              if (cornerClear(midX + offset)) { midX = midX + offset; break; }
-              if (cornerClear(midX - offset)) { midX = midX - offset; break; }
-            }
-          }
+      } else {
+        found = true;
+      }
+    }
+    if (!found) {
+      // Stage B: corner-only (drop body too — the hard invariant survives).
+      midX = Math.round((a.x + b.x) / 2);
+      if (cornerClear(midX)) {
+        found = true;
+      } else {
+        for (let offset = 1; offset <= SEARCH_RADIUS && !found; offset++) {
+          if (cornerClear(midX + offset)) { midX = midX + offset; found = true; break; }
+          if (cornerClear(midX - offset)) { midX = midX - offset; found = true; break; }
         }
       }
+    }
+    if (!found) {
+      // Stage C: escape-channel U-route. Run the route up to a y-coordinate
+      // strictly above every prior wire and body, traverse to b's column,
+      // then drop down. Each call reserves its own escape y so escape
+      // corners never collide with earlier escapes. This is the guaranteed-
+      // clean fallback that makes coincident-corner emission impossible.
+      const escY = escapeState.nextEscapeY;
+      escapeState.nextEscapeY += 2;
+      pushWire(circuit, a, { x: a.x, y: escY });
+      pushWire(circuit, { x: a.x, y: escY }, { x: b.x, y: escY });
+      pushWire(circuit, { x: b.x, y: escY }, b);
+      return;
     }
   }
 

@@ -46,6 +46,31 @@ function normalizeMessage(msg: string): string {
 
 const quiet = !!process.env.VITEST_QUIET;
 
+// When VITEST_TAG_OUTPUT=1, every line the reporter emits is prefixed with a
+// sentinel so the parent runner can pass it through verbatim and drop anything
+// else (e.g. ngspice DLL writes that bypass koffi's SendChar callback and land
+// directly on the worker's fd 1 / fd 2). Heartbeat dots and summary lines use
+// distinct prefixes so the filter knows whether to keep the trailing newline.
+const tagged = !!process.env.VITEST_TAG_OUTPUT;
+const HB_PREFIX = '\x01H';
+const LN_PREFIX = '\x01L';
+
+function hbWrite(ch: string): void {
+  if (!ch) return;
+  if (tagged) process.stdout.write(HB_PREFIX + ch + '\n');
+  else process.stdout.write(ch);
+}
+
+function lnWrite(s: string = ''): void {
+  if (tagged) {
+    for (const line of s.split('\n')) {
+      process.stdout.write(LN_PREFIX + line + '\n');
+    }
+  } else {
+    process.stdout.write(s + '\n');
+  }
+}
+
 export default class CompactReporter implements Reporter {
   private cwd = process.cwd();
   private passed = 0;
@@ -63,13 +88,14 @@ export default class CompactReporter implements Reporter {
     if (!quiet) {
       for (const [, result] of packs) {
         if (!result) continue;
-        process.stdout.write(result.state === 'pass' ? '.' : result.state === 'fail' ? 'F' : '');
+        if (result.state === 'pass') hbWrite('.');
+        else if (result.state === 'fail') hbWrite('F');
       }
     }
   }
 
   onFinished(files?: File[]) {
-    if (!quiet) process.stdout.write('\n\n');
+    if (!quiet) { lnWrite(''); lnWrite(''); }
 
     if (!files) return;
     this.totalFiles = files.length;
@@ -111,42 +137,42 @@ export default class CompactReporter implements Reporter {
     if (quiet) {
       // Minimal output: one summary line + JSON path
       const status = this.failed > 0 ? 'FAIL' : 'PASS';
-      console.log(`${status} ${this.passed} passed, ${this.failed} failed, ${this.skipped} skipped (${elapsed}s, ${this.totalFiles} files)`);
+      lnWrite(`${status} ${this.passed} passed, ${this.failed} failed, ${this.skipped} skipped (${elapsed}s, ${this.totalFiles} files)`);
       if (this.failed > 0 && jsonWritten) {
-        console.log(`Details: ${outPath}`);
+        lnWrite(`Details: ${outPath}`);
       } else if (this.failed > 0) {
-        console.log(JSON.stringify(jsonReport));
+        lnWrite(JSON.stringify(jsonReport));
       }
       return;
     }
 
     // Print human-readable summary
-    console.log(`${'='.repeat(60)}`);
-    console.log(`  ${this.passed} passed  ${this.failed} failed  ${this.skipped} skipped  (${elapsed}s)`);
-    console.log(`  ${this.totalFiles} test files`);
-    console.log(`${'='.repeat(60)}`);
+    lnWrite(`${'='.repeat(60)}`);
+    lnWrite(`  ${this.passed} passed  ${this.failed} failed  ${this.skipped} skipped  (${elapsed}s)`);
+    lnWrite(`  ${this.totalFiles} test files`);
+    lnWrite(`${'='.repeat(60)}`);
 
     if (this.failureGroups.size === 0) return;
 
     // Print grouped failures (human-readable)
-    console.log('\nFailures grouped by error:\n');
+    lnWrite('\nFailures grouped by error:\n');
     let groupIdx = 0;
     for (const [, group] of this.failureGroups) {
       groupIdx++;
-      console.log(`  [${groupIdx}] ${group.message}  (x${group.count})`);
+      lnWrite(`  [${groupIdx}] ${group.message}  (x${group.count})`);
       for (const loc of group.locations) {
         const pos = loc.line != null ? `:${loc.line}${loc.column != null ? ':' + loc.column : ''}` : '';
-        console.log(`      ${loc.file}${pos}  "${loc.test}"`);
+        lnWrite(`      ${loc.file}${pos}  "${loc.test}"`);
       }
-      console.log('');
+      lnWrite('');
     }
 
     if (jsonWritten) {
-      console.log(`Structured report: ${outPath}`);
+      lnWrite(`Structured report: ${outPath}`);
     } else if (this.failed > 0) {
-      console.log('\n--- FAILURE_REPORT_JSON ---');
-      console.log(JSON.stringify(jsonReport, null, 2));
-      console.log('--- END_FAILURE_REPORT_JSON ---');
+      lnWrite('\n--- FAILURE_REPORT_JSON ---');
+      lnWrite(JSON.stringify(jsonReport, null, 2));
+      lnWrite('--- END_FAILURE_REPORT_JSON ---');
     }
   }
 

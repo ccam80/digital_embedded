@@ -174,7 +174,7 @@ export class TransformerElement extends AbstractCircuitElement {
  * Builds the MNA subcircuit netlist for a two-winding transformer. Emits two
  * Inductor leaves (L1, L2) and one MutualInductor element that stamps
  * the mutual-inductance off-diagonals across the coil branch indices
- * resolved via siblingBranch.
+ * resolved via `{ kind: "ref", name }`.
  *
  * Port order: P1=0, P2=1, S1=2, S2=3 (no internal nets).
  *
@@ -212,19 +212,19 @@ export const buildTransformerNetlist = (params: PropertyBag): MnaSubcircuitNetli
         params: { inductance: l2 },
       },
       // K-coupling — strict ngspice match. ngspice K elements are 1-to-1
-      // with coupled pairs (mutsetup.c:66-67, mutload.c). Branch refs to
-      // sibling Inductor leaves go through `siblingBranch`; the compiler's
-      // "mutual-inductor" kind constructs MutualInductorElement with live
-      // partner references. K = couplingCoefficient; MUTfactor = K·√(L1·L2)
-      // is computed in MutualInductorElement.setup() from live partner inductances.
+      // with coupled pairs (mutsetup.c:66-67, mutload.c). Partner inductor
+      // refs use `{ kind: "ref", name }`; MutualInductorElement.setup()
+      // resolves them via ctx.findDevice (CKTfndDev pattern). K =
+      // couplingCoefficient; MUTfactor = K·√(L1·L2) is computed in setup()
+      // from live partner inductances.
       {
         typeId: "MutualInductor",
         modelRef: "default",
         subElementName: "MUT",
         params: {
           K: couplingCoefficient,
-          L1_branch: { kind: "siblingBranch", subElementName: "L1" },
-          L2_branch: { kind: "siblingBranch", subElementName: "L2" },
+          L1_branch: { kind: "ref", name: "L1" },
+          L2_branch: { kind: "ref", name: "L2" },
         },
       },
     ],

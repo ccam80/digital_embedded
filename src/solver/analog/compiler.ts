@@ -308,7 +308,6 @@ function expandCompositeInstance(
     return internalNetIds[netIdx - netlist.ports.length]!;
   };
 
-  const constructedByName = new Map<string, AnalogElement>();
   const subElements: AnalogElement[] = [];
   const allLeaves: AnalogElement[] = [];
   const subElementLabelInfo: Array<{ el: AnalogElement; subElementName: string }> = [];
@@ -434,7 +433,6 @@ function expandCompositeInstance(
       );
     }
 
-    constructedByName.set(subName, childEl);
     subElementLabelInfo.push({ el: childEl, subElementName: subName });
 
     // Record string-ref bindings for setParam routing.

@@ -1,15 +1,21 @@
-﻿/**
- * MutualInductorElement, MutualInductorDefinition, and MutualInductorFactory —
- * the canonical MUT (K element) for coupled-inductor simulation.
+/**
+ * MutualInductorElement and MutualInductorDefinition — ngspice K element.
  *
- * Transformer (`transformer.ts`) is `kind: "netlist"` and references
- * `Inductor` + `MutualInductor` by typeId for the compiled topology.
+ * Internal-only sub-element used by Transformer / TappedTransformer composites.
+ * Resolves its two partner inductors by resolved-label string at setup() time
+ * via ctx.findDevice (ngspice CKTfndDev pattern), reads their branch indices,
+ * and stamps the two mutual-inductance off-diagonals.
+ *
+ * Sibling references arrive as `{ kind: "ref", name }` netlist params —
+ * the compiler resolves L1_branch / L2_branch to "{parentLabel}:{name}"
+ * strings and writes them into the property partition. Same path
+ * CurrentControlledSwitch's ctrlBranch and InternalCccs's sense use.
  *
  * ngspice anchors:
- *   mutsetup.c:30-70  - MUT branch resolution and TSTALLOC sequence
- *   indload.c:64-76   - MUT coupling pass (flux augmentation + matrix stamps)
- *   muttemp.c:35-41   - MUTfactor = k · sqrt(INDinduct1 * INDinduct2)
- *   mutacld.c:27-30   - AC coupling stamp (-ω·M into imaginary off-diagonals)
+ *   mutsetup.c:30-70  — MUT branch resolution + TSTALLOC sequence
+ *   indload.c:64-76   — MUT coupling pass (flux augmentation + matrix stamps)
+ *   muttemp.c:35-41   — MUTfactor = k · sqrt(INDinduct1 · INDinduct2)
+ *   mutacld.c:27-30   — AC coupling stamp
  */
 
 import { AnalogElement } from "../../solver/analog/element.js";
@@ -20,39 +26,25 @@ import type { TempContext } from "../../solver/analog/temp-context.js";
 import type { ComplexSparseSolverStamp } from "../../solver/analog/complex-sparse-solver.js";
 import { MODEDC, MODEINITPRED } from "../../solver/analog/ckt-mode.js";
 import { AnalogInductorElement, type MutSiblingNotifiable } from "./inductor.js";
-import type { ComponentDefinition, MutualInductorFactory } from "../../core/registry.js";
+import { PropertyBag } from "../../core/properties.js";
+import type { ComponentDefinition } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // MutualInductorElement
 // ---------------------------------------------------------------------------
 
-/**
- * Mutual inductor (K element) — the canonical MUT.
- *
- * Implements the 3-pass IND_FAMILY load contract verbatim from `indload.c:35-127`.
- * The IND_FAMILY load handler (loaders/ind-family-loader.ts) calls this element's
- * `loadCouplingPass(ctx)` between Pass 1 (IND.loadFluxInit) and Pass 3
- * (IND.load NIintegrate + 5-stamp). The MUT's `load(ctx)` itself is intentionally
- * a no-op — all MUT contributions land via `loadCouplingPass` driven by the
- * family handler.
- *
- * NOT pool-backed — MUT allocates no state slots (`mutsetup.c:28` NG_IGNORE(states)).
- * Implements `MutSiblingNotifiable` so partner inductors can notify it of L changes.
- *
- * ngspice anchors:
- *   indload.c:64-76  — coupling pass (flux augmentation + matrix stamps)
- *   muttemp.c:35-41  — MUTfactor = k · sqrt(INDinduct1 * INDinduct2)
- *   mutacld.c:27-30  — AC coupling stamp (-ω·M into imaginary off-diagonals)
- *   mutsetup.c:66-67 — TSTALLOC sequence (2 off-diagonal entries)
- */
 export class MutualInductorElement extends AnalogElement implements MutSiblingNotifiable {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
   readonly deviceFamily: DeviceFamily = "IND";
 
   private _coupling: number;
   private _mutFactor: number = 0;
-  private readonly _partner1: AnalogInductorElement;
-  private readonly _partner2: AnalogInductorElement;
+  /** Resolved global labels of the two partner inductors, compiler-stamped. */
+  private readonly _l1Label: string;
+  private readonly _l2Label: string;
+  // Live partner refs are resolved at setup() time via ctx.findDevice.
+  private _partner1!: AnalogInductorElement;
+  private _partner2!: AnalogInductorElement;
   private _hBr1Br2: number = -1;
   private _hBr2Br1: number = -1;
 
@@ -60,42 +52,57 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
   get hBr2Br1(): number { return this._hBr2Br1; }
   get mutFactor(): number { return this._mutFactor; }
 
-  constructor(
-    coupling: number,
-    partner1: AnalogInductorElement,
-    partner2: AnalogInductorElement,
-  ) {
+  constructor(_pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(new Map());
-    this._coupling = coupling;
-    this._partner1 = partner1;
-    this._partner2 = partner2;
+    this._coupling = props.hasModelParam("K") ? props.getModelParam<number>("K") : 1;
+    this._l1Label = props.has("L1_branch") ? props.get<string>("L1_branch") : "";
+    this._l2Label = props.has("L2_branch") ? props.get<string>("L2_branch") : "";
+    if (!this._l1Label || !this._l2Label) {
+      throw new Error(
+        "MutualInductorElement: requires L1_branch and L2_branch as " +
+        "`{ kind: \"ref\", name }` params (resolved partner inductor labels).",
+      );
+    }
   }
 
   setup(ctx: SetupContext): void {
-    const solver = ctx.solver;
+    // mutsetup.c:44-57 — resolve named inductors via CKTfndDev. Both partners'
+    // setup() must have already run so their branchIndex is allocated; IND=27
+    // < MUT=28 in static_devices[] guarantees this ordering.
+    const l1 = ctx.findDevice(this._l1Label);
+    const l2 = ctx.findDevice(this._l2Label);
+    if (!(l1 instanceof AnalogInductorElement)) {
+      throw new Error(
+        `MutualInductorElement: ctx.findDevice("${this._l1Label}") did not return an AnalogInductorElement ` +
+        `(got ${l1?.constructor.name ?? "null"}).`,
+      );
+    }
+    if (!(l2 instanceof AnalogInductorElement)) {
+      throw new Error(
+        `MutualInductorElement: ctx.findDevice("${this._l2Label}") did not return an AnalogInductorElement ` +
+        `(got ${l2?.constructor.name ?? "null"}).`,
+      );
+    }
+    this._partner1 = l1;
+    this._partner2 = l2;
 
-    // mutsetup.c:44-57 — resolve inductor refs. Pre-condition: both partners' setup()
-    // MUST have already run so their branchIndex is allocated.
     const b1 = this._partner1.branchIndex;
     const b2 = this._partner2.branchIndex;
     if (b1 === -1 || b2 === -1) {
       throw new Error(
-        "MutualInductorElement.setup(): branchIndex not yet allocated on partner inductor",
+        "MutualInductorElement.setup(): branchIndex not yet allocated on partner inductor " +
+        `(${this._l1Label}.branchIndex=${b1}, ${this._l2Label}.branchIndex=${b2}). ` +
+        "IND must run setup() before MUT — check ngspiceLoadOrder.",
       );
     }
 
     // mutsetup.c:66-67 — TSTALLOC sequence, 2 off-diagonal entries.
-    this._hBr1Br2 = solver.allocElement(b1, b2);
-    this._hBr2Br1 = solver.allocElement(b2, b1);
+    this._hBr1Br2 = ctx.solver.allocElement(b1, b2);
+    this._hBr2Br1 = ctx.solver.allocElement(b2, b1);
 
-    // Register as mutual-inductor sibling so each partner can notify on inductance
-    // changes via setParam("inductance", ...) → recomputeMutFactor() cascade.
     this._partner1._mutSiblings.push(this);
     this._partner2._mutSiblings.push(this);
 
-    // Seed _mutFactor from current partner inductances. IND_FAMILY temperature
-    // handler will subsequently call computeTemperature() to refresh it from
-    // temperature-corrected effective inductances.
     this._mutFactor = this._coupling * Math.sqrt(
       this._partner1.inductance * this._partner2.inductance,
     );
@@ -103,23 +110,10 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
 
   /**
    * IND_FAMILY Pass 2 — MUT coupling per `indload.c:64-76`.
-   *
-   *   if (!(ckt->CKTmode & (MODEDC | MODEINITPRED))) {
-   *     CKTstate0[l1.INDflux] += MUTfactor * CKTrhsOld[l2.INDbrEq];   // line 67
-   *     CKTstate0[l2.INDflux] += MUTfactor * CKTrhsOld[l1.INDbrEq];   // line 68
-   *   }
-   *   *(MUTbr1br2) -= MUTfactor * CKTag[0];                            // line 74 (unconditional)
-   *   *(MUTbr2br1) -= MUTfactor * CKTag[0];                            // line 75 (unconditional)
-   *
-   * Pass 1 (each IND.loadFluxInit) has already initialized partner flux φ = L·i.
-   * This pass augments partner flux with the mutual contribution, then stamps the
-   * two off-diagonal matrix entries. Pass 3 (each IND.load NIintegrate) then reads
-   * the augmented flux to produce the correct branch current.
    */
   loadCouplingPass(ctx: LoadContext): void {
     const { ag, rhsOld, cktMode: mode } = ctx;
 
-    // indload.c:64-71 — gated flux augmentation (transient mode only).
     if (!(mode & (MODEDC | MODEINITPRED))) {
       const i_p1 = rhsOld[this._partner1.branchIndex];
       const i_p2 = rhsOld[this._partner2.branchIndex];
@@ -127,60 +121,28 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
       this._partner2.augmentFlux(this._mutFactor * i_p1);
     }
 
-    // indload.c:74-75 — unconditional off-diagonal matrix stamps.
     const ag0 = ag[0] ?? 0;
     ctx.solver.stampElement(this._hBr1Br2, -this._mutFactor * ag0);
     ctx.solver.stampElement(this._hBr2Br1, -this._mutFactor * ag0);
   }
 
-  /**
-   * IND_FAMILY load Pass 3 routes through `AnalogInductorElement.load()`.
-   * MUT contributions are entirely handled by `loadCouplingPass()` driven by
-   * the IND_FAMILY load handler. This `load(ctx)` is a no-op so MUT instances
-   * do not double-stamp if the family handler erroneously dispatches them as
-   * regular elements.
-   */
   load(_ctx: LoadContext): void {
-    // intentional no-op — see class JSDoc and loadCouplingPass()
+    // intentional no-op — MUT contributions flow through loadCouplingPass()
+    // driven by the IND_FAMILY load handler.
   }
 
-  /**
-   * IND_FAMILY temperature Pass 2 per `muttemp.c:35-41`.
-   *
-   *   factor = sqrt(here->MUTind1->INDinduct * here->MUTind2->INDinduct);  // line 38
-   *   here->MUTfactor = here->MUTcouple * factor;                          // line 41
-   *
-   * Pass 1 (each IND.computeTemperature) has already set effective INDinduct on
-   * both partners. This pass reads those temperature-corrected inductances and
-   * recomputes MUTfactor.
-   */
   computeTemperature(_ctx: TempContext): void {
     this._mutFactor = this._coupling * Math.sqrt(
       this._partner1.inductance * this._partner2.inductance,
     );
   }
 
-  /**
-   * MutSiblingNotifiable contract — callable from partner inductor's
-   * setParam("inductance", v) cascade. Identical formula to computeTemperature
-   * but invoked at hot-load time rather than via the temperature pass.
-   * cite: muttemp.c:38
-   */
   recomputeMutFactor(): void {
     this._mutFactor = this._coupling * Math.sqrt(
       this._partner1.inductance * this._partner2.inductance,
     );
   }
 
-  /**
-   * IND_FAMILY AC stamp Pass 2 per `mutacld.c:27-30`.
-   *
-   *   *(here->MUTbr1br2 + 1) -= here->MUTfactor * omega;  // line 28 (imag at br1×br2)
-   *   *(here->MUTbr2br1 + 1) -= here->MUTfactor * omega;  // line 29 (imag at br2×br1)
-   *
-   * Pure imaginary coupling: stamp -ω·M into the IMAGINARY half of the two
-   * off-diagonal entries. Real part is zero (no resistive coupling at AC).
-   */
   stampAcCoupling(solver: ComplexSparseSolverStamp, omega: number, _ctx: LoadContext): void {
     const wM = omega * this._mutFactor;
     solver.stampComplexElement(this._hBr1Br2, 0, -wM);
@@ -200,45 +162,8 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
 }
 
 // ---------------------------------------------------------------------------
-// MutualInductorDefinition
-//
-// Internal-only sub-element registration. `MutualInductorElement` is
-// constructed by the compiler via the `"mutual-inductor"` ModelEntry kind,
-// which passes live `AnalogInductorElement` partner references rather than
-// routing through a generic PropertyBag factory.
-//
-// `internalOnly: true` — excluded from the editor palette, SPICE-import
-// primary matching, and surfaced under its parent composite in harness_describe.
-// Registered in register-all.ts so the registry assigns a stable typeId.
-//
-// ngspice anchor: mutsetup.c:44-57 — partner inductors resolved after all IND
-// branches allocated; `"mutual-inductor"` kind enforces the same ordering.
+// MutualInductorDefinition (internal-only)
 // ---------------------------------------------------------------------------
-
-const mutualInductorFactory: MutualInductorFactory = (
-  l1SubName: string,
-  l2SubName: string,
-  coupling: number,
-  siblings: ReadonlyMap<string, import("../../solver/analog/element.js").AnalogElement>,
-): MutualInductorElement => {
-  const l1 = siblings.get(l1SubName);
-  const l2 = siblings.get(l2SubName);
-  if (!(l1 instanceof AnalogInductorElement)) {
-    throw new Error(
-      `MutualInductorDefinition: sibling "${l1SubName}" is not an AnalogInductorElement ` +
-      `(got ${l1?.constructor.name ?? "undefined"}). ` +
-      `Inductor leaves must appear before MutualInductor in netlist.elements.`,
-    );
-  }
-  if (!(l2 instanceof AnalogInductorElement)) {
-    throw new Error(
-      `MutualInductorDefinition: sibling "${l2SubName}" is not an AnalogInductorElement ` +
-      `(got ${l2?.constructor.name ?? "undefined"}). ` +
-      `Inductor leaves must appear before MutualInductor in netlist.elements.`,
-    );
-  }
-  return new MutualInductorElement(coupling, l1, l2);
-};
 
 export const MutualInductorDefinition: ComponentDefinition = {
   name: "MutualInductor",
@@ -246,14 +171,17 @@ export const MutualInductorDefinition: ComponentDefinition = {
   internalOnly: true,
   modelRegistry: {
     default: {
-      kind: "mutual-inductor",
+      kind: "inline",
       paramDefs: [
         { key: "K", default: 1 },
       ],
       params: { K: 1 },
-      factory: mutualInductorFactory,
+      factory: (
+        pinNodes: ReadonlyMap<string, number>,
+        props: PropertyBag,
+        _getTime: () => number,
+      ): AnalogElement => new MutualInductorElement(pinNodes, props),
     },
   },
   defaultModel: "default",
 };
-

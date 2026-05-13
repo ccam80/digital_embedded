@@ -1,18 +1,11 @@
 ﻿/**
- * InternalCccs â€” internal-only current-controlled current source.
- *
- * Per Composite M4 (phase-composite-architecture.md), J-024
- * (contracts_group_02.md). Promoted from CccsSubElement in optocoupler.ts.
+ * InternalCccs — internal-only current-controlled current source.
  *
  * Used as the coupling element in the Optocoupler netlist. Reads the branch
- * current of a sibling InternalZeroVoltSense via siblingBranch resolution
+ * current of a sibling V-source (resolved at setup() time via ctx.findBranch)
  * and injects I_out = gain * I_sense into the output (pos/neg) nodes.
  *
- * Template: hybrid of MutualInductorElement (siblingBranch reader pattern,
- * mutual-inductor.ts) and TransmissionSegmentR (2-pin stamp via cached
- * handles, transmission-segment-r.ts).
- *
- * Stamp math: CCCS (ccsload.c). Two off-diagonal matrix entries on the
+ * Stamp math: CCCS (cccsload.c). Two off-diagonal matrix entries on the
  * b_sense column; no branch row of its own:
  *   G[pos, b_sense] += gain
  *   G[neg, b_sense] -= gain
@@ -76,7 +69,7 @@ export class InternalCccsElement extends AnalogElement {
     this._senseLabel = this._props.getOrDefault<string>("sense", "");
     if (!this._senseLabel) {
       throw new Error(
-        "InternalCccs: requires sense siblingBranch param.",
+        "InternalCccs: requires `sense: { kind: \"ref\", name }` param.",
       );
     }
 

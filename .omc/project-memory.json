@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778494819181,
+  "lastScanned": 1778583965939,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit --project tsconfig.json 2>&1 | head -30",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && node -e \"const f=require('./.vitest-failures.json');f.failures.forEach(x=>console.log(x.locations?.[0]?.test,'|',x.message.slice(0,180)))\"",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && rm src/components/active/__tests__/optocoupler-deck-probe.test.ts scripts/probe-optocoupler-deck.mjs && npx tsc --noEmit --project tsconfig.json > C:/tmp/tsc2.txt 2>&1; echo \"exit=$?\"; wc -l C:/tmp/tsc2.txt",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && npx vitest run \"src/editor/__tests__/wire-current-resolver.test.ts\" -t \"non-junction pin wires\" --reporter=basic 2>&1 | tail -25",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778494819068,
+      "lastAccessed": 1778583965896,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1778494819069,
+      "lastAccessed": 1778583965896,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1778494819070,
+      "lastAccessed": 1778583965897,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1778494819070,
+      "lastAccessed": 1778583965897,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778494819149,
+      "lastAccessed": 1778583965897,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1778494819149,
+      "lastAccessed": 1778583965920,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -143,28 +143,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1778494819150,
+      "lastAccessed": 1778583965921,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778494819150,
+      "lastAccessed": 1778583965921,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778494819151,
+      "lastAccessed": 1778583965921,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 14,
-      "lastAccessed": 1778494819151,
+      "lastAccessed": 1778583965922,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -176,21 +176,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 11,
-      "lastAccessed": 1778494819152,
+      "fileCount": 18,
+      "lastAccessed": 1778583965922,
       "keyFiles": [
         "dig-format-excision.md",
         "orchestrator-exit-log.md",
-        "plan.md",
-        "progress.md",
-        "refactor-per-type-orchestration.md"
+        "phase-0-dead-code-removal.md",
+        "phase-1-foundation.md",
+        "phase-2-switch-relay-coupling.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778494819152,
+      "lastAccessed": 1778583965922,
       "keyFiles": [
         "main.ts"
       ]
@@ -198,15 +198,18 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1778494819153,
-      "keyFiles": []
+      "fileCount": 3,
+      "lastAccessed": 1778583965922,
+      "keyFiles": [
+        "playwright-failures.json",
+        "test-failures.json"
+      ]
     },
     "tmp-hang-circuits": {
       "path": "tmp-hang-circuits",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1778494819153,
+      "lastAccessed": 1778583965923,
       "keyFiles": [
         "rc-ac-lowpass.dts",
         "rc-step.dts",
@@ -219,7 +222,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778494819153,
+      "lastAccessed": 1778583965923,
       "keyFiles": [
         "index.json"
       ]
@@ -228,21 +231,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1778494819154,
+      "lastAccessed": 1778583965923,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778494819157,
+      "lastAccessed": 1778583965924,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1778494819158,
+      "lastAccessed": 1778583965924,
       "keyFiles": [
         "main-DuWHuFk1.js",
         "memory-editor-DEA45Iu0.js",
@@ -253,7 +256,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1778494819160,
+      "lastAccessed": 1778583965925,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -264,7 +267,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1778494819162,
+      "lastAccessed": 1778583965927,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -275,7 +278,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1778494819162,
+      "lastAccessed": 1778583965927,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -286,33 +289,63 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1778494819163,
+      "lastAccessed": 1778583965927,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 128,
-      "lastAccessed": 1778583806593,
+      "accessCount": 138,
+      "lastAccessed": 1778642703030,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 62,
-      "lastAccessed": 1778580216384,
+      "accessCount": 95,
+      "lastAccessed": 1778641638751,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 32,
-      "lastAccessed": 1778547279829,
+      "accessCount": 41,
+      "lastAccessed": 1778624096947,
       "type": "file"
     },
     {
       "path": "src\\headless\\auto-layout.ts",
+      "accessCount": 41,
+      "lastAccessed": 1778641590542,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 32,
+      "lastAccessed": 1778626920789,
+      "type": "file"
+    },
+    {
+      "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+      "accessCount": 26,
+      "lastAccessed": 1778642685295,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\wiring\\splitter.ts",
       "accessCount": 25,
-      "lastAccessed": 1778547158717,
+      "lastAccessed": 1778621949882,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 21,
+      "lastAccessed": 1778629622850,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\digital\\digital-engine.ts",
+      "accessCount": 19,
+      "lastAccessed": 1778622711543,
       "type": "file"
     },
     {
@@ -322,21 +355,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\digital\\digital-engine.ts",
-      "accessCount": 17,
-      "lastAccessed": 1778246337985,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\digital\\compiler.ts",
       "accessCount": 15,
       "lastAccessed": 1778278278293,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 15,
-      "lastAccessed": 1778443695154,
       "type": "file"
     },
     {
@@ -352,9 +373,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\wiring\\splitter.ts",
+      "path": "src\\headless\\__tests__\\default-facade.test.ts",
       "accessCount": 10,
-      "lastAccessed": 1778583736795,
+      "lastAccessed": 1778627948148,
       "type": "file"
     },
     {
@@ -382,15 +403,9 @@
       "type": "file"
     },
     {
-      "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1778213674737,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\__tests__\\default-facade.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1778219295882,
+      "path": "src\\components\\memory\\__tests__\\register.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1778632407442,
       "type": "file"
     },
     {
@@ -424,18 +439,6 @@
       "type": "directory"
     },
     {
-      "path": "src\\components\\memory\\__tests__\\register.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1778280951073,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\partition.ts",
-      "accessCount": 5,
-      "lastAccessed": 1778547200760,
-      "type": "file"
-    },
-    {
       "path": "src\\headless\\netlist.ts",
       "accessCount": 4,
       "lastAccessed": 1778323801969,
@@ -454,15 +457,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\editor\\__tests__\\property-panel-model.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1778213214605,
+      "path": "src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1778590053519,
       "type": "file"
     },
     {
-      "path": "src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts",
+      "path": "src\\editor\\__tests__\\property-panel-model.test.ts",
       "accessCount": 2,
-      "lastAccessed": 1778213317641,
+      "lastAccessed": 1778213214605,
       "type": "file"
     },
     {

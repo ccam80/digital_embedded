@@ -232,16 +232,22 @@ export function executeRelay(index: number, state: Uint32Array, _highZs: Uint32A
 // Internal nets: coilMid (4), coilSenseMid (5)
 //
 // Elements:
-//   0: Inductor (coilL):     pos=in1(0),          neg=coilMid(4)
-//   1: Voltage (coilSense):  neg=coilSenseMid(5), pos=coilMid(4)  (0V sense, branchCount=1)
-//   2: Resistor (coilR):     pos=coilSenseMid(5), neg=in2(1)
-//   3: Switch (contactSW):   A1(2) ↔ B1(3), ctrlBranch -> coilSense (ngspice CSW)
+//   0: Inductor (coilL):                pos=in1(0),          neg=coilMid(4)
+//   1: Voltage (coilSense):             neg=coilSenseMid(5), pos=coilMid(4)  (0V sense, branchCount=1)
+//   2: Resistor (coilR):                pos=coilSenseMid(5), neg=in2(1)
+//   3: CurrentControlledSwitch (contactSW): A1(2) ↔ B1(3), ctrlBranch -> coilSense (ngspice W)
 //
 // coilSense pin assignment: neg=coilSenseMid, pos=coilMid. Current flows from
 // in1 through coilL into coilMid (pos terminal of coilSense), through the
 // sense source, out at coilSenseMid (neg terminal), then through coilR to in2.
 // This makes branchIndex current positive (i_k = I_coil > 0) when the coil
 // is energised — matching ngspice CSW i_ctrl sign convention (cswload.c).
+//
+// The CurrentControlledSwitch sub-element sits at NGSPICE_LOAD_ORDER.CSW (21),
+// before IND (27), so its setup() resolves coilSense's branch row via
+// ctx.findBranch BEFORE coilL's setup() allocates its own branch row. This
+// produces the ngspice-faithful row order: coilSense branch first, coilL branch
+// second.
 // ---------------------------------------------------------------------------
 
 export const RELAY_NETLIST: MnaSubcircuitNetlist = {
@@ -249,14 +255,14 @@ export const RELAY_NETLIST: MnaSubcircuitNetlist = {
   params: { inductance: 0.05, coilResistance: 100,
             pullInI: 0.05, dropOutI: 0.02, Ron: 0.01, Roff: 1e9 },
   elements: [
-    { typeId: "Inductor",        modelRef: "behavioral", subElementName: "coilL",     branchCount: 1, params: { inductance: "inductance" } },
-    { typeId: "DcVoltageSource", modelRef: "behavioral", subElementName: "coilSense", branchCount: 1, params: { voltage: 0 } },
-    { typeId: "Resistor",        modelRef: "behavioral", subElementName: "coilR",                     params: { resistance: "coilResistance" } },
-    { typeId: "Switch",          modelRef: "behavioral", subElementName: "contactSW",
+    { typeId: "Inductor",                modelRef: "behavioral", subElementName: "coilL",     branchCount: 1, params: { inductance: "inductance" } },
+    { typeId: "DcVoltageSource",         modelRef: "behavioral", subElementName: "coilSense", branchCount: 1, params: { voltage: 0 } },
+    { typeId: "Resistor",                modelRef: "behavioral", subElementName: "coilR",                     params: { resistance: "coilResistance" } },
+    { typeId: "CurrentControlledSwitch", modelRef: "default",    subElementName: "contactSW",
       params: {
         Ron: "Ron",
         Roff: "Roff",
-        ctrlBranch: { kind: "siblingBranch", subElementName: "coilSense" },
+        ctrlBranch: { kind: "ref", name: "coilSense" },
         pullInI: "pullInI",
         dropOutI: "dropOutI",
       } },

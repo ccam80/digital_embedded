@@ -4,7 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { BJT_MAPPING, DEVICE_MAPPINGS } from "./device-mappings.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
+import { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { PropertyBag } from "../../../../core/properties.js";
 import { AbstractCircuitElement } from "../../../../core/element.js";
 import type { RenderContext } from "../../../../core/renderer-interface.js";
@@ -13,7 +13,6 @@ import { AnalogElement } from "../../element.js";
 import type { DeviceFamily } from "../../ngspice-load-order.js";
 import type { LoadContext } from "../../load-context.js";
 import type { SetupContext } from "../../setup-context.js";
-import type { StatePool } from "../../state-pool.js";
 import { createDefaultRegistry } from "../../../../components/register-all.js";
 
 // ---------------------------------------------------------------------------
@@ -93,16 +92,16 @@ function makeAnalogEl(nodeIds: number[]): AnalogElement {
 type CEMap = Map<number, import("../../../../core/element.js").CircuitElement>;
 
 function makeCompiled(elements: AnalogElement[], ce: CEMap): ConcreteCompiledAnalogCircuit {
-  return {
-    nodeCount: 3, matrixSize: 4,
-    elements, labelToNodeId: new Map(), labelPinNodes: new Map(),
-    wireToNodeId: new Map(), models: new Map(), elementToCircuitElement: ce,
-    elementPinVertices: new Map(), elementResolvedPins: new Map(),
-    groupToNodeId: new Map(), elementBridgeAdapters: new Map(),
-    bridgeAdaptersByGroupId: new Map(), diagnostics: [],
-    timeRef: { value: 0 }, statePool: null as unknown as StatePool,
-    netCount: 3, componentCount: elements.length, elementCount: elements.length,
-  } as unknown as ConcreteCompiledAnalogCircuit;
+  return new ConcreteCompiledAnalogCircuit({
+    nodeCount: 3,
+    elements,
+    elementsByFamily: new Map(),
+    labelToNodeId: new Map(),
+    wireToNodeId: new Map(),
+    models: new Map(),
+    elementToCircuitElement: ce,
+    statePool: null,
+  });
 }
 
 describe("generateSpiceNetlist", () => {
@@ -401,14 +400,14 @@ describe("generateSpiceNetlist", () => {
     expect(ls).toHaveLength(2);
   });
 
-  it("skips unknown typeId", () => {
+  it("throws on unregistered typeId", () => {
     const props = new PropertyBag();
     const compiled = makeCompiled(
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("UnknownThing", props)]]),
     );
-    const ls = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "X1"]])).split("\n");
-    expect(ls).toHaveLength(2);
+    expect(() => generateSpiceNetlist(compiled, testRegistry, new Map([[0, "X1"]])))
+      .toThrow(/typeId "UnknownThing" not registered/);
   });
 
   it("model card has no parens when no model params set", () => {

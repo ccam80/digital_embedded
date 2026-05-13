@@ -148,24 +148,6 @@ export interface ModelEmissionSpec {
 // ModelEntry- unified model type (inline factory or netlist-derived)
 // ---------------------------------------------------------------------------
 
-/**
- * Factory for a `kind: "mutual-inductor"` sub-element.
- *
- * Unlike `AnalogFactory`, this receives the already-constructed sibling
- * element map so the K element can hold live partner references. The compiler
- * invokes this after all Inductor leaves in the same composite have been
- * constructed, passing `constructedByName` as `siblings`.
- *
- * `L1SubName` and `L2SubName` are the `subElementName` values resolved from
- * the `L1_branch` / `L2_branch` siblingBranch params declared in the netlist.
- */
-export type MutualInductorFactory = (
-  l1SubName: string,
-  l2SubName: string,
-  coupling: number,
-  siblings: ReadonlyMap<string, AnalogElement>,
-) => AnalogElement;
-
 export type ModelEntry =
   | {
       kind: "inline";
@@ -183,23 +165,6 @@ export type ModelEntry =
       params: Record<string, number>;
       /** SPICE-emission overrides for this model. */
       spice?: ModelEmissionSpec;
-    }
-  | {
-      /**
-       * K-element (mutual inductor) sub-element model kind.
-       *
-       * Used exclusively by `MutualInductorDefinition`. The compiler detects
-       * this kind, resolves L1/L2 sibling references from the netlist params,
-       * and calls `factory` with live partner `AnalogInductorElement` refs
-       * instead of routing through the generic `AnalogFactory` path.
-       *
-       * ngspice anchor: mutsetup.c:44-57 — partner inductor references resolved
-       * after all IND branches are allocated; same sequencing rule applies here.
-       */
-      kind: "mutual-inductor";
-      factory: MutualInductorFactory;
-      paramDefs: ParamDef[];
-      params: Record<string, number>;
     };
 
 // ---------------------------------------------------------------------------

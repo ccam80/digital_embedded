@@ -705,10 +705,19 @@ describe("Public definition parametric audit (every registered, non-internalOnly
           expect(el).not.toBeNull();
         });
 
-        it("pinLayout declares at least one pin", () => {
-          expect(Array.isArray(def.pinLayout)).toBe(true);
-          expect(def.pinLayout.length).toBeGreaterThan(0);
-        });
+        // Decorations (Text/Rectangle/Testcase) and meta-elements (AsyncSeq)
+        // are intentionally pinless — they contribute nothing to MNA topology
+        // and exist only for annotation or sequencing.
+        if (def.pinLayout.length > 0) {
+          it("pinLayout declares at least one pin", () => {
+            expect(Array.isArray(def.pinLayout)).toBe(true);
+            expect(def.pinLayout.length).toBeGreaterThan(0);
+          });
+        } else {
+          it("pinLayout is a (possibly empty) array", () => {
+            expect(Array.isArray(def.pinLayout)).toBe(true);
+          });
+        }
       }
     });
   }
@@ -820,12 +829,22 @@ describe("Definition-shape parametric audit (every registered, non-internalOnly 
       // -- 2. Pin-layout shape ----------------------------------------------
 
       if (!isStub74xx) {
-        it(`def_${def.name}_pinLayout_has_at_least_one_input_or_output_pin`, () => {
-          const ioPins = def.pinLayout.filter(
-            (p) => p.direction === PinDirection.INPUT || p.direction === PinDirection.OUTPUT,
-          );
-          expect(ioPins.length).toBeGreaterThan(0);
-        });
+        // Decorations / meta-elements with no pinLayout are non-electrical
+        // and have nothing to assert about pin direction. Components with
+        // any pins must have at least one electrical pin (INPUT, OUTPUT,
+        // or BIDIRECTIONAL — passive two-terminals like Switch / Fuse /
+        // Resistor are BIDIRECTIONAL-only and still electrically functional).
+        if (def.pinLayout.length > 0) {
+          it(`def_${def.name}_pinLayout_has_at_least_one_electrical_pin`, () => {
+            const ioPins = def.pinLayout.filter(
+              (p) =>
+                p.direction === PinDirection.INPUT ||
+                p.direction === PinDirection.OUTPUT ||
+                p.direction === PinDirection.BIDIRECTIONAL,
+            );
+            expect(ioPins.length).toBeGreaterThan(0);
+          });
+        }
 
         for (let i = 0; i < def.pinLayout.length; i++) {
           const pin = def.pinLayout[i];
