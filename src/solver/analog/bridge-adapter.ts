@@ -21,15 +21,16 @@ import { BridgeInputDriverElement } from "./behavioral-drivers/bridge-input-driv
 
 /**
  * Build a BridgeOutputDriverElement from a ResolvedPinElectrical spec, a
- * pre-assigned MNA node ID, a branch variable index, and a loaded flag.
+ * pre-assigned MNA node ID, and a loaded flag. The branch row is allocated
+ * lazily inside the element's setup() via ctx.makeCur (VSRCsetup parity,
+ * vsrcset.c:40-44).
  */
 export function makeBridgeOutputAdapter(
   spec: ResolvedPinElectrical,
   nodeId: number,
-  branchIdx: number,
   loaded: boolean,
 ): BridgeOutputDriverElement {
-  return new BridgeOutputDriverElement(spec, nodeId, branchIdx, loaded);
+  return new BridgeOutputDriverElement(spec, nodeId, loaded);
 }
 
 /**

@@ -276,7 +276,7 @@ function expandCompositeInstance(
     }
   }
 
-  // Build elementsByName index for siblingBranch resolution.
+  // Build elementsByName index for cross-element ref resolution.
   const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
   for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
     const subEl = netlist.elements[elIdx]!;
@@ -361,19 +361,20 @@ function expandCompositeInstance(
           if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
         } else if (v !== null && typeof v === "object") {
           const tag = (v as { kind?: string }).kind;
-          if (tag === "siblingBranch") {
-            const ref = v as { kind: "siblingBranch"; subElementName: string };
-            const sibling = elementsByName.get(ref.subElementName);
+          if (tag === "ref") {
+            const ref = v as { kind: "ref"; name: string };
+            const sibling = elementsByName.get(ref.name);
             if (!sibling) {
-              throw new Error(`siblingBranch: unknown element "${ref.subElementName}"`);
+              throw new Error(`SubcircuitElementParam ref: unknown element "${ref.name}"`);
             }
-            // Parent label is known at compile time; resolve immediately
-            // instead of deferring to a patcher leaf at engine setup time.
-            subProps.set(paramKey, `${parentLabel}:${ref.subElementName}`);
+            // Resolve to the flattened sibling label. The consumer's setup()
+            // hands this string to ctx.findBranch / ctx.findDevice (ngspice
+            // CKTfndBranch / CKTfndDev) for runtime resolution.
+            subProps.set(paramKey, `${parentLabel}:${ref.name}`);
           } else {
             throw new Error(
               "Unsupported SubcircuitElementParam discriminator. " +
-                "Allowed shapes: number, string, { kind: 'siblingBranch', subElementName }.",
+                "Allowed shapes: number, string, { kind: 'ref', name }.",
             );
           }
         }
@@ -424,36 +425,6 @@ function expandCompositeInstance(
       childEl.label = childLabel;
       subElements.push(childEl);
       allLeaves.push(childEl, ...inner.allLeaves);
-    } else if (leafEntry.kind === "mutual-inductor") {
-      // K-element construction path. The MutualInductorElement requires live
-      // AnalogInductorElement partner references; the generic AnalogFactory
-      // signature cannot provide them. We resolve L1_branch/L2_branch sibling
-      // names from the netlist params and look them up in constructedByName.
-      //
-      // ngspice anchor: mutsetup.c:44-57 — partner inductors must be allocated
-      // before MUT runs setup(), so Inductor leaves must precede MutualInductor
-      // in netlist.elements (enforced by the factory's instanceof guard).
-      const rawParams = subEl.params ?? {};
-      const l1Ref = rawParams["L1_branch"];
-      const l2Ref = rawParams["L2_branch"];
-      if (
-        typeof l1Ref !== "object" || l1Ref === null || (l1Ref as { kind?: string }).kind !== "siblingBranch" ||
-        typeof l2Ref !== "object" || l2Ref === null || (l2Ref as { kind?: string }).kind !== "siblingBranch"
-      ) {
-        throw new Error(
-          `Composite sub-element "${subName}" (kind: "mutual-inductor") must declare ` +
-          `L1_branch and L2_branch as siblingBranch refs. ` +
-          `Got L1_branch=${JSON.stringify(l1Ref)}, L2_branch=${JSON.stringify(l2Ref)}.`,
-        );
-      }
-      const l1SubName = (l1Ref as { subElementName: string }).subElementName;
-      const l2SubName = (l2Ref as { subElementName: string }).subElementName;
-      // coupling = K param from the MutualInductor's resolved params (default 1).
-      const coupling = subProps.getModelParam<number>("K") ?? 1;
-      childEl = leafEntry.factory(l1SubName, l2SubName, coupling, constructedByName);
-      childEl.label = childLabel;
-      subElements.push(childEl);
-      allLeaves.push(childEl);
     } else {
       // Future ModelEntry kinds: surface loudly so we never silently drop a
       // sub-element the way the old code did with `if (kind !== "inline") continue`.
@@ -869,7 +840,6 @@ export function compileAnalogPartition(
   // node IDs are allocated lazily at setup() time (A6.1).
   const elementMeta = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading, runtimeModelMap);
 
-  let branchCount = 0;
   let totalNodeCount = externalNodeCount;
 
   // Compile-time node allocator for composite-internal nets. Threaded into
@@ -1150,10 +1120,9 @@ export function compileAnalogPartition(
 
     if (descriptor.direction === "digital-to-analog") {
       // Digital output pin drives the analog node- BridgeOutputDriverElement (voltage source).
-      // 1-based slot indexing per the absoluteBranchIdx convention above.
-      const branchIdx = totalNodeCount + 1 + branchCount;
-      branchCount++;
-      const adapter = makeBridgeOutputAdapter(spec, nodeId, branchIdx, loaded);
+      // Branch row allocated inside adapter.setup() via ctx.makeCur, matching
+      // VSRCsetup (vsrcset.c:40-44).
+      const adapter = makeBridgeOutputAdapter(spec, nodeId, loaded);
       // Label for coordinator pin-param dispatch (e.g. "out.rOut" â†’ endsWith(":out"))
       const driverPin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
       if (driverPin) adapter.label = `bridge-${boundaryGroupId}:${driverPin.pinLabel}`;

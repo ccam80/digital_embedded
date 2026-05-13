@@ -51,10 +51,15 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   VCCS:            { prefix: "G" },
   CCVS:            { prefix: "H" },
   CCCS:            { prefix: "F" },
+  // InternalCccs is the internal-only flavour of CCCS used inside composites
+  // (e.g. Optocoupler). Same ngspice F-card; the sense V-source is identified
+  // by a `{ kind: "ref" }` peer reference rather than user-facing sense pins.
+  InternalCccs:    { prefix: "F" },
   SwitchSPST:      { prefix: "S", modelType: "SW" },
   SwitchSPDT:      { prefix: "S", modelType: "SW" },
   Switch:          { prefix: "S", modelType: "SW" },
   SwitchDT:        { prefix: "S", modelType: "SW" },
+  CurrentControlledSwitch: { prefix: "W", modelType: "CSW" },
   TransmissionLine: { prefix: "T" },
   LDR:             { prefix: "R" },
   VariableRail:    { prefix: "V" },
@@ -82,60 +87,44 @@ function canonicalizeSpiceLabel(rawLabel: string, requiredPrefix: string): strin
 // ---------------------------------------------------------------------------
 
 /**
- * Throw if a sub-element parameter uses siblingBranch. Sibling-branch refs
- * reach into a peer leaf's branch row at every cktLoad- they're a digiTS-
- * specific state-coupling mechanism with no SPICE-syntax equivalent (except
- * via the MutualInductor K-element exemption below). Their presence on a
- * sub-element means the parent composite is non-SPICE-faithful as currently
- * factored. Author must either fuse the coupled leaves into a single SPICE-
- * primitive device or mark the parent component pairedSpiceEquivalent:
- * false on its definition.
+ * Resolve a `{ kind: "ref", name }` cross-element reference to the canonical
+ * SPICE label of the referenced sibling sub-element.
  *
- * Exemption: `MutualInductor` sub-elements are permitted to use
- * `siblingBranch` on `L1_branch` / `L2_branch` because they map directly to
- * ngspice's K element. K resolves L1Name/L2Name to coil branch indices and
- * stamps mutual-inductance off-diagonals (mutsetup.c:66-67, mutload.c) — the
- * same semantics our siblingBranch decorator carries. The K emit is handled
- * inline in `emitElement`'s subcircuit recursion before this check fires.
- * The exemption is keyed on (subTypeId, key) — siblingBranch on any other
- * key or sub-typeId still throws.
+ * The runtime resolves refs via `ctx.findBranch` / `ctx.findDevice`. For the
+ * harness's paired-vs-ngspice path the same ref must resolve to a SPICE
+ * device-name on the emitted deck. That resolution is derived, not enumerated:
+ * the sibling's `typeId` (already declared in the parent netlist) determines
+ * the SPICE prefix via `ELEMENT_SPECS`. ngspice's CCCS/CCVS (`F`/`H` cards),
+ * CSW (`W` card), and K (mutual inductor) all consume the same shape — a
+ * canonical device-name string identifying the sibling — so there is nothing
+ * per-`(typeId, key)` about the resolution.
+ *
+ * Throws if the sibling is not present in `parentSubckt.elements`, or if the
+ * sibling's typeId has no SPICE prefix entry. The latter is the only case
+ * that legitimately means the composite is non-SPICE-faithful as factored.
  */
-function assertNoSiblingRefs(
-  sub: SubcircuitElement,
-  parentLabel: string,
-  parentTypeId: string,
-): void {
-  const params = sub.params ?? {};
-  for (const key of Object.keys(params)) {
-    const v = params[key];
-    if (typeof v === "object" && v !== null && "kind" in v &&
-        v.kind === "siblingBranch") {
-      if (sub.typeId === "MutualInductor" &&
-          v.kind === "siblingBranch" &&
-          (key === "L1_branch" || key === "L2_branch")) {
-        continue;
-      }
-      // ngspice CSW (W element): Switch's `ctrlBranch` siblingBranch resolves
-      // to a Vsense source name on the emitted W device line. The sibling is
-      // a primitive Voltage source whose canonicalized SPICE label is the
-      // value the W device references for its controlling-branch current.
-      // Same semantic as the MutualInductor K exemption: a digiTS sibling
-      // ref that maps directly to ngspice's name-based cross-element lookup.
-      if (sub.typeId === "Switch" && v.kind === "siblingBranch" && key === "ctrlBranch") {
-        continue;
-      }
-      throw new Error(
-        `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
-        `of ${parentTypeId} '${parentLabel}' uses ${v.kind} on param '${key}'. ` +
-        `The digiTS factoring is non-SPICE-faithful at this leaf- sibling refs ` +
-        `cannot be translated to SPICE syntax. Either (a) fuse the coupled ` +
-        `leaves into a single SPICE-primitive device (e.g. a CurrentControlledSwitch ` +
-        `leaf with internal hysteresis state mapping to ngspice's W element), or ` +
-        `(b) mark this component pairedSpiceEquivalent: false on its definition ` +
-        `and use ComparisonSession.createSelfCompare for tests.`
-      );
-    }
+function resolveRefToSpiceLabel(
+  ref: { name: string },
+  parentSubckt: MnaSubcircuitNetlist,
+  parentRawLabel: string,
+): string {
+  const target = parentSubckt.elements.find((e) => e.subElementName === ref.name);
+  if (!target) {
+    throw new Error(
+      `netlist-generator: ref { name: '${ref.name}' } in '${parentRawLabel}' ` +
+      `points at no sibling sub-element. Available subElementNames: ` +
+      `${parentSubckt.elements.map((e) => e.subElementName ?? `<${e.typeId}>`).join(", ")}.`
+    );
   }
+  const spec = ELEMENT_SPECS[target.typeId];
+  if (!spec) {
+    throw new Error(
+      `netlist-generator: ref to sibling '${ref.name}' of typeId '${target.typeId}' ` +
+      `has no SPICE prefix in ELEMENT_SPECS. Either add an entry for that typeId, ` +
+      `or mark the parent composite pairedSpiceEquivalent: false.`
+    );
+  }
+  return canonicalizeSpiceLabel(`${parentRawLabel}_${ref.name}`, spec.prefix);
 }
 
 /**
@@ -145,8 +134,11 @@ function assertNoSiblingRefs(
  *   - string lookup  -> read from parent's model params (preferred) or
  *                       subckt.params defaults; throw if neither
  *                       defines the key
- *   - sibling refs   -> handled separately by assertNoSiblingRefs (caller
- *                       must invoke first)
+ *   - { kind: "ref" } -> resolve to the canonical SPICE label of the
+ *                       referenced sibling via `resolveRefToSpiceLabel`
+ *                       and store under the same key (as a non-model
+ *                       string prop). The downstream emit branch for the
+ *                       consuming card type (F/H/W/etc.) reads that prop.
  *
  * The synthetic bag also carries `model = sub.modelRef` (when set) so that
  * the existing emit-path's `props.has("model") ? props.get("model") :
@@ -154,12 +146,13 @@ function assertNoSiblingRefs(
  */
 function resolveSubElementProps(
   sub: SubcircuitElement,
-  subcktParams: Record<string, number> | undefined,
+  parentSubckt: MnaSubcircuitNetlist,
   parentProps: PropertyBag,
   parentRawLabel: string,
 ): PropertyBag {
   const bag = new PropertyBag();
   if (sub.modelRef !== undefined) bag.set("model", sub.modelRef);
+  const subcktParams = parentSubckt.params;
   const subParams = sub.params ?? {};
   for (const subKey of Object.keys(subParams)) {
     const v: SubcircuitElementParam = subParams[subKey];
@@ -178,37 +171,10 @@ function resolveSubElementProps(
           `params nor the subcircuit's defaults define a value for that key.`
         );
       }
-    } else if (typeof v === "object" && v !== null && "kind" in v && v.kind === "siblingBranch") {
-      // ngspice CSW (W element) passthrough: Switch's `ctrlBranch` siblingBranch
-      // resolves to the SPICE label of the sibling V-source. The Switch emit
-      // branch reads the resolved label from the regular property partition
-      // and emits it as the Vsense reference on the W device line. Same
-      // resolution shape the MutualInductor K-element uses; the assertion
-      // exemption in assertNoSiblingRefs gates which (typeId, key) pairs are
-      // permitted to flow through.
-      if (sub.typeId === "Switch" && subKey === "ctrlBranch") {
-        const ref = v as { kind: "siblingBranch"; subElementName: string };
-        // The sibling sub-element's V-source line is emitted with the raw
-        // label `${parentRawLabel}_${sub.subElementName}` which is then
-        // canonicalized to a "V"-prefixed identifier at emit time. We mirror
-        // that canonicalization here so the W device line references the
-        // exact same identifier.
-        const senseRawLabel = `${parentRawLabel}_${ref.subElementName}`;
-        const senseSpiceLabel = canonicalizeSpiceLabel(senseRawLabel, "V");
-        bag.set(subKey, senseSpiceLabel);
-        continue;
-      }
-      // Sibling refs not on the (typeId, key) exemption list reach here
-      // because assertNoSiblingRefs has already thrown; if we get here the
-      // exemption table drifted.
-      throw new Error(
-        `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
-        `param '${subKey}' is a siblingBranch ref that assertNoSiblingRefs ` +
-        `exempted but resolveSubElementProps does not know how to translate.`
-      );
+    } else if (typeof v === "object" && v !== null && "kind" in v && v.kind === "ref") {
+      bag.set(subKey, resolveRefToSpiceLabel(v, parentSubckt, parentRawLabel));
+      continue;
     } else {
-      // Reaching here means a new SubcircuitElementParam shape was added
-      // without updating this generator. Throw rather than silently swallow.
       throw new Error(
         `netlist-generator: sub-element '${sub.subElementName ?? sub.typeId}' ` +
         `param '${subKey}' has unrecognized SubcircuitElementParam shape ` +
@@ -399,15 +365,12 @@ function emitElement(
       // MutualInductor maps directly to ngspice's K element. ngspice K
       // resolves L1Name/L2Name to coil branch indices and stamps mutual-
       // inductance off-diagonals (mutsetup.c:66-67, mutload.c) — identical to
-      // our siblingBranch semantics. Emit inline (the assertNoSiblingRefs
-      // exemption permits L1_branch/L2_branch siblingBranch refs on this
-      // typeId only).
+      // our `{ kind: "ref" }` semantics. Emit inline because the K card is
+      // structurally different from a leaf param substitution.
       if (sub.typeId === "MutualInductor") {
         lines.push(...emitMutualInductorK(rawLabel, sub, subckt, props));
         continue;
       }
-
-      assertNoSiblingRefs(sub, rawLabel, typeId);
 
       const subDef = registry.get(sub.typeId);
       if (!subDef) {
@@ -431,7 +394,7 @@ function emitElement(
         subPinNodesByLabel.set(pinLabel, outer);
       }
 
-      const subProps = resolveSubElementProps(sub, subckt.params, props, rawLabel);
+      const subProps = resolveSubElementProps(sub, subckt, props, rawLabel);
       const subRawLabel = `${rawLabel}_${sub.subElementName ?? `e${i}`}`;
       const subModelKey = sub.modelRef ?? subDef.defaultModel ?? "";
 
@@ -613,6 +576,14 @@ function emitPrimitive(
     const senseRef = canonicalizeSpiceLabel(props.get<string>("senseSourceLabel"), "V");
     return [`${label} ${nodeAt(nodes, 2, rawLabel, "out+")} ${nodeAt(nodes, 3, rawLabel, "out-")} ${senseRef} ${gain}`];
   }
+  if (typeId === "InternalCccs") {
+    // InternalCccs pinLayout: [pos, neg]. Sense V-source is identified by the
+    // `sense` prop, written by resolveSubElementProps as the canonical SPICE
+    // label of the sibling V-source. SPICE: `Fname N+ N- VSENSE gain`.
+    const gain = requireParam(props, def, modelKey, "gain", rawLabel);
+    const senseRef = props.get<string>("sense");
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${senseRef} ${gain}`];
+  }
 
   // ---------------------------------------------------------------------------
   // S-element branches — voltage-controlled switch (ngspice SW / VSWITCH)
@@ -659,43 +630,46 @@ function emitPrimitive(
     ];
   }
 
+  if (typeId === "CurrentControlledSwitch") {
+    // ngspice CSW (W element). ctrlBranch resolves to the sibling V-source's
+    // canonicalized SPICE label (written by resolveSubElementProps). The W
+    // device samples that V-source's branch current per NR iteration and
+    // applies pull-in / drop-out hysteresis via the CSW .model card.
+    //
+    // Model card (cswparam.c / cswload.c):
+    //   .model {modelName} CSW (IT={iThreshold} IH={iHysteresis} RON={ron} ROFF={roff})
+    // ngspice CSW->digiTS mapping:
+    //   CSWiThreshold  = (pullInI + dropOutI) / 2
+    //   CSWiHysteresis = (pullInI - dropOutI) / 2
+    // NC switches additionally emit the `ON` keyword per cswparam.c:27-30
+    // (CSW_IC_ON case sets CSWzero_stateGiven), pinning the CSWITCH's
+    // initial state to closed and matching digiTS's `normallyClosed: true`.
+    const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
+    const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
+    const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
+    const roff = requireParam(props, def, modelKey, "Roff", rawLabel);
+    const pullInI  = requireParam(props, def, modelKey, "pullInI",  rawLabel);
+    const dropOutI = requireParam(props, def, modelKey, "dropOutI", rawLabel);
+    const iThreshold  = (pullInI + dropOutI) / 2;
+    const iHysteresis = (pullInI - dropOutI) / 2;
+    const senseLabel = props.get<string>("ctrlBranch");
+    const wLabel = canonicalizeSpiceLabel(rawLabel, "W");
+    const modelName = `CSWMODEL_${wLabel}`;
+    const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, `.model ${modelName} CSW (IT=${iThreshold} IH=${iHysteresis} RON=${ron} ROFF=${roff})`);
+    }
+    const onKeyword = normallyClosed ? " ON" : "";
+    return [
+      `${wLabel} ${a1Node} ${b1Node} ${senseLabel} ${modelName}${onKeyword}`,
+    ];
+  }
+
   if (typeId === "Switch") {
     const a1Node = nodeAt(nodes, 0, rawLabel, "A1");
     const b1Node = nodeAt(nodes, 1, rawLabel, "B1");
     const ron  = requireParam(props, def, modelKey, "Ron",  rawLabel);
     const roff = requireParam(props, def, modelKey, "Roff", rawLabel);
-
-    if (props.has("ctrlBranch")) {
-      // ngspice CSW (W element) path: Switch's ctrlBranch resolves to the
-      // sibling V-source's canonicalized SPICE label (written by
-      // resolveSubElementProps). The W device samples that V-source's branch
-      // current per NR iteration and applies pull-in / drop-out hysteresis
-      // via the CSW .model card.
-      //
-      // Model card (cswparam.c / cswload.c):
-      //   .model {modelName} CSW (IT={iThreshold} IH={iHysteresis} RON={ron} ROFF={roff})
-      // ngspice CSW->digiTS mapping:
-      //   CSWiThreshold  = (pullInI + dropOutI) / 2
-      //   CSWiHysteresis = (pullInI - dropOutI) / 2
-      // NC switches additionally emit the `ON` keyword per cswparam.c:27-30
-      // (CSW_IC_ON case sets CSWzero_stateGiven), pinning the CSWITCH's
-      // initial state to closed and matching digiTS's `closed: true` initial.
-      const pullInI  = requireParam(props, def, modelKey, "pullInI",  rawLabel);
-      const dropOutI = requireParam(props, def, modelKey, "dropOutI", rawLabel);
-      const iThreshold  = (pullInI + dropOutI) / 2;
-      const iHysteresis = (pullInI - dropOutI) / 2;
-      const senseLabel = props.get<string>("ctrlBranch");
-      const wLabel = canonicalizeSpiceLabel(rawLabel, "W");
-      const modelName = `CSWMODEL_${wLabel}`;
-      const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;
-      if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, `.model ${modelName} CSW (IT=${iThreshold} IH=${iHysteresis} RON=${ron} ROFF=${roff})`);
-      }
-      const onKeyword = normallyClosed ? " ON" : "";
-      return [
-        `${wLabel} ${a1Node} ${b1Node} ${senseLabel} ${modelName}${onKeyword}`,
-      ];
-    }
 
     // Class B (manual click-toggle): no ctrlBranch wired. Synthesize an
     // internal ctrl net + 0V/+1V V-source snapshotting `closed` at deck-build
@@ -1116,17 +1090,17 @@ function emitMutualInductorK(
 
   const l1Ref = subParams["L1_branch"];
   const l2Ref = subParams["L2_branch"];
-  if (!isSiblingBranchRef(l1Ref) || !isSiblingBranchRef(l2Ref)) {
+  if (!isElementRef(l1Ref) || !isElementRef(l2Ref)) {
     throw new Error(
       `netlist-generator: MutualInductor sub-element '${subName}' of ` +
       `'${parentRawLabel}' must declare L1_branch and L2_branch as ` +
-      `siblingBranch refs. Got L1_branch=${JSON.stringify(l1Ref)}, ` +
+      `{ kind: "ref", name } refs. Got L1_branch=${JSON.stringify(l1Ref)}, ` +
       `L2_branch=${JSON.stringify(l2Ref)}.`
     );
   }
 
-  const l1SubName = l1Ref.subElementName;
-  const l2SubName = l2Ref.subElementName;
+  const l1SubName = l1Ref.name;
+  const l2SubName = l2Ref.name;
   const l1Sub = parentSubckt.elements.find((e) => e.subElementName === l1SubName);
   const l2Sub = parentSubckt.elements.find((e) => e.subElementName === l2SubName);
   if (!l1Sub || !l2Sub) {
@@ -1186,16 +1160,16 @@ function emitMutualInductorK(
 
   const subRawLabel = `${parentRawLabel}_${subName}`;
   const kLabel  = canonicalizeSpiceLabel(subRawLabel, "K");
-  const l1Label = canonicalizeSpiceLabel(`${parentRawLabel}_${l1SubName}`, "L");
-  const l2Label = canonicalizeSpiceLabel(`${parentRawLabel}_${l2SubName}`, "L");
+  const l1Label = resolveRefToSpiceLabel(l1Ref, parentSubckt, parentRawLabel);
+  const l2Label = resolveRefToSpiceLabel(l2Ref, parentSubckt, parentRawLabel);
 
   return [`${kLabel} ${l1Label} ${l2Label} ${k}`];
 }
 
-function isSiblingBranchRef(
+function isElementRef(
   v: SubcircuitElementParam | undefined,
-): v is { kind: "siblingBranch"; subElementName: string } {
-  return typeof v === "object" && v !== null && "kind" in v && v.kind === "siblingBranch";
+): v is { kind: "ref"; name: string } {
+  return typeof v === "object" && v !== null && "kind" in v && v.kind === "ref";
 }
 
 /**

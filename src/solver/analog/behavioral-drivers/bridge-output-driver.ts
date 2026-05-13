@@ -89,13 +89,11 @@ export class BridgeOutputDriverElement extends PoolBackedAnalogElement {
   constructor(
     spec: ResolvedPinElectrical,
     nodeId: number,
-    branchIdx: number,
     loaded: boolean,
   ) {
     super(new Map([["node", nodeId]]));
     this._spec = { ...spec };
     this._nodeId = nodeId;
-    this.branchIndex = branchIdx;
     this._loaded = loaded;
 
     if (loaded && spec.cOut > 0 && nodeId > 0) {
@@ -113,6 +111,14 @@ export class BridgeOutputDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     if (this._nodeId <= 0) return;
+
+    // VSRCsetup parity (vsrcset.c:40-44): allocate the branch row via
+    // CKTmkCur from setup, idempotent on re-entry. Bridges are voltage
+    // sources by MNA stamp; the branch index is owned by the engine's
+    // _maxEqNum sequence, not pre-reserved by the compiler.
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
 
     if (this.branchIndex > 0) {
       this._hBranchNode   = ctx.solver.allocElement(this.branchIndex, this._nodeId);

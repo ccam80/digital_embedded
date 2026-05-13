@@ -172,9 +172,9 @@ export function buildDirectNodeMapping(
   }
 
   // 2. Branch currents: voltage/current source elements with branchIndex >= 0.
-  // el.branchIndex is the 1-based absolute slot index `totalNodeCount + 1 + meta.branchIdx`
-  // (compiler.ts:1192-1193); consumers like inductor.ts read voltages[branchIndex]
-  // directly, so this must remain 1-based.
+  // el.branchIndex is the 1-based MNA equation index allocated inside the
+  // element's setup() via ctx.makeCur (VSRCsetup parity); consumers like
+  // inductor.ts read voltages[branchIndex] directly, so this must remain 1-based.
   for (let ei = 0; ei < elements.length; ei++) {
     const el = elements[ei];
     if (el.branchIndex < 0) continue;

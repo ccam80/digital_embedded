@@ -24,7 +24,6 @@ const CMOS_3V3: ResolvedPinElectrical = {
 };
 
 const NODE = 1;
-const BRANCH_IDX = 2;
 
 // ---------------------------------------------------------------------------
 // BridgeOutputDriverElement / BridgeInputDriverElement — threshold logic
@@ -57,7 +56,7 @@ describe("BridgeOutputDriverElement", () => {
   });
 
   it("makeBridgeOutputAdapter produces element with setLogicLevel and setHighZ", () => {
-    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
+    const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, false);
     expect(typeof adapter.setLogicLevel).toBe("function");
     expect(typeof adapter.setHighZ).toBe("function");
   });
