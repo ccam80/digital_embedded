@@ -26,9 +26,6 @@
  * vOL. The external "out" pin's open-collector character (if any) is the
  * outPin sub-element's concern; this driver writes a clean smoothed target
  * to ctrl_out so the matrix stays well-conditioned regardless of latch.
- * (The docstring previously specified G_eff = w/rOut with no RHS; that model
- * leaves ctrl_out high-Z when w=0, making the MNA matrix singular because
- * ctrl_out is an internal net with no external pull-up.)
  *
  * Schema source: `COMPARATOR_SCHEMA` is owned by the parent (the
  * comparator's hysteresis is a chip-level property); this driver imports
