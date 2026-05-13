@@ -24,18 +24,19 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge } from "./edge-detect.js";
+import { detectRisingEdge, logicLevel } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Memoised arity-indexed schema factory
 // ---------------------------------------------------------------------------
 //
-// Three slots, independent of bitWidth (bitWidth parameterises masking only).
+// Slots, independent of bitWidth (bitWidth parameterises masking only).
 //
 // Slot layout:
 //   [0] LAST_CLOCK          - clock voltage at last accepted timestep
 //   [1] STORED_VALUE        - packed N-bit integer latch
+//   [2] PREV_EN             - prior hysteresis classification of en (0 or 1)
 
 const REGISTER_SCHEMAS = new Map<number, StateSchema>();
 
@@ -51,6 +52,10 @@ function getRegisterSchema(bitWidth: number): StateSchema {
     {
       name: "STORED_VALUE",
       doc: "Packed N-bit integer latch. Updated on rising clock edge when en is high by sampling the D bus.",
+    },
+    {
+      name: "PREV_EN",
+      doc: "Prior hysteresis classification of en (0 or 1). Held by logicLevel when v sits in [vIL, vIH).",
     },
   ];
 
@@ -100,6 +105,7 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
   private readonly _mask: number;
   private readonly _slotLastClock: number;
   private readonly _slotStoredValue: number;
+  private readonly _slotPrevEn: number;
   private readonly _dNode: number;
   private readonly _cNode: number;
   private readonly _enNode: number;
@@ -124,6 +130,7 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
     this.stateSize = this.stateSchema.size;
     this._slotLastClock  = this.stateSchema.indexOf.get("LAST_CLOCK")!;
     this._slotStoredValue = this.stateSchema.indexOf.get("STORED_VALUE")!;
+    this._slotPrevEn      = this.stateSchema.indexOf.get("PREV_EN")!;
 
     this._dNode   = pinNodes.get("D")!;
     this._cNode   = pinNodes.get("C")!;
@@ -157,8 +164,8 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
    * with DigitalOutputPinLoaded packed-value output); bit-level analog
    * hysteresis is inappropriate because the bits are already discrete.
    *
-   * en-guard uses simple-threshold (v >= vIH) consistent with counter-driver
-   * control-input classification; only D uses full vIH/vIL hysteresis.
+   * en is classified with vIH/vIL hysteresis via logicLevel, holding the
+   * prior class when v sits in [vIL, vIH).
    */
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
@@ -173,9 +180,11 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
 
     const prevClock = s1[base + this._slotLastClock];
     let stored = s1[base + this._slotStoredValue];
+    const prevEn = (s1[base + this._slotPrevEn] >= 0.5 ? 1 : 0) as 0 | 1;
+    const en = logicLevel(vEn, this._vIH, this._vIL, prevEn);
 
     if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
-      if (vEn >= this._vIH) {
+      if (en) {
         // vD is a packed integer value on the analog node; each bit i is the
         // i-th bit of that integer (same encoding as the DigitalOutputPinLoaded
         // packed-value output). The extracted bit is already 0 or 1 — no
@@ -189,6 +198,7 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
 
     s0[base + this._slotLastClock]   = vClock;
     s0[base + this._slotStoredValue] = stored;
+    s0[base + this._slotPrevEn]      = en;
 
     for (let i = 0; i < this._bitWidth; i++) {
       const bit = (stored >>> i) & 1;

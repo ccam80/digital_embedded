@@ -59,12 +59,13 @@ export const COMPARATOR_SCHEMA: StateSchema = defineStateSchema("Comparator", [
 
 export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_DEFAULTS } = defineModelParams({
   primary: {
-    hysteresis:   { default: 0,    unit: "V", description: "Hysteresis band width" },
+    hysteresis:   { default: 0,     unit: "V", description: "Hysteresis band width" },
     vos:          { default: 0.001, unit: "V", description: "Input offset voltage" },
-    rSat:         { default: 50,   unit: "Ω", description: "Output saturation resistance" },
-    responseTime: { default: 1e-6, unit: "s", description: "Propagation delay time constant" },
-    vOH:          { default: 3.3,  unit: "V", description: "Output HIGH voltage" },
-    vOL:          { default: 0.0,  unit: "V", description: "Output LOW voltage" },
+    rOut:         { default: 50,    unit: "Ω", description: "Output saturation resistance (single output stage; same value flows to driver and outPin)" },
+    cOut:         { default: 1e-12, unit: "F", description: "Output capacitance (RC load on the external output)" },
+    responseTime: { default: 1e-6,  unit: "s", description: "Propagation delay time constant" },
+    vOH:          { default: 3.3,   unit: "V", description: "Output HIGH voltage" },
+    vOL:          { default: 0.0,   unit: "V", description: "Output LOW voltage" },
   },
 });
 
@@ -184,7 +185,7 @@ export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
       params: {
         hysteresis:   "hysteresis",
         vos:          "vos",
-        rSat:         "rSat",
+        rOut:         "rOut",
         responseTime: "responseTime",
       },
     },
@@ -194,6 +195,7 @@ export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
       subElementName: "outPin",
       params: {
         rOut: "rOut",
+        cOut: "cOut",
         vOH:  "vOH",
         vOL:  "vOL",
       },
@@ -219,7 +221,7 @@ export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
       params: {
         hysteresis:   "hysteresis",
         vos:          "vos",
-        rSat:         "rSat",
+        rOut:         "rOut",
         responseTime: "responseTime",
         vOH:          "vOH",
         vOL:          "vOL",
@@ -231,6 +233,7 @@ export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
       subElementName: "outPin",
       params: {
         rOut: "rOut",
+        cOut: "cOut",
         vOH:  "vOH",
         vOL:  "vOL",
       },
@@ -266,7 +269,8 @@ const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
 const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "hysteresis",   propertyKey: "hysteresis",   convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "vos",          propertyKey: "vos",          convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "rSat",         propertyKey: "rSat",         convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rOut",         propertyKey: "rOut",         convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "cOut",         propertyKey: "cOut",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "outputType",   propertyKey: "model",         convert: (v) => v },
   { xmlName: "responseTime", propertyKey: "responseTime", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",        propertyKey: "label",        convert: (v) => v },

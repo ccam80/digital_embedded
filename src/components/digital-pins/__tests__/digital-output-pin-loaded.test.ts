@@ -152,7 +152,7 @@ describe("DigitalOutputPinLoaded (3-port composite)", () => {
   });
 
   it("cOut RC charges node from vOL to vOH after ctrl flip", () => {
-    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000, cOut = 1e-12;
+    const vOH = 5, vOL = 0, rOut = 100, rLoad = 1_000_000;
     // Start: ctrl at vOL → node settled near vOL
     // Then flip ctrl to vOH and advance time > 5τ (τ = rOut × cOut = 100 ps)
     // 5τ = 500 ps: step with maxTimeStep = 50e-12, take 15 steps → ~750 ps

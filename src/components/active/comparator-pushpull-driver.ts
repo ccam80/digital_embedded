@@ -7,9 +7,9 @@
  * `COMPARATOR_PUSH_PULL_NETLIST` as the sole sub-element.
  *
  * Stamp model differs from open-collector:
- * - Open-collector: G = w/rSat at (out, out), no RHS. Active LOW only;
+ * - Open-collector: G = w/rOut at (out, out), no RHS. Active LOW only;
  *   inactive state is high-Z and needs an external pull-up.
- * - Push-pull (this file): G = 1/rSat at (out, out), RHS = G * vTarget.
+ * - Push-pull (this file): G = 1/rOut at (out, out), RHS = G * vTarget.
  *   The output is driven to a smoothed target between vOL and vOH, with
  *   the smoothing tracked by the existing `OUTPUT_WEIGHT` slot:
  *     vTarget = (1 - w) * vOH + w * vOL
@@ -58,24 +58,22 @@ const COMPARATOR_PUSHPULL_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 const COMPARATOR_PUSHPULL_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "hysteresis",   default: 0 },
   { key: "vos",          default: 0.001 },
-  { key: "rSat",         default: 50 },
+  { key: "rOut",         default: 50 },
   { key: "responseTime", default: 1e-6 },
   { key: "vOH",          default: 3.3 },
   { key: "vOL",          default: 0 },
-  { key: "rOut",         default: 100 },
 ];
 
 const COMPARATOR_PUSHPULL_DRIVER_DEFAULTS: Record<string, number> = {
   hysteresis: 0,
   vos: 0.001,
-  rSat: 50,
+  rOut: 50,
   responseTime: 1e-6,
   vOH: 3.3,
   vOL: 0,
-  rOut: 100,
 };
 
-const MIN_RSAT = 1e-9;
+const MIN_ROUT = 1e-9;
 const MIN_TAU  = 1e-12;
 
 // ---------------------------------------------------------------------------
@@ -90,7 +88,6 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
 
   private _hysteresis: number;
   private _vos: number;
-  private _rSat: number;
   private _tau: number;
   private _vOH: number;
   private _vOL: number;
@@ -104,11 +101,10 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     super(pinNodes);
     this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["hysteresis"]!;
     this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vos"]!;
-    this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
+    this._rOut       = Math.max(props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["rOut"]!, MIN_ROUT);
     this._tau        = Math.max(props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["responseTime"]!, MIN_TAU);
     this._vOH        = props.hasModelParam("vOH")          ? props.getModelParam<number>("vOH")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vOH"]!;
     this._vOL        = props.hasModelParam("vOL")          ? props.getModelParam<number>("vOL")          : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["vOL"]!;
-    this._rOut       = props.hasModelParam("rOut")         ? props.getModelParam<number>("rOut")         : COMPARATOR_PUSHPULL_DRIVER_DEFAULTS["rOut"]!;
   }
 
   setup(ctx: SetupContext): void {
@@ -122,11 +118,10 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     switch (key) {
       case "hysteresis":   this._hysteresis = value; break;
       case "vos":          this._vos = value; break;
-      case "rSat":         this._rSat = Math.max(value, MIN_RSAT); break;
+      case "rOut":         this._rOut = Math.max(value, MIN_ROUT); break;
       case "responseTime": this._tau = Math.max(value, MIN_TAU); break;
       case "vOH":          this._vOH = value; break;
       case "vOL":          this._vOL = value; break;
-      case "rOut":         this._rOut = value; break;
     }
   }
 

@@ -114,7 +114,7 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
   private _vOH: number;
   private _vOL: number;
   private _ctrlNodes: number[];
-  private _handlesByBit: readonly [number, number, number, number][];
+  private _handlesByBit: readonly (readonly [number, number, number, number])[];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -141,7 +141,7 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
 
   setup(ctx: SetupContext): void {
     this._stateBase = ctx.allocStates(this.stateSize);
-    const handles: [number, number, number, number][] = [];
+    const handles: (readonly [number, number, number, number])[] = [];
     for (let i = 0; i < this._outCount; i++) {
       this._ctrlNodes[i] = this.pinNodes.get(`ctrl_${i}`)!;
       handles.push(allocNortonStamp(ctx.solver, this._ctrlNodes[i], this._gndNode));

@@ -67,7 +67,7 @@ describe("Comparator initialization — open-collector (T1)", () => {
               model:        "open-collector",
               hysteresis:   0,
               vos:          0,
-              rSat:         50,
+              rOut:         50,
               responseTime: 1e-7,
             },
           },
@@ -115,7 +115,7 @@ describe("Comparator initialization — open-collector (T1)", () => {
               model:        "open-collector",
               hysteresis:   0,
               vos:          0,
-              rSat:         50,
+              rOut:         50,
               responseTime: 1e-7,
             },
           },
@@ -162,7 +162,7 @@ describe("Comparator initialization — push-pull (T1)", () => {
               model:        "push-pull",
               hysteresis:   0,
               vos:          0,
-              rSat:         50,
+              rOut:         50,
               responseTime: 1e-7,
               vOH:          3.3,
               vOL:          0,
@@ -197,9 +197,9 @@ describe("Comparator initialization — push-pull (T1)", () => {
 
 // ---------------------------------------------------------------------------
 // Category 2 — DC operating point analytical (T1)
-// Open-collector: V+=2V, V-=1V, rSat=50, vOH=3.3V pull-up through 1kΩ.
-// Active state: G_eff = w/rSat at (out,out). Closed-form: with rSat=50 and
-// Rpull=1000, Vout = vOH * rSat / (rSat + Rpull) = 3.3 * 50/1050 ≈ 0.157V.
+// Open-collector: V+=2V, V-=1V, rOut=50, vOH=3.3V pull-up through 1kΩ.
+// Active state: G_eff = w/rOut at (out,out). Closed-form: with rOut=50 and
+// Rpull=1000, Vout = vOH * rOut / (rOut + Rpull) = 3.3 * 50/1050 ≈ 0.157V.
 // Push-pull: uses dcOperatingPoint() and asserts converged + Vout direction.
 // Note: DCOP uses dt=0 so alpha=0 and OUTPUT_WEIGHT does not integrate from
 // the warm-start seed. Assertions are on convergence and directional output.
@@ -207,8 +207,8 @@ describe("Comparator initialization — push-pull (T1)", () => {
 
 describe("Comparator DCOP analytical (T1)", () => {
   it("dcop_oc_active_output_converged", () => {
-    // Open-collector: V+=2V, V-=1V, vOH=3.3V pull-up via rload=1kΩ, rSat=50.
-    // Closed-form at full weight (w=1): Vout = vOH * rSat/(rSat+rload)
+    // Open-collector: V+=2V, V-=1V, vOH=3.3V pull-up via rload=1kΩ, rOut=50.
+    // Closed-form at full weight (w=1): Vout = vOH * rOut/(rOut+rload)
     //   = 3.3 * 50/1050 ≈ 0.157V — output well below vOH (sinking active).
     const fix = buildFixture({
       build: (_r, facade) => facade.build({
@@ -225,7 +225,7 @@ describe("Comparator DCOP analytical (T1)", () => {
               model:      "open-collector",
               hysteresis: 0,
               vos:        0,
-              rSat:       50,
+              rOut:       50,
             },
           },
           { id: "gnd", type: "Ground", props: { label: "gnd" } },
@@ -272,7 +272,7 @@ describe("Comparator DCOP analytical (T1)", () => {
               model:      "open-collector",
               hysteresis: 0,
               vos:        0,
-              rSat:       50,
+              rOut:       50,
             },
           },
           { id: "gnd", type: "Ground", props: { label: "gnd" } },
@@ -318,7 +318,7 @@ describe("Comparator DCOP analytical (T1)", () => {
               model:      "push-pull",
               hysteresis: 0,
               vos:        0,
-              rSat:       50,
+              rOut:       50,
               vOH:        3.3,
               vOL:        0,
             },
@@ -362,7 +362,7 @@ describe("Comparator DCOP analytical (T1)", () => {
               model:      "push-pull",
               hysteresis: 0,
               vos:        0,
-              rSat:       50,
+              rOut:       50,
               vOH:        3.3,
               vOL:        0,
             },
@@ -504,7 +504,7 @@ describeIfDll("Comparator PP inactive vs ngspice — transient + stamp parity (T
 
 // ---------------------------------------------------------------------------
 // Category 4 — Parameter hot-load (T1)
-// One it() per settable parameter: rSat, hysteresis, vos, responseTime.
+// One it() per settable parameter: rOut, hysteresis, vos, responseTime.
 // ---------------------------------------------------------------------------
 
 describe("Comparator parameter hot-load (T1)", () => {
@@ -527,7 +527,7 @@ describe("Comparator parameter hot-load (T1)", () => {
               model:      "open-collector",
               hysteresis: 0,
               vos:        0,
-              rSat:       50,
+              rOut:       50,
             },
           },
           { id: "gnd", type: "Ground", props: { label: "gnd" } },
@@ -559,10 +559,10 @@ describe("Comparator parameter hot-load (T1)", () => {
     return ce!;
   }
 
-  it("hotload_rSat_changes_output_voltage", () => {
-    // rSat scales G_eff = w/rSat (OC). After running enough steps for weight
+  it("hotload_rOut_changes_output_voltage", () => {
+    // rOut scales G_eff = w/rOut (OC). After running enough steps for weight
     // to build up (responseTime=1e-7, many steps), the output is well below vOH.
-    // Raising rSat to 5000 reduces G_eff => less sinking => Vout rises.
+    // Raising rOut to 5000 reduces G_eff => less sinking => Vout rises.
     const fix = buildFixture({
       build: (_r, facade) => facade.build({
         components: [
@@ -578,7 +578,7 @@ describe("Comparator parameter hot-load (T1)", () => {
               model:        "open-collector",
               hysteresis:   0,
               vos:          0,
-              rSat:         50,
+              rOut:         50,
               responseTime: 1e-7,
             },
           },
@@ -605,11 +605,11 @@ describe("Comparator parameter hot-load (T1)", () => {
     // Weight built up => output is below vOH (sinking active)
     expect(before).toBeLessThan(3.3);
 
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "rSat", 5000);
+    fix.coordinator.setComponentProperty(getCmpCe(fix), "rOut", 5000);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNodeId);
-    // Higher rSat => lower G_eff => less sinking => Vout rises
+    // Higher rOut => lower G_eff => less sinking => Vout rises
     expect(after).toBeGreaterThan(before);
   });
 
@@ -648,7 +648,7 @@ describe("Comparator parameter hot-load (T1)", () => {
               model:        "open-collector",
               hysteresis:   0,
               vos:          0,
-              rSat:         50,
+              rOut:         50,
               responseTime: 1e-7,
             },
           },
@@ -708,7 +708,7 @@ describe("Comparator parameter hot-load (T1)", () => {
               model:        "open-collector",
               hysteresis:   0,
               vos:          0,
-              rSat:         50,
+              rOut:         50,
               responseTime: 1e-3,
             },
           },

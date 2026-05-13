@@ -320,8 +320,8 @@ describeIfDll("Comparator transient + iteration parity — PP inactive (T3)", ()
 // ---------------------------------------------------------------------------
 
 describe("Comparator parameter hot-load — open-collector (T1)", () => {
-  it("hotload_rSat_reduces_sinking_raises_output_voltage", () => {
-    // rSat scales G_eff=w/rSat. Raising rSat→5000 lowers G_eff → V_out rises.
+  it("hotload_rOut_reduces_sinking_raises_output_voltage", () => {
+    // rOut scales G_eff=w/rOut. Raising rOut→5000 lowers G_eff → V_out rises.
     const fix = buildFixture({
       build: (_r, facade) => facade.build({
         components: [
@@ -345,7 +345,7 @@ describe("Comparator parameter hot-load — open-collector (T1)", () => {
     const outNodeId = fix.circuit.labelToNodeId.get("cmp:out")!;
     const before = fix.engine.getNodeVoltage(outNodeId);
     expect(before).toBeLessThan(3.3);
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "rSat", 5000);
+    fix.coordinator.setComponentProperty(getCmpCe(fix), "rOut", 5000);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNodeId);
     expect(after).toBeGreaterThan(before);

@@ -63,7 +63,7 @@ function adcPinNodes(): ReadonlyMap<string, number> {
 describe("component-local-driver-params — accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("ComparatorDriverElement accepts rOut/vOH/vOL", () => {
     const props = makeProps({
-      hysteresis: 0, vos: 0.001, rSat: 50, responseTime: 1e-6,
+      hysteresis: 0, vos: 0.001, responseTime: 1e-6,
       rOut: 100, vOH: 5, vOL: 0,
     });
     const el = new ComparatorDriverElement(comparatorPinNodes(), props);
@@ -74,7 +74,7 @@ describe("component-local-driver-params — accepts rOut/vOH/vOL via setParam wi
 
   it("ComparatorPushPullDriverElement accepts rOut/vOH/vOL", () => {
     const props = makeProps({
-      hysteresis: 0, vos: 0.001, rSat: 50, responseTime: 1e-6,
+      hysteresis: 0, vos: 0.001, responseTime: 1e-6,
       vOH: 3.3, vOL: 0, rOut: 100,
     });
     const el = new ComparatorPushPullDriverElement(comparatorPinNodes(), props);

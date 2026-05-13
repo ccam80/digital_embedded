@@ -145,8 +145,8 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
  * Port order: VIN(0), CLK(1), VREF(2), GND(3), EOC(4), D0(5)..D(N-1)(4+N).
  *
  * Sub-elements:
- *   drv      - ADCDriver (driver leaf: reads VIN/CLK/VREF/GND, writes N+1 output slots)
- *   eocPin   - DigitalOutputPinLoaded for EOC
+ *   drv      - ADCDriver (driver leaf: reads VIN/CLK/VREF/GND, writes ctrl_eoc + ctrl_d_*)
+ *   eocPin   - DigitalOutputPinLoaded for EOC (driven by ctrl_eoc from drv)
  *   dPin0..N - DigitalOutputPinLoaded for D0..D(N-1)
  */
 export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
@@ -158,17 +158,17 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   for (let i = 0; i < N; i++) ports.push(`D${i}`);
   const P = ports.length; // N + 5
 
-  // Internal nets: ctrl_d_0..ctrl_d_{N-1} at indices P..P+N-1.
-  const internalNetLabels: string[] = [];
+  // Internal nets: ctrl_eoc at index P, then ctrl_d_0..ctrl_d_{N-1} at P+1..P+N.
+  const internalNetLabels: string[] = ["ctrl_eoc"];
   for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_d_${i}`);
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // ADCDriver reads VIN(0), CLK(1), VREF(2), GND(3) and stamps ctrl_d_0..ctrl_d_{N-1}.
-  // Pin order for driver: VIN, CLK, VREF, GND, ctrl_d_0..ctrl_d_{N-1}.
-  const drvPins = [0, 1, 2, 3];
-  for (let i = 0; i < N; i++) drvPins.push(P + i);
+  // ADCDriver reads VIN(0), CLK(1), VREF(2), GND(3) and stamps ctrl_eoc + ctrl_d_0..ctrl_d_{N-1}.
+  // Pin order for driver: VIN, CLK, VREF, GND, ctrl_eoc, ctrl_d_0..ctrl_d_{N-1}.
+  const drvPins = [0, 1, 2, 3, P /* ctrl_eoc */];
+  for (let i = 0; i < N; i++) drvPins.push(P + 1 + i);
   elements.push({
     typeId: "ADCDriver",
     modelRef: "default",
@@ -183,7 +183,7 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   });
   netlist.push(drvPins);
 
-  // EOC digital output pin (port index 4, gnd = port index 3, ctrl = GND -> vOL).
+  // EOC digital output pin (port index 4, gnd = port index 3, ctrl = ctrl_eoc).
   elements.push({
     typeId: "DigitalOutputPinLoaded",
     modelRef: "default",
@@ -195,7 +195,7 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
       vOL: "vOL",
     },
   });
-  netlist.push([4 /* EOC */, 3 /* GND */, 3 /* ctrl = GND */]);
+  netlist.push([4 /* EOC */, 3 /* GND */, P /* ctrl_eoc */]);
 
   // D0..D(N-1) digital output pins — each gains its ctrl_d_i net.
   for (let i = 0; i < N; i++) {
@@ -210,10 +210,10 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
         vOL: "vOL",
       },
     });
-    netlist.push([5 + i /* D_i */, 3 /* GND */, P + i /* ctrl_d_i */]);
+    netlist.push([5 + i /* D_i */, 3 /* GND */, P + 1 + i /* ctrl_d_i */]);
   }
 
-  return { ports, elements, internalNetCount: N, internalNetLabels, netlist };
+  return { ports, elements, internalNetCount: N + 1, internalNetLabels, netlist };
 };
 
 // ---------------------------------------------------------------------------

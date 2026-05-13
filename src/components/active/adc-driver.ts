@@ -52,7 +52,14 @@ import { detectRisingEdge } from "../../solver/analog/behavioral-drivers/edge-de
 //   [1]          FSM_PHASE            (0=idle/1=sample/2=convert/3=ready)
 //   [2]          SAR_BITS             (packed bitmask, internal SAR register)
 //   [3]          SAR_BIT_INDEX        (current bit-under-test in convert phase)
-//   [4]          OUTPUT_CODE          (latched final code)
+//   [4]          OUTPUT_CODE          (latched final code, packed integer)
+//   [5]          OUTPUT_EOC           (end-of-conversion, 0 or 1; held across NR
+//                                       iterations and timesteps until the FSM
+//                                       updates it)
+//   [6..6+N-1]   OUTPUT_D{0..N-1}     (per-bit denormalised view of OUTPUT_CODE,
+//                                       written at the bottom of load() so
+//                                       downstream consumers can observe the
+//                                       latched bus bit-by-bit without unpacking)
 
 const ADC_SCHEMAS = new Map<number, StateSchema>();
 
@@ -81,7 +88,17 @@ function getAdcSchema(bits: number): StateSchema {
       name: "OUTPUT_CODE",
       doc: "Latched final conversion code. Written when FSM transitions to ready; held until the next conversion completes.",
     },
+    {
+      name: "OUTPUT_EOC",
+      doc: "End-of-conversion handshake (0 or 1). In SAR mode, asserts 1 when phase transitions 2→3 (LSB decided), held through phase 3, clears to 0 on phase 3→0. In instant mode, asserts 1 on rising CLK edge, clears when CLK falls below vIL. Held between branches that don't update it.",
+    },
   ];
+  for (let i = 0; i < bits; i++) {
+    slots.push({
+      name: `OUTPUT_D${i}`,
+      doc: `Bit ${i} of OUTPUT_CODE, denormalised so the latched bus is observable bit-by-bit. Written at the bottom of load() from (outputCode >> ${i}) & 1.`,
+    });
+  }
 
   const schema = defineStateSchema(`ADCDriver_${bits}b`, slots);
   ADC_SCHEMAS.set(bits, schema);
@@ -100,6 +117,7 @@ function buildAdcDriverPinLayout(props: PropertyBag): PinDeclaration[] {
     { direction: PinDirection.INPUT, label: "CLK",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: true,  kind: "signal" },
     { direction: PinDirection.INPUT, label: "VREF", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     { direction: PinDirection.INPUT, label: "GND",  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "ctrl_eoc", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
   for (let i = 0; i < bits; i++) {
     pins.push({
@@ -136,6 +154,8 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
   private readonly _slotSarBits:     number;
   private readonly _slotSarBitIndex: number;
   private readonly _slotOutputCode:  number;
+  private readonly _slotOutputEoc:   number;
+  private readonly _slotOutputD:     readonly number[];
   private readonly _vinNode:  number;
   private readonly _clkNode:  number;
   private readonly _vrefNode: number;
@@ -147,7 +167,9 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
   private _vOL: number;
   private _firstSample: boolean = true;
   private _ctrlNodes: number[] = [];
+  private _ctrlEocNode: number = -1;
   private _handlesByBit: Array<readonly [number, number, number, number]> = [];
+  private _handleEoc: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -164,6 +186,12 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     this._slotSarBits     = this.stateSchema.indexOf.get("SAR_BITS")!;
     this._slotSarBitIndex = this.stateSchema.indexOf.get("SAR_BIT_INDEX")!;
     this._slotOutputCode  = this.stateSchema.indexOf.get("OUTPUT_CODE")!;
+    this._slotOutputEoc   = this.stateSchema.indexOf.get("OUTPUT_EOC")!;
+    const outputDSlots: number[] = [];
+    for (let i = 0; i < this._bits; i++) {
+      outputDSlots.push(this.stateSchema.indexOf.get(`OUTPUT_D${i}`)!);
+    }
+    this._slotOutputD = outputDSlots;
 
     this._vinNode  = pinNodes.get("VIN")!;
     this._clkNode  = pinNodes.get("CLK")!;
@@ -185,6 +213,8 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
       this._ctrlNodes.push(ctrlNode);
       this._handlesByBit.push(allocNortonStamp(ctx.solver, ctrlNode, this._gndNode));
     }
+    this._ctrlEocNode = this.pinNodes.get("ctrl_eoc")!;
+    this._handleEoc   = allocNortonStamp(ctx.solver, this._ctrlEocNode, this._gndNode);
   }
 
   /**
@@ -219,7 +249,10 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     let sarBits     = s1[base + this._slotSarBits];
     let sarBitIndex = s1[base + this._slotSarBitIndex];
     let outputCode  = s1[base + this._slotOutputCode];
-    let outputEoc   = 0;
+    // Hold prior EOC across calls; FSM branches that change it write a new
+    // value below. Without this hold, EOC would collapse to 0 every load()
+    // even though the SAR FSM specifies it stays high through phase 3.
+    let outputEoc   = s1[base + this._slotOutputEoc] >= 0.5 ? 1 : 0;
 
     const edge = !this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH);
     this._firstSample = false;
@@ -289,13 +322,19 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     s0[base + this._slotSarBits]     = sarBits;
     s0[base + this._slotSarBitIndex] = sarBitIndex;
     s0[base + this._slotOutputCode]  = outputCode;
+    s0[base + this._slotOutputEoc]   = outputEoc;
 
     // Norton stamp at each ctrl_d_<i>: drive each bit of the output code.
+    // Also denormalise the bit into OUTPUT_D{i} so consumers can observe the
+    // latched bus bit-by-bit without unpacking OUTPUT_CODE.
     for (let i = 0; i < this._bits; i++) {
       const bit = (outputCode >> i) & 1;
+      s0[base + this._slotOutputD[i]!] = bit;
       const target = bit ? this._vOH : this._vOL;
       stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, this._rOut, target);
     }
+    // Norton stamp at ctrl_eoc: drive EOC handshake.
+    stampNortonValue(ctx, this._handleEoc, this._ctrlEocNode, this._gndNode, this._rOut, outputEoc ? this._vOH : this._vOL);
   }
 
   /**

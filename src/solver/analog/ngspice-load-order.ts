@@ -32,6 +32,7 @@ export const NGSPICE_LOAD_ORDER = {
   CCCS: 18,
   CCVS: 19,
   CPL:  20,  // dev.c: get_cpl_info (index 20)
+  CSW:  21,  // dev.c: get_csw_info (index 21) — current-controlled switch (W element)
   DIO:  22,
   IND:  27,
   MUT:  28,
@@ -64,6 +65,7 @@ export const NGSPICE_LOAD_ORDER = {
  */
 export type DeviceFamily =
   | "IND"
+  | "MUT"
   | "VSRC"
   | "ISRC"
   | "VCVS"
@@ -73,6 +75,7 @@ export type DeviceFamily =
   | "RES"
   | "CAP"
   | "SW"
+  | "CSW"
   | "TRA"
   | "DIO"
   | "BJT"
@@ -125,6 +128,8 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
   PMOS:            NGSPICE_LOAD_ORDER.MOS,
   NJFET:           NGSPICE_LOAD_ORDER.JFET,
   PJFET:           NGSPICE_LOAD_ORDER.JFET,
+  // Switches
+  CurrentControlledSwitch: NGSPICE_LOAD_ORDER.CSW,
   // Behavioral / controlled sources
   VCCS:            NGSPICE_LOAD_ORDER.VCCS,
   VCVS:            NGSPICE_LOAD_ORDER.VCVS,
@@ -170,6 +175,8 @@ export const TYPE_ID_TO_DEVICE_FAMILY: Readonly<Record<string, DeviceFamily>> = 
   PMOS:            "MOS",
   NJFET:           "JFET",
   PJFET:           "JFET",
+  // Switches
+  CurrentControlledSwitch: "CSW",
   // Behavioral / controlled sources
   VCCS:            "VCCS",
   VCVS:            "VCVS",

@@ -26,13 +26,6 @@ function nodeOf(fix: Fixture, label: string): number {
   return n;
 }
 
-function findAnalogElementByLabel(fix: Fixture, label: string): AnalogElement {
-  for (let i = 0; i < fix.circuit.elements.length; i++) {
-    if (fix.elementLabels.get(i) === label) return fix.circuit.elements[i]!;
-  }
-  throw new Error(`AnalogElement with label '${label}' not found`);
-}
-
 // ---------------------------------------------------------------------------
 // Thin test-wrapper for DigitalOutputPinTriStateLoaded (internalOnly composite)
 //

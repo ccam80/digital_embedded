@@ -20,8 +20,8 @@
  *   wNew = wOld + (dt / (tau + dt)) * (target - wOld)
  *   where tau = responseTime, target = latch. At dt=0 (DC) wNew = wOld.
  *
- * Stamp: G_eff = s1[OUTPUT_WEIGHT] / rSat at (out, out); no RHS (output
- * sinks to GND through rSat when latch=1; otherwise high-Z requires
+ * Stamp: G_eff = s1[OUTPUT_WEIGHT] / rOut at (out, out); no RHS (output
+ * sinks to GND through rOut when latch=1; otherwise high-Z requires
  * external pull-up).
  *
  * Schema source: `COMPARATOR_SCHEMA` is owned by the parent (the
@@ -66,9 +66,8 @@ const COMPARATOR_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
 const COMPARATOR_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "hysteresis",   default: 0 },
   { key: "vos",          default: 0.001 },
-  { key: "rSat",         default: 50 },
+  { key: "rOut",         default: 50 },
   { key: "responseTime", default: 1e-6 },
-  { key: "rOut",         default: 100 },
   { key: "vOH",          default: 5 },
   { key: "vOL",          default: 0 },
 ];
@@ -76,14 +75,13 @@ const COMPARATOR_DRIVER_PARAM_DEFS: ParamDef[] = [
 const COMPARATOR_DRIVER_DEFAULTS: Record<string, number> = {
   hysteresis: 0,
   vos: 0.001,
-  rSat: 50,
+  rOut: 50,
   responseTime: 1e-6,
-  rOut: 100,
   vOH: 5,
   vOL: 0,
 };
 
-const MIN_RSAT = 1e-9;
+const MIN_ROUT = 1e-9;
 const MIN_TAU  = 1e-12;
 
 // ---------------------------------------------------------------------------
@@ -98,7 +96,6 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
 
   private _hysteresis: number;
   private _vos: number;
-  private _rSat: number;
   private _tau: number;
   private _rOut: number;
   private _vOH: number;
@@ -112,9 +109,8 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
     super(pinNodes);
     this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_DRIVER_DEFAULTS["hysteresis"]!;
     this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_DRIVER_DEFAULTS["vos"]!;
-    this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
+    this._rOut       = Math.max(props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : COMPARATOR_DRIVER_DEFAULTS["rOut"]!, MIN_ROUT);
     this._tau        = Math.max(props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_DRIVER_DEFAULTS["responseTime"]!, MIN_TAU);
-    this._rOut       = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : COMPARATOR_DRIVER_DEFAULTS["rOut"]!;
     this._vOH        = props.hasModelParam("vOH")  ? props.getModelParam<number>("vOH")  : COMPARATOR_DRIVER_DEFAULTS["vOH"]!;
     this._vOL        = props.hasModelParam("vOL")  ? props.getModelParam<number>("vOL")  : COMPARATOR_DRIVER_DEFAULTS["vOL"]!;
   }
@@ -130,9 +126,8 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
     switch (key) {
       case "hysteresis":   this._hysteresis = value; break;
       case "vos":          this._vos = value; break;
-      case "rSat":         this._rSat = Math.max(value, MIN_RSAT); break;
+      case "rOut":         this._rOut = Math.max(value, MIN_ROUT); break;
       case "responseTime": this._tau = Math.max(value, MIN_TAU); break;
-      case "rOut":         this._rOut = value; break;
       case "vOH":          this._vOH = value; break;
       case "vOL":          this._vOL = value; break;
     }
