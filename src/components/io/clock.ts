@@ -305,6 +305,20 @@ class AnalogClockElementImpl
 
   setParam(_key: string, _value: number): void {}
 
+  /**
+   * Square-wave voltage value at simulation time `t`. Matches the ngspice
+   * vsrcload.c PULSE branch (lines 118-126) evaluated against the deck the
+   * netlist generator emits for Clock: PULSE(0 vdd 0 0 0 halfP period).
+   * With TR=TF=0 and PW=halfP, V=vdd holds only on the OPEN interval
+   * (k*PER, k*PER + halfP); every period boundary (t = k*PER, including
+   * t=0) lands in `time <= 0 || time >= TR+PW+TF` and resolves to V1=0.
+   */
+  private _valueAtTime(t: number): number {
+    const period = 2 * this._halfPeriod;
+    const tInPeriod = t - Math.floor(t / period) * period;
+    return tInPeriod > 0 && tInPeriod < this._halfPeriod ? this._vdd : 0;
+  }
+
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     const k = this.branchIndex;
@@ -316,18 +330,12 @@ class AnalogClockElementImpl
     solver.stampElement(this._hBranchPos,  1);
     solver.stampElement(this._hBranchNeg, -1);
 
-    // Square-wave voltage value at current simulation time.
-    const t = this._getTime();
-    const halfPeriods = Math.floor(t / this._halfPeriod);
-    const v = halfPeriods % 2 === 0 ? this._vdd : 0;
+    const v = this._valueAtTime(this._getTime());
     stampRHS(ctx.rhs, k, v * ctx.srcFact);
   }
 
   stampAtTime(rhs: Float64Array, t: number): void {
-    const k = this.branchIndex;
-    const halfPeriods = Math.floor(t / this._halfPeriod);
-    const v = halfPeriods % 2 === 0 ? this._vdd : 0;
-    stampRHS(rhs, k, v);
+    stampRHS(rhs, this.branchIndex, this._valueAtTime(t));
   }
 
   nextBreakpoint(afterTime: number): number | null {

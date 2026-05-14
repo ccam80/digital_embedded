@@ -348,6 +348,12 @@ export class MNAEngine implements AnalogEngine {
     let newDt = dt;
     let worstRatio = 0;
     let olddelta = dt;    // ngspice dctran.c:729- tracks previous delta for two-strike delmin
+    // ngspice dctran.c:881-892- tryOrderPromotion writes CKTdelta directly via
+    // line 894 (`ckt->CKTdelta = newdelta;`). Track whether tryOrderPromotion
+    // ran on the accepting attempt so the post-loop currentDt assignment at
+    // the bottom of step() doesn't clobber the order-2 result with the stale
+    // order-1 newDt.
+    let promotionAttempted = false;
 
     // ngspice dctran.c:704-706- rotate deltaOld BEFORE entering the loop.
     this._timestep.rotateDeltaOld();
@@ -580,6 +586,9 @@ export class MNAEngine implements AnalogEngine {
         // Gate: only attempt when order is 1 and LTE result is >= 90% of the executed step.
         if (this._timestep.currentOrder === 1 && newDt > 0.9 * dt) {
           this._timestep.tryOrderPromotion(elements, this._history, this._simTime, dt);
+          promotionAttempted = true;
+        } else {
+          promotionAttempted = false;
         }
 
         if (!this._timestep.shouldReject(worstRatio)) {
@@ -651,8 +660,15 @@ export class MNAEngine implements AnalogEngine {
     if (cac?.timeRef) cac.timeRef.value = this._simTime;
     this._lastDt = dt;
 
-    // Advance timestep controller state
-    this._timestep.currentDt = newDt;
+    // Advance timestep controller state. When tryOrderPromotion ran it already
+    // wrote currentDt with the order-2 trial result (timestep.ts:712/723,
+    // mirroring ngspice dctran.c:894 `ckt->CKTdelta = newdelta`); overwriting
+    // with the pre-promotion order-1 newDt clobbers that and forces the next
+    // step to take the smaller order-1 timestep — visible in the harness as a
+    // 1.354× growth instead of ngspice's 2× cap.
+    if (!promotionAttempted) {
+      this._timestep.currentDt = newDt;
+    }
     try {
       this._timestep.markAccepted(this._simTime);
     } catch (err) {

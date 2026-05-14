@@ -385,6 +385,9 @@ describe("RAMSinglePort two-phase observable (Cat 9)", () => {
     facade.setSignal(coord, "STR", 0);
     facade.setSignal(coord, "LD", 0);
     pulseClock(facade, coord, "C");
+    // Read phase: drv must release the bidirectional D net (drive zero) so
+    // ram's read-back is not OR-merged with the stale 0xFF from D_DRIVE.
+    facade.setSignal(coord, "D_DRIVE", 0);
     facade.setSignal(coord, "LD", 1);
     facade.step(coord);
     expect(facade.readSignal(coord, "D_OBS")).toBe(0);
@@ -605,14 +608,17 @@ describe("BlockRAMDualPort two-phase observable (Cat 9)", () => {
   it("write_then_read_round_trip_drives_d_to_written_value", () => {
     const facade = new DefaultSimulatorFacade(registry);
     const coord = facade.compile(buildBlockRAMDualPort(facade));
-    // Write 0x42 into address 9.
+    // Write 0x42 into address 9. BlockRAM is read-first synchronous: the
+    // read-latch on the write edge captures the OLD memory value, then the
+    // write commits. A second clock edge is required to latch the just-
+    // written value into the read register.
     facade.setSignal(coord, "A", 9);
     facade.setSignal(coord, "DIN", 0x42);
     facade.setSignal(coord, "STR", 1);
     pulseClock(facade, coord, "C");
-    // Read address 9.
+    // Read address 9 — latch the freshly-written value.
     facade.setSignal(coord, "STR", 0);
-    facade.step(coord);
+    pulseClock(facade, coord, "C");
     expect(facade.readSignal(coord, "D")).toBe(0x42);
   });
 });
@@ -738,7 +744,6 @@ describe("PRNG two-phase observable (Cat 9)", () => {
   it("rising_edge_with_ne_high_advances_lfsr_state_then_executes_r_changed", () => {
     const facade = new DefaultSimulatorFacade(registry);
     const coord = facade.compile(buildPRNG(facade));
-    // Seed: assert se=1 with S=1 over a rising edge to load seed.
     facade.setSignal(coord, "S", 1);
     facade.setSignal(coord, "SE", 1);
     facade.setSignal(coord, "NE", 0);
@@ -746,7 +751,6 @@ describe("PRNG two-phase observable (Cat 9)", () => {
     facade.setSignal(coord, "SE", 0);
     facade.step(coord);
     const before = facade.readSignal(coord, "R") as number;
-    // Advance LFSR.
     facade.setSignal(coord, "NE", 1);
     pulseClock(facade, coord, "C");
     const after = facade.readSignal(coord, "R") as number;

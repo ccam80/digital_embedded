@@ -40,6 +40,7 @@ import {
 
 export interface ProgramCounterLayout extends ComponentLayout {
   stateOffset(componentIndex: number): number;
+  getProperty(componentIndex: number, key: string): number;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +188,8 @@ export class ProgramCounterElement extends AbstractCircuitElement {
 export function sampleProgramCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const stBase = (layout as ProgramCounterLayout).stateOffset(index);
+  const extLayout = layout as ProgramCounterLayout;
+  const stBase = extLayout.stateOffset(index);
 
   const D = state[wt[inBase]] >>> 0;
   const en = state[wt[inBase + 1]] & 1;
@@ -195,13 +197,16 @@ export function sampleProgramCounter(index: number, state: Uint32Array, _highZs:
   const ld = state[wt[inBase + 3]] & 1;
   const prevClock = state[stBase + 1] & 1;
 
+  const bitWidth = extLayout.getProperty(index, "bitWidth") ?? 8;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1) >>> 0;
+
   let counter = state[stBase] >>> 0;
 
   if (!prevClock && clk) {
     if (ld) {
-      counter = D;
+      counter = D & mask;
     } else if (en) {
-      counter = (counter + 1) >>> 0;
+      counter = ((counter + 1) >>> 0) & mask;
     }
   }
 
@@ -213,7 +218,8 @@ export function executeProgramCounter(index: number, state: Uint32Array, _highZs
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const stBase = (layout as ProgramCounterLayout).stateOffset(index);
+  const extLayout = layout as ProgramCounterLayout;
+  const stBase = extLayout.stateOffset(index);
 
   const D = state[wt[inBase]] >>> 0;
   const en = state[wt[inBase + 1]] & 1;
@@ -221,14 +227,17 @@ export function executeProgramCounter(index: number, state: Uint32Array, _highZs
   const ld = state[wt[inBase + 3]] & 1;
   const prevClock = state[stBase + 1] & 1;
 
+  const bitWidth = extLayout.getProperty(index, "bitWidth") ?? 8;
+  const mask = bitWidth >= 32 ? 0xFFFFFFFF : ((1 << bitWidth) - 1) >>> 0;
+
   let counter = state[stBase] >>> 0;
   let ovf = 0;
 
   if (!prevClock && clk) {
     if (ld) {
-      counter = D;
+      counter = D & mask;
     } else if (en) {
-      counter = (counter + 1) >>> 0;
+      counter = ((counter + 1) >>> 0) & mask;
       if (counter === 0) {
         ovf = 1;
       }

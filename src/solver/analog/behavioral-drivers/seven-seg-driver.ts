@@ -1,15 +1,15 @@
-﻿/**
- * BehavioralSevenSegDriverElement- observation-only driver leaf for the
- * seven-segment display.
+/**
+ * BehavioralSevenSegDriverElement — observation + drive driver leaf for the
+ * seven-segment display. See and-driver.ts for the normalized-bit
+ * driver-chain architecture.
  *
  * Reads eight segment-input voltages (a, b, c, d, e, f, g, dp) from rhsOld
- * relative to gnd, threshold-classifies each against vIH/vIL hysteresis, and
- * writes the resulting logic level to the corresponding SEG_* observation slot.
- * Those slots are consumed by the parent composite's draw() function to
- * determine which segments to illuminate; no electrical output pins exist on
- * this component (the display itself is the consumer).
+ * relative to gnd, threshold-classifies each at 0.5 V, and writes the logic
+ * level to the corresponding SEG_* observation slot (consumed by the parent
+ * composite's draw() function) and stamps a Norton source at the matching
+ * ctrl_a..ctrl_g output net.
  *
- * pinLayout: 8 INPUT-only segment pins + 1 INPUT gnd (no OUTPUT pins).
+ * pinLayout: 9 INPUT pins (8 segments + gnd) + 7 OUTPUT pins (ctrl_a..ctrl_g).
  * schema: 8 observation-only SEG_* slots.
  * load(): 8 independent threshold classifications, no edge detection, no latching.
  */
@@ -26,45 +26,20 @@ import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { logicLevel } from "./edge-detect.js";
 
 // ---------------------------------------------------------------------------
 // State schema
 // ---------------------------------------------------------------------------
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralSevenSegDriver", [
-  {
-    name: "SEG_A",
-    doc: "Observation-only logic level (0 or 1) for segment a. Written each load(); read by the parent component's draw() to determine illumination.",
-  },
-  {
-    name: "SEG_B",
-    doc: "Observation-only logic level (0 or 1) for segment b.",
-  },
-  {
-    name: "SEG_C",
-    doc: "Observation-only logic level (0 or 1) for segment c.",
-  },
-  {
-    name: "SEG_D",
-    doc: "Observation-only logic level (0 or 1) for segment d.",
-  },
-  {
-    name: "SEG_E",
-    doc: "Observation-only logic level (0 or 1) for segment e.",
-  },
-  {
-    name: "SEG_F",
-    doc: "Observation-only logic level (0 or 1) for segment f.",
-  },
-  {
-    name: "SEG_G",
-    doc: "Observation-only logic level (0 or 1) for segment g.",
-  },
-  {
-    name: "SEG_DP",
-    doc: "Observation-only logic level (0 or 1) for the decimal point segment (dp).",
-  },
+  { name: "SEG_A",  doc: "Observation-only logic level (0 or 1) for segment a. Written each load(); read by the parent component's draw() to determine illumination." },
+  { name: "SEG_B",  doc: "Observation-only logic level (0 or 1) for segment b." },
+  { name: "SEG_C",  doc: "Observation-only logic level (0 or 1) for segment c." },
+  { name: "SEG_D",  doc: "Observation-only logic level (0 or 1) for segment d." },
+  { name: "SEG_E",  doc: "Observation-only logic level (0 or 1) for segment e." },
+  { name: "SEG_F",  doc: "Observation-only logic level (0 or 1) for segment f." },
+  { name: "SEG_G",  doc: "Observation-only logic level (0 or 1) for segment g." },
+  { name: "SEG_DP", doc: "Observation-only logic level (0 or 1) for the decimal point segment (dp)." },
 ]);
 
 const SLOT_SEG_A  = SCHEMA.indexOf.get("SEG_A")!;
@@ -79,14 +54,6 @@ const SLOT_SEG_DP = SCHEMA.indexOf.get("SEG_DP")!;
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
-//
-// Order MUST match the buildSevenSegNetlist drv connectivity row
-// `[0, 1, 2, 3, 4, 5, 6, 7, netGnd(8)]` mapping to ports
-// `[a, b, c, d, e, f, g, dp, gnd]`. The compiler reads pinLayout[i].label
-// and stores it in pinNodes against the resolved node from connectivity[i].
-//
-// All 9 pins are INPUT direction. There are no OUTPUT pins on this driver;
-// the display rendering is the sole consumer of the SEG_* observation slots.
 
 const SEVEN_SEG_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "a",      defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -117,12 +84,6 @@ export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
-
   private _ctrlANode: number;
   private _ctrlBNode: number;
   private _ctrlCNode: number;
@@ -140,13 +101,8 @@ export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
   private _handlesF: readonly [number, number, number, number];
   private _handlesG: readonly [number, number, number, number];
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH  = props.getModelParam<number>("vOH");
-    this._vOL  = props.getModelParam<number>("vOL");
     this._ctrlANode = -1;
     this._ctrlBNode = -1;
     this._ctrlCNode = -1;
@@ -186,7 +142,6 @@ export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
     const base = this._stateBase;
 
     const gnd = rhsOld[this.pinNodes.get("gnd")!];
@@ -199,20 +154,16 @@ export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
     const vG  = rhsOld[this.pinNodes.get("g")!]  - gnd;
     const vDP = rhsOld[this.pinNodes.get("dp")!] - gnd;
 
-    // Threshold-classify each segment voltage with vIH/vIL hysteresis.
-    // logicLevel holds the previous value when the input sits in the
-    // indeterminate band (same convention as d-flipflop driver).
-    const segA  = logicLevel(vA,  this._vIH, this._vIL, s1[base + SLOT_SEG_A]  >= 0.5 ? 1 : 0);
-    const segB  = logicLevel(vB,  this._vIH, this._vIL, s1[base + SLOT_SEG_B]  >= 0.5 ? 1 : 0);
-    const segC  = logicLevel(vC,  this._vIH, this._vIL, s1[base + SLOT_SEG_C]  >= 0.5 ? 1 : 0);
-    const segD  = logicLevel(vD,  this._vIH, this._vIL, s1[base + SLOT_SEG_D]  >= 0.5 ? 1 : 0);
-    const segE  = logicLevel(vE,  this._vIH, this._vIL, s1[base + SLOT_SEG_E]  >= 0.5 ? 1 : 0);
-    const segF  = logicLevel(vF,  this._vIH, this._vIL, s1[base + SLOT_SEG_F]  >= 0.5 ? 1 : 0);
-    const segG  = logicLevel(vG,  this._vIH, this._vIL, s1[base + SLOT_SEG_G]  >= 0.5 ? 1 : 0);
-    const segDP = logicLevel(vDP, this._vIH, this._vIL, s1[base + SLOT_SEG_DP] >= 0.5 ? 1 : 0);
+    const segA  = vA  >= 0.5 ? 1 : 0;
+    const segB  = vB  >= 0.5 ? 1 : 0;
+    const segC  = vC  >= 0.5 ? 1 : 0;
+    const segD  = vD  >= 0.5 ? 1 : 0;
+    const segE  = vE  >= 0.5 ? 1 : 0;
+    const segF  = vF  >= 0.5 ? 1 : 0;
+    const segG  = vG  >= 0.5 ? 1 : 0;
+    const segDP = vDP >= 0.5 ? 1 : 0;
 
-    // Bottom-of-load writes — every slot mutated this step writes to s0
-    // exactly once (no pre-stamp s0 mutations).
+    // Bottom-of-load writes — every slot mutated this step writes to s0 once.
     s0[base + SLOT_SEG_A]  = segA;
     s0[base + SLOT_SEG_B]  = segB;
     s0[base + SLOT_SEG_C]  = segC;
@@ -222,25 +173,21 @@ export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
     s0[base + SLOT_SEG_G]  = segG;
     s0[base + SLOT_SEG_DP] = segDP;
 
-    stampNortonValue(ctx, this._handlesA, this._ctrlANode, this._gndNode, this._rOut, segA ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesB, this._ctrlBNode, this._gndNode, this._rOut, segB ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesC, this._ctrlCNode, this._gndNode, this._rOut, segC ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesD, this._ctrlDNode, this._gndNode, this._rOut, segD ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesE, this._ctrlENode, this._gndNode, this._rOut, segE ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesF, this._ctrlFNode, this._gndNode, this._rOut, segF ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesG, this._ctrlGNode, this._gndNode, this._rOut, segG ? this._vOH : this._vOL);
+    stampNortonValue(ctx, this._handlesA, this._ctrlANode, this._gndNode, 1, segA);
+    stampNortonValue(ctx, this._handlesB, this._ctrlBNode, this._gndNode, 1, segB);
+    stampNortonValue(ctx, this._handlesC, this._ctrlCNode, this._gndNode, 1, segC);
+    stampNortonValue(ctx, this._handlesD, this._ctrlDNode, this._gndNode, 1, segD);
+    stampNortonValue(ctx, this._handlesE, this._ctrlENode, this._gndNode, 1, segE);
+    stampNortonValue(ctx, this._handlesF, this._ctrlFNode, this._gndNode, 1, segF);
+    stampNortonValue(ctx, this._handlesG, this._ctrlGNode, this._gndNode, 1, segG);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
 
@@ -256,14 +203,8 @@ export const BehavioralSevenSegDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH",  default: 2.0 },
-        { key: "vIL",  default: 0.8 },
-        { key: "rOut", default: 100  },
-        { key: "vOH",  default: 5    },
-        { key: "vOL",  default: 0    },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralSevenSegDriverElement(pinNodes, props),
     },

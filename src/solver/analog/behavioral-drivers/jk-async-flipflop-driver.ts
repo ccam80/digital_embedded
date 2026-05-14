@@ -1,15 +1,14 @@
-﻿/**
- * BehavioralJKAsyncFlipflopDriverElement- pure-truth-function driver leaf for
- * the JK flip-flop with asynchronous Set / Clr.
+/**
+ * BehavioralJKAsyncFlipflopDriverElement — pure-truth-function driver leaf for
+ * the JK flip-flop with asynchronous Set / Clr. See and-driver.ts for the
+ * normalized-bit driver-chain architecture.
  *
  * On rising clock edge: same JK behavior as the synchronous variant
  * (M18 / `BehavioralJKFlipflopDriver`).
  *
  * After the clocked update, async Set / Clr override the latched state every
- * load() pass. Collision policy- preserved from
- * `.recovery/behavioral-flipflop-jk-async.ts.orig`'s
- * `BehavioralJKAsyncFlipflopElement.accept()`- Set runs first (Set high â†’ q=1),
- * Clr runs second (Clr high â†’ q=0). When both are high, **Clr wins**.
+ * load() pass: Set first (high → q=1), Clr second (high → q=0). When both are
+ * high, Clr wins.
  *
  * Per Composite M19 (phase-composite-architecture.md), J-147
  * (contracts_group_10.md).
@@ -26,6 +25,7 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralJKAsyncFlipflopDriver", [
@@ -36,7 +36,6 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralJKAsyncFlipflopDriver",
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
 const SLOT_Q          = SCHEMA.indexOf.get("Q")!;
 
-// Pin order matches buildJKAsyncFlipflopNetlist drv row [0..7] = Set,J,C,K,Clr,ctrl_q,ctrl_nq,gnd.
 const JK_AS_DRIVER_PIN_LAYOUT: PinDeclaration[] = [
   { direction: PinDirection.INPUT,  label: "Set",     defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   { direction: PinDirection.INPUT,  label: "J",       defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -54,12 +53,6 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private _vIH: number;
-  private _vIL: number;
-  private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
-
   private _firstSample: boolean = true;
 
   private _ctrlQNode: number = 0;
@@ -68,13 +61,8 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
   private _handlesQ: readonly [number, number, number, number] = [-1, -1, -1, -1];
   private _handlesNq: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
-  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+  constructor(pinNodes: ReadonlyMap<string, number>, _props: PropertyBag) {
     super(pinNodes);
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
-    this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -102,32 +90,22 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
-    const risingEdge =
-      !this._firstSample &&
-      prevClock < this._vIH &&
-      vClock >= this._vIH;
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
+      const j = vJ >= 0.5 ? 1 : 0;
+      const k = vK >= 0.5 ? 1 : 0;
+      if (j && k)      q = 1 - q;
+      else if (j)      q = 1;
+      else if (k)      q = 0;
+      // both low → hold
+    }
     this._firstSample = false;
 
-    if (risingEdge) {
-      const jHigh = vJ >= this._vIH;
-      const jLow  = vJ <  this._vIL;
-      const kHigh = vK >= this._vIH;
-      const kLow  = vK <  this._vIL;
-      if ((jHigh || jLow) && (kHigh || kLow)) {
-        if      (jHigh && kHigh) q = 1 - q;
-        else if (jHigh)          q = 1;
-        else if (kHigh)          q = 0;
-      }
-    }
+    // Async Set then async Clr — Clr wins on collision.
+    if (vSet >= 0.5) q = 1;
+    if (vClr >= 0.5) q = 0;
 
-    // Async Set then async Clr — Clr wins on collision (matches recovered
-    // original's accept() ordering: setV check, then clrV check, with second
-    // assignment overwriting first).
-    if (vSet > this._vIH) q = 1;
-    if (vClr > this._vIH) q = 0;
-
-    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, this._rOut, q ? this._vOH : this._vOL);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, this._rOut, q ? this._vOL : this._vOH);
+    stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;
@@ -137,12 +115,8 @@ export class BehavioralJKAsyncFlipflopDriverElement extends PoolBackedAnalogElem
     return new Array(this.pinNodes.size).fill(0);
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
+  setParam(_key: string, _value: number): void {
+    // No hot-loadable params.
   }
 }
 
@@ -154,14 +128,8 @@ export const BehavioralJKAsyncFlipflopDriverDefinition: ComponentDefinition = {
   modelRegistry: {
     default: {
       kind: "inline",
-      paramDefs: [
-        { key: "vIH", default: 2.0 },
-        { key: "vIL", default: 0.8 },
-        { key: "rOut", default: 100 },
-        { key: "vOH", default: 5 },
-        { key: "vOL", default: 0 },
-      ],
-      params: { vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 },
+      paramDefs: [],
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralJKAsyncFlipflopDriverElement(pinNodes, props),
     },

@@ -36,7 +36,13 @@ const DTS_GAIN10 = path.resolve(
 // I_sense = Vs / Rsense (the 0V senseVsrc forces sense+ to 0V and measures
 // the current through Rsense via its branch row).
 // I_out   = currentGain * I_sense  (default expression "I(sense)").
-// V(rload+) = I_out * Rload.
+//
+// SPICE F-element convention (ngspice cccsload.c, matched bit-exact by
+// digiTS as of the Norton-stamp sign fix): current of magnitude I_out flows
+// FROM out+ THROUGH the source TO out-. With out- grounded and rload between
+// out+ and GND, the external loop runs GND -> rload -> out+ -> source ->
+// out- -> GND. The resistor sees current flowing from rload:neg (GND) up to
+// rload:pos (out+), so V(rload+) = -I_out * Rload (below GND).
 
 interface CccsCircuitParams {
   vsVoltage?: number;
@@ -97,22 +103,24 @@ describe("CCCS initialization (T1)", () => {
   it("init_post_warm_start_node_voltages_match_dcop", () => {
     // Cat 1: post-warm-start (one coordinator.step()) the node voltage at
     // cccs1:out+ must equal the DCOP-seeded value. With Vs=5V, Rsense=1k,
-    // gain=1, Rload=1k: I_sense = 5mA, I_out = 5mA, V(rload+) = 5V.
+    // gain=1, Rload=1k: I_sense = 5mA, I_out = 5mA flowing out+ → out-.
+    // SPICE F convention: V(rload+) = -5mA * 1kΩ = -5V.
     const fix = buildFixture({
       build: (_r, facade) => buildCccsCircuit(facade, {
         vsVoltage: 5.0, rSense: 1000, rLoad: 1000, currentGain: 1,
       }),
     });
-    // sense+ is forced to 0V by senseVsrc; out+ is driven by the controlled
-    // current into Rload-to-GND.
+    // sense+ is forced to 0V by senseVsrc; out+ is pulled below GND by the
+    // controlled current sinking through Rload from GND.
     expect(fix.engine.getNodeVoltage(nodeOf(fix, "cccs1:sense+"))).toBeCloseTo(0.0, 6);
-    expect(fix.engine.getNodeVoltage(nodeOf(fix, "cccs1:out+"))).toBeCloseTo(5.0, 4);
+    expect(fix.engine.getNodeVoltage(nodeOf(fix, "cccs1:out+"))).toBeCloseTo(-5.0, 4);
   });
 });
 
 describe("CCCS DCOP analytical (T1)", () => {
   it("dcop_current_mirror_gain_1", () => {
-    // I_sense = 5V/1kΩ = 5mA, gain=1 → I_out=5mA → V(rload+) = 5mA*1kΩ = 5V.
+    // I_sense = 5V/1kΩ = 5mA, gain=1 → I_out=5mA out+ → out-.
+    // SPICE F convention: V(rload+) = -5mA * 1kΩ = -5V.
     const fix = buildFixture({
       build: (_r, facade) => buildCccsCircuit(facade, {
         vsVoltage: 5.0, rSense: 1000, rLoad: 1000, currentGain: 1,
@@ -121,11 +129,12 @@ describe("CCCS DCOP analytical (T1)", () => {
     const result = fix.coordinator.dcOperatingPoint()!;
     expect(result.converged).toBe(true);
     const vOut = fix.engine.getNodeVoltage(nodeOf(fix, "cccs1:out+"));
-    expect(vOut).toBeCloseTo(5.0, 4);
+    expect(vOut).toBeCloseTo(-5.0, 4);
   });
 
   it("dcop_current_gain_10_amplification", () => {
-    // I_sense = 1V/1kΩ = 1mA, gain=10 → I_out=10mA → V(rload+) = 10V.
+    // I_sense = 1V/1kΩ = 1mA, gain=10 → I_out=10mA out+ → out-.
+    // SPICE F convention: V(rload+) = -10mA * 1kΩ = -10V.
     const fix = buildFixture({
       build: (_r, facade) => buildCccsCircuit(facade, {
         vsVoltage: 1.0, rSense: 1000, rLoad: 1000, currentGain: 10,
@@ -134,7 +143,7 @@ describe("CCCS DCOP analytical (T1)", () => {
     const result = fix.coordinator.dcOperatingPoint()!;
     expect(result.converged).toBe(true);
     const vOut = fix.engine.getNodeVoltage(nodeOf(fix, "cccs1:out+"));
-    expect(vOut).toBeCloseTo(10.0, 4);
+    expect(vOut).toBeCloseTo(-10.0, 4);
   });
 
   it("dcop_zero_input_zero_output", () => {
@@ -152,8 +161,8 @@ describe("CCCS DCOP analytical (T1)", () => {
 
   it("dcop_nonlinear_expression_quadratic_in_isense", () => {
     // expression: 0.1 * I(sense)^2; I_sense = 10V/1kΩ = 10mA = 0.01A.
-    // I_out = 0.1 * (0.01)^2 = 1e-5 A = 10 µA.
-    // V(rload+) = 10µA * 1kΩ = 10mV = 0.01V.
+    // I_out = 0.1 * (0.01)^2 = 1e-5 A = 10 µA flowing out+ → out-.
+    // SPICE F convention: V(rload+) = -10µA * 1kΩ = -10mV = -0.01V.
     const fix = buildFixture({
       build: (_r, facade) => buildCccsCircuit(facade, {
         vsVoltage: 10.0, rSense: 1000, rLoad: 1000, expression: "0.1 * I(sense)^2",
@@ -162,7 +171,7 @@ describe("CCCS DCOP analytical (T1)", () => {
     const result = fix.coordinator.dcOperatingPoint()!;
     expect(result.converged).toBe(true);
     const vOut = fix.engine.getNodeVoltage(nodeOf(fix, "cccs1:out+"));
-    expect(vOut).toBeCloseTo(0.01, 4);
+    expect(vOut).toBeCloseTo(-0.01, 4);
   });
 
   it("dcop_setup_throws_without_senseSourceLabel", () => {
@@ -178,8 +187,8 @@ describe("CCCS DCOP analytical (T1)", () => {
 describe("CCCS parameter hot-load (T1)", () => {
   it("hotload_currentGain_changes_output_voltage", () => {
     // Cat 4: setComponentProperty on currentGain must change V(rload+).
-    // Start at gain=1, Vs=5V, Rsense=Rload=1kΩ → V(rload+)=5V.
-    // After gain=2 → I_out=10mA → V(rload+)=10V.
+    // Start gain=1, Vs=5V, Rsense=Rload=1kΩ → V(rload+)=-5V (SPICE F).
+    // After gain=2 → I_out=10mA → V(rload+)=-10V.
     const fix = buildFixture({
       build: (_r, facade) => buildCccsCircuit(facade, {
         vsVoltage: 5.0, rSense: 1000, rLoad: 1000, currentGain: 1,
@@ -187,20 +196,21 @@ describe("CCCS parameter hot-load (T1)", () => {
     });
     const outNode = nodeOf(fix, "cccs1:out+");
     const before = fix.engine.getNodeVoltage(outNode);
-    expect(before).toBeCloseTo(5.0, 4);
+    expect(before).toBeCloseTo(-5.0, 4);
 
     const cccsEl = ceByLabel(fix, "cccs1");
     fix.coordinator.setComponentProperty(cccsEl, "currentGain", 2);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
     expect(after).not.toBeCloseTo(before);
-    expect(after).toBeCloseTo(10.0, 4);
+    expect(after).toBeCloseTo(-10.0, 4);
   });
 
   it("hotload_vs_drives_isense_changes_output", () => {
     // Cat 4 sibling: changing the source voltage on the upstream Vs changes
-    // I_sense and therefore V(rload+). With gain=1, Rsense=Rload=1kΩ:
-    // start Vs=5V → V(rload+)=5V; after Vs=2V → V(rload+)=2V.
+    // I_sense and therefore V(rload+). With gain=1, Rsense=Rload=1kΩ
+    // (SPICE F convention):
+    //   start Vs=5V → V(rload+)=-5V; after Vs=2V → V(rload+)=-2V.
     const fix = buildFixture({
       build: (_r, facade) => buildCccsCircuit(facade, {
         vsVoltage: 5.0, rSense: 1000, rLoad: 1000, currentGain: 1,
@@ -208,13 +218,13 @@ describe("CCCS parameter hot-load (T1)", () => {
     });
     const outNode = nodeOf(fix, "cccs1:out+");
     const before = fix.engine.getNodeVoltage(outNode);
-    expect(before).toBeCloseTo(5.0, 4);
+    expect(before).toBeCloseTo(-5.0, 4);
 
     fix.coordinator.setSourceByLabel("vs1", "voltage", 2.0);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
     expect(after).not.toBeCloseTo(before);
-    expect(after).toBeCloseTo(2.0, 4);
+    expect(after).toBeCloseTo(-2.0, 4);
   });
 });
 

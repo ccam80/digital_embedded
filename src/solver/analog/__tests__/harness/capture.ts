@@ -23,6 +23,8 @@ import type {
 } from "./types.js";
 import type { LimitingEvent } from "../../newton-raphson.js";
 import { normalizeDeviceType, DEVICE_MAPPINGS, projectPinCurrents } from "./device-mappings.js";
+import { canonicalizeSpiceLabel } from "./netlist-generator.js";
+import type { DeviceFamily } from "../../ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // Topology capture (once per compile)
@@ -44,7 +46,47 @@ const TYPE_TO_PREFIX: Record<string, string> = {
 };
 
 /**
+ * Map `DeviceFamily` → SPICE deck prefix. Used for composite-leaf label
+ * canonicalization in `buildElementLabelMap` Pass 3 below: the leaf's
+ * `deviceFamily` is set by its factory (e.g. a Resistor leaf inside
+ * PolarizedCap has family RES), and the SPICE prefix derived from it matches
+ * what `netlist-generator.ts` emits on the ngspice deck for that leaf.
+ *
+ * Source of truth: `netlist-generator.ts::ELEMENT_SPECS`. Keep in sync.
+ */
+const FAMILY_TO_SPICE_PREFIX: Partial<Record<DeviceFamily, string>> = {
+  RES: "R", CAP: "C", IND: "L", MUT: "K",
+  DIO: "D", BJT: "Q", MOS: "M", JFET: "J",
+  VSRC: "V", ISRC: "I",
+  VCVS: "E", VCCS: "G", CCVS: "H", CCCS: "F",
+  SW: "S", CSW: "W",
+  TRA: "T", URC: "U",
+};
+
+/**
  * Build a map from element index â†’ human-readable component label.
+ *
+ * Composite leaves (sub-elements emitted by `expandCompositeInstance`) have
+ * NO entry in `compiled.elementToCircuitElement` — only the wrapper does.
+ * Their `compiled.elements[i].label` is `${parentLabel}:${subName}`, set by
+ * the compiler at composite-expansion time (where `parentLabel` is the
+ * wrapper's user-label-or-instanceId).
+ *
+ * The deck emitter (`netlist-generator.ts`) flattens those leaves onto the
+ * ngspice deck as `${spicePrefix}${wrapperHarnessLabel}_${subName}` — i.e.
+ * with `:` replaced by `_` and a SPICE prefix prepended via
+ * `canonicalizeSpiceLabel`. **The `wrapperHarnessLabel` is what this map
+ * returns for the wrapper**, NOT the raw `parentLabel` from the leaf's
+ * `.label` field — for unlabeled composites those differ (raw =
+ * instanceId, harness = auto-numbered `X1`/`Q1`/...).
+ *
+ * Pass 3 below mirrors that exact emission so the element-state pairing
+ * logic in `comparison-session.ts` (lines 1023, 3815) finds each leaf's
+ * ngspice counterpart by case-insensitive label match. Without it,
+ * `compareAllSteps` sees `ours=<value>, ngspice=NaN` for every composite
+ * leaf state slot, and `harness_first_divergence` silently `continue`s past
+ * every composite-leaf state comparison — masking real numerical
+ * divergences inside composites.
  */
 export function buildElementLabelMap(
   compiled: ConcreteCompiledAnalogCircuit,
@@ -52,6 +94,9 @@ export function buildElementLabelMap(
   const map = new Map<number, string>();
   const e2ce = compiled.elementToCircuitElement;
 
+  // Pass 1: user-set `label` property on top-level circuit elements (wrappers
+  // and primitives). Leaves never reach this path because they have no
+  // CircuitElement entry.
   for (let i = 0; i < compiled.elements.length; i++) {
     const ce = e2ce?.get(i);
     if (ce) {
@@ -62,9 +107,15 @@ export function buildElementLabelMap(
     }
   }
 
+  // Pass 2: auto-number top-level circuit elements that didn't get a user
+  // label. Composite leaves are deferred to Pass 3 — they're identified by
+  // the `:` separator in their `.label` and need their wrapper's already-
+  // assigned harness label to construct the canonical SPICE form.
   const prefixCounters = new Map<string, number>();
   for (let i = 0; i < compiled.elements.length; i++) {
     if (map.has(i)) continue;
+    const el = compiled.elements[i];
+    if (el && el.label.includes(":")) continue;   // composite leaf — defer
 
     const ce = e2ce?.get(i);
     const typeId = ce?.typeId ?? "";
@@ -73,6 +124,42 @@ export function buildElementLabelMap(
     const count = (prefixCounters.get(prefix) ?? 0) + 1;
     prefixCounters.set(prefix, count);
     map.set(i, `${prefix}${count}`);
+  }
+
+  // Pass 3: composite leaves. Look up each leaf's wrapper by the raw parent
+  // label (= wrapper's `.label`, which is its user-label-or-instanceId) and
+  // build the canonical SPICE form `${wrapperHarnessLabel}_${subPath}` +
+  // SPICE prefix from the leaf's `deviceFamily`.
+  const wrapperHarnessLabelByRawParent = new Map<string, string>();
+  for (let i = 0; i < compiled.elements.length; i++) {
+    const el = compiled.elements[i];
+    if (!el || el.label.includes(":")) continue;
+    const harnessLabel = map.get(i);
+    if (harnessLabel !== undefined) {
+      wrapperHarnessLabelByRawParent.set(el.label, harnessLabel);
+    }
+  }
+  for (let i = 0; i < compiled.elements.length; i++) {
+    if (map.has(i)) continue;
+    const el = compiled.elements[i];
+    if (!el || !el.label.includes(":")) continue;
+
+    const colonIdx = el.label.indexOf(":");
+    const rawParent = el.label.slice(0, colonIdx);
+    const subPath = el.label.slice(colonIdx + 1).replace(/:/g, "_");
+    const wrapperHarnessLabel = wrapperHarnessLabelByRawParent.get(rawParent) ?? rawParent;
+    const flattened = `${wrapperHarnessLabel}_${subPath}`;
+
+    const prefix = FAMILY_TO_SPICE_PREFIX[el.deviceFamily];
+    if (prefix !== undefined) {
+      map.set(i, canonicalizeSpiceLabel(flattened, prefix));
+    } else {
+      // No SPICE prefix for this family (e.g. BEHAVIORAL bridge adapters).
+      // Use the flattened label directly so diagnostic attribution stays
+      // distinct from auto-numbered slots even when no ngspice counterpart
+      // exists.
+      map.set(i, flattened);
+    }
   }
 
   return map;
@@ -209,6 +296,7 @@ export function captureElementStates(
   const s0 = statePool.state0;
   const s1 = statePool.state1;
   const s2 = statePool.state2;
+  const s3 = statePool.state3;
 
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
@@ -228,24 +316,28 @@ export function captureElementStates(
       const abSlots: Record<string, number> = { CURRENT_STATE: s0[base + 0], V_CTRL: s0[base + 1] };
       const abState1: Record<string, number> = s1 ? { CURRENT_STATE: s1[base + 0], V_CTRL: s1[base + 1] } : {};
       const abState2: Record<string, number> = s2 ? { CURRENT_STATE: s2[base + 0], V_CTRL: s2[base + 1] } : {};
+      const abState3: Record<string, number> = s3 ? { CURRENT_STATE: s3[base + 0], V_CTRL: s3[base + 1] } : {};
       snapshots.push({
         elementIndex: i,
         label: `${baseLabel}_AB`,
         slots: abSlots,
         state1Slots: abState1,
         state2Slots: abState2,
+        state3Slots: abState3,
         pinCurrents: projectPinCurrents(vswitchMapping, abSlots),
       });
       // AC sub-entry: NC path (base+2=NC_CURRENT_STATE, base+3=NC_V_CTRL)
       const acSlots: Record<string, number> = { CURRENT_STATE: s0[base + 2], V_CTRL: s0[base + 2 + 1] };
       const acState1: Record<string, number> = s1 ? { CURRENT_STATE: s1[base + 2], V_CTRL: s1[base + 2 + 1] } : {};
       const acState2: Record<string, number> = s2 ? { CURRENT_STATE: s2[base + 2], V_CTRL: s2[base + 2 + 1] } : {};
+      const acState3: Record<string, number> = s3 ? { CURRENT_STATE: s3[base + 2], V_CTRL: s3[base + 2 + 1] } : {};
       snapshots.push({
         elementIndex: i,
         label: `${baseLabel}_AC`,
         slots: acSlots,
         state1Slots: acState1,
         state2Slots: acState2,
+        state3Slots: acState3,
         pinCurrents: projectPinCurrents(vswitchMapping, acSlots),
       });
       continue;
@@ -254,12 +346,14 @@ export function captureElementStates(
     const slots: Record<string, number> = {};
     const state1Slots: Record<string, number> = {};
     const state2Slots: Record<string, number> = {};
+    const state3Slots: Record<string, number> = {};
 
     for (let s = 0; s < schema.slots.length; s++) {
       const name = schema.slots[s].name;
       slots[name] = s0[base + s];
       if (s1) state1Slots[name] = s1[base + s];
       if (s2) state2Slots[name] = s2[base + s];
+      if (s3) state3Slots[name] = s3[base + s];
     }
 
     const deviceType = elementTypes?.get(i);
@@ -272,6 +366,7 @@ export function captureElementStates(
       slots,
       state1Slots,
       state2Slots,
+      state3Slots,
       pinCurrents,
     });
   }

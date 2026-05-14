@@ -432,8 +432,9 @@ export class ComparisonSession {
   // Whether init() has completed
   protected _inited: boolean = false;
 
-  // Whether this session installed the ucrt libm shim — dispose() uses this
-  // to balance the install with a matching uninstall (refcounted in shim).
+  // Whether this session installed the ucrt libm override — dispose() uses
+  // this to balance the install with a matching uninstall (refcounted
+  // inside the installer).
   protected _libmShimInstalled: boolean = false;
 
   // Whether runDcOp()/runTransient() has completed
@@ -496,7 +497,7 @@ export class ComparisonSession {
    * and close the boot step directly into _stepCapture.
    */
   async init(): Promise<void> {
-    // Install the ucrt libm shim so digiTS uses the same `exp`/`log`
+    // Install the ucrt libm override so digiTS uses the same `exp`/`log`
     // implementations ngspice.dll statically embeds. Eliminates the V8 vs
     // ucrt 1-ULP transcendental disagreement across the dcop_paired_*
     // cluster (see memory/reference_libm_log_one_ulp.md). selfCompare
@@ -1690,6 +1691,9 @@ export class ComparisonSession {
         elementStates2Slots: Object.fromEntries(
           ourIter.elementStates.map(es => [es.label, es.state2Slots]),
         ),
+        elementStates3Slots: Object.fromEntries(
+          ourIter.elementStates.map(es => [es.label, es.state3Slots]),
+        ),
         limitingEvents: ourIter.limitingEvents,
         rhs: ourLinSys!.rhs,
         residual: ourLinSys!.residual,
@@ -1729,6 +1733,9 @@ export class ComparisonSession {
         ),
         elementStates2Slots: Object.fromEntries(
           ngIter.elementStates.map(es => [es.label, es.state2Slots]),
+        ),
+        elementStates3Slots: Object.fromEntries(
+          ngIter.elementStates.map(es => [es.label, es.state3Slots]),
         ),
         limitingEvents: ngIter.limitingEvents,
         rhs: ngLinSys!.rhs,

@@ -19,11 +19,17 @@
  *
  * Sort target: URC -> ... -> VSRC -> BEHAVIORAL.
  *
- * Composite-internal MNA node IDs are pre-allocated at compile time by
- * `expandCompositeInstance` (compiler.ts) and seeded into the engine's
- * `_nodeTable` before `_setup()` runs. There are no compiler pseudo-leaves
- * any more; every element in the engine's walk is a real ngspice-shaped
- * device.
+ * Composite-internal MNA node IDs are pre-allocated at compile time inside
+ * `buildAnalogNodeMapFromPartition`'s deck-order walk (compiler.ts), at the
+ * point each parent composite is visited — interleaved with external node
+ * allocation in ngspice INPpas2 flattened-deck first-encounter order. The
+ * resulting IDs are seeded into the engine's `_nodeTable` via
+ * `preAllocatedNodes` before `_setup()` runs. `expandCompositeInstance`
+ * reads those IDs by `${parentLabel}#${suffix}` key when it builds the
+ * leaves; declared-but-unreferenced internal nets fall to a per-instance
+ * straggler allocator whose IDs land past the deck-walk range. There are
+ * no compiler pseudo-leaves any more; every element in the engine's walk
+ * is a real ngspice-shaped device.
  */
 export const NGSPICE_LOAD_ORDER = {
   URC:  0,   // dev.c:141- MUST precede both resistors and capacitors

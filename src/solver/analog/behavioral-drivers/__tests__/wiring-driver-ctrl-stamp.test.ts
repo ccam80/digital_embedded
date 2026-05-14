@@ -25,6 +25,8 @@ import type { AnalogElement } from "../../element.js";
 
 const VDD = 5.0;
 const GND = 0.0;
+const HI  = 1.0;  // normalized {0,1} ctrl_out voltage for "high" bit
+const LO  = 0.0;  // normalized {0,1} ctrl_out voltage for "low"  bit
 const LOAD_R = 1_000_000;
 
 // ---------------------------------------------------------------------------
@@ -98,19 +100,19 @@ describe("BehavioralMuxDriver ctrl_out stamp (Cat 2 DCOP)", () => {
   it("selects in_0 (VDD) when sel=GND, stamps vOH at ctrl_out", () => {
     const fix = buildMuxFixture(GND, VDD, GND);
     const el = findDriverElement(fix, BehavioralMuxDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_out")).toBeCloseTo(VDD, 4);
+    expect(getCtrlV(fix, el, "ctrl_out")).toBeCloseTo(HI, 4);
   });
 
   it("selects in_1 (GND) when sel=VDD, stamps vOL at ctrl_out", () => {
     const fix = buildMuxFixture(VDD, VDD, GND);
     const el = findDriverElement(fix, BehavioralMuxDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_out")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_out")).toBeCloseTo(LO, 4);
   });
 
   it("selects in_0 (GND) when sel=GND, stamps vOL at ctrl_out", () => {
     const fix = buildMuxFixture(GND, GND, VDD);
     const el = findDriverElement(fix, BehavioralMuxDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_out")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_out")).toBeCloseTo(LO, 4);
   });
 });
 
@@ -151,22 +153,22 @@ describe("BehavioralDemuxDriver ctrl_* stamp (Cat 2 DCOP)", () => {
   it("sel=GND, in=VDD: stamps vOH at ctrl_0 and vOL at ctrl_1", () => {
     const fix = buildDemuxFixture(GND, VDD);
     const el = findDriverElement(fix, BehavioralDemuxDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(VDD, 4);
-    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(HI, 4);
+    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(LO, 4);
   });
 
   it("sel=VDD, in=VDD: stamps vOL at ctrl_0 and vOH at ctrl_1", () => {
     const fix = buildDemuxFixture(VDD, VDD);
     const el = findDriverElement(fix, BehavioralDemuxDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(VDD, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(HI, 4);
   });
 
   it("sel=GND, in=GND: stamps vOL at both ctrl_0 and ctrl_1", () => {
     const fix = buildDemuxFixture(GND, GND);
     const el = findDriverElement(fix, BehavioralDemuxDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(LO, 4);
   });
 });
 
@@ -204,15 +206,15 @@ describe("BehavioralDecoderDriver ctrl_* stamp (Cat 2 DCOP)", () => {
   it("sel=GND: stamps vOH at ctrl_0 and vOL at ctrl_1", () => {
     const fix = buildDecoderFixture(GND);
     const el = findDriverElement(fix, BehavioralDecoderDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(VDD, 4);
-    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(HI, 4);
+    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(LO, 4);
   });
 
   it("sel=VDD: stamps vOL at ctrl_0 and vOH at ctrl_1", () => {
     const fix = buildDecoderFixture(VDD);
     const el = findDriverElement(fix, BehavioralDecoderDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(VDD, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_1")).toBeCloseTo(HI, 4);
   });
 });
 
@@ -254,13 +256,13 @@ describe("BehavioralSplitterDriver ctrl_* stamp (Cat 2 DCOP)", () => {
   it("merge mode: in_0=VDD, in_1=GND stamps vOH at ctrl_0 (packed bits non-zero)", () => {
     const fix = buildSplitterFixture(VDD, GND);
     const el = findDriverElement(fix, BehavioralSplitterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(VDD, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(HI, 4);
   });
 
   it("merge mode: in_0=GND, in_1=GND stamps vOL at ctrl_0 (packed bits zero)", () => {
     const fix = buildSplitterFixture(GND, GND);
     const el = findDriverElement(fix, BehavioralSplitterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_0")).toBeCloseTo(LO, 4);
   });
 });
 
@@ -297,20 +299,20 @@ describe("BehavioralSevenSegDriver ctrl_* stamp (Cat 2 DCOP)", () => {
   it("digit 1 pattern (b=c=VDD, rest=GND): stamps vOH at ctrl_b and ctrl_c, vOL at ctrl_a/d/e/f/g", () => {
     const fix = buildSevenSegFixture({ a: GND, b: VDD, c: VDD, d: GND, e: GND, f: GND, g: GND, dp: GND });
     const el = findDriverElement(fix, BehavioralSevenSegDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_a")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_b")).toBeCloseTo(VDD, 4);
-    expect(getCtrlV(fix, el, "ctrl_c")).toBeCloseTo(VDD, 4);
-    expect(getCtrlV(fix, el, "ctrl_d")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_e")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_f")).toBeCloseTo(GND, 4);
-    expect(getCtrlV(fix, el, "ctrl_g")).toBeCloseTo(GND, 4);
+    expect(getCtrlV(fix, el, "ctrl_a")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_b")).toBeCloseTo(HI, 4);
+    expect(getCtrlV(fix, el, "ctrl_c")).toBeCloseTo(HI, 4);
+    expect(getCtrlV(fix, el, "ctrl_d")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_e")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_f")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_g")).toBeCloseTo(LO, 4);
   });
 
   it("all segments high: stamps vOH at all ctrl_a..ctrl_g", () => {
     const fix = buildSevenSegFixture({ a: VDD, b: VDD, c: VDD, d: VDD, e: VDD, f: VDD, g: VDD, dp: GND });
     const el = findDriverElement(fix, BehavioralSevenSegDriverElement);
     for (const seg of ["a", "b", "c", "d", "e", "f", "g"]) {
-      expect(getCtrlV(fix, el, `ctrl_${seg}`)).toBeCloseTo(VDD, 4);
+      expect(getCtrlV(fix, el, `ctrl_${seg}`)).toBeCloseTo(HI, 4);
     }
   });
 
@@ -318,7 +320,7 @@ describe("BehavioralSevenSegDriver ctrl_* stamp (Cat 2 DCOP)", () => {
     const fix = buildSevenSegFixture({ a: GND, b: GND, c: GND, d: GND, e: GND, f: GND, g: GND, dp: GND });
     const el = findDriverElement(fix, BehavioralSevenSegDriverElement);
     for (const seg of ["a", "b", "c", "d", "e", "f", "g"]) {
-      expect(getCtrlV(fix, el, `ctrl_${seg}`)).toBeCloseTo(GND, 4);
+      expect(getCtrlV(fix, el, `ctrl_${seg}`)).toBeCloseTo(LO, 4);
     }
   });
 });

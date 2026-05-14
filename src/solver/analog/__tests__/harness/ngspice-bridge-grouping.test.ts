@@ -32,6 +32,7 @@ function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIter
     state0: new Float64Array(0),
     state1: new Float64Array(0),
     state2: new Float64Array(0),
+    state3: new Float64Array(0),
     numStates: 0,
     noncon: 0,
     converged: true,
@@ -56,9 +57,7 @@ function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIter
 function makeBridge(iters: RawNgspiceIterationEx[], outerEvents: RawNgspiceOuterEvent[] = []): NgspiceBridge {
   // NgspiceBridge requires a DLL path but we never call init()- we inject directly.
   const bridge = new NgspiceBridge("__fake__");
-  (bridge as any)._iterations = iters;
-  (bridge as any)._outerEvents = outerEvents;
-  (bridge as any)._topology = null;
+  bridge.installSyntheticState(iters, outerEvents);
   return bridge;
 }
 

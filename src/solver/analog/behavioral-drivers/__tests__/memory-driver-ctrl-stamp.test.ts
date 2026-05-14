@@ -9,6 +9,11 @@ import type { AnalogElement } from "../../element.js";
 
 const VOH = 5.0;
 const VOL = 0.0;
+// Internal driver-chain ctrl_* nodes carry NORMALIZED {0, 1} V per the
+// post-migration architecture (see and-driver.ts). Input DC sources still
+// drive at rail voltages (VOH/VOL); the driver threshold-snaps at 0.5 V.
+const HI = 1.0;
+const LO = 0.0;
 
 type AnyDriverClass =
   | typeof BehavioralCounterDriverElement
@@ -87,8 +92,8 @@ describe("BehavioralCounterDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsCLR", VOL);
     fix.coordinator.step();
     const el = findDriverElement(fix, BehavioralCounterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOL, 4);
-    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(VOL, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(LO, 4);
   });
 
   it("count=1 after rising edge with en=1: ctrl_bit_0=VOH, ctrl_ovf=VOH (maxValue=1)", () => {
@@ -97,8 +102,8 @@ describe("BehavioralCounterDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsCLR", VOL);
     pulseClock(fix, "vsC");
     const el = findDriverElement(fix, BehavioralCounterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOH, 4);
-    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(VOH, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(HI, 4);
+    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(HI, 4);
   });
 
   it("clr=1 on rising edge resets count to 0: ctrl_bit_0=VOL, ctrl_ovf=VOL", () => {
@@ -110,8 +115,8 @@ describe("BehavioralCounterDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     pulseClock(fix, "vsC");
     fix.facade.setSignal(fix.coordinator, "vsCLR", VOL);
     const el = findDriverElement(fix, BehavioralCounterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOL, 4);
-    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(VOL, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(LO, 4);
   });
 });
 
@@ -162,8 +167,8 @@ describe("BehavioralCounterPresetDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsLD", VOL);
     fix.coordinator.step();
     const el = findDriverElement(fix, BehavioralCounterPresetDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOL, 4);
-    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(VOL, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(LO, 4);
   });
 
   it("count=1 after rising edge with en=1, dir=0: ctrl_bit_0=VOH, ctrl_ovf=VOH", () => {
@@ -174,8 +179,8 @@ describe("BehavioralCounterPresetDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsLD", VOL);
     pulseClock(fix, "vsC");
     const el = findDriverElement(fix, BehavioralCounterPresetDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOH, 4);
-    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(VOH, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(HI, 4);
+    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(HI, 4);
   });
 
   it("dir=1 (down) from count=1: after one down-count, count=0, ctrl_ovf=VOH", () => {
@@ -191,8 +196,8 @@ describe("BehavioralCounterPresetDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     // Count down once: count=0, ctrl_ovf=VOH (underflow on next down-count would set ovf)
     pulseClock(fix, "vsC");
     const el = findDriverElement(fix, BehavioralCounterPresetDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOL, 4);
-    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(VOH, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(LO, 4);
+    expect(getCtrlV(fix, el, "ctrl_ovf")).toBeCloseTo(HI, 4);
   });
 });
 
@@ -232,7 +237,7 @@ describe("BehavioralRegisterDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsD", VOL);
     fix.coordinator.step();
     const el = findDriverElement(fix, BehavioralRegisterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOL, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(LO, 4);
   });
 
   it("stores D=1 on rising edge with en=1: ctrl_bit_0=VOH", () => {
@@ -241,7 +246,7 @@ describe("BehavioralRegisterDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsEN", VOH);
     pulseClock(fix, "vsC");
     const el = findDriverElement(fix, BehavioralRegisterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOH, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(HI, 4);
   });
 
   it("en=0: rising clock does not latch D=1; stored value holds at 0 => ctrl_bit_0=VOL", () => {
@@ -250,6 +255,6 @@ describe("BehavioralRegisterDriver ctrl_bit_0 stamp (bitWidth=1)", () => {
     fix.facade.setSignal(fix.coordinator, "vsEN", VOL);
     pulseClock(fix, "vsC");
     const el = findDriverElement(fix, BehavioralRegisterDriverElement);
-    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(VOL, 4);
+    expect(getCtrlV(fix, el, "ctrl_bit_0")).toBeCloseTo(LO, 4);
   });
 });

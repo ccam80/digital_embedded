@@ -51,6 +51,7 @@ import { differentiate, simplify } from "../../solver/analog/expression-differen
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -147,6 +148,14 @@ export class VCVSAnalogElement extends ControlledSourceElement {
   private _hIbrCtP: number = -1; // C[branch,  ctrlPosNode] :57
   private _hIbrCtN: number = -1; // C[branch,  ctrlNegNode] :58
 
+  // Hot-loadable linear gain. Active only when constructed via the linear
+  // shortcut (expression === "V(ctrl)"). Other expressions go through the
+  // immutable compiled path. Composites that need hot-loadable rails (e.g.
+  // DigitalOutputPinLoaded's eDrive driving its gain from vOH-vOL) rely on
+  // this — see digital-output-pin-loaded.ts analogWrapperHook.
+  private _gain: number = 1.0;
+  private _isLinearMode = false;
+
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
     const posNode     = this.pinNodes.get("out+")!;   // VCVSposNode
@@ -169,7 +178,31 @@ export class VCVSAnalogElement extends ControlledSourceElement {
     this._hIbrCtN = solver.allocElement(branch,      ctrlNegNode); // :58
   }
 
-  setParam(_key: string, _value: number): void {
+  setParam(key: string, value: number): void {
+    if (key === "gain") this._gain = value;
+  }
+
+  /**
+   * Mark this VCVS instance as linear-gain-mode and seed the gain. When set,
+   * `load()` bypasses the compiled expression and stamps `_gain * V(ctrl)`
+   * directly so that `setParam("gain", x)` hot-updates take effect on the
+   * next NR iteration. Used by composite-internal eDrives in DOPL where the
+   * outer rail (vOH - vOL) is hot-loadable.
+   */
+  setLinearGain(gain: number): void {
+    this._gain = gain;
+    this._isLinearMode = true;
+  }
+
+  override load(ctx: LoadContext): void {
+    if (!this._isLinearMode) {
+      super.load(ctx);
+      return;
+    }
+    this._bindContext(ctx.rhsOld);
+    this._stampLinear(ctx.solver);
+    const value = this._gain * this._ctrlValue;
+    this.stampOutput(ctx.solver, ctx.rhs, value, this._gain, this._ctrlValue);
   }
 
   /** Stamp the linear B/C incidence for the output voltage source branch. */
@@ -357,11 +390,14 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const gain = props.getModelParam<number>("gain");
-        const rawExpr = parseExpression(expression === "V(ctrl)"
+        const isLinear = expression === "V(ctrl)";
+        const rawExpr = parseExpression(isLinear
           ? `${gain} * V(ctrl)`
           : expression);
         const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
-        return new VCVSAnalogElement(pinNodes, rawExpr, deriv, "V(ctrl)", "voltage");
+        const el = new VCVSAnalogElement(pinNodes, rawExpr, deriv, "V(ctrl)", "voltage");
+        if (isLinear) el.setLinearGain(gain);
+        return el;
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,

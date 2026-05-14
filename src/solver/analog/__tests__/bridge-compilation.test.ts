@@ -57,13 +57,13 @@ describe('bridge-compilation: boundary group adapter creation', () => {
 });
 
 describe('bridge-compilation: bridge output adapter branch index', () => {
-  it('bridge output adapter has branch index >= 0', () => {
+  it('bridge output adapter defers branch allocation to setup()', () => {
     const group = makeBoundaryGroup(1);
     const stub = makeStub(group, 'digital-to-analog');
     const partition = makePartition([stub], [group]);
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputDriverElement;
-    expect(adapter.branchIndex).toBeGreaterThanOrEqual(0);
+    expect(adapter.branchIndex).toBe(-1);
   });
 });
 

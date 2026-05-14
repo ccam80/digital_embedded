@@ -4,8 +4,13 @@
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
  * out+ and out- are the output current source terminals.
  *
- * The output current equals an expression of the control voltage:
+ * Per the SPICE G-element convention (ngspice user manual, vccsload.c:34-37):
+ * current flows FROM out+, through the source, TO out-. The output magnitude
+ * is an expression of the control voltage:
  *   I_out = f(V_ctrl)  where  V_ctrl = V(ctrl+) - V(ctrl-)
+ * Positive `transconductance` therefore PULLS current out of out+ and pushes
+ * it into out- (not "injects into out+" - that is the textbook MNA convention
+ * but is NOT what SPICE G-elements implement).
  *
  * A linear shortcut is provided via the `transconductance` property: when
  * `expression` is the default ("V(ctrl)"), the effective expression is
@@ -13,23 +18,19 @@
  *
  * MNA formulation (Norton stamp- no branch variable):
  *   setup() allocates 4 off-diagonal matrix handles (vccsset.c:43-46 port).
- *   load() stamps the NR-linearized Norton equivalent using cached handles:
+ *   load() stamps the NR-linearized Norton equivalent using cached handles
+ *   line-for-line with ngspice vccsload.c:34-37:
  *
- *   Norton current source (NR linearized around Vctrl0 = current op point):
+ *     G[nOutP, nCtrlP] += f'    G[nOutP, nCtrlN] -= f'
+ *     G[nOutN, nCtrlP] -= f'    G[nOutN, nCtrlN] += f'
+ *     RHS[nOutP] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
+ *     RHS[nOutN] += f(Vctrl0) - f'(Vctrl0) * Vctrl0
+ *
+ *   NR linearization around Vctrl0 (current op point):
  *     I_out(Vctrl) = f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
  *                  = f'(Vctrl0) * Vctrl + [f(Vctrl0) - f'(Vctrl0)*Vctrl0]
  *
- *   MNA off-diagonal stamp for controlled source injecting gm*V_ctrl INTO nOutP:
- *   The KCL row at nOutP has: G_load*V_outP - gm*V_ctrlP = 0
- *   so the off-diagonal entry G[nOutP, nCtrlP] = -gm (negative), not +gm.
- *
- *     G[nOutP, nCtrlP] -= f'    G[nOutP, nCtrlN] += f'
- *     G[nOutN, nCtrlP] += f'    G[nOutN, nCtrlN] -= f'
- *     RHS[nOutP] += f(Vctrl0) - f'(Vctrl0) * Vctrl0
- *     RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
- *
- * At convergence (Vctrl = Vctrl0) the current injected into out+ equals
- * f(Vctrl0), which is the desired output current. âˆŽ
+ * At convergence (Vctrl = Vctrl0) the current leaving out+ equals f(Vctrl0).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -172,11 +173,11 @@ export class VCCSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp the Norton transconductance matrix using cached handles.
-   * Port of vccsload.c, value-side only- no allocElement calls.
+   * Port of vccsload.c:34-37, value-side only- no allocElement calls.
    *
-   * Signs follow the MNA Norton convention: current gm*Vctrl injected
-   * INTO posNode requires G[posNode, ctrlPosNode] = -gm so the KCL
-   * term is -gm*VctrlP.
+   * SPICE G-element convention: current flows FROM out+ TO out-, so a
+   * positive value f(Vctrl) appears as +gm at G[posNode, ctrlPosNode]
+   * and the constant term subtracts from RHS[posNode] / adds to RHS[negNode].
    */
   override stampOutput(
     solver: SparseSolver,
@@ -188,16 +189,16 @@ export class VCCSAnalogElement extends ControlledSourceElement {
     const gm  = derivative;
     const iNR = value - derivative * ctrlValue; // NR constant term
 
-    solver.stampElement(this._hPCtP, -gm); // G[posNode, ctrlPosNode]
-    solver.stampElement(this._hPCtN,  gm); // G[posNode, ctrlNegNode]
-    solver.stampElement(this._hNCtP,  gm); // G[negNode, ctrlPosNode]
-    solver.stampElement(this._hNCtN, -gm); // G[negNode, ctrlNegNode]
+    solver.stampElement(this._hPCtP,  gm); // G[posNode, ctrlPosNode]   vccsload.c:34
+    solver.stampElement(this._hPCtN, -gm); // G[posNode, ctrlNegNode]   vccsload.c:35
+    solver.stampElement(this._hNCtP, -gm); // G[negNode, ctrlPosNode]   vccsload.c:36
+    solver.stampElement(this._hNCtN,  gm); // G[negNode, ctrlNegNode]   vccsload.c:37
 
     const posNode = this.pinNodes.get("out+")!;
     const negNode = this.pinNodes.get("out-")!;
     // Unconditional - ground rows land in rhs[0], cleared post-solve.
-    rhs[posNode] += iNR;
-    rhs[negNode] -= iNR;
+    rhs[posNode] -= iNR;
+    rhs[negNode] += iNR;
   }
 
   /**
@@ -206,11 +207,14 @@ export class VCCSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output current is f(V_ctrl) evaluated at the
    * current operating point. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. âˆŽ
+   *
+   * Per the SPICE G-element convention (matches matrix stamps), positive
+   * f(V_ctrl) means current LEAVES out+ and ARRIVES at out-: into-pin
+   * current at out+ is -I_out, at out- is +I_out.
    */
   getPinCurrents(_rhs: Float64Array): number[] {
     const iOut = this._compiledExpr(this._ctx);
-    return [0, 0, iOut, -iOut];
+    return [0, 0, -iOut, iOut];
   }
 }
 

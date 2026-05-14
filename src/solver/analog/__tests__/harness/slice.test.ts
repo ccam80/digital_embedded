@@ -56,6 +56,7 @@ function makeSide(n: number): IterationSideData {
     elementStates: {},
     elementStates1Slots: {},
     elementStates2Slots: {},
+    elementStates3Slots: {},
     limitingEvents: [],
     rhs,
     residual,

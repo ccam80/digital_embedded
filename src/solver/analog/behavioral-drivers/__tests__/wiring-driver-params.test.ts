@@ -192,18 +192,16 @@ describe("wiring-driver-params: accepts rOut/vOH/vOL via setParam without throwi
     expect(el!.getProperties().getModelParam<number>("vOL")).toBe(0.5);
   });
 
-  it("Splitter (BehavioralSplitterDriverElement): setParam rOut/vOH/vOL does not throw", () => {
-    const props = makeSplitterProps({ inputCount: 1, outputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+  it("Splitter (BehavioralSplitterDriverElement): tolerates legacy setParam without throwing", () => {
+    // Drivers no longer carry rOut/vOH/vOL — those concepts moved to the
+    // pin boundary (DigitalOutputPinLoaded). The driver's setParam is a
+    // no-op; external callers must continue to work.
+    const props = makeSplitterProps({ inputCount: 1, outputCount: 2 });
     const pinNodes = splitterPinNodes(1, 2);
     const el = new BehavioralSplitterDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
-    expect(el.getParam("rOut")).toBe(200);
-
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
-    expect(el.getParam("vOH")).toBe(3.3);
-
     expect(() => el.setParam("vOL", 0.5)).not.toThrow();
-    expect(el.getParam("vOL")).toBe(0.5);
   });
 
   it("SevenSeg (BehavioralSevenSegDriverElement): setParam rOut/vOH/vOL does not throw", () => {

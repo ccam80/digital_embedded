@@ -627,23 +627,20 @@ describe("RegisterFile — Cat 13 port-width clamping via Splitter (T1)", () => 
   });
 
   it("masked_addresses_are_independent_across_distinct_register_slots", () => {
-    // Cat 13 — two masked addresses (1 and 2) address distinct slots.
-    // Source 0b001 → reg[1]=0xAA, source 0b010 → reg[2]=0xCC.
-    // Reading Ra=1 and Rb=2 must yield independent values (Da=0xAA, Db=0xCC).
     const fix = buildRegisterFileWithSplitterFixture();
     fix.facade.setSignal(fix.coordinator, "WE", 1);
     fix.facade.setSignal(fix.coordinator, "RA", 1);
     fix.facade.setSignal(fix.coordinator, "RB", 2);
 
     fix.facade.setSignal(fix.coordinator, "IN3", 0b001);
-    fix.facade.setSignal(fix.coordinator, "RW",  0b001);  // masked addr = 1
+    fix.facade.setSignal(fix.coordinator, "RW",  0b001);
     fix.facade.setSignal(fix.coordinator, "DIN", 0xAA);
-    risingEdge(fix);   // capture: DIN=0xAA → reg[1]
+    risingEdge(fix);
 
     fix.facade.setSignal(fix.coordinator, "IN3", 0b010);
-    fix.facade.setSignal(fix.coordinator, "RW",  0b010);  // masked addr = 2
+    fix.facade.setSignal(fix.coordinator, "RW",  0b010);
     fix.facade.setSignal(fix.coordinator, "DIN", 0xCC);
-    risingEdge(fix);   // capture: DIN=0xCC → reg[2]
+    risingEdge(fix);
 
     fix.facade.setSignal(fix.coordinator, "WE", 0);
     fix.facade.step(fix.coordinator);

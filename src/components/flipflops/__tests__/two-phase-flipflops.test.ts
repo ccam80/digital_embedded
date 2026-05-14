@@ -103,10 +103,9 @@ describe("D_FF two-phase observable (Cat 9)", () => {
     facade.setSignal(coord, "D", 0);
     pulseClock(facade, coord, "C");
     expect(facade.readSignal(coord, "Q")).toBe(0);
-    // Now hold C high (no new rising edge) and change D=1. Execute phase reads
-    // state, not D — Q must stay 0.
+    // pulseClock returns with C=0. Change D=1 with no new clock edge —
+    // execute phase reads state, not D, so Q must stay 0.
     facade.setSignal(coord, "D", 1);
-    facade.setSignal(coord, "C", 1);
     facade.step(coord);
     facade.step(coord);
     expect(facade.readSignal(coord, "Q")).toBe(0);

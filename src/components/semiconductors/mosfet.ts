@@ -33,6 +33,7 @@ import {
 import type { AnalogElement } from "../../solver/analog/element.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
@@ -969,6 +970,7 @@ function _createMosfetElementWithPolarity(
       const s0 = this._pool.states[0];
       const s1 = this._pool.states[1];
       const s2 = this._pool.states[2];
+      const s3 = this._pool.states[3];
       const mode = ctx.cktMode;
       const voltages = ctx.rhsOld;
       const solver = ctx.solver;
@@ -1424,52 +1426,35 @@ function _createMosfetElementWithPolarity(
           const ag = ctx.ag;
           // mos1load.c:714-719: BD junction integrate, lump into gbd & cbd.
           {
-            const qbd_now = s0[this._stateBase + SLOT_QBD];
-            const qbd1 = s1[this._stateBase + SLOT_QBD];
-            let qbd2 = 0;
-            if (ctx.order >= 2) qbd2 = s2[this._stateBase + SLOT_QBD];
-            let ccap_bd: number;
-            if (ctx.method === "trapezoidal") {
-              if (ctx.order === 1) {
-                ccap_bd = ag[0] * qbd_now + ag[1] * qbd1;
-              } else {
-                const ccapPrev = s1[this._stateBase + SLOT_CQBD];
-                ccap_bd = -ccapPrev * ag[1] + ag[0] * (qbd_now - qbd1);
-              }
-            } else {
-              ccap_bd = ag[0] * qbd_now + ag[1] * qbd1;
-              if (ctx.order >= 2) ccap_bd += ag[2] * qbd2;
-            }
-            const geq_bd = ag[0] * capbd;
-            s0[this._stateBase + SLOT_CQBD] = ccap_bd;
+            const ccapPrev = s1[this._stateBase + SLOT_CQBD];
+            const q2 = s2[this._stateBase + SLOT_QBD];
+            const q3 = s3[this._stateBase + SLOT_QBD];
+            const { ccap, geq } = niIntegrate(
+              ctx.method, ctx.order, capbd, ag,
+              s0[this._stateBase + SLOT_QBD],
+              s1[this._stateBase + SLOT_QBD],
+              [q2, q3, 0, 0, 0], ccapPrev,
+            );
+            s0[this._stateBase + SLOT_CQBD] = ccap;
             // mos1load.c:717-719: gbd += geq; cbd += CKTstate0[cqbd]; cd -= CKTstate0[cqbd].
-            gbd += geq_bd;
-            cbd += ccap_bd;
-            // Store updated cd
-            this._cd = cd - ccap_bd;
+            gbd += geq;
+            cbd += ccap;
+            this._cd = cd - ccap;
           }
           // mos1load.c:720-724: BS junction integrate, lump into gbs & cbs.
           {
-            const qbs_now = s0[this._stateBase + SLOT_QBS];
-            const qbs1 = s1[this._stateBase + SLOT_QBS];
-            let qbs2 = 0;
-            if (ctx.order >= 2) qbs2 = s2[this._stateBase + SLOT_QBS];
-            let ccap_bs: number;
-            if (ctx.method === "trapezoidal") {
-              if (ctx.order === 1) {
-                ccap_bs = ag[0] * qbs_now + ag[1] * qbs1;
-              } else {
-                const ccapPrev = s1[this._stateBase + SLOT_CQBS];
-                ccap_bs = -ccapPrev * ag[1] + ag[0] * (qbs_now - qbs1);
-              }
-            } else {
-              ccap_bs = ag[0] * qbs_now + ag[1] * qbs1;
-              if (ctx.order >= 2) ccap_bs += ag[2] * qbs2;
-            }
-            const geq_bs = ag[0] * capbs;
-            s0[this._stateBase + SLOT_CQBS] = ccap_bs;
-            gbs += geq_bs;
-            cbs += ccap_bs;
+            const ccapPrev = s1[this._stateBase + SLOT_CQBS];
+            const q2 = s2[this._stateBase + SLOT_QBS];
+            const q3 = s3[this._stateBase + SLOT_QBS];
+            const { ccap, geq } = niIntegrate(
+              ctx.method, ctx.order, capbs, ag,
+              s0[this._stateBase + SLOT_QBS],
+              s1[this._stateBase + SLOT_QBS],
+              [q2, q3, 0, 0, 0], ccapPrev,
+            );
+            s0[this._stateBase + SLOT_CQBS] = ccap;
+            gbs += geq;
+            cbs += ccap;
           }
         }
       }
@@ -1551,88 +1536,57 @@ function _createMosfetElementWithPolarity(
           if (capgb === 0) s0[this._stateBase + SLOT_CQGB] = 0;
           // mos1load.c:878-894: MODETRAN-only path. NIintegrate the three caps.
           const ag = ctx.ag;
+          // mos1load.c:882-893: per-cap NIintegrate then companion-source
+          // formula `ceq = NIceq - g*v + CKTag[0]*state0[q]`. The +ag[0]*q is
+          // mos1load's explicit undo of niinteg.c:77's `ceq = ccap - ag[0]*q`
+          // subtraction; preserving the subtract-then-add op order matches
+          // ngspice bit-for-bit instead of folding to `ccap - g*v`.
           // Gate-source cap companion.
           {
+            const ccapPrev = s1[this._stateBase + SLOT_CQGS];
+            const q2 = s2[this._stateBase + SLOT_QGS];
+            const q3 = s3[this._stateBase + SLOT_QGS];
             const q0 = s0[this._stateBase + SLOT_QGS];
-            const q1 = s1[this._stateBase + SLOT_QGS];
-            let q2 = 0;
-            if (ctx.order >= 2) q2 = s2[this._stateBase + SLOT_QGS];
-            let ccap_gs: number;
-            if (ctx.method === "trapezoidal") {
-              if (ctx.order === 1) {
-                ccap_gs = ag[0] * q0 + ag[1] * q1;
-              } else {
-                const ccapPrev = s1[this._stateBase + SLOT_CQGS];
-                ccap_gs = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
-              }
-            } else {
-              ccap_gs = ag[0] * q0 + ag[1] * q1;
-              if (ctx.order >= 2) ccap_gs += ag[2] * q2;
-            }
-            gcgs = ag[0] * capgs;
-            // ngspice mos1load.c:888-889 writes:
-            //   ceqgs = <NIintegrate's ceq> - gcgs*vgs + CKTag[0]*state0[qgs]
-            // where NIintegrate (niinteg.c:77) returns ceq = ccap_n - ag[0]*q_n.
-            // The +ag[0]*q_n in mos1load.c cancels the -ag[0]*q_n inside ceq,
-            // leaving the net companion-source value `ccap_n - gcgs*vgs`. Our
-            // `ccap_gs` already IS ccap_n (the full integrated cap current),
-            // not NIintegrate's already-decremented `ceq`, so we must NOT add
-            // ag[0]*q0 again — doing so double-counts ag[0]*q_n and stamps a
-            // spurious 2.3e-4-class current at every tranNR iteration where
-            // QGS is non-trivial.
-            ceqgs = ccap_gs - gcgs * vgs;
-            s0[this._stateBase + SLOT_CQGS] = ccap_gs;
+            const { ccap, ceq, geq } = niIntegrate(
+              ctx.method, ctx.order, capgs, ag,
+              q0, s1[this._stateBase + SLOT_QGS],
+              [q2, q3, 0, 0, 0], ccapPrev,
+            );
+            gcgs = geq;
+            ceqgs = ceq - gcgs * vgs + ag[0] * q0;
+            s0[this._stateBase + SLOT_CQGS] = ccap;
           }
           // Gate-drain cap companion.
           {
+            const ccapPrev = s1[this._stateBase + SLOT_CQGD];
+            const q2 = s2[this._stateBase + SLOT_QGD];
+            const q3 = s3[this._stateBase + SLOT_QGD];
             const q0 = s0[this._stateBase + SLOT_QGD];
-            const q1 = s1[this._stateBase + SLOT_QGD];
-            let q2 = 0;
-            if (ctx.order >= 2) q2 = s2[this._stateBase + SLOT_QGD];
-            let ccap_gd: number;
-            if (ctx.method === "trapezoidal") {
-              if (ctx.order === 1) {
-                ccap_gd = ag[0] * q0 + ag[1] * q1;
-              } else {
-                const ccapPrev = s1[this._stateBase + SLOT_CQGD];
-                ccap_gd = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
-              }
-            } else {
-              ccap_gd = ag[0] * q0 + ag[1] * q1;
-              if (ctx.order >= 2) ccap_gd += ag[2] * q2;
-            }
-            gcgd = ag[0] * capgd;
-            // See ceqgs comment above: `ccap_gd` is already ccap_n; the
-            // ag[0]*q0 term would double-count ag[0]*q_n (mos1load.c:890-891
-            // adds it back to NIintegrate's pre-decremented ceq).
-            ceqgd = ccap_gd - gcgd * vgd;
-            s0[this._stateBase + SLOT_CQGD] = ccap_gd;
+            const { ccap, ceq, geq } = niIntegrate(
+              ctx.method, ctx.order, capgd, ag,
+              q0, s1[this._stateBase + SLOT_QGD],
+              [q2, q3, 0, 0, 0], ccapPrev,
+            );
+            gcgd = geq;
+            ceqgd = ceq - gcgd * vgd + ag[0] * q0;
+            s0[this._stateBase + SLOT_CQGD] = ccap;
           }
-          // Gate-bulk cap companion.
+          // Gate-bulk cap companion. vgb is computed locally; ngspice reads it
+          // as vgb (mos1load.c:892), not state0[qgb].
           {
+            const ccapPrev = s1[this._stateBase + SLOT_CQGB];
+            const q2 = s2[this._stateBase + SLOT_QGB];
+            const q3 = s3[this._stateBase + SLOT_QGB];
             const q0 = s0[this._stateBase + SLOT_QGB];
-            const q1 = s1[this._stateBase + SLOT_QGB];
-            let q2 = 0;
-            if (ctx.order >= 2) q2 = s2[this._stateBase + SLOT_QGB];
-            let ccap_gb: number;
-            if (ctx.method === "trapezoidal") {
-              if (ctx.order === 1) {
-                ccap_gb = ag[0] * q0 + ag[1] * q1;
-              } else {
-                const ccapPrev = s1[this._stateBase + SLOT_CQGB];
-                ccap_gb = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
-              }
-            } else {
-              ccap_gb = ag[0] * q0 + ag[1] * q1;
-              if (ctx.order >= 2) ccap_gb += ag[2] * q2;
-            }
-            gcgb = ag[0] * capgb;
+            const { ccap, ceq, geq } = niIntegrate(
+              ctx.method, ctx.order, capgb, ag,
+              q0, s1[this._stateBase + SLOT_QGB],
+              [q2, q3, 0, 0, 0], ccapPrev,
+            );
+            gcgb = geq;
             const vgb_now = vgs - vbs;
-            // See ceqgs comment above: ccap_gb is already ccap_n; ag[0]*q0
-            // would double-count ag[0]*q_n vs the ngspice net formula
-            // (mos1load.c:892-893 adds it back to NIintegrate's ceq).
-            ceqgb = ccap_gb - gcgb * vgb_now;
-            s0[this._stateBase + SLOT_CQGB] = ccap_gb;
+            ceqgb = ceq - gcgb * vgb_now + ag[0] * q0;
+            s0[this._stateBase + SLOT_CQGB] = ccap;
           }
         }
       } // end if (!bypassed)
@@ -1791,7 +1745,10 @@ function _createMosfetElementWithPolarity(
       method: IntegrationMethod,
       lteParams: LteParams,
     ): number {
-      // CKTterr on qgs, qgd, qgb, qbd, qbs per mos1load.c state layout.
+      // ngspice mos1trun.c:24-26 calls CKTterr on the three Meyer gate caps
+      // ONLY (qgs, qgd, qgb). The bulk-junction depletion caps (qbd, qbs)
+      // are NOT consulted by mos1's CKTtrunc — including them here would
+      // bound dt below mos1's actual LTE constraint.
       const s0 = this._pool.states[0];
       const s1 = this._pool.states[1];
       const s2 = this._pool.states[2];
@@ -1801,8 +1758,6 @@ function _createMosfetElementWithPolarity(
         [SLOT_QGS, SLOT_CQGS],
         [SLOT_QGD, SLOT_CQGD],
         [SLOT_QGB, SLOT_CQGB],
-        [SLOT_QBD, SLOT_CQBD],
-        [SLOT_QBS, SLOT_CQBS],
       ];
       for (const [slotQ, slotCcap] of pairs) {
         const q0 = s0[this._stateBase + slotQ];

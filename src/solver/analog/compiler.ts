@@ -226,6 +226,136 @@ function computeSubcktParams(
 }
 
 /**
+ * Walk a composite's netlist in INPpas2 first-encounter order and allocate
+ * MNA node IDs for each composite-internal net at the deck position where
+ * ngspice would first encounter the net name on the flattened deck.
+ *
+ * Called from `buildAnalogNodeMapFromPartition` *inside* its
+ * `componentsInDeckOrder` loop, immediately after the composite's external
+ * pins have been allocated. This interleaves composite-internal IDs with
+ * external IDs in the same order ngspice does, so a composite sitting in the
+ * CAP bucket (e.g. PolarizedCap) gets its `nCap` allocated before the next
+ * outer-bucket element's external pins — matching ngspice's flattened-deck
+ * INPpas2 walk (`inppas2.c:76` + `inpsymt.c:43-72`).
+ *
+ * `allocateInternal(parentLabel, suffix)` is idempotent on the
+ * `${parentLabel}#${suffix}` key — callers can safely re-walk without double-
+ * allocating. Nested composites (sub-elements that are themselves
+ * `kind: "netlist"`) recurse via the same allocator so their internal nets
+ * also land in flattened-deck position.
+ *
+ * Pin walk order: `connectivity[pi]` from `netlist.netlist[elIdx]` (pinLayout
+ * order). Composite authors write `nodes:` in pinLayout order per the
+ * `MnaSubcircuitNetlist` contract, so for every primitive sub-element that
+ * has an entry in `TYPE_ID_TO_DECK_PIN_LABEL_ORDER`, pinLayout order matches
+ * the deck card's node-list order. The MOSFET/JFET (D-G-S deck vs G-S-D
+ * pinLayout) divergence does not currently affect any shipped composite —
+ * none has a MOSFET or JFET sub-element. If one is added, extend this walk
+ * to consult `TYPE_ID_TO_DECK_PIN_LABEL_ORDER[sub.typeId]`.
+ */
+function walkCompositeForNodeAllocation(
+  netlist: MnaSubcircuitNetlist,
+  parentLabel: string,
+  outerPortNodes: ReadonlyMap<string, number>,
+  registry: ComponentRegistry,
+  runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined,
+  subcktParams: Map<string, number>,
+  allocateInternal: (parentLabel: string, suffix: string) => number,
+  internalIds: Map<string, number>,
+): void {
+  const portCount = netlist.ports.length;
+
+  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+    const sub = netlist.elements[elIdx]!;
+    const connectivity = netlist.netlist[elIdx]!;
+
+    for (let pi = 0; pi < connectivity.length; pi++) {
+      const netIdx = connectivity[pi];
+      if (netIdx === undefined || netIdx < portCount) continue;
+      const slot = netIdx - portCount;
+      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
+      const key = `${parentLabel}#${suffix}`;
+      if (!internalIds.has(key)) {
+        allocateInternal(parentLabel, suffix);
+      }
+    }
+
+    // Nested-composite recursion: if a sub-element is itself `kind: "netlist"`,
+    // its internal nets are also flattened-deck-visible and must land at this
+    // sub-element's deck position, not after the outer composite finishes.
+    const subDef = registry.get(sub.typeId);
+    if (!subDef) continue;
+    const modelKey = sub.modelRef ?? (sub.params?.model as string | undefined);
+    if (modelKey === undefined) continue;
+    const subEntry = resolveModelEntry(subDef, modelKey, runtimeModelMap);
+    if (!subEntry || subEntry.kind !== "netlist") continue;
+
+    // Build subProps for the nested netlist resolution. Mirrors the
+    // expandCompositeInstance subProps construction (literal numbers + string
+    // refs into subcktParams; sibling-refs aren't walk-relevant so skip them).
+    const subProps = new PropertyBag();
+    if (subEntry.params) {
+      for (const [k, v] of Object.entries(subEntry.params)) {
+        if (typeof v === "number") subProps.setModelParam(k, v);
+      }
+    }
+    if (sub.params) {
+      for (const [paramKey, v] of Object.entries(sub.params)) {
+        if (typeof v === "number") {
+          subProps.setModelParam(paramKey, v);
+        } else if (typeof v === "string") {
+          const resolved = subcktParams.get(v);
+          if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
+        }
+      }
+    }
+
+    const innerNetlist = resolveNetlistInstance(subEntry, subProps);
+    const innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
+    const subName = sub.subElementName ?? `el${elIdx}`;
+    const childLabel = `${parentLabel}:${subName}`;
+    const subPinLayout = resolvePinLayout(subDef, subProps);
+
+    const innerOuterPortNodes = new Map<string, number>();
+    for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
+      const netIdx = connectivity[pi];
+      if (netIdx === undefined) continue;
+      const pinLabel = subPinLayout[pi]!.label;
+      let nodeId: number;
+      if (netIdx < portCount) {
+        const portLabel = netlist.ports[netIdx]!;
+        const id = outerPortNodes.get(portLabel);
+        if (id !== undefined) {
+          nodeId = id;
+        } else if (portLabel === "gnd" || portLabel === "GND") {
+          nodeId = 0;
+        } else {
+          continue;
+        }
+      } else {
+        const slot = netIdx - portCount;
+        const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
+        const id = internalIds.get(`${parentLabel}#${suffix}`);
+        if (id === undefined) continue;
+        nodeId = id;
+      }
+      innerOuterPortNodes.set(pinLabel, nodeId);
+    }
+
+    walkCompositeForNodeAllocation(
+      innerNetlist,
+      childLabel,
+      innerOuterPortNodes,
+      registry,
+      runtimeModelMap,
+      innerSubcktParams,
+      allocateInternal,
+      internalIds,
+    );
+  }
+}
+
+/**
  * Expand a composite instance into a flat list of leaf AnalogElements with
  * fully-resolved pin-node IDs. Recursive- nested composites are expanded in
  * the same pass. The returned `wrapper` is a presentation-only
@@ -233,6 +363,11 @@ function computeSubcktParams(
  * getPinCurrents aggregation, and internal-node label exposure. The returned
  * `allLeaves` is the depth-first flattening that the engine's element walk
  * sees as primary participants.
+ *
+ * Composite-internal node IDs are read from `compositeInternalIds`, which the
+ * node-map builder populates in flattened-deck INPpas2 order via
+ * `walkCompositeForNodeAllocation`. The straggler pass below covers declared
+ * internal nets that no sub-element pin references (rare, but legal).
  */
 function expandCompositeInstance(
   netlist: MnaSubcircuitNetlist,
@@ -243,32 +378,30 @@ function expandCompositeInstance(
   registry: ComponentRegistry,
   getTime: () => number,
   allocateNode: NodeAllocator,
+  compositeInternalIds: ReadonlyMap<string, number>,
   hookFactory?: import("../../core/registry.js").AnalogWrapperHookFactory,
   outerProps?: PropertyBag,
 ): { wrapper: SubcircuitWrapperElement; allLeaves: AnalogElement[] } {
-  // Allocate internal-net IDs in ngspice INPpas2 / INPtermInsert order:
-  // walk `netlist.elements` in deck order, walk each element's
-  // connectivity in pin order, allocate on first encounter of an
-  // internal-net index. Mirrors cktnewn.c:23 + inpsymt.c:43 first-
-  // encounter-wins semantics over the parser's left-to-right card walk.
+  // Pre-allocated path: `walkCompositeForNodeAllocation` (called from the
+  // node-map builder during Pass A's deck walk) populates `compositeInternalIds`
+  // with `${parentLabel}#${suffix}` → nodeId entries in ngspice INPpas2
+  // first-encounter order over the flattened deck. Read those IDs here so the
+  // expanded leaves see exactly the same node IDs the deck emitter encodes
+  // and ngspice's flattened-deck node-numbering walk assigns.
   const internalNetIds: number[] = new Array(netlist.internalNetCount);
   const internalNetLabels: string[] = new Array(netlist.internalNetCount);
-  const portCount = netlist.ports.length;
-  for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
-    const connectivity = netlist.netlist[elIdx]!;
-    for (let pi = 0; pi < connectivity.length; pi++) {
-      const netIdx = connectivity[pi];
-      if (netIdx === undefined || netIdx < portCount) continue;
-      const slot = netIdx - portCount;
-      if (internalNetIds[slot] !== undefined) continue;
-      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
-      internalNetIds[slot] = allocateNode(parentLabel, suffix);
+  for (let slot = 0; slot < netlist.internalNetCount; slot++) {
+    const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
+    const id = compositeInternalIds.get(`${parentLabel}#${suffix}`);
+    if (id !== undefined) {
+      internalNetIds[slot] = id;
       internalNetLabels[slot] = suffix;
     }
   }
   // Straggler pass: any internal net never referenced by a sub-element pin
-  // is unreachable; the current contract requires every declared internal
-  // net to have an ID, so fill stragglers in declared order for symmetry.
+  // is not seen by the flattened-deck walk; the current contract requires
+  // every declared internal net to have an ID, so fill stragglers via the
+  // partition-level allocator (these IDs land past the deck-walk range).
   for (let slot = 0; slot < netlist.internalNetCount; slot++) {
     if (internalNetIds[slot] === undefined) {
       const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
@@ -417,6 +550,9 @@ function expandCompositeInstance(
         registry,
         getTime,
         allocateNode,
+        compositeInternalIds,
+        leafDef?.analogWrapperHook,
+        subProps,
       );
       childEl = inner.wrapper;
       // Inner expansion already set inner.wrapper.label = childLabel via
@@ -489,7 +625,29 @@ function expandCompositeInstance(
 type PartitionElementMeta = {
   pc: PartitionedComponent;
   route: ComponentRoute;
+  /** Composite components only: pre-resolved netlist + subcktParams +
+   *  parentLabel. Computed in Pass A so the node-map builder and the element
+   *  construction loop reuse the same `MnaSubcircuitNetlist` instance — the
+   *  one whose internal-net slot indices we allocate node IDs against. */
+  composite?: {
+    netlist: MnaSubcircuitNetlist;
+    subcktParams: Map<string, number>;
+    parentLabel: string;
+  };
 };
+
+/**
+ * Resolve a CircuitElement's compile-time label. Mirrors the precedence used
+ * in expandCompositeInstance's `${parentLabel}#${suffix}` key construction:
+ * the user-set `label` property wins, falling back to `instanceId`.
+ */
+function resolveElementLabel(el: CircuitElement): string {
+  const props = el.getProperties();
+  if (props.has("label")) {
+    return String(props.get("label") ?? el.instanceId);
+  }
+  return el.instanceId;
+}
 
 /**
  * Pass A for `compileAnalogPartition`: iterate over partition components and
@@ -501,7 +659,6 @@ type PartitionElementMeta = {
  */
 function runPassA_partition(
   partition: SolverPartition,
-  _externalNodeCount: number,
   _diagnostics: Diagnostic[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
@@ -551,7 +708,15 @@ function runPassA_partition(
           merged[k] = props.getModelParam<number>(k);
         }
         props.replaceModelParams(merged, { preserveGivenness: true });
-        elementMeta.push({ pc, route });
+        // Resolve the function-form netlist + subcktParams here so the same
+        // MnaSubcircuitNetlist instance is shared by the node-map deck walk
+        // (which allocates composite-internal node IDs in INPpas2 first-
+        // encounter order) and the element construction loop (which builds
+        // the wrapper + leaves against those same internal-net slot indices).
+        const netlist = resolveNetlistInstance(route.entry, props);
+        const subcktParams = computeSubcktParams(netlist, props);
+        const parentLabel = resolveElementLabel(el);
+        elementMeta.push({ pc, route, composite: { netlist, subcktParams, parentLabel } });
         continue;
       }
     }
@@ -574,6 +739,9 @@ function runPassA_partition(
 function buildAnalogNodeMapFromPartition(
   partition: SolverPartition,
   diagnostics: Diagnostic[],
+  elementMeta: ReadonlyMap<PartitionedComponent, PartitionElementMeta>,
+  registry: ComponentRegistry,
+  runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined,
 ): {
   nodeCount: number;
   groupToNodeId: Map<number, number>;
@@ -581,6 +749,8 @@ function buildAnalogNodeMapFromPartition(
   labelToNodeId: Map<string, number>;
   labelPinNodes: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
   positionToNodeId: Map<string, number>;
+  compositeInternalIds: Map<string, number>;
+  preAllocatedNodes: PreAllocatedNodeEntry[];
 } {
   const groups = partition.groups;
 
@@ -691,7 +861,22 @@ function buildAnalogNodeMapFromPartition(
       if (lhs !== rhs) return lhs - rhs;
       return a.originalIndex - b.originalIndex;
     });
+  // Composite-internal node IDs land in the deck-walk range, interleaved with
+  // external IDs at the position the parent composite occupies in the
+  // emission. The compositeInternalIds map and preAllocatedNodes entries are
+  // populated as we go via `allocateCompositeInternal`.
+  const compositeInternalIds = new Map<string, number>();
+  const preAllocatedNodes: PreAllocatedNodeEntry[] = [];
   let nextNodeId = 1;
+  const allocateCompositeInternal = (label: string, suffix: string): number => {
+    const key = `${label}#${suffix}`;
+    const existing = compositeInternalIds.get(key);
+    if (existing !== undefined) return existing;
+    const id = nextNodeId++;
+    compositeInternalIds.set(key, id);
+    preAllocatedNodes.push({ name: key, number: id, type: "voltage" });
+    return id;
+  };
   for (const { pc } of componentsInDeckOrder) {
     // Visit pins in SPICE deck-emission order. ngspice numbers nodes during
     // PARSE, in the order each new node name appears on each element line.
@@ -720,9 +905,41 @@ function buildAnalogNodeMapFromPartition(
       }
     } else {
       // Unknown typeId (composite or non-ngspice element): fall back to
-      // pinLayout order. ngspice-parity is not currently established for
-      // these, so the walk order doesn't have to match a SPICE deck.
+      // pinLayout order. ngspice-parity for the outer pins of composites is
+      // established by walking pc.resolvedPins in pinLayout order — which
+      // matches what netlist-generator emits at the composite's outer
+      // call site (the composite typeId has no SPICE card; its sub-element
+      // cards drive ngspice's first-encounter walk).
       for (const rp of pc.resolvedPins) visitPin(rp);
+    }
+
+    // Composite-internal walk: immediately after this component's outer pins
+    // are allocated, walk into its netlist (if any) and allocate IDs for any
+    // composite-internal nets in flattened-deck INPpas2 first-encounter order.
+    // This lands `nCap` / `senseMid` / etc. at the deck position they
+    // actually appear in ngspice's flattened parse — interleaved with, not
+    // appended after, the outer-pin allocations.
+    const meta = elementMeta.get(pc);
+    if (meta?.composite) {
+      const { netlist, subcktParams, parentLabel } = meta.composite;
+      const outerPortNodes = new Map<string, number>();
+      for (const rp of pc.resolvedPins) {
+        const k = `${rp.worldPosition.x},${rp.worldPosition.y}`;
+        const gid = positionToGroupId.get(k);
+        if (gid === undefined) continue;
+        const id = groupToNodeId.get(gid);
+        if (id !== undefined) outerPortNodes.set(rp.pinLabel, id);
+      }
+      walkCompositeForNodeAllocation(
+        netlist,
+        parentLabel,
+        outerPortNodes,
+        registry,
+        runtimeModelMap,
+        subcktParams,
+        allocateCompositeInternal,
+        compositeInternalIds,
+      );
     }
   }
   // Any groups not visited by any component pin (floating wire-only nets)
@@ -788,7 +1005,16 @@ function buildAnalogNodeMapFromPartition(
     }
   }
 
-  return { nodeCount, groupToNodeId, wireToNodeId, labelToNodeId, labelPinNodes, positionToNodeId };
+  return {
+    nodeCount,
+    groupToNodeId,
+    wireToNodeId,
+    labelToNodeId,
+    labelPinNodes,
+    positionToNodeId,
+    compositeInternalIds,
+    preAllocatedNodes,
+  };
 }
 
 /**
@@ -811,15 +1037,40 @@ export function compileAnalogPartition(
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: Diagnostic[] = [];
 
-  // Build node map from partition groups
+  // Extract typed inline runtime models for use in route resolution.
+  const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
+    outerCircuit?.metadata.models;
+
+  // Pass A: resolve component routes + merged params + (for composites) the
+  // resolved MnaSubcircuitNetlist + subcktParams + parentLabel. Must run
+  // before the node-map builder so the latter can walk into each composite
+  // at its deck position and allocate composite-internal node IDs in
+  // INPpas2 first-encounter order.
+  const elementMeta = runPassA_partition(partition, diagnostics, digitalPinLoading, runtimeModelMap);
+  const metaByComponent = new Map<PartitionedComponent, PartitionElementMeta>();
+  for (const m of elementMeta) metaByComponent.set(m.pc, m);
+
+  // Build node map from partition groups. Composite-internal IDs are
+  // interleaved with external IDs at the position the parent composite
+  // occupies in the deck walk, matching ngspice's flattened-deck INPpas2
+  // node-numbering. `preAllocatedNodes` is seeded with the composite-internal
+  // entries here; the engine reads it before `_setup()` runs.
   const {
-    nodeCount: externalNodeCount,
+    nodeCount: deckWalkNodeCount,
     groupToNodeId,
     wireToNodeId,
     labelToNodeId,
     labelPinNodes,
     positionToNodeId,
-  } = buildAnalogNodeMapFromPartition(partition, diagnostics);
+    compositeInternalIds,
+    preAllocatedNodes,
+  } = buildAnalogNodeMapFromPartition(
+    partition,
+    diagnostics,
+    metaByComponent,
+    registry,
+    runtimeModelMap,
+  );
 
   // Build a reverse map from MNA node ID â†’ per-net loading override so that
   // bridge synthesis sites can consult per-net overrides instead of relying
@@ -837,22 +1088,14 @@ export function compileAnalogPartition(
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
-  // Extract typed inline runtime models for use in route resolution.
-  const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
-    outerCircuit?.metadata.models;
-
-  // Stage 3 (Pass A): Resolve component routes. Branch indices and internal
-  // node IDs are allocated lazily at setup() time (A6.1).
-  const elementMeta = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading, runtimeModelMap);
-
-  let totalNodeCount = externalNodeCount;
-
-  // Compile-time node allocator for composite-internal nets. Threaded into
-  // `expandCompositeInstance` so every nested level shares one contiguous
-  // node-ID range. The engine seeds `_nodeTable` with `preAllocatedNodes`
-  // before `_setup()` so element-private `makeVolt` calls continue from
-  // `compiled.nodeCount + 1` without colliding.
-  const preAllocatedNodes: PreAllocatedNodeEntry[] = [];
+  // Compile-time node allocator for composite-internal nets that the
+  // flattened-deck walk did NOT visit (declared but unreferenced by any
+  // sub-element pin — straggler case in `expandCompositeInstance`). These
+  // IDs land past the deck-walk range, since ngspice doesn't see them on
+  // its flattened deck either. The engine seeds `_nodeTable` with
+  // `preAllocatedNodes` before `_setup()` so element-private `makeVolt`
+  // calls during setup continue from `compiled.nodeCount + 1`.
+  let totalNodeCount = deckWalkNodeCount;
   const allocateCompositeNode: NodeAllocator = (label, suffix) => {
     totalNodeCount += 1;
     preAllocatedNodes.push({
@@ -893,7 +1136,7 @@ export function compileAnalogPartition(
     // Use the partition's authoritative per-pin resolution (`pc.resolvedPins`)
     // rather than spatial wire-walking on `circuit.wires`. The spec-mode
     // partition assigned each pin to its correct connectivity group based on
-    // the SpecConnection list; the wire-walk fallback breaks at auto-layout
+    // the SpecConnection list; a spatial wire-walk breaks at auto-layout
     // corner collisions where two routed wires from distinct nets share an
     // endpoint coordinate. `positionToNodeId` is keyed by pin world-position
     // and carries the spec-derived group nodeId for each pin position, which
@@ -1039,8 +1282,18 @@ export function compileAnalogPartition(
       core = analogFactory(pinNodes, props, getTime);
       core.label = resolvedLabel;
     } else {
-      const netlist = resolveNetlistInstance(route.entry, props);
-      const subcktParams = computeSubcktParams(netlist, props);
+      // The composite's netlist + subcktParams + parentLabel were resolved
+      // up-front in Pass A and stored on the meta so the node-map builder
+      // could allocate composite-internal IDs against the same netlist
+      // instance. Reuse those here.
+      if (!meta.composite) {
+        throw new Error(
+          `Compose route on "${resolvedLabel}" (${pc.element.typeId}) has no ` +
+            `pre-resolved netlist on its PartitionElementMeta. runPassA_partition ` +
+            `should populate meta.composite for every compose route.`,
+        );
+      }
+      const { netlist, subcktParams } = meta.composite;
       // Parent-side runtime hook: instantiate once per parent-component
       // instance and thread to the wrapper. The wrapper forwards
       // load/setDiagnosticEmitter/setParam/acceptStep calls to the hook;
@@ -1059,6 +1312,7 @@ export function compileAnalogPartition(
         registry,
         getTime,
         allocateCompositeNode,
+        compositeInternalIds,
         hookFactory,
         props,
       );

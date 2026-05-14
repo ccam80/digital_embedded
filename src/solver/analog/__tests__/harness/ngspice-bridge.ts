@@ -293,6 +293,7 @@ export class NgspiceBridge {
       state0:           koffi.pointer("double"),
       state1:           koffi.pointer("double"),
       state2:           koffi.pointer("double"),
+      state3:           koffi.pointer("double"),
       numStates:        "int",
       noncon:           "int",
       converged:        "int",
@@ -361,6 +362,9 @@ export class NgspiceBridge {
         const state2 = d.state2
           ? Float64Array.from(koffi.decode(d.state2, "double", numStates))
           : new Float64Array(numStates);
+        const state3 = d.state3
+          ? Float64Array.from(koffi.decode(d.state3, "double", numStates))
+          : new Float64Array(numStates);
 
         const matrixColPtrArr: number[] | null = matrixNnz > 0 && d.matrixColPtr
           ? Array.from(koffi.decode(d.matrixColPtr, "int", matrixSize + 1)) as number[] : null;
@@ -408,7 +412,7 @@ export class NgspiceBridge {
 
         this._iterations.push({
           iteration, matrixSize, rhsBufSize, rhs, rhsOld, preSolveRhs,
-          state0, state1, state2,
+          state0, state1, state2, state3,
           numStates, noncon, converged: d.converged !== 0,
           simTime, simTimeStart, dt, cktMode,
           ag0, ag1, integrateMethod, order,
@@ -529,10 +533,25 @@ export class NgspiceBridge {
   getTopology(): NgspiceTopology | null { return this._topology; }
   getRawTopology(): RawNgspiceTopology | null { return this._rawTopology; }
 
+  /**
+   * Test-only seam: inject synthetic iteration/outer-event data so unit tests
+   * can exercise getCaptureSession() without loading the DLL. Resets topology
+   * to null so getCaptureSession() takes the synthetic-driven path.
+   */
+  installSyntheticState(
+    iterations: RawNgspiceIterationEx[],
+    outerEvents: RawNgspiceOuterEvent[] = [],
+  ): void {
+    this._iterations = iterations;
+    this._outerEvents = outerEvents;
+    this._topology = null;
+  }
+
   private _unpackElementStates(
     state0: Float64Array,
     state1: Float64Array,
     state2: Float64Array,
+    state3: Float64Array,
   ): ElementStateSnapshot[] {
     if (!this._topology || this._topology.devices.length === 0) return [];
     const snapshots: ElementStateSnapshot[] = [];
@@ -545,6 +564,7 @@ export class NgspiceBridge {
       const slots: Record<string, number> = {};
       const state1Slots: Record<string, number> = {};
       const state2Slots: Record<string, number> = {};
+      const state3Slots: Record<string, number> = {};
 
       for (const [offsetStr, slotName] of Object.entries(mapping.ngspiceToSlot)) {
         const offset = Number(offsetStr);
@@ -552,6 +572,7 @@ export class NgspiceBridge {
         if (absOffset < state0.length) slots[slotName] = state0[absOffset];
         if (absOffset < state1.length) state1Slots[slotName] = state1[absOffset];
         if (absOffset < state2.length) state2Slots[slotName] = state2[absOffset];
+        if (absOffset < state3.length) state3Slots[slotName] = state3[absOffset];
       }
 
       if (Object.keys(slots).length > 0) {
@@ -559,7 +580,7 @@ export class NgspiceBridge {
         snapshots.push({
           elementIndex: -1,
           label: dev.name.toUpperCase(),
-          slots, state1Slots, state2Slots,
+          slots, state1Slots, state2Slots, state3Slots,
           pinCurrents,
         });
       }
@@ -800,7 +821,7 @@ export class NgspiceBridge {
       }
 
       // 6: Build iteration snapshot and push
-      const elementStates = this._unpackElementStates(raw.state0, raw.state1, raw.state2);
+      const elementStates = this._unpackElementStates(raw.state0, raw.state1, raw.state2, raw.state3);
       const limitingEvents: LimitingEvent[] = raw.limitingEvents.map(ev => ({
         elementIndex: -1,
         label: ev.deviceName.toUpperCase(),

@@ -797,7 +797,6 @@ function emitPrimitive(
 
   if (typeId === "Clock") {
     // Clock is a hardcoded square wave (see clock.ts AnalogClockElementImpl):
-    //   V = vdd on even half-periods, V = 0 on odd half-periods, no rise/fall.
     // Equivalent to a SPICE PULSE source with v1=0, v2=vdd, td=tr=tf=0,
     // pw=halfP, per=period. Single "out" pin; neg side is ground.
     const frequency = requireParam(props, def, modelKey, "Frequency", rawLabel);

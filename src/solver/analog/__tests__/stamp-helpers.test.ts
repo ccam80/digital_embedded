@@ -1,10 +1,5 @@
 ﻿import { describe, it, expect, beforeAll } from "vitest";
-import {
-  allocNortonStamp,
-  stampNortonAt,
-  stampNortonValue,
-} from "../stamp-helpers.js";
-import type { LoadContext } from "../load-context.js";
+import { allocNortonStamp } from "../stamp-helpers.js";
 import { buildFixture, type Fixture } from "./fixtures/build-fixture.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../core/registry.js";

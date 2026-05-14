@@ -11,6 +11,10 @@
  * `expression` is the default ("I(sense)"), the effective expression is
  * `currentGain * I(sense)`.
  *
+ * Per the SPICE F-element convention (ngspice user manual, cccsload.c:35-36):
+ * current flows FROM out+, through the source, TO out-. Positive
+ * `currentGain` therefore PULLS current out of out+ and pushes it into out-.
+ *
  * MNA formulation (port of ngspice cccsset.c / cccsload.c):
  *   CCCS has no own branch row. Current sensing relies on a 0V VSRC
  *   (the sense source) whose branch is resolved via ctx.findBranch at
@@ -19,11 +23,11 @@
  *     _hNCtBr = G[negNode, contBranch]
  *
  *   load() reads the controlling branch current from rhsOld and stamps
- *   the NR-linearized Norton equivalent:
- *     G[posNode, contBranch] = -gm
- *     G[negNode, contBranch] =  gm
- *     RHS[posNode] += iNR
- *     RHS[negNode] -= iNR
+ *   the NR-linearized Norton equivalent (cccsload.c:35-36):
+ *     G[posNode, contBranch] += gm
+ *     G[negNode, contBranch] -= gm
+ *     RHS[posNode] -= iNR
+ *     RHS[negNode] += iNR
  *
  * senseSourceLabel MUST be set via setParam("senseSourceLabel", ...) at
  * compile time before setup() runs.
@@ -176,17 +180,15 @@ export class CCCSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp NR-linearized Norton equivalent for the controlled current output.
-   * Port of cccsload.c value-side- no allocElement calls.
+   * Port of cccsload.c:35-36 value-side- no allocElement calls.
    *
    * I_out â‰ˆ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
    *
-   * G sub-matrix (controlling branch COLUMN linked to output node ROWS):
-   *   G[posNode, contBranch] -= gm    (âˆ’gm stamps so current flows INTO posNode)
-   *   G[negNode, contBranch] += gm
-   *
-   * RHS (Norton constant term):
-   *   RHS[posNode] += iNR
-   *   RHS[negNode] -= iNR
+   * SPICE F-element convention: current flows FROM posNode TO negNode, so
+   *   G[posNode, contBranch] += gm
+   *   G[negNode, contBranch] -= gm
+   *   RHS[posNode] -= iNR
+   *   RHS[negNode] += iNR
    */
   override stampOutput(
     solver: SparseSolver,
@@ -198,14 +200,14 @@ export class CCCSAnalogElement extends ControlledSourceElement {
     const gm  = derivative;
     const iNR = value - derivative * ctrlValue;
 
-    solver.stampElement(this._hPCtBr, -gm); // G[posNode, contBranch]
-    solver.stampElement(this._hNCtBr,  gm); // G[negNode, contBranch]
+    solver.stampElement(this._hPCtBr,  gm); // G[posNode, contBranch]   cccsload.c:35
+    solver.stampElement(this._hNCtBr, -gm); // G[negNode, contBranch]   cccsload.c:36
 
     const posNode = this.pinNodes.get("out+")!;
     const negNode = this.pinNodes.get("out-")!;
     // Unconditional - ground rows land in rhs[0], cleared post-solve.
-    rhs[posNode] += iNR;
-    rhs[negNode] -= iNR;
+    rhs[posNode] -= iNR;
+    rhs[negNode] += iNR;
   }
 
   /**

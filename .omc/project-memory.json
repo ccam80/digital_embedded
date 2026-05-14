@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778670680378,
+  "lastScanned": 1778758515561,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit -p tsconfig.json 2>&1 | tail -60",
-    "testCommand": "npx vitest run --reporter=verbose src/components/semiconductors/__tests__/bjt.test.ts 2>&1 > /tmp/bjt-post.log; echo done",
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778670680344,
+      "lastAccessed": 1778758515516,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1778670680344,
+      "lastAccessed": 1778758515516,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1778670680344,
+      "lastAccessed": 1778758515517,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1778670680344,
+      "lastAccessed": 1778758515517,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778670680345,
+      "lastAccessed": 1778758515517,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1778670680361,
+      "lastAccessed": 1778758515541,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -143,28 +143,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1778670680361,
+      "lastAccessed": 1778758515542,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778670680362,
+      "lastAccessed": 1778758515542,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778670680362,
+      "lastAccessed": 1778758515542,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 19,
-      "lastAccessed": 1778670680362,
+      "fileCount": 14,
+      "lastAccessed": 1778758515542,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -176,21 +176,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 17,
-      "lastAccessed": 1778670680363,
+      "fileCount": 19,
+      "lastAccessed": 1778758515543,
       "keyFiles": [
+        "bridge-synthesis.md",
         "dig-format-excision.md",
+        "dipl-promotion.md",
         "orchestrator-exit-log.md",
-        "phase-0-dead-code-removal.md",
-        "phase-1-foundation.md",
-        "phase-2-switch-relay-coupling.md"
+        "phase-0-dead-code-removal.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778670680363,
+      "lastAccessed": 1778758515543,
       "keyFiles": [
         "main.ts"
       ]
@@ -199,7 +199,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778670680363,
+      "lastAccessed": 1778758515544,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -209,7 +209,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778670680364,
+      "lastAccessed": 1778758515544,
       "keyFiles": [
         "index.json"
       ]
@@ -218,21 +218,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1778670680364,
+      "lastAccessed": 1778758515544,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778670680365,
+      "lastAccessed": 1778758515545,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1778670680365,
+      "lastAccessed": 1778758515546,
       "keyFiles": [
         "main-DuWHuFk1.js",
         "memory-editor-DEA45Iu0.js",
@@ -243,7 +243,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1778670680366,
+      "lastAccessed": 1778758515547,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -254,7 +254,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1778670680367,
+      "lastAccessed": 1778758515548,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -265,7 +265,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1778670680367,
+      "lastAccessed": 1778758515549,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -276,7 +276,7 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1778670680368,
+      "lastAccessed": 1778758515549,
       "keyFiles": []
     }
   },
@@ -289,8 +289,8 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 107,
-      "lastAccessed": 1778661083028,
+      "accessCount": 108,
+      "lastAccessed": 1778712638944,
       "type": "file"
     },
     {
@@ -325,8 +325,8 @@
     },
     {
       "path": "src\\compile\\partition.ts",
-      "accessCount": 21,
-      "lastAccessed": 1778629622850,
+      "accessCount": 22,
+      "lastAccessed": 1778737867622,
       "type": "file"
     },
     {
@@ -349,9 +349,15 @@
     },
     {
       "path": "src/core/registry.ts",
-      "accessCount": 13,
-      "lastAccessed": 1778660969620,
+      "accessCount": 14,
+      "lastAccessed": 1778737942077,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\memory\\__tests__\\register.test.ts",
+      "accessCount": 12,
+      "lastAccessed": 1778725419119,
+      "type": "file"
     },
     {
       "path": "src\\core\\__tests__\\digital-registry.test.ts",
@@ -390,10 +396,10 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\memory\\__tests__\\register.test.ts",
+      "path": "src/solver",
       "accessCount": 8,
-      "lastAccessed": 1778632407442,
-      "type": "file"
+      "lastAccessed": 1778725727661,
+      "type": "directory"
     },
     {
       "path": "src\\app\\menu-toolbar.ts",
@@ -412,12 +418,6 @@
       "accessCount": 6,
       "lastAccessed": 1778217653550,
       "type": "file"
-    },
-    {
-      "path": "src/solver",
-      "accessCount": 6,
-      "lastAccessed": 1778362650742,
-      "type": "directory"
     },
     {
       "path": "src/solver/digital/compiler.ts",
@@ -483,6 +483,12 @@
       "path": "src/components/switching/relay.ts",
       "accessCount": 2,
       "lastAccessed": 1778281338906,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/digital/digital-engine.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778724404487,
       "type": "directory"
     },
     {
@@ -562,12 +568,6 @@
       "accessCount": 1,
       "lastAccessed": 1778214818073,
       "type": "file"
-    },
-    {
-      "path": "src/solver/digital/digital-engine.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778217178713,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\digital\\compiled-circuit.ts",

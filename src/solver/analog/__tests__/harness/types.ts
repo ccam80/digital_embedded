@@ -249,6 +249,15 @@ export interface ElementStateSnapshot {
   state1Slots: Record<string, number>;
   state2Slots: Record<string, number>;
   /**
+   * State pool slot[3] values at this iteration- the fourth-oldest accepted
+   * step's state (rotated in via state-pool.ts:112-119, dctran.c:719-723).
+   * Both sides populated: our side from `statePool.state3`, ngspice from
+   * `CKTstate3` (added to NiIterationData in niiter.c). Read to verify
+   * order-2 LTE inputs: at end of step N, this slot holds the converged
+   * state from end of step N-3 if state pool rotation is correct.
+   */
+  state3Slots: Record<string, number>;
+  /**
    * Per-pin terminal current at this iteration, keyed by pin label
    * (matching the component's `pinLayout` labels — e.g. "B"/"C"/"E" for
    * BJT, "A"/"K" for diode). Built from the device's
@@ -580,6 +589,7 @@ export interface RawNgspiceIterationEx {
   state0: Float64Array;
   state1: Float64Array;
   state2: Float64Array;
+  state3: Float64Array;
   numStates: number;
   noncon: number;
   converged: boolean;
@@ -927,6 +937,14 @@ export interface IterationSideData {
    * `elementStates` (state0).
    */
   elementStates2Slots: Record<string, Record<string, number>>;
+  /**
+   * Element state slots at state3 (three steps ago). Keyed by element label.
+   * Used by order-2 LTE's 3rd divided difference (`cktTerr` reads
+   * q3 = state3[Q]). Same shape as the other state slot maps. Populated on
+   * both sides: our side from `statePool.state3`, ngspice from `CKTstate3`
+   * (added to NiIterationData; requires DLL rebuild).
+   */
+  elementStates3Slots: Record<string, Record<string, number>>;
   limitingEvents: LimitingEvent[];
   /**
    * RHS vector b at the start of this iteration (before the linear solve).
