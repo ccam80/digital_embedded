@@ -1,13 +1,14 @@
 /**
  * Unit tests for the ss6.1 ngspice grouping state machine.
  *
- * No FFI, no DLL. Injects synthetic RawNgspiceIterationEx[] directly into
- * NgspiceBridge._iterations and calls getCaptureSession() to exercise the
- * grouping logic (stepStartTime keying, attempt boundaries, outcome assignment).
+ * No FFI, no DLL. Drives the pure `buildCaptureSession(iters, outerEvents,
+ * topology)` converter with synthetic RawNgspiceIterationEx[] inputs to
+ * exercise the grouping logic (stepStartTime keying, attempt boundaries,
+ * outcome assignment).
  */
 
 import { describe, it, expect } from "vitest";
-import { NgspiceBridge } from "./ngspice-bridge.js";
+import { buildCaptureSession } from "./ngspice-bridge.js";
 import type { RawNgspiceIterationEx, RawNgspiceOuterEvent } from "./types.js";
 
 // CKTmode constants (mirror of ngspice-bridge.ts internal constants)
@@ -54,19 +55,15 @@ function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIter
   };
 }
 
-function makeBridge(iters: RawNgspiceIterationEx[], outerEvents: RawNgspiceOuterEvent[] = []): NgspiceBridge {
-  // NgspiceBridge requires a DLL path but we never call init()- we inject directly.
-  const bridge = new NgspiceBridge("__fake__");
-  bridge.installSyntheticState(iters, outerEvents);
-  return bridge;
+function makeSession(iters: RawNgspiceIterationEx[], outerEvents: RawNgspiceOuterEvent[] = []) {
+  return buildCaptureSession(iters, outerEvents, null);
 }
 
 describe("ngspice-bridge grouping- ss6.1 state machine", () => {
 
   it("single DCOP iteration → one step, one attempt, stepStartTime=0", () => {
     const iters = [makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 0, converged: true })];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     expect(session.steps[0].stepStartTime).toBe(0);
     expect(session.steps[0].attempts.length).toBe(1);
@@ -79,8 +76,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 0, converged: false }),
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 1, converged: true }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     expect(session.steps[0].attempts.length).toBe(1);
     expect(session.steps[0].attempts[0].iterations.length).toBe(2);
@@ -91,8 +87,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0,    cktMode: MODEDCOP,  iteration: 0, converged: true, dt: 0 }),
       makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN,  iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(2);
     expect(session.steps[0].stepStartTime).toBe(0);
     expect(session.steps[1].stepStartTime).toBe(1e-9);
@@ -108,8 +103,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 0, converged: false, dt: 5e-10 }),
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 1, converged: true,  dt: 5e-10 }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     // Two attempts: first failed (iter reset boundary), second accepted
     expect(session.steps[0].attempts.length).toBe(2);
@@ -123,8 +117,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0,   iteration: 0, converged: false }),
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x1, iteration: 0, converged: true  }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     // Phase change from dcopDirect → dcopGminDynamic creates a new attempt
     expect(session.steps[0].attempts.length).toBe(2);
@@ -140,8 +133,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
     const outerEvents: RawNgspiceOuterEvent[] = [
       { simTimeStart: t, delta: 1e-9, lteRejected: 1, nrFailed: 0, accepted: 0, finalFailure: 0, nextDelta: 5e-10 },
     ];
-    const bridge = makeBridge(iters, outerEvents);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters, outerEvents);
     expect(session.steps.length).toBe(1);
     expect(session.steps[0].attempts[0].outcome).toBe("lteRejectedRetry");
   });
@@ -154,8 +146,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
     const outerEvents: RawNgspiceOuterEvent[] = [
       { simTimeStart: t, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
     ];
-    const bridge = makeBridge(iters, outerEvents);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters, outerEvents);
     expect(session.steps[0].attempts[0].outcome).toBe("accepted");
   });
 
@@ -165,8 +156,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN,   iteration: 0, converged: true, dt: 1e-9 }),
       makeRaw({ simTimeStart: 2e-9, cktMode: MODETRAN,   iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(3);
     expect(session.steps[0].stepStartTime).toBe(0);
     expect(session.steps[1].stepStartTime).toBe(1e-9);
@@ -174,8 +164,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
   });
 
   it("empty iteration stream → zero steps", () => {
-    const bridge = makeBridge([]);
-    const session = bridge.getCaptureSession();
+    const session = makeSession([]);
     expect(session.steps.length).toBe(0);
   });
 
@@ -186,8 +175,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x1, phaseGmin: 1e-4, iteration: 0, converged: true }),
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x1, phaseGmin: 0,    iteration: 0, converged: true }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     expect(session.steps[0].stepStartTime).toBe(0);
     // All three sub-solves are in the gminDynamic phase- each iteration reset creates a new attempt
@@ -203,8 +191,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x2, phaseSrcFact: 0.5, iteration: 1, converged: true }),
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0,   iteration: 0, converged: true }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     const step = session.steps[0];
     expect(step.attempts.length).toBeGreaterThanOrEqual(2);
@@ -219,8 +206,7 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 1, converged: false }),
       makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 2, converged: true }),
     ];
-    const bridge = makeBridge(iters);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters);
     expect(session.steps.length).toBe(1);
     const step = session.steps[0];
     expect(step.attempts.length).toBe(1);

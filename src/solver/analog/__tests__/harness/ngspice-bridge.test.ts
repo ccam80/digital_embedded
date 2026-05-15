@@ -4,11 +4,12 @@
  * The DLL-dependent test uses describeIfDll from parity-helpers so the
  * test skips gracefully when the ngspice DLL is absent.
  *
- * The synthetic test injects RawNgspiceOuterEvent.nextDelta directly into
- * NgspiceBridge and verifies it is mapped to lteDt on the accepted iteration.
+ * The synthetic test drives the pure `buildCaptureSession` converter with
+ * a RawNgspiceOuterEvent.nextDelta and verifies it is mapped to lteDt on
+ * the accepted iteration.
  */
 import { describe, it, expect } from "vitest";
-import { NgspiceBridge } from "./ngspice-bridge.js";
+import { buildCaptureSession } from "./ngspice-bridge.js";
 import { describeIfDll, DLL_PATH } from "../ngspice-parity/parity-helpers.js";
 import type { RawNgspiceIterationEx, RawNgspiceOuterEvent } from "./types.js";
 import { ComparisonSession } from "./comparison-session.js";
@@ -50,13 +51,11 @@ function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIter
   };
 }
 
-function makeBridge(
+function makeSession(
   iters: RawNgspiceIterationEx[],
   outerEvents: RawNgspiceOuterEvent[] = [],
-): NgspiceBridge {
-  const bridge = new NgspiceBridge("__fake__");
-  bridge.installSyntheticState(iters, outerEvents);
-  return bridge;
+) {
+  return buildCaptureSession(iters, outerEvents, null);
 }
 
 describe("ngspice-bridge lteDt mapping- synthetic", () => {
@@ -78,8 +77,7 @@ describe("ngspice-bridge lteDt mapping- synthetic", () => {
         nextDelta: expectedLteDt,
       },
     ];
-    const bridge = makeBridge(iters, outerEvents);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters, outerEvents);
 
     expect(session.steps.length).toBe(1);
     const step = session.steps[0]!;
@@ -105,8 +103,7 @@ describe("ngspice-bridge lteDt mapping- synthetic", () => {
         nextDelta: 0,
       },
     ];
-    const bridge = makeBridge(iters, outerEvents);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters, outerEvents);
 
     expect(session.steps.length).toBe(1);
     const step = session.steps[0]!;
@@ -120,8 +117,7 @@ describe("ngspice-bridge lteDt mapping- synthetic", () => {
     const iters = [
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    const bridge = makeBridge(iters, []);
-    const session = bridge.getCaptureSession();
+    const session = makeSession(iters, []);
 
     const step = session.steps[0]!;
     const acceptedAttempt = step.attempts[step.acceptedAttemptIndex]!;

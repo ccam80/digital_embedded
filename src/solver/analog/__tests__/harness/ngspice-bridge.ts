@@ -150,6 +150,426 @@ interface PendingStep {
 }
 
 // ---------------------------------------------------------------------------
+// Pure capture-session builder
+//
+// The conversion from raw ngspice FFI data to a CaptureSession is a pure
+// function of (iterations, outerEvents, topology). Hosted at module scope so
+// unit tests can drive the grouping state machine + lteDt mapping with
+// synthetic inputs without standing up an NgspiceBridge / DLL.
+// ---------------------------------------------------------------------------
+
+function canonicalizeNgspiceDeviceType(ngspiceType: string): string | null {
+  const lower = ngspiceType.toLowerCase();
+  const map: Record<string, string> = {
+    "capacitor": "capacitor", "inductor": "inductor",
+    "diode": "diode", "bjt": "bjt",
+    "mos1": "mosfet", "mosfet": "mosfet", "jfet": "jfet",
+    "switch": "vswitch",
+  };
+  return map[lower] ?? null;
+}
+
+function unpackElementStates(
+  state0: Float64Array,
+  state1: Float64Array,
+  state2: Float64Array,
+  state3: Float64Array,
+  topology: NgspiceTopology | null,
+): ElementStateSnapshot[] {
+  if (!topology || topology.devices.length === 0) return [];
+  const snapshots: ElementStateSnapshot[] = [];
+
+  for (const dev of topology.devices) {
+    const deviceType = canonicalizeNgspiceDeviceType(dev.typeName);
+    const mapping = deviceType ? DEVICE_MAPPINGS[deviceType] : undefined;
+    if (!mapping) continue;
+
+    const slots: Record<string, number> = {};
+    const state1Slots: Record<string, number> = {};
+    const state2Slots: Record<string, number> = {};
+    const state3Slots: Record<string, number> = {};
+
+    for (const [offsetStr, slotName] of Object.entries(mapping.ngspiceToSlot)) {
+      const offset = Number(offsetStr);
+      const absOffset = dev.stateBase + offset;
+      if (absOffset < state0.length) slots[slotName] = state0[absOffset];
+      if (absOffset < state1.length) state1Slots[slotName] = state1[absOffset];
+      if (absOffset < state2.length) state2Slots[slotName] = state2[absOffset];
+      if (absOffset < state3.length) state3Slots[slotName] = state3[absOffset];
+    }
+
+    if (Object.keys(slots).length > 0) {
+      const pinCurrents = projectPinCurrents(mapping, slots);
+      snapshots.push({
+        elementIndex: -1,
+        label: dev.name.toUpperCase(),
+        slots, state1Slots, state2Slots, state3Slots,
+        pinCurrents,
+      });
+    }
+  }
+  return snapshots;
+}
+
+function buildTopologySnapshot(
+  topology: NgspiceTopology | null,
+  firstIterationMatrixSize: number,
+): TopologySnapshot {
+  if (!topology) {
+    return {
+      matrixSize: firstIterationMatrixSize,
+      nodeCount: 0, elementCount: 0,
+      elements: [],
+      nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map(),
+    };
+  }
+
+  const nodeLabels = new Map<number, string>();
+  topology.nodeNames.forEach((nodeNum, nodeName) => {
+    nodeLabels.set(nodeNum, nodeName);
+  });
+
+  const matrixRowLabels = new Map<number, string>();
+  const matrixColLabels = new Map<number, string>();
+  nodeLabels.forEach((label, nodeId) => {
+    const row = nodeId - 1;
+    if (row >= 0) { matrixRowLabels.set(row, label); matrixColLabels.set(row, label); }
+  });
+
+  const elements = topology.devices.map((d, i) => ({
+    index: i, label: d.name, type: d.typeName,
+    pinNodeIds: d.nodeIndices as readonly number[],
+  }));
+
+  // nodeNames includes both voltage-node entries (numeric names like "1",
+  // "2", ...) and branch-row entries that ngspice exposes as `<elem>#branch`
+  // (current-variable rows created via CKTmkCur — vsources, inductors, etc.).
+  // Our convention's `nodeCount` is voltage nodes ONLY (branches live in the
+  // matrix beyond `nodeCount` and `slice.ts:116` relies on that gating).
+  // Filter the branch rows out here so the snapshot's nodeCount lines up
+  // with what `captureTopology` produces for our engine.
+  let voltageNodeCount = 0;
+  topology.nodeNames.forEach((_, name) => {
+    if (!name.endsWith("#branch")) voltageNodeCount++;
+  });
+  return {
+    matrixSize: topology.matrixSize,
+    nodeCount: voltageNodeCount,
+    elementCount: topology.devices.length,
+    elements, nodeLabels, matrixRowLabels, matrixColLabels,
+  };
+}
+
+/**
+ * Convert raw ngspice FFI data into a CaptureSession.
+ *
+ * Grouping algorithm (spec ss6.1):
+ *   - Keyed on simTimeStart from each raw iteration.
+ *   - New step when simTimeStart changes.
+ *   - New attempt when: iteration resets OR phase changes.
+ *   - Outer callback events (ni_outer_cb) set attempt outcomes deterministically.
+ *
+ * Pure function — unit tests drive the state machine with synthetic
+ * iteration / outer-event arrays directly.
+ */
+export function buildCaptureSession(
+  iterations: RawNgspiceIterationEx[],
+  outerEvents: RawNgspiceOuterEvent[],
+  topology: NgspiceTopology | null,
+): CaptureSession {
+  const steps: StepSnapshot[] = [];
+
+  if (iterations.length === 0) {
+    return { source: "ngspice", topology: buildTopologySnapshot(topology, 0), steps };
+  }
+
+  // Build a map from simTimeStart → outer event for quick lookup
+  const outerByTime = new Map<number, RawNgspiceOuterEvent>();
+  for (const ev of outerEvents) {
+    outerByTime.set(ev.simTimeStart, ev);
+  }
+
+  let currentStep: PendingStep | null = null;
+  let prevIteration = -1;
+  let prevPhase: NRPhase | null = null;
+
+  const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome): void => {
+    const pa = step.pendingAttempt;
+    if (!pa || pa.iterations.length === 0) {
+      step.pendingAttempt = null;
+      return;
+    }
+    const lastIter = pa.iterations[pa.iterations.length - 1]!;
+    const attemptIndexInStep = step.attempts.length;
+    const role = cktModeToRole(pa.firstRaw.cktMode, pa.firstRaw.phaseFlags, attemptIndexInStep);
+    const attempt: NRAttempt = {
+      dt: pa.firstRaw.dt,
+      iterations: pa.iterations,
+      converged: lastIter.globalConverged,
+      iterationCount: pa.iterations.length,
+      phase: pa.phase,
+      outcome,
+      ...(role !== undefined ? { role } : {}),
+      ...(pa.phase === "dcopGminDynamic" || pa.phase === "dcopGminSpice3"
+        ? { phaseParameter: pa.firstRaw.phaseGmin }
+        : pa.phase === "dcopSrcSweep"
+        ? { phaseParameter: pa.firstRaw.phaseSrcFact }
+        : {}),
+    };
+    step.attempts.push(attempt);
+    step.pendingAttempt = null;
+  };
+
+  const flushStep = (step: PendingStep): void => {
+    if (step.attempts.length === 0) return;
+
+    // Find accepted attempt index: last attempt with converged === true
+    // and outcome "accepted" or "dcopSubSolveConverged"
+    let acceptedIdx = -1;
+    for (let i = step.attempts.length - 1; i >= 0; i--) {
+      const a = step.attempts[i]!;
+      if (a.outcome === "accepted" || a.outcome === "dcopSubSolveConverged") {
+        acceptedIdx = i;
+        break;
+      }
+    }
+    if (acceptedIdx < 0) acceptedIdx = step.attempts.length - 1;
+
+    const acceptedAttempt = step.attempts[acceptedIdx]!;
+    const lastRaw = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1];
+    const ngspiceCoeff = _ngspiceIntegCoeff(
+      // Find the raw iteration for the last accepted iteration
+      iterations.find(r =>
+        r.simTimeStart === step.stepStartTime &&
+        r.iteration === lastRaw?._rawIteration
+      ) ?? iterations.find(r => r.simTimeStart === step.stepStartTime),
+    );
+    const integCoeff: IntegrationCoefficients = {
+      ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
+      ngspice: ngspiceCoeff,
+    };
+
+    // Derive analysisPhase from the numeric cktMode of the first captured
+    // iteration. We look it up via simTimeStart + iteration number rather
+    // than re-parsing the diagnostic string label produced by bitsToName().
+    const firstRawForPhase = iterations.find(
+      r => r.simTimeStart === step.stepStartTime,
+    );
+    const analysisPhase = firstRawForPhase
+      ? cktModeToAnalysisPhase(firstRawForPhase.cktMode)
+      : "dcop";
+
+    // stepEndTime: for accepted transient step it is simTime (post-advance);
+    // for DCOP it equals stepStartTime.
+    const stepEndTime = acceptedAttempt.dt > 0
+      ? step.stepStartTime + acceptedAttempt.dt
+      : step.stepStartTime;
+
+    const totalIterationCount = step.attempts.reduce((sum, att) => sum + att.iterationCount, 0);
+
+    // Retroactively assign finalVerify: a dcopInitFloat that follows a dcopDirect
+    // in the same step is a post-convergence verification pass, not a cold start.
+    let sawDcopDirect = false;
+    for (const att of step.attempts) {
+      if (att.phase === "dcopDirect") sawDcopDirect = true;
+      else if (att.phase === "dcopInitFloat" && sawDcopDirect && att.role !== "coldStart") {
+        att.role = "finalVerify";
+      }
+    }
+
+    // Assign tran-phase roles: the accepted tran attempt is the real solve (tranSolve);
+    // any tran attempt that failed with nrFailedRetry is a predictor pass (predictorPass).
+    const isTranPhase = (p: string) => p === "tranInit" || p === "tranPredictor" || p === "tranNR";
+    for (const att of step.attempts) {
+      if (!isTranPhase(att.phase)) continue;
+      if (att.outcome === "accepted") {
+        att.role = "tranSolve";
+      } else if (att.outcome === "nrFailedRetry") {
+        att.role = "predictorPass";
+      }
+    }
+
+    // Populate lteDt on the last iteration of the accepted attempt from
+    // RawNgspiceOuterEvent.nextDelta (the LTE-proposed next timestep).
+    const outerEv = outerByTime.get(step.stepStartTime);
+    if (
+      outerEv !== undefined &&
+      typeof outerEv.nextDelta === "number" &&
+      isFinite(outerEv.nextDelta) &&
+      outerEv.nextDelta > 0 &&
+      acceptedAttempt.iterations.length > 0
+    ) {
+      const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
+      lastIter.lteDt = outerEv.nextDelta;
+    }
+
+    steps.push({
+      stepStartTime: step.stepStartTime,
+      stepEndTime,
+      attempts: step.attempts,
+      acceptedAttemptIndex: acceptedIdx,
+      accepted: acceptedAttempt.converged,
+      dt: acceptedAttempt.dt,
+      iterations: acceptedAttempt.iterations,
+      converged: acceptedAttempt.converged,
+      iterationCount: acceptedAttempt.iterationCount,
+      totalIterationCount,
+      integrationCoefficients: integCoeff,
+      analysisPhase,
+    });
+  };
+
+  for (const raw of iterations) {
+    const attemptPhase = cktModeToPhase(raw.cktMode, raw.phaseFlags);
+    const stepStartTimeOfRaw = raw.simTimeStart;
+
+    // 3/4: Open or switch step
+    if (currentStep === null) {
+      currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
+    } else if (Math.abs(stepStartTimeOfRaw - currentStep.stepStartTime) > 1e-20) {
+      // Step boundary: flush current attempt with appropriate outcome
+      if (currentStep.pendingAttempt) {
+        const outerEv = outerByTime.get(currentStep.stepStartTime);
+        let outcome: NRAttemptOutcome = "accepted";
+        if (outerEv) {
+          if (outerEv.lteRejected) outcome = "lteRejectedRetry";
+          else if (outerEv.nrFailed) outcome = "nrFailedRetry";
+          else if (outerEv.finalFailure) outcome = "finalFailure";
+          else if (outerEv.accepted) outcome = "accepted";
+        }
+        flushAttempt(currentStep, outcome);
+      }
+      flushStep(currentStep);
+      currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
+      prevIteration = -1;
+      prevPhase = null;
+    }
+
+    // 5: New attempt if: no current attempt, OR iteration reset, OR phase changed.
+    // Iteration reset: counter goes down (raw.iteration <= prevIteration when prevIteration >= 0),
+    // which covers both typical NR retry (e.g. 2→0) and gmin stepping (0→0 between sub-solves).
+    const isIterReset = raw.iteration <= prevIteration && prevIteration >= 0
+      && currentStep.pendingAttempt !== null
+      && currentStep.pendingAttempt.iterations.length > 0;
+    const isPhaseChange = prevPhase !== null && attemptPhase !== prevPhase;
+
+    if (currentStep.pendingAttempt === null || isIterReset || isPhaseChange) {
+      if (currentStep.pendingAttempt && (isIterReset || isPhaseChange)) {
+        let outcome: NRAttemptOutcome;
+        // Transient INITTRAN→FLOAT and INITPRED→FLOAT happen inside one
+        // ngspice NIiter call (niiter.c:1072-1076 INITF dispatcher)- the
+        // mid-call mode flip is not a NR failure or a sub-solve boundary,
+        // it is a phase handoff. Emit "tranPhaseHandoff" so the outcome
+        // matches our engine's transient mode-ladder, instead of falsely
+        // labeling it "nrFailedRetry" / "dcopSubSolveConverged".
+        const isTranHandoff = isPhaseChange &&
+          (currentStep.pendingAttempt.phase === "tranInit" ||
+           currentStep.pendingAttempt.phase === "tranPredictor") &&
+          attemptPhase === "tranNR";
+        if (isTranHandoff) {
+          outcome = "tranPhaseHandoff";
+        } else if (currentStep.pendingAttempt.iterations.length > 0) {
+          const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
+          if (lastIter.globalConverged) {
+            outcome = "dcopSubSolveConverged";
+          } else {
+            outcome = "nrFailedRetry";
+          }
+        } else {
+          outcome = "nrFailedRetry";
+        }
+        flushAttempt(currentStep, outcome);
+      }
+      currentStep.pendingAttempt = {
+        phase: attemptPhase,
+        phaseFlags: raw.phaseFlags,
+        iterations: [],
+        firstRaw: raw,
+      };
+    }
+
+    // 6: Build iteration snapshot and push
+    const elementStates = unpackElementStates(raw.state0, raw.state1, raw.state2, raw.state3, topology);
+    const limitingEvents: LimitingEvent[] = raw.limitingEvents.map(ev => ({
+      elementIndex: -1,
+      label: ev.deviceName.toUpperCase(),
+      junction: ev.junction,
+      limitType: "pnjlim" as const,
+      vBefore: ev.vBefore,
+      vAfter: ev.vAfter,
+      wasLimited: ev.wasLimited,
+    }));
+
+    // ngspice integrateMethod FFI code (cktdefs.h:107-108) → harness IntegrationMethod.
+    // TRAPEZOIDAL=1, GEAR=2. Code 2 → "gear"; all other values → "trapezoidal".
+    const ngIntegrateMethod: IntegrationMethod =
+      raw.integrateMethod === 2 ? "gear"
+      : "trapezoidal";
+    // Only ag0/ag1 are marshalled across the FFI (see ss8.1 of ngspice-bridge
+    // struct); pad remaining slots with 0 to match the length-7 harness shape.
+    const agBuf = new Float64Array(7);
+    agBuf[0] = raw.ag0 ?? 0;
+    agBuf[1] = raw.ag1 ?? 0;
+
+    const iterSnap: IterationSnapshot = {
+      iteration: raw.iteration,
+      matrixSize: raw.matrixSize,
+      rhsBufSize: raw.rhsBufSize,
+      voltages: raw.rhs.slice(),
+      prevVoltages: raw.rhsOld.slice(),
+      preSolveRhs: raw.preSolveRhs.length > 0 ? raw.preSolveRhs.slice() : new Float64Array(0),
+      matrix: raw.matrix ?? [],
+      elementStates,
+      noncon: raw.noncon,
+      diagGmin: raw.phaseGmin,
+      srcFact: raw.phaseSrcFact,
+      initMode: bitsToName(raw.cktMode),
+      order: raw.order,
+      delta: raw.dt,
+      ag: agBuf,
+      method: ngIntegrateMethod,
+      globalConverged: raw.converged,
+      elemConverged: raw.converged,
+      limitingEvents,
+      convergenceFailedElements: [],
+      ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices ?? [],
+    };
+    iterSnap._rawIteration = raw.iteration;
+
+    currentStep.pendingAttempt!.iterations.push(iterSnap);
+
+    // 7: Update trackers
+    prevIteration = raw.iteration;
+    prevPhase = attemptPhase;
+  }
+
+  // Flush last step
+  if (currentStep !== null) {
+    if (currentStep.pendingAttempt) {
+      const outerEv = outerByTime.get(currentStep.stepStartTime);
+      let outcome: NRAttemptOutcome = "accepted";
+      if (outerEv) {
+        if (outerEv.finalFailure) outcome = "finalFailure";
+        else if (outerEv.lteRejected) outcome = "lteRejectedRetry";
+        else if (outerEv.nrFailed) outcome = "nrFailedRetry";
+        else if (outerEv.accepted) outcome = "accepted";
+      } else if (currentStep.pendingAttempt.iterations.length > 0) {
+        const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
+        outcome = lastIter.globalConverged ? "accepted" : "finalFailure";
+      }
+      flushAttempt(currentStep, outcome);
+    }
+    flushStep(currentStep);
+  }
+
+  return {
+    source: "ngspice",
+    topology: buildTopologySnapshot(topology, iterations[0]?.matrixSize ?? 0),
+    steps,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // NgspiceBridge
 // ---------------------------------------------------------------------------
 
@@ -534,417 +954,12 @@ export class NgspiceBridge {
   getRawTopology(): RawNgspiceTopology | null { return this._rawTopology; }
 
   /**
-   * Test-only seam: inject synthetic iteration/outer-event data so unit tests
-   * can exercise getCaptureSession() without loading the DLL. Resets topology
-   * to null so getCaptureSession() takes the synthetic-driven path.
-   */
-  installSyntheticState(
-    iterations: RawNgspiceIterationEx[],
-    outerEvents: RawNgspiceOuterEvent[] = [],
-  ): void {
-    this._iterations = iterations;
-    this._outerEvents = outerEvents;
-    this._topology = null;
-  }
-
-  private _unpackElementStates(
-    state0: Float64Array,
-    state1: Float64Array,
-    state2: Float64Array,
-    state3: Float64Array,
-  ): ElementStateSnapshot[] {
-    if (!this._topology || this._topology.devices.length === 0) return [];
-    const snapshots: ElementStateSnapshot[] = [];
-
-    for (const dev of this._topology.devices) {
-      const deviceType = this._canonicalizeDeviceType(dev.typeName);
-      const mapping = deviceType ? DEVICE_MAPPINGS[deviceType] : undefined;
-      if (!mapping) continue;
-
-      const slots: Record<string, number> = {};
-      const state1Slots: Record<string, number> = {};
-      const state2Slots: Record<string, number> = {};
-      const state3Slots: Record<string, number> = {};
-
-      for (const [offsetStr, slotName] of Object.entries(mapping.ngspiceToSlot)) {
-        const offset = Number(offsetStr);
-        const absOffset = dev.stateBase + offset;
-        if (absOffset < state0.length) slots[slotName] = state0[absOffset];
-        if (absOffset < state1.length) state1Slots[slotName] = state1[absOffset];
-        if (absOffset < state2.length) state2Slots[slotName] = state2[absOffset];
-        if (absOffset < state3.length) state3Slots[slotName] = state3[absOffset];
-      }
-
-      if (Object.keys(slots).length > 0) {
-        const pinCurrents = projectPinCurrents(mapping, slots);
-        snapshots.push({
-          elementIndex: -1,
-          label: dev.name.toUpperCase(),
-          slots, state1Slots, state2Slots, state3Slots,
-          pinCurrents,
-        });
-      }
-    }
-    return snapshots;
-  }
-
-  private _canonicalizeDeviceType(ngspiceType: string): string | null {
-    const lower = ngspiceType.toLowerCase();
-    const map: Record<string, string> = {
-      "capacitor": "capacitor", "inductor": "inductor",
-      "diode": "diode", "bjt": "bjt",
-      "mos1": "mosfet", "mosfet": "mosfet", "jfet": "jfet",
-      "switch": "vswitch",
-    };
-    return map[lower] ?? null;
-  }
-
-  /**
-   * Convert accumulated iteration data into a CaptureSession.
-   *
-   * Grouping algorithm (spec ss6.1):
-   *   - Keyed on simTimeStart from each raw iteration.
-   *   - New step when simTimeStart changes.
-   *   - New attempt when: iteration resets OR phase changes.
-   *   - Outer callback events (ni_outer_cb) set attempt outcomes deterministically.
+   * Convert accumulated iteration data into a CaptureSession. Thin wrapper
+   * over the module-level pure `buildCaptureSession` — unit tests call that
+   * directly with synthetic inputs.
    */
   getCaptureSession(): CaptureSession {
-    const steps: StepSnapshot[] = [];
-
-    if (this._iterations.length === 0) {
-      return { source: "ngspice", topology: this._buildTopologySnapshot(), steps };
-    }
-
-    // Build a map from simTimeStart → outer event for quick lookup
-    const outerByTime = new Map<number, RawNgspiceOuterEvent>();
-    for (const ev of this._outerEvents) {
-      outerByTime.set(ev.simTimeStart, ev);
-    }
-
-    let currentStep: PendingStep | null = null;
-    let prevIteration = -1;
-    let prevPhase: NRPhase | null = null;
-
-    const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome): void => {
-      const pa = step.pendingAttempt;
-      if (!pa || pa.iterations.length === 0) {
-        step.pendingAttempt = null;
-        return;
-      }
-      const lastIter = pa.iterations[pa.iterations.length - 1]!;
-      const attemptIndexInStep = step.attempts.length;
-      const role = cktModeToRole(pa.firstRaw.cktMode, pa.firstRaw.phaseFlags, attemptIndexInStep);
-      const attempt: NRAttempt = {
-        dt: pa.firstRaw.dt,
-        iterations: pa.iterations,
-        converged: lastIter.globalConverged,
-        iterationCount: pa.iterations.length,
-        phase: pa.phase,
-        outcome,
-        ...(role !== undefined ? { role } : {}),
-        ...(pa.phase === "dcopGminDynamic" || pa.phase === "dcopGminSpice3"
-          ? { phaseParameter: pa.firstRaw.phaseGmin }
-          : pa.phase === "dcopSrcSweep"
-          ? { phaseParameter: pa.firstRaw.phaseSrcFact }
-          : {}),
-      };
-      step.attempts.push(attempt);
-      step.pendingAttempt = null;
-    };
-
-    const flushStep = (step: PendingStep): void => {
-      if (step.attempts.length === 0) return;
-
-      // Find accepted attempt index: last attempt with converged === true
-      // and outcome "accepted" or "dcopSubSolveConverged"
-      let acceptedIdx = -1;
-      for (let i = step.attempts.length - 1; i >= 0; i--) {
-        const a = step.attempts[i]!;
-        if (a.outcome === "accepted" || a.outcome === "dcopSubSolveConverged") {
-          acceptedIdx = i;
-          break;
-        }
-      }
-      if (acceptedIdx < 0) acceptedIdx = step.attempts.length - 1;
-
-      const acceptedAttempt = step.attempts[acceptedIdx]!;
-      const lastRaw = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1];
-      const ngspiceCoeff = _ngspiceIntegCoeff(
-        // Find the raw iteration for the last accepted iteration
-        this._iterations.find(r =>
-          r.simTimeStart === step.stepStartTime &&
-          r.iteration === lastRaw?._rawIteration
-        ) ?? this._iterations.find(r => r.simTimeStart === step.stepStartTime),
-      );
-      const integCoeff: IntegrationCoefficients = {
-        ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
-        ngspice: ngspiceCoeff,
-      };
-
-      // Derive analysisPhase from the numeric cktMode of the first captured
-      // iteration. We look it up via simTimeStart + iteration number rather
-      // than re-parsing the diagnostic string label produced by bitsToName().
-      const firstRawForPhase = this._iterations.find(
-        r => r.simTimeStart === step.stepStartTime,
-      );
-      const analysisPhase = firstRawForPhase
-        ? cktModeToAnalysisPhase(firstRawForPhase.cktMode)
-        : "dcop";
-
-      // stepEndTime: for accepted transient step it is simTime (post-advance);
-      // for DCOP it equals stepStartTime.
-      const stepEndTime = acceptedAttempt.dt > 0
-        ? step.stepStartTime + acceptedAttempt.dt
-        : step.stepStartTime;
-
-      const totalIterationCount = step.attempts.reduce((sum, att) => sum + att.iterationCount, 0);
-
-      // Retroactively assign finalVerify: a dcopInitFloat that follows a dcopDirect
-      // in the same step is a post-convergence verification pass, not a cold start.
-      let sawDcopDirect = false;
-      for (const att of step.attempts) {
-        if (att.phase === "dcopDirect") sawDcopDirect = true;
-        else if (att.phase === "dcopInitFloat" && sawDcopDirect && att.role !== "coldStart") {
-          att.role = "finalVerify";
-        }
-      }
-
-      // Assign tran-phase roles: the accepted tran attempt is the real solve (tranSolve);
-      // any tran attempt that failed with nrFailedRetry is a predictor pass (predictorPass).
-      const isTranPhase = (p: string) => p === "tranInit" || p === "tranPredictor" || p === "tranNR";
-      for (const att of step.attempts) {
-        if (!isTranPhase(att.phase)) continue;
-        if (att.outcome === "accepted") {
-          att.role = "tranSolve";
-        } else if (att.outcome === "nrFailedRetry") {
-          att.role = "predictorPass";
-        }
-      }
-
-      // Populate lteDt on the last iteration of the accepted attempt from
-      // RawNgspiceOuterEvent.nextDelta (the LTE-proposed next timestep).
-      const outerEv = outerByTime.get(step.stepStartTime);
-      if (
-        outerEv !== undefined &&
-        typeof outerEv.nextDelta === "number" &&
-        isFinite(outerEv.nextDelta) &&
-        outerEv.nextDelta > 0 &&
-        acceptedAttempt.iterations.length > 0
-      ) {
-        const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
-        lastIter.lteDt = outerEv.nextDelta;
-      }
-
-      steps.push({
-        stepStartTime: step.stepStartTime,
-        stepEndTime,
-        attempts: step.attempts,
-        acceptedAttemptIndex: acceptedIdx,
-        accepted: acceptedAttempt.converged,
-        dt: acceptedAttempt.dt,
-        iterations: acceptedAttempt.iterations,
-        converged: acceptedAttempt.converged,
-        iterationCount: acceptedAttempt.iterationCount,
-        totalIterationCount,
-        integrationCoefficients: integCoeff,
-        analysisPhase,
-      });
-    };
-
-    for (const raw of this._iterations) {
-      const attemptPhase = cktModeToPhase(raw.cktMode, raw.phaseFlags);
-      const stepStartTimeOfRaw = raw.simTimeStart;
-
-      // 3/4: Open or switch step
-      if (currentStep === null) {
-        currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
-      } else if (Math.abs(stepStartTimeOfRaw - currentStep.stepStartTime) > 1e-20) {
-        // Step boundary: flush current attempt with appropriate outcome
-        if (currentStep.pendingAttempt) {
-          const outerEv = outerByTime.get(currentStep.stepStartTime);
-          let outcome: NRAttemptOutcome = "accepted";
-          if (outerEv) {
-            if (outerEv.lteRejected) outcome = "lteRejectedRetry";
-            else if (outerEv.nrFailed) outcome = "nrFailedRetry";
-            else if (outerEv.finalFailure) outcome = "finalFailure";
-            else if (outerEv.accepted) outcome = "accepted";
-          }
-          flushAttempt(currentStep, outcome);
-        }
-        flushStep(currentStep);
-        currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
-        prevIteration = -1;
-        prevPhase = null;
-      }
-
-      // 5: New attempt if: no current attempt, OR iteration reset, OR phase changed.
-      // Iteration reset: counter goes down (raw.iteration <= prevIteration when prevIteration >= 0),
-      // which covers both typical NR retry (e.g. 2→0) and gmin stepping (0→0 between sub-solves).
-      const isIterReset = raw.iteration <= prevIteration && prevIteration >= 0
-        && currentStep.pendingAttempt !== null
-        && currentStep.pendingAttempt.iterations.length > 0;
-      const isPhaseChange = prevPhase !== null && attemptPhase !== prevPhase;
-
-      if (currentStep.pendingAttempt === null || isIterReset || isPhaseChange) {
-        if (currentStep.pendingAttempt && (isIterReset || isPhaseChange)) {
-          let outcome: NRAttemptOutcome;
-          // Transient INITTRAN→FLOAT and INITPRED→FLOAT happen inside one
-          // ngspice NIiter call (niiter.c:1072-1076 INITF dispatcher)- the
-          // mid-call mode flip is not a NR failure or a sub-solve boundary,
-          // it is a phase handoff. Emit "tranPhaseHandoff" so the outcome
-          // matches our engine's transient mode-ladder, instead of falsely
-          // labeling it "nrFailedRetry" / "dcopSubSolveConverged".
-          const isTranHandoff = isPhaseChange &&
-            (currentStep.pendingAttempt.phase === "tranInit" ||
-             currentStep.pendingAttempt.phase === "tranPredictor") &&
-            attemptPhase === "tranNR";
-          if (isTranHandoff) {
-            outcome = "tranPhaseHandoff";
-          } else if (currentStep.pendingAttempt.iterations.length > 0) {
-            const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
-            if (lastIter.globalConverged) {
-              outcome = "dcopSubSolveConverged";
-            } else {
-              outcome = "nrFailedRetry";
-            }
-          } else {
-            outcome = "nrFailedRetry";
-          }
-          flushAttempt(currentStep, outcome);
-        }
-        currentStep.pendingAttempt = {
-          phase: attemptPhase,
-          phaseFlags: raw.phaseFlags,
-          iterations: [],
-          firstRaw: raw,
-        };
-      }
-
-      // 6: Build iteration snapshot and push
-      const elementStates = this._unpackElementStates(raw.state0, raw.state1, raw.state2, raw.state3);
-      const limitingEvents: LimitingEvent[] = raw.limitingEvents.map(ev => ({
-        elementIndex: -1,
-        label: ev.deviceName.toUpperCase(),
-        junction: ev.junction,
-        limitType: "pnjlim" as const,
-        vBefore: ev.vBefore,
-        vAfter: ev.vAfter,
-        wasLimited: ev.wasLimited,
-      }));
-
-      // ngspice integrateMethod FFI code (cktdefs.h:107-108) → harness IntegrationMethod.
-      // TRAPEZOIDAL=1, GEAR=2. Code 2 → "gear"; all other values → "trapezoidal".
-      const ngIntegrateMethod: IntegrationMethod =
-        raw.integrateMethod === 2 ? "gear"
-        : "trapezoidal";
-      // Only ag0/ag1 are marshalled across the FFI (see ss8.1 of ngspice-bridge
-      // struct); pad remaining slots with 0 to match the length-7 harness shape.
-      const agBuf = new Float64Array(7);
-      agBuf[0] = raw.ag0 ?? 0;
-      agBuf[1] = raw.ag1 ?? 0;
-
-      const iterSnap: IterationSnapshot = {
-        iteration: raw.iteration,
-        matrixSize: raw.matrixSize,
-        rhsBufSize: raw.rhsBufSize,
-        voltages: raw.rhs.slice(),
-        prevVoltages: raw.rhsOld.slice(),
-        preSolveRhs: raw.preSolveRhs.length > 0 ? raw.preSolveRhs.slice() : new Float64Array(0),
-        matrix: raw.matrix ?? [],
-        elementStates,
-        noncon: raw.noncon,
-        diagGmin: raw.phaseGmin,
-        srcFact: raw.phaseSrcFact,
-        initMode: bitsToName(raw.cktMode),
-        order: raw.order,
-        delta: raw.dt,
-        ag: agBuf,
-        method: ngIntegrateMethod,
-        globalConverged: raw.converged,
-        elemConverged: raw.converged,
-        limitingEvents,
-        convergenceFailedElements: [],
-        ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices ?? [],
-      };
-      iterSnap._rawIteration = raw.iteration;
-
-      currentStep.pendingAttempt!.iterations.push(iterSnap);
-
-      // 7: Update trackers
-      prevIteration = raw.iteration;
-      prevPhase = attemptPhase;
-    }
-
-    // Flush last step
-    if (currentStep !== null) {
-      if (currentStep.pendingAttempt) {
-        const outerEv = outerByTime.get(currentStep.stepStartTime);
-        let outcome: NRAttemptOutcome = "accepted";
-        if (outerEv) {
-          if (outerEv.finalFailure) outcome = "finalFailure";
-          else if (outerEv.lteRejected) outcome = "lteRejectedRetry";
-          else if (outerEv.nrFailed) outcome = "nrFailedRetry";
-          else if (outerEv.accepted) outcome = "accepted";
-        } else if (currentStep.pendingAttempt.iterations.length > 0) {
-          const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
-          outcome = lastIter.globalConverged ? "accepted" : "finalFailure";
-        }
-        flushAttempt(currentStep, outcome);
-      }
-      flushStep(currentStep);
-    }
-
-    return {
-      source: "ngspice",
-      topology: this._buildTopologySnapshot(),
-      steps,
-    };
-  }
-
-  private _buildTopologySnapshot(): TopologySnapshot {
-    if (!this._topology) {
-      return {
-        matrixSize: this._iterations[0]?.matrixSize ?? 0,
-        nodeCount: 0, elementCount: 0,
-        elements: [],
-        nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map(),
-      };
-    }
-
-    const nodeLabels = new Map<number, string>();
-    this._topology.nodeNames.forEach((nodeNum, nodeName) => {
-      nodeLabels.set(nodeNum, nodeName);
-    });
-
-    const matrixRowLabels = new Map<number, string>();
-    const matrixColLabels = new Map<number, string>();
-    nodeLabels.forEach((label, nodeId) => {
-      const row = nodeId - 1;
-      if (row >= 0) { matrixRowLabels.set(row, label); matrixColLabels.set(row, label); }
-    });
-
-    const elements = this._topology.devices.map((d, i) => ({
-      index: i, label: d.name, type: d.typeName,
-      pinNodeIds: d.nodeIndices as readonly number[],
-    }));
-
-    // nodeNames includes both voltage-node entries (numeric names like "1",
-    // "2", ...) and branch-row entries that ngspice exposes as `<elem>#branch`
-    // (current-variable rows created via CKTmkCur — vsources, inductors, etc.).
-    // Our convention's `nodeCount` is voltage nodes ONLY (branches live in the
-    // matrix beyond `nodeCount` and `slice.ts:116` relies on that gating).
-    // Filter the branch rows out here so the snapshot's nodeCount lines up
-    // with what `captureTopology` produces for our engine.
-    let voltageNodeCount = 0;
-    this._topology.nodeNames.forEach((_, name) => {
-      if (!name.endsWith("#branch")) voltageNodeCount++;
-    });
-    return {
-      matrixSize: this._topology.matrixSize,
-      nodeCount: voltageNodeCount,
-      elementCount: this._topology.devices.length,
-      elements, nodeLabels, matrixRowLabels, matrixColLabels,
-    };
+    return buildCaptureSession(this._iterations, this._outerEvents, this._topology);
   }
 
   dispose(): void {
