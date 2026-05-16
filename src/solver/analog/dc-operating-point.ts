@@ -979,13 +979,16 @@ function gillespieSrc(
     }
   }
 
-  // ngspice cktop.c gillespie_src (v41): `ckt->CKTdiagGmin = ckt->CKTgmin =
-  // gminstart;` — at the converged exit the diagonal gmin is restored to the
-  // device gmin. v26 left CKTdiagGmin at CKTgshunt (the value the inner gmin
-  // recovery loop parked it at), which then carried into the transient solve.
-  // CKTgmin is never mutated inside gillespie_src (the gmin-raise branch is
-  // commented out upstream), so gminStart still equals ctx.loadCtx.cktGmin.
+  // ngspice cktop.c gillespie_src- `ckt->CKTdiagGmin = ckt->CKTgmin =
+  // gminstart;` at the converged exit restores both the diagonal gmin and the
+  // device gmin to the value captured at function entry. The gmin-recovery
+  // loop above parks CKTdiagGmin at CKTgshunt; without this restore that value
+  // would carry into the transient solve. `ckt->CKTgmin` is not mutated
+  // anywhere inside gillespie_src, so the second assignment is presently a
+  // no-op- it is written anyway to match ngspice line-for-line and to stay
+  // correct should a future edit mutate cktGmin within this function.
   ctx.diagonalGmin = gminStart;
+  ctx.loadCtx.cktGmin = gminStart;
   scaleAllSources(ctx, 1);
 
   return {

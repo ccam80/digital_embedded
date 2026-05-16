@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npm run build 2>&1 | tail -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && node -e \"\nconst f = JSON.parse(require('fs').readFileSync('.vitest-failures.json','utf8'));\nconst failures = f.failures || [];\nconsole.log('Total failures in baseline:', failures.length);\nconsole.log('Sample files:', [...new Set(failures.slice(0,20).map(t=>t.file))]);\n\" 2>&1",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && node -e \"const f = require('./.vitest-failures.json'); console.log(JSON.stringify(f.failures, null, 2).slice(0, 4000));\"",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -296,14 +296,14 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 114,
-      "lastAccessed": 1778923899583,
+      "accessCount": 122,
+      "lastAccessed": 1778931694176,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 41,
-      "lastAccessed": 1778624096947,
+      "accessCount": 47,
+      "lastAccessed": 1778931714191,
       "type": "file"
     },
     {
@@ -325,15 +325,15 @@
       "type": "file"
     },
     {
-      "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-      "accessCount": 26,
-      "lastAccessed": 1778642685295,
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 29,
+      "lastAccessed": 1778931513085,
       "type": "file"
     },
     {
-      "path": "src\\compile\\partition.ts",
-      "accessCount": 22,
-      "lastAccessed": 1778737867622,
+      "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+      "accessCount": 26,
+      "lastAccessed": 1778642685295,
       "type": "file"
     },
     {
@@ -343,21 +343,21 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\digital\\compiler.ts",
+      "accessCount": 20,
+      "lastAccessed": 1778931568821,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\schottky.ts",
       "accessCount": 18,
       "lastAccessed": 1778579151812,
       "type": "file"
     },
     {
-      "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 16,
-      "lastAccessed": 1778659183140,
-      "type": "file"
-    },
-    {
       "path": "src/core/registry.ts",
-      "accessCount": 16,
-      "lastAccessed": 1778799967479,
+      "accessCount": 18,
+      "lastAccessed": 1778930983895,
       "type": "directory"
     },
     {
@@ -428,8 +428,8 @@
     },
     {
       "path": "src/solver/digital/compiler.ts",
-      "accessCount": 5,
-      "lastAccessed": 1778230362906,
+      "accessCount": 6,
+      "lastAccessed": 1778931565445,
       "type": "directory"
     },
     {
@@ -503,6 +503,12 @@
       "accessCount": 2,
       "lastAccessed": 1778923889438,
       "type": "file"
+    },
+    {
+      "path": "src/core/element.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778931237805,
+      "type": "directory"
     },
     {
       "path": "src\\components\\wiring\\__tests__\\priority-encoder-partition-drop-probe.test.ts",
@@ -581,12 +587,6 @@
       "accessCount": 1,
       "lastAccessed": 1778214818073,
       "type": "file"
-    },
-    {
-      "path": "src/core/element.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778217256043,
-      "type": "directory"
     }
   ],
   "userDirectives": []

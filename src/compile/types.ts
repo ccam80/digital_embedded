@@ -223,7 +223,7 @@ export interface ConnectivityGroup {
  */
 export interface PartitionedComponent {
   element: CircuitElement;
-  definition: StandaloneComponentDefinition;
+  definition: ComponentDefinition;
   modelKey: string;
   model: DigitalModel | MnaModel | null;
   resolvedPins: ResolvedGroupPin[];

@@ -231,6 +231,7 @@ import { BehavioralXorDriverDefinition } from "../solver/analog/behavioral-drive
 import { BehavioralXnorDriverDefinition } from "../solver/analog/behavioral-drivers/xnor-driver.js";
 import { BehavioralNotDriverDefinition } from "../solver/analog/behavioral-drivers/not-driver.js";
 import { BehavioralBufDriverDefinition } from "../solver/analog/behavioral-drivers/buf-driver.js";
+import { DigitalInputThresholderDefinition } from "../solver/analog/behavioral-drivers/digital-input-thresholder.js";
 
 // Wiring behavioral drivers (internalOnly)
 import { BehavioralMuxDriverDefinition } from "../solver/analog/behavioral-drivers/mux-driver.js";
@@ -524,6 +525,7 @@ export function createDefaultRegistry(
   registry.register(BehavioralXnorDriverDefinition);
   registry.register(BehavioralNotDriverDefinition);
   registry.register(BehavioralBufDriverDefinition);
+  registry.register(DigitalInputThresholderDefinition);
 
   // Wiring behavioral drivers (internalOnly)
   registry.register(BehavioralMuxDriverDefinition);

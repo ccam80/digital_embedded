@@ -7,6 +7,7 @@
 import type { CircuitElement } from '../core/element.js';
 import type { Wire, ConnectivitySource } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
+import { isStandalone } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { PinDirection } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
@@ -62,7 +63,7 @@ export function resolveModelAssignments(
       continue;
     }
 
-    const def = registry.getStandalone(el.typeId);
+    const def = registry.get(el.typeId);
     if (def === undefined) {
       result.push({ elementIndex: i, modelKey: 'neutral', model: null });
       continue;
@@ -76,7 +77,7 @@ export function resolveModelAssignments(
     // Collect all available model keys for this component.
     // modelRegistry is the canonical source for analog models.
     // Runtime models from circuit.metadata.models are also valid keys.
-    const hasDigital = Boolean(def.models?.digital);
+    const hasDigital = isStandalone(def) && Boolean(def.models?.digital);
     const staticKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
     const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
@@ -111,7 +112,7 @@ export function resolveModelAssignments(
 
     let model: import('../core/registry.js').DigitalModel | null;
     if (modelKey === 'digital') {
-      model = def.models?.digital ?? null;
+      model = (isStandalone(def) ? def.models?.digital : undefined) ?? null;
     } else {
       model = null;
     }

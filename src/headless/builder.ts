@@ -3,7 +3,7 @@
  */
 
 import { Circuit, Wire } from '../core/circuit.js';
-import type { ComponentRegistry, StandaloneComponentDefinition, AttributeMapping } from '../core/registry.js';
+import type { ComponentRegistry, ComponentDefinition, StandaloneComponentDefinition, AttributeMapping } from '../core/registry.js';
 import { resolveComponentDef } from '../core/resolve-component.js';
 import type { PropertyValue } from '../core/properties.js';
 import { PropertyBag, PropertyType } from '../core/properties.js';
@@ -122,19 +122,25 @@ export class CircuitBuilder {
    * attributeMap entry are passed through with a console warning.
    */
   private translateProps(
-    definition: StandaloneComponentDefinition,
+    definition: ComponentDefinition | StandaloneComponentDefinition,
     props: Record<string, PropertyValue>,
   ): Record<string, PropertyValue> {
     if (!props || Object.keys(props).length === 0) return props;
 
     const xmlToInternal = new Map<string, AttributeMapping>();
-    for (const mapping of definition.attributeMap) {
-      xmlToInternal.set(mapping.xmlName, mapping);
+    const attributeMap = (definition as StandaloneComponentDefinition).attributeMap;
+    if (attributeMap) {
+      for (const mapping of attributeMap) {
+        xmlToInternal.set(mapping.xmlName, mapping);
+      }
     }
 
     const knownKeys = new Set<string>();
-    for (const pd of definition.propertyDefs) {
-      knownKeys.add(pd.key);
+    const propertyDefs = (definition as StandaloneComponentDefinition).propertyDefs;
+    if (propertyDefs) {
+      for (const pd of propertyDefs) {
+        knownKeys.add(pd.key);
+      }
     }
     // Model-param keys (e.g. `resistance`, `capacitance`) declared via
     // modelRegistry are also internal keys that callers pass directly.
@@ -186,7 +192,9 @@ export class CircuitBuilder {
     typeName: string,
     props?: Record<string, PropertyValue>
   ): CircuitElement {
-    const definition = resolveComponentDef(typeName, circuit, this.registry);
+    const standaloneDefinition = resolveComponentDef(typeName, circuit, this.registry);
+    const definition: ComponentDefinition | StandaloneComponentDefinition | undefined =
+      standaloneDefinition ?? this.registry.get(typeName);
     if (!definition) {
       const allNames = this.registry.getAll().map((d) => d.name);
       const suggestion = findClosestMatch(typeName, allNames);
@@ -237,7 +245,14 @@ export class CircuitBuilder {
       bag.set('position', [0, this.elementPositionCounter * AUTO_POSITION_Y_STEP]);
     }
 
-    const element = definition.factory(bag);
+    const standaloneFactory = (definition as StandaloneComponentDefinition).factory;
+    if (!standaloneFactory) {
+      throw new FacadeError(
+        `Component type '${typeName}' is internal-only and has no circuit element factory.`,
+        typeName
+      );
+    }
+    const element = standaloneFactory(bag);
 
     // Factories create elements at (0,0)- apply the position from the bag.
     const pos = bag.has('position') ? bag.get<number[]>('position') : undefined;
@@ -880,11 +895,12 @@ export class CircuitBuilder {
    * (e.g. initializeBackingStores) always see the canonical type.
    */
   private coercePropertyValue(
-    definition: StandaloneComponentDefinition,
+    definition: ComponentDefinition | StandaloneComponentDefinition,
     key: string,
     value: PropertyValue,
   ): PropertyValue {
-    const propDef = definition.propertyDefs.find((pd) => pd.key === key);
+    const propertyDefs = (definition as StandaloneComponentDefinition).propertyDefs;
+    const propDef = propertyDefs?.find((pd) => pd.key === key);
     if (propDef === undefined) return value;
 
     if (propDef.type === PropertyType.HEX_DATA && typeof value === "string") {

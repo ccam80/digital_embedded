@@ -1,0 +1,137 @@
+/**
+ * DigitalInputThresholderElement — stateless rail-down classifier leaf.
+ *
+ * Reads V(in) − V(gnd) each NR iteration and Norton-stamps the result node
+ * at 1.0 V (HI), 0.0 V (LO), or 0.5 V (indeterminate) according to the
+ * vIH / vIL thresholds. Strict > / < comparators: equality at either
+ * threshold lands in the indeterminate branch, matching the >= / <=
+ * band-predicate symmetry the ngspice B-source uses on the reference side.
+ */
+
+import {
+  defineStateSchema,
+  type StateSchema,
+} from "../state-schema.js";
+import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../ngspice-load-order.js";
+import { PoolBackedAnalogElement } from "../element.js";
+import type { SetupContext } from "../setup-context.js";
+import type { LoadContext } from "../load-context.js";
+import type { ComponentDefinition } from "../../../core/registry.js";
+import { AbstractCircuitElement } from "../../../core/element.js";
+import type { RenderContext, Rect } from "../../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../../core/pin-voltage-access.js";
+import type { PropertyBag } from "../../../core/properties.js";
+import { PinDirection, type PinDeclaration, type Pin, type Rotation } from "../../../core/pin.js";
+import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
+
+const SCHEMA: StateSchema = defineStateSchema("DigitalInputThresholder", []);
+
+export const THRESHOLDER_PIN_LAYOUT: PinDeclaration[] = [
+  {
+    direction: PinDirection.INPUT, label: "in",
+    defaultBitWidth: 1, position: { x: 0, y: 0 },
+    isNegatable: false, isClockCapable: false, kind: "signal",
+  },
+  {
+    direction: PinDirection.INPUT, label: "gnd",
+    defaultBitWidth: 1, position: { x: 0, y: 2 },
+    isNegatable: false, isClockCapable: false, kind: "signal",
+  },
+  {
+    direction: PinDirection.OUTPUT, label: "result",
+    defaultBitWidth: 1, position: { x: 4, y: 1 },
+    isNegatable: false, isClockCapable: false, kind: "signal",
+  },
+];
+
+class ThresholderCircuitElement extends AbstractCircuitElement {
+  constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
+    super("DigitalInputThresholder", instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(THRESHOLDER_PIN_LAYOUT, []);
+  }
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y, width: 1, height: 1 };
+  }
+
+  draw(_ctx: RenderContext, _signals?: PinVoltageAccess): void {
+    // Internal-only element — not rendered in the editor.
+  }
+}
+
+export class DigitalInputThresholderElement extends PoolBackedAnalogElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
+  readonly deviceFamily: DeviceFamily = "BEHAVIORAL";
+  readonly stateSchema = SCHEMA;
+  readonly stateSize = SCHEMA.size;
+
+  private readonly _inputNode: number;
+  private readonly _gndNode: number;
+  private readonly _resultNode: number;
+  private _vIH: number;
+  private _vIL: number;
+  private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
+
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    super(pinNodes);
+    this._inputNode = pinNodes.get("in")!;
+    this._gndNode = pinNodes.get("gnd")!;
+    this._resultNode = pinNodes.get("result")!;
+    this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
+    this._vIL = props.hasModelParam("vIL") ? props.getModelParam<number>("vIL") : 0.8;
+  }
+
+  setup(ctx: SetupContext): void {
+    this._stateBase = ctx.allocStates(this.stateSize);
+    this._handles = allocNortonStamp(ctx.solver, this._resultNode, this._gndNode);
+  }
+
+  load(ctx: LoadContext): void {
+    const rhsOld = ctx.rhsOld;
+    const v = rhsOld[this._inputNode] - rhsOld[this._gndNode];
+    const result = v > this._vIH ? 1.0 : v < this._vIL ? 0.0 : 0.5;
+    stampNortonValue(ctx, this._handles, this._resultNode, this._gndNode, 1, result);
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return new Array(this.pinNodes.size).fill(0);
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "vIH") this._vIH = value;
+    else if (key === "vIL") this._vIL = value;
+  }
+}
+
+export const DigitalInputThresholderDefinition: ComponentDefinition & {
+  factory: (props: PropertyBag) => ThresholderCircuitElement;
+} = {
+  name: "DigitalInputThresholder",
+  typeId: -1,
+  internalOnly: true,
+  pinLayout: THRESHOLDER_PIN_LAYOUT,
+  factory: (props: PropertyBag) =>
+    new ThresholderCircuitElement(
+      crypto.randomUUID(),
+      { x: 0, y: 0 },
+      0 as Rotation,
+      false,
+      props,
+    ),
+  modelRegistry: {
+    default: {
+      kind: "inline",
+      paramDefs: [
+        { key: "vIH", default: 2.0 },
+        { key: "vIL", default: 0.8 },
+      ],
+      params: { vIH: 2.0, vIL: 0.8 },
+      factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
+        new DigitalInputThresholderElement(pinNodes, props),
+    },
+  },
+  defaultModel: "default",
+};
