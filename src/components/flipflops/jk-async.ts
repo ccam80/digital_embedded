@@ -52,6 +52,8 @@ export const { paramDefs: JK_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: JK_FF_AS_BEH
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:  { default: 1e6,   unit: "Ω", description: "Input load resistance" },
+    cIn:  { default: 1e-12, unit: "F", description: "Input load capacitance" },
     rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -74,10 +76,47 @@ export const { paramDefs: JK_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: JK_FF_AS_BEH
 // ---------------------------------------------------------------------------
 
 export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  // ports: ["Set","J","C","K","Clr","Q","~Q","gnd"] — P=8, M=5 control inputs (Set=0,J=1,C=2,K=3,Clr=4)
+  // ctrl_q=8, ctrl_nq=9, result_Set=10, result_J=11, result_C=12, result_K=13, result_Clr=14; internalNetCount=7
   return {
     ports: ["Set", "J", "C", "K", "Clr", "Q", "~Q", "gnd"],
-    params: { ...JK_FF_AS_BEHAVIORAL_DEFAULTS },
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements: [
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_Set",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_J",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_C",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_K",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_Clr",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
       {
         typeId: "BehavioralJKAsyncFlipflopDriver",
         modelRef: "default",
@@ -108,12 +147,17 @@ export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitN
         },
       },
     ],
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_q", "ctrl_nq"],
+    internalNetCount: 7,
+    internalNetLabels: ["ctrl_q", "ctrl_nq", "result_Set", "result_J", "result_C", "result_K", "result_Clr"],
     netlist: [
-      [0, 1, 2, 3, 4, 8, 9, 7],   // drv: Set, J, C, K, Clr, ctrl_q, ctrl_nq, gnd
-      [5, 7, 8],                  // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
-      [6, 7, 9],                  // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
+      [0, 7, 10],                       // inPin_Set: node=Set, gnd=gnd, result=result_Set
+      [1, 7, 11],                       // inPin_J:   node=J,   gnd=gnd, result=result_J
+      [2, 7, 12],                       // inPin_C:   node=C,   gnd=gnd, result=result_C
+      [3, 7, 13],                       // inPin_K:   node=K,   gnd=gnd, result=result_K
+      [4, 7, 14],                       // inPin_Clr: node=Clr, gnd=gnd, result=result_Clr
+      [10, 11, 12, 13, 14, 8, 9, 7],    // drv: result_Set, result_J, result_C, result_K, result_Clr, ctrl_q, ctrl_nq, gnd
+      [5, 7, 8],                        // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [6, 7, 9],                        // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }

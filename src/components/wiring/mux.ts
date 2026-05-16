@@ -285,6 +285,8 @@ export const { paramDefs: MUX_BEHAVIORAL_PARAM_DEFS, defaults: MUX_BEHAVIORAL_DE
     loaded:       { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
     vIH:          { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:          { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:          { default: 1e6,   unit: "Ω", description: "Input impedance" },
+    cIn:          { default: 1e-12, unit: "F", description: "Input capacitance" },
     rOut:         { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut:         { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:          { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -311,11 +313,6 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
   // Port order: in_0..in_{N-1}, sel (K=1) or sel_0..sel_{K-1} (K>1), out, gnd.
-  // Labels match the element pinLayout exactly (see buildMuxPinDeclarations):
-  // data inputs are `in_${i}`, the (single multi-bit) selector is `sel`. The
-  // K>1 case still emits per-bit `sel_${i}` ports because the analog leaf
-  // pin needs one node per bit; that path requires a follow-up to split the
-  // user-visible `sel` pin into per-bit pins when an analog model is selected.
   const ports: string[] = [];
   for (let i = 0; i < N; i++) ports.push(`in_${i}`);
   if (K === 1) {
@@ -327,18 +324,28 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 
   const outPortIdx = N + K;
   const gndPortIdx = N + K + 1;
+  const portCount  = N + K + 2;
 
-  // Internal net: ctrl_out lands at index N + K + 2 (first index after all ports).
-  const ctrlOutNet = N + K + 2;
+  // Internal nets (decision P3-D5):
+  //   ctrl_out       at portCount + 0
+  //   result_data_i  at portCount + 1 + i       (i in 0..N-1)
+  //   result_sel_b   at portCount + 1 + N + b   (b in 0..K-1)
+  const ctrlOutNet   = portCount;
+  const resultDataBase = portCount + 1;
+  const resultSelBase  = portCount + 1 + N;
+
+  const internalNetLabels: string[] = ["ctrl_out"];
+  for (let i = 0; i < N; i++) internalNetLabels.push(`result_data_${i}`);
+  for (let b = 0; b < K; b++) internalNetLabels.push(`result_sel_${b}`);
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf.
+  // Driver leaf reads result-nets for data and sel inputs.
   // Pin order in driver: data_0..data_{N-1}, sel_0..sel_{K-1}, ctrl_out, gnd
   const driverPins: number[] = [];
-  for (let i = 0; i < N; i++) driverPins.push(i);
-  for (let i = 0; i < K; i++) driverPins.push(N + i);
+  for (let i = 0; i < N; i++) driverPins.push(resultDataBase + i);
+  for (let b = 0; b < K; b++) driverPins.push(resultSelBase + b);
   driverPins.push(ctrlOutNet, gndPortIdx);
   elements.push({
     typeId: "BehavioralMuxDriver",
@@ -350,24 +357,26 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push(driverPins);
 
-  // Data input pins- one per data port.
+  // Data input pins — 3-port DIPL, string-bound.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: inputPinType,
       modelRef: "default",
       subElementName: `inPin_data_${i}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
     });
-    netlist.push([i, gndPortIdx]);
+    netlist.push([i, gndPortIdx, resultDataBase + i]);
   }
 
-  // Selector input pins- one per sel port.
-  for (let i = 0; i < K; i++) {
+  // Selector input pins — 3-port DIPL, string-bound.
+  for (let b = 0; b < K; b++) {
     elements.push({
       typeId: inputPinType,
       modelRef: "default",
-      subElementName: `inPin_sel_${i}`,
+      subElementName: `inPin_sel_${b}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
     });
-    netlist.push([N + i, gndPortIdx]);
+    netlist.push([N + b, gndPortIdx, resultSelBase + b]);
   }
 
   // Output pin.
@@ -386,9 +395,15 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 
   return {
     ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements,
-    internalNetCount: 1,
-    internalNetLabels: ["ctrl_out"],
+    internalNetCount: 1 + N + K,
+    internalNetLabels,
     netlist,
   };
 }

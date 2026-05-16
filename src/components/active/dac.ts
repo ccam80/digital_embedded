@@ -212,30 +212,40 @@ export const buildDacNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // VREF treated as an analog-driven reference input- DigitalInputPinLoaded
-  // for the loading model only (R+C to GND); the actual voltage flows
-  // through the loaded R back to whatever drives VREF externally.
-  elements.push({ typeId: "DigitalInputPinLoaded", modelRef: "default", subElementName: "vrefPin",
-                  params: { rIn: "rIn", cIn: "cIn" } });
-  netlist.push([0 /* VREF */, 2 /* GND */]);
+  // VREF → raw R + C (X2 decision; thresholding VREF would corrupt the analog reference).
+  elements.push({ typeId: "Resistor",  modelRef: "behavioral", subElementName: "vrefR", params: { resistance: "rIn" } });
+  netlist.push([0, 2]);
+  elements.push({ typeId: "Capacitor", modelRef: "behavioral", subElementName: "vrefC", params: { capacitance: "cIn" } });
+  netlist.push([0, 2]);
 
-  // N digital data input pins
+  // Per-bit result_nets after the user-facing port range.
+  const resultNets: number[] = [];
+  for (let i = 0; i < N; i++) resultNets.push(3 + N + i);
+
+  // Each Di port → 3-port DIPL with string-bound vIH/vIL/rIn/cIn.
   for (let i = 0; i < N; i++) {
-    elements.push({ typeId: "DigitalInputPinLoaded", modelRef: "default", subElementName: `dPin${i}`,
-                    params: { rIn: "rIn", cIn: "cIn" } });
-    netlist.push([3 + i /* D_i port */, 2 /* GND */]);
+    elements.push({
+      typeId: "DigitalInputPinLoaded",
+      modelRef: "default",
+      subElementName: `dPin${i}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+    });
+    netlist.push([3 + i, 2, resultNets[i]!]);
   }
 
-  // DAC behavioural driver- branchCount:1, stamps target at OUT via VCVS shape.
-  // Pin order: vref, out, gnd, d_0..d_{N-1}.
+  // DAC driver pin order: vref, out, gnd, d_0..d_{N-1} — but d_i indices are now result_nets.
   const drvPins = [0, 1, 2];
-  for (let i = 0; i < N; i++) drvPins.push(3 + i);
-  elements.push({ typeId: "DACDriver", modelRef: "default", subElementName: "drv",
-                  branchCount: 1,
-                  params: { bits: N, bipolar: params.getOrDefault<number>("bipolar", 0) ? 1 : 0 } });
+  for (let i = 0; i < N; i++) drvPins.push(resultNets[i]!);
+  elements.push({
+    typeId: "DACDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    branchCount: 1,
+    params: { bits: N, bipolar: params.getOrDefault<number>("bipolar", 0) ? 1 : 0 },
+  });
   netlist.push(drvPins);
 
-  return { ports, elements, internalNetCount: 0, netlist };
+  return { ports, elements, internalNetCount: N, internalNetLabels: resultNets.map((_, i) => `result_d_${i}`), netlist };
 };
 
 // ---------------------------------------------------------------------------

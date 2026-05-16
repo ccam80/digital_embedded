@@ -105,6 +105,8 @@ export const { paramDefs: BUF_BEHAVIORAL_PARAM_DEFS, defaults: BUF_BEHAVIORAL_DE
     loaded: { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
     vIH:    { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:    { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:    { default: 1e6,   unit: "Ω", description: "Input impedance" },
+    cIn:    { default: 1e-12, unit: "F", description: "Input capacitance" },
     rOut:   { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut:   { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:    { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -127,34 +129,31 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  // Port indices: In_1=0, out=1, gnd=2. ctrl_out internal net at index 3.
-  const ports: string[] = ["In_1", "out", "gnd"];
-  const outIdx = 1;
-  const gndIdx = 2;
-  const ctrlOutNet = 3;
+  // ports: In_1=0, out=1, gnd=2. Internal nets: ctrl_out=3, result_1=4.
+  const ports = ["In_1", "out", "gnd"];
+  const outIdx = 1, gndIdx = 2, ctrlOutNet = 3, resultNet = 4;
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf: in_1=0, ctrl_out=ctrlOutNet, gnd=gndIdx
+  // Driver leaf reads the result-net (not the raw input port).
   elements.push({
     typeId: "BehavioralBufDriver",
     modelRef: "default",
     subElementName: "drv",
-    params: {
-    },
+    params: {},
   });
-  netlist.push([0, ctrlOutNet, gndIdx]);
+  netlist.push([resultNet, ctrlOutNet, gndIdx]);
 
-  // Input pin- port in_1 (index 0) to gnd (index 2)
+  // 3-port DIPL on the single input, string-bound.
   elements.push({
     typeId: inputPinType,
     modelRef: "default",
     subElementName: "inPin_1",
+    params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
   });
-  netlist.push([0, gndIdx]);
+  netlist.push([0, gndIdx, resultNet]);
 
-  // Output pin: node=outIdx, gnd=gndIdx, ctrl=ctrlOutNet (3-port)
   elements.push({
     typeId: outputPinType,
     modelRef: "default",
@@ -170,9 +169,15 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 
   return {
     ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements,
-    internalNetCount: 1,
-    internalNetLabels: ["ctrl_out"],
+    internalNetCount: 2,
+    internalNetLabels: ["ctrl_out", "result_1"],
     netlist,
   };
 }

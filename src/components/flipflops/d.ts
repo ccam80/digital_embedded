@@ -53,6 +53,8 @@ export const { paramDefs: D_FF_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_BEHAVIORAL_
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:  { default: 1e6,   unit: "Ω", description: "Input load resistance" },
+    cIn:  { default: 1e-12, unit: "F", description: "Input load capacitance" },
     rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -75,10 +77,29 @@ export const { paramDefs: D_FF_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_BEHAVIORAL_
 // ---------------------------------------------------------------------------
 
 export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  // ports: ["D","C","Q","~Q","gnd"] — P=5, M=2 control inputs (D at 0, C at 1)
+  // ctrl_q=5, ctrl_nq=6, result_D=7, result_C=8; internalNetCount=4
   return {
     ports: ["D", "C", "Q", "~Q", "gnd"],
-    params: { ...D_FF_BEHAVIORAL_DEFAULTS },
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements: [
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_D",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_C",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
       {
         typeId: "BehavioralDFlipflopDriver",
         modelRef: "default",
@@ -109,10 +130,12 @@ export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
         },
       },
     ],
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_q", "ctrl_nq"],
+    internalNetCount: 4,
+    internalNetLabels: ["ctrl_q", "ctrl_nq", "result_D", "result_C"],
     netlist: [
-      [0, 1, 5, 6, 4],   // drv: D, C, ctrl_q, ctrl_nq, gnd
+      [0, 4, 7],         // inPin_D: node=D, gnd=gnd, result=result_D
+      [1, 4, 8],         // inPin_C: node=C, gnd=gnd, result=result_C
+      [7, 8, 5, 6, 4],   // drv: result_D, result_C, ctrl_q, ctrl_nq, gnd
       [2, 4, 5],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
       [3, 4, 6],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],

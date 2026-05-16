@@ -1,21 +1,21 @@
 {
   "summary": {
-    "passed": 11,
+    "passed": 44,
     "failed": 1,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 3.6
+    "totalFiles": 2,
+    "durationSeconds": 3
   },
   "failures": [
     {
-      "message": "expected 1 to be +0 // Object.is equality",
+      "message": "Bus conflict on net 1: conflicting drivers",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\t-flipflop-driver.test.ts",
-          "test": "two successive rising edges with T=1 toggle Q back to 0",
-          "line": 189,
-          "column": 57
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "masked_addresses_are_independent_across_distinct_register_slots",
+          "line": 229,
+          "column": 12
         }
       ]
     }

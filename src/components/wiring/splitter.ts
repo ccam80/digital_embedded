@@ -25,6 +25,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { buildSplitterNetlist } from "../../solver/analog/behavioral-remaining.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Port type
@@ -469,6 +470,15 @@ function splitterFactory(props: PropertyBag): SplitterElement {
 const _defaultInputPorts = parsePorts("4,4");
 const _defaultOutputPorts = parsePorts("8");
 
+export const { paramDefs: SPLITTER_BEHAVIORAL_PARAM_DEFS, defaults: SPLITTER_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH: { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL: { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn: { default: 1e6,   unit: "Ω", description: "Input impedance" },
+    cIn: { default: 1e-12, unit: "F", description: "Input capacitance" },
+  },
+});
+
 export const SplitterDefinition: StandaloneComponentDefinition = {
   name: "Splitter",
   typeId: -1,
@@ -498,8 +508,8 @@ export const SplitterDefinition: StandaloneComponentDefinition = {
     behavioral: {
       kind: "netlist",
       netlist: buildSplitterNetlist,
-      paramDefs: [],
-      params: {},
+      paramDefs: SPLITTER_BEHAVIORAL_PARAM_DEFS,
+      params: SPLITTER_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",

@@ -252,7 +252,10 @@ export const { paramDefs: COUNTER_BEHAVIORAL_PARAM_DEFS, defaults: COUNTER_BEHAV
   primary: {
     bitWidth: { default: 4,     unit: "",  description: "Number of output bits (structural)" },
     loaded:   { default: 1,     unit: "",  description: "1 = DigitalInputPinLoaded / DigitalOutputPinLoaded; 0 = unloaded" },
-    vIH:      { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec; en/clr/clock simple-threshold against this)" },
+    vIH:      { default: 2.0,   unit: "V", description: "Input high threshold" },
+    vIL:      { default: 0.8,   unit: "V", description: "Input low threshold" },
+    rIn:      { default: 1e6,   unit: "Ω", description: "Input pin load resistance" },
+    cIn:      { default: 1e-12, unit: "F", description: "Input pin load capacitance" },
     rOut:     { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut:     { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:      { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -287,20 +290,31 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const ovfIdx = 4;
   const gndIdx = 5;
 
-  // Internal ctrl nets: P=6 ports; ctrl_bit_0..N-1 at P..P+N-1; ctrl_ovf at P+N
+  // P=6 ports. Internal nets:
+  //   ctrl_bit_0..N-1  at P..P+N-1
+  //   ctrl_ovf         at P+N
+  //   result_en        at P+N+1
+  //   result_C         at P+N+2
+  //   result_clr       at P+N+3
   const P = 6;
-  const ctrlBitBase = P;
-  const ctrlOvfNet  = P + N;
+  const ctrlBitBase  = P;
+  const ctrlOvfNet   = P + N;
+  const resultEnNet  = P + N + 1;
+  const resultCNet   = P + N + 2;
+  const resultClrNet = P + N + 3;
 
   const internalNetLabels: string[] = [];
   for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_bit_${i}`);
   internalNetLabels.push("ctrl_ovf");
+  internalNetLabels.push("result_en");
+  internalNetLabels.push("result_C");
+  internalNetLabels.push("result_clr");
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf pin order: [en, C, clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
-  const drvNets: number[] = [enIdx, cIdx, clrIdx, gndIdx];
+  // Driver leaf pin order: [result_en, result_C, result_clr, gnd, ctrl_bit_0, ..., ctrl_bit_{N-1}, ctrl_ovf]
+  const drvNets: number[] = [resultEnNet, resultCNet, resultClrNet, gndIdx];
   for (let i = 0; i < N; i++) drvNets.push(ctrlBitBase + i);
   drvNets.push(ctrlOvfNet);
 
@@ -314,14 +328,19 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push(drvNets);
 
-  // Control input pins.
-  for (const [name, idx] of [["en", enIdx], ["C", cIdx], ["clr", clrIdx]] as const) {
+  // Single-bit control inputs get 3-port DIPL rows with string-bound params.
+  for (const [name, idx, resultNet] of [
+    ["en",  enIdx,  resultEnNet],
+    ["C",   cIdx,   resultCNet],
+    ["clr", clrIdx, resultClrNet],
+  ] as const) {
     elements.push({
       typeId: inputPinType,
       modelRef: "default",
       subElementName: `inPin_${name}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
     });
-    netlist.push([idx, gndIdx]);
+    netlist.push([idx, gndIdx, resultNet]);
   }
 
   // Output bit pins- one per bit, all drive the single packed bus "out" node.
@@ -357,8 +376,14 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 
   return {
     ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements,
-    internalNetCount: N + 1,
+    internalNetCount: N + 4,
     internalNetLabels,
     netlist,
   };

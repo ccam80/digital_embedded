@@ -51,6 +51,8 @@ export const { paramDefs: D_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_AS_BEHAV
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:  { default: 1e6,   unit: "Ω", description: "Input load resistance" },
+    cIn:  { default: 1e-12, unit: "F", description: "Input load capacitance" },
     rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -73,10 +75,41 @@ export const { paramDefs: D_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_AS_BEHAV
 // ---------------------------------------------------------------------------
 
 export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  // ports: ["Set","D","C","Clr","Q","~Q","gnd"] — P=7, M=4 control inputs (Set=0,D=1,C=2,Clr=3)
+  // ctrl_q=7, ctrl_nq=8, result_Set=9, result_D=10, result_C=11, result_Clr=12; internalNetCount=6
   return {
     ports: ["Set", "D", "C", "Clr", "Q", "~Q", "gnd"],
-    params: { ...D_FF_AS_BEHAVIORAL_DEFAULTS },
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements: [
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_Set",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_D",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_C",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_Clr",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
       {
         typeId: "BehavioralDAsyncFlipflopDriver",
         modelRef: "default",
@@ -107,10 +140,14 @@ export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNe
         },
       },
     ],
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_q", "ctrl_nq"],
+    internalNetCount: 6,
+    internalNetLabels: ["ctrl_q", "ctrl_nq", "result_Set", "result_D", "result_C", "result_Clr"],
     netlist: [
-      [0, 1, 2, 3, 7, 8, 6],   // drv: Set, D, C, Clr, ctrl_q, ctrl_nq, gnd
+      [0, 6,  9],              // inPin_Set: node=Set, gnd=gnd, result=result_Set
+      [1, 6, 10],              // inPin_D:   node=D,   gnd=gnd, result=result_D
+      [2, 6, 11],              // inPin_C:   node=C,   gnd=gnd, result=result_C
+      [3, 6, 12],              // inPin_Clr: node=Clr, gnd=gnd, result=result_Clr
+      [9, 10, 11, 12, 7, 8, 6],  // drv: result_Set, result_D, result_C, result_Clr, ctrl_q, ctrl_nq, gnd
       [4, 6, 7],               // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
       [5, 6, 8],               // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],

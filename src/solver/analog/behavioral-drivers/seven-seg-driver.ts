@@ -144,24 +144,15 @@ export class BehavioralSevenSegDriverElement extends PoolBackedAnalogElement {
     const s0 = this._pool.states[0];
     const base = this._stateBase;
 
-    const gnd = rhsOld[this.pinNodes.get("gnd")!];
-    const vA  = rhsOld[this.pinNodes.get("a")!]  - gnd;
-    const vB  = rhsOld[this.pinNodes.get("b")!]  - gnd;
-    const vC  = rhsOld[this.pinNodes.get("c")!]  - gnd;
-    const vD  = rhsOld[this.pinNodes.get("d")!]  - gnd;
-    const vE  = rhsOld[this.pinNodes.get("e")!]  - gnd;
-    const vF  = rhsOld[this.pinNodes.get("f")!]  - gnd;
-    const vG  = rhsOld[this.pinNodes.get("g")!]  - gnd;
-    const vDP = rhsOld[this.pinNodes.get("dp")!] - gnd;
-
-    const segA  = vA  >= 0.5 ? 1 : 0;
-    const segB  = vB  >= 0.5 ? 1 : 0;
-    const segC  = vC  >= 0.5 ? 1 : 0;
-    const segD  = vD  >= 0.5 ? 1 : 0;
-    const segE  = vE  >= 0.5 ? 1 : 0;
-    const segF  = vF  >= 0.5 ? 1 : 0;
-    const segG  = vG  >= 0.5 ? 1 : 0;
-    const segDP = vDP >= 0.5 ? 1 : 0;
+    const gnd  = rhsOld[this._gndNode];
+    const segA  = rhsOld[this.pinNodes.get("a")!]  - gnd;
+    const segB  = rhsOld[this.pinNodes.get("b")!]  - gnd;
+    const segC  = rhsOld[this.pinNodes.get("c")!]  - gnd;
+    const segD  = rhsOld[this.pinNodes.get("d")!]  - gnd;
+    const segE  = rhsOld[this.pinNodes.get("e")!]  - gnd;
+    const segF  = rhsOld[this.pinNodes.get("f")!]  - gnd;
+    const segG  = rhsOld[this.pinNodes.get("g")!]  - gnd;
+    const segDP = rhsOld[this.pinNodes.get("dp")!] - gnd;
 
     // Bottom-of-load writes — every slot mutated this step writes to s0 once.
     s0[base + SLOT_SEG_A]  = segA;

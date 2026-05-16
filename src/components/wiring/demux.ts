@@ -50,6 +50,8 @@ export const { paramDefs: DEMUX_BEHAVIORAL_PARAM_DEFS, defaults: DEMUX_BEHAVIORA
     loaded:       { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
     vIH:          { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:          { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:          { default: 1e6,   unit: "Ω", description: "Input impedance" },
+    cIn:          { default: 1e-12, unit: "F", description: "Input capacitance" },
     rOut:         { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut:         { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:          { default: 5.0,   unit: "V", description: "Output high voltage" },

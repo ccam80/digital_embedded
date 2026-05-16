@@ -54,6 +54,8 @@ export const { paramDefs: RS_FF_BEHAVIORAL_PARAM_DEFS, defaults: RS_FF_BEHAVIORA
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:  { default: 1e6,   unit: "Ω", description: "Input load resistance" },
+    cIn:  { default: 1e-12, unit: "F", description: "Input load capacitance" },
     rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -75,10 +77,35 @@ export const { paramDefs: RS_FF_BEHAVIORAL_PARAM_DEFS, defaults: RS_FF_BEHAVIORA
 // ---------------------------------------------------------------------------
 
 export function buildRSFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  // ports: ["S","C","R","Q","~Q","gnd"] — P=6, M=3 control inputs (S=0, C=1, R=2)
+  // ctrl_q=6, ctrl_nq=7, result_S=8, result_C=9, result_R=10; internalNetCount=5
   return {
     ports: ["S", "C", "R", "Q", "~Q", "gnd"],
-    params: { ...RS_FF_BEHAVIORAL_DEFAULTS },
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements: [
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_S",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_C",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_R",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
       {
         typeId: "BehavioralRSFlipflopDriver",
         modelRef: "default",
@@ -109,12 +136,15 @@ export function buildRSFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlis
         },
       },
     ],
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_q", "ctrl_nq"],
+    internalNetCount: 5,
+    internalNetLabels: ["ctrl_q", "ctrl_nq", "result_S", "result_C", "result_R"],
     netlist: [
-      [0, 1, 2, 6, 7, 5],   // drv: S, C, R, ctrl_q, ctrl_nq, gnd
-      [3, 5, 6],            // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
-      [4, 5, 7],            // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
+      [0, 5,  8],            // inPin_S: node=S, gnd=gnd, result=result_S
+      [1, 5,  9],            // inPin_C: node=C, gnd=gnd, result=result_C
+      [2, 5, 10],            // inPin_R: node=R, gnd=gnd, result=result_R
+      [8, 9, 10, 6, 7, 5],   // drv: result_S, result_C, result_R, ctrl_q, ctrl_nq, gnd
+      [3, 5, 6],             // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
+      [4, 5, 7],             // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],
   } as MnaSubcircuitNetlist;
 }

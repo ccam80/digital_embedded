@@ -31,6 +31,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { buildCounterPresetNetlist } from "../../solver/analog/behavioral-sequential.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -326,6 +327,24 @@ const COUNTER_PRESET_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: COUNTER_PRESET_BEHAVIORAL_PARAM_DEFS, defaults: COUNTER_PRESET_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    bitWidth: { default: 4,     unit: "",  description: "Number of output bits (structural)" },
+    vIH:      { default: 2.0,   unit: "V", description: "Input high threshold" },
+    vIL:      { default: 0.8,   unit: "V", description: "Input low threshold" },
+    rIn:      { default: 1e6,   unit: "Ω", description: "Input pin load resistance" },
+    cIn:      { default: 1e-12, unit: "F", description: "Input pin load capacitance" },
+    rOut:     { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:     { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:      { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:      { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
 // CounterPresetDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
@@ -361,10 +380,8 @@ export const CounterPresetDefinition: StandaloneComponentDefinition = {
     behavioral: {
       kind: "netlist",
       netlist: buildCounterPresetNetlist,
-      paramDefs: [
-        { key: "bitWidth", default: 4 },
-      ],
-      params: { bitWidth: 4 },
+      paramDefs: COUNTER_PRESET_BEHAVIORAL_PARAM_DEFS,
+      params: COUNTER_PRESET_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",

@@ -54,6 +54,8 @@ export const { paramDefs: RS_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: RS_FF_AS_BEH
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:  { default: 1e6,   unit: "Ω", description: "Input load resistance" },
+    cIn:  { default: 1e-12, unit: "F", description: "Input load capacitance" },
     rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -75,10 +77,29 @@ export const { paramDefs: RS_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: RS_FF_AS_BEH
 // ---------------------------------------------------------------------------
 
 export function buildRSAsyncLatchNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  // ports: ["S","R","Q","~Q","gnd"] — P=5, M=2 control inputs (S=0, R=1)
+  // ctrl_q=5, ctrl_nq=6, result_S=7, result_R=8; internalNetCount=4
   return {
     ports: ["S", "R", "Q", "~Q", "gnd"],
-    params: { ...RS_FF_AS_BEHAVIORAL_DEFAULTS },
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements: [
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_S",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_R",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
       {
         typeId: "BehavioralRSAsyncLatchDriver",
         modelRef: "default",
@@ -109,10 +130,12 @@ export function buildRSAsyncLatchNetlist(params: PropertyBag): MnaSubcircuitNetl
         },
       },
     ],
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_q", "ctrl_nq"],
+    internalNetCount: 4,
+    internalNetLabels: ["ctrl_q", "ctrl_nq", "result_S", "result_R"],
     netlist: [
-      [0, 1, 5, 6, 4],   // drv: S, R, ctrl_q, ctrl_nq, gnd
+      [0, 4, 7],         // inPin_S: node=S, gnd=gnd, result=result_S
+      [1, 4, 8],         // inPin_R: node=R, gnd=gnd, result=result_R
+      [7, 8, 5, 6, 4],   // drv: result_S, result_R, ctrl_q, ctrl_nq, gnd
       [2, 4, 5],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
       [3, 4, 6],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],

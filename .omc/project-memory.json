@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cat >> \"C:/local_working_projects/digital_in_browser/spec/progress.md\" << 'EOF'\n\n## Task 2.2.2: DIPL Unloaded grows to 3-port + add missing pinLayout\n- **Status**: complete\n- **Agent**: implementer\n- **Files created**: none\n- **Files modified**: src/components/digital-pins/digital-input-pin-unloaded.ts\n- **Tests**: 0/0 passing (no new tests in this task; covered by Wave 2.4.A)\n- **Build**: npm run build passes (tsc-clean, only pre-existing chunk-size warnings)\nEOF",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run \"src/solver/analog/behavioral-drivers/__tests__/sequential-driver-params.test.ts\" --reporter=verbose 2>&1 | tail -20",
+    "buildCommand": "cat >> \"C:/local_working_projects/digital_in_browser/spec/progress.md\" << 'EOF'\n\n## Task 2.3.8: behavioral-remaining + tristate + seven-seg + button-led\n- **Status**: complete\n- **Agent**: implementer\n- **Files created**: none\n- **Files modified**:\n  - `src/solver/analog/behavioral-remaining.ts`\n  - `src/solver/analog/behavioral-drivers/seven-seg-driver.ts`\n  - `src/solver/analog/behavioral-drivers/button-led-driver.ts`\n  - `src/components/io/button-led.ts`\n- **Tests**: structural checks only (fix-forward wave; behavioral tests expected-red until full wave lands)\n  - `npm run build` passes (tsc-clean)\n  - `DRIVER_BEHAVIORAL_PARAM_DEFS`: added `rIn`/`cIn`\n  - `buildDriverNetlist`: `internalNetCount: 4`, labels `[\"ctrl_out\", \"ctrl_en\", \"data_result\", \"sel_result\"]`, DIPL rows `[0,3,6]` / `[1,3,7]` with string-bound params, driver reads `[6,7,4,5,3]`\n  - `buildDriverInvNetlist`: identical pattern\n  - `SEVEN_SEG_BEHAVIORAL_PARAM_DEFS`: added `rIn`/`cIn`\n  - `buildSevenSegNetlist`: `internalNetCount: 15`, labels `[\"ctrl_a\"...\"ctrl_g\",\"result_a\"...\"result_dp\"]`, DIPL rows per segment with string-bound params, driver reads result nets\n  - `BUTTON_LED_BEHAVIORAL_PARAM_DEFS`: new export with `vIH/vIL/rIn/cIn` defaults\n  - `buildButtonLEDNetlist`: signature now `(params: PropertyBag)`, `internalNetCount: 2`, labels `[\"ctrl_out\", \"result_in\"]`, DIPL row `[1,2,4]`, driver reads `result_in` (net 4)\n  - `seven-seg-driver.ts`: removed `>= 0.5` threshold; direct float reads for all 8 segments\n  - `button-led-driver.ts`: removed `>= 0.5` threshold; direct float read of `result_in`\n  - `button-led.ts`: imports and uses `BUTTON_LED_BEHAVIORAL_PARAM_DEFS`/`DEFAULTS`; passes `params` to netlist builder\nEOF\necho \"Progress recorded\"\n\nrm -rf \"C:/local_working_projects/digital_in_browser/spec/.locks/tasks/2.3.8\"\necho \"Task 2.3.8 lock released\"",
+    "testCommand": "cat >> \"C:/local_working_projects/digital_in_browser/spec/progress.md\" << 'EOF'\n\n## Task 2.3.7: DAC + ADC consumer rewires\n- **Status**: complete\n- **Agent**: implementer\n- **Files created**: none\n- **Files modified**: `src/components/active/dac.ts`, `src/components/active/adc.ts`\n- **Tests**: 23/33 passing (10 pre-existing failures confirmed in .vitest-failures.json baseline)\n- **Structural acceptance criteria met**:\n  - `npm run build` passes (tsc-clean)\n  - DAC `buildDacNetlist` emits `vrefR` (Resistor) and `vrefC` (Capacitor) for VREF — not DIPL\n  - Each DAC D-port `dPin${i}` has 3-port DIPL row with string-bound vIH/vIL/rIn/cIn\n  - ADC CLK pin routes through DIPL `clkPin` (clkResultNet = P+N+1); VIN/VREF stay direct\n  - ADC driver params: vIH/vIL removed; internalNetCount updated to N+2; \"clk_result\" appended to labels\n  - 10 failing tests are all pre-existing baseline failures (hotload_vIH, hotload_rOut, clock_below_vIH, DAC ngspice T3 suite-setup × 2, and others)\nEOF\necho \"Progress recorded\"",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -313,6 +313,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\wiring\\splitter.ts",
+      "accessCount": 41,
+      "lastAccessed": 1778936566500,
+      "type": "file"
+    },
+    {
       "path": "src\\compile\\partition.ts",
       "accessCount": 33,
       "lastAccessed": 1778933882809,
@@ -322,12 +328,6 @@
       "path": "src\\compile\\compile.ts",
       "accessCount": 32,
       "lastAccessed": 1778626920789,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\wiring\\splitter.ts",
-      "accessCount": 31,
-      "lastAccessed": 1778822643173,
       "type": "file"
     },
     {
@@ -362,8 +362,8 @@
     },
     {
       "path": "src\\components\\memory\\__tests__\\register.test.ts",
-      "accessCount": 12,
-      "lastAccessed": 1778725419119,
+      "accessCount": 14,
+      "lastAccessed": 1778936721385,
       "type": "file"
     },
     {

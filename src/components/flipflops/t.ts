@@ -60,6 +60,8 @@ export const { paramDefs: T_FF_BEHAVIORAL_PARAM_DEFS, defaults: T_FF_BEHAVIORAL_
   primary: {
     vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:  { default: 1e6,   unit: "Ω", description: "Input load resistance" },
+    cIn:  { default: 1e-12, unit: "F", description: "Input load capacitance" },
     rOut: { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -90,14 +92,6 @@ export const { paramDefs: T_FF_BEHAVIORAL_PARAM_DEFS, defaults: T_FF_BEHAVIORAL_
 
 export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const withEnable = params.getOrDefault<boolean>("withEnable", true);
-  const drvSubElement = {
-    typeId: "BehavioralTFlipflopDriver",
-    modelRef: "default",
-    subElementName: "drv",
-    params: {
-      forceToggle: withEnable ? 0 : 1,
-    },
-  };
   const qPinSubElement = {
     typeId: "DigitalOutputPinLoaded",
     modelRef: "default",
@@ -120,32 +114,81 @@ export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
       vOL:  params.getModelParam<number>("vOL"),
     },
   };
+  const forwardedParams = {
+    vIH: params.getModelParam<number>("vIH"),
+    vIL: params.getModelParam<number>("vIL"),
+    rIn: params.getModelParam<number>("rIn"),
+    cIn: params.getModelParam<number>("cIn"),
+  };
 
   if (withEnable) {
+    // ports: ["T","C","Q","~Q","gnd"] — P=5, M=2 control inputs (T at 0, C at 1)
+    // ctrl_q=5, ctrl_nq=6, result_T=7, result_C=8; internalNetCount=4
     return {
       ports: ["T", "C", "Q", "~Q", "gnd"],
-      params: { ...T_FF_BEHAVIORAL_DEFAULTS },
-      elements: [drvSubElement, qPinSubElement, nqPinSubElement],
-      internalNetCount: 2,
-      internalNetLabels: ["ctrl_q", "ctrl_nq"],
+      params: forwardedParams,
+      elements: [
+        {
+          typeId: "DigitalInputPinLoaded",
+          modelRef: "default",
+          subElementName: "inPin_T",
+          params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+        },
+        {
+          typeId: "DigitalInputPinLoaded",
+          modelRef: "default",
+          subElementName: "inPin_C",
+          params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+        },
+        {
+          typeId: "BehavioralTFlipflopDriver",
+          modelRef: "default",
+          subElementName: "drv",
+          params: { forceToggle: 0 },
+        },
+        qPinSubElement,
+        nqPinSubElement,
+      ],
+      internalNetCount: 4,
+      internalNetLabels: ["ctrl_q", "ctrl_nq", "result_T", "result_C"],
       netlist: [
-        [0, 1, 5, 6, 4],   // drv: T, C, ctrl_q, ctrl_nq, gnd
+        [0, 4, 7],         // inPin_T: node=T, gnd=gnd, result=result_T
+        [1, 4, 8],         // inPin_C: node=C, gnd=gnd, result=result_C
+        [7, 8, 5, 6, 4],   // drv: result_T, result_C, ctrl_q, ctrl_nq, gnd
         [2, 4, 5],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
         [3, 4, 6],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
       ],
     } as MnaSubcircuitNetlist;
   }
 
-  // withEnable=false: T is absent from parent ports; wire driver's T pin to
-  // gnd as a placeholder. forceToggle=1 makes the driver ignore T entirely.
+  // withEnable=false: ports ["C","Q","~Q","gnd"] — P=4, M=1 control input (C at 0)
+  // ctrl_q=4, ctrl_nq=5, result_C=6; internalNetCount=3
+  // T is absent from parent ports; driver's T slot is wired to gnd (index 3).
+  // forceToggle=1 makes the driver ignore T entirely.
   return {
     ports: ["C", "Q", "~Q", "gnd"],
-    params: { ...T_FF_BEHAVIORAL_DEFAULTS },
-    elements: [drvSubElement, qPinSubElement, nqPinSubElement],
-    internalNetCount: 2,
-    internalNetLabels: ["ctrl_q", "ctrl_nq"],
+    params: forwardedParams,
+    elements: [
+      {
+        typeId: "DigitalInputPinLoaded",
+        modelRef: "default",
+        subElementName: "inPin_C",
+        params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+      },
+      {
+        typeId: "BehavioralTFlipflopDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: { forceToggle: 1 },
+      },
+      qPinSubElement,
+      nqPinSubElement,
+    ],
+    internalNetCount: 3,
+    internalNetLabels: ["ctrl_q", "ctrl_nq", "result_C"],
     netlist: [
-      [3, 0, 4, 5, 3],   // drv: T=gnd, C, ctrl_q, ctrl_nq, gnd
+      [0, 3, 6],         // inPin_C: node=C, gnd=gnd, result=result_C
+      [3, 6, 4, 5, 3],   // drv: T=gnd, result_C, ctrl_q, ctrl_nq, gnd
       [1, 3, 4],         // qPin:  node=Q, gnd=gnd, ctrl=ctrl_q
       [2, 3, 5],         // nqPin: node=~Q, gnd=gnd, ctrl=ctrl_nq
     ],

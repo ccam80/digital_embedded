@@ -27,6 +27,11 @@ import type { PropertyBag } from "../../core/properties.js";
 //   drv          : BehavioralDecoderDriver (K selector pins + gnd)
 //   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded} per selector bit
 //   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per decoded output bit
+//
+// Internal nets (decision P3-D5):
+//   ctrl_0..ctrl_{N-1}               at portCount + 0..N-1
+//   result_sel_0..result_sel_{K-1}   at portCount + N..N+K-1
+//   internalNetCount = N + K
 
 export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const K        = params.getModelParam<number>("selectorBits");
@@ -36,11 +41,6 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
   // Port order: sel (K=1) or sel_0..sel_{K-1} (K>1), out_0..out_{N-1}, gnd.
-  // Single-bit `sel` matches the decoder's user-visible pinLayout label
-  // exactly. K>1 still emits per-bit `sel_${i}` ports because the analog
-  // domain needs one node per selector bit; that path requires a follow-up
-  // to split the user-visible `sel` pin into per-bit pins when an analog
-  // model is selected.
   const ports: string[] = [];
   if (K === 1) {
     ports.push("sel");
@@ -53,19 +53,26 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const selPortBase = 0;
   const outPortBase = K;
   const gndPortIdx  = K + N;
+  const portCount   = K + N + 1;
 
-  // Internal ctrl nets: ctrl_0..ctrl_{N-1} land at K+N+1..K+N+N.
-  const ctrlNetBase = K + N + 1;
+  // Internal nets (decision P3-D5):
+  //   ctrl_i        at portCount + i          (i in 0..N-1)
+  //   result_sel_b  at portCount + N + b      (b in 0..K-1)
+  const ctrlNetBase   = portCount;
+  const resultSelBase = portCount + N;
+
   const internalNetLabels: string[] = [];
   for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_${i}`);
+  for (let b = 0; b < K; b++) internalNetLabels.push(`result_sel_${b}`);
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- pin order MUST match buildDecoderDriverPinLayout
+  // Driver leaf reads result-nets for selector inputs.
+  // Pin order MUST match buildDecoderDriverPinLayout
   // (sel_0..sel_{K-1}, gnd, ctrl_0..ctrl_{N-1}).
   const drvNets: number[] = [];
-  for (let i = 0; i < K; i++) drvNets.push(selPortBase + i);
+  for (let b = 0; b < K; b++) drvNets.push(resultSelBase + b);
   drvNets.push(gndPortIdx);
   for (let i = 0; i < N; i++) drvNets.push(ctrlNetBase + i);
   elements.push({
@@ -78,17 +85,18 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push(drvNets);
 
-  // Selector input pins- one per selector bit.
-  for (let i = 0; i < K; i++) {
+  // Selector input pins — 3-port DIPL, string-bound.
+  for (let b = 0; b < K; b++) {
     elements.push({
       typeId: inputPinType,
       modelRef: "default",
-      subElementName: `inPin_sel_${i}`,
+      subElementName: `inPin_sel_${b}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
     });
-    netlist.push([selPortBase + i, gndPortIdx]);
+    netlist.push([selPortBase + b, gndPortIdx, resultSelBase + b]);
   }
 
-  // Output pins- one per decoded output bit.
+  // Output pins — one per decoded output bit.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: outputPinType,
@@ -106,8 +114,14 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 
   return {
     ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements,
-    internalNetCount: N,
+    internalNetCount: N + K,
     internalNetLabels,
     netlist,
   };
@@ -125,8 +139,11 @@ export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 //   inPin_in     : DigitalInputPin{Loaded|Unloaded} for data input
 //   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per output port
 //
-// Analog model treats data as 1-bit (matches mux's analog-model limitation:
-// multi-bit data falls through to the digital path).
+// Internal nets (decision P3-D5):
+//   ctrl_0..ctrl_{N-1}               at portCount + 0..N-1
+//   result_in                         at portCount + N
+//   result_sel_0..result_sel_{K-1}   at portCount + N+1..N+K
+//   internalNetCount = N + 1 + K
 
 export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const K        = params.getModelParam<number>("selectorBits");
@@ -136,11 +153,6 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
   // Port order: sel (K=1) or sel_0..sel_{K-1} (K>1), in, out_0..out_{N-1}, gnd.
-  // Single-bit `sel` matches the demux's user-visible pinLayout label
-  // exactly. K>1 still emits per-bit `sel_${i}` ports because the analog
-  // domain needs one node per selector bit; that path requires a follow-up
-  // to split the user-visible `sel` pin into per-bit pins when an analog
-  // model is selected.
   const ports: string[] = [];
   if (K === 1) {
     ports.push("sel");
@@ -155,20 +167,30 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const inPortIdx   = K;
   const outPortBase = K + 1;
   const gndPortIdx  = K + 1 + N;
+  const portCount   = K + 1 + N + 1;
 
-  // Internal ctrl nets: ctrl_0..ctrl_{N-1} land at K+1+N+1..K+1+N+N.
-  const ctrlNetBase = K + 1 + N + 1;
+  // Internal nets (decision P3-D5):
+  //   ctrl_i        at portCount + i          (i in 0..N-1)
+  //   result_in     at portCount + N
+  //   result_sel_b  at portCount + N + 1 + b  (b in 0..K-1)
+  const ctrlNetBase   = portCount;
+  const resultInNet   = portCount + N;
+  const resultSelBase = portCount + N + 1;
+
   const internalNetLabels: string[] = [];
   for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_${i}`);
+  internalNetLabels.push("result_in");
+  for (let b = 0; b < K; b++) internalNetLabels.push(`result_sel_${b}`);
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // Driver leaf- pin order MUST match buildDemuxDriverPinLayout
+  // Driver leaf reads result-nets for sel and data inputs.
+  // Pin order MUST match buildDemuxDriverPinLayout
   // (sel_0..sel_{K-1}, in, gnd, ctrl_0..ctrl_{N-1}).
   const drvNets: number[] = [];
-  for (let i = 0; i < K; i++) drvNets.push(selPortBase + i);
-  drvNets.push(inPortIdx, gndPortIdx);
+  for (let b = 0; b < K; b++) drvNets.push(resultSelBase + b);
+  drvNets.push(resultInNet, gndPortIdx);
   for (let i = 0; i < N; i++) drvNets.push(ctrlNetBase + i);
   elements.push({
     typeId: "BehavioralDemuxDriver",
@@ -180,25 +202,27 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   });
   netlist.push(drvNets);
 
-  // Selector input pins.
-  for (let i = 0; i < K; i++) {
+  // Selector input pins — 3-port DIPL, string-bound.
+  for (let b = 0; b < K; b++) {
     elements.push({
       typeId: inputPinType,
       modelRef: "default",
-      subElementName: `inPin_sel_${i}`,
+      subElementName: `inPin_sel_${b}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
     });
-    netlist.push([selPortBase + i, gndPortIdx]);
+    netlist.push([selPortBase + b, gndPortIdx, resultSelBase + b]);
   }
 
-  // Data input pin.
+  // Data input pin — 3-port DIPL, string-bound.
   elements.push({
     typeId: inputPinType,
     modelRef: "default",
     subElementName: "inPin_in",
+    params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
   });
-  netlist.push([inPortIdx, gndPortIdx]);
+  netlist.push([inPortIdx, gndPortIdx, resultInNet]);
 
-  // Output pins- one per demux output port.
+  // Output pins — one per demux output port.
   for (let i = 0; i < N; i++) {
     elements.push({
       typeId: outputPinType,
@@ -216,8 +240,14 @@ export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
 
   return {
     ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements,
-    internalNetCount: N,
+    internalNetCount: N + 1 + K,
     internalNetLabels,
     netlist,
   };

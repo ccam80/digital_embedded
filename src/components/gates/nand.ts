@@ -161,6 +161,8 @@ export const { paramDefs: NAND_BEHAVIORAL_PARAM_DEFS, defaults: NAND_BEHAVIORAL_
     loaded:     { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
     vIH:        { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
     vIL:        { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rIn:        { default: 1e6,   unit: "Ω", description: "Input impedance" },
+    cIn:        { default: 1e-12, unit: "F", description: "Input capacitance" },
     rOut:       { default: 100,   unit: "Ω", description: "Output drive resistance" },
     cOut:       { default: 1e-12, unit: "F", description: "Output companion capacitance" },
     vOH:        { default: 5.0,   unit: "V", description: "Output high voltage" },
@@ -183,23 +185,21 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
   ports.push("out", "gnd");
   const outIdx = N;
   const gndIdx = N + 1;
+  const ctrlOutNet = N + 2;
+  const resultNets: number[] = [];
+  for (let i = 0; i < N; i++) resultNets.push(N + 3 + i);
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // ctrl_out internal net lands at index N+2
-  const ctrlOutNet = N + 2;
-
   const driverPins: number[] = [];
-  for (let i = 0; i < N; i++) driverPins.push(i);
+  for (let i = 0; i < N; i++) driverPins.push(resultNets[i]!);
   driverPins.push(ctrlOutNet, gndIdx);
   elements.push({
     typeId: "BehavioralNandDriver",
     modelRef: "default",
     subElementName: "drv",
-    params: {
-      inputCount: N,
-    },
+    params: { inputCount: N },
   });
   netlist.push(driverPins);
 
@@ -208,8 +208,9 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
       typeId: inputPinType,
       modelRef: "default",
       subElementName: `inPin_${i + 1}`,
+      params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
     });
-    netlist.push([i, gndIdx]);
+    netlist.push([i, gndIdx, resultNets[i]!]);
   }
 
   elements.push({
@@ -227,9 +228,15 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
 
   return {
     ports,
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+      rIn: params.getModelParam<number>("rIn"),
+      cIn: params.getModelParam<number>("cIn"),
+    },
     elements,
-    internalNetCount: 1,
-    internalNetLabels: ["ctrl_out"],
+    internalNetCount: 1 + N,
+    internalNetLabels: ["ctrl_out", ...Array.from({ length: N }, (_, i) => `result_${i + 1}`)],
     netlist,
   };
 }

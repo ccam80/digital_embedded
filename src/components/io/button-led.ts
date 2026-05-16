@@ -22,7 +22,7 @@ import {
   type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { buildButtonLEDNetlist } from "../../solver/analog/behavioral-remaining.js";
+import { buildButtonLEDNetlist, BUTTON_LED_BEHAVIORAL_PARAM_DEFS, BUTTON_LED_BEHAVIORAL_DEFAULTS } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -242,8 +242,8 @@ export const ButtonLEDDefinition: StandaloneComponentDefinition = {
     behavioral: {
       kind: "netlist",
       netlist: buildButtonLEDNetlist,
-      paramDefs: [],
-      params: {},
+      paramDefs: BUTTON_LED_BEHAVIORAL_PARAM_DEFS,
+      params: BUTTON_LED_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",

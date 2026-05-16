@@ -88,8 +88,7 @@ export class BehavioralButtonLEDDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const vIn = rhsOld[this._inNode] - rhsOld[this._gndNode];
-    const bit = vIn >= 0.5 ? 1 : 0;
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, bit);
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, vIn);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

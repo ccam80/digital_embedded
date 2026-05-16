@@ -158,16 +158,18 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
   for (let i = 0; i < N; i++) ports.push(`D${i}`);
   const P = ports.length; // N + 5
 
-  // Internal nets: ctrl_eoc at index P, then ctrl_d_0..ctrl_d_{N-1} at P+1..P+N.
+  // Internal nets: ctrl_eoc at index P, then ctrl_d_0..ctrl_d_{N-1} at P+1..P+N,
+  // then clk_result at P+N+1.
   const internalNetLabels: string[] = ["ctrl_eoc"];
   for (let i = 0; i < N; i++) internalNetLabels.push(`ctrl_d_${i}`);
+  const clkResultNet = P + N + 1;
 
   const elements: SubcircuitElement[] = [];
   const netlist: number[][] = [];
 
-  // ADCDriver reads VIN(0), CLK(1), VREF(2), GND(3) and stamps ctrl_eoc + ctrl_d_0..ctrl_d_{N-1}.
-  // Pin order for driver: VIN, CLK, VREF, GND, ctrl_eoc, ctrl_d_0..ctrl_d_{N-1}.
-  const drvPins = [0, 1, 2, 3, P /* ctrl_eoc */];
+  // ADCDriver reads VIN(0), clk_result, VREF(2), GND(3) and stamps ctrl_eoc + ctrl_d_0..ctrl_d_{N-1}.
+  // Pin order for driver: VIN, clk_result, VREF, GND, ctrl_eoc, ctrl_d_0..ctrl_d_{N-1}.
+  const drvPins = [0, clkResultNet, 2, 3, P /* ctrl_eoc */];
   for (let i = 0; i < N; i++) drvPins.push(P + 1 + i);
   elements.push({
     typeId: "ADCDriver",
@@ -177,11 +179,18 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
       bits: N,
       bipolar: params.getOrDefault<number>("bipolar", 0) ? 1 : 0,
       sar: params.getOrDefault<number>("sar", 0) ? 1 : 0,
-      vIH: params.getOrDefault<number>("vIH", 2.0),
-      vIL: params.getOrDefault<number>("vIL", 0.8),
     },
   });
   netlist.push(drvPins);
+
+  // CLK pin → 3-port DIPL with string-bound vIH/vIL/rIn/cIn.
+  elements.push({
+    typeId: "DigitalInputPinLoaded",
+    modelRef: "default",
+    subElementName: "clkPin",
+    params: { vIH: "vIH", vIL: "vIL", rIn: "rIn", cIn: "cIn" },
+  });
+  netlist.push([1 /* CLK port */, 3 /* GND port */, clkResultNet]);
 
   // EOC digital output pin (port index 4, gnd = port index 3, ctrl = ctrl_eoc).
   elements.push({
@@ -213,7 +222,7 @@ export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
     netlist.push([5 + i /* D_i */, 3 /* GND */, P + 1 + i /* ctrl_d_i */]);
   }
 
-  return { ports, elements, internalNetCount: N + 1, internalNetLabels, netlist };
+  return { ports, elements, internalNetCount: N + 2, internalNetLabels: [...internalNetLabels, "clk_result"], netlist };
 };
 
 // ---------------------------------------------------------------------------
