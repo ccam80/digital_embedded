@@ -20,7 +20,6 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -89,7 +88,6 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   readonly stateSize: number;
 
   private readonly _bitWidth: number;
-  private readonly _maxValue: number;
   private readonly _slotLastClock: number;
   private readonly _slotCountBase: number;
   private readonly _enNode: number;
@@ -106,7 +104,6 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
-    this._maxValue = this._bitWidth >= 32 ? 0xFFFFFFFF : ((1 << this._bitWidth) - 1);
 
     this.stateSchema = getCounterSchema(this._bitWidth);
     this.stateSize = this.stateSchema.size;
@@ -145,36 +142,24 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
     const vEn    = rhsOld[this._enNode]  - gnd;
     const vClr   = rhsOld[this._clrNode] - gnd;
 
-    let count = 0;
-    for (let i = 0; i < this._bitWidth; i++) {
-      const bit = s1[base + this._slotCountBase + i] >= 0.5 ? 1 : 0;
-      count |= bit << i;
-    }
-    count >>>= 0;
-
-    const prevClock = s1[base + this._slotLastClock];
-    const en  = vEn  >= 0.5 ? 1 : 0;
-    const clr = vClr >= 0.5 ? 1 : 0;
-
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
-      if      (clr) count = 0;
-      else if (en)  count = (count + 1) & this._maxValue;
-    }
+    const prevClock  = s1[base + this._slotLastClock];
+    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
     this._firstSample = false;
-
-    s0[base + this._slotLastClock] = vClock;
+    const enEff    = vEn * (1 - vClr);
+    const clearEff = vClr;
+    let carry = enEff;
     for (let i = 0; i < this._bitWidth; i++) {
-      const bit = (count >>> i) & 1;
-      s0[base + this._slotCountBase + i] = bit;
+      const state_i = s1[base + this._slotCountBase + i];
+      const tEff    = carry * risingEdge;
+      const clocked = state_i * (1 - tEff) + (1 - state_i) * tEff;
+      const next_i  = (1 - clearEff) * clocked;
+      s0[base + this._slotCountBase + i] = next_i;
+      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, next_i);
+      carry = carry * state_i;
     }
-
-    const ovf = (count === this._maxValue && en !== 0) ? 1 : 0;
-
-    for (let i = 0; i < this._bitWidth; i++) {
-      const bit = (count >>> i) & 1;
-      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, bit);
-    }
+    const ovf = carry * risingEdge * (1 - clearEff);
     stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, 1, ovf);
+    s0[base + this._slotLastClock] = vClock;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

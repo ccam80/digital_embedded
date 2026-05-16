@@ -6,11 +6,12 @@
  * (contracts_group_02.md). Emitted by the `DAC` parent's `buildDacNetlist`
  * (`dac.ts`) as the single sub-element `drv`.
  *
- * Canonical Template D exemplar â€” combines Template C's matrix-stamping body
+ * Canonical Template D exemplar — combines Template C's matrix-stamping body
  * with Template A's state-bearing latch machinery. Reads N digital input
- * voltages from `rhsOld[D_i] - rhsOld[GND]`; latches each at threshold 0.5;
- * reads `rhsOld[VREF] - rhsOld[GND]` for the reference; computes output
- * target; stamps a VSRC-style branch row that enforces V_OUT - V_GND = target.
+ * voltages from `rhsOld[D_i] - rhsOld[GND]` as floats (arithmetic Kleene,
+ * no threshold); reads `rhsOld[VREF] - rhsOld[GND]` for the reference;
+ * computes output target; stamps a VSRC-style branch row that enforces
+ * V_OUT - V_GND = target.
  *
  * Schema is variable-arity (N from `bits` param). Module-scope memoised
  * factory `getDacSchema(bits)` per the counter-driver.ts pattern.
@@ -55,7 +56,7 @@ function getDacSchema(bits: number): StateSchema {
   for (let i = 0; i < bits; i++) {
     slots.push({
       name: `LATCHED_BIT_${i}`,
-      doc: `Latched digital input bit ${i} (0 or 1). Threshold 0.5 applied to rhsOld[D${i}] - rhsOld[GND].`,
+      doc: `Float input bit ${i} read from rhsOld[D${i}] - rhsOld[GND]. Lies in {0, 0.5, 1} after Wave 2.3 DIPL wiring.`,
     });
   }
   slots.push({
@@ -170,16 +171,17 @@ export class DACDriverElement extends PoolBackedAnalogElement {
     const gnd  = rhsOld[gndNode];
     const vref = rhsOld[vrefNode] - gnd;
 
-    // Read and threshold-latch each digital input bit.
-    const inputs: boolean[] = [];
+    // Read each digital input bit as a float (arithmetic Kleene- no threshold).
+    const inputs: number[] = [];
     for (let i = 0; i < this._bits; i++) {
       const diNode = this.pinNodes.get(`D${i}`)!;
       const v = rhsOld[diNode] - gnd;
-      inputs.push(v >= 0.5);
+      inputs.push(v);
     }
 
-    // Assemble binary code from latched inputs (LSB = D0).
-    const code = inputs.reduce((acc, b, i) => acc + (b ? (1 << i) : 0), 0);
+    // Assemble fractional code from bit floats (LSB = D0).
+    // A 0.5 V D0 input contributes 0.5 LSB to the unipolar output.
+    const code = inputs.reduce((acc, v, i) => acc + v * (1 << i), 0);
 
     // Compute target voltage.
     // Unipolar: target = vref * code / (2^N - 1)
@@ -197,9 +199,9 @@ export class DACDriverElement extends PoolBackedAnalogElement {
     solver.stampElement(this._hBrGnd, -1);
     ctx.rhs[this.branchIndex] += target;
 
-    // Bottom-of-load writes â€” every slot mutated this step writes to s0 exactly once.
+    // Bottom-of-load writes — every slot mutated this step writes to s0 exactly once.
     for (let i = 0; i < this._bits; i++) {
-      s0[base + i] = inputs[i] ? 1 : 0;
+      s0[base + i] = inputs[i];
     }
     s0[base + this._slotTarget] = target;
   }

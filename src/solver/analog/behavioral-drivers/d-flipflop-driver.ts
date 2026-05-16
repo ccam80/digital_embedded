@@ -20,7 +20,6 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralDFlipflopDriver", [
@@ -82,16 +81,14 @@ export class BehavioralDFlipflopDriverElement extends PoolBackedAnalogElement {
     const vClock = rhsOld[this.pinNodes.get("C")!] - gnd;
     const vD     = rhsOld[this.pinNodes.get("D")!] - gnd;
 
-    const prevClock = s1[base + SLOT_LAST_CLOCK];
-    let q: 0 | 1 = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
-
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
-      q = vD >= 0.5 ? 1 : 0;
-    }
+    const prevClock  = s1[base + SLOT_LAST_CLOCK];
+    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
     this._firstSample = false;
+    const state = s1[base + SLOT_Q];
+    const q = state * (1 - risingEdge) + vD * risingEdge;
 
     stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, 1 - q);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;

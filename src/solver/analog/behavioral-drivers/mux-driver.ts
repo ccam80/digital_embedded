@@ -95,15 +95,19 @@ export class BehavioralMuxDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const gnd = rhsOld[this._gndNode];
-
-    let selIdx = 0;
+    const sel: number[] = [];
     for (let i = 0; i < this._selectorBits; i++) {
-      if (rhsOld[this._selNodes[i]] - gnd >= 0.5) selIdx |= 1 << i;
+      sel.push(rhsOld[this._selNodes[i]] - gnd);
     }
-
-    const dv = rhsOld[this._dataNodes[selIdx]] - gnd;
-    const result = dv >= 0.5 ? 1 : 0;
-
+    let result = 0;
+    for (let i = 0; i < this._dataCount; i++) {
+      let weight = 1;
+      for (let b = 0; b < this._selectorBits; b++) {
+        const sb = sel[b]!;
+        weight *= ((i >>> b) & 1) === 1 ? sb : (1 - sb);
+      }
+      result += weight * (rhsOld[this._dataNodes[i]] - gnd);
+    }
     stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 

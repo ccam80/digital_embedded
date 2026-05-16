@@ -61,8 +61,8 @@ export class BehavioralDriverDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const gnd  = rhsOld[this._gndNode];
-    const dataOut    = rhsOld[this.pinNodes.get("in")!]  - gnd >= 0.5 ? 1 : 0;
-    const enableHigh = rhsOld[this.pinNodes.get("sel")!] - gnd >= 0.5 ? 1 : 0;
+    const dataOut    = rhsOld[this.pinNodes.get("in")!]  - gnd;
+    const enableHigh = rhsOld[this.pinNodes.get("sel")!] - gnd;
 
     stampNortonValue(ctx, this._handlesOut, this._ctrlOutNode, this._gndNode, 1, dataOut);
     stampNortonValue(ctx, this._handlesEn,  this._ctrlEnNode,  this._gndNode, 1, enableHigh);

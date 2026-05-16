@@ -23,7 +23,6 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralJKFlipflopDriver", [
@@ -81,21 +80,15 @@ export class BehavioralJKFlipflopDriverElement extends PoolBackedAnalogElement {
     const vJ     = rhsOld[this.pinNodes.get("J")!] - gnd;
     const vK     = rhsOld[this.pinNodes.get("K")!] - gnd;
 
-    const prevClock = s1[base + SLOT_LAST_CLOCK];
-    let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
-
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
-      const j = vJ >= 0.5 ? 1 : 0;
-      const k = vK >= 0.5 ? 1 : 0;
-      if (j && k)      q = 1 - q;
-      else if (j)      q = 1;
-      else if (k)      q = 0;
-      // both low → hold
-    }
+    const prevClock  = s1[base + SLOT_LAST_CLOCK];
+    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
     this._firstSample = false;
+    const state       = s1[base + SLOT_Q];
+    const clockedNext = vJ * (1 - state) + (1 - vK) * state;
+    const q           = state * (1 - risingEdge) + clockedNext * risingEdge;
 
     stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, 1 - q);
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;

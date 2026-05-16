@@ -22,7 +22,6 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const COUNTER_PRESET_SCHEMAS = new Map<number, StateSchema>();
@@ -36,11 +35,13 @@ function getCounterPresetSchema(bitWidth: number): StateSchema {
       name: "LAST_CLOCK",
       doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample prevents spurious edges when clock boots high.",
     },
-    {
-      name: "COUNT",
-      doc: "Latched count as packed integer. Read-modify-written each load().",
-    },
   ];
+  for (let i = 0; i < bitWidth; i++) {
+    slots.push({
+      name: `COUNT_BIT${i}`,
+      doc: `Internal counter latch bit ${i} (LSB=0). Read-modify-written each load().`,
+    });
+  }
 
   const schema = defineStateSchema(`BehavioralCounterPresetDriver_${bitWidth}b`, slots);
   COUNTER_PRESET_SCHEMAS.set(bitWidth, schema);
@@ -80,9 +81,8 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
   readonly stateSize: number;
 
   private readonly _bitWidth: number;
-  private readonly _maxValue: number;
   private readonly _slotLastClock: number;
-  private readonly _slotCount: number;
+  private readonly _slotCountBase: number;
   private readonly _enNode: number;
   private readonly _cNode: number;
   private readonly _dirNode: number;
@@ -101,12 +101,11 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
-    this._maxValue = this._bitWidth >= 32 ? 0xFFFFFFFF : ((1 << this._bitWidth) - 1);
 
     this.stateSchema = getCounterPresetSchema(this._bitWidth);
     this.stateSize = this.stateSchema.size;
-    this._slotLastClock = this.stateSchema.indexOf.get("LAST_CLOCK")!;
-    this._slotCount     = this.stateSchema.indexOf.get("COUNT")!;
+    this._slotLastClock  = this.stateSchema.indexOf.get("LAST_CLOCK")!;
+    this._slotCountBase  = this.stateSchema.indexOf.get("COUNT_BIT0")!;
 
     this._enNode  = pinNodes.get("en")!;
     this._cNode   = pinNodes.get("C")!;
@@ -142,47 +141,35 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
     const vClock = rhsOld[this._cNode]   - gnd;
     const vEn    = rhsOld[this._enNode]  - gnd;
     const vDir   = rhsOld[this._dirNode] - gnd;
-    const vIn    = rhsOld[this._inNode]  - gnd;
     const vLd    = rhsOld[this._ldNode]  - gnd;
     const vClr   = rhsOld[this._clrNode] - gnd;
 
-    let count = (s1[base + this._slotCount] | 0) >>> 0;
-
-    const prevClock = s1[base + this._slotLastClock];
-    const en  = vEn  >= 0.5 ? 1 : 0;
-    const dir = vDir >= 0.5 ? 1 : 0;
-    const ld  = vLd  >= 0.5 ? 1 : 0;
-    const clr = vClr >= 0.5 ? 1 : 0;
-
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
-      if (clr) {
-        count = 0;
-      } else if (ld) {
-        const loadVal = (vIn >>> 0) >>> 0;
-        count = (loadVal & this._maxValue) >>> 0;
-      } else if (en) {
-        if (dir) {
-          count = count === 0 ? this._maxValue : (count - 1) & this._maxValue;
-        } else {
-          count = count === this._maxValue ? 0 : (count + 1) & this._maxValue;
-        }
-      }
-    }
-
+    const prevClock  = s1[base + this._slotLastClock];
+    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
     this._firstSample = false;
-
-    s0[base + this._slotLastClock] = vClock;
-    s0[base + this._slotCount]     = count;
-
-    const ovf = (dir
-      ? ((count >>> 0) === 0 && en !== 0)
-      : ((count >>> 0) === this._maxValue && en !== 0)) ? 1 : 0;
-
+    const enEff  = vEn * (1 - vClr);
+    const ld     = vLd * risingEdge;
+    const dirUp  = 1 - vDir;
+    const dirDn  = vDir;
+    const inPacked = (rhsOld[this._inNode] - gnd) >>> 0;
+    let carryUp = enEff;
+    let carryDn = enEff;
     for (let i = 0; i < this._bitWidth; i++) {
-      const bit = (count >>> i) & 1;
-      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, bit);
+      const state_i = s1[base + this._slotCountBase + i];
+      const loadBit = ((inPacked >>> i) & 1) >>> 0;
+      const t_i     = dirUp * carryUp + dirDn * carryDn;
+      const tEff    = t_i * risingEdge * (1 - ld);
+      const clocked = state_i * (1 - tEff) + (1 - state_i) * tEff;
+      const loaded  = state_i * (1 - ld)   + loadBit  * ld;
+      const next_i  = (1 - vClr) * ((1 - ld) * clocked + ld * loaded);
+      s0[base + this._slotCountBase + i] = next_i;
+      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, next_i);
+      carryUp = carryUp * state_i;
+      carryDn = carryDn * (1 - state_i);
     }
+    const ovf = (dirUp * carryUp + dirDn * carryDn) * risingEdge * (1 - vClr) * (1 - ld);
     stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, 1, ovf);
+    s0[base + this._slotLastClock] = vClock;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

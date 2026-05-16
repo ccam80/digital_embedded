@@ -69,8 +69,7 @@ export class BehavioralBufDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const gndV = rhsOld[this._gndNode];
-    const v = rhsOld[this._inNode] - gndV;
-    const result = v >= 0.5 ? 1 : 0;
+    const result = rhsOld[this._inNode] - gndV;
     stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 

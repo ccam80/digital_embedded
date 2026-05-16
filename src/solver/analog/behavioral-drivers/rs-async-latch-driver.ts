@@ -47,8 +47,6 @@ export class BehavioralRSAsyncLatchDriverElement extends PoolBackedAnalogElement
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  private _firstSample: boolean = true;
-
   private _ctrlQNode: number = 0;
   private _ctrlNqNode: number = 0;
   private _gndNode: number = 0;
@@ -78,29 +76,16 @@ export class BehavioralRSAsyncLatchDriverElement extends PoolBackedAnalogElement
     const vS  = rhsOld[this.pinNodes.get("S")!] - gnd;
     const vR  = rhsOld[this.pinNodes.get("R")!] - gnd;
 
+    const state = s1[base + SLOT_Q];
     let q: number;
-    if (this._firstSample) {
-      q = 0;
-      this._firstSample = false;
+    if (vR + vS > 1) {
+      q = 0.5;
     } else {
-      q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
+      q = vS * 1 + vR * 0 + (1 - vR - vS + vR * vS) * state;
     }
-
-    const sHigh = vS >= 0.5;
-    const rHigh = vR >= 0.5;
-
-    if (sHigh && rHigh) {
-      // Forbidden state: both outputs forced LOW (matches parent executeRSAsync).
-      q = 0;
-    } else if (sHigh) {
-      q = 1;
-    } else if (rHigh) {
-      q = 0;
-    }
-    // both low → hold
 
     stampNortonValue(ctx, this._handlesQ,  this._ctrlQNode,  this._gndNode, 1, q);
-    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, q ? 0 : 1);
+    stampNortonValue(ctx, this._handlesNq, this._ctrlNqNode, this._gndNode, 1, 1 - q);
 
     s0[base + SLOT_Q] = q;
   }

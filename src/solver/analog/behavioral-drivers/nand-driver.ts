@@ -75,17 +75,12 @@ export class BehavioralNandDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const gndV = rhsOld[this._gndNode];
-
-    let andResult = 1;
-    for (let i = 0; i < this._inputCount; i++) {
+    let andResult = rhsOld[this._inputNodes[0]] - gndV;
+    for (let i = 1; i < this._inputCount; i++) {
       const v = rhsOld[this._inputNodes[i]] - gndV;
-      if (v < 0.5) {
-        andResult = 0;
-        break;
-      }
+      if (v < andResult) andResult = v;
     }
-
-    const result = andResult ? 0 : 1;
+    const result = 1 - andResult;
     stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 

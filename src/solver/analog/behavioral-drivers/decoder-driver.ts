@@ -89,16 +89,17 @@ export class BehavioralDecoderDriverElement extends PoolBackedAnalogElement {
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
     const gnd = rhsOld[this._gndNode];
-
-    let sel = 0;
+    const sel: number[] = [];
     for (let i = 0; i < this._selectorBits; i++) {
-      if (rhsOld[this._selNodes[i]!]! - gnd >= 0.5) sel |= 1 << i;
+      sel.push(rhsOld[this._selNodes[i]!]! - gnd);
     }
-    sel >>>= 0;
-
     for (let i = 0; i < this._outCount; i++) {
-      const target = i === sel ? 1 : 0;
-      stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, 1, target);
+      let weight = 1;
+      for (let b = 0; b < this._selectorBits; b++) {
+        const sb = sel[b]!;
+        weight *= ((i >>> b) & 1) === 1 ? sb : (1 - sb);
+      }
+      stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, 1, weight);
     }
   }
 

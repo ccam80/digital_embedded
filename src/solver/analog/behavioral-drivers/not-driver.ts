@@ -66,7 +66,7 @@ export class BehavioralNotDriverElement extends PoolBackedAnalogElement {
     const rhsOld = ctx.rhsOld;
     const gndV = rhsOld[this._gndNode];
     const v = rhsOld[this._inputNode] - gndV;
-    const result = v >= 0.5 ? 0 : 1;
+    const result = 1 - v;
     stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, 1, result);
   }
 

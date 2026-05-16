@@ -41,7 +41,6 @@ import { allocNortonStamp, stampNortonValue } from "../../solver/analog/stamp-he
 import type { ComponentDefinition } from "../../core/registry.js";
 import type { PropertyBag } from "../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
-import { detectRisingEdge } from "../../solver/analog/behavioral-drivers/edge-detect.js";
 
 // ---------------------------------------------------------------------------
 // Memoised arity-indexed schema factory
@@ -148,8 +147,6 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
   private readonly _clkNode:  number;
   private readonly _vrefNode: number;
   private readonly _gndNode:  number;
-  private _vIH: number;
-  private _vIL: number;
   private _rOut: number;
   private _vOH: number;
   private _vOL: number;
@@ -180,8 +177,6 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     this._clkNode  = pinNodes.get("CLK")!;
     this._vrefNode = pinNodes.get("VREF")!;
     this._gndNode  = pinNodes.get("GND")!;
-    this._vIH = props.getModelParam<number>("vIH");
-    this._vIL = props.getModelParam<number>("vIL");
     this._rOut = props.getModelParam<number>("rOut");
     this._vOH = props.getModelParam<number>("vOH");
     this._vOL = props.getModelParam<number>("vOL");
@@ -235,10 +230,11 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
     // Hold prior EOC across calls; FSM branches that change it write a new
     // value below. Without this hold, EOC would collapse to 0 every load()
     // even though the SAR FSM specifies it stays high through phase 3.
-    let outputEoc   = s1[base + this._slotOutputEoc] >= 0.5 ? 1 : 0;
+    let outputEoc   = s1[base + this._slotOutputEoc];
 
-    const edge = !this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH);
+    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
     this._firstSample = false;
+    const edge = risingEdge > 0;
 
     if (edge) {
       const vIn  = rhsOld[this._vinNode]  - gnd;
@@ -291,7 +287,7 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
         outputEoc   = 1;
         fsmPhase    = 3;
       }
-    } else if (!this._sar && vClock < this._vIL) {
+    } else if (!this._sar && vClock < 0.5) {
       // Instant mode only: clear EOC on CLK low so it pulses rather than
       // latching high until the next sample. SAR mode keeps state across
       // edges and must not be reset mid-conversion.
@@ -354,9 +350,7 @@ export class ADCDriverElement extends PoolBackedAnalogElement {
   }
 
   setParam(key: string, value: number): void {
-    if (key === "vIH") this._vIH = value;
-    else if (key === "vIL") this._vIL = value;
-    else if (key === "rOut") this._rOut = value;
+    if (key === "rOut") this._rOut = value;
     else if (key === "vOH") this._vOH = value;
     else if (key === "vOL") this._vOL = value;
     // bits, bipolar, sar are structural (drive schema, _maxCode, FSM shape);
@@ -378,15 +372,13 @@ export const ADCDriverDefinition: ComponentDefinition = {
       kind: "inline",
       paramDefs: [
         { key: "bits",    default: 8 },
-        { key: "vIH",     default: 2.0 },
-        { key: "vIL",     default: 0.8 },
         { key: "bipolar", default: 0 },
         { key: "sar",     default: 1 },
         { key: "rOut",    default: 100 },
         { key: "vOH",     default: 5 },
         { key: "vOL",     default: 0 },
       ],
-      params: { bits: 8, vIH: 2.0, vIL: 0.8, bipolar: 0, sar: 1, rOut: 100, vOH: 5, vOL: 0 },
+      params: { bits: 8, bipolar: 0, sar: 1, rOut: 100, vOH: 5, vOL: 0 },
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new ADCDriverElement(pinNodes, props),
     },

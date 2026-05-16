@@ -22,7 +22,6 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
-import { detectRisingEdge } from "./edge-detect.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const REGISTER_SCHEMAS = new Map<number, StateSchema>();
@@ -36,11 +35,13 @@ function getRegisterSchema(bitWidth: number): StateSchema {
       name: "LAST_CLOCK",
       doc: "Clock voltage at last accepted timestep — compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
     },
-    {
-      name: "STORED_VALUE",
-      doc: "Packed N-bit integer latch. Updated on rising clock edge when en is high by sampling the D bus.",
-    },
   ];
+  for (let i = 0; i < bitWidth; i++) {
+    slots.push({
+      name: `STORED_BIT${i}`,
+      doc: `Internal register latch bit ${i} (LSB=0). Read-modify-written each load().`,
+    });
+  }
 
   const schema = defineStateSchema(`BehavioralRegisterDriver_${bitWidth}b`, slots);
   REGISTER_SCHEMAS.set(bitWidth, schema);
@@ -72,9 +73,8 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
   readonly stateSize: number;
 
   private readonly _bitWidth: number;
-  private readonly _mask: number;
   private readonly _slotLastClock: number;
-  private readonly _slotStoredValue: number;
+  private readonly _slotStoredBase: number;
   private readonly _dNode: number;
   private readonly _cNode: number;
   private readonly _enNode: number;
@@ -88,12 +88,11 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
-    this._mask = this._bitWidth >= 32 ? 0xFFFFFFFF : ((1 << this._bitWidth) - 1);
 
     this.stateSchema = getRegisterSchema(this._bitWidth);
     this.stateSize = this.stateSchema.size;
     this._slotLastClock  = this.stateSchema.indexOf.get("LAST_CLOCK")!;
-    this._slotStoredValue = this.stateSchema.indexOf.get("STORED_VALUE")!;
+    this._slotStoredBase = this.stateSchema.indexOf.get("STORED_BIT0")!;
 
     this._dNode   = pinNodes.get("D")!;
     this._cNode   = pinNodes.get("C")!;
@@ -122,28 +121,22 @@ export class BehavioralRegisterDriverElement extends PoolBackedAnalogElement {
 
     const gnd    = rhsOld[this._gndNode];
     const vClock = rhsOld[this._cNode]  - gnd;
-    const vD     = rhsOld[this._dNode]  - gnd;
     const vEn    = rhsOld[this._enNode] - gnd;
 
-    const prevClock = s1[base + this._slotLastClock];
-    let stored = s1[base + this._slotStoredValue];
-    const en = vEn >= 0.5 ? 1 : 0;
-
-    if (!this._firstSample && detectRisingEdge(prevClock, vClock, 0.5)) {
-      if (en) {
-        const sampledD = (vD >>> 0) >>> 0;
-        stored = (sampledD & this._mask) >>> 0;
-      }
-    }
+    const prevClock  = s1[base + this._slotLastClock];
+    const risingEdge = this._firstSample ? 0 : vClock * (1 - prevClock);
     this._firstSample = false;
-
-    s0[base + this._slotLastClock]   = vClock;
-    s0[base + this._slotStoredValue] = stored;
-
+    const enEff   = vEn;
+    const dPacked = (rhsOld[this._dNode] - gnd) >>> 0;
     for (let i = 0; i < this._bitWidth; i++) {
-      const bit = (stored >>> i) & 1;
-      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, bit);
+      const state_i = s1[base + this._slotStoredBase + i];
+      const dBit    = ((dPacked >>> i) & 1) >>> 0;
+      const edge    = risingEdge * enEff;
+      const next_i  = state_i * (1 - edge) + dBit * edge;
+      s0[base + this._slotStoredBase + i] = next_i;
+      stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, next_i);
     }
+    s0[base + this._slotLastClock] = vClock;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

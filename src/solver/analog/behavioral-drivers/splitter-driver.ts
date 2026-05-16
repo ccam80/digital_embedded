@@ -120,23 +120,20 @@ export class BehavioralSplitterDriverElement extends PoolBackedAnalogElement {
         stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, 1, bit);
       }
     } else if (this._outputCount === 1 && this._inputCount >= 1) {
-      // Merge mode: classify each normalized bit input, stamp "any bit set"
-      // on ctrl_0. Preserves the pre-normalization stamp pattern
-      // (`packed ? vOH : vOL`) at the new {0, 1} levels.
-      let anyHigh = 0;
-      for (let i = 0; i < this._inputCount; i++) {
-        if (rhsOld[this._inNodes[i]] - gnd >= 0.5) {
-          anyHigh = 1;
-          break;
-        }
+      // Merge mode: stamp the raw float max of all inputs so that 0.5 propagates
+      // through unchanged (Kleene-uniform per decision P1-D5).
+      let maxVal = rhsOld[this._inNodes[0]] - gnd;
+      for (let i = 1; i < this._inputCount; i++) {
+        const v = rhsOld[this._inNodes[i]] - gnd;
+        if (v > maxVal) maxVal = v;
       }
-      stampNortonValue(ctx, this._handlesByBit[0]!, this._ctrlNodes[0]!, this._gndNode, 1, anyHigh);
+      stampNortonValue(ctx, this._handlesByBit[0]!, this._ctrlNodes[0]!, this._gndNode, 1, maxVal);
     } else {
-      // Passthrough mode: classify in_i → ctrl_i directly.
+      // Passthrough mode: direct float pass-through for each output i.
       const n = Math.min(this._inputCount, this._outputCount);
       for (let i = 0; i < n; i++) {
-        const bit = rhsOld[this._inNodes[i]] - gnd >= 0.5 ? 1 : 0;
-        stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, 1, bit);
+        const v = rhsOld[this._inNodes[i]] - gnd;
+        stampNortonValue(ctx, this._handlesByBit[i]!, this._ctrlNodes[i]!, this._gndNode, 1, v);
       }
     }
   }
