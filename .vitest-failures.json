@@ -4,7 +4,7 @@
     "failed": 492,
     "skipped": 2,
     "totalFiles": 426,
-    "durationSeconds": 57.8
+    "durationSeconds": 71.4
   },
   "failures": [
     {
@@ -829,30 +829,6 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient: inductor current divergence over iterations in step 1",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient: PNP BJT internal node agreement in step 1",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "[suite-setup] NPN-CE harness branch value test",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dc_op_match",
           "line": 3146,
           "column": 13
@@ -872,6 +848,30 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dump+compare step 0 attempt structure",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient: inductor current divergence over iterations in step 1",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient: PNP BJT internal node agreement in step 1",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "[suite-setup] NPN-CE harness branch value test",
           "line": 3146,
           "column": 13
         }
@@ -2756,7 +2756,7 @@
       ]
     },
     {
-      "message": "expected -1.509964256899645 not to be -1.509964256899645 // Object.is equality",
+      "message": "expected 2.2695324681205107 not to be 2.2695324681205107 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -3452,6 +3452,30 @@
       ]
     },
     {
+      "message": "step=0 iter=3 state0[M1][VBD]: ours=-4.999999949899999 ngspice=-4.9999999499 absDelta=8.881784197001252e-16: expected 8.881784197001252e-16 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
+          "test": "transient_match",
+          "line": 258,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "message": "step=0 iter=0 voltages[1]: ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 2.0679515313825692e-25 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
+          "test": "transient_oscillation_match",
+          "line": 235,
+          "column": 90
+        }
+      ]
+    },
+    {
       "message": "ENOENT: no such file or directory, open 'C:\\local_working_projects\\digital_in_browser\\tmp-hang-circuits\\rc-step.dts'",
       "count": 4,
       "locations": [
@@ -3550,30 +3574,6 @@
           "test": "PJFET: J prefix, PMF model type",
           "line": 383,
           "column": 15
-        }
-      ]
-    },
-    {
-      "message": "step=0 iter=3 state0[M1][VBD]: ours=-4.999999949899999 ngspice=-4.9999999499 absDelta=8.881784197001252e-16: expected 8.881784197001252e-16 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "transient_match",
-          "line": 258,
-          "column": 5
-        }
-      ]
-    },
-    {
-      "message": "step=0 iter=0 voltages[1]: ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 2.0679515313825692e-25 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "transient_oscillation_match",
-          "line": 235,
-          "column": 90
         }
       ]
     },

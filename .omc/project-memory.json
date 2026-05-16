@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && bash \"C:/Users/cca79/.claude/plugins/cache/claude-orchestrator-marketplace/claude-orchestrator/0765e1418c18/scripts/mark-dead-implementer.sh\" && echo \"---\" && bash \"C:/Users/cca79/.claude/plugins/cache/claude-orchestrator-marketplace/claude-orchestrator/0765e1418c18/scripts/i-fixed-it.sh\" \"Fix-implementer reverted the 4 compile-pipeline files (byte-identical to HEAD~1), rewrote digital-input-thresholder.ts removing ThresholderCircuitElement/extra-imports/top-level-factory, and deleted the deferred test file. Coordinator verified: empty diff vs HEAD~1 on the 4 files, no hack remnants in thresholder.ts, tsc exit 0. Agent died before running complete-implementer.sh.\" && echo \"---\" && cat spec/.hybrid-state.json | python -c \"import sys,json; b=json.load(sys.stdin)['batches'][0]; print('spawned',b['spawned'],'completed',b['completed'],'v_pass',b['verifications_passed'],'v_fail',b['verifications_failed'],'dead',b['dead_implementers'])\"",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run \"digital-input-thresholder\" --reporter=verbose 2>&1",
+    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npm run build 2>&1 | tail -20",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && node -e \"const f = JSON.parse(require('fs').readFileSync('.vitest-failures.json','utf8')); console.log('summary:', JSON.stringify(f.summary)); const failures = f.failures; console.log('failure count:', failures.length); const thresh = failures.filter(t => JSON.stringify(t).includes('hresholder')); console.log('thresholder failures:', thresh.length); if(thresh.length) console.log(thresh);\" 2>&1",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
