@@ -17,11 +17,8 @@ import { PoolBackedAnalogElement } from "../element.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
-import { AbstractCircuitElement } from "../../../core/element.js";
-import type { RenderContext, Rect } from "../../../core/renderer-interface.js";
-import type { PinVoltageAccess } from "../../../core/pin-voltage-access.js";
 import type { PropertyBag } from "../../../core/properties.js";
-import { PinDirection, type PinDeclaration, type Pin, type Rotation } from "../../../core/pin.js";
+import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 import { allocNortonStamp, stampNortonValue } from "../stamp-helpers.js";
 
 const SCHEMA: StateSchema = defineStateSchema("DigitalInputThresholder", []);
@@ -34,33 +31,15 @@ export const THRESHOLDER_PIN_LAYOUT: PinDeclaration[] = [
   },
   {
     direction: PinDirection.INPUT, label: "gnd",
-    defaultBitWidth: 1, position: { x: 0, y: 2 },
+    defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   },
   {
     direction: PinDirection.OUTPUT, label: "result",
-    defaultBitWidth: 1, position: { x: 4, y: 1 },
+    defaultBitWidth: 1, position: { x: 0, y: 0 },
     isNegatable: false, isClockCapable: false, kind: "signal",
   },
 ];
-
-class ThresholderCircuitElement extends AbstractCircuitElement {
-  constructor(instanceId: string, position: { x: number; y: number }, rotation: Rotation, mirror: boolean, props: PropertyBag) {
-    super("DigitalInputThresholder", instanceId, position, rotation, mirror, props);
-  }
-
-  getPins(): readonly Pin[] {
-    return this.derivePins(THRESHOLDER_PIN_LAYOUT, []);
-  }
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 1, height: 1 };
-  }
-
-  draw(_ctx: RenderContext, _signals?: PinVoltageAccess): void {
-    // Internal-only element — not rendered in the editor.
-  }
-}
 
 export class DigitalInputThresholderElement extends PoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BEHAVIORAL;
@@ -106,21 +85,11 @@ export class DigitalInputThresholderElement extends PoolBackedAnalogElement {
   }
 }
 
-export const DigitalInputThresholderDefinition: ComponentDefinition & {
-  factory: (props: PropertyBag) => ThresholderCircuitElement;
-} = {
+export const DigitalInputThresholderDefinition: ComponentDefinition = {
   name: "DigitalInputThresholder",
   typeId: -1,
   internalOnly: true,
   pinLayout: THRESHOLDER_PIN_LAYOUT,
-  factory: (props: PropertyBag) =>
-    new ThresholderCircuitElement(
-      crypto.randomUUID(),
-      { x: 0, y: 0 },
-      0 as Rotation,
-      false,
-      props,
-    ),
   modelRegistry: {
     default: {
       kind: "inline",

@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npm run build 2>&1 | tail -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && node -e \"const f = require('./.vitest-failures.json'); console.log(JSON.stringify(f.failures, null, 2).slice(0, 4000));\"",
+    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && bash \"C:/Users/cca79/.claude/plugins/cache/claude-orchestrator-marketplace/claude-orchestrator/0765e1418c18/scripts/mark-dead-implementer.sh\" && echo \"---\" && bash \"C:/Users/cca79/.claude/plugins/cache/claude-orchestrator-marketplace/claude-orchestrator/0765e1418c18/scripts/i-fixed-it.sh\" \"Fix-implementer reverted the 4 compile-pipeline files (byte-identical to HEAD~1), rewrote digital-input-thresholder.ts removing ThresholderCircuitElement/extra-imports/top-level-factory, and deleted the deferred test file. Coordinator verified: empty diff vs HEAD~1 on the 4 files, no hack remnants in thresholder.ts, tsc exit 0. Agent died before running complete-implementer.sh.\" && echo \"---\" && cat spec/.hybrid-state.json | python -c \"import sys,json; b=json.load(sys.stdin)['batches'][0]; print('spawned',b['spawned'],'completed',b['completed'],'v_pass',b['verifications_passed'],'v_fail',b['verifications_failed'],'dead',b['dead_implementers'])\"",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run \"digital-input-thresholder\" --reporter=verbose 2>&1",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -296,20 +296,26 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 122,
-      "lastAccessed": 1778931694176,
+      "accessCount": 127,
+      "lastAccessed": 1778932766331,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 47,
-      "lastAccessed": 1778931714191,
+      "accessCount": 53,
+      "lastAccessed": 1778933889435,
       "type": "file"
     },
     {
       "path": "src\\headless\\auto-layout.ts",
       "accessCount": 41,
       "lastAccessed": 1778641590542,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\partition.ts",
+      "accessCount": 33,
+      "lastAccessed": 1778933882809,
       "type": "file"
     },
     {
@@ -322,12 +328,6 @@
       "path": "src\\components\\wiring\\splitter.ts",
       "accessCount": 31,
       "lastAccessed": 1778822643173,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\partition.ts",
-      "accessCount": 29,
-      "lastAccessed": 1778931513085,
       "type": "file"
     },
     {
