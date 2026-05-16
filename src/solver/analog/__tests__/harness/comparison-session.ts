@@ -228,7 +228,7 @@ function getDllPath(opts: ComparisonSessionOptions): string {
   return (
     opts.dllPath ??
     process.env.NGSPICE_DLL_PATH ??
-    resolve(ROOT, "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll")
+    resolve(ROOT, "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll")
   );
 }
 
@@ -847,15 +847,35 @@ export class ComparisonSession {
         });
         prevSimTime = nowTime;
       } else {
-        // Engine did not advance (ERROR state or stalled). Avoid spinning
-        // forever in the outer for-loop.
+        // Engine did not advance (ERROR state or stalled). Commit whatever
+        // the capture hook accumulated during this step() — a failed DC-OP
+        // runs a full NR attempt ladder (direct → gmin → src stepping), and
+        // those attempts sit in the pending buffer until endStep() closes
+        // them. The catch-branch above already does this; without the same
+        // call here the buffer is silently dropped and the comparison shows
+        // `ours: []` even though the engine ran (and failed) identically to
+        // ngspice. Break afterwards to avoid spinning the outer loop.
+        sc.endStep({
+          stepEndTime: this._engine.simTime ?? prevSimTime,
+          integrationCoefficients: this._captureIntegCoeff(),
+          analysisPhase: this._curAnalysisPhase(),
+          acceptedAttemptIndex: -1,
+          order: this._engine.integrationOrder,
+          delta: this._engine.lastDt,
+        });
         this.errors.push(
           `Our engine did not advance at step ${s} (simTime=${this._engine.simTime ?? "?"}, lastDt=${acceptedDt}).`,
         );
         break;
       }
 
-      if (nowTime >= tStop) break;
+      // ngspice dctran.c (v41) transient-loop termination: the run ends when
+      // `CKTfinalTime - CKTtime < CKTminBreak`. v26 used the wider
+      // `fabs(time - finalTime) < minBreak || AlmostEqualUlps(time, finalTime, 100)`.
+      // The breakpoint clamp lands the final step exactly on tStop, so in the
+      // common case both forms fire on the same step; the v41 form additionally
+      // stops a step that lands just short of tStop (within minBreak).
+      if (tStop - nowTime < this._engine.minBreak) break;
     }
 
     this._refreshOurTopologyAfterSetup();
@@ -3293,7 +3313,7 @@ export class ComparisonSession {
     const dt = deltaOld[0] > 0 ? deltaOld[0] : this._engine.currentDt;
     const agBuf = new Float64Array(7);
     const scratchBuf = new Float64Array(49);
-    computeNIcomCof(dt, deltaOld as number[], order, method, agBuf, scratchBuf);
+    computeNIcomCof(dt, deltaOld as number[], order, method, this._engine.integrationXmu, agBuf, scratchBuf);
     const ag0 = agBuf[0];
     const ag1 = agBuf[1];
     return {

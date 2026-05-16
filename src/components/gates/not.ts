@@ -232,7 +232,6 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 //
 // loaded: when true, parent emits DigitalInputPinLoaded / DigitalOutputPinLoaded
 //   sub-elements. When false, emits the Unloaded variants.
-// vIH/vIL: per-input CMOS thresholds, consumed by the BehavioralNotDriver leaf.
 // rOut/cOut/vOH/vOL: per-output drive params, consumed by the outPin sibling.
 
 export const { paramDefs: NOT_BEHAVIORAL_PARAM_DEFS, defaults: NOT_BEHAVIORAL_DEFAULTS } = defineModelParams({
@@ -277,8 +276,6 @@ export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     modelRef: "default",
     subElementName: "drv",
     params: {
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push([0, ctrlOutNet, gndIdx]);
@@ -390,3 +387,4 @@ export const NotDefinition: StandaloneComponentDefinition = {
   },
   defaultModel: "digital",
 };
+

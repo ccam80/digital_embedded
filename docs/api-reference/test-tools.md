@@ -153,7 +153,7 @@ import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comp
 import path from "node:path";
 
 const DTS = path.resolve("src/components/semiconductors/__tests__/fixtures/bjt-canon-dcop.dts");
-const DLL = process.env.NGSPICE_DLL_PATH ?? "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll";
+const DLL = process.env.NGSPICE_DLL_PATH ?? "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll";
 
 let session: ComparisonSession;
 beforeAll(async () => {
@@ -602,7 +602,7 @@ All query methods (`sessionMap`, `getStep`, `getAttempt`, `getStepEnd`, `getIter
 new ComparisonSession({
   dtsPath: string,                       // required (or supplied via createSelfCompare)
   cirPath?: string,                      // hand-written .cir; otherwise auto-generated from compiled circuit
-  dllPath?: string,                      // default: process.env.NGSPICE_DLL_PATH ?? "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll"
+  dllPath?: string,                      // default: process.env.NGSPICE_DLL_PATH ?? "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll"
   maxOurSteps?: number,                  // default 5000
   selfCompare?: boolean,                 // true → DLL not loaded, ngspice side is a clone
 });

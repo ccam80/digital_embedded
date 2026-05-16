@@ -134,9 +134,7 @@ export class BehavioralAndDriverElement extends PoolBackedAnalogElement {
   }
 
   setParam(_key: string, _value: number): void {
-    // No hot-loadable params; inputCount is structural (allocates _inputNodes)
-    // and is not setParam-able. vIH/vIL/vOH/vOL/rOut were removed in the
-    // {0, 1} normalization pass — drivers are ideal and rail-agnostic.
+    // No hot-loadable params.
   }
 }
 
@@ -162,3 +160,4 @@ export const BehavioralAndDriverDefinition: ComponentDefinition = {
   },
   defaultModel: "default",
 };
+

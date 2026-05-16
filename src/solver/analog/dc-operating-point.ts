@@ -46,6 +46,7 @@ export type DcOpNRPhase =
   | "dcopInitFloat"
   | "dcopDirect"
   | "dcopGminDynamic"
+  | "dcopGminNew"
   | "dcopGminSpice3"
   | "dcopSrcSweep";
 
@@ -377,8 +378,22 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   // -------------------------------------------------------------------------
   const numGminSteps = params.numGminSteps ?? 1;
   let gminResult: StepResult;
+  let gminViaNew = false;
   if (numGminSteps <= 1) {
     gminResult = dynamicGmin(ctx, onPhaseBegin, onPhaseEnd);
+    // ngspice cktop.c (v41): when numGminSteps === 1 and the `dyngmin` option
+    // is not set, a failed dynamic_gmin falls through to a second `new_gmin`
+    // pass that ramps the device gmin (CKTgmin) itself. v26 ran dynamic_gmin
+    // alone.
+    if (!gminResult.converged && !params.dyngmin) {
+      const newGminResult = newGmin(ctx, onPhaseBegin, onPhaseEnd);
+      gminResult = {
+        converged: newGminResult.converged,
+        iterations: gminResult.iterations + newGminResult.iterations,
+        voltages: ctx.rhs,
+      };
+      gminViaNew = newGminResult.converged;
+    }
   } else {
     gminResult = spice3Gmin(ctx, onPhaseBegin, onPhaseEnd);
   }
@@ -390,11 +405,17 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     if (!isTranOp(ctx.cktMode)) {
       dcopFinalize(ctx);
     }
-    const gminMethod = numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin";
-    const gminLabel = numGminSteps <= 1 ? "dynamic Gmin stepping" : "spice3 Gmin stepping";
-    const gminExplanation = numGminSteps <= 1
-      ? "Direct Newton-Raphson failed. Dynamic Gmin stepping succeeded: adaptive diagonal conductance was stepped from 1e-2 S down to params.gmin."
-      : "Direct Newton-Raphson failed. spice3 Gmin stepping succeeded: diagonal conductance was stepped from gmin*1e10 down by factor 10 over 11 decades.";
+    const gminMethod = gminViaNew
+      ? "new-gmin"
+      : (numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin");
+    const gminLabel = gminViaNew
+      ? "true Gmin stepping"
+      : (numGminSteps <= 1 ? "dynamic Gmin stepping" : "spice3 Gmin stepping");
+    const gminExplanation = gminViaNew
+      ? "Direct Newton-Raphson and dynamic Gmin stepping both failed. True Gmin stepping succeeded: the device gmin was stepped from 1e-2 S down to params.gmin."
+      : (numGminSteps <= 1
+        ? "Direct Newton-Raphson failed. Dynamic Gmin stepping succeeded: adaptive diagonal conductance was stepped from 1e-2 S down to params.gmin."
+        : "Direct Newton-Raphson failed. spice3 Gmin stepping succeeded: diagonal conductance was stepped from gmin*1e10 down by factor 10 over 11 decades.");
     diagnostics.emit(
       makeDiagnostic(
         "dc-op-gmin",
@@ -523,7 +544,10 @@ function dynamicGmin(
 
   let factor = params.gminFactor ?? 10;
   let oldGmin = 1e-2;
-  let diagGmin = oldGmin;
+  // cite: cktop.c:164 — `ckt->CKTdiagGmin = OldGmin / factor;` (first trial
+  // at OldGmin/factor, NOT OldGmin). Prior `let diagGmin = oldGmin;` started
+  // the dynamic-gmin ramp one decade higher than ngspice.
+  let diagGmin = oldGmin / factor;
   const gtarget = Math.max(params.gmin, params.gshunt ?? 0);
   let totalIter = 0;
 
@@ -549,7 +573,11 @@ function dynamicGmin(
       if (result.iterations <= iterLo) {
         factor = Math.min(factor * Math.sqrt(factor), params.gminFactor ?? 10);
       } else if (result.iterations > iterHi) {
-        factor = Math.sqrt(factor);
+        // ngspice cktop.c (v41): `factor = MAX(sqrt(factor), 1.00005);`
+        // v26 used a bare `factor = sqrt(factor)`; v41 floors it at 1.00005
+        // so a high-iteration-count step can never collapse the gmin ramp
+        // factor to <=1 (which would stall the descent toward gtarget).
+        factor = Math.max(Math.sqrt(factor), 1.00005);
       }
 
       oldGmin = diagGmin;
@@ -563,7 +591,14 @@ function dynamicGmin(
     } else {
       onPhaseEnd?.("nrFailedRetry", false);
       if (factor < 1.00005) {
-        return { converged: false, iterations: totalIter, voltages: ctx.rhs };
+        // ngspice cktop.c dynamic_gmin: `break; /* failed */`. The loop is
+        // abandoned but the post-loop final NIiter(iterlim) solve still runs,
+        // and ITS result is what dynamic_gmin returns. v26 and v41 are
+        // identical here. A bare early return skipped that final solve, so a
+        // failed gmin ramp could never recover via the iterlim solve and the
+        // `if (converged != 0) new_gmin(...)` gate in CKTop saw the wrong
+        // `converged` value.
+        break;
       }
       factor = Math.sqrt(Math.sqrt(factor));
       diagGmin = oldGmin / factor;
@@ -572,10 +607,140 @@ function dynamicGmin(
     }
   }
 
-  // cktop.c:253- final clean solve, no rhsOld touch (carries forward from
-  // the last successful NIiter exit inside the while loop).
+  // ngspice cktop.c dynamic_gmin: post-loop `converged = NIiter(ckt, iterlim);`
+  // runs with CKTdiagGmin left at the loop's final value- gtarget after a
+  // successful ramp, or the just-failed step's diagGmin after a failed one.
+  // `diagGmin` holds exactly that value at both break points: the success
+  // break tests `diagGmin <= gtarget`, and the failure break exits the else
+  // branch before it rewrites diagGmin. Previously this passed `gshunt`, which
+  // diverged from ngspice (v26 and v41 alike). rhsOld is not touched- it
+  // carries forward from the last NIiter exit inside the while loop.
   onPhaseBegin?.("dcopGminDynamic", 0);
-  const cleanResult = runNR(ctx, params.maxIterations, params.gshunt ?? 0, null);
+  const cleanResult = runNR(ctx, params.maxIterations, diagGmin, null);
+  totalIter += cleanResult.iterations;
+  onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
+
+  return {
+    converged: cleanResult.converged,
+    iterations: totalIter,
+    voltages: ctx.rhs,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// newGmin- cktop.c (v41) new_gmin
+// ---------------------------------------------------------------------------
+
+/**
+ * "True" gmin stepping (ngspice cktop.c v41 `new_gmin`).
+ *
+ * Runs after `dynamicGmin` fails when numGminSteps === 1 and the `dyngmin`
+ * option is not set (cktop.c v41 CKTop). Structurally identical to
+ * `dynamicGmin`, with one difference: it ramps the *device* gmin (ngspice
+ * CKTgmin, our `ctx.loadCtx.cktGmin`) rather than the MNA diagonal conductance
+ * (CKTdiagGmin, our `ctx.diagonalGmin`). Every device's load() reads `cktGmin`
+ * and adds it across its own junctions- ngspice calls this "the real gmin
+ * found in every device model".
+ *
+ * `ctx.diagonalGmin` is left untouched throughout: ngspice new_gmin never
+ * writes CKTdiagGmin (the `/*ckt->CKTdiagGmin = * /` assignments are commented
+ * out in the ngspice source). Every NR sub-solve runs with whatever CKTdiagGmin
+ * the preceding `dynamicGmin` left in place, so `inheritedDiagGmin` is pinned
+ * once at entry and passed unchanged to every runNR call.
+ *
+ * Variable mapping (ngspice -> ours):
+ *   CKTgmin       -> ctx.loadCtx.cktGmin   (ramped here)
+ *   CKTdiagGmin   -> ctx.diagonalGmin      (inherited, not modified)
+ *   CKTgminFactor -> params.gminFactor
+ *   startgmin     -> startGmin
+ *   gtarget       -> gtarget = MAX(startgmin, CKTgshunt)
+ *
+ * Like dynamic_gmin, new_gmin zeroes CKTrhsOld and CKTstate0 ONCE at entry and
+ * save/restores them on backtrack. Both loop-exit paths (`cktGmin <= gtarget`
+ * success, `factor < 1.00005` failure) fall through to the device-gmin restore
+ * and the final clean NIiter solve.
+ */
+function newGmin(
+  ctx: CKTCircuitContext,
+  onPhaseBegin?: PhaseBeginFn,
+  onPhaseEnd?: PhaseEndFn,
+): StepResult {
+  const { statePool, params } = ctx;
+
+  // ngspice new_gmin- `for n: CKTrhsOld = 0; for i: CKTstate0 = 0;` at entry.
+  zeroRhsOldAndState(ctx, statePool);
+
+  ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // firstmode = MODEINITJCT
+
+  // CKTdiagGmin is inherited unchanged from the preceding dynamicGmin solve;
+  // ngspice new_gmin never writes it. Pin it so every runNR self-assigns.
+  const inheritedDiagGmin = ctx.diagonalGmin;
+
+  const savedVoltages = ctx.dcopSavedVoltages;
+  const savedState0 = ctx.dcopSavedState0;
+
+  // ngspice new_gmin: startgmin = CKTgmin; factor = CKTgminFactor;
+  //   OldGmin = 1e-2; CKTgmin = OldGmin / factor; gtarget = MAX(startgmin, gshunt)
+  const startGmin = ctx.loadCtx.cktGmin;
+  let factor = params.gminFactor ?? 10;
+  let oldGmin = 1e-2;
+  const gtarget = Math.max(startGmin, params.gshunt ?? 0);
+  let cktGmin = oldGmin / factor;
+  ctx.loadCtx.cktGmin = cktGmin;
+  let totalIter = 0;
+
+  while (true) {
+    onPhaseBegin?.("dcopGminNew", cktGmin);
+    const result = runNR(ctx, params.dcTrcvMaxIter, inheritedDiagGmin, null);
+    totalIter += result.iterations;
+
+    if (result.converged) {
+      onPhaseEnd?.("dcopSubSolveConverged", true);
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // continuemode = MODEINITFLOAT
+      if (cktGmin <= gtarget) {
+        break;          // ngspice new_gmin: "successfull"
+      }
+
+      saveSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
+
+      const iterLo = (params.dcTrcvMaxIter / 4) | 0;
+      const iterHi = ((3 * params.dcTrcvMaxIter / 4) | 0);
+
+      if (result.iterations <= iterLo) {
+        factor = Math.min(factor * Math.sqrt(factor), params.gminFactor ?? 10);
+      } else if (result.iterations > iterHi) {
+        // ngspice cktop.c (v41): `factor = MAX(sqrt(factor), 1.00005);`
+        factor = Math.max(Math.sqrt(factor), 1.00005);
+      }
+
+      oldGmin = cktGmin;
+
+      if (cktGmin < factor * gtarget) {
+        factor = cktGmin / gtarget;
+        cktGmin = gtarget;
+      } else {
+        cktGmin /= factor;
+      }
+      ctx.loadCtx.cktGmin = cktGmin;
+    } else {
+      onPhaseEnd?.("nrFailedRetry", false);
+      if (factor < 1.00005) {
+        break;          // ngspice new_gmin: "Last gmin step failed"
+      }
+      factor = Math.sqrt(Math.sqrt(factor));
+      cktGmin = oldGmin / factor;
+      ctx.loadCtx.cktGmin = cktGmin;
+      restoreSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
+    }
+  }
+
+  // ngspice new_gmin: `ckt->CKTgmin = MAX(startgmin, ckt->CKTgshunt);`
+  ctx.loadCtx.cktGmin = Math.max(startGmin, params.gshunt ?? 0);
+
+  // ngspice new_gmin: final `converged = NIiter(ckt, iterlim);`- CKTgmin
+  // restored, CKTdiagGmin still inherited.
+  onPhaseBegin?.("dcopGminNew", 0);
+  const cleanResult = runNR(ctx, params.maxIterations, inheritedDiagGmin, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
@@ -709,6 +874,11 @@ function gillespieSrc(
 ): StepResult {
   const { statePool, params } = ctx;
 
+  // ngspice cktop.c gillespie_src (v41): `double gminstart = ckt->CKTgmin;`
+  // captured at function entry, restored to CKTdiagGmin/CKTgmin at the
+  // converged exit (see end of this function).
+  const gminStart = ctx.loadCtx.cktGmin;
+
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:381 firstmode=MODEINITJCT
   scaleAllSources(ctx, 0);
 
@@ -809,6 +979,13 @@ function gillespieSrc(
     }
   }
 
+  // ngspice cktop.c gillespie_src (v41): `ckt->CKTdiagGmin = ckt->CKTgmin =
+  // gminstart;` — at the converged exit the diagonal gmin is restored to the
+  // device gmin. v26 left CKTdiagGmin at CKTgshunt (the value the inner gmin
+  // recovery loop parked it at), which then carried into the transient solve.
+  // CKTgmin is never mutated inside gillespie_src (the gmin-raise branch is
+  // commented out upstream), so gminStart still equals ctx.loadCtx.cktGmin.
+  ctx.diagonalGmin = gminStart;
   scaleAllSources(ctx, 1);
 
   return {

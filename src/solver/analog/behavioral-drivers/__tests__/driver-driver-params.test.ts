@@ -49,7 +49,7 @@ function driverDriverPinNodes(): ReadonlyMap<string, number> {
 
 describe("driver-driver-params — accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("BehavioralButtonLEDDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralButtonLEDDriverElement(buttonLedPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -57,7 +57,7 @@ describe("driver-driver-params — accepts rOut/vOH/vOL via setParam without thr
   });
 
   it("BehavioralDriverDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralDriverDriverElement(driverDriverPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -65,7 +65,7 @@ describe("driver-driver-params — accepts rOut/vOH/vOL via setParam without thr
   });
 
   it("BehavioralDriverInvDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralDriverInvDriverElement(driverDriverPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();

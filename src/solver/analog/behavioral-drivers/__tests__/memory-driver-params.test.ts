@@ -29,7 +29,7 @@ function pinNodesFromLabels(labels: readonly string[]): ReadonlyMap<string, numb
 
 describe("memory-driver-params — accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("BehavioralCounterDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, bitWidth: 4, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ bitWidth: 4, rOut: 100, vOH: 5, vOL: 0 });
     const pinNodes = pinNodesFromLabels(["en", "C", "clr", "gnd"]);
     const el = new BehavioralCounterDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -38,7 +38,7 @@ describe("memory-driver-params — accepts rOut/vOH/vOL via setParam without thr
   });
 
   it("BehavioralCounterPresetDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, bitWidth: 4, preset: 0, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ bitWidth: 4, preset: 0, rOut: 100, vOH: 5, vOL: 0 });
     const pinNodes = pinNodesFromLabels(["en", "C", "clr", "ld", "gnd"]);
     const el = new BehavioralCounterPresetDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
@@ -47,7 +47,7 @@ describe("memory-driver-params — accepts rOut/vOH/vOL via setParam without thr
   });
 
   it("BehavioralRegisterDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, bitWidth: 4, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ bitWidth: 4, rOut: 100, vOH: 5, vOL: 0 });
     const pinNodes = pinNodesFromLabels(["C", "clr", "ld", "d_0", "d_1", "d_2", "d_3", "gnd"]);
     const el = new BehavioralRegisterDriverElement(pinNodes, props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();

@@ -1375,12 +1375,21 @@ export class SparseSolver {
 
     done: {
       if (!this._needsReorder) {
-        // ngspice spfactor.c:216-228- reuse loop.
+        // ngspice spfactor.c:225-242- reuse loop.
         for (step = 1; step <= size; step++) {
           const pPivot = this._diag[step];
-          // ngspice spfactor.c:218.
+          // ngspice spfactor.c:230-234 (v41 addition)- if the diagonal pivot
+          // for this step is absent, the no-reorder fast path cannot proceed;
+          // flag a reorder and fall through to the reorder loop below.
+          // (`Matrix->Diag[Step] == NULL` in ngspice; `_diag[step] < 0` here,
+          // since `_diag` carries the -1 "no diagonal element" marker.)
+          if (pPivot < 0) {
+            reorderingRequired = true;
+            break;
+          }
+          // ngspice spfactor.c:235.
           const largestInCol = this._findLargestInCol(this._elNextInCol[pPivot]);
-          // ngspice spfactor.c:219.
+          // ngspice spfactor.c:236.
           if (largestInCol * relThreshold < Math.abs(this._elVal[pPivot])) {
             // ngspice spfactor.c:223- real branch (Complex out of scope).
             this._realRowColElimination(pPivot);

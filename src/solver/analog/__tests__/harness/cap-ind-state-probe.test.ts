@@ -16,7 +16,7 @@ import { ComparisonSession } from "./comparison-session.js";
 
 const DLL_PATH = resolve(
   process.cwd(),
-  "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll",
+  "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll",
 );
 let _dllAvailable: boolean | null = null;
 function dllAvailable(): boolean {

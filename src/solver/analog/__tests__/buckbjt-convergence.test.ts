@@ -14,7 +14,7 @@ import type { NRPhase } from './harness/types.js';
 // run on a machine without the DLL.
 const DLL_PATH = resolve(
   process.cwd(),
-  'ref/ngspice/visualc-shared/x64/Release/bin/spice.dll',
+  'ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll',
 );
 try { accessSync(DLL_PATH); } catch { throw new Error('ngspice DLL required for buckbjt convergence test'); }
 const describeIfDll = describe;

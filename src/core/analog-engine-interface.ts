@@ -36,6 +36,14 @@ export type { Diagnostic, DiagnosticCode };
 export interface SimulationParams {
   /** Maximum allowed timestep in seconds. Default: 10e-6 */
   maxTimeStep?: number;
+  /**
+   * ngspice `set nostepsizelimit` option (traninit.c v41). Only consulted when
+   * `maxTimeStep` is auto-derived (user omitted it). When false (default) the
+   * derived max step is `MIN(outputStep, (tStop - initTime) / 50)`; when true
+   * the `outputStep` branch is suppressed and the max step is always
+   * `(tStop - initTime) / 50`. Default: false.
+   */
+  nostepsizelimit?: boolean;
   /** Minimum allowed timestep in seconds. Default: 1e-15 */
   minTimeStep?: number;
   /** Initial timestep for the first transient step, in seconds. Default: 1e-9 */
@@ -86,6 +94,13 @@ export interface SimulationParams {
   gshunt?: number;
   /** Number of gmin stepping levels. 1 = dynamic (default), >1 = spice3. ngspice: CKTnumGminSteps */
   numGminSteps?: number;
+  /**
+   * Restrict gmin stepping (numGminSteps === 1) to dynamic gmin only.
+   * ngspice `set dyngmin` option (cktop.c v41): when false (default), a failed
+   * `dynamic_gmin` falls through to a second `new_gmin` pass that ramps the
+   * device gmin itself; when true, only `dynamic_gmin` runs. Default: false.
+   */
+  dyngmin?: boolean;
   /** Number of source stepping levels. 0 or 1 = gillespie (default), >1 = spice3_src. ngspice: CKTnumSrcSteps */
   numSrcSteps?: number;
   /** Use Initial Conditions mode. ngspice: MODEUIC. Default false. */
@@ -155,7 +170,7 @@ export interface SimulationParams {
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
 export type ResolvedSimulationParams = SimulationParams &
-  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep" | "temp" | "nomTemp" | "copyNodesets">>;
+  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep" | "temp" | "nomTemp" | "copyNodesets" | "xmu">>;
 
 /**
  * Default values for all SimulationParams fields, matching circuits-engine-spec.md section 2.
@@ -209,10 +224,18 @@ export function resolveSimulationParams(params: SimulationParams): ResolvedSimul
   if (userMax != null && userMax !== 0) {
     maxTimeStep = userMax;
   } else if (params.tStop != null && params.tStop > 0 && params.outputStep != null) {
-    // CKTmaxStep = MIN(CKTstep, (CKTfinalTime - CKTinitTime) / 50)
+    // ngspice traninit.c (v41): CKTmaxStep = MIN(CKTstep, (CKTfinalTime -
+    // CKTinitTime) / 50), with the CKTstep branch suppressed when the
+    // `nostepsizelimit` option is set:
+    //   if (CKTstep < span && !cp_getvar("nostepsizelimit", ...))
+    //       CKTmaxStep = CKTstep;
+    //   else CKTmaxStep = span;
     const tStart = params.initTime ?? 0;
     const span = (params.tStop - tStart) / 50;
-    maxTimeStep = params.outputStep < span ? params.outputStep : span;
+    maxTimeStep =
+      (params.outputStep < span && !params.nostepsizelimit)
+        ? params.outputStep
+        : span;
   } else {
     // Streaming mode (no tStop)- ngspice cannot run .tran without a
     // finalTime; the static default is the closest analogue.
@@ -251,7 +274,7 @@ export interface DcOpResult {
   /** Whether the DC operating point converged. */
   converged: boolean;
   /** Which convergence method was used. */
-  method: "direct" | "dynamic-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src";
+  method: "direct" | "dynamic-gmin" | "new-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src";
   /** Total Newton-Raphson iterations performed across all attempts. */
   iterations: number;
   /** Node voltages at the operating point (indexed by MNA node ID). */

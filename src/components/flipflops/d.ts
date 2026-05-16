@@ -45,8 +45,6 @@ const COMP_WIDTH = 3;
 // Behavioural model parameter declarations
 // ---------------------------------------------------------------------------
 //
-// vIH/vIL: per-instance CMOS input thresholds, consumed by the driver leaf
-// for clock-edge detection and D-input level classification.
 // rOut/cOut/vOH/vOL: per-instance output-pin drive parameters, consumed by
 // the qPin / nqPin DigitalOutputPinLoaded sub-elements that own the actual
 // VSRC stamps on Q / ~Q.
@@ -86,8 +84,6 @@ export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
         modelRef: "default",
         subElementName: "drv",
         params: {
-          vIH: params.getModelParam<number>("vIH"),
-          vIL: params.getModelParam<number>("vIL"),
         },
       },
       {

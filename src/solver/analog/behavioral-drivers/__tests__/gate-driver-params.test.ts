@@ -51,7 +51,7 @@ function singleInputPinNodes(): ReadonlyMap<string, number> {
 
 describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("BehavioralAndDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ inputCount: 2, rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralAndDriverElement(multiInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -59,7 +59,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralOrDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ inputCount: 2, rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralOrDriverElement(multiInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -67,7 +67,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralNandDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ inputCount: 2, rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralNandDriverElement(multiInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -75,7 +75,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralNorDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ inputCount: 2, rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralNorDriverElement(multiInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -83,7 +83,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralXorDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ inputCount: 2, rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralXorDriverElement(multiInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -91,7 +91,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralXnorDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ inputCount: 2, vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ inputCount: 2, rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralXnorDriverElement(multiInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -99,7 +99,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralNotDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralNotDriverElement(singleInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();
@@ -107,7 +107,7 @@ describe("gate-driver-params — accepts rOut/vOH/vOL via setParam without throw
   });
 
   it("BehavioralBufDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({ vIH: 2.0, vIL: 0.8, rOut: 100, vOH: 5, vOL: 0 });
+    const props = makeProps({ rOut: 100, vOH: 5, vOL: 0 });
     const el = new BehavioralBufDriverElement(singleInputPinNodes(), props);
     expect(() => el.setParam("rOut", 200)).not.toThrow();
     expect(() => el.setParam("vOH", 3.3)).not.toThrow();

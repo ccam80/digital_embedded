@@ -142,8 +142,6 @@ export function buildBufNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     modelRef: "default",
     subElementName: "drv",
     params: {
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push([0, ctrlOutNet, gndIdx]);
@@ -256,3 +254,4 @@ export const BufDefinition: StandaloneComponentDefinition = {
   },
   defaultModel: "digital",
 };
+

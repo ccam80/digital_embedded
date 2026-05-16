@@ -14,8 +14,6 @@ import { BehavioralRSAsyncLatchDriverElement } from "../rs-async-latch-driver.js
 describe("BehavioralDFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
-    props.setModelParam("vIH", 2.0);
-    props.setModelParam("vIL", 0.8);
     props.setModelParam("rOut", 100);
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
@@ -32,8 +30,6 @@ describe("BehavioralDFlipflopDriver accepts rOut/vOH/vOL via setParam without th
 describe("BehavioralJKFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
-    props.setModelParam("vIH", 2.0);
-    props.setModelParam("vIL", 0.8);
     props.setModelParam("rOut", 100);
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
@@ -50,8 +46,6 @@ describe("BehavioralJKFlipflopDriver accepts rOut/vOH/vOL via setParam without t
 describe("BehavioralRSFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
-    props.setModelParam("vIH", 2.0);
-    props.setModelParam("vIL", 0.8);
     props.setModelParam("rOut", 100);
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
@@ -68,8 +62,6 @@ describe("BehavioralRSFlipflopDriver accepts rOut/vOH/vOL via setParam without t
 describe("BehavioralDAsyncFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
-    props.setModelParam("vIH", 2.0);
-    props.setModelParam("vIL", 0.8);
     props.setModelParam("rOut", 100);
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
@@ -86,8 +78,6 @@ describe("BehavioralDAsyncFlipflopDriver accepts rOut/vOH/vOL via setParam witho
 describe("BehavioralJKAsyncFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
-    props.setModelParam("vIH", 2.0);
-    props.setModelParam("vIL", 0.8);
     props.setModelParam("rOut", 100);
     props.setModelParam("vOH", 5);
     props.setModelParam("vOL", 0);
@@ -104,11 +94,9 @@ describe("BehavioralJKAsyncFlipflopDriver accepts rOut/vOH/vOL via setParam with
 describe("BehavioralRSAsyncLatchDriver accepts rOut/vOH/vOL via setParam without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
-    props.setModelParam("vIH", 2.0);
-    props.setModelParam("vIL", 0.8);
+    props.setModelParam("vOL", 0);
     props.setModelParam("rOut", 100);
     props.setModelParam("vOH", 5);
-    props.setModelParam("vOL", 0);
     const pinNodes = new Map<string, number>([
       ["S", 1], ["R", 2], ["ctrl_q", 3], ["ctrl_nq", 4], ["gnd", 0],
     ]);

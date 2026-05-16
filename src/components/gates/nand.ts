@@ -199,8 +199,6 @@ export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
     subElementName: "drv",
     params: {
       inputCount: N,
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push(driverPins);
@@ -293,3 +291,4 @@ export const NAndDefinition: StandaloneComponentDefinition = {
   },
   defaultModel: "digital",
 };
+

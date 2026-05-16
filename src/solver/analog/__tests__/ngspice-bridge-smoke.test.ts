@@ -7,7 +7,7 @@ import { NgspiceBridge } from './harness/ngspice-bridge.js';
 import { resolve } from 'path';
 
 const DLL_PATH = process.env.NGSPICE_DLL_PATH
-  ?? resolve(__dirname, '../../../../ref/ngspice/visualc-shared/x64/Release/bin/spice.dll');
+  ?? resolve(__dirname, '../../../../ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll');
 
 describe('ngspice bridge smoke test', () => {
   it('loads DLL and runs voltage divider DC OP', async () => {

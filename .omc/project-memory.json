@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778758515561,
+  "lastScanned": 1778902241572,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build",
-    "testCommand": "npm test",
+    "buildCommand": "cat >> \"C:/local_working_projects/digital_in_browser/spec/progress.md\" << 'EOF'\n\n## Task 0.1.1: Strip dead vIH/vIL plumbing from gate family\n- **Status**: complete\n- **Agent**: implementer\n- **Files created**: scratch/task-0.1.1-apply.mjs (apply script, not production code)\n- **Files modified**:\n  - src/components/gates/and.ts (deleted descriptor comment line 167 + vIH/vIL forwarding lines 220-221)\n  - src/components/gates/or.ts (deleted descriptor comment line 179 + vIH/vIL forwarding lines 233-234)\n  - src/components/gates/nand.ts (deleted vIH/vIL forwarding lines 202-203)\n  - src/components/gates/nor.ts (deleted vIH/vIL forwarding lines 224-225)\n  - src/components/gates/xor.ts (deleted descriptor comment line 179 + vIH/vIL forwarding lines 232-233)\n  - src/components/gates/xnor.ts (deleted vIH/vIL forwarding lines 235-236)\n  - src/components/gates/not.ts (deleted descriptor comment line 235 + vIH/vIL forwarding lines 280-281)\n  - src/components/gates/buf.ts (deleted vIH/vIL forwarding lines 145-146)\n  - src/solver/analog/behavioral-drivers/and-driver.ts (replaced 5-line setParam comment block with 3-line terse form, removing rail-agnostic narrative)\n- **Tests**: 114/114 passing\n  - gate-driver-params.test.ts: 8/8\n  - behavioral-combinational.test.ts: (included in gate-driver run)\n  - src/components/gates/__tests__: 106/106\n- **Acceptance criteria met**:\n  - Dry-run: all 25 validations matched spec exactly (no extras, no misses)\n  - Zero hits for vIH/vIL params.getModelParam in src/components/gates/\n  - Zero hits for \"consumed by the Behavioral\" in src/components/gates/\n  - Zero hits for \"rail-agnostic\" in src/solver/analog/behavioral-drivers/\n  - Mojibake smoke check: pre-existing â€\" (em-dash) sequence confirmed unchanged from HEAD; no new encoding issues introduced\n  - npm run build: tsc-clean (exit 0)\n  - All listed tests pass\nEOF\necho \"Progress recorded\"",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npm test -- src/solver/analog/behavioral-drivers/__tests__/driver-driver-params.test.ts 2>&1 | tail -20",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778758515516,
+      "lastAccessed": 1778902241466,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1778758515516,
+      "lastAccessed": 1778902241466,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1778758515517,
+      "lastAccessed": 1778902241466,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1778758515517,
+      "lastAccessed": 1778902241467,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778758515517,
+      "lastAccessed": 1778902241467,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1778758515541,
+      "lastAccessed": 1778902241553,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -143,28 +143,35 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1778758515542,
+      "lastAccessed": 1778902241553,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778758515542,
+      "lastAccessed": 1778902241553,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778758515542,
+      "lastAccessed": 1778902241553,
+      "keyFiles": []
+    },
+    "scratch": {
+      "path": "scratch",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778902241554,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 14,
-      "lastAccessed": 1778758515542,
+      "lastAccessed": 1778902241554,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -176,8 +183,8 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 19,
-      "lastAccessed": 1778758515543,
+      "fileCount": 16,
+      "lastAccessed": 1778902241554,
       "keyFiles": [
         "bridge-synthesis.md",
         "dig-format-excision.md",
@@ -190,7 +197,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778758515543,
+      "lastAccessed": 1778902241555,
       "keyFiles": [
         "main.ts"
       ]
@@ -199,7 +206,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1778758515544,
+      "lastAccessed": 1778902241555,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -209,7 +216,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778758515544,
+      "lastAccessed": 1778902241555,
       "keyFiles": [
         "index.json"
       ]
@@ -218,21 +225,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1778758515544,
+      "lastAccessed": 1778902241555,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778758515545,
+      "lastAccessed": 1778902241556,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1778758515546,
+      "lastAccessed": 1778902241557,
       "keyFiles": [
         "main-DuWHuFk1.js",
         "memory-editor-DEA45Iu0.js",
@@ -243,7 +250,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1778758515547,
+      "lastAccessed": 1778902241558,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -254,7 +261,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1778758515548,
+      "lastAccessed": 1778902241559,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -265,7 +272,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1778758515549,
+      "lastAccessed": 1778902241559,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -276,7 +283,7 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1778758515549,
+      "lastAccessed": 1778902241559,
       "keyFiles": []
     }
   },
@@ -289,8 +296,8 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 108,
-      "lastAccessed": 1778712638944,
+      "accessCount": 114,
+      "lastAccessed": 1778923899583,
       "type": "file"
     },
     {
@@ -312,15 +319,15 @@
       "type": "file"
     },
     {
-      "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-      "accessCount": 26,
-      "lastAccessed": 1778642685295,
+      "path": "src\\components\\wiring\\splitter.ts",
+      "accessCount": 31,
+      "lastAccessed": 1778822643173,
       "type": "file"
     },
     {
-      "path": "src\\components\\wiring\\splitter.ts",
-      "accessCount": 25,
-      "lastAccessed": 1778621949882,
+      "path": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+      "accessCount": 26,
+      "lastAccessed": 1778642685295,
       "type": "file"
     },
     {
@@ -331,8 +338,8 @@
     },
     {
       "path": "src\\solver\\digital\\digital-engine.ts",
-      "accessCount": 19,
-      "lastAccessed": 1778622711543,
+      "accessCount": 20,
+      "lastAccessed": 1778923877782,
       "type": "file"
     },
     {
@@ -349,8 +356,8 @@
     },
     {
       "path": "src/core/registry.ts",
-      "accessCount": 14,
-      "lastAccessed": 1778737942077,
+      "accessCount": 16,
+      "lastAccessed": 1778799967479,
       "type": "directory"
     },
     {
@@ -426,15 +433,21 @@
       "type": "directory"
     },
     {
+      "path": "src\\core\\pin.ts",
+      "accessCount": 5,
+      "lastAccessed": 1778822558941,
+      "type": "file"
+    },
+    {
       "path": "src\\headless\\netlist.ts",
       "accessCount": 4,
       "lastAccessed": 1778323801969,
       "type": "file"
     },
     {
-      "path": "src\\core\\pin.ts",
+      "path": "src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts",
       "accessCount": 4,
-      "lastAccessed": 1778493270794,
+      "lastAccessed": 1778800153409,
       "type": "file"
     },
     {
@@ -442,12 +455,6 @@
       "accessCount": 3,
       "lastAccessed": 1778495890743,
       "type": "directory"
-    },
-    {
-      "path": "src\\headless\\__tests__\\digital-pin-loading-mcp.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778590053519,
-      "type": "file"
     },
     {
       "path": "src\\editor\\__tests__\\property-panel-model.test.ts",
@@ -490,6 +497,12 @@
       "accessCount": 2,
       "lastAccessed": 1778724404487,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\digital\\compiled-circuit.ts",
+      "accessCount": 2,
+      "lastAccessed": 1778923889438,
+      "type": "file"
     },
     {
       "path": "src\\components\\wiring\\__tests__\\priority-encoder-partition-drop-probe.test.ts",
@@ -567,12 +580,6 @@
       "path": ".tmp-wcr-debug.test.ts",
       "accessCount": 1,
       "lastAccessed": 1778214818073,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\digital\\compiled-circuit.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778217205618,
       "type": "file"
     },
     {

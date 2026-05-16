@@ -122,7 +122,8 @@
       "Bash(git commit *)",
       "Bash(python3 -c ' *)",
       "Bash(echo \"---rc=$?---\")",
-      "Bash(rm -rf spec/.locks/tasks/* spec/.locks/files/*)"
+      "Bash(rm -rf spec/.locks/tasks/* spec/.locks/files/*)",
+      "Skill(codebase-memory-exploring)"
     ]
   },
   "enableAllProjectMcpServers": true,

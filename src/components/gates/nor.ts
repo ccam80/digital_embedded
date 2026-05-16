@@ -221,8 +221,6 @@ export function buildNorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     subElementName: "drv",
     params: {
       inputCount: N,
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push(driverPins);
@@ -317,3 +315,4 @@ export const NOrDefinition: StandaloneComponentDefinition = {
   },
   defaultModel: "digital",
 };
+

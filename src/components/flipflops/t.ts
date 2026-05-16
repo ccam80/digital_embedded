@@ -95,8 +95,6 @@ export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist
     modelRef: "default",
     subElementName: "drv",
     params: {
-      vIH:         params.getModelParam<number>("vIH"),
-      vIL:         params.getModelParam<number>("vIL"),
       forceToggle: withEnable ? 0 : 1,
     },
   };

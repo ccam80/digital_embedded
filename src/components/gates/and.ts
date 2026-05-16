@@ -164,7 +164,6 @@ const CMOS_AND2_NETLIST: MnaSubcircuitNetlist = {
 //   sub-elements (gate inputs draw current; gate output drives via VSRC + R+C).
 //   When false, parent emits the Unloaded variants (high-Z inputs, no VSRC
 //   stamp on output- pure observability).
-// vIH/vIL: per-input CMOS thresholds, consumed by the BehavioralAndDriver leaf.
 // rOut/cOut/vOH/vOL: per-output drive params, consumed by the outPin sibling.
 
 export const { paramDefs: AND_BEHAVIORAL_PARAM_DEFS, defaults: AND_BEHAVIORAL_DEFAULTS } = defineModelParams({
@@ -217,8 +216,6 @@ export function buildAndGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     subElementName: "drv",
     params: {
       inputCount: N,
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push(driverPins);
@@ -315,3 +312,4 @@ export const AndDefinition: StandaloneComponentDefinition = {
   },
   defaultModel: "digital",
 };
+

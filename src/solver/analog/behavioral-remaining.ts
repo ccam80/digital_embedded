@@ -20,8 +20,6 @@ import { defineModelParams } from "../../core/model-params.js";
 //
 // Shared shape across both tri-state variants:
 //   loaded:    1 = loaded pin sub-elements (Loaded variants), 0 = unloaded.
-//   vIH/vIL:   per-input CMOS thresholds, consumed by the driver leaf's
-//              threshold-classify-with-hold logic.
 //   rOut/cOut: outPin's RC load (rOut feeds the Norton conductance inside
 //              BehavioralOutputDriver; cOut is a separate Capacitor child).
 //   vOH/vOL:   driven analog rail voltages.
@@ -73,8 +71,6 @@ export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
       modelRef: "default",
       subElementName: "drv",
       params: {
-        vIH:  params.getModelParam<number>("vIH"),
-        vIL:  params.getModelParam<number>("vIL"),
         rOut: params.getModelParam<number>("rOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),
@@ -159,8 +155,6 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
       modelRef: "default",
       subElementName: "drv",
       params: {
-        vIH:  params.getModelParam<number>("vIH"),
-        vIL:  params.getModelParam<number>("vIL"),
         rOut: params.getModelParam<number>("rOut"),
         vOH:  params.getModelParam<number>("vOH"),
         vOL:  params.getModelParam<number>("vOL"),

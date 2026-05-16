@@ -796,14 +796,25 @@ function emitPrimitive(
   }
 
   if (typeId === "Clock") {
-    // Clock is a hardcoded square wave (see clock.ts AnalogClockElementImpl):
-    // Equivalent to a SPICE PULSE source with v1=0, v2=vdd, td=tr=tf=0,
-    // pw=halfP, per=period. Single "out" pin; neg side is ground.
-    const frequency = requireParam(props, def, modelKey, "Frequency", rawLabel);
-    const vdd       = requireParam(props, def, modelKey, "vdd",       rawLabel);
-    const period = 1 / frequency;
-    const halfP  = period / 2;
-    return [`${label} ${nodeAt(nodes, 0, rawLabel, "out")} 0 PULSE(0 ${vdd} 0 0 0 ${halfP} ${period})`];
+    // Clock is a digital signal first (its analog `behavioral` model exists for
+    // mixed-signal cross-domain tests, NOT for ngspice parity). Mapping it to
+    // PULSE(0 vdd 0 0 0 ...) cannot achieve bit-exact parity because ngspice's
+    // vsrcload.c:81-86 unconditionally substitutes CKTstep for any TR=0 / TF=0,
+    // producing a finite ramp window the digiTS clock does not model. There is
+    // no per-test workaround that doesn't either pollute the breakpoint
+    // sequence or force digiTS's clock to grow rise/fall semantics it
+    // shouldn't have. For analog square-wave parity fixtures, use
+    // AcVoltageSource with waveform="square" and explicit non-zero
+    // riseTime/fallTime - that path emits the user's TR/TF directly into the
+    // SPICE deck, sidestepping the substitution.
+    throw new Error(
+      `netlist-generator: Clock '${rawLabel}' has no SPICE-paired emit path. ` +
+      `Clock is a digital component; its analog model is not bit-exact with ` +
+      `ngspice's PULSE source (vsrcload.c:81-86 CKTstep substitution on TR=0). ` +
+      `For analog square-wave parity fixtures, use AcVoltageSource with ` +
+      `waveform="square" and explicit non-zero riseTime/fallTime (see ` +
+      `acvsource-canon-square-1khz-loaded.dts for a worked example).`
+    );
   }
 
   throw new Error(

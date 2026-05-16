@@ -769,6 +769,15 @@ export class TimestepController {
    * @param time - Breakpoint time in seconds
    */
   addBreakpoint(time: number): void {
+    // ngspice cktsetbk.c CKTsetBreak (v41 addition): a breakpoint requested at
+    // (within 3 ULPs of) the current circuit time is silently ignored -
+    // `if (AlmostEqualUlps(time, ckt->CKTtime, 3)) return (OK);`. v26 had no
+    // such guard and would insert a breakpoint coincident with "now", which the
+    // top-of-step pop loop then discards on the very next step. _lastAcceptedSimTime
+    // is the controller's CKTtime (the time of the last accepted step, which is
+    // the circuit time in effect when devices dispatch acceptStep -> addBreakpoint).
+    if (almostEqualUlps(time, this._lastAcceptedSimTime, 3)) return;
+
     let lo = 0, hi = this._breakpoints.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;

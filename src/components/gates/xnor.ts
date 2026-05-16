@@ -232,8 +232,6 @@ export function buildXnorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist 
     subElementName: "drv",
     params: {
       inputCount: N,
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push(driverPins);
@@ -329,3 +327,4 @@ export const XNOrDefinition: StandaloneComponentDefinition = {
   },
   defaultModel: "digital",
 };
+

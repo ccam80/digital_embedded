@@ -82,8 +82,6 @@ export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNe
         modelRef: "default",
         subElementName: "drv",
         params: {
-          vIH: params.getModelParam<number>("vIH"),
-          vIL: params.getModelParam<number>("vIL"),
         },
       },
       {

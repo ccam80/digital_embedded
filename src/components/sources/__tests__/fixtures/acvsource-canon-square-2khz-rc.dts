@@ -1,0 +1,75 @@
+{
+  "circuit": {
+    "description": "2kHz square AcVoltageSource (amplitude=1.65 + dcOffset=1.65 = 0V to 3.3V swing, riseTime/fallTime=1ns) driving an RC low-pass (R=10k, C=1uF, tau=10ms). Half-period 0.25ms is much shorter than tau so the cap voltage ramps continuously while the source toggles. Replaces clock-canon-2khz-rc.dts; AcVoltageSource is the ngspice-parity-clean analog square-wave primitive.",
+    "elements": [
+      {
+        "id": "v1-2khz-square",
+        "position": { "x": 0, "y": 2 },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1.65,
+            "dcOffset": 1.65,
+            "fallTime": 1e-9,
+            "frequency": 2000,
+            "phase": 0,
+            "riseTime": 1e-9
+          },
+          "amplitude": 1.65,
+          "dcOffset": 1.65,
+          "frequency": 2000,
+          "label": "V1",
+          "phase": 0,
+          "waveform": "square"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "r1-10k",
+        "position": { "x": 12, "y": 1 },
+        "properties": {
+          "_modelParams": { "resistance": 10000 },
+          "label": "R1",
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c1-1uf",
+        "position": { "x": 24, "y": 0 },
+        "properties": {
+          "_modelParams": { "capacitance": 1e-6 },
+          "capacitance": 1e-6,
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "gnd",
+        "position": { "x": 36, "y": 2 },
+        "properties": { "label": "gnd" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "acvsource-canon-square-2khz-rc",
+    "wires": [
+      { "points": [{ "x": 4, "y": 2 }, { "x": 8, "y": 2 }] },
+      { "points": [{ "x": 8, "y": 2 }, { "x": 8, "y": 1 }] },
+      { "points": [{ "x": 8, "y": 1 }, { "x": 12, "y": 1 }] },
+      { "points": [{ "x": 16, "y": 1 }, { "x": 20, "y": 1 }] },
+      { "points": [{ "x": 20, "y": 1 }, { "x": 20, "y": 0 }] },
+      { "points": [{ "x": 20, "y": 0 }, { "x": 24, "y": 0 }] },
+      { "points": [{ "x": 28, "y": 0 }, { "x": 32, "y": 0 }] },
+      { "points": [{ "x": 32, "y": 0 }, { "x": 32, "y": 2 }] },
+      { "points": [{ "x": 32, "y": 2 }, { "x": 36, "y": 2 }] },
+      { "points": [{ "x": 0, "y": 2 }, { "x": 0, "y": 5 }] },
+      { "points": [{ "x": 0, "y": 5 }, { "x": 36, "y": 5 }] },
+      { "points": [{ "x": 36, "y": 5 }, { "x": 36, "y": 2 }] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

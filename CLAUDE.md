@@ -77,6 +77,21 @@ When comparing digiTS against ngspice, the following words are banned as closing
 
 Rationale: these words, used as closing verdicts, raised the tolerance floor across the project and sheltered real numerical bugs. Banning them at the vocabulary level prevents the drift.
 
+### Code Comments- No Historical Narrative
+
+Source-code comments cite the current reference and explain how the code works **now**. They never narrate history.
+
+Banned in comments:
+- ngspice version numbers or eras- `v26`, `v41`, `v26-era`, "since v41", etc.
+- Migration / change narrative- "changed from X to Y", "previously hard-coded", "now reads", "used to", "ported from", file-header or tombstone migration notes.
+- Refactor jargon describing what a prior version looked like.
+
+Required instead:
+- A citation to the current `ref/ngspice` file and line (e.g. `nicomcof.c:43-44`), verified by hand against the tree- never invented.
+- An explanation of the mechanism: what the code computes and why, in present tense.
+
+Rationale: historical narrative rots the moment the migration is over, leaks refactor jargon, and tells the reader nothing about current behavior. A verified citation plus a mechanism explanation is durable. This applies to all source comments; the `spec/ngspice-v41-engine-diffs/` and `spec/ngspice-v41-model-diffs/` diff archives are exempt- they are version-framed by definition.
+
 ### ngspice Comparison Harness- First Tool for Numerical Issues
 
 For ANY numerical discrepancy, convergence failure, or model correctness question, the **first step** is to compare per-NR-iteration internal node/branch values against ngspice using the harness MCP tools. Do not theorize about code differences, do not write `.mjs` probe scripts that copy values out of tool responses- the harness tools answer "where did this first go wrong" directly.

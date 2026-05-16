@@ -13,7 +13,7 @@ import { NgspiceBridge } from './harness/ngspice-bridge.js';
 import type { MNAEngine } from '../analog-engine.js';
 
 const DLL_PATH = process.env.NGSPICE_DLL_PATH
-  ?? resolve(__dirname, '../../../../ref/ngspice/visualc-shared/x64/Release/bin/spice.dll');
+  ?? resolve(__dirname, '../../../../ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll');
 
 const BUCKBJT_CIR = readFileSync(
   resolve(__dirname, '../../../../e2e/spice-ref/buckbjt.cir'), 'utf-8',

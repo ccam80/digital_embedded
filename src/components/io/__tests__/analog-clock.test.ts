@@ -1,23 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import path from "node:path";
+import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import {
-  DLL_PATH,
-  describeIfDll,
-} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
-// ---------------------------------------------------------------------------
-// .dts paths (authored alongside this file via MCP circuit_build/save)
-// ---------------------------------------------------------------------------
-
-const DTS_1KHZ_LOADED = path.resolve(
-  "src/components/io/__tests__/fixtures/clock-canon-1khz-loaded.dts",
-);
-const DTS_2KHZ_RC = path.resolve(
-  "src/components/io/__tests__/fixtures/clock-canon-2khz-rc.dts",
-);
+// Clock paired-with-ngspice (T3) coverage moved to
+// src/components/sources/__tests__/ac-voltage-source.test.ts. The digital Clock
+// component cannot achieve bit-exact PULSE parity (ngspice vsrcload.c:81-86
+// substitutes CKTstep for TR=0); analog square-wave parity belongs to
+// AcVoltageSource where TR/TF are explicit non-zero deck values. The Clock
+// keeps its T1 init/DCOP/breakpoint/bridged-digital coverage below.
 
 // ---------------------------------------------------------------------------
 // Common builders (T1 programmatic)
@@ -112,86 +102,6 @@ describe("Clock DCOP analytical (T1)", () => {
     expect(outNode).toBeDefined();
     const vOut = fix.engine.getNodeVoltage(outNode!);
     expect(vOut).toBeCloseTo(5, 6);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Categories 2-numerical / 3 / 5 — 1kHz loaded paired vs ngspice (T3)
-// 1kHz Clock driving a 1kΩ resistor to ground. Square wave with sharp edges
-// at 0.5ms / 1.0ms / 1.5ms / ... Captures one full period plus margin.
-// ---------------------------------------------------------------------------
-
-describeIfDll("Clock paired vs ngspice — 1kHz loaded (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_1KHZ_LOADED, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  // Cat 3 — owns the runTransient and sweeps every accepted step end vs ngspice.
-  it("transient_step_end_paired_1khz_loaded", async () => {
-    await session.runTransient(0, 2.5e-3, 1e-5);
-    session.compareAllSteps();
-  });
-
-  // Cat 2-numerical — DCOP-equivalent (boot step) full-node comparison from
-  // the recorded session.
-  it("dcop_paired_1khz_loaded", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const cv of Object.values(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-    for (const cv of Object.values(stepEnd.branches)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  // Cat 5 — every iteration of every attempt of every step vs ngspice.
-  it("full_iteration_paired_1khz_loaded", () => {
-    session.compareAllAttempts();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Categories 2-numerical / 3 / 5 — 2kHz RC paired vs ngspice (T3)
-// 2kHz Clock driving an RC low-pass (R=10kΩ, C=1µF). RC time constant 10ms
-// — much slower than the half-period 0.25ms — so the cap voltage ramps
-// continuously while the clock toggles. Distinct regime from 1kHz-loaded:
-// breakpoints land mid-RC-charge and the integration order matters.
-// ---------------------------------------------------------------------------
-
-describeIfDll("Clock paired vs ngspice — 2kHz RC (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_2KHZ_RC, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_2khz_rc", async () => {
-    await session.runTransient(0, 2e-3, 1e-5);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_2khz_rc", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const cv of Object.values(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-    for (const cv of Object.values(stepEnd.branches)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_2khz_rc", () => {
-    session.compareAllAttempts();
   });
 });
 

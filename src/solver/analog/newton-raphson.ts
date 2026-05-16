@@ -569,6 +569,13 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
           largestChangeMag = delta;
           largestChangeNode = i;
         }
+        // ngspice niconv.c:43-46 - a NaN solution node is non-convergence.
+        // The tolerance test below cannot catch it on its own: `delta` is NaN
+        // and `NaN > tol` evaluates false, so a NaN node would otherwise pass
+        // the test and let the solve falsely report convergence.
+        if (Number.isNaN(ctx.rhs[i])) {
+          globalConverged = false;
+        }
         const absTol = i < nodeCount ? abstol : iabstol;
         const tol = reltol * Math.max(Math.abs(ctx.rhs[i]), Math.abs(ctx.rhsOld[i])) + absTol;
         if (delta > tol) {

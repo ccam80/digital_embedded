@@ -35,7 +35,6 @@ import { defineModelParams } from "../../core/model-params.js";
 // loaded: when true (>= 0.5), parent emits DigitalInputPinLoaded /
 //   DigitalOutputPinLoaded sub-elements. When false, parent emits the
 //   Unloaded variants.
-// vIH/vIL: per-input CMOS thresholds, consumed by BehavioralDecoderDriver leaf.
 // rOut/cOut/vOH/vOL: per-output drive params, consumed by each outPin sibling.
 // ---------------------------------------------------------------------------
 

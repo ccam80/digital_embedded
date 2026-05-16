@@ -153,7 +153,7 @@ export class DcOpResult {
   /** Whether the DC operating point converged. */
   converged: boolean = false;
   /** Which convergence method was used. */
-  method: "direct" | "dynamic-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src" = "direct";
+  method: "direct" | "dynamic-gmin" | "new-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src" = "direct";
   /** Total NR iterations across all convergence levels. */
   iterations: number = 0;
   /**

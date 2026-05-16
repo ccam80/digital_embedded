@@ -414,7 +414,7 @@ export class MNAEngine implements AnalogEngine {
       if (statePool) {
         statePool.dt = dt;
         computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
-          this._timestep.currentMethod, this._ctx!.ag, this._ctx!.gearMatScratch);
+          this._timestep.currentMethod, params.xmu, this._ctx!.ag, this._ctx!.gearMatScratch);
         // MODEINITTRAN is already live in ctx.cktMode from _seedFromDcop.
         // niiter's INITF dispatcher will clear it to MODEINITFLOAT after the
         // first cktLoad. No deferred write needed.
@@ -729,9 +729,27 @@ export class MNAEngine implements AnalogEngine {
     return this._timestep.currentDt;
   }
 
+  /**
+   * Minimum-break threshold (ngspice CKTminBreak). Used by transient drivers
+   * to detect that the run has reached the final time: ngspice dctran.c (v41)
+   * terminates when `CKTfinalTime - CKTtime < CKTminBreak`.
+   */
+  get minBreak(): number {
+    return this._timestep.minBreak;
+  }
+
   /** Active numerical integration method for the current step. */
   get integrationMethod(): IntegrationMethod {
     return this._timestep.currentMethod;
+  }
+
+  /**
+   * Trapezoidal weighting factor (ngspice ckt->CKTxmu) fed to NIcomCof for
+   * the order-2 trapezoidal coefficients. 0.5 is the standard trapezoidal
+   * rule; 0 degenerates to backward Euler.
+   */
+  get integrationXmu(): number {
+    return this._params.xmu;
   }
 
   /**

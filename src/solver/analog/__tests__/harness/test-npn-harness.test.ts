@@ -3,7 +3,7 @@ import { resolve } from "path";
 import { existsSync } from "fs";
 import { ComparisonSession } from "./comparison-session.js";
 
-const DLL_PATH = resolve(process.cwd(), "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll");
+const DLL_PATH = resolve(process.cwd(), "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll");
 const HAS_DLL = DLL_PATH !== "" && existsSync(DLL_PATH);
 const describeGate = HAS_DLL ? describe : describe.skip;
 

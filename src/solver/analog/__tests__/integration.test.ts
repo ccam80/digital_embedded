@@ -168,7 +168,7 @@ describe("gear_vandermonde_zero_alloc", () => {
 
     // GEAR order 2 equal steps: ag*dt = [1.5, -2, 0.5]
     scratch.fill(0);
-    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h], 2, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(3 / (2 * h));
     expect(ag[1]).toBe(-2 / h);
     expect(ag[2]).toBe(1 / (2 * h));
@@ -178,7 +178,7 @@ describe("gear_vandermonde_zero_alloc", () => {
 
     // GEAR order 3 equal steps: ag*dt = [11/6, -3, 3/2, -1/3]
     ag.fill(0); scratch.fill(0);
-    computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h], 3, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(11 / (6 * h));
     expect(ag[1]).toBe(-3 / h);
     expect(ag[2]).toBe(3 / (2 * h));
@@ -188,7 +188,7 @@ describe("gear_vandermonde_zero_alloc", () => {
     // Closed-form rationals differ from LU output by 1 ULP; we assert the LU
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
     ag.fill(0); scratch.fill(0);
-    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(2083333.333333333);
     expect(ag[1]).toBe(-4 / h);
     expect(ag[4]).toBe(1 / (4 * h));
@@ -197,7 +197,7 @@ describe("gear_vandermonde_zero_alloc", () => {
     // Closed-form rationals differ from LU output by 1 ULP; we assert the LU
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
     ag.fill(0); scratch.fill(0);
-    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(2283333.3333333335);
     expect(ag[5]).toBe(-200000);
 
@@ -205,7 +205,7 @@ describe("gear_vandermonde_zero_alloc", () => {
     // Closed-form rationals differ from LU output by 1 ULP; we assert the LU
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
     ag.fill(0); scratch.fill(0);
-    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(2450000.0000000005);
     expect(ag[6]).toBe(1 / (6 * h));
   });
@@ -227,7 +227,7 @@ describe("computeNIcomCof", () => {
   it("fills ag with zeros when dt <= 0", () => {
     const ag = new Float64Array(7);
     ag.fill(99); // pre-fill to confirm overwrite
-    computeNIcomCof(0, [0, 0], 1, "trapezoidal", ag, scratch);
+    computeNIcomCof(0, [0, 0], 1, "trapezoidal", 0.5, ag, scratch);
     for (let i = 0; i < ag.length; i++) {
       expect(ag[i]).toBe(0);
     }
@@ -235,21 +235,21 @@ describe("computeNIcomCof", () => {
 
   it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
+    computeNIcomCof(h, [h, h], 1, "trapezoidal", 0.5, ag, scratch);
     expect(ag[0]).toBe(1 / h);
     expect(ag[1]).toBe(-1 / h);
   });
 
   it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
+    computeNIcomCof(h, [h, h], 1, "trapezoidal", 0.5, ag, scratch);
     expect(ag[0]).toBe(1 / h);
     expect(ag[1]).toBe(-1 / h);
   });
 
   it("trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5)", () => {
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag, scratch);
+    computeNIcomCof(h, [h, h], 2, "trapezoidal", 0.5, ag, scratch);
     // xmu=0.5: ag[0] = 1/dt/(1-0.5) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
     expect(ag[0]).toBe(2 / h);
     expect(ag[1]).toBe(1);
@@ -257,7 +257,7 @@ describe("computeNIcomCof", () => {
 
   it("gear order 2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h], 2, "gear", 0.5, ag, scratch);
     // With h1=h: r1=1, r2=2, u22=2*(2-1)=2, rhs2=1/h
     // ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
     // ag0 = -(ag1+ag2) = 2/h - 1/(2h) = 3/(2h)
@@ -270,7 +270,7 @@ describe("computeNIcomCof", () => {
     // When deltaOld[1]=0, safeH1 defaults to dt, which gives equal-steps gear-2.
     // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt- so h1=dt → equal steps gear-2.
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, 0], 2, "gear", ag, scratch);
+    computeNIcomCof(h, [h, 0], 2, "gear", 0.5, ag, scratch);
     // h1=0 → safeH1=dt=h → same as equal steps
     expect(ag[0]).toBe(3 / (2 * h));
     expect(ag[1]).toBe(-2 / h);
@@ -281,7 +281,7 @@ describe("computeNIcomCof", () => {
     // nicomcof.c: Vandermonde with r[1]=1, r[2]=2 gives ag*dt = [1.5, -2, 0.5].
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
-    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h], 2, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(3 / (2 * h));
     expect(ag[1]).toBe(-2 / h);
     expect(ag[2]).toBe(1 / (2 * h));
@@ -293,7 +293,7 @@ describe("computeNIcomCof", () => {
     // ag*dt = [11/6, -3, 3/2, -1/3]
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
-    computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h], 3, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(11 / (6 * h));
     expect(ag[1]).toBe(-3 / h);
     expect(ag[2]).toBe(3 / (2 * h));
@@ -307,7 +307,7 @@ describe("computeNIcomCof", () => {
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
-    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(2083333.333333333);
     expect(ag[1]).toBe(-4 / h);
     expect(ag[2]).toBe(3 / h);
@@ -321,7 +321,7 @@ describe("computeNIcomCof", () => {
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
-    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(2283333.3333333335);
     expect(ag[1]).toBe(-5 / h);
     expect(ag[2]).toBe(5 / h);
@@ -336,7 +336,7 @@ describe("computeNIcomCof", () => {
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
-    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", 0.5, ag, scratch);
     expect(ag[0]).toBe(2450000.0000000005);
     expect(ag[1]).toBe(-6 / h);
     expect(ag[2]).toBe(15 / (2 * h));
@@ -352,7 +352,7 @@ describe("computeNIcomCof", () => {
     const scratch = new Float64Array(49);
     for (const order of [2, 3, 4, 5, 6]) {
       ag.fill(0);
-      computeNIcomCof(h, [h, h, h, h, h, h], order, "gear", ag, scratch);
+      computeNIcomCof(h, [h, h, h, h, h, h], order, "gear", 0.5, ag, scratch);
       let sum = 0;
       for (let k = 0; k <= order; k++) sum += ag[k];
       expect(Math.abs(sum)).toBeLessThan(1e-9);
@@ -377,7 +377,7 @@ describe("gear_vandermonde_regression", () => {
     // Verify scratch starts zeroed
     expect(scratch[0]).toBe(0);
 
-    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", 0.5, ag, scratch);
 
     // Assert ag[0..4] match the GEAR-4 LU output bit-exact.
     // Known GEAR-4 coefficients for equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4].
@@ -398,44 +398,35 @@ describe("gear_vandermonde_regression", () => {
 // ngspice trapezoidal order-2 rounding regression guard
 // ---------------------------------------------------------------------------
 //
-// Guard against the rounding-order regression. The ngspice trapezoidal
-// order-2 formula is `ag[0] = 1.0 / dt / (1.0 - xmu)` (two sequential
-// divisions), matching nicomcof.c operand order. The alternative formula
-// `1 / (dt * (1 - xmu))` performs a multiplication then a single division-
-// IEEE-754 gives different last-bit values for non-trivial xmu, so using
-// that form would be silently wrong.
-//
-// The current implementation hardcodes xmu=0.5, so we exercise computeNIcomCof
-// with that value and confirm the result matches `1.0 / dt / (1.0 - 0.5)`. We
-// ALSO compute both formula variants at xmu=1/3 (a value that exposes IEEE-754
-// rounding-order sensitivity) and assert they produce two distinct bit
-// patterns. If a future refactor reintroduces the pre-fix operand order, the
-// differential assertion fires.
+// computeNIcomCof must compute the trapezoidal order-2 coefficient with
+// ngspice's operand order (nicomcof.c:43): `ag[0] = 1.0 / dt / (1.0 - xmu)`,
+// two sequential divisions. The alternative `1 / (dt * (1 - xmu))` does a
+// multiplication then a single division; for a non-trivial xmu IEEE-754
+// yields a different last bit. The test drives xmu = 1/3 (which exposes the
+// rounding-order sensitivity) and asserts ag[0] matches the sequential-
+// division form bit-exact.
 
 describe("nicomcof rounding regression (C4.6)", () => {
   it("nicomcof_trap_order2_matches_ngspice_rounding", () => {
     const dt = 1.23456789e-7;
     const xmu = 1 / 3;
 
-    // ngspice operand order: 1.0 / dt / (1 - xmu)
+    // ngspice operand order (nicomcof.c:43): two sequential divisions.
     const postFix = 1.0 / dt / (1.0 - xmu);
-    // Pre-fix formula (multiplication then division)
+    // Alternative form: one multiplication then one division.
     const preFix  = 1 / (dt * (1 - xmu));
 
-    // Whole purpose of this guard: the two IEEE-754 values must differ for
-    // this (dt, xmu) input. If they match, the test inputs are too benign and
-    // the guard is useless.
+    // The two IEEE-754 values must differ for this (dt, xmu) input, otherwise
+    // the guard proves nothing.
     expect(postFix).not.toBe(preFix);
 
-    // Exercise computeNIcomCof- its hardcoded xmu is 0.5. The implementation
-    // must produce `1.0 / dt / (1.0 - 0.5)` bit-exactly (not the pre-fix
-    // operand order). For xmu=0.5 the two formulas happen to coincide, so
-    // the differential assertion above on xmu=1/3 carries the regression guard.
+    // computeNIcomCof must reproduce ngspice's operand order bit-exactly at
+    // the supplied xmu.
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
-    computeNIcomCof(dt, [dt, dt], 2, "trapezoidal", ag, scratch);
-    expect(ag[0]).toBe(1.0 / dt / (1.0 - 0.5));
-    // ag[1] for trap order 2 is xmu / (1 - xmu) = 0.5/0.5 = 1
-    expect(ag[1]).toBe(0.5 / (1 - 0.5));
+    computeNIcomCof(dt, [dt, dt], 2, "trapezoidal", xmu, ag, scratch);
+    expect(ag[0]).toBe(postFix);
+    // nicomcof.c:44 - ag[1] = xmu / (1 - xmu).
+    expect(ag[1]).toBe(xmu / (1 - xmu));
   });
 });

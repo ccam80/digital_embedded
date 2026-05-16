@@ -245,7 +245,6 @@ const COUNTER_PROPERTY_DEFS: PropertyDefinition[] = [
 // bitWidth: structural; per-instance N output bits. Defaults to 4 to match
 //   the user-facing default.
 // loaded: 1 = loaded input/output pin variants; 0 = unloaded (high-Z, no VSRC).
-// vIH/vIL: per-instance CMOS thresholds, consumed by BehavioralCounterDriver.
 // rOut/cOut/vOH/vOL: per-output drive params, consumed by each outBit / ovf
 //   DigitalOutputPinLoaded sibling.
 
@@ -311,7 +310,6 @@ export function buildCounterNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     subElementName: "drv",
     params: {
       bitWidth: N,
-      vIH: params.getModelParam<number>("vIH"),
     },
   });
   netlist.push(drvNets);

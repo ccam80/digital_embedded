@@ -308,6 +308,7 @@ export type NRPhase =
   | "dcopInitFloat"
   | "dcopDirect"
   | "dcopGminDynamic"
+  | "dcopGminNew"
   | "dcopGminSpice3"
   | "dcopSrcSweep"
   | "tranInit"

@@ -44,6 +44,18 @@ const DTS_TRIANGLE_RC = path.resolve(
 const DTS_SAWTOOTH_RC = path.resolve(
   "src/components/sources/__tests__/fixtures/acvsource-canon-sawtooth-rc.dts",
 );
+// 1kHz square 0V↔3.3V → 1kΩ load (no cap). Migrated from clock-canon-1khz-loaded.dts
+// because Clock-as-PULSE cannot achieve bit-exact ngspice parity (vsrcload.c:81-86
+// substitutes CKTstep for TR=0). AcVoltageSource carries explicit non-zero
+// riseTime/fallTime in the deck, so ngspice uses them directly.
+const DTS_SQUARE_1KHZ_LOADED = path.resolve(
+  "src/components/sources/__tests__/fixtures/acvsource-canon-square-1khz-loaded.dts",
+);
+// 2kHz square 0V↔3.3V → 10kΩ → 1µF RC low-pass (tau=10ms ≫ 0.25ms half-period).
+// Migrated from clock-canon-2khz-rc.dts.
+const DTS_SQUARE_2KHZ_RC = path.resolve(
+  "src/components/sources/__tests__/fixtures/acvsource-canon-square-2khz-rc.dts",
+);
 
 // ---------------------------------------------------------------------------
 // Programmatic circuit factory shared by Cat 1, Cat 2 (analytical), Cat 4,
@@ -551,6 +563,89 @@ describeIfDll("AcVoltageSource sawtooth-RC paired vs ngspice (T3)", () => {
   });
 
   it("full_iteration_paired_sawtooth_rc", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ===========================================================================
+// 1kHz square 0V↔3.3V driving a 1kΩ load — migrated from analog-clock.test.ts
+// (clock-canon-1khz-loaded.dts). Same physical scenario as the original Clock
+// fixture but using AcVoltageSource so ngspice's PULSE deck has explicit
+// non-zero TR/TF (no CKTstep substitution).
+// ===========================================================================
+
+describeIfDll("AcVoltageSource square-1kHz-loaded paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_SQUARE_1KHZ_LOADED,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_1khz_loaded", async () => {
+    await session.runTransient(0, 2.5e-3, 1e-5);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_1khz_loaded", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_1khz_loaded", () => {
+    session.compareAllAttempts();
+  });
+});
+
+// ===========================================================================
+// 2kHz square 0V↔3.3V driving R=10kΩ + C=1µF RC low-pass — migrated from
+// analog-clock.test.ts (clock-canon-2khz-rc.dts). RC time constant 10ms is
+// much longer than the 0.25ms half-period, so the cap voltage ramps
+// continuously while the source toggles. Distinct integration regime from
+// the 1kHz-loaded fixture.
+// ===========================================================================
+
+describeIfDll("AcVoltageSource square-2kHz-RC paired vs ngspice (T3)", () => {
+  let session: ComparisonSession;
+
+  beforeAll(async () => {
+    session = await ComparisonSession.create({
+      dtsPath: DTS_SQUARE_2KHZ_RC,
+      dllPath: DLL_PATH,
+    });
+  });
+
+  afterAll(async () => {
+    if (session !== undefined) await session.dispose();
+  });
+
+  it("transient_step_end_paired_2khz_rc", async () => {
+    await session.runTransient(0, 2e-3, 1e-5);
+    session.compareAllSteps();
+  });
+
+  it("dcop_paired_2khz_rc", () => {
+    const stepEnd = session.getStepEnd(0);
+    for (const cv of Object.values(stepEnd.nodes)) {
+      expect(cv.withinTol).toBe(true);
+    }
+    for (const cv of Object.values(stepEnd.branches)) {
+      expect(cv.withinTol).toBe(true);
+    }
+  });
+
+  it("full_iteration_paired_2khz_rc", () => {
     session.compareAllAttempts();
   });
 });

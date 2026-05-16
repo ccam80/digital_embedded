@@ -39,6 +39,7 @@ const DEFAULT_PARAMS: ResolvedSimulationParams = {
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
+  xmu: 0.5,
   temp: 300.15,
   nomTemp: 300.15,
   copyNodesets: false,

@@ -51,15 +51,17 @@ const MODEINITFIX    = 0x0400;
 const MODEINITTRAN   = 0x1000;
 const MODEINITPRED   = 0x2000;
 
-// phaseFlags bits (from ni_set_phase_flags)
+// phaseFlags bits (from ni_set_phase_flags; see ref/ngspice cktop.c NI_PHASE_*)
 const PF_GMIN_DYN = 0x1;
 const PF_SRC_STEP = 0x2;
 const PF_GMIN_SP3 = 0x4;
+const PF_GMIN_NEW = 0x8;
 
 function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
   const inGminDyn = (phaseFlags & PF_GMIN_DYN) !== 0;
   const inSrcStep = (phaseFlags & PF_SRC_STEP) !== 0;
   const inGminSp3 = (phaseFlags & PF_GMIN_SP3) !== 0;
+  const inGminNew = (phaseFlags & PF_GMIN_NEW) !== 0;
 
   // Standalone `op`: CKTop(firstmode=MODEDCOP|MODEINITJCT, continuemode=MODEDCOP|MODEINITFLOAT).
   // Transient's DC OP: dctran.c uses MODETRANOP|MODEINITJCT → MODETRANOP|MODEINITFLOAT.
@@ -68,6 +70,7 @@ function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
   if (isDcOpFamily) {
     if (inSrcStep) return "dcopSrcSweep";
     if (inGminSp3) return "dcopGminSpice3";
+    if (inGminNew) return "dcopGminNew";
     if (inGminDyn) return "dcopGminDynamic";
     if (mode & MODEINITJCT)   return "dcopInitJct";
     if (mode & MODEINITFIX)   return "dcopInitFix";
@@ -310,7 +313,7 @@ export function buildCaptureSession(
       phase: pa.phase,
       outcome,
       ...(role !== undefined ? { role } : {}),
-      ...(pa.phase === "dcopGminDynamic" || pa.phase === "dcopGminSpice3"
+      ...(pa.phase === "dcopGminDynamic" || pa.phase === "dcopGminSpice3" || pa.phase === "dcopGminNew"
         ? { phaseParameter: pa.firstRaw.phaseGmin }
         : pa.phase === "dcopSrcSweep"
         ? { phaseParameter: pa.firstRaw.phaseSrcFact }

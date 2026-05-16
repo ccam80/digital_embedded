@@ -232,6 +232,7 @@ export function computeNIcomCof(
   deltaOld: readonly number[],
   order: number,
   method: IntegrationMethod,
+  xmu: number,
   ag: Float64Array,
   scratch: Float64Array,
 ): void {
@@ -242,10 +243,12 @@ export function computeNIcomCof(
       ag[0] = 1 / dt;
       ag[1] = -1 / dt;
     } else {
-      const xmu = 0.5;
-      // nicomcof.c trap order 2: two sequential divisions match ngspice operand order
+      // nicomcof.c:43-44 - trapezoidal order-2 coefficients. xmu is ngspice
+      // ckt->CKTxmu, the trapezoidal weighting factor (default 0.5 per
+      // cktinit.c; 0 = backward Euler, 0.5 = standard trapezoidal). The two
+      // sequential divisions match ngspice's operand order bit-for-bit.
       ag[0] = 1.0 / dt / (1.0 - xmu);
-      ag[1] = xmu / (1 - xmu);
+      ag[1] = xmu / (1.0 - xmu);
     }
   } else {
     // method === "gear"

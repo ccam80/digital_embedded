@@ -3,7 +3,7 @@ import type { CaptureSession, IterationSnapshot } from "../harness/types.js";
 import { DEVICE_MAPPINGS } from "../harness/device-mappings.js";
 import { describe, expect } from "vitest";
 
-export const DLL_PATH = "C:/local_working_projects/digital_in_browser/ref/ngspice/visualc-shared/x64/Release/bin/spice.dll";
+export const DLL_PATH = "C:/local_working_projects/digital_in_browser/ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll";
 
 let _dllAvailable: boolean | null = null;
 export function dllAvailable(): boolean {
@@ -530,6 +530,11 @@ function _flattenGminSteps(session: CaptureSession): GminEntry[] {
     const step = session.steps[si]!;
     for (let ai = 0; ai < step.attempts.length; ai++) {
       const attempt = step.attempts[ai]!;
+      // NOTE: dcopGminNew is intentionally excluded. new_gmin ramps the
+      // device gmin (CKTgmin), but this helper compares the per-iteration
+      // MNA-diagonal gmin (diagGmin) the capture records. Covering new_gmin's
+      // ramp here needs a capture-schema extension (capture CKTgmin per
+      // iteration) plus handling the final-clean-solve grouping asymmetry.
       const isGmin =
         attempt.phase === "dcopGminDynamic" || attempt.phase === "dcopGminSpice3";
       if (isGmin) {

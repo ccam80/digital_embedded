@@ -84,8 +84,6 @@ export function buildJKFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlis
         modelRef: "default",
         subElementName: "drv",
         params: {
-          vIH: params.getModelParam<number>("vIH"),
-          vIL: params.getModelParam<number>("vIL"),
         },
       },
       {

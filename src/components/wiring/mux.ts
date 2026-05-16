@@ -277,7 +277,6 @@ const MUX_PROPERTY_DEFS: PropertyDefinition[] = [
 // selectorBits: structural; per-instance K selector bits. N = 2^K data inputs.
 // loaded: when true, parent emits DigitalInputPinLoaded / DigitalOutputPinLoaded
 //   sub-elements. When false, parent emits the Unloaded variants.
-// vIH/vIL: per-input CMOS thresholds, consumed by BehavioralMuxDriver leaf.
 // rOut/cOut/vOH/vOL: per-output drive params, consumed by the outPin sibling.
 
 export const { paramDefs: MUX_BEHAVIORAL_PARAM_DEFS, defaults: MUX_BEHAVIORAL_DEFAULTS } = defineModelParams({
@@ -347,8 +346,6 @@ export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
     subElementName: "drv",
     params: {
       selectorBits: K,
-      vIH: params.getModelParam<number>("vIH"),
-      vIL: params.getModelParam<number>("vIL"),
     },
   });
   netlist.push(driverPins);

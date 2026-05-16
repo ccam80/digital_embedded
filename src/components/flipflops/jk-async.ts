@@ -83,8 +83,6 @@ export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitN
         modelRef: "default",
         subElementName: "drv",
         params: {
-          vIH: params.getModelParam<number>("vIH"),
-          vIL: params.getModelParam<number>("vIL"),
         },
       },
       {
