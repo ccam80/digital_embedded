@@ -39,6 +39,7 @@ export class BridgeInputDriverElement extends PoolBackedAnalogElement {
   readonly stateSchema = BRIDGE_INPUT_SCHEMA;
   readonly stateSize: number;
 
+  // CARVEOUT: vIH/vIL kept until spec/bridge-synthesis.md replaces this leaf with a DIPL on the a→d boundary; allowlisted by spec/plan.md Phase 2 verification.
   private _spec: ResolvedPinElectrical;
   private readonly _loaded: boolean;
   private readonly _nodeId: number;

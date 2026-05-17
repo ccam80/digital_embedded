@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit 2>&1 | tail -20 && echo \"TSC EXIT: $?\"",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && node -e \"const f=require('./.vitest-failures.json'); const arr=Array.isArray(f)?f:(f.failures||f.tests||[]); const hits=arr.filter(x=>JSON.stringify(x).match(/function\\.test|pin_loading|init-sequence|noise-init|truth.table|Function \\(digital\\)/i)); console.log('matching failures:', hits.length); hits.slice(0,10).forEach(h=>console.log(' -', h.name||h.fullName||JSON.stringify(h).slice(0,120)));\"",
+    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npm run build 2>&1 | tail -20",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --reporter=verbose --testNamePattern=\"dump labels\" \"src/components/digital-pins/__tests__/dipl-result-port\" 2>&1 | tail -30",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -296,8 +296,8 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 127,
-      "lastAccessed": 1778932766331,
+      "accessCount": 128,
+      "lastAccessed": 1778978009389,
       "type": "file"
     },
     {
@@ -332,8 +332,8 @@
     },
     {
       "path": "src\\solver\\digital\\compiler.ts",
-      "accessCount": 28,
-      "lastAccessed": 1778976762321,
+      "accessCount": 29,
+      "lastAccessed": 1778977442170,
       "type": "file"
     },
     {
