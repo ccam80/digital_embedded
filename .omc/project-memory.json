@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npm run build 2>&1 | tail -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --reporter=verbose --testNamePattern=\"dump labels\" \"src/components/digital-pins/__tests__/dipl-result-port\" 2>&1 | tail -30",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npm run build 2>&1 | tail -50",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && npx vitest run --reporter=verbose 2>&1 | tail -10",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-17T05:00:55.652Z",
+  "updatedAt": "2026-05-17T05:08:37.196Z",
   "missions": [
     {
       "id": "session:95dd67bd-3c4a-4ee1-b08f-6b318a4b374b:team",
@@ -25981,15 +25981,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-05-16T10:00:17.772Z",
-      "updatedAt": "2026-05-17T05:00:55.652Z",
+      "updatedAt": "2026-05-17T05:08:37.196Z",
       "status": "done",
-      "workerCount": 43,
+      "workerCount": 44,
       "taskCounts": {
-        "total": 43,
+        "total": 44,
         "pending": 0,
         "blocked": 0,
         "inProgress": 0,
-        "completed": 43,
+        "completed": 44,
         "failed": 0
       },
       "agents": [
@@ -26422,25 +26422,19 @@
           "latestUpdate": "completed",
           "completedSummary": null,
           "updatedAt": "2026-05-17T05:00:55.652Z"
+        },
+        {
+          "name": "verifier:aa41a0b",
+          "role": "verifier",
+          "ownership": "aa41a0b493743a009",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-05-17T05:08:37.196Z"
         }
       ],
       "timeline": [
-        {
-          "id": "session-start:aa09e6ebf2c6c88a6:2026-05-17T04:42:08.912Z",
-          "at": "2026-05-17T04:42:08.912Z",
-          "kind": "update",
-          "agent": "claude-orchestrator:implementer:aa09e6e",
-          "detail": "started claude-orchestrator:implementer:aa09e6e",
-          "sourceKey": "session-start:aa09e6ebf2c6c88a6"
-        },
-        {
-          "id": "session-stop:aa09e6ebf2c6c88a6:2026-05-17T04:53:40.527Z",
-          "at": "2026-05-17T04:53:40.527Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:aa09e6e",
-          "detail": "completed",
-          "sourceKey": "session-stop:aa09e6ebf2c6c88a6"
-        },
         {
           "id": "session-start:a048757d4ed35782c:2026-05-17T04:54:13.499Z",
           "at": "2026-05-17T04:54:13.499Z",
@@ -26456,6 +26450,22 @@
           "agent": "claude-orchestrator:wave-verifier:a048757",
           "detail": "completed",
           "sourceKey": "session-stop:a048757d4ed35782c"
+        },
+        {
+          "id": "session-start:aa41a0b493743a009:2026-05-17T05:02:45.157Z",
+          "at": "2026-05-17T05:02:45.157Z",
+          "kind": "update",
+          "agent": "verifier:aa41a0b",
+          "detail": "started verifier:aa41a0b",
+          "sourceKey": "session-start:aa41a0b493743a009"
+        },
+        {
+          "id": "session-stop:aa41a0b493743a009:2026-05-17T05:08:37.196Z",
+          "at": "2026-05-17T05:08:37.196Z",
+          "kind": "completion",
+          "agent": "verifier:aa41a0b",
+          "detail": "completed",
+          "sourceKey": "session-stop:aa41a0b493743a009"
         }
       ]
     }
