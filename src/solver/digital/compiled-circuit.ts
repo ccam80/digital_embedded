@@ -184,6 +184,16 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Type name per type ID slot, for serialization to the Web Worker. */
   readonly typeNames: string[];
 
+  /**
+   * Initial values for the signal array, indexed absolutely.
+   *
+   * Length equals signalArraySize. Net indices [0, netCount) are 0; state-slot
+   * indices carry compile-time-seeded values (e.g. a Function component's
+   * truth-table rows). The engine applies this after zeroing the signal array
+   * during initialization so executeFns see the seeded slots from step one.
+   */
+  readonly initialStateSlots: Uint32Array;
+
   constructor(fields: {
     netCount: number;
     componentCount: number;
@@ -208,6 +218,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     switchClassification?: Uint8Array;
     shadowNetCount?: number;
     typeNames?: string[];
+    initialStateSlots?: Uint32Array;
   }) {
     this.netCount = fields.netCount;
     this.componentCount = fields.componentCount;
@@ -233,6 +244,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.switchClassification = fields.switchClassification ?? new Uint8Array(fields.componentCount);
     this.shadowNetCount = fields.shadowNetCount ?? 0;
     this.typeNames = fields.typeNames ?? [];
+    this.initialStateSlots = fields.initialStateSlots ?? new Uint32Array(this.signalArraySize);
     if (this.switchClassification.length > 0) {
       this.layout.setSwitchClassification(this.switchClassification);
     }

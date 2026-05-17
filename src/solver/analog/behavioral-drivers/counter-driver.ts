@@ -155,9 +155,9 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
       const next_i  = (1 - clearEff) * clocked;
       s0[base + this._slotCountBase + i] = next_i;
       stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, next_i);
-      carry = carry * state_i;
+      carry = carry * next_i;
     }
-    const ovf = carry * risingEdge * (1 - clearEff);
+    const ovf = carry * (1 - clearEff);
     stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, 1, ovf);
     s0[base + this._slotLastClock] = vClock;
   }

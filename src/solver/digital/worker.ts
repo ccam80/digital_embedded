@@ -179,6 +179,7 @@ function handleInit(msg: Extract<EngineMessage, { type: "init" }>): void {
     multiDriverNets: new Set<number>(),
     switchComponentIndices: msg.switchComponentIndices,
     switchClassification: msg.switchClassification,
+    initialStateSlots: msg.initialStateSlots,
   };
 
   // Store shared buffer views

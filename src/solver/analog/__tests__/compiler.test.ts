@@ -590,10 +590,14 @@ function buildPinLoadingCircuit(
 
   const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), reg);
   const resistor = makeElement("AnalogR", "r1", [{ x: 20, y: 0 }, { x: 22, y: 0 }], new Map(), reg);
+  // The `model` property is the single source of truth for model resolution
+  // at compile time (defaultModel is not consulted there). Set it explicitly
+  // so the NAND routes to its behavioural analog model and the behavioural
+  // factory receives the compiler-threaded _pinLoading.
   const nand = makeElement(
     "Nand", "nand1",
     [{ x: 10, y: 1, label: "In_1" }, { x: 10, y: 2, label: "In_2" }, { x: 12, y: 1, label: "out" }],
-    new Map(),
+    new Map<string, import("../../../core/properties.js").PropertyValue>([["model", "behavioral"]]),
     reg,
   );
 

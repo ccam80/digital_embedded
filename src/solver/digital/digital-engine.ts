@@ -31,7 +31,7 @@ import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 import type { CircuitElement } from "@/core/element";
 import type { Wire } from "@/core/circuit";
 import type { EvaluationMode } from "./evaluation-mode.js";
-import { initializeCircuit } from "./init-sequence.js";
+import { initializeCircuit, applyInitialStateSlots } from "./init-sequence.js";
 import type { InitializableEngine } from "./init-sequence.js";
 import { DataField, registerBackingStore, clearBackingStores, createBackingStoreMap, setActiveBackingStores } from "@/components/memory/ram.js";
 import type { BusResolver } from "./bus-resolution.js";
@@ -113,6 +113,9 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly shadowNetCount: number;
   /** Human-readable type name per type ID, for memory component initialization. */
   readonly typeNames?: string[];
+  /** Compile-time-seeded signal-array values (absolute index), applied by the
+   *  init sequence after the signal array is zeroed. */
+  readonly initialStateSlots?: Uint32Array;
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {
@@ -251,6 +254,10 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     return this._initSnapshotBuffer;
   }
 
+  get initialStateSlots(): Uint32Array {
+    return this._compiled?.initialStateSlots ?? new Uint32Array(0);
+  }
+
   get typeIds(): Uint16Array {
     return this._compiled !== null ? this._compiled.typeIds : new Uint16Array(0);
   }
@@ -335,6 +342,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     setActiveBackingStores(this._backingStores);
     if (this._compiled !== null) {
       initializeBackingStores(this._compiled);
+      applyInitialStateSlots(this._values, this.initialStateSlots);
     }
   }
 

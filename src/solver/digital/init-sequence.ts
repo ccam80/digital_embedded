@@ -49,6 +49,9 @@ export interface InitializableEngine {
   readonly evaluationOrder: EvaluationGroup[];
   /** Indices of Reset components (if any). Their output net is driven to 1 after noise init. */
   readonly resetComponentIndices: Uint32Array;
+  /** Compile-time-seeded signal-array values (absolute index). Applied after
+   *  the signal array is zeroed, before noise propagation. */
+  readonly initialStateSlots: Uint32Array;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +90,12 @@ export function initializeCircuit(engine: InitializableEngine): void {
   // Step 1: Set all signals to UNDEFINED (value = 0)
   state.fill(UNDEFINED_VALUE);
 
+  // Step 1.4: Apply compile-time-seeded state slots (e.g. a Function
+  // component's truth-table rows). These occupy the state-slot region of the
+  // signal array; the executeFns read them directly, so they must be present
+  // before any evaluation pass runs.
+  applyInitialStateSlots(state, engine.initialStateSlots);
+
   // Step 1.5: Apply default values for In components.
   // This seeds the starting state before propagation. defaultValue is read
   // once at init- runtime changes have no effect on the running simulation.
@@ -113,6 +122,26 @@ export function initializeCircuit(engine: InitializableEngine): void {
 
   // Step 4: Deterministic settle- one full sweep in topological order, no noise
   runDeterministicSettle(state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
+}
+
+// ---------------------------------------------------------------------------
+// applyInitialStateSlots
+// ---------------------------------------------------------------------------
+
+/**
+ * Copy compile-time-seeded values into the signal array.
+ *
+ * `initialStateSlots` is absolutely indexed and parallel to the signal array:
+ * net indices hold 0, state-slot indices hold their seeded values. Only the
+ * overlapping prefix is copied so a length mismatch cannot overrun the array.
+ */
+export function applyInitialStateSlots(state: Uint32Array, initialStateSlots: Uint32Array): void {
+  const n = Math.min(state.length, initialStateSlots.length);
+  for (let i = 0; i < n; i++) {
+    if (initialStateSlots[i] !== 0) {
+      state[i] = initialStateSlots[i]!;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -24,10 +24,12 @@
  *   Don't-care entries (value === 0xFFFFFFFF sentinel, set by compiler) output 0.
  *
  * Truth table storage in state:
- *   The compiler stores the truth table values in extra state slots after the
- *   regular output slots. Slot layout (outputOffset(index)):
- *     [0..outputCount-1] - output values (written by executeFn)
- *     [outputCount..]    - truth table (2^inputCount entries, set by compiler)
+ *   The compiler stores the truth table values in the component's state slots,
+ *   one slot per truth-table row. Slot layout (stateOffset(index)):
+ *     [0..2^inputCount-1] - truth table values, set by the compiler at
+ *                           compile time from the component's `truthTable`
+ *                           property. Don't-care rows (-1) are re-encoded as
+ *                           the 0xFFFFFFFF sentinel.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -289,8 +291,9 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
 // Input slot layout: in0 at inputStart+0 (LSB), in1 at inputStart+1, etc.
 // Output slot layout: out0 at outputStart+0, out1 at outputStart+1, etc.
 //
-// Truth table values are stored in output slots AFTER the output pins:
-//   state[wt[outputStart + outputCount + row]] = table[row]
+// Truth table values are stored in the component's state slots, one slot per
+// truth-table row, populated by the compiler at compile time:
+//   state[stateOffset(index) + row] = table[row]
 //
 // A don't-care entry is encoded as 0xFFFFFFFF in the state array.
 // ---------------------------------------------------------------------------
@@ -306,6 +309,7 @@ export function executeBooleanFunction(
   const inputCount = layout.inputCount(index);
   const outputStart = layout.outputOffset(index);
   const outputCount = layout.outputCount(index);
+  const tableBase = layout.stateOffset(index);
 
   // Compute input index: in0 is LSB
   let inputIndex = 0;
@@ -315,9 +319,8 @@ export function executeBooleanFunction(
     }
   }
 
-  // Table starts at outputStart + outputCount
-  const tableBase = outputStart + outputCount;
-  const tableEntry = state[wt[tableBase + inputIndex]];
+  // Truth table rows occupy contiguous state slots, one per row.
+  const tableEntry = state[tableBase + inputIndex];
 
   if (tableEntry === 0xFFFFFFFF) {
     // Don't-care: output all zeros
@@ -424,8 +427,9 @@ export const BooleanFunctionDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeBooleanFunction,
-      inputSchema: ["in0", "in1"],
-      outputSchema: ["out"],
+      inputSchema: (props) => buildInputLabels(props.getOrDefault<number>("inputCount", 2)),
+      outputSchema: (props) => buildOutputLabels(props.getOrDefault<number>("outputCount", 1)),
+      stateSlotCount: (props) => 1 << props.getOrDefault<number>("inputCount", 2),
       defaultDelay: 10,
     },
   },

@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 14797,
-    "failed": 488,
+    "passed": 14793,
+    "failed": 492,
     "skipped": 2,
     "totalFiles": 426,
-    "durationSeconds": 68.9
+    "durationSeconds": 71.4
   },
   "failures": [
     {
@@ -184,30 +184,6 @@
           "test": "linear_converges_in_two_iterations",
           "line": 129,
           "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected true to be false // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "hotload_vIH_changes_clock_sensitivity",
-          "line": 198,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected 128 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "clock_below_vIH_does_not_trigger_conversion",
-          "line": 319,
-          "column": 34
         }
       ]
     },
@@ -602,13 +578,25 @@
       ]
     },
     {
-      "message": "expected 2.5 to be close to +0, received difference is 2.5, but expected 0.00005",
+      "message": "expected 5 to not be close to 5, received difference is 0, but expected 0.005",
       "count": 1,
       "locations": [
         {
           "file": "src\\components\\active\\__tests__\\dac.test.ts",
           "test": "hotload_vIH_shifts_threshold_so_3p3v_reads_low",
-          "line": 240,
+          "line": 239,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "expected 5 to be close to +0, received difference is 5, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\dac.test.ts",
+          "test": "hotload_vIL_shifts_threshold_so_1v_reads_low",
+          "line": 250,
           "column": 20
         }
       ]
@@ -626,7 +614,7 @@
       ]
     },
     {
-      "message": "netlist-generator: typeId 'DigitalInputThresholder' (label='dac_dPin0_thresh') has no entry in ELEMENT_SPECS and therefore no SPICE-deck emission. Either (a) add an entry to ELEMENT_SPECS with the mat...",
+      "message": "netlist-generator: typeId 'DACDriver' (label='dac_drv') has no entry in ELEMENT_SPECS and therefore no SPICE-deck emission. Either (a) add an entry to ELEMENT_SPECS with the matching SPICE prefix (E/F...",
       "count": 2,
       "locations": [
         {
@@ -841,30 +829,6 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient: inductor current divergence over iterations in step 1",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "transient: PNP BJT internal node agreement in step 1",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "[suite-setup] NPN-CE harness branch value test",
-          "line": 3146,
-          "column": 13
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dc_op_match",
           "line": 3146,
           "column": 13
@@ -884,6 +848,30 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dump+compare step 0 attempt structure",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient: inductor current divergence over iterations in step 1",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient: PNP BJT internal node agreement in step 1",
+          "line": 3146,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "[suite-setup] NPN-CE harness branch value test",
           "line": 3146,
           "column": 13
         }
@@ -1556,6 +1544,72 @@
       ]
     },
     {
+      "message": "expected [ +0 ] to deeply equal [ 1 ]",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "AND truth table drives single output through every input combination",
+          "line": 98,
+          "column": 92
+        },
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "OR truth table drives single output through every input combination",
+          "line": 111,
+          "column": 92
+        },
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "XOR truth table drives single output through every input combination",
+          "line": 126,
+          "column": 92
+        },
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "NOT (1-input) truth table drives output through both input states",
+          "line": 140,
+          "column": 89
+        },
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "3-input majority function drives output for representative rows",
+          "line": 157,
+          "column": 95
+        },
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "don't-care entries (-1) emit zero on every output bit",
+          "line": 199,
+          "column": 92
+        }
+      ]
+    },
+    {
+      "message": "expected [ +0, +0 ] to deeply equal [ 1, +0 ]",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "multi-output function emits each output bit independently",
+          "line": 182,
+          "column": 101
+        }
+      ]
+    },
+    {
+      "message": "expected [ +0, +0 ] to deeply equal [ 1, 1 ]",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\basic\\__tests__\\function.test.ts",
+          "test": "don't-care row on a multi-output function emits zero on every bit",
+          "line": 216,
+          "column": 101
+        }
+      ]
+    },
+    {
       "message": "expected 983045 to be 5 // Object.is equality",
       "count": 1,
       "locations": [
@@ -1636,6 +1690,48 @@
           "test": "rising_edge_with_ne_high_advances_lfsr_state_then_executes_r_changed",
           "line": 757,
           "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 1 }",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "diode_backward_drives_dout_to_din",
+          "line": 177,
+          "column": 45
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "diode_forward_drives_dout_high_when_din_high",
+          "line": 192,
+          "column": 45
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "diode_anode_high_pulls_cathode_to_one",
+          "line": 214,
+          "column": 48
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "blown_property_disables_active_drive_observable_at_dout",
+          "line": 259,
+          "column": 46
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "blown_property_keeps_dout_at_pulldown_default_with_din_high",
+          "line": 281,
+          "column": 46
+        },
+        {
+          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
+          "test": "blown_property_keeps_cathode_at_pulldown_default_with_anode_high",
+          "line": 302,
+          "column": 49
         }
       ]
     },
@@ -1731,7 +1827,7 @@
     },
     {
       "message": "expected undefined to be defined",
-      "count": 11,
+      "count": 15,
       "locations": [
         {
           "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
@@ -1780,6 +1876,30 @@
           "test": "square_halfperiod_breakpoint_lands_exactly",
           "line": 394,
           "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "pin_loading_threaded_for_behavioural_gate_all_mode",
+          "line": 626,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "pin_loading_threaded_for_behavioural_gate_none_mode",
+          "line": 644,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "pin_loading_respects_per_net_override",
+          "line": 672,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "pin_loading_helper_shared_with_bridge_adapter",
+          "line": 693,
+          "column": 32
         },
         {
           "file": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
@@ -2074,48 +2194,6 @@
           "test": "full_iteration_paired_matched_load",
           "line": 63,
           "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 1 }",
-      "count": 6,
-      "locations": [
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "diode_backward_drives_dout_to_din",
-          "line": 177,
-          "column": 45
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "diode_forward_drives_dout_high_when_din_high",
-          "line": 192,
-          "column": 45
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "diode_anode_high_pulls_cathode_to_one",
-          "line": 214,
-          "column": 48
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "blown_property_disables_active_drive_observable_at_dout",
-          "line": 259,
-          "column": 46
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "blown_property_keeps_dout_at_pulldown_default_with_din_high",
-          "line": 281,
-          "column": 46
-        },
-        {
-          "file": "src\\components\\pld\\__tests__\\pld.test.ts",
-          "test": "blown_property_keeps_cathode_at_pulldown_default_with_anode_high",
-          "line": 302,
-          "column": 49
         }
       ]
     },
@@ -2678,7 +2756,7 @@
       ]
     },
     {
-      "message": "expected 1.143460908733858 not to be 1.143460908733858 // Object.is equality",
+      "message": "expected 2.2695324681205107 not to be 2.2695324681205107 // Object.is equality",
       "count": 1,
       "locations": [
         {
@@ -3020,14 +3098,14 @@
       ]
     },
     {
-      "message": "expected 0.19232222916994643 to be close to +0, received difference is 0.19232222916994643, but expected 0.00005",
+      "message": "expected 4.950495049504951 to not be close to 4.950495049504951, received difference is 0, but expected 0.0005",
       "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
           "test": "hotload_vIH_shifts_digital_input_threshold",
-          "line": 383,
-          "column": 19
+          "line": 382,
+          "column": 23
         }
       ]
     },
@@ -3076,6 +3154,18 @@
           "test": "ideal_pin_sees_full_source_voltage",
           "line": 274,
           "column": 40
+        }
+      ]
+    },
+    {
+      "message": "expected 4.950495049504951 to not be close to 4.950495049504951, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-integration.test.ts",
+          "test": "hotload_vih_threshold_classifies_input",
+          "line": 230,
+          "column": 23
         }
       ]
     },
@@ -3350,66 +3440,6 @@
       ]
     },
     {
-      "message": "expected 0.5 to be close to 1, received difference is 0.5, but expected 0.00005",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): AND → HI",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): OR → HI",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): XNOR → HI (equal)",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (In_1=MID): BUF → HI",
-          "line": 100,
-          "column": 17
-        }
-      ]
-    },
-    {
-      "message": "expected 0.5 to be close to +0, received difference is 0.5, but expected 0.00005",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): NAND → LO",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): NOR → LO",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (A=MID, B=MID): XOR → LO (equal)",
-          "line": 100,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
-          "test": "treats above-threshold input as HIGH (in=MID): NOT → LO",
-          "line": 100,
-          "column": 17
-        }
-      ]
-    },
-    {
       "message": "expected undefined to be close to 5, received difference is NaN, but expected 5e-7",
       "count": 1,
       "locations": [
@@ -3418,6 +3448,30 @@
           "test": "warm-started simulation reaches DC steady state (cap holds source voltage)",
           "line": 65,
           "column": 59
+        }
+      ]
+    },
+    {
+      "message": "step=0 iter=3 state0[M1][VBD]: ours=-4.999999949899999 ngspice=-4.9999999499 absDelta=8.881784197001252e-16: expected 8.881784197001252e-16 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
+          "test": "transient_match",
+          "line": 258,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "message": "step=0 iter=0 voltages[1]: ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 2.0679515313825692e-25 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
+          "test": "transient_oscillation_match",
+          "line": 235,
+          "column": 90
         }
       ]
     },
@@ -3520,30 +3574,6 @@
           "test": "PJFET: J prefix, PMF model type",
           "line": 383,
           "column": 15
-        }
-      ]
-    },
-    {
-      "message": "step=0 iter=3 state0[M1][VBD]: ours=-4.999999949899999 ngspice=-4.9999999499 absDelta=8.881784197001252e-16: expected 8.881784197001252e-16 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "transient_match",
-          "line": 258,
-          "column": 5
-        }
-      ]
-    },
-    {
-      "message": "step=0 iter=0 voltages[1]: ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 2.0679515313825692e-25 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "transient_oscillation_match",
-          "line": 235,
-          "column": 90
         }
       ]
     },

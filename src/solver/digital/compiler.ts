@@ -620,6 +620,43 @@ export function compileDigitalPartition(
   const switchComponentIndices = new Uint32Array(bidirectionalSwitchIndices);
 
   // -----------------------------------------------------------------------
+  // Step 8d: Seed compile-time component state slots
+  //
+  // The Function component stores its truth table in state slots- one slot
+  // per row, indexed by the combined input value. executeBooleanFunction
+  // reads state[stateOffset(index) + inputIndex]. Populate those slots here
+  // from the component's truthTable property, re-encoding don't-care rows
+  // (-1) as the 0xFFFFFFFF sentinel the executeFn checks. State offsets are
+  // final at this point- shadow-net shifts in Steps 8b/8c have already been
+  // applied to the stateOffsets array the layout reads.
+  // -----------------------------------------------------------------------
+
+  const signalArraySize = totalNetCount + totalStateSlots + shadowNetCount;
+  const initialStateSlots = new Uint32Array(signalArraySize);
+
+  for (let i = 0; i < componentCount; i++) {
+    const el = elements[i]!;
+    if (el.typeId !== "Function") continue;
+
+    const inputCountProp = componentPropertiesList[i]!.get("inputCount");
+    const inputCount = typeof inputCountProp === "number" ? inputCountProp : 2;
+    const rowCount = 1 << inputCount;
+
+    const rawTable = componentPropertiesList[i]!.get("truthTable");
+    const table = Array.isArray(rawTable) ? rawTable as number[] : [];
+
+    const stBase = layout.stateOffset(i);
+    for (let row = 0; row < rowCount; row++) {
+      const value = table[row];
+      if (value === -1) {
+        initialStateSlots[stBase + row] = 0xFFFFFFFF;
+      } else {
+        initialStateSlots[stBase + row] = (typeof value === "number" ? value : 0) >>> 0;
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Step 9: SCC decomposition and topological sort
   // -----------------------------------------------------------------------
 
@@ -820,6 +857,7 @@ export function compileDigitalPartition(
     switchClassification,
     shadowNetCount,
     typeNames,
+    initialStateSlots,
   });
 }
 

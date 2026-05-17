@@ -146,6 +146,9 @@ export type EngineMessage =
       outputCounts: Uint8Array;
       stateOffsets: Int32Array;
       wiringTable: Int32Array;
+      /** Compile-time-seeded signal-array values (absolute index), e.g. a
+       *  Function component's truth-table rows. Length equals signalArraySize. */
+      initialStateSlots: Uint32Array;
       evaluationGroups: Array<{
         componentIndices: Uint32Array;
         isFeedback: boolean;

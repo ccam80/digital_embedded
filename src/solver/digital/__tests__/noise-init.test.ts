@@ -89,6 +89,7 @@ describe("NoiseInit", () => {
       layout,
       evaluationOrder: [{ componentIndices: new Uint32Array([0, 1]), isFeedback: true }],
       resetComponentIndices: new Uint32Array(0),
+      initialStateSlots: new Uint32Array(STATE_SIZE),
     };
 
     initializeCircuit(engine);
@@ -145,6 +146,7 @@ describe("NoiseInit", () => {
         { componentIndices: new Uint32Array([0, 1]), isFeedback: true },
       ],
       resetComponentIndices: new Uint32Array([2]),
+      initialStateSlots: new Uint32Array(STATE_SIZE),
     };
 
     initializeCircuit(engine);
