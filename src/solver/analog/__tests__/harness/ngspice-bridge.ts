@@ -30,6 +30,7 @@ import type {
   NgspiceDeviceInfo,
   RawNgspiceIterationEx,
   RawNgspiceOuterEvent,
+  RawNgspiceAcPoint,
   RawNgspiceTopology,
   IntegrationCoefficients,
   MatrixEntry,
@@ -583,6 +584,7 @@ export class NgspiceBridge {
 
   private _iterations: RawNgspiceIterationEx[] = [];
   private _outerEvents: RawNgspiceOuterEvent[] = [];
+  private _acPoints: RawNgspiceAcPoint[] = [];
   private _rawTopology: RawNgspiceTopology | null = null;
   private _topology: NgspiceTopology | null = null;
 
@@ -634,8 +636,86 @@ export class NgspiceBridge {
     this._registerTopologyCallback(koffi, uid);
     this._registerIterationCallback(koffi, uid);
     this._registerOuterCallback(koffi, uid);
+    this._registerAcCallback(koffi, uid);
 
     this._cmd = this._lib.func("int ngSpice_Command(str)");
+  }
+
+  /**
+   * Register the AC sweep callback. ngspice fires this once per frequency
+   * point inside NIacIter (after CKTacLoad + factor + SMPcSolve), passing
+   * a `NiAcData*` whose layout matches the C struct in niiter.c. Eager
+   * decode of every variable-length array is required- the staging buffers
+   * are reused on the next frequency point.
+   */
+  private _registerAcCallback(koffi: any, uid: string): void {
+    const NiAcData = koffi.struct(`NiAcData${uid}`, {
+      matrixSize: "int",
+      rhsBufSize: "int",
+      nnz:        "int",
+      colPtr:     koffi.pointer("int"),
+      rowIdx:     koffi.pointer("int"),
+      valsRe:     koffi.pointer("double"),
+      valsIm:     koffi.pointer("double"),
+      rhsRe:      koffi.pointer("double"),
+      rhsIm:      koffi.pointer("double"),
+      solRe:      koffi.pointer("double"),
+      solIm:      koffi.pointer("double"),
+      omega:      "double",
+      freq:       "double",
+    });
+
+    const callbackType = koffi.proto(
+      `void ni_ac_cb${uid}(_Inout_ NiAcData${uid}*)`,
+    );
+    const registerFn = this._lib.func(`void ni_ac_register(ni_ac_cb${uid}*)`);
+
+    const callback = koffi.register(
+      (dataPtr: any) => {
+        const d = koffi.decode(dataPtr, NiAcData);
+        const { matrixSize, rhsBufSize, nnz, omega, freq } = d;
+
+        // colPtr length = matrixSize + 1; rowIdx/vals* length = nnz;
+        // rhs*/sol* length = rhsBufSize. Eager Float64Array.from / Int32Array.from
+        // copies into V8-owned buffers- the C side reuses its statics.
+        const colPtr = d.colPtr
+          ? Int32Array.from(koffi.decode(d.colPtr, "int", matrixSize + 1))
+          : new Int32Array(matrixSize + 1);
+        const rowIdx = d.rowIdx && nnz > 0
+          ? Int32Array.from(koffi.decode(d.rowIdx, "int", nnz))
+          : new Int32Array(0);
+        const valsRe = d.valsRe && nnz > 0
+          ? Float64Array.from(koffi.decode(d.valsRe, "double", nnz))
+          : new Float64Array(0);
+        const valsIm = d.valsIm && nnz > 0
+          ? Float64Array.from(koffi.decode(d.valsIm, "double", nnz))
+          : new Float64Array(0);
+        const rhsRe = d.rhsRe
+          ? Float64Array.from(koffi.decode(d.rhsRe, "double", rhsBufSize))
+          : new Float64Array(rhsBufSize);
+        const rhsIm = d.rhsIm
+          ? Float64Array.from(koffi.decode(d.rhsIm, "double", rhsBufSize))
+          : new Float64Array(rhsBufSize);
+        const solRe = d.solRe
+          ? Float64Array.from(koffi.decode(d.solRe, "double", rhsBufSize))
+          : new Float64Array(rhsBufSize);
+        const solIm = d.solIm
+          ? Float64Array.from(koffi.decode(d.solIm, "double", rhsBufSize))
+          : new Float64Array(rhsBufSize);
+
+        this._acPoints.push({
+          matrixSize, rhsBufSize, nnz,
+          colPtr, rowIdx,
+          valsRe, valsIm,
+          rhsRe, rhsIm,
+          solRe, solIm,
+          omega, freq,
+        });
+      },
+      koffi.pointer(callbackType),
+    );
+
+    registerFn(callback);
   }
 
   private _registerTopologyCallback(koffi: any, uid: string): void {
@@ -953,6 +1033,27 @@ export class NgspiceBridge {
     }
   }
 
+  /**
+   * Issue ngspice `.ac <type> <n> <fStart> <fStop>`.
+   * The deck must contain an AC voltage source (`vX n+ n- ac 1`) for the
+   * sweep to do anything- ngspice's `ACan` does a DC operating point then
+   * a linear complex solve at each frequency point. The AC callback
+   * (registered in `_registerAcCallback`) fires once per frequency.
+   *
+   * - `type = "dec"`: `n` points per decade
+   * - `type = "oct"`: `n` points per octave
+   * - `type = "lin"`: `n` total points across the band
+   */
+  runAc(type: "dec" | "oct" | "lin", n: number, fStart: number, fStop: number): void {
+    this._iterations = [];
+    this._outerEvents = [];
+    this._acPoints = [];
+    this._cmd(`ac ${type} ${n} ${fStart} ${fStop}`);
+  }
+
+  /** Per-frequency AC capture from the last `runAc` call (in sweep order). */
+  getAcPoints(): RawNgspiceAcPoint[] { return this._acPoints.slice(); }
+
   getTopology(): NgspiceTopology | null { return this._topology; }
   getRawTopology(): RawNgspiceTopology | null { return this._rawTopology; }
 
@@ -967,6 +1068,7 @@ export class NgspiceBridge {
 
   dispose(): void {
     if (this._lib) {
+      this._lib.func("void ni_ac_register(void*)")(null);
       this._lib.func("void ni_outer_register(void*)")(null);
       this._lib.func("void ni_instrument_register(void*)")(null);
       this._lib.func("void ni_topology_register(void*)")(null);

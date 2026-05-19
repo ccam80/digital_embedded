@@ -630,6 +630,36 @@ export interface RawNgspiceOuterEvent {
 }
 
 /**
+ * Raw data from the ngspice AC sweep callback (ni_ac_cb), fired once per
+ * frequency point inside NIacIter (after CKTacLoad, factor, and SMPcSolve).
+ *
+ * Field layout mirrors the C `NiAcData` struct in
+ * `ref/ngspice/src/maths/ni/niiter.c`. Buffers carry external-coords CSC for
+ * the loaded complex Jacobian (re+im twin arrays) plus the loaded complex
+ * RHS and the complex solution. All arrays are decoded eagerly inside the
+ * koffi callback handler- ngspice reuses the staging buffers on the next
+ * frequency point.
+ *
+ * Phase 1b deliverable: this is the raw FFI round-trip type. The Phase 2
+ * `"ac"` analysis kind in CaptureSession will consume an array of these.
+ */
+export interface RawNgspiceAcPoint {
+  matrixSize: number;     // CKTmaxEqNum + 1
+  rhsBufSize: number;     // SMPmatSize(CKTmatrix) + 1
+  nnz: number;            // CSC non-zero count for this frequency
+  colPtr: Int32Array;     // length matrixSize+1, CSC column offsets (external coords)
+  rowIdx: Int32Array;     // length nnz, external row index per entry
+  valsRe: Float64Array;   // length nnz, loaded complex matrix Real
+  valsIm: Float64Array;   // length nnz, loaded complex matrix Imag
+  rhsRe: Float64Array;    // length rhsBufSize, loaded complex RHS Real
+  rhsIm: Float64Array;    // length rhsBufSize, loaded complex RHS Imag
+  solRe: Float64Array;    // length rhsBufSize, solution Real (= CKTrhsOld)
+  solIm: Float64Array;    // length rhsBufSize, solution Imag (= CKTirhsOld)
+  omega: number;          // CKTomega at this frequency point (rad/s)
+  freq: number;           // omega / (2π), Hz
+}
+
+/**
  * One-time topology data from ngspice (sent before first NR iteration).
  */
 export interface RawNgspiceTopology {
