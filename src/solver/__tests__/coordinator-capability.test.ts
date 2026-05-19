@@ -26,7 +26,7 @@ import { AnalogElement } from '../analog/element.js';
 import type { DeviceFamily } from '../analog/ngspice-load-order.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { SetupContext } from '../analog/setup-context.js';
-import type { ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
+import type { SparseSolverStamp as ComplexSparseSolver } from '../analog/sparse-solver.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';

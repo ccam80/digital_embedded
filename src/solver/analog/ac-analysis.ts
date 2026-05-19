@@ -5,12 +5,12 @@
  * linearize all nonlinear elements at their operating points, then sweep
  * frequency to compute the complex transfer function H(f) = V_out(f) / V_in(f).
  *
- * The analysis builds a ComplexSparseSolver of the same dimension as the real
- * MNA system. For each frequency point:
- *   1. Clear the complex matrix.
- *   2. Call element.stampAc(complexSolver, omega) on every element.
- *   3. Inject 1+0j at the AC source node.
- *   4. Solve the complex system.
+ * The analysis uses the unified SparseSolver in complex mode (setComplex),
+ * the same factor/solve code path as DC and transient. For each frequency:
+ *   1. Reset matrix values (spClear), keeping structure across frequencies.
+ *   2. Call element.stampAc(solver, omega) on every element.
+ *   3. Inject 1+0j at the AC source branch.
+ *   4. Factor and solve the complex system.
  *   5. Read node voltages for the requested output nodes.
  *
  * Passive element AC stamps:
@@ -22,7 +22,6 @@
  * the last NR iteration stored internally after DC OP convergence.
  */
 
-import { ComplexSparseSolver } from "./complex-sparse-solver.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
@@ -103,13 +102,14 @@ export interface AcCompiledCircuit {
 }
 
 /**
- * Optional AC-analysis dependencies. Harness tests inject custom factories
- * so a single ComplexSparseSolver instance can be spied on across a sweep.
- * Production callers omit this entirely and get the default ComplexSparseSolver.
+ * Optional AC-analysis dependencies. Tests inject a custom factory so a single
+ * SparseSolver instance can be spied on across a sweep. Production callers omit
+ * this and get a default SparseSolver. The factory's solver is reset
+ * (_initStructure) and switched to complex mode (setComplex) by the analysis.
  */
 export interface AcAnalysisDeps {
-  /** Factory returning the ComplexSparseSolver used for the frequency sweep. */
-  complexSolverFactory?: () => ComplexSparseSolver;
+  /** Factory returning the SparseSolver used for the frequency sweep. */
+  solverFactory?: () => SparseSolver;
 }
 
 /**
@@ -208,22 +208,31 @@ export class AcAnalysis {
       imagMap.set(label, new Float64Array(numFreq));
     }
 
-    // MNA matrix size- expand by 1 for the AC voltage source branch row
+    // MNA system: nodes and branches occupy 1-based external indices 1..N
+    // (ground = 0 = TrashCan, ngspice-faithful, identical to the DC/transient
+    // solver). The ideal AC stimulus is an independent voltage source whose
+    // branch equation gets one fresh index past every real unknown.
     const N = compiled.matrixSize;
-    const N_ac = N + 1;               // AC system size: add one branch row for V_ac
-    const branchRow = N;              // 0-based index of the AC source branch row
-    const sourceNodeIdx = sourceNodeId - 1; // 0-based node index (sourceNodeId is 1-based)
+    const branchExt = N + 1;          // synthetic AC source branch (1-based)
 
-    // Allocate solution vectors (reused each frequency)
-    const xRe = new Float64Array(N_ac);
-    const xIm = new Float64Array(N_ac);
+    // Caller-owned RHS / solution vectors (length N+2: indices 0..branchExt),
+    // reused each frequency. SparseSolver.solve takes the real and imaginary
+    // halves as separate parallel arrays (ngspice RHS / iRHS, Solution /
+    // iSolution)- the halves are NOT adjacent.
+    const rhsRe = new Float64Array(N + 2);
+    const rhsIm = new Float64Array(N + 2);
+    const solRe = new Float64Array(N + 2);
+    const solIm = new Float64Array(N + 2);
 
-    // Step 5: Frequency sweep
-    const complexSolver = this._deps.complexSolverFactory
-      ? this._deps.complexSolverFactory()
-      : new ComplexSparseSolver();
+    // Step 5: Frequency sweep- one unified SparseSolver in complex mode, the
+    // same factor/solve code path as DC and transient (ngspice spSetComplex).
+    const solver = this._deps.solverFactory
+      ? this._deps.solverFactory()
+      : new SparseSolver();
+    solver._initStructure();
+    solver.setComplex(true);
 
-    // Handle cache for the AC voltage-source branch-row stamps.
+    // Handle cache for the AC voltage-source branch incidence stamps.
     // Allocated once on frequency 0, reused across the sweep.
     let acBranchHandleA = -1;
     let acBranchHandleB = -1;
@@ -237,45 +246,50 @@ export class AcAnalysis {
       const f = frequencies[fi];
       const omega = 2 * Math.PI * f;
 
-      // Assemble complex MNA matrix for this frequency
-      complexSolver.beginAssembly(N_ac);
+      // ngspice spClear- zero matrix values while keeping the linked
+      // structure and pivot order across frequencies. Skipped on fi===0:
+      // the structure does not exist yet; the first stamp pass builds it.
+      if (fi !== 0) solver._resetForAssembly();
 
       // Stamp all elements' AC admittances via the family dispatcher.
+      // Elements lazily allocate their matrix cells on the first stamp.
       // cite: acan.c:409-414 -- per-type DEVacLoad loop.
-      const acHandlerCtx: AcHandlerCtx = { solver: complexSolver, omega, loadCtx: acLoadCtx };
+      const acHandlerCtx: AcHandlerCtx = { solver, omega, loadCtx: acLoadCtx };
       runByDeviceFamily(compiled.elementsByFamily, "stampAc", acHandlerCtx, defaultStampAcHandler);
 
-      // Stamp the ideal AC voltage source: V(sourceNode) = 1 + 0j
-      // MNA voltage source stamp (node positive = sourceNodeId, negative = ground):
-      //   B[sourceNodeIdx, branchRow] += 1   (B sub-matrix: node row, branch col)
-      //   C[branchRow, sourceNodeIdx] += 1   (C sub-matrix: branch row, node col)
-      //   RHS[branchRow] = 1 + 0j            (voltage constraint: V_src = 1V AC)
-      if (sourceNodeIdx >= 0) {
+      // Ideal AC voltage source V(sourceNode) = 1+0j (sourceNode → ground):
+      //   (sourceNode, branch) += 1   node KCL picks up the branch current
+      //   (branch, sourceNode) += 1   branch eqn: V(sourceNode) = E
+      //   RHS[branch] = 1+0j          the 1 V AC stimulus (real, imag 0)
+      // Re-stamped every frequency- spClear zeroed the +1 incidence values.
+      if (sourceNodeId >= 1) {
         if (fi === 0) {
-          acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow);
-          acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx);
+          acBranchHandleA = solver.allocElement(sourceNodeId, branchExt);
+          acBranchHandleB = solver.allocElement(branchExt, sourceNodeId);
         }
-        complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0);
-        complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);
+        solver.stampElement(acBranchHandleA, 1.0);
+        solver.stampElement(acBranchHandleB, 1.0);
       }
-      complexSolver.stampRHS(branchRow, 1.0, 0.0);
+      rhsRe.fill(0);
+      rhsIm.fill(0);
+      rhsRe[branchExt] = 1.0;
 
-      // Spec 0.4: forceReorder() MUST run before finalize() so the reorder
-      // is picked up by factor() on frequency 0. The prior ordering (finalize
-      // then forceReorder) discarded the reorder intent.
-      if (fi === 0) complexSolver.forceReorder();
-      complexSolver.finalize();
-      const ok = complexSolver.factor();
+      // ngspice spFactor: fi===0 reorders (spOrderAndFactor, complex path);
+      // subsequent frequencies reuse the pivot order (FactorComplexMatrix).
+      // spOKAY === 0; any nonzero is an error (singular etc.).
+      const err = solver.factor();
 
-      if (ok) {
-        complexSolver.solve(xRe, xIm);
+      if (err === 0) {
+        solRe.fill(0);
+        solIm.fill(0);
+        // ngspice spSolve(Matrix, RHS, Solution, iRHS, iSolution).
+        solver.solve(rhsRe, solRe, rhsIm, solIm);
 
-        // Extract transfer function at each output node
+        // Extract transfer function at each output node (1-based index).
         for (const [label, nodeId] of outputNodeIds) {
-          const idx = nodeId - 1; // 0-based solver index
-          if (idx >= 0 && idx < N) {
-            const re = xRe[idx];
-            const im = xIm[idx];
+          if (nodeId >= 1 && nodeId <= N) {
+            const re = solRe[nodeId];
+            const im = solIm[nodeId];
             const mag = Math.sqrt(re * re + im * im);
             const magDb = mag > 0 ? 20 * Math.log10(mag) : -300;
             const phaseDeg = (Math.atan2(im, re) * 180) / Math.PI;

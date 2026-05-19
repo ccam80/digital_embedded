@@ -33,8 +33,21 @@
 
 import type { FamilyHandler } from "../family-registry.js";
 import type { AcHandlerCtx } from "./default-loaders.js";
-import { AnalogInductorElement } from "../../../components/passives/inductor.js";
-import { MutualInductorElement } from "../../../components/passives/mutual-inductor.js";
+
+/**
+ * MUT instances carry `stampAcCoupling` (mutacld.c); IND instances and any
+ * other IND-family element carry `stampAc` (indacld.c). The two passes are
+ * separated by capability, not `instanceof`: an `instanceof` check silently
+ * drops any IND-family element that is not the exact production class (e.g.
+ * a test-double inductor), so that element contributes no AC stamp and a
+ * series-RLC circuit loses its inductor entirely. ngspice's per-type
+ * DEVacLoad dispatch (acan.c:409-414) keys on the function-pointer slot
+ * being non-NULL- a capability check is the faithful analogue.
+ */
+type AcCouplingEl = { stampAcCoupling(s: unknown, w: number, c: unknown): void };
+function hasAcCoupling(el: unknown): el is AcCouplingEl {
+  return typeof (el as { stampAcCoupling?: unknown }).stampAcCoupling === "function";
+}
 
 /**
  * IND_FAMILY AC stamp handler.
@@ -47,21 +60,21 @@ export const IndFamilyStampAcHandler: FamilyHandler = {
   run(ctx: unknown, elements): void {
     const acCtx = ctx as AcHandlerCtx;
 
-    // Pass 1: IND AC stamp — indacld.c:29-35
-    // Each IND contributes 4 real connectivity stamps (±1 at B/C sub-matrix
-    // positions) and 1 imaginary branch-diagonal stamp (−ω·L/m).
+    // Pass 1: IND AC stamp — indacld.c:29-35. Every IND-family element that
+    // is not a mutual coupling (i.e. carries stampAc) contributes 4 real ±1
+    // connectivity stamps and 1 imaginary branch-diagonal stamp (−ω·L/m).
     for (const el of elements) {
-      if (el instanceof AnalogInductorElement) {
-        el.stampAc(acCtx.solver, acCtx.omega, acCtx.loadCtx);
+      if (!hasAcCoupling(el)) {
+        el.stampAc?.(acCtx.solver, acCtx.omega, acCtx.loadCtx);
       }
     }
 
-    // Pass 2: MUT AC coupling — mutacld.c:27-30
-    // Each MUT contributes 2 imaginary off-diagonal stamps:
+    // Pass 2: MUT AC coupling — mutacld.c:27-30. Each MUT contributes 2
+    // imaginary off-diagonal stamps:
     //   *(MUTbr1br2+1) -= ω·MUTfactor
     //   *(MUTbr2br1+1) -= ω·MUTfactor
     for (const el of elements) {
-      if (el instanceof MutualInductorElement) {
+      if (hasAcCoupling(el)) {
         el.stampAcCoupling(acCtx.solver, acCtx.omega, acCtx.loadCtx);
       }
     }

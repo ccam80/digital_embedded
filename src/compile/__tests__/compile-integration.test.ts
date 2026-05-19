@@ -21,7 +21,7 @@ import type { StandaloneComponentDefinition, ComponentModels, ModelEntry } from 
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
-import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
+import type { SparseSolverStamp as ComplexSparseSolver } from '../../solver/analog/sparse-solver.js';
 import { AnalogElement } from '../../solver/analog/element.js';
 import type { DeviceFamily } from '../../solver/analog/ngspice-load-order.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';

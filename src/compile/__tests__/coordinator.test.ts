@@ -21,7 +21,7 @@ import { AnalogElement } from '../../solver/analog/element.js';
 import type { DeviceFamily } from '../../solver/analog/ngspice-load-order.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SetupContext } from '../../solver/analog/setup-context.js';
-import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
+import type { SparseSolverStamp as ComplexSparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { SignalAddress } from '../types.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough, executeAnd2 } from '../../test-fixtures/execute-stubs.js';
@@ -49,18 +49,14 @@ class CoordinatorTestResistorEl extends AnalogElement {
     const n1 = this._n1;
     const n2 = this._n2;
     if (n1 !== 0) {
-      const h = solver.allocComplexElement(n1 - 1, n1 - 1);
-      solver.stampComplexElement(h, g, 0);
+      solver.stampElement(solver.allocElement(n1, n1), g);
     }
     if (n2 !== 0) {
-      const h = solver.allocComplexElement(n2 - 1, n2 - 1);
-      solver.stampComplexElement(h, g, 0);
+      solver.stampElement(solver.allocElement(n2, n2), g);
     }
     if (n1 !== 0 && n2 !== 0) {
-      const hab = solver.allocComplexElement(n1 - 1, n2 - 1);
-      solver.stampComplexElement(hab, -g, 0);
-      const hba = solver.allocComplexElement(n2 - 1, n1 - 1);
-      solver.stampComplexElement(hba, -g, 0);
+      solver.stampElement(solver.allocElement(n1, n2), -g);
+      solver.stampElement(solver.allocElement(n2, n1), -g);
     }
   }
   load(ctx: LoadContext): void {

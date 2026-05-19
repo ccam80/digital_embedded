@@ -28,7 +28,7 @@
 import type { IntegrationMethod } from "./integration.js";
 import type { StatePoolRef } from "./state-pool.js";
 import type { StateSchema } from "./state-schema.js";
-import type { ComplexSparseSolverStamp } from "./complex-sparse-solver.js";
+import type { SparseSolverStamp } from "./sparse-solver.js";
 import type { LteParams } from "./ckt-terr.js";
 import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
@@ -117,7 +117,7 @@ export abstract class AnalogElement {
 
   /** Stamp frequency-domain small-signal model for AC analysis. Matches ngspice ACload. */
   stampAc?(
-    solver: ComplexSparseSolverStamp,
+    solver: SparseSolverStamp,
     omega: number,
     ctx: LoadContext,
   ): void;

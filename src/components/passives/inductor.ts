@@ -36,7 +36,7 @@ import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
-import type { ComplexSparseSolverStamp } from "../../solver/analog/complex-sparse-solver.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // MutSiblingNotifiable — interface for MUT elements that notify partner inductors
@@ -219,8 +219,11 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   protected _hIbrP:   number = -1;
   protected _hIbrIbr: number = -1;
 
-  // AC complex-matrix handles allocated during setup() or lazily in stampAc().
-  // cite: indacld.c:31-35 — same 5 matrix positions as real DC stamps but complex.
+  // AC matrix-cell handles, lazily allocated on the first stampAc() against
+  // the AC analysis's solver instance. cite: indacld.c:31-35 — the same five
+  // (pos,Ibr)/(neg,Ibr)/(Ibr,pos)/(Ibr,neg)/(Ibr,Ibr) cells as the real DC
+  // stamps; the four ±1 connectivity cells are real, the branch diagonal
+  // carries the −ωL imaginary reactance.
   protected _hAcPIbr:   number = -1;
   protected _hAcNIbr:   number = -1;
   protected _hAcIbrN:   number = -1;
@@ -283,17 +286,6 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     this._hIbrN   = solver.allocElement(b, negNode);  // (INDbrEq,    INDnegNode)
     this._hIbrP   = solver.allocElement(b, posNode);  // (INDbrEq,    INDposNode)
     this._hIbrIbr = solver.allocElement(b, b);        // (INDbrEq,    INDbrEq)
-
-    // Eagerly allocate AC complex-matrix entries when setup() has an acSolver.
-    // cite: indacld.c:31-35 — same 5 (row,col) positions in the complex matrix.
-    const acSolver = (ctx as unknown as { acSolver?: ComplexSparseSolverStamp }).acSolver;
-    if (acSolver) {
-      this._hAcPIbr   = acSolver.allocComplexElement(posNode, b);
-      this._hAcNIbr   = acSolver.allocComplexElement(negNode, b);
-      this._hAcIbrP   = acSolver.allocComplexElement(b, posNode);
-      this._hAcIbrN   = acSolver.allocComplexElement(b, negNode);
-      this._hAcIbrIbr = acSolver.allocComplexElement(b, b);
-    }
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
@@ -498,7 +490,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    *
    * _effectiveL already incorporates the /m division from indtemp.c:72.
    */
-  stampAc(solver: ComplexSparseSolverStamp, omega: number, _ctx: LoadContext): void {
+  stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
     const b = this.branchIndex;
     const posNode = this.pinNodes.get("pos")!;
     const negNode = this.pinNodes.get("neg")!;
@@ -506,22 +498,23 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     // cite: indacld.c:29 — val = ckt->CKTomega * here->INDinduct / m
     const val = omega * this._effectiveL;
 
-    // Lazily allocate complex handles if setup() did not have an acSolver.
+    // Lazily allocate the five matrix cells against the AC solver on first
+    // stamp. Order matches indsetup.c (posIbr, negIbr, ibrPos, ibrNeg, ibrIbr).
     if (this._hAcPIbr === -1) {
-      this._hAcPIbr   = solver.allocComplexElement(posNode, b);
-      this._hAcNIbr   = solver.allocComplexElement(negNode, b);
-      this._hAcIbrP   = solver.allocComplexElement(b, posNode);
-      this._hAcIbrN   = solver.allocComplexElement(b, negNode);
-      this._hAcIbrIbr = solver.allocComplexElement(b, b);
+      this._hAcPIbr   = solver.allocElement(posNode, b);
+      this._hAcNIbr   = solver.allocElement(negNode, b);
+      this._hAcIbrP   = solver.allocElement(b, posNode);
+      this._hAcIbrN   = solver.allocElement(b, negNode);
+      this._hAcIbrIbr = solver.allocElement(b, b);
     }
 
-    // cite: indacld.c:31-34 — 4 real ±1 connectivity stamps (re=±1, im=0).
-    solver.stampComplexElement(this._hAcPIbr,    1,    0);  // *(INDposIbrptr) += 1
-    solver.stampComplexElement(this._hAcNIbr,   -1,    0);  // *(INDnegIbrptr) -= 1
-    solver.stampComplexElement(this._hAcIbrP,    1,    0);  // *(INDibrPosptr) += 1
-    solver.stampComplexElement(this._hAcIbrN,   -1,    0);  // *(INDibrNegptr) -= 1
-    // cite: indacld.c:35 — *(INDibrIbrptr+1) -= val  (imaginary part, re=0, im=-val).
-    solver.stampComplexElement(this._hAcIbrIbr,  0, -val);
+    // cite: indacld.c:31-34 — 4 real ±1 connectivity stamps (`*ptr ±= 1`).
+    solver.stampElement(this._hAcPIbr,  1);  // *(INDposIbrptr) += 1
+    solver.stampElement(this._hAcNIbr, -1);  // *(INDnegIbrptr) -= 1
+    solver.stampElement(this._hAcIbrP,  1);  // *(INDibrPosptr) += 1
+    solver.stampElement(this._hAcIbrN, -1);  // *(INDibrNegptr) -= 1
+    // cite: indacld.c:35 — `*(INDibrIbrptr+1) -= val`: imaginary branch diagonal.
+    solver.stampElementImag(this._hAcIbrIbr, -val);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

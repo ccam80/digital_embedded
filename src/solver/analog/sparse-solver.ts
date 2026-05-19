@@ -63,6 +63,12 @@ import { getProjectConfig } from "../project-config.js";
 export interface SparseSolverStamp {
   allocElement(row: number, col: number): number;
   stampElement(handle: number, value: number): void;
+  /**
+   * Accumulate onto the imaginary half of an element (ngspice acLoad `+1`
+   * pointer offset). Used by `stampAc` bodies during AC analysis; a no-op
+   * concern for real-only `load()` bodies, which never call it.
+   */
+  stampElementImag(handle: number, value: number): void;
 }
 
 // =========================================================================
@@ -126,8 +132,16 @@ export class SparseSolver {
   private _elRow: Int32Array = new Int32Array(0);
   /** Column of element e. */
   private _elCol: Int32Array = new Int32Array(0);
-  /** Accumulated matrix value at element e. */
+  /** Accumulated matrix value at element e- the real half (ngspice ElementValue.Real, spdefs.h:99). */
   private _elVal: Float64Array = new Float64Array(0);
+  /**
+   * Accumulated matrix value at element e- the imaginary half
+   * (ngspice ElementValue.Imag, spdefs.h:100). ngspice carries Real and Imag
+   * as adjacent fields of one struct; digiTS's element pool is structure-of-
+   * arrays, so the Imag field is a parallel array. Untouched (stays 0) while
+   * `_complex` is false- a real-only matrix never writes it.
+   */
+  private _elValImag: Float64Array = new Float64Array(0);
   /** Next element in same row (-1 = end). */
   private _elNextInRow: Int32Array = new Int32Array(0);
   /** Next element in same column (-1 = end). */
@@ -216,14 +230,34 @@ export class SparseSolver {
   /** Insertion order for _getInsertionOrder()- test-only debug field. */
   private _insertionOrder: Array<{ extRow: number; extCol: number }> = [];
 
+  // =========================================================================
+  // ngspice Matrix->Complex / Matrix->PreviousMatrixWasComplex (spdefs.h).
+  //   _complex                  → factorization and solve operate on the
+  //                               complex ElementValue (Real + Imag); set via
+  //                               setComplex() (ngspice spSetComplex / spSetReal).
+  //   _previousMatrixWasComplex → whether the prior assembly pass was complex;
+  //                               drives spClear's clear-both-halves branch
+  //                               (spbuild.c:106) so a complex→real transition
+  //                               still zeros the stale Imag halves once.
+  // =========================================================================
+  private _complex: boolean = false;
+  private _previousMatrixWasComplex: boolean = false;
+
 
   // =========================================================================
   // ngspice Matrix->Intermediate (spdefs.h, spfactor.c:738-742). Length
   // Size + 1; allocated by spcCreateInternalVectors. Used as the scatter-
   // gather buffer in spFactor's partition body and the working vector in
   // spSolve.
+  //
+  // ngspice sizes Intermediate `2 * (Size + 1)` because the complex factor /
+  // solve treats it as a ComplexNumber[] (Real + Imag interleaved). digiTS's
+  // structure-of-arrays form splits that: `_intermediate` holds the real half,
+  // `_intermediateImag` the imaginary half. The imaginary buffer is allocated
+  // only when the complex factor / solve needs it.
   // =========================================================================
   private _intermediate: Float64Array = new Float64Array(0);
+  private _intermediateImag: Float64Array = new Float64Array(0);
 
   // =========================================================================
   // State flags- ngspice MatrixFrame fields (spdefs.h:733-788) + macro :69.
@@ -290,6 +324,10 @@ export class SparseSolver {
   private _partitioned: boolean = false;
   /** ngspice Matrix->DoRealDirect (spdefs.h). Allocated by spcCreateInternalVectors. */
   private _doRealDirect: Int32Array = new Int32Array(0);
+  /** ngspice Matrix->DoCmplxDirect (spdefs.h). Per-step direct-vs-indirect
+   *  addressing decision for the complex factor; the partition heuristic
+   *  uses a heavier op-count threshold than DoRealDirect (spfactor.c:688-689). */
+  private _doCmplxDirect: Int32Array = new Int32Array(0);
 
   /**
    * ngspice MatrixFrame.NumberOfInterchangesIsOdd (spdefs.h). Toggled at every
@@ -540,11 +578,12 @@ export class SparseSolver {
       // ngspice spbuild.c:793- `if (Row == Col) Matrix->Diag[Row] = pElement`.
       if (row === col) this._diag[row] = pElement;
 
-      // ngspice spbuild.c:797-800- initialise Element fields.
+      // ngspice spbuild.c:797-803- initialise Element fields (Real + Imag).
       this._elRow[pElement] = row;
       this._elCol[pElement] = col;
       this._elVal[pElement] = 0.0;
-      // (Imag = 0.0 / pInitInfo = NULL- complex / INITIALIZE both off.)
+      this._elValImag[pElement] = 0.0;
+      // (pInitInfo = NULL- INITIALIZE off.)
 
       // ngspice spbuild.c:806-807- splice into column at *LastAddr.
       if (prevInCol < 0) {
@@ -585,11 +624,13 @@ export class SparseSolver {
       // ngspice spbuild.c:851- `if (Row == Col) Matrix->Diag[Row] = pElement`.
       if (row === col) this._diag[row] = pElement;
 
-      // ngspice spbuild.c:855-860- initialise. (DEBUG branch always sets
-      // Col; we do too because pivot search reads _elCol unconditionally.)
+      // ngspice spbuild.c:855-863- initialise (Real + Imag). (DEBUG branch
+      // always sets Col; we do too because pivot search reads _elCol
+      // unconditionally.)
       this._elRow[pElement] = row;
       this._elCol[pElement] = col;
       this._elVal[pElement] = 0.0;
+      this._elValImag[pElement] = 0.0;
 
       // ngspice spbuild.c:866-867- splice into column at *LastAddr.
       if (prevInCol < 0) {
@@ -617,9 +658,36 @@ export class SparseSolver {
     this._elVal[handle] += value;
   }
 
+  /**
+   * Accumulate value onto the imaginary half of the element at handle. O(1).
+   * The complex-stamp counterpart of stampElement: ngspice device acLoad
+   * routines write the imaginary admittance via the `+1` pointer offset
+   * (`*(here->...ptr +1) += val`, e.g. capacld.c:32-35). Real and imaginary
+   * halves are stamped independently- a capacitor touches only the imaginary
+   * half, a resistor only the real half- exactly as ngspice's two pointer
+   * expressions are independent writes.
+   */
+  stampElementImag(handle: number, value: number): void {
+    this._elValImag[handle] += value;
+  }
+
   // =========================================================================
   // Public API
   // =========================================================================
+
+  /**
+   * Select real or complex arithmetic for the next factor / solve.
+   * ngspice spSetComplex (spalloc.c:830-837, `Matrix->Complex = YES`) and
+   * spSetReal (spalloc.c:819-826, `Matrix->Complex = NO`) collapsed into one
+   * setter. DC-OP and transient leave this false; AC analysis sets it true
+   * before assembling the complex MNA system.
+   */
+  setComplex(complex: boolean): void {
+    this._complex = complex;
+  }
+
+  /** Current arithmetic mode (ngspice Matrix->Complex). */
+  get isComplex(): boolean { return this._complex; }
 
   /**
    * ngspice SMPluFac (spsmp.c:168-175)- line-for-line port. PivTol is
@@ -659,13 +727,13 @@ export class SparseSolver {
   }
 
   /**
-   * ngspice spSolve (spsolve.c:126-191)- line-for-line port, real-only.
+   * ngspice spSolve (spsolve.c:126-191)- line-for-line port.
    *
    * Five-argument signature mirrors spSolve(Matrix, RHS, Solution, iRHS,
-   * iSolution). Real-only port: iRHS / iSolution are accepted for
-   * signature parity but unused. The Complex branch (spsolve.c:139-143)
-   * is out of scope per amendment A8; complex solves live in
-   * complex-sparse-solver.ts.
+   * iSolution). When `_complex` is set the call dispatches to
+   * `_solveComplexMatrix` (ngspice spsolve.c:139-143) and iRHS / iSolution
+   * carry the imaginary halves of the right-hand side and solution. For a
+   * real solve they are unused.
    *
    * Per spsolve.c:90-91, RHS and Solution may alias (in-place solve).
    *
@@ -694,10 +762,14 @@ export class SparseSolver {
     if (!this._factored || this._needsReorder) {
       throw new Error("spSolve: matrix is not factored (IS_FACTORED assertion)");
     }
-    // ngspice spsolve.c:139-143- Complex branch dispatched to
-    // SolveComplexMatrix. Out of scope per amendment A8.
-    void iRHS;
-    void iSolution;
+    // ngspice spsolve.c:139-143- complex matrices dispatch to SolveComplexMatrix.
+    if (this._complex) {
+      if (!iRHS || !iSolution) {
+        throw new Error("spSolve: complex solve requires iRHS and iSolution vectors");
+      }
+      this._solveComplexMatrix(rhs, solution, iRHS, iSolution);
+      return;
+    }
 
     // ngspice spsolve.c:145-146.
     const b = this._intermediate;
@@ -769,6 +841,103 @@ export class SparseSolver {
     //   for (I = Size; I > 0; I--)
     //       Solution[*(pExtOrder--)] = Intermediate[I];
     for (let i = n; i >= 1; i--) solution[intToExtCol[i]] = b[i];
+  }
+
+  /**
+   * ngspice SolveComplexMatrix (spsolve.c:258-329)- line-for-line port, the
+   * complex companion to the real `solve` body. Forward substitution (solves
+   * Lc = b) then backward substitution (solves Ux = c) in complex arithmetic.
+   * The Intermediate scatter buffer is split across `_intermediate` (real
+   * half) and `_intermediateImag` (imaginary half)- ngspice's single
+   * `ComplexVector Intermediate`.
+   *
+   * RHS / iRHS are original-row keyed; Solution / iSolution original-col
+   * keyed. Per spsolve.c, RHS and Solution may alias.
+   */
+  private _solveComplexMatrix(
+    rhs: Float64Array,
+    solution: Float64Array,
+    iRhs: Float64Array,
+    iSolution: Float64Array,
+  ): void {
+    const n = this._size;
+    const bRe = this._intermediate;
+    const bIm = this._intermediateImag;
+    const intToExtRow = this._intToExtRow;
+    const intToExtCol = this._intToExtCol;
+    const diag = this._diag;
+    const elVal = this._elVal;
+    const elValImag = this._elValImag;
+    const elRow = this._elRow;
+    const elCol = this._elCol;
+    const elNextInCol = this._elNextInCol;
+    const elNextInRow = this._elNextInRow;
+
+    // ngspice spsolve.c:272-279- initialize Intermediate from RHS / iRHS.
+    for (let i = n; i >= 1; i--) {
+      const ext = intToExtRow[i];
+      bRe[i] = rhs[ext];
+      bIm[i] = iRhs[ext];
+    }
+
+    // ngspice spsolve.c:281-302- forward substitution, solves Lc = b.
+    for (let i = 1; i <= n; i++) {
+      let tRe = bRe[i];
+      let tIm = bIm[i];
+      // ngspice spsolve.c:287- step skipped when Temp is exactly zero.
+      if (tRe !== 0.0 || tIm !== 0.0) {
+        const pPivot = diag[i];
+        // ngspice spsolve.c:291- CMPLX_MULT_ASSIGN(Temp, *pPivot): Temp *= pivot.
+        {
+          const pRe = elVal[pPivot];
+          const pIm = elValImag[pPivot];
+          const newRe = tRe * pRe - tIm * pIm;
+          tIm = tRe * pIm + tIm * pRe;
+          tRe = newRe;
+        }
+        bRe[i] = tRe;
+        bIm[i] = tIm;
+        // ngspice spsolve.c:293-300- CMPLX_MULT_SUBT_ASSIGN:
+        // Intermediate[Element->Row] -= Temp * *Element.
+        let pElement = elNextInCol[pPivot];
+        while (pElement >= 0) {
+          const row = elRow[pElement];
+          const eRe = elVal[pElement];
+          const eIm = elValImag[pElement];
+          bRe[row] -= tRe * eRe - tIm * eIm;
+          bIm[row] -= tRe * eIm + tIm * eRe;
+          pElement = elNextInCol[pElement];
+        }
+      }
+    }
+
+    // ngspice spsolve.c:304-317- backward substitution, solves Ux = c.
+    for (let i = n; i >= 1; i--) {
+      let tRe = bRe[i];
+      let tIm = bIm[i];
+      let pElement = elNextInRow[diag[i]];
+      while (pElement >= 0) {
+        const col = elCol[pElement];
+        // ngspice spsolve.c:313- CMPLX_MULT_SUBT_ASSIGN(Temp, *pElement,
+        // Intermediate[Element->Col]): Temp -= *Element * Intermediate[Col].
+        const eRe = elVal[pElement];
+        const eIm = elValImag[pElement];
+        const cRe = bRe[col];
+        const cIm = bIm[col];
+        tRe -= eRe * cRe - eIm * cIm;
+        tIm -= eRe * cIm + eIm * cRe;
+        pElement = elNextInRow[pElement];
+      }
+      bRe[i] = tRe;
+      bIm[i] = tIm;
+    }
+
+    // ngspice spsolve.c:319-326- unscramble into Solution / iSolution.
+    for (let i = n; i >= 1; i--) {
+      const ext = intToExtCol[i];
+      solution[ext] = bRe[i];
+      iSolution[ext] = bIm[i];
+    }
   }
 
   /**
@@ -1101,6 +1270,9 @@ export class SparseSolver {
     this._internalVectorsAllocated = false;
     this._singularCol = 0;
     this._singularRow = 0;
+    // A freshly (re)built structure has no prior assembly pass; `_complex`
+    // itself is caller-owned mode (setComplex) and is left untouched here.
+    this._previousMatrixWasComplex = false;
 
     this._intToExtCol = new Int32Array(initialAlloc + 1);
     this._intToExtRow = new Int32Array(initialAlloc + 1);
@@ -1121,6 +1293,7 @@ export class SparseSolver {
     this._elRow = new Int32Array(elCap);
     this._elCol = new Int32Array(elCap);
     this._elVal = new Float64Array(elCap);
+    this._elValImag = new Float64Array(elCap);
     this._elNextInRow = new Int32Array(elCap).fill(-1);
     this._elNextInCol = new Int32Array(elCap).fill(-1);
     this._elCapacity = elCap;
@@ -1131,7 +1304,9 @@ export class SparseSolver {
     this._markowitzCol = new Int32Array(0);
     this._markowitzProd = new Int32Array(0);
     this._intermediate = new Float64Array(0);
+    this._intermediateImag = new Float64Array(0);
     this._doRealDirect = new Int32Array(0);
+    this._doCmplxDirect = new Int32Array(0);
     this._insertionOrder = [];                    // for _getInsertionOrder
   }
 
@@ -1171,7 +1346,9 @@ export class SparseSolver {
     this._markowitzCol  = new Int32Array(0);
     this._markowitzProd = new Int32Array(0);
     this._doRealDirect  = new Int32Array(0);
+    this._doCmplxDirect = new Int32Array(0);
     this._intermediate  = new Float64Array(0);
+    this._intermediateImag = new Float64Array(0);
     this._internalVectorsAllocated = false;
 
     // spbuild.c:1009-1016- initialise the new portion (identity map).
@@ -1204,23 +1381,38 @@ export class SparseSolver {
     return next;
   }
 
-  /** ngspice spClear (spbuild.c:96-142)- line-for-line port (real-only). */
+  /** ngspice spClear (spbuild.c:96-142)- line-for-line port. */
   _resetForAssembly(): void {
-    // ngspice spbuild.c:121-129 (real branch)- `for (I = Size; I > 0; I--)`.
-    for (let i = this._size; i >= 1; i--) {
-      let e = this._colHead[i];
-      while (e >= 0) {
-        this._elVal[e] = 0.0;
-        e = this._elNextInCol[e];
+    if (this._previousMatrixWasComplex || this._complex) {
+      // ngspice spbuild.c:106-118 (complex branch)- zero Real and Imag.
+      for (let i = this._size; i >= 1; i--) {
+        let e = this._colHead[i];
+        while (e >= 0) {
+          this._elVal[e] = 0.0;
+          this._elValImag[e] = 0.0;
+          e = this._elNextInCol[e];
+        }
+      }
+    } else {
+      // ngspice spbuild.c:119-129 (real branch)- `for (I = Size; I > 0; I--)`.
+      for (let i = this._size; i >= 1; i--) {
+        let e = this._colHead[i];
+        while (e >= 0) {
+          this._elVal[e] = 0.0;
+          e = this._elNextInCol[e];
+        }
       }
     }
     // ngspice spbuild.c:133-134- TrashCan.Real / .Imag = 0.0.
     this._elVal[0] = 0.0;
+    this._elValImag[0] = 0.0;
     // ngspice spbuild.c:136-139.
     this._error = spOKAY;
     this._factored = false;
     this._singularCol = 0;
     this._singularRow = 0;
+    // ngspice spbuild.c:140- PreviousMatrixWasComplex = Complex.
+    this._previousMatrixWasComplex = this._complex;
   }
 
   // =========================================================================
@@ -1311,6 +1503,7 @@ export class SparseSolver {
     this._elRow = growI(this._elRow);
     this._elCol = growI(this._elCol);
     this._elVal = growF(this._elVal);
+    this._elValImag = growF(this._elValImag);
     this._elNextInRow = growI(this._elNextInRow);
     this._elNextInCol = growI(this._elNextInCol);
     this._elCapacity = newCap;
@@ -1330,12 +1523,16 @@ export class SparseSolver {
     if (this._markowitzRow.length === 0) this._markowitzRow = new Int32Array(n + 2);
     if (this._markowitzCol.length === 0) this._markowitzCol = new Int32Array(n + 2);
     if (this._markowitzProd.length === 0) this._markowitzProd = new Int32Array(n + 2);
-    // ngspice spfactor.c:728-732- DoRealDirect length Size + 1 (real-only;
-    // DoCmplxDirect skipped per amendment A4 + complex-out-of-scope A8).
+    // ngspice spfactor.c:728-732, 750-758- DoRealDirect / DoCmplxDirect,
+    // each length Size + 1.
     if (this._doRealDirect.length === 0) this._doRealDirect = new Int32Array(n + 1);
-    // ngspice spfactor.c:738-742- Intermediate length Size + 1 (real-only:
-    // drop the `2 *` complex factor at spfactor.c:738).
+    if (this._doCmplxDirect.length === 0) this._doCmplxDirect = new Int32Array(n + 1);
+    // ngspice spfactor.c:738-742- Intermediate length 2 * (Size + 1): a
+    // ComplexNumber[] in C. digiTS's structure-of-arrays form splits it into
+    // `_intermediate` (real half) and `_intermediateImag` (imaginary half),
+    // each Size + 1.
     if (this._intermediate.length === 0) this._intermediate = new Float64Array(n + 1);
+    if (this._intermediateImag.length === 0) this._intermediateImag = new Float64Array(n + 1);
     // ngspice spfactor.c:745.
     this._internalVectorsAllocated = true;
   }
@@ -1402,10 +1599,11 @@ export class SparseSolver {
           }
           // ngspice spfactor.c:235.
           const largestInCol = this._findLargestInCol(this._elNextInCol[pPivot]);
-          // ngspice spfactor.c:236.
-          if (largestInCol * relThreshold < Math.abs(this._elVal[pPivot])) {
-            // ngspice spfactor.c:223- real branch (Complex out of scope).
-            this._realRowColElimination(pPivot);
+          // ngspice spfactor.c:237- threshold test uses ELEMENT_MAG(pPivot).
+          if (largestInCol * relThreshold < this._elementMag(pPivot)) {
+            // ngspice spfactor.c:238-241- complex / real elimination dispatch.
+            if (this._complex) this._complexRowColElimination(pPivot);
+            else this._realRowColElimination(pPivot);
           } else {
             // ngspice spfactor.c:225-226.
             reorderingRequired = true;
@@ -1438,8 +1636,9 @@ export class SparseSolver {
         if (pPivot < 0) return this._matrixIsSingular(step);
         // ngspice spfactor.c:263.
         this._exchangeRowsAndCols(pPivot, step);
-        // ngspice spfactor.c:265-268- real branch.
-        this._realRowColElimination(pPivot);
+        // ngspice spfactor.c:287-290- complex / real elimination dispatch.
+        if (this._complex) this._complexRowColElimination(pPivot);
+        else this._realRowColElimination(pPivot);
         // ngspice spfactor.c:270.
         if (this._error >= spFATAL) return this._error;
         // ngspice spfactor.c:271.
@@ -1469,7 +1668,8 @@ export class SparseSolver {
     }
     // ngspice spfactor.c:337.
     if (!this._partitioned) this._spPartition(spDEFAULT_PARTITION);
-    // ngspice spfactor.c:338-339- complex branch out of scope.
+    // ngspice spfactor.c:360-361- `if (Matrix->Complex) return FactorComplexMatrix(Matrix)`.
+    if (this._complex) return this._factorComplexMatrix();
 
     const size = this._size;
 
@@ -1563,29 +1763,167 @@ export class SparseSolver {
   }
 
   /**
-   * ngspice spPartition (spfactor.c:580-681)- line-for-line port (real-
-   * only, generic-machine heuristic per amendment A4). Counts Nc/Nm/No
-   * via mock-factor walk and sets DoRealDirect[Step] per the
-   * `Nm + No > 3*Nc - 2*Nm` decision.
+   * ngspice FactorComplexMatrix (spfactor.c:461-558)- line-for-line port,
+   * the complex companion to the `_spFactor` numeric-reuse body. Same dual-
+   * body (direct / indirect addressing) row-at-a-time LU, carried out in
+   * complex arithmetic. Reached from `_spFactor` when `_complex` is set and
+   * the pivot order is being reused (no reorder pending).
+   */
+  private _factorComplexMatrix(): number {
+    const size = this._size;
+
+    // ngspice spfactor.c:474-477.
+    if (size === 0) {
+      this._factored = true;
+      return (this._error = spOKAY);
+    }
+
+    // ngspice spfactor.c:479-482- pivot 1: ELEMENT_MAG zero-test, reciprocal.
+    {
+      const pEl = this._diag[1];
+      if (this._elementMag(pEl) === 0.0) return this._zeroPivot(1);
+      this._cmplxReciprocal(pEl, this._elVal[pEl], this._elValImag[pEl]);
+    }
+
+    // ngspice Dest = (ComplexNumber *)Matrix->Intermediate- the structure-
+    // of-arrays split: real half in _intermediate, imaginary in _intermediateImag.
+    const destRe = this._intermediate;
+    const destIm = this._intermediateImag;
+
+    // ngspice spfactor.c:484-554- start factorization.
+    for (let step = 2; step <= size; step++) {
+      if (this._doCmplxDirect[step]) {
+        // ngspice spfactor.c:486-522- direct addressing scatter-gather.
+        // ngspice spfactor.c:491-496- scatter.
+        let pElement = this._colHead[step];
+        while (pElement >= 0) {
+          const row = this._elRow[pElement];
+          destRe[row] = this._elVal[pElement];
+          destIm[row] = this._elValImag[pElement];
+          pElement = this._elNextInCol[pElement];
+        }
+
+        // ngspice spfactor.c:498-510- update column.
+        let pColumn = this._colHead[step];
+        while (this._elRow[pColumn] < step) {
+          pElement = this._diag[this._elRow[pColumn]];
+          // ngspice spfactor.c:503- CMPLX_MULT(Mult, Dest[pColumn->Row], *pElement).
+          const dRe = destRe[this._elRow[pColumn]];
+          const dIm = destIm[this._elRow[pColumn]];
+          const peRe = this._elVal[pElement];
+          const peIm = this._elValImag[pElement];
+          const multRe = dRe * peRe - dIm * peIm;
+          const multIm = dRe * peIm + dIm * peRe;
+          // ngspice spfactor.c:504- CMPLX_ASSIGN(*pColumn, Mult).
+          this._elVal[pColumn] = multRe;
+          this._elValImag[pColumn] = multIm;
+          // ngspice spfactor.c:505-508- CMPLX_MULT_SUBT_ASSIGN inner update.
+          while ((pElement = this._elNextInCol[pElement]) >= 0) {
+            const row = this._elRow[pElement];
+            const eRe = this._elVal[pElement];
+            const eIm = this._elValImag[pElement];
+            destRe[row] -= multRe * eRe - multIm * eIm;
+            destIm[row] -= multRe * eIm + multIm * eRe;
+          }
+          pColumn = this._elNextInCol[pColumn];
+        }
+
+        // ngspice spfactor.c:512-517- gather.
+        pElement = this._elNextInCol[this._diag[step]];
+        while (pElement >= 0) {
+          const row = this._elRow[pElement];
+          this._elVal[pElement] = destRe[row];
+          this._elValImag[pElement] = destIm[row];
+          pElement = this._elNextInCol[pElement];
+        }
+
+        // ngspice spfactor.c:519-522- check for singular matrix
+        // (CMPLX_1_NORM(Pivot) === |Real| + |Imag|).
+        const pivRe = destRe[step];
+        const pivIm = destIm[step];
+        if (Math.abs(pivRe) + Math.abs(pivIm) === 0.0) return this._zeroPivot(step);
+        this._cmplxReciprocal(this._diag[step], pivRe, pivIm);
+      } else {
+        // ngspice spfactor.c:523-552- indirect addressing. _intermediate
+        // stores element handles (ngspice's `pDest`, a ComplexNumber*[]).
+        const pDest = this._intermediate;
+
+        // ngspice spfactor.c:528-533- scatter (store handles).
+        let pElement = this._colHead[step];
+        while (pElement >= 0) {
+          pDest[this._elRow[pElement]] = pElement;
+          pElement = this._elNextInCol[pElement];
+        }
+
+        // ngspice spfactor.c:535-547- update column.
+        let pColumn = this._colHead[step];
+        while (this._elRow[pColumn] < step) {
+          pElement = this._diag[this._elRow[pColumn]];
+          const destIdx = pDest[this._elRow[pColumn]];
+          // ngspice spfactor.c:540- CMPLX_MULT(Mult, *pDest[pColumn->Row], *pElement).
+          const dRe = this._elVal[destIdx];
+          const dIm = this._elValImag[destIdx];
+          const peRe = this._elVal[pElement];
+          const peIm = this._elValImag[pElement];
+          const multRe = dRe * peRe - dIm * peIm;
+          const multIm = dRe * peIm + dIm * peRe;
+          // ngspice spfactor.c:541- CMPLX_ASSIGN(*pDest[pColumn->Row], Mult).
+          this._elVal[destIdx] = multRe;
+          this._elValImag[destIdx] = multIm;
+          // ngspice spfactor.c:542-545- CMPLX_MULT_SUBT_ASSIGN inner update.
+          while ((pElement = this._elNextInCol[pElement]) >= 0) {
+            const di = pDest[this._elRow[pElement]];
+            const eRe = this._elVal[pElement];
+            const eIm = this._elValImag[pElement];
+            this._elVal[di]     -= multRe * eRe - multIm * eIm;
+            this._elValImag[di] -= multRe * eIm + multIm * eRe;
+          }
+          pColumn = this._elNextInCol[pColumn];
+        }
+
+        // ngspice spfactor.c:549-552- check for singular matrix.
+        const pEl = this._diag[step];
+        if (this._elementMag(pEl) === 0.0) return this._zeroPivot(step);
+        this._cmplxReciprocal(pEl, this._elVal[pEl], this._elValImag[pEl]);
+      }
+    }
+
+    // ngspice spfactor.c:556-557.
+    this._factored = true;
+    return (this._error = spOKAY);
+  }
+
+  /**
+   * ngspice spPartition (spfactor.c:580-690)- line-for-line port
+   * (generic-machine heuristic per amendment A4). Counts Nc/Nm/No via a
+   * mock-factor walk and sets DoRealDirect[Step] / DoCmplxDirect[Step] per
+   * the `Nm + No > 3*Nc - 2*Nm` and `Nm + No > 7*Nc - 4*Nm` decisions.
    */
   private _spPartition(mode: number): void {
     // ngspice spfactor.c:589.
     if (this._partitioned) return;
     const size = this._size;
     const doRealDirect = this._doRealDirect;
+    const doCmplxDirect = this._doCmplxDirect;
     // ngspice spfactor.c:594.
     this._partitioned = true;
 
     // ngspice spfactor.c:597.
     if (mode === spDEFAULT_PARTITION) mode = DEFAULT_PARTITION;
-    // ngspice spfactor.c:598-603.
+    // ngspice spfactor.c:598-603- spDIRECT_PARTITION sets both vectors YES.
     if (mode === spDIRECT_PARTITION) {
-      for (let step = 1; step <= size; step++) doRealDirect[step] = 1;
+      for (let step = 1; step <= size; step++) {
+        doRealDirect[step] = 1;
+        doCmplxDirect[step] = 1;
+      }
       return;
     }
-    // ngspice spfactor.c:604-609.
+    // ngspice spfactor.c:604-609- spINDIRECT_PARTITION sets both vectors NO.
     if (mode === spINDIRECT_PARTITION) {
-      for (let step = 1; step <= size; step++) doRealDirect[step] = 0;
+      for (let step = 1; step <= size; step++) {
+        doRealDirect[step] = 0;
+        doCmplxDirect[step] = 0;
+      }
       return;
     }
     // ngspice spfactor.c:610-611- assert(Mode == spAUTO_PARTITION).
@@ -1618,9 +1956,12 @@ export class SparseSolver {
       }
     }
 
-    // ngspice spfactor.c:638-670- generic-machine heuristic at line 666.
+    // ngspice spfactor.c:687-690- generic-machine heuristic. DoRealDirect
+    // and DoCmplxDirect use different op-count thresholds: a complex
+    // multiply-add costs more, so direct addressing pays off less often.
     for (let step = 1; step <= size; step++) {
-      doRealDirect[step] = (nm[step] + no[step] > 3 * nc[step] - 2 * nm[step]) ? 1 : 0;
+      doRealDirect[step]  = (nm[step] + no[step] > 3 * nc[step] - 2 * nm[step]) ? 1 : 0;
+      doCmplxDirect[step] = (nm[step] + no[step] > 7 * nc[step] - 4 * nm[step]) ? 1 : 0;
     }
   }
 
@@ -1665,6 +2006,108 @@ export class SparseSolver {
         }
         // ngspice spfactor.c:2591- pSub->Real -= pUpper->Real * pLower->Real.
         this._elVal[pSub] -= this._elVal[pUpper] * this._elVal[pLower];
+        pSub = this._elNextInCol[pSub];
+        pLower = this._elNextInCol[pLower];
+      }
+      pUpper = this._elNextInRow[pUpper];
+    }
+  }
+
+  /**
+   * ngspice ELEMENT_MAG (spdefs.h:105)- approximate (L-1 norm) magnitude of
+   * a matrix element: `|Real| + |Imag|`. Unconditional, exactly as the
+   * ngspice macro: for a real matrix `_elValImag` is identically zero, so
+   * this degenerates to `|Real|` with no branch- `x + 0.0 === x` in IEEE-754.
+   */
+  private _elementMag(e: number): number {
+    return Math.abs(this._elVal[e]) + Math.abs(this._elValImag[e]);
+  }
+
+  /**
+   * ngspice CMPLX_RECIPROCAL (spdefs.h:348-359)- complex reciprocal
+   * `e := 1.0 / (denRe + j·denIm)`. Smith's algorithm: divide through by the
+   * larger-magnitude component to bound overflow. The denominator is taken as
+   * explicit args because the macro is used both aliased
+   * (`CMPLX_RECIPROCAL(*pPivot, *pPivot)`- pass `_elVal[e]`/`_elValImag[e]`)
+   * and unaliased (`CMPLX_RECIPROCAL(*Diag[Step], Pivot)`- pass the scatter-
+   * buffer pivot). The denominator must already be in locals at the call site,
+   * so a later write to element `e` cannot disturb it.
+   */
+  private _cmplxReciprocal(e: number, denRe: number, denIm: number): void {
+    if ((denRe >= denIm && denRe > -denIm) || (denRe < denIm && denRe <= -denIm)) {
+      const r = denIm / denRe;
+      const toRe = 1.0 / (denRe + r * denIm);
+      this._elVal[e] = toRe;
+      this._elValImag[e] = -r * toRe;
+    } else {
+      const r = denRe / denIm;
+      const toIm = -1.0 / (denIm + r * denRe);
+      this._elValImag[e] = toIm;
+      this._elVal[e] = -r * toIm;
+    }
+  }
+
+  /**
+   * ngspice ComplexRowColElimination (spfactor.c:2657-2705)- line-for-line
+   * port. Twin of `_realRowColElimination`: the pUpper / pLower / pSub walk
+   * and CreateFillin path are identical; only the four arithmetic ops differ-
+   * ELEMENT_MAG zero-test, CMPLX_RECIPROCAL pivot, CMPLX_MULT_ASSIGN upper
+   * update, CMPLX_MULT_SUBT_ASSIGN submatrix update. ngspice keeps these as
+   * two separate functions (rather than one branched body) so the inner
+   * rank-1 update loop carries no per-element real/complex branch.
+   */
+  private _complexRowColElimination(pivotE: number): void {
+    // ngspice spfactor.c:2666-2670- Test for zero pivot (ELEMENT_MAG).
+    if (this._elementMag(pivotE) === 0.0) {
+      this._matrixIsSingular(this._elRow[pivotE]);
+      return;
+    }
+    // ngspice spfactor.c:2671- CMPLX_RECIPROCAL(*pPivot, *pPivot).
+    this._cmplxReciprocal(pivotE, this._elVal[pivotE], this._elValImag[pivotE]);
+
+    let pUpper = this._elNextInRow[pivotE];
+    while (pUpper >= 0) {
+      // ngspice spfactor.c:2677- CMPLX_MULT_ASSIGN(*pUpper, *pPivot):
+      // *pUpper *= *pPivot (the reciprocated pivot). Old pUpper Real/Imag
+      // are captured first- the macro's `to_Real_` temp plus the fact that
+      // line 2 still reads the old `to.Imag`.
+      {
+        const uRe = this._elVal[pUpper];
+        const uIm = this._elValImag[pUpper];
+        const pRe = this._elVal[pivotE];
+        const pIm = this._elValImag[pivotE];
+        this._elVal[pUpper]     = uRe * pRe - uIm * pIm;
+        this._elValImag[pUpper] = uRe * pIm + uIm * pRe;
+      }
+
+      let pSub = this._elNextInCol[pUpper];
+      let pLower = this._elNextInCol[pivotE];
+      while (pLower >= 0) {
+        const row = this._elRow[pLower];
+
+        // ngspice spfactor.c:2685-2686- advance pSub to row alignment.
+        while (pSub >= 0 && this._elRow[pSub] < row) {
+          pSub = this._elNextInCol[pSub];
+        }
+
+        // ngspice spfactor.c:2689-2695- create fill-in if missing.
+        if (pSub < 0 || this._elRow[pSub] > row) {
+          pSub = this._createFillin(row, this._elCol[pUpper]);
+          if (pSub < 0) {
+            this._error = spNO_MEMORY;
+            return;
+          }
+        }
+        // ngspice spfactor.c:2698- CMPLX_MULT_SUBT_ASSIGN(*pSub, *pUpper, *pLower):
+        // *pSub -= *pUpper * *pLower.
+        {
+          const uRe = this._elVal[pUpper];
+          const uIm = this._elValImag[pUpper];
+          const lRe = this._elVal[pLower];
+          const lIm = this._elValImag[pLower];
+          this._elVal[pSub]     -= uRe * lRe - uIm * lIm;
+          this._elValImag[pSub] -= uRe * lIm + uIm * lRe;
+        }
         pSub = this._elNextInCol[pSub];
         pLower = this._elNextInCol[pLower];
       }
@@ -1746,7 +2189,8 @@ export class SparseSolver {
     let largest = 0;
     let e = startE;
     while (e >= 0) {
-      const magnitude = Math.abs(this._elVal[e]);
+      // ngspice FindLargestInCol uses ELEMENT_MAG (degenerates to |Real| in real mode).
+      const magnitude = this._elementMag(e);
       if (magnitude > largest) largest = magnitude;
       e = this._elNextInCol[e];
     }
@@ -1776,13 +2220,13 @@ export class SparseSolver {
     /* Initialize the variable Largest. */
     let largest: number;
     if (this._elRow[e] !== row)
-      largest = Math.abs(this._elVal[e]);
+      largest = this._elementMag(e);
     else
       largest = 0.0;
 
     /* Search rest of column for largest element, avoiding excluded element. */
     while ((e = this._elNextInCol[e]) >= 0) {
-      const magnitude = Math.abs(this._elVal[e]);
+      const magnitude = this._elementMag(e);
       if (magnitude > largest) {
         if (this._elRow[e] !== row)
           largest = magnitude;
@@ -1957,7 +2401,7 @@ export class SparseSolver {
       let chosenPivot = this._diag[i];
       if (chosenPivot >= 0) {
         /* Singleton lies on the diagonal. */
-        const pivotMag = Math.abs(this._elVal[chosenPivot]);
+        const pivotMag = this._elementMag(chosenPivot);
         if (pivotMag > this._absThreshold &&
             pivotMag > this._relThreshold *
             this._findBiggestInColExclude(chosenPivot, step))
@@ -1972,7 +2416,7 @@ export class SparseSolver {
             /* Reduced column has no elements, matrix is singular. */
             break;
           }
-          const pivotMag = Math.abs(this._elVal[chosenPivot]);
+          const pivotMag = this._elementMag(chosenPivot);
           if (pivotMag > this._absThreshold &&
               pivotMag > this._relThreshold *
               this._findBiggestInColExclude(chosenPivot, step))
@@ -1986,7 +2430,7 @@ export class SparseSolver {
                 /* Reduced row has no elements, matrix is singular. */
                 break;
               }
-              const pivotMag2 = Math.abs(this._elVal[chosenPivot]);
+              const pivotMag2 = this._elementMag(chosenPivot);
               if (pivotMag2 > this._absThreshold &&
                   pivotMag2 > this._relThreshold *
                   this._findBiggestInColExclude(chosenPivot, step))
@@ -2001,7 +2445,7 @@ export class SparseSolver {
             /* Reduced row has no elements, matrix is singular. */
             break;
           }
-          const pivotMag = Math.abs(this._elVal[chosenPivot]);
+          const pivotMag = this._elementMag(chosenPivot);
           if (pivotMag > this._absThreshold &&
               pivotMag > this._relThreshold *
               this._findBiggestInColExclude(chosenPivot, step))
@@ -2052,7 +2496,7 @@ export class SparseSolver {
       if ((pDiag = this._diag[i]) < 0)
         continue; /* Endless for loop */
       let magnitude: number;
-      if ((magnitude = Math.abs(this._elVal[pDiag])) <= this._absThreshold)
+      if ((magnitude = this._elementMag(pDiag)) <= this._absThreshold)
         continue; /* Endless for loop */
 
       if (mProd[p] === 1) {
@@ -2081,8 +2525,8 @@ export class SparseSolver {
         if (pOtherInRow >= 0 && pOtherInCol >= 0) {
           if (this._elCol[pOtherInRow] === this._elRow[pOtherInCol]) {
             const largestOffDiagonal = Math.max(
-              Math.abs(this._elVal[pOtherInRow]),
-              Math.abs(this._elVal[pOtherInCol]),
+              this._elementMag(pOtherInRow),
+              this._elementMag(pOtherInCol),
             );
             if (magnitude >= largestOffDiagonal) {
               /* Accept pivot, it is unlikely to contribute excess error. */
@@ -2117,7 +2561,7 @@ export class SparseSolver {
 
     for (let i = 0; i <= numberOfTies; i++) {
       const pDiag = tiedElements[i];
-      const magnitude = Math.abs(this._elVal[pDiag]);
+      const magnitude = this._elementMag(pDiag);
       const largestInCol = this._findBiggestInColExclude(pDiag, step);
       const ratio = largestInCol / magnitude;
       if (ratio < maxRatio) {
@@ -2169,7 +2613,7 @@ export class SparseSolver {
       if ((pDiag = this._diag[i]) < 0)
         continue; /* Endless for loop */
       let magnitude: number;
-      if ((magnitude = Math.abs(this._elVal[pDiag])) <= this._absThreshold)
+      if ((magnitude = this._elementMag(pDiag)) <= this._absThreshold)
         continue; /* Endless for loop */
 
       if (mProd[p] === 1) {
@@ -2198,8 +2642,8 @@ export class SparseSolver {
         if (pOtherInRow >= 0 && pOtherInCol >= 0) {
           if (this._elCol[pOtherInRow] === this._elRow[pOtherInCol]) {
             const largestOffDiagonal = Math.max(
-              Math.abs(this._elVal[pOtherInRow]),
-              Math.abs(this._elVal[pOtherInCol]),
+              this._elementMag(pOtherInRow),
+              this._elementMag(pOtherInCol),
             );
             if (magnitude >= largestOffDiagonal) {
               /* Accept pivot, it is unlikely to contribute excess error. */
@@ -2219,7 +2663,7 @@ export class SparseSolver {
     // if the running pivot fails it (caller falls through to SearchDiagonal).
     if (chosenPivot >= 0) {
       const largestInCol = this._findBiggestInColExclude(chosenPivot, step);
-      if (Math.abs(this._elVal[chosenPivot]) <= this._relThreshold * largestInCol)
+      if (this._elementMag(chosenPivot) <= this._relThreshold * largestInCol)
         chosenPivot = -1;
     }
     return chosenPivot;
@@ -2257,7 +2701,7 @@ export class SparseSolver {
       if ((pDiag = this._diag[i]) < 0)
         continue; /* for loop */
       let magnitude: number;
-      if ((magnitude = Math.abs(this._elVal[pDiag])) <= this._absThreshold)
+      if ((magnitude = this._elementMag(pDiag)) <= this._absThreshold)
         continue; /* for loop */
 
       /* Test to see if diagonal's magnitude is acceptable. */
@@ -2325,7 +2769,7 @@ export class SparseSolver {
         /* Check to see if element is the largest encountered so
            far.  If so, record its magnitude and address. */
         let magnitude: number;
-        if ((magnitude = Math.abs(this._elVal[pElement])) > largestElementMag) {
+        if ((magnitude = this._elementMag(pElement)) > largestElementMag) {
           largestElementMag = magnitude;
           pLargestElement = pElement;
         }

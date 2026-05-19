@@ -19,7 +19,7 @@ import { AnalogElement, PoolBackedAnalogElement, isPoolBacked } from "../element
 import type { DeviceFamily } from "../ngspice-load-order.js";
 import { defineStateSchema } from "../state-schema.js";
 import type { SetupContext } from "../setup-context.js";
-import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { SparseSolverStamp as ComplexSparseSolver } from "../sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import { compileAnalogPartition } from "../compiler.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";

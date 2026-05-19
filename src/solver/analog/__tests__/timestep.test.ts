@@ -15,7 +15,7 @@ import { AnalogElement } from "../element.js";
 import type { DeviceFamily } from "../ngspice-load-order.js";
 import type { IntegrationMethod } from "../integration.js";
 import type { ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
-import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { SparseSolverStamp as ComplexSparseSolver } from "../sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { LteParams } from "../ckt-terr.js";
 

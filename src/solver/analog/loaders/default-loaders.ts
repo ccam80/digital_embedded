@@ -13,7 +13,7 @@
 import type { FamilyHandler } from "../family-registry.js";
 import type { LoadContext } from "../load-context.js";
 import type { TempContext } from "../temp-context.js";
-import type { ComplexSparseSolverStamp } from "../complex-sparse-solver.js";
+import type { SparseSolverStamp } from "../sparse-solver.js";
 
 /**
  * Context object passed to the AC stamp handler by the dispatcher.
@@ -26,7 +26,7 @@ import type { ComplexSparseSolverStamp } from "../complex-sparse-solver.js";
  *   every AC-stamp method in this codebase.
  */
 export interface AcHandlerCtx {
-  solver: ComplexSparseSolverStamp;
+  solver: SparseSolverStamp;
   omega: number;
   loadCtx: LoadContext;
 }

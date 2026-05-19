@@ -25,7 +25,7 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import { AnalogElement } from "../element.js";
 import type { DeviceFamily } from "../ngspice-load-order.js";
-import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { SparseSolverStamp as ComplexSparseSolver } from "../sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { SetupContext } from "../setup-context.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";

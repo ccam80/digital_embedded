@@ -37,6 +37,23 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
+import type { TempContext } from "../../solver/analog/temp-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
+
+// ---------------------------------------------------------------------------
+// Physical constants — ngspice const.h
+// ---------------------------------------------------------------------------
+
+// const.h:44 — CONSTmuZero = 4·π·1e-7 H/m.
+const CONST_MU_ZERO = 4.0 * Math.PI * 1e-7;
+// const.h:19 — CONSTc = 299792458 m/s (speed of light).
+const CONST_C = 299792458;
+// const.h:47 — CONSTepsZero = 1 / (CONSTmuZero · CONSTc²)  F/m (vacuum permittivity).
+const EPS0 = 1.0 / (CONST_MU_ZERO * CONST_C * CONST_C);
+// const.h:51 — CONSTepsrSiO2 = 3.9 (relative permittivity of SiO₂).
+const CONST_EPSR_SIO2 = 3.9;
+// const.h:53 — CONSTepsSiO2 = CONSTepsrSiO2 · CONSTepsZero  F/m.
+const EPS_SIO2 = CONST_EPSR_SIO2 * EPS0;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -53,6 +70,29 @@ export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } =
     TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients", spiceConverter: kelvinToCelsius },
     SCALE: { default: 1,                   description: "Instance scale factor" },
     M:    { default: 1,                    description: "Parallel multiplicity" },
+    // Geometric-capacitance model parameters — ngspice CAPmodel
+    // (capsetup.c:31-88, captemp.c:55-68).
+    cj:     { default: 0.0,     unit: "F/m^2", description: "Junction bottom capacitance per area" },
+    cjsw:   { default: 0.0,     unit: "F/m",   description: "Junction sidewall capacitance per perimeter" },
+    defw:   { default: 10e-6,   unit: "m",     description: "Default device width" },
+    defl:   { default: 0.0,     unit: "m",     description: "Default device length" },
+    narrow: { default: 0.0,     unit: "m",     description: "Width correction factor" },
+    short:  { default: 0.0,     unit: "m",     description: "Length correction factor" },
+    del:    { default: 0.0,     unit: "m",     description: "Width/length etch correction" },
+    di:     { default: 0.0,                    description: "Relative dielectric constant" },
+    thick:  { default: 0.0,     unit: "m",     description: "Dielectric thickness" },
+    mCap:   { default: 0.0,     unit: "F",     description: "Model default capacitance" },
+    // Per-instance geometry — ngspice CAPinstance CAPwidth / CAPlength.
+    // Registered so builder.ts:224-231 promotes a netlisted flat prop into
+    // the model-param partition (and marks it given). The defaults here are
+    // the seeded fallbacks for the !_wGiven / !_lGiven path: w → model defw
+    // (captemp.c:49-51), l → 0 (capsetup.c:95-97).
+    w:     { default: 10e-6, unit: "m", description: "Instance device width" },
+    l:     { default: 0.0,   unit: "m", description: "Instance device length" },
+    // Per-instance temperature parameters — ngspice CAPinstance
+    // (captemp.c:38-47).
+    TEMP:  { default: 300.15, unit: "K", description: "Instance operating temperature", spiceConverter: kelvinToCelsius },
+    DTEMP: { default: 0.0,    unit: "K", description: "Instance temperature delta from ambient" },
   },
 });
 
@@ -180,29 +220,148 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
   private _SCALE: number;
   private _M: number;
 
+  // Geometric-capacitance model parameters — ngspice CAPmodel
+  // (capsetup.c:31-88, captemp.c:55-68). _cj / _narrow / _short may be
+  // overwritten by the setup() default-processing block (Part B.0).
+  private _cj: number;
+  private _cjsw: number;
+  private _defw: number;
+  private _narrow: number;
+  private _short: number;
+  private _del: number;
+  private _di: number;
+  private _thick: number;
+  private _mCap: number;
+  // *Given guards — true when the netlist supplied the param. Gate the
+  // capsetup.c:71-88 cj/narrow/short derivation and the captemp.c:55-68
+  // base-capacitance selection.
+  private _cjGiven: boolean;
+  private _mCapGiven: boolean;
+  private _narrowGiven: boolean;
+  private _shortGiven: boolean;
+  private _delGiven: boolean;
+  private _diGiven: boolean;
+  private _thickGiven: boolean;
+
+  // Per-instance geometry — ngspice CAPwidth / CAPlength (captemp.c:49-51,
+  // capsetup.c:95-97).
+  private _w: number;
+  private _l: number;
+  private _wGiven: boolean;
+  private _lGiven: boolean;
+  // True when the netlist supplied an instance capacitance — gates the
+  // captemp.c:55-70 base-capacitance selection.
+  private _capGiven: boolean;
+
+  // Per-instance temperature parameters — ngspice CAPtemp / CAPdtemp
+  // (captemp.c:38-47).
+  private _TEMP: number;
+  private _DTEMP: number;
+  private _tempGiven: boolean;
+  private _dtempGiven: boolean;
+
   // Cached Norton-stamp handles [hPP, hNN, hPN, hNP] allocated in setup()
   // per capsetup.c:114-117 (TSTALLOC sequence).
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
 
+  // AC matrix-cell handles, lazily allocated on the first stampAc() against
+  // the AC analysis's solver instance. cite: capacld.c:32-35 — the same four
+  // (pos,pos)/(neg,neg)/(pos,neg)/(neg,pos) cells as the real-side Norton
+  // stamp; under the unified solver `stampElementImag` writes the `+1`
+  // imaginary half of those cells.
+  protected _hAcPosPos: number = -1;
+  protected _hAcNegNeg: number = -1;
+  protected _hAcPosNeg: number = -1;
+  protected _hAcNegPos: number = -1;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._nominalC = props.hasModelParam("capacitance") ? props.getModelParam<number>("capacitance") : CAPACITOR_DEFAULTS["capacitance"]!;
-    this._IC       = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
-    this._TC1      = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
-    this._TC2      = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : CAPACITOR_DEFAULTS["TC2"]!;
-    this._TNOM     = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
-    this._SCALE    = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : CAPACITOR_DEFAULTS["SCALE"]!;
-    this._M        = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : CAPACITOR_DEFAULTS["M"]!;
+    // *Given guards mirror ngspice's per-instance/model `<x>Given` flags:
+    // true only when the netlist actually supplied `<x>`. PropertyBag seeds
+    // every registered param's default into the model-param partition
+    // (builder.ts:214-215) without marking it given, so hasModelParam(<any
+    // declared param>) is permanently true. isModelParamGiven mirrors the
+    // ngspice flag (properties.ts:200-203), matching the semiconductors
+    // (diode.ts:528, bjt.ts:525, mosfet.ts:849, njfet.ts:315, pjfet.ts:284,
+    // zener.ts:218). Value reads use it too: a seeded default and an absent
+    // param both fall to CAPACITOR_DEFAULTS, so the two ternary branches
+    // converge — but isModelParamGiven keeps the read consistent with the
+    // guards.
+    this._capGiven = props.isModelParamGiven("capacitance");
+    this._nominalC = this._capGiven ? props.getModelParam<number>("capacitance") : CAPACITOR_DEFAULTS["capacitance"]!;
+    this._IC       = props.isModelParamGiven("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
+    this._TC1      = props.isModelParamGiven("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
+    this._TC2      = props.isModelParamGiven("TC2")   ? props.getModelParam<number>("TC2")   : CAPACITOR_DEFAULTS["TC2"]!;
+    this._TNOM     = props.isModelParamGiven("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
+    this._SCALE    = props.isModelParamGiven("SCALE") ? props.getModelParam<number>("SCALE") : CAPACITOR_DEFAULTS["SCALE"]!;
+    this._M        = props.isModelParamGiven("M")     ? props.getModelParam<number>("M")     : CAPACITOR_DEFAULTS["M"]!;
+
+    // Geometric-capacitance model parameters — *Given guards gate the
+    // capsetup.c:71-88 cj/narrow/short derivation and the captemp.c:55-68
+    // base-capacitance selection.
+    this._cjGiven     = props.isModelParamGiven("cj");
+    this._cj          = this._cjGiven ? props.getModelParam<number>("cj") : CAPACITOR_DEFAULTS["cj"]!;
+    this._cjsw        = props.isModelParamGiven("cjsw")   ? props.getModelParam<number>("cjsw")   : CAPACITOR_DEFAULTS["cjsw"]!;
+    this._defw        = props.isModelParamGiven("defw")   ? props.getModelParam<number>("defw")   : CAPACITOR_DEFAULTS["defw"]!;
+    this._narrowGiven = props.isModelParamGiven("narrow");
+    this._narrow      = this._narrowGiven ? props.getModelParam<number>("narrow") : CAPACITOR_DEFAULTS["narrow"]!;
+    this._shortGiven  = props.isModelParamGiven("short");
+    this._short       = this._shortGiven ? props.getModelParam<number>("short") : CAPACITOR_DEFAULTS["short"]!;
+    this._delGiven    = props.isModelParamGiven("del");
+    this._del         = this._delGiven ? props.getModelParam<number>("del") : CAPACITOR_DEFAULTS["del"]!;
+    this._diGiven     = props.isModelParamGiven("di");
+    this._di          = this._diGiven ? props.getModelParam<number>("di") : CAPACITOR_DEFAULTS["di"]!;
+    this._thickGiven  = props.isModelParamGiven("thick");
+    this._thick       = this._thickGiven ? props.getModelParam<number>("thick") : CAPACITOR_DEFAULTS["thick"]!;
+    this._mCapGiven   = props.isModelParamGiven("mCap");
+    this._mCap        = this._mCapGiven ? props.getModelParam<number>("mCap") : CAPACITOR_DEFAULTS["mCap"]!;
+
+    // Per-instance geometry — CAPwidth defaults to model defw when not given
+    // (captemp.c:49-51); CAPlength defaults to 0 (capsetup.c:95-97).
+    this._wGiven = props.isModelParamGiven("w");
+    this._w      = this._wGiven ? props.getModelParam<number>("w") : this._defw;
+    this._lGiven = props.isModelParamGiven("l");
+    this._l      = this._lGiven ? props.getModelParam<number>("l") : 0;
+
+    // Per-instance temperature — captemp.c:38-47.
+    this._tempGiven  = props.isModelParamGiven("TEMP");
+    this._TEMP       = this._tempGiven ? props.getModelParam<number>("TEMP") : CAPACITOR_DEFAULTS["TEMP"]!;
+    this._dtempGiven = props.isModelParamGiven("DTEMP");
+    this._DTEMP      = this._dtempGiven ? props.getModelParam<number>("DTEMP") : CAPACITOR_DEFAULTS["DTEMP"]!;
+
     // capload.c:44  CAPm is applied at stamp time, not folded into CAPcapac.
-    // C is raw per-instance capacitance (TC + SCALE applied); M kept separate.
-    // _pool not yet set in constructor; temperature defaults to TNOM  dT = 0.
-    const _dT0 = 300.15 - this._TNOM;
-    this.C = this._nominalC * (1 + this._TC1 * _dT0 + this._TC2 * _dT0 * _dT0) * this._SCALE;
+    // Construction-time C uses the inductor-pattern init (inductor.ts:248-252):
+    // the reference temperature is TNOM, so difference = 0, factor = 1, and
+    // C = base · SCALE with base = _nominalC. computeTemperature() overwrites
+    // C with the geometry/TC/SCALE fold before the first NR iteration.
+    this.C = this._nominalC * this._SCALE;
   }
 
   setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
     const posNode = this.pinNodes.get("pos")!;  // CAPposNode
     const negNode = this.pinNodes.get("neg")!;  // CAPnegNode
+
+    // capsetup.c:71-81 — cj-from-thickness derivation. When cj was not
+    // supplied directly, derive it from di/thick: di·ε₀/thick if di is given,
+    // else εSiO2/thick when thick > 0, else 0.
+    if (!this._cjGiven) {
+      if (this._thickGiven && this._thick > 0.0) {
+        if (this._diGiven) {
+          this._cj = (this._di * EPS0) / this._thick;
+        } else {
+          this._cj = EPS_SIO2 / this._thick;
+        }
+      } else {
+        this._cj = 0.0;
+      }
+    }
+
+    // capsetup.c:83-87 — del-driven narrow/short derivation. When del was
+    // supplied, narrow/short default to 2·del where not explicitly given.
+    if (this._delGiven) {
+      if (!this._narrowGiven) this._narrow = 2 * this._del;
+      if (!this._shortGiven)  this._short  = 2 * this._del;
+    }
 
     // capsetup.c:102-103 — `*states += 2` (CAPqcap slot, with ccap = qcap+1
     // per niinteg.c:15).
@@ -215,32 +374,169 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
     this._handles = allocNortonStamp(ctx.solver, posNode, negNode);
   }
 
+  /**
+   * computeTemperature — per-instance temperature pass.
+   *
+   * cite: captemp.c:38-89 (CAPtemp instance body). Selects the base
+   * capacitance (instance value / model mCap / area·cj + perimeter·cjsw),
+   * resolves the per-instance operating temperature, and folds the TC/SCALE
+   * correction into the effective capacitance this.C.
+   *
+   * The base-capacitance selection covers the two `!CAPcapGiven` arms
+   * (captemp.c:55-68): the geometry formula and the model-mCap default. When
+   * an instance capacitance is given, the base is the netlisted value
+   * (this._nominalC).
+   */
+  computeTemperature(ctx: TempContext): void {
+    // captemp.c:38-47 — per-instance temperature override. When temp is given
+    // the instance uses its absolute TEMP and dtemp is forced 0 and ignored
+    // (ngspice prints a warning if dtemp was also supplied); otherwise the
+    // operating temperature is ambient + DTEMP.
+    let effectiveTemp: number;
+    if (this._tempGiven) {
+      effectiveTemp = this._TEMP;
+      if (this._dtempGiven) {
+        console.warn(`${this.label}: Instance temperature specified, dtemp ignored`);
+      }
+    } else {
+      effectiveTemp = ctx.cktTemp + this._DTEMP;
+    }
+
+    // captemp.c:49-51 — CAPwidth defaults to model defw when not given.
+    if (!this._wGiven) this._w = this._defw;
+
+    // captemp.c:55-70 — base capacitance selection. When no instance
+    // capacitance is given, the base is either the geometry formula or the
+    // model mCap default; when an instance capacitance is given, the base is
+    // the netlisted value (this._nominalC).
+    let base: number;
+    if (!this._capGiven) {
+      if (!this._mCapGiven) {
+        // captemp.c:57-63 — area·cj + perimeter·cjsw. _cj / _narrow / _short
+        // were resolved in setup() (capsetup.c:71-88).
+        base =
+          this._cj *
+          (this._w - this._narrow) *
+          (this._l - this._short) +
+          this._cjsw * 2 * (
+            (this._l - this._short) +
+            (this._w - this._narrow));
+      } else {
+        // captemp.c:66 — model default capacitance.
+        base = this._mCap;
+      }
+    } else {
+      base = this._nominalC;
+    }
+
+    // captemp.c:72-89 — TC/SCALE fold.
+    const difference = effectiveTemp - this._TNOM;
+    const factor = 1.0 + this._TC1 * difference + this._TC2 * difference * difference;
+    this.C = base * factor * this._SCALE;
+  }
+
+  /**
+   * stampAc — AC small-signal stamp per ngspice CAPacLoad (capacld.c).
+   *
+   * cite: capacld.c:28-35 —
+   *   m   = here->CAPm;
+   *   val = ckt->CKTomega * here->CAPcapac;
+   *   *(CAPposPosPtr+1) += m*val;   *(CAPnegNegPtr+1) += m*val;
+   *   *(CAPposNegPtr+1) -= m*val;   *(CAPnegPosPtr+1) -= m*val;
+   *
+   * The capacitor AC admittance Y = jωC has no conductance: only the
+   * susceptance ωC exists, written into the imaginary half of each cell
+   * (the `+1` offset in ngspice). Real part of every stamp is 0.
+   */
+  stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
+    const posNode = this.pinNodes.get("pos")!;  // CAPposNode
+    const negNode = this.pinNodes.get("neg")!;  // CAPnegNode
+
+    // capacld.c:30 — val = ckt->CKTomega * here->CAPcapac.
+    const val = omega * this.C;
+    // capacld.c:28 — m = here->CAPm; applied at stamp time, not folded into C.
+    const m = this._M;
+
+    // Lazily allocate the four matrix cells against the AC solver on first
+    // stamp. Order matches capsetup.c:114-117 (posPos, negNeg, posNeg, negPos).
+    if (this._hAcPosPos === -1) {
+      this._hAcPosPos = solver.allocElement(posNode, posNode);
+      this._hAcNegNeg = solver.allocElement(negNode, negNode);
+      this._hAcPosNeg = solver.allocElement(posNode, negNode);
+      this._hAcNegPos = solver.allocElement(negNode, posNode);
+    }
+
+    // capacld.c:32-35 — `*(...Ptr+1) ±= m*val`: the imaginary half only, the
+    // capacitor's AC admittance jωC has no conductance (real part is 0).
+    solver.stampElementImag(this._hAcPosPos,  m * val);  // *(CAPposPosPtr+1) += m*val
+    solver.stampElementImag(this._hAcNegNeg,  m * val);  // *(CAPnegNegPtr+1) += m*val
+    solver.stampElementImag(this._hAcPosNeg, -m * val);  // *(CAPposNegPtr+1) -= m*val
+    solver.stampElementImag(this._hAcNegPos, -m * val);  // *(CAPnegPosPtr+1) -= m*val
+  }
+
+  /**
+   * setParam — hot-loadable parameter update.
+   *
+   * Each branch updates the stored field only; the capacitance recompute is
+   * centralised in computeTemperature(), which the engine invokes after
+   * setup() and on every setCircuitTemp() (analog-engine.ts:1364-1372). This
+   * mirrors the inductor's setParam (inductor.ts:328-352): no hardcoded
+   * temperature term lives here.
+   */
   setParam(key: string, value: number): void {
     if (key === "capacitance") {
       this._nominalC = value;
-      const dT = 300.15 - this._TNOM;
-      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
+      this._capGiven = true;
     } else if (key === "IC") {
       this._IC = value;
     } else if (key === "TC1") {
       this._TC1 = value;
-      const dT = 300.15 - this._TNOM;
-      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "TC2") {
       this._TC2 = value;
-      const dT = 300.15 - this._TNOM;
-      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "TNOM") {
       this._TNOM = value;
-      const dT = 300.15 - this._TNOM;
-      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "SCALE") {
       this._SCALE = value;
-      const dT = 300.15 - this._TNOM;
-      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "M") {
       // capload.c:44  M is applied at stamp time; C is not recomputed when M changes.
       this._M = value;
+    } else if (key === "cj") {
+      this._cj = value;
+      this._cjGiven = true;
+    } else if (key === "cjsw") {
+      this._cjsw = value;
+    } else if (key === "defw") {
+      this._defw = value;
+    } else if (key === "narrow") {
+      this._narrow = value;
+      this._narrowGiven = true;
+    } else if (key === "short") {
+      this._short = value;
+      this._shortGiven = true;
+    } else if (key === "del") {
+      this._del = value;
+      this._delGiven = true;
+    } else if (key === "di") {
+      this._di = value;
+      this._diGiven = true;
+    } else if (key === "thick") {
+      this._thick = value;
+      this._thickGiven = true;
+    } else if (key === "mCap") {
+      this._mCap = value;
+      this._mCapGiven = true;
+    } else if (key === "w") {
+      this._w = value;
+      this._wGiven = true;
+    } else if (key === "l") {
+      this._l = value;
+      this._lGiven = true;
+    } else if (key === "TEMP") {
+      this._TEMP = value;
+      this._tempGiven = true;
+    } else if (key === "DTEMP") {
+      this._DTEMP = value;
+      this._dtempGiven = true;
     }
   }
 

@@ -19,7 +19,7 @@ import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js"
 import type { AnalogFactory, ComponentLayout } from "../../../core/registry.js";
 import { AnalogElement } from "../element.js";
 import type { DeviceFamily } from "../ngspice-load-order.js";
-import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { SparseSolverStamp as ComplexSparseSolver } from "../sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import { compileUnified } from "@/compile/compile.js";
 

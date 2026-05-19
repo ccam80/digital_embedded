@@ -23,7 +23,7 @@ import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspi
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
-import type { ComplexSparseSolverStamp } from "../../solver/analog/complex-sparse-solver.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { MODEDC, MODEINITPRED } from "../../solver/analog/ckt-mode.js";
 import { AnalogInductorElement, type MutSiblingNotifiable } from "./inductor.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -47,6 +47,12 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
   private _partner2!: AnalogInductorElement;
   private _hBr1Br2: number = -1;
   private _hBr2Br1: number = -1;
+  // AC matrix-cell handles, lazily allocated on the first stampAcCoupling()
+  // against the AC analysis's solver instance. These are SEPARATE from the
+  // DC `_hBr1Br2`/`_hBr2Br1` (which index the DC solver's pool): the AC sweep
+  // factors a different solver, so its cells must be allocated there.
+  private _hAcBr1Br2: number = -1;
+  private _hAcBr2Br1: number = -1;
 
   get hBr1Br2(): number { return this._hBr1Br2; }
   get hBr2Br1(): number { return this._hBr2Br1; }
@@ -143,10 +149,20 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
     );
   }
 
-  stampAcCoupling(solver: ComplexSparseSolverStamp, omega: number, _ctx: LoadContext): void {
+  stampAcCoupling(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
+    // Lazily allocate the two off-diagonal coupling cells against the AC
+    // solver on first stamp. mutsetup.c:66-67 order (br1br2, br2br1). The
+    // partner branch indices are the same MNA branch rows the inductors use.
+    if (this._hAcBr1Br2 === -1) {
+      const b1 = this._partner1.branchIndex;
+      const b2 = this._partner2.branchIndex;
+      this._hAcBr1Br2 = solver.allocElement(b1, b2);
+      this._hAcBr2Br1 = solver.allocElement(b2, b1);
+    }
+    // cite: mutacld.c:27-30 — `*(MUTbr1br2+1) -= ω·MUTfactor`: imaginary only.
     const wM = omega * this._mutFactor;
-    solver.stampComplexElement(this._hBr1Br2, 0, -wM);
-    solver.stampComplexElement(this._hBr2Br1, 0, -wM);
+    solver.stampElementImag(this._hAcBr1Br2, -wM);
+    solver.stampElementImag(this._hAcBr2Br1, -wM);
   }
 
   setParam(key: string, value: number): void {

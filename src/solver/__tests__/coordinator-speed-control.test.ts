@@ -18,7 +18,7 @@ import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import { AnalogElement } from '../analog/element.js';
 import type { DeviceFamily } from '../analog/ngspice-load-order.js';
-import type { ComplexSparseSolverStamp as ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
+import type { SparseSolverStamp as ComplexSparseSolver } from '../analog/sparse-solver.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { SetupContext } from '../analog/setup-context.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
@@ -55,9 +55,9 @@ class SpeedTestResistorEl extends AnalogElement {
     const g = 1 / this._resistance;
     const n1 = this._n1;
     const n2 = this._n2;
-    if (n1 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n1), g, 0); }
-    if (n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n2, n2), g, 0); }
-    if (n1 !== 0 && n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n2), -g, 0); solver.stampComplexElement(solver.allocComplexElement(n2, n1), -g, 0); }
+    if (n1 !== 0) { solver.stampElement(solver.allocElement(n1, n1), g); }
+    if (n2 !== 0) { solver.stampElement(solver.allocElement(n2, n2), g); }
+    if (n1 !== 0 && n2 !== 0) { solver.stampElement(solver.allocElement(n1, n2), -g); solver.stampElement(solver.allocElement(n2, n1), -g); }
   }
   getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
   setParam(_key: string, _value: number): void {}
