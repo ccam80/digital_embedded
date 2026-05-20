@@ -31,6 +31,7 @@ import { NgspiceBridge, buildAcCaptureSession } from "./ngspice-bridge.js";
 import type {
   AcCaptureSession, AcCapturePoint, AcSessionShape, AcPointShape,
   AcDivergenceReport, AcSolutionDivergenceEntry, AcShapeDivergenceEntry,
+  AcMatrixDivergenceEntry,
 } from "./types.js";
 import type { AcParams } from "../../ac-analysis.js";
 import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
@@ -811,7 +812,9 @@ export class ComparisonSession {
           matrixSize: snap.matrixSize,
           solRe: snap.solRe,
           solIm: snap.solIm,
-          // matrix / rhs* deferred to Phase 3 (SparseSolver complex CSC export).
+          matrix: snap.matrix,
+          rhsRe: snap.rhsRe,
+          rhsIm: snap.rhsIm,
         });
       },
     });
@@ -842,7 +845,10 @@ export class ComparisonSession {
       }
     } else if (this._opts.selfCompare) {
       // Self-compare: deep-clone our points as the ngspice side for zero-drift
-      // unit-testing of the AC query surface (no DLL required).
+      // unit-testing of the AC query surface (no DLL required). Matrix CSC
+      // and RHS are also deep-cloned so the matrix-class divergence walk in
+      // acFirstDivergence sees genuinely independent buffers- mutating one
+      // side's matrix in a test must not leak into the other.
       this._ngAcSession = {
         source: "ngspice",
         topology: this._acSession.topology,
@@ -852,6 +858,19 @@ export class ComparisonSession {
           matrixSize: p.matrixSize,
           solRe: new Float64Array(p.solRe),
           solIm: new Float64Array(p.solIm),
+          // Conditional spread: omit optional fields entirely when absent
+          // (TS strict-optional distinguishes `T?` from `T | undefined`).
+          ...(p.matrix && {
+            matrix: {
+              nnz: p.matrix.nnz,
+              colPtr: new Int32Array(p.matrix.colPtr),
+              rowIdx: new Int32Array(p.matrix.rowIdx),
+              valsRe: new Float64Array(p.matrix.valsRe),
+              valsIm: new Float64Array(p.matrix.valsIm),
+            },
+          }),
+          ...(p.rhsRe && { rhsRe: new Float64Array(p.rhsRe) }),
+          ...(p.rhsIm && { rhsIm: new Float64Array(p.rhsIm) }),
         })),
       };
     } else {
@@ -2987,6 +3006,7 @@ export class ComparisonSession {
 
     let solution: AcSolutionDivergenceEntry | null = null;
     let shape: AcShapeDivergenceEntry | null = null;
+    let matrix: AcMatrixDivergenceEntry | null = null;
 
     for (let i = 0; i < max; i++) {
       const o = i < ours.length ? ours[i] : null;
@@ -3002,8 +3022,7 @@ export class ComparisonSession {
             matrixSize: { ours: o ? o.matrixSize : null, ngspice: n ? n.matrixSize : null },
           };
         }
-        // No paired solution to compare; advance.
-        if (solution !== null && shape !== null) break;
+        if (solution !== null && shape !== null && matrix !== null) break;
         continue;
       }
 
@@ -3051,17 +3070,105 @@ export class ComparisonSession {
         }
       }
 
-      if (solution !== null && shape !== null) break;
+      // Matrix: per-cell complex Jacobian comparison.
+      // Build (row,col) -> {re,im} maps from each side's CSC and walk for
+      // first mismatch in order (ours.col asc, ours.row asc). A cell present
+      // only on one side is reported as "ours-only" / "ngspice-only"; cells
+      // present on both with differing complex values are "value-mismatch".
+      if (matrix === null && o.matrix && n.matrix) {
+        const cellKey = (row: number, col: number) => (col << 20) | row;
+        const oMap = new Map<number, { row: number; col: number; re: number; im: number }>();
+        const nMap = new Map<number, { row: number; col: number; re: number; im: number }>();
+        const oM = o.matrix;
+        const nM = n.matrix;
+        // Build maps from each side's CSC.
+        for (let c = 1; c < oM.colPtr.length; c++) {
+          const start = oM.colPtr[c - 1];
+          const end   = oM.colPtr[c];
+          for (let idx = start; idx < end; idx++) {
+            oMap.set(cellKey(oM.rowIdx[idx], c - 1 + 1 /* col is 1-based col index */),
+              { row: oM.rowIdx[idx], col: c - 1 + 1, re: oM.valsRe[idx], im: oM.valsIm[idx] });
+          }
+        }
+        for (let c = 1; c < nM.colPtr.length; c++) {
+          const start = nM.colPtr[c - 1];
+          const end   = nM.colPtr[c];
+          for (let idx = start; idx < end; idx++) {
+            nMap.set(cellKey(nM.rowIdx[idx], c - 1 + 1),
+              { row: nM.rowIdx[idx], col: c - 1 + 1, re: nM.valsRe[idx], im: nM.valsIm[idx] });
+          }
+        }
+        // Iterate union of keys, ordered by (col asc, row asc) to be
+        // deterministic. Build a sorted list of all cells from both sides.
+        const allKeys = new Set<number>();
+        for (const k of oMap.keys()) allKeys.add(k);
+        for (const k of nMap.keys()) allKeys.add(k);
+        const sortedCells: Array<{ row: number; col: number; key: number }> = [];
+        for (const k of allKeys) {
+          const fromO = oMap.get(k);
+          const fromN = nMap.get(k);
+          const ref = fromO ?? fromN!;
+          sortedCells.push({ row: ref.row, col: ref.col, key: k });
+        }
+        sortedCells.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row);
+
+        for (const c of sortedCells) {
+          const oc = oMap.get(c.key);
+          const nc = nMap.get(c.key);
+          if (oc && !nc) {
+            matrix = {
+              pointIndex: i, freq: o.freq, row: c.row, col: c.col,
+              kind: "ours-only",
+              ours: { re: oc.re, im: oc.im },
+              ngspice: null,
+              absDelta: 0, relDelta: 0,
+            };
+            break;
+          }
+          if (nc && !oc) {
+            matrix = {
+              pointIndex: i, freq: o.freq, row: c.row, col: c.col,
+              kind: "ngspice-only",
+              ours: null,
+              ngspice: { re: nc.re, im: nc.im },
+              absDelta: 0, relDelta: 0,
+            };
+            break;
+          }
+          if (oc && nc) {
+            const dRe = oc.re - nc.re;
+            const dIm = oc.im - nc.im;
+            const absDelta = Math.hypot(dRe, dIm);
+            if (absDelta > 0) {
+              const oMag = Math.hypot(oc.re, oc.im);
+              const nMag = Math.hypot(nc.re, nc.im);
+              const denom = Math.max(oMag, nMag, Number.MIN_VALUE);
+              matrix = {
+                pointIndex: i, freq: o.freq, row: c.row, col: c.col,
+                kind: "value-mismatch",
+                ours: { re: oc.re, im: oc.im },
+                ngspice: { re: nc.re, im: nc.im },
+                absDelta,
+                relDelta: absDelta / denom,
+              };
+              break;
+            }
+          }
+        }
+      }
+
+      if (solution !== null && shape !== null && matrix !== null) break;
     }
 
     const earliestCandidates: number[] = [];
     if (solution) earliestCandidates.push(solution.pointIndex);
     if (shape)    earliestCandidates.push(shape.pointIndex);
+    if (matrix)   earliestCandidates.push(matrix.pointIndex);
     const earliestPointIndex = earliestCandidates.length === 0
       ? null
       : Math.min(...earliestCandidates);
 
-    return { earliestPointIndex, solution, shape, matrix: null };
+    return { earliestPointIndex, solution, shape, matrix };
   }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get ourTopology(): TopologySnapshot { return this._ourTopology; }

@@ -139,11 +139,38 @@ export interface AcShapeDivergenceEntry {
 }
 
 /**
+ * First per-cell complex Jacobian mismatch between paired AC sessions.
+ *
+ * Cells are addressed by (row, col) in external (MNA) coordinates,
+ * matching ngspice's pre-LU CSC capture in niiter.c. `kind` distinguishes
+ * the three structural/value cases:
+ *   - "ours-only": cell present in ours' CSC but absent from ngspice's.
+ *   - "ngspice-only": cell present in ngspice's CSC but absent from ours'.
+ *   - "value-mismatch": cell present on both sides with differing complex
+ *     values (bit-exact bar; absDelta > 0 in the complex plane).
+ *
+ * For value-mismatch, both sides' values are carried. For presence kinds,
+ * only the present side's value is non-null.
+ */
+export interface AcMatrixDivergenceEntry {
+  pointIndex: number;
+  freq: number;
+  row: number;
+  col: number;
+  kind: "ours-only" | "ngspice-only" | "value-mismatch";
+  ours: { re: number; im: number } | null;
+  ngspice: { re: number; im: number } | null;
+  /** |ours - ngspice| in the complex plane; 0 for presence kinds (one side null). */
+  absDelta: number;
+  /** absDelta / max(|ours|, |ngspice|, MIN_VALUE); 0 for presence kinds. */
+  relDelta: number;
+}
+
+/**
  * Per-class first-divergence report for a paired AC sweep.
  *
  * Modeled on `firstDivergence` for DC/TRAN: each class is independently
- * computed (solution / shape, with matrix arriving in Phase 3b once
- * SparseSolver gains a complex CSC export), plus an `earliestPointIndex`
+ * computed (solution / shape / matrix), plus an `earliestPointIndex`
  * across all populated classes. `null` in any class means "no divergence
  * detected in this class within the paired range."
  *
@@ -157,8 +184,7 @@ export interface AcDivergenceReport {
   earliestPointIndex: number | null;
   solution: AcSolutionDivergenceEntry | null;
   shape: AcShapeDivergenceEntry | null;
-  /** Phase 3b: per-cell complex Jacobian mismatch. Always null in 3a. */
-  matrix: null;
+  matrix: AcMatrixDivergenceEntry | null;
 }
 
 /** Bundle of all instrumentation hooks the comparison harness needs. */

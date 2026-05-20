@@ -112,19 +112,42 @@ export interface AcAnalysisDeps {
   solverFactory?: () => SparseSolver;
   /**
    * Optional per-frequency snapshot sink. Called once per successful complex
-   * solve with the post-solve complex solution and `freq`/`omega`/`matrixSize`
-   * metadata. The arrays are defensive copies (sink owns them; safe to retain
-   * past the next frequency point).
+   * solve with the loaded complex matrix CSC (captured pre-factor), the
+   * loaded complex RHS (captured pre-solve), and the post-solve complex
+   * solution, plus `freq`/`omega`/`matrixSize` metadata. All arrays are
+   * defensive copies (sink owns them; safe to retain past the next
+   * frequency point).
+   *
+   * Capture timing mirrors ngspice's AC bridge instrumentation
+   * (niiter.c `ni_ac_capture_*` block): matrix is taken between
+   * `runByDeviceFamily(stampAc, ...)` and `solver.factor()` (factor
+   * overwrites `.Real`/`.Imag` with L/U), RHS is taken between
+   * `solver.factor()` and `solver.solve()`, solution is taken after
+   * `solve()`.
    *
    * Used by the parity harness to capture our-side AC data for comparison
    * against ngspice's per-frequency callback. Default `undefined`: zero cost
-   * for production callers.
+   * for production callers (no CSC walk, no array slicing).
    */
   acSnapshotSink?: (snap: {
     freq: number;
     omega: number;
     matrixSize: number;
+    /** Complex Jacobian in external-coords CSC, pre-factor. */
+    matrix: {
+      nnz: number;
+      colPtr: Int32Array;
+      rowIdx: Int32Array;
+      valsRe: Float64Array;
+      valsIm: Float64Array;
+    };
+    /** Complex RHS real part, pre-solve. */
+    rhsRe: Float64Array;
+    /** Complex RHS imag part, pre-solve. */
+    rhsIm: Float64Array;
+    /** Post-solve complex solution real part. */
     solRe: Float64Array;
+    /** Post-solve complex solution imag part. */
     solIm: Float64Array;
   }) => void;
 }
@@ -291,12 +314,60 @@ export class AcAnalysis {
       rhsIm.fill(0);
       rhsRe[branchExt] = 1.0;
 
+      // Harness matrix capture (pre-factor)- mirrors ngspice's
+      // ni_ac_capture_matrix(ckt) hook in niiter.c, fired between CKTacLoad
+      // and SMPcLUfac. Captured into a local var here; passed to the sink
+      // after solve so all per-frequency data lands in one call. The CSC
+      // build (sort by col asc, then row asc; colPtr by prefix-sum) matches
+      // ngspice's pre-LU CSC layout in the C-side ni_ac_capture_matrix.
+      let snapshotMatrix: {
+        nnz: number;
+        colPtr: Int32Array;
+        rowIdx: Int32Array;
+        valsRe: Float64Array;
+        valsIm: Float64Array;
+      } | null = null;
+      if (this._deps.acSnapshotSink) {
+        const cells = solver.getComplexCSCNonZeros();
+        const nnz = cells.length;
+        // Standard CSC convention (matches ngspice's pre-LU CSC layout in
+        // niiter.c): `colPtr[c]` is the END of column c's cells (= start of
+        // column c+1); column c's non-zeros live at indices
+        // [colPtr[c-1], colPtr[c]). `colPtr[0]` is always 0; the synthetic
+        // AC source branch occupies column N+1, so `colPtr` has length N+2
+        // (indices 0..N+1) and `colPtr[N+1]` is the terminating `nnz`
+        // sentinel.
+        const colPtr = new Int32Array(N + 2);
+        const rowIdx = new Int32Array(nnz);
+        const valsRe = new Float64Array(nnz);
+        const valsIm = new Float64Array(nnz);
+        cells.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row);
+        let cursor = 0;
+        for (let c = 1; c <= N + 1; c++) {
+          while (cursor < nnz && cells[cursor].col === c) {
+            rowIdx[cursor] = cells[cursor].row;
+            valsRe[cursor] = cells[cursor].valueRe;
+            valsIm[cursor] = cells[cursor].valueIm;
+            cursor++;
+          }
+          colPtr[c] = cursor;
+        }
+        snapshotMatrix = { nnz, colPtr, rowIdx, valsRe, valsIm };
+      }
+
       // ngspice spFactor: fi===0 reorders (spOrderAndFactor, complex path);
       // subsequent frequencies reuse the pivot order (FactorComplexMatrix).
       // spOKAY === 0; any nonzero is an error (singular etc.).
       const err = solver.factor();
 
       if (err === 0) {
+        // Harness RHS capture (pre-solve)- mirrors ni_ac_capture_loaded_rhs.
+        // solve() reads rhsRe/rhsIm and writes solRe/solIm (separate buffers),
+        // so capturing here is timing-equivalent to capturing after solve;
+        // doing it pre-solve matches the C-side fire-order exactly.
+        const snapshotRhsRe = this._deps.acSnapshotSink ? rhsRe.slice() : null;
+        const snapshotRhsIm = this._deps.acSnapshotSink ? rhsIm.slice() : null;
+
         solRe.fill(0);
         solIm.fill(0);
         // ngspice spSolve(Matrix, RHS, Solution, iRHS, iSolution).
@@ -318,15 +389,18 @@ export class AcAnalysis {
           }
         }
 
-        // Harness snapshot hook: emit a defensive copy of the full complex
-        // solution for this frequency. The bridge mirrors the ngspice
-        // per-frequency callback; pairing happens by frequency index in
-        // ComparisonSession.
-        if (this._deps.acSnapshotSink) {
+        // Harness snapshot hook: emit defensive copies of the full
+        // per-frequency capture (matrix pre-factor, RHS pre-solve, solution
+        // post-solve). The bridge mirrors the ngspice per-frequency
+        // callback; pairing happens by frequency index in ComparisonSession.
+        if (this._deps.acSnapshotSink && snapshotMatrix) {
           this._deps.acSnapshotSink({
             freq: f,
             omega,
             matrixSize: N,
+            matrix: snapshotMatrix,
+            rhsRe: snapshotRhsRe!,
+            rhsIm: snapshotRhsIm!,
             solRe: solRe.slice(),
             solIm: solIm.slice(),
           });

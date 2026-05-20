@@ -26,6 +26,13 @@ export interface PreFactorEntry {
   value: number;
 }
 
+export interface ComplexPreFactorEntry {
+  row: number;
+  col: number;
+  valueRe: number;
+  valueIm: number;
+}
+
 export class SparseSolverInstrumentation {
   constructor(private readonly _solver: SparseSolver) {}
 
@@ -89,6 +96,16 @@ export class SparseSolverInstrumentation {
    */
   getCSCNonZeros(): Array<PreFactorEntry> {
     return this._solver.getCSCNonZeros();
+  }
+
+  /**
+   * Complex sibling of `getCSCNonZeros()`. Same lifecycle constraint-
+   * must be called BEFORE `factor()` in complex mode; factorisation
+   * overwrites per-element `.Real`/`.Imag` with L/U. Mirrors ngspice's
+   * pre-LU CSC capture in niiter.c (AC bridge instrumentation block).
+   */
+  getComplexCSCNonZeros(): Array<ComplexPreFactorEntry> {
+    return this._solver.getComplexCSCNonZeros();
   }
 }
 

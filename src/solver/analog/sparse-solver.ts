@@ -1244,6 +1244,49 @@ export class SparseSolver {
     return result;
   }
 
+  /**
+   * @instrumentation Test-only. Use SparseSolverInstrumentation in new code.
+   *
+   * Complex sibling of `getCSCNonZeros()`. Returns the assembled complex
+   * matrix as `{row, col, valueRe, valueIm}` per non-zero element in
+   * external (MNA) ordering. Same walking pattern as the real export-
+   * `_elVal` and `_elValImag` are parallel arrays per element (see
+   * the SparseSolver class commentary).
+   *
+   * Must be called BEFORE `factor()`; once factorisation runs in complex
+   * mode the per-element `.Real`/`.Imag` fields hold L/U bytes, not the
+   * loaded admittance. Mirrors ngspice's pre-LU CSC capture in niiter.c
+   * (the AC bridge instrumentation block) which walks the matrix before
+   * SMPcLUfac overwrites the values.
+   *
+   * Real-mode use produces all-zero imag parts (a real matrix has
+   * `_elValImag` left untouched at 0 per the field comment), so the
+   * harness can use this uniformly for AC capture without checking
+   * `isComplex` first.
+   */
+  getComplexCSCNonZeros(): Array<{ row: number; col: number; valueRe: number; valueIm: number }> {
+    const n = this._size;
+    const result: Array<{ row: number; col: number; valueRe: number; valueIm: number }> = [];
+    const intToExtRow = this._intToExtRow;
+    const intToExtCol = this._intToExtCol;
+    for (let col = 1; col <= n; col++) {
+      let e = this._colHead[col];
+      while (e >= 0) {
+        const intRow = this._elRow[e]!;
+        const intCol = this._elCol[e]!;
+        const extRow = intToExtRow[intRow] ?? intRow;
+        const extCol = intToExtCol[intCol] ?? intCol;
+        result.push({
+          row: extRow, col: extCol,
+          valueRe: this._elVal[e]!,
+          valueIm: this._elValImag[e]!,
+        });
+        e = this._elNextInCol[e]!;
+      }
+    }
+    return result;
+  }
+
   // =========================================================================
   // Internal: structure initialization
   // =========================================================================

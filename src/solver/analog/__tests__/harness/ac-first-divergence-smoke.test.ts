@@ -38,7 +38,7 @@ it("ac_first_divergence_happy_path_self_compare_clean", async () => {
   const report = session.acFirstDivergence();
   expect(report.solution).toBeNull();
   expect(report.shape).toBeNull();
-  expect(report.matrix).toBeNull(); // Phase 3b contract.
+  expect(report.matrix).toBeNull(); // selfCompare clone matches bit-exact.
   expect(report.earliestPointIndex).toBeNull();
 }, 30_000);
 
