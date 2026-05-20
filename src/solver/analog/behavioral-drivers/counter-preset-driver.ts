@@ -164,8 +164,8 @@ export class BehavioralCounterPresetDriverElement extends PoolBackedAnalogElemen
       const next_i  = (1 - vClr) * ((1 - ld) * clocked + ld * loaded);
       s0[base + this._slotCountBase + i] = next_i;
       stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, next_i);
-      carryUp = carryUp * next_i;
-      carryDn = carryDn * (1 - next_i);
+      carryUp = carryUp * state_i;        // up-overflow: all lower bits were 1
+      carryDn = carryDn * (1 - state_i);  // down-underflow: all lower bits were 0
     }
     const ovf = (dirUp * carryUp + dirDn * carryDn) * (1 - vClr) * (1 - ld);
     stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, 1, ovf);

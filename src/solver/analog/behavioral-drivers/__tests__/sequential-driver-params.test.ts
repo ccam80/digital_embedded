@@ -8,7 +8,7 @@ import { BehavioralJKAsyncFlipflopDriverElement } from "../jk-async-flipflop-dri
 import { BehavioralRSAsyncLatchDriverElement } from "../rs-async-latch-driver.js";
 
 // ===========================================================================
-// setParam — rOut / vOH / vOL hot-loadability (Phase 1 param declaration)
+// setParam — rOut / vOH / vOL hot-loadability
 // ===========================================================================
 
 describe("BehavioralDFlipflopDriver accepts rOut/vOH/vOL via setParam without throwing", () => {

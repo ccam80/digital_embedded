@@ -192,7 +192,7 @@ describe("wiring-driver-params: accepts rOut/vOH/vOL via setParam without throwi
     expect(el!.getProperties().getModelParam<number>("vOL")).toBe(0.5);
   });
 
-  it("Splitter (BehavioralSplitterDriverElement): tolerates legacy setParam without throwing", () => {
+  it("Splitter (BehavioralSplitterDriverElement): tolerates unknown setParam keys without throwing", () => {
     // Drivers no longer carry rOut/vOH/vOL — those concepts moved to the
     // pin boundary (DigitalOutputPinLoaded). The driver's setParam is a
     // no-op; external callers must continue to work.

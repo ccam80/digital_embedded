@@ -3,9 +3,8 @@
  *
  * Reads V(in) − V(gnd) each NR iteration and Norton-stamps the result node
  * at 1.0 V (HI), 0.0 V (LO), or 0.5 V (indeterminate) according to the
- * vIH / vIL thresholds. Strict > / < comparators: equality at either
- * threshold lands in the indeterminate branch, matching the >= / <=
- * band-predicate symmetry the ngspice B-source uses on the reference side.
+ * vIH / vIL thresholds. Strict > / < comparators: a voltage exactly equal
+ * to either threshold lands in the indeterminate 0.5 V band.
  */
 
 import {
@@ -82,6 +81,7 @@ export class DigitalInputThresholderElement extends PoolBackedAnalogElement {
   setParam(key: string, value: number): void {
     if (key === "vIH") this._vIH = value;
     else if (key === "vIL") this._vIL = value;
+    // Unknown keys are silently ignored (no-op).
   }
 }
 

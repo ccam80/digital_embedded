@@ -4,10 +4,12 @@
  * driver-chain architecture.
  *
  * Two modes selected by `forceToggle`:
- *   forceToggle=0 (default, withEnable=true): on rising clock edge, toggle Q
- *                 when T high (≥ 0.5), hold when T low.
- *   forceToggle=1 (withEnable=false): unconditionally toggle on every rising
- *                 clock edge. T is ignored.
+ *   forceToggle=0 (default, withEnable=true): on rising clock edge, the
+ *                 toggle is gated by vT as a raw float via arithmetic Kleene
+ *                 product (tEff = vT * risingEdge); Q toggles smoothly in
+ *                 proportion to vT.
+ *   forceToggle=1 (withEnable=false): tEff = risingEdge unconditionally;
+ *                 the T input is ignored.
  *
  * Per Composite M15 (phase-composite-architecture.md), J-159.
  */

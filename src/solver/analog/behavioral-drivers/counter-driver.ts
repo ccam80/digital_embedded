@@ -3,9 +3,9 @@
  * up-counter with enable, clear, and overflow outputs. See and-driver.ts for
  * the normalized-bit driver-chain architecture.
  *
- * Control inputs (en, clr) and clock (C) are normalized {0, 1} V; edge
- * detection uses 0.5 V as the rising-edge threshold. Output bits and ovf
- * stamp at {0, 1} V.
+ * Control inputs (en, clr) and clock (C) are normalized {0, 1} V; rising-edge
+ * detection is arithmetic: risingEdge = vClock * (1 - prevClock), so a full
+ * high-then-low swing produces risingEdge = 1. Output bits and ovf stamp at {0, 1} V.
  */
 
 import {
@@ -155,7 +155,7 @@ export class BehavioralCounterDriverElement extends PoolBackedAnalogElement {
       const next_i  = (1 - clearEff) * clocked;
       s0[base + this._slotCountBase + i] = next_i;
       stampNortonValue(ctx, this._handlesByBit[i], this._ctrlBitNodes[i], this._gndNode, 1, next_i);
-      carry = carry * next_i;
+      carry = carry * state_i;  // next bit toggles only if all lower bits were 1
     }
     const ovf = carry * (1 - clearEff);
     stampNortonValue(ctx, this._handlesOvf, this._ctrlOvfNode, this._gndNode, 1, ovf);

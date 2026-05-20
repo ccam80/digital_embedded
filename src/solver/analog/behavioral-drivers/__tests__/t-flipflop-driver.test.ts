@@ -266,7 +266,7 @@ describe("BehavioralTFlipflopDriver parameter hot-load (Cat 4)", () => {
 // driver's setParam is a no-op; external callers must continue to work.
 // ===========================================================================
 
-describe("BehavioralTFlipflopDriver tolerates legacy setParam without throwing", () => {
+describe("BehavioralTFlipflopDriver tolerates unknown setParam keys without throwing", () => {
   it("accepts rOut/vOH/vOL via setParam without throwing", () => {
     const props = new PropertyBag();
     props.setModelParam("forceToggle", 0);
