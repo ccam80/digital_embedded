@@ -1,0 +1,22 @@
+* RC AC parity fixture (companion of rc-transient.dts).
+*
+* Same R, C, and topology as rc-transient.dts (R1=1k, C1=1u, single-pole at
+* fc = 1/(2*pi*R*C) ~= 159.155 Hz). The .dts wires the source via an
+* AcVoltageSource (V1) whose transient waveform our AcAnalysis ignores under
+* AC sweep- we stamp a synthetic 1V AC excitation at the V1:pos node from
+* params.sourceLabel. ngspice needs the real `ac N` directive in the deck,
+* which transient-spec emission by netlist-generator.ts does not provide, so
+* this .cir is hand-authored alongside the .dts and loaded via the harness's
+* `cirPath` opt (comparison-session.ts:614, readFileSync direct, no
+* generator translation).
+*
+* Node mapping rationale: this .cir uses bare integer names (1 = V1:pos,
+* 2 = R1:neg / C1:pos) rather than text labels. The harness compares matrix
+* and solution by integer MNA row index, so the comparison is meaningful as
+* long as both sides' equation orderings agree. Any permutation surfaces as
+* a matrix-class value-permutation in acFirstDivergence rather than as a
+* false positive- that's the right signal for Phase 3c node-mapping work.
+v1 1 0 ac 1
+r1 1 2 1k
+c1 2 0 1u
+.end

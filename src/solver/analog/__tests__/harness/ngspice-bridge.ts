@@ -594,6 +594,10 @@ export function buildAcCaptureSession(
   acPoints: RawNgspiceAcPoint[],
   topology: TopologySnapshot,
 ): AcCaptureSession {
+  // matrixSize passes through raw (ngspice's CKTmaxEqNum + 1, niiter.c:480),
+  // matching the DC/TRAN per-iteration pass-through at line 522 above. Cell-
+  // level comparison routes through `_ngMatrixRowMap`/`_ngMatrixColMap`
+  // translation in comparison-session.ts.
   const points: AcCapturePoint[] = acPoints.map((p) => ({
     freq: p.freq,
     omega: p.omega,

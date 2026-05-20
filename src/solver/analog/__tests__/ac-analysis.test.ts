@@ -250,14 +250,18 @@ describe("AC", () => {
     expect(diag!.severity).toBe("error");
   });
 
-  it("decade_sweep_points- type='dec', numPoints=10, 1Hz to 1MHz; 60 points", () => {
+  it("decade_sweep_points- type='dec', numPoints=10, 1Hz to 1MHz; 61 points (endpoint inclusive, ngspice-faithful)", () => {
     const result = buildFrequencyArray({
       type: "dec", numPoints: 10, fStart: 1, fStop: 1e6,
       sourceLabel: "s", outputNodes: [],
     });
 
-    expect(result.length).toBe(60);
+    // ngspice acan.c:89 num_steps = floor(log10(1e6/1) * 10) = 60; the sweep
+    // loop emits num_steps + 1 = 61 frequencies, with the last point at
+    // exactly fStop (modulo float rounding).
+    expect(result.length).toBe(61);
     expect(result[0]).toBeCloseTo(1, 10);
+    expect(result[result.length - 1]).toBeCloseTo(1e6, 5);
     const ratio0 = result[1] / result[0];
     const ratio1 = result[2] / result[1];
     expect(ratio0).toBeCloseTo(ratio1, 10);

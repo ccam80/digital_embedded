@@ -833,10 +833,16 @@ export class ComparisonSession {
         bridge.loadNetlist(this._materializeCir());
         bridge.runAc(params.type, params.numPoints, params.fStart, params.fStop);
         const raw = bridge.getAcPoints();
-        // Phase 2 uses emptyTopology() on the ngspice side; Phase 3 will
-        // resolve node names via the bridge's NgspiceTopology so MCP tooling
-        // can address points by label.
         this._ngAcSession = buildAcCaptureSession(raw, emptyTopology());
+        // Populate _nodeMap + _ngMatrixRowMap/_ngMatrixColMap so
+        // acFirstDivergence's matrix walk can translate ngspice's external
+        // (row, col) indices into our coordinate space. Without this the
+        // matrix-class diff compares raw ngspice indices (which include the
+        // CKTmaxEqNum-style +1 offset and ngspice-specific permutation)
+        // against our raw indices, producing meaningless false positives.
+        // Mirrors what runDcOp + runTransient do via the same helper.
+        this._buildNodeMapping(bridge);
+        this._buildMatrixMaps();
       } catch (e: any) {
         this.errors.push(`ngspice AC sweep failed: ${e.message}`);
         this._ngAcSession = { source: "ngspice", topology: emptyTopology(), points: [] };
@@ -2930,12 +2936,8 @@ export class ComparisonSession {
     const presenceCounts = { both: 0, oursOnly: 0, ngspiceOnly: 0 };
     const largeFreqDeltas: Array<{ pointIndex: number; freqRelDelta: number }> = [];
 
-    // Match the SessionShape threshold philosophy- ngspice and our sweep
-    // both build frequencies from {fStart, fStop, n, type} via independent
-    // float arithmetic, so true agreement is bit-close (~1e-15). Anything
-    // past 1e-9 relative is a real disagreement worth flagging.
-    const FREQ_REL_TOL = 1e-9;
-
+    // Reported, not gated- mirrors the DC/TRAN largeTimeDeltas surface.
+    // Consumers cross-reference freqRelDelta and decide how to investigate.
     for (let i = 0; i < max; i++) {
       const o = i < oursLen ? ours[i] : null;
       const n = i < ngLen ? ngsp[i] : null;
@@ -2947,7 +2949,7 @@ export class ComparisonSession {
       if (o && n) {
         const denom = Math.max(Math.abs(o.freq), Math.abs(n.freq), Number.MIN_VALUE);
         freqRelDelta = Math.abs(n.freq - o.freq) / denom;
-        if (freqRelDelta > FREQ_REL_TOL) {
+        if (freqRelDelta > 0) {
           largeFreqDeltas.push({ pointIndex: i, freqRelDelta });
         }
       }
@@ -3026,23 +3028,20 @@ export class ComparisonSession {
         continue;
       }
 
-      // Shape: frequency or matrixSize disagreement (both present).
-      if (shape === null) {
-        if (o.freq !== n.freq) {
-          shape = {
-            pointIndex: i,
-            kind: "frequency-mismatch",
-            freq: { ours: o.freq, ngspice: n.freq },
-            matrixSize: { ours: o.matrixSize, ngspice: n.matrixSize },
-          };
-        } else if (o.matrixSize !== n.matrixSize) {
-          shape = {
-            pointIndex: i,
-            kind: "matrix-size-mismatch",
-            freq: { ours: o.freq, ngspice: n.freq },
-            matrixSize: { ours: o.matrixSize, ngspice: n.matrixSize },
-          };
-        }
+      // matrixSize is NOT flagged here: ngspice's CKTmaxEqNum+1 = N+2 while
+      // ours = N, so the raw values always differ by 2 even on identical
+      // topologies. The matrix dimension is carried in AcPointShape for
+      // inspection (matching DC/TRAN's `topologyDiff` at line 3886 which
+      // surfaces both sides separately). Structural matrix divergence
+      // surfaces in the matrix-class walk below via ours-only / ngspice-only
+      // cells after `_ngMatrixRowMap` translation.
+      if (shape === null && o.freq !== n.freq) {
+        shape = {
+          pointIndex: i,
+          kind: "frequency-mismatch",
+          freq: { ours: o.freq, ngspice: n.freq },
+          matrixSize: { ours: o.matrixSize, ngspice: n.matrixSize },
+        };
       }
 
       // Solution: per-MNA-row complex value comparison.
@@ -3071,32 +3070,75 @@ export class ComparisonSession {
       }
 
       // Matrix: per-cell complex Jacobian comparison.
-      // Build (row,col) -> {re,im} maps from each side's CSC and walk for
-      // first mismatch in order (ours.col asc, ours.row asc). A cell present
-      // only on one side is reported as "ours-only" / "ngspice-only"; cells
-      // present on both with differing complex values are "value-mismatch".
+      // Build (row,col) -> {re,im} maps in OUR coordinate space and walk for
+      // first mismatch in order (col asc, row asc). ngspice's external indices
+      // are translated through _ngMatrixRowMap / _ngMatrixColMap (populated
+      // by _buildNodeMapping in runAcSweep) so both sides' cells land in a
+      // common keyspace- without this translation the raw ngspice indices
+      // (CKTmaxEqNum-style +1 offset and ngspice-specific permutation) would
+      // never overlap with ours and every cell would falsely report as
+      // ours-only / ngspice-only. ngspice cells whose row OR col has no map
+      // entry surface as "ngspice-only" using the raw ngspice coordinates;
+      // ours cells are always in our space (no translation needed).
       if (matrix === null && o.matrix && n.matrix) {
         const cellKey = (row: number, col: number) => (col << 20) | row;
-        const oMap = new Map<number, { row: number; col: number; re: number; im: number }>();
-        const nMap = new Map<number, { row: number; col: number; re: number; im: number }>();
+        type CellInfo = { row: number; col: number; re: number; im: number };
+        const oMap = new Map<number, CellInfo>();
+        const nMap = new Map<number, CellInfo>();
+        // ngspice cells whose ng-coords don't map (no translation) get keyed
+        // by their ngspice coords directly and reported as "ngspice-only".
+        const nUnmapped = new Map<number, CellInfo>();
         const oM = o.matrix;
         const nM = n.matrix;
-        // Build maps from each side's CSC.
+        // Ours: standard CSC convention, colPtr[c] = end of col c.
         for (let c = 1; c < oM.colPtr.length; c++) {
           const start = oM.colPtr[c - 1];
           const end   = oM.colPtr[c];
           for (let idx = start; idx < end; idx++) {
-            oMap.set(cellKey(oM.rowIdx[idx], c - 1 + 1 /* col is 1-based col index */),
-              { row: oM.rowIdx[idx], col: c - 1 + 1, re: oM.valsRe[idx], im: oM.valsIm[idx] });
+            const row = oM.rowIdx[idx];
+            oMap.set(cellKey(row, c), { row, col: c, re: oM.valsRe[idx], im: oM.valsIm[idx] });
           }
         }
+        // ngspice: same CSC convention; apply row/col map translation.
+        const ngRowMap = this._ngMatrixRowMap;
+        const ngColMap = this._ngMatrixColMap;
+        const haveMaps = ngRowMap.size > 0 && ngColMap.size > 0;
         for (let c = 1; c < nM.colPtr.length; c++) {
           const start = nM.colPtr[c - 1];
           const end   = nM.colPtr[c];
           for (let idx = start; idx < end; idx++) {
-            nMap.set(cellKey(nM.rowIdx[idx], c - 1 + 1),
-              { row: nM.rowIdx[idx], col: c - 1 + 1, re: nM.valsRe[idx], im: nM.valsIm[idx] });
+            const ngRow = nM.rowIdx[idx];
+            const ngCol = c;
+            const cellRe = nM.valsRe[idx];
+            const cellIm = nM.valsIm[idx];
+            if (!haveMaps) {
+              // selfCompare or no mapping built; keys match ours' space already.
+              nMap.set(cellKey(ngRow, ngCol), { row: ngRow, col: ngCol, re: cellRe, im: cellIm });
+              continue;
+            }
+            const ourRow = ngRowMap.get(ngRow);
+            const ourCol = ngColMap.get(ngCol);
+            if (ourRow === undefined || ourCol === undefined) {
+              nUnmapped.set(cellKey(ngRow, ngCol),
+                { row: ngRow, col: ngCol, re: cellRe, im: cellIm });
+            } else {
+              nMap.set(cellKey(ourRow, ourCol),
+                { row: ourRow, col: ourCol, re: cellRe, im: cellIm });
+            }
           }
+        }
+        // Surface any ngspice-only structural cells first (they're a
+        // permanent topology issue, not transient per-point disagreement).
+        if (nUnmapped.size > 0 && matrix === null) {
+          const ngOnly = Array.from(nUnmapped.values())
+            .sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row)[0]!;
+          matrix = {
+            pointIndex: i, freq: o.freq, row: ngOnly.row, col: ngOnly.col,
+            kind: "ngspice-only",
+            ours: null,
+            ngspice: { re: ngOnly.re, im: ngOnly.im },
+            absDelta: 0, relDelta: 0,
+          };
         }
         // Iterate union of keys, ordered by (col asc, row asc) to be
         // deterministic. Build a sorted list of all cells from both sides.

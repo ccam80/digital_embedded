@@ -451,9 +451,27 @@ export class AcAnalysis {
 /**
  * Generate the frequency array for an AC sweep.
  *
- * - 'lin': numPoints equally-spaced from fStart to fStop (inclusive).
- * - 'dec': numPoints per decade; total = ceil(log10(fStop/fStart)) * numPoints.
- * - 'oct': numPoints per octave; total = ceil(log2(fStop/fStart)) * numPoints.
+ * Counts and spacing mirror ngspice acan.c (CKTacAnalyze) exactly:
+ *
+ *   DEC: num_steps = floor(|log10(fStop/fStart)| * numPointsPerDecade);
+ *        freqDelta = exp(log(fStop/fStart) / num_steps);
+ *        emit num_steps + 1 points from fStart to fStart * freqDelta^num_steps
+ *        (= fStop exactly, modulo float rounding). Endpoint inclusive.
+ *   OCT: num_steps = floor(|log2 (fStop/fStart)| * numPointsPerOctave);
+ *        freqDelta = exp(log(2) / numPointsPerOctave);
+ *        emit num_steps + 1 points (endpoint inclusive). Note ngspice's OCT
+ *        freqDelta does NOT depend on fStop- it is a fixed octave step- so
+ *        the last point can fall slightly past fStop when (log2(fStop/fStart)
+ *        * numPoints) is not integer; the while-loop terminates at
+ *        `freq <= stopFreq + freqTol` (acan.c:257). We match the integer
+ *        endpoint via num_steps + 1 emission.
+ *   LIN: numPoints equally-spaced from fStart to fStop (endpoint inclusive,
+ *        ngspice's num_steps frequencies with step = (fStop-fStart)/(n-1)).
+ *
+ * Citation: ngspice acan.c:84-115 (freqDelta setup) and acan.c:227-389
+ * (the sweep while-loop). The endpoint-inclusive count was off-by-one in
+ * an earlier version of this function (emitted num_steps without the +1);
+ * the ac-bridge-paired smoke caught it on the first real ngspice run.
  */
 export function buildFrequencyArray(params: AcParams): Float64Array {
   const { type, numPoints, fStart, fStop } = params;
@@ -473,21 +491,31 @@ export function buildFrequencyArray(params: AcParams): Float64Array {
   }
 
   if (type === "dec") {
-    const decades = Math.log10(fStop / fStart);
-    const total = Math.round(decades * numPoints);
+    // ngspice acan.c:89 num_steps = floor(|log10(stop/start)| * n_per_dec).
+    // freqDelta from acan.c:90; we emit fStart * freqDelta^i for
+    // i = 0..num_steps (inclusive) to mirror the C-side sweep loop's
+    // endpoint behaviour.
+    const numSteps = Math.floor(Math.abs(Math.log10(fStop / fStart)) * numPoints);
+    const freqDelta = Math.exp(Math.log(fStop / fStart) / numSteps);
+    const total = numSteps + 1;
     const freqs = new Float64Array(total);
-    for (let i = 0; i < total; i++) {
-      freqs[i] = fStart * Math.pow(10, (i / numPoints));
+    freqs[0] = fStart;
+    for (let i = 1; i < total; i++) {
+      freqs[i] = freqs[i - 1] * freqDelta;
     }
     return freqs;
   }
 
-  // 'oct'
-  const octaves = Math.log2(fStop / fStart);
-  const total = Math.round(octaves * numPoints);
+  // 'oct'- ngspice acan.c:98-99 freqDelta = exp(log(2)/n_per_octave);
+  // num_steps mirrors the DEC case (floor of log2 span * n_per_octave),
+  // with num_steps + 1 emission.
+  const numSteps = Math.floor(Math.abs(Math.log2(fStop / fStart)) * numPoints);
+  const freqDelta = Math.exp(Math.log(2) / numPoints);
+  const total = numSteps + 1;
   const freqs = new Float64Array(total);
-  for (let i = 0; i < total; i++) {
-    freqs[i] = fStart * Math.pow(2, i / numPoints);
+  freqs[0] = fStart;
+  for (let i = 1; i < total; i++) {
+    freqs[i] = freqs[i - 1] * freqDelta;
   }
   return freqs;
 }
