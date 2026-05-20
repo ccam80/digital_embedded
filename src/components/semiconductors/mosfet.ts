@@ -173,8 +173,8 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     ICVGS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 1 }, description: "Initial condition for Vgs (MODEUIC)" },
     ICVBS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 2 }, description: "Initial condition for Vbs (MODEUIC)" },
     TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
-    drainSquares:  { default: 1, description: "Drain diffusion squares (mos1set.c:124-125)" },
-    sourceSquares: { default: 1, description: "Source diffusion squares (mos1set.c:127-128)" },
+    drainSquares:  { default: 1, spiceName: "nrd", description: "Drain diffusion squares (mos1.c:21 MOS1_NRD)" },
+    sourceSquares: { default: 1, spiceName: "nrs", description: "Source diffusion squares (mos1.c:22 MOS1_NRS)" },
   },
 });
 
@@ -278,8 +278,8 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     ICVGS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 1 }, description: "Initial condition for Vgs (MODEUIC)" },
     ICVBS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 2 }, description: "Initial condition for Vbs (MODEUIC)" },
     TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
-    drainSquares:  { default: 1, description: "Drain diffusion squares (mos1set.c:124-125)" },
-    sourceSquares: { default: 1, description: "Source diffusion squares (mos1set.c:127-128)" },
+    drainSquares:  { default: 1, spiceName: "nrd", description: "Drain diffusion squares (mos1.c:21 MOS1_NRD)" },
+    sourceSquares: { default: 1, spiceName: "nrs", description: "Source diffusion squares (mos1.c:22 MOS1_NRS)" },
   },
 });
 

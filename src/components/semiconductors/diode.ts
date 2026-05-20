@@ -118,7 +118,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
     // D-W3-6: sidewall saturation current params  dioload.c:209-243
     ISW:   { default: 0,    unit: "A",  spiceName: "JSW", description: "Sidewall saturation current (DIOsatSWCur)" },
-    NSW:   { default: NaN,             description: "Sidewall emission coefficient (DIOswEmissionCoeff; default=N)" },
+    NSW:   { default: NaN,             spiceName: "ns", description: "Sidewall emission coefficient (DIOswEmissionCoeff; dio.c:60 DIO_MOD_NS; default=N)" },
   },
   instance: {
     AREA: { default: 1,               description: "Area scaling factor" },

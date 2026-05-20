@@ -31,7 +31,7 @@ interface ElementSpec {
 
 const ELEMENT_SPECS: Record<string, ElementSpec> = {
   Resistor:        { prefix: "R" },
-  Capacitor:       { prefix: "C" },
+  Capacitor:       { prefix: "C", modelType: "C" },
   Inductor:        { prefix: "L" },
   DcVoltageSource: { prefix: "V" },
   AcVoltageSource: { prefix: "V" },
@@ -483,28 +483,51 @@ function emitPrimitive(
 ): string[] {
   let paramDefs: readonly ParamDef[] = [];
   let emission: ModelEmissionSpec | undefined;
-  if (spec.modelType !== undefined) {
-    const modelEntry = def.modelRegistry?.[modelKey];
-    if (!modelEntry) {
-      throw new Error(`netlist-generator: typeId "${typeId}" has no modelRegistry["${modelKey}"]`);
-    }
+  const modelEntry = def.modelRegistry?.[modelKey];
+  if (modelEntry) {
     paramDefs = modelEntry.paramDefs;
     emission = modelEntry.kind === "netlist" ? modelEntry.spice : undefined;
+  } else if (spec.modelType !== undefined) {
+    throw new Error(`netlist-generator: typeId "${typeId}" has no modelRegistry["${modelKey}"]`);
   }
 
   const label = canonicalizeSpiceLabel(rawLabel, spec.prefix);
 
   if (typeId === "Resistor") {
     const R = requireParam(props, def, modelKey, "resistance", rawLabel);
-    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${R}`];
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${R}${instanceParamSuffix(paramDefs, props)}`];
   }
   if (typeId === "Capacitor") {
-    const C = requireParam(props, def, modelKey, "capacitance", rawLabel);
-    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${C}`];
+    // ngspice C-card has two semantic paths gated by captemp.c:55-70:
+    //
+    //   1. Direct-value path (instance VALUE given):
+    //        `Cxxx N+ N- VALUE [inst-params]`
+    //      ngspice's captemp.c:69-70 takes the positional VALUE as the cap;
+    //      cj/cjsw/defw/defl on a .model card are unused. Emit with NO model
+    //      card so ngspice attaches its default cap model.
+    //
+    //   2. Geometric / model path (instance VALUE NOT given):
+    //        `Cxxx N+ N- MODELNAME [W=... L=... inst-params]`
+    //      + `.model MODELNAME C (cj=... cjsw=... defw=... defl=... ...)`
+    //      ngspice's captemp.c:55-68 computes effective C from the model's
+    //      process params and the instance W/L.
+    //
+    // The positional VALUE wins outright (captemp.c:70 reset), so emitting
+    // both VALUE and MODELNAME is contradictory and ngspice rejects the
+    // resulting C-card. Gate on isModelParamGiven("capacitance").
+    if (props.isModelParamGiven("capacitance")) {
+      const C = props.getModelParam<number>("capacitance");
+      return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${C}${instanceParamSuffix(paramDefs, props)}`];
+    }
+    const modelName = `${label}_${spec.modelType}`;
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+    }
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${modelName}${instanceParamSuffix(paramDefs, props)}`];
   }
   if (typeId === "Inductor") {
     const L = requireParam(props, def, modelKey, "inductance", rawLabel);
-    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${L}`];
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${L}${instanceParamSuffix(paramDefs, props)}`];
   }
   if (typeId === "DcVoltageSource") {
     const V = requireParam(props, def, modelKey, "voltage", rawLabel);
@@ -886,6 +909,10 @@ function modelCardSuffix(
 
   for (const def of paramDefs) {
     if (def.partition === "instance") continue;
+    // Positional params (e.g. cap.capacitance, inductor.inductance) emit as the
+    // bare VALUE on the instance line per inp2c.c:18 / inp2l.c — never inside
+    // a .model card body.
+    if (def.positional) continue;
     if (def.emitGroup || def.emit === "flag") {
       throw new Error(
         `netlist-generator: model-card param ${def.key} declares emit/group; ` +

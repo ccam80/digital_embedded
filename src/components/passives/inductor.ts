@@ -59,7 +59,7 @@ export interface MutSiblingNotifiable {
 
 export const { paramDefs: INDUCTOR_PARAM_DEFS, defaults: INDUCTOR_DEFAULTS } = defineModelParams({
   primary: {
-    inductance: { default: 1e-3, unit: "H", description: "Inductance in henries", min: 1e-12 },
+    inductance: { default: 1e-3, unit: "H", positional: true, description: "Inductance in henries (positional VALUE on the L-card per inp2l.c)", min: 1e-12 },
   },
   secondary: {
     IC:   { default: NaN,    unit: "A",    description: "Initial condition current for UIC" },

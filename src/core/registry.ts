@@ -131,6 +131,21 @@ export interface ParamDef {
    * unaffected.
    */
   spiceConverter?: (value: number) => number;
+  /**
+   * `true` if the param is emitted positionally on the instance line as a
+   * bare value (no `KEY=`) and must NOT appear inside a `.model` card body.
+   * Currently used for the cap's `capacitance` and the inductor's `inductance`:
+   * ngspice's CAPpTable / INDpTable accept these as the positional VALUE
+   * (`Cxxx N+ N- VALUE [MODELNAME]` per `inp2c.c:18`), and CAPmPTable /
+   * INDmPTable do NOT accept `capacitance=` / `inductance=` inside a
+   * `.model` (they use `cap=` / `ind=` respectively, which is the model's
+   * default value — a different concept from the per-instance VALUE).
+   * Without this flag the param leaks into the .model card body, ngspice
+   * silently rejects the .model card, the model lookup at instance-parse
+   * time falls back to the default model, and the instance line trips on
+   * its own model-name token as "unknown parameter".
+   */
+  positional?: boolean;
 }
 
 /** SPICE-emission overrides for a ModelEntry. */

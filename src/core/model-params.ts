@@ -11,6 +11,9 @@ interface ParamSpec {
   emit?: "key-value" | "flag";
   emitGroup?: { name: string; index: number };
   spiceConverter?: (value: number) => number;
+  /** `true` if the param emits positionally on the instance line (bare VALUE)
+   *  and must NOT appear inside a `.model` card body. See ParamDef.positional. */
+  positional?: boolean;
 }
 
 /**
@@ -52,6 +55,7 @@ export function defineModelParams(spec: {
       if (s.emit !== undefined) pDef.emit = s.emit;
       if (s.emitGroup !== undefined) pDef.emitGroup = s.emitGroup;
       if (s.spiceConverter !== undefined) pDef.spiceConverter = s.spiceConverter;
+      if (s.positional !== undefined) pDef.positional = s.positional;
       paramDefs.push(pDef);
       defaults[key] = s.default;
     }
