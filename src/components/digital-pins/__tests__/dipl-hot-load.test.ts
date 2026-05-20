@@ -166,33 +166,89 @@ describe("DIPL Loaded: rIn hot-load shifts load-induced node voltage (T1)", () =
     expect(dcAfter).not.toBeNull();
     expect(dcAfter!.converged).toBe(true);
 
+    // V(In_1) = 5 × rIn/(rDriver + rIn) = 5 × 1e7/(4e6 + 1e7) = 5 × 10/14 = 25/7 V
     const vNodeAfter = fix.engine.getNodeVoltage(inNode);
-    expect(vNodeAfter).toBeGreaterThan(2.0);
+    expect(vNodeAfter).toBeCloseTo(25 / 7, 5);
     const after = fix.engine.getNodeVoltage(outNode);
     expect(after).toBeCloseTo(V_HIGH, 6);
   });
 });
 
 describe("DIPL Loaded: cIn hot-load shifts settling time constant (T1)", () => {
-  it("Loaded: setComponentProperty(dipl, 'cIn', 1e-10) shifts the settling time constant", () => {
-    // This test verifies cIn reaches the inner DIPL cap sub-element without error.
-    // Drive the gate at 5 V (above vIH → result = 1.0 → V(out) = V_HIGH at DC).
-    // After hot-loading a larger cIn the DC classification is unchanged (cIn is
-    // reactive; zero effect at DC), but the param must have been accepted
-    // without throw — same DC output voltage.
-    const fix = buildFixture({ build: buildBufAt(5.0, 1) });
-    const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
-    expect(dc!.converged).toBe(true);
-    const outNode = nodeOf(fix, "gate:out");
-    expect(fix.engine.getNodeVoltage(outNode)).toBeCloseTo(V_HIGH, 6);
+  it("Loaded: setComponentProperty(dipl, 'cIn', 1e-7) slows RC settling — binding is observable in transient", () => {
+    // Strategy: drive the gate input through a 1 MΩ series resistor so that the
+    // RC time constant τ = rSeries × cIn is observable in transient.
+    // Default cIn = 1e-12 → τ_small = 1e6 × 1e-12 = 1 µs.
+    // After hot-load cIn = 1e-7  → τ_large = 1e6 × 1e-7  = 0.1 s.
+    //
+    // Test sequence:
+    //   1. DC-OP at vs = 0 V: node settled at 0 V.
+    //   2. Hot-load cIn = 1e-7 on the gate.
+    //   3. Flip vs to 5 V; step for t_observe = 5 × τ_small = 5 µs
+    //      (10 steps × maxTimeStep = 0.5 µs each).
+    //   4. With τ_large = 0.1 s, node voltage ≈ 5 × (1 − e^(−5µs/100ms))
+    //      ≈ 5 × 5e-5 = 2.5e-4 V — still essentially 0 V.
+    //   5. If cIn binding were broken (silently kept at 1e-12), τ = 1 µs and
+    //      node would be ~5 × (1 − e^-5) ≈ 4.97 V — test would fail.
+    //
+    // This test MUST FAIL if the cIn hot-load binding is dropped.
+    const rSeries = 1e6;
+    const cInLarge = 1e-7;
+    const tauSmall = rSeries * 1e-12;      // 1 µs (default cIn)
+    const tObserve = 5 * tauSmall;         // 5 µs
+    const maxTimeStep = tObserve / 10;     // 0.5 µs — 10 steps to reach t_observe
 
+    const fix = buildFixture({
+      build: (_registry: ComponentRegistry, facade: DefaultSimulatorFacade): Circuit => {
+        return facade.build({
+          components: [
+            { id: "vs",      type: "DcVoltageSource", props: { label: "vs",      voltage: 0.0 } },
+            { id: "rSeries", type: "Resistor",        props: { label: "rSeries", resistance: rSeries } },
+            { id: "gate",    type: "Buf",             props: { label: "gate",    model: "behavioral", loaded: 1 } },
+            { id: "gnd",     type: "Ground" },
+          ],
+          connections: [
+            ["vs:pos",       "rSeries:pos"],
+            ["rSeries:neg",  "gate:In_1"],
+            ["vs:neg",       "gnd:out"],
+          ],
+        });
+      },
+      params: { maxTimeStep },
+    });
+
+    // DC-OP at vs = 0 V: In_1 node fully settled at 0 V.
+    const dcBefore = fix.coordinator.dcOperatingPoint();
+    expect(dcBefore).not.toBeNull();
+    expect(dcBefore!.converged).toBe(true);
+    const inNode = nodeOf(fix, "gate:In_1");
+    expect(fix.engine.getNodeVoltage(inNode)).toBeCloseTo(0.0, 6);
+
+    // Hot-load cIn = 1e-7 (100 nF), making τ = 0.1 s.
     const gate = ceByLabel(fix, "gate");
-    fix.coordinator.setComponentProperty(gate, "cIn", 1e-10);
-    fix.coordinator.step();
+    fix.coordinator.setComponentProperty(gate, "cIn", cInLarge);
 
-    // DC classification unchanged; cIn is reactive, no DC current contribution
-    expect(fix.engine.getNodeVoltage(outNode)).toBeCloseTo(V_HIGH, 6);
+    // Find the vs element and flip it to 5 V to drive a rising edge.
+    let vsEl: CircuitElement | undefined;
+    for (const ce of fix.circuit.elementToCircuitElement.values()) {
+      if (ce.getProperties().getOrDefault<string>("label", "") === "vs") {
+        vsEl = ce;
+        break;
+      }
+    }
+    if (vsEl === undefined) throw new Error("vs not found in elementToCircuitElement");
+    fix.coordinator.setComponentProperty(vsEl, "voltage", 5.0);
+
+    // Step for t_observe = 5 µs (10 steps at 0.5 µs each).
+    for (let i = 0; i < 10; i++) {
+      fix.coordinator.step();
+    }
+
+    // With cIn = 1e-7 (τ = 0.1 s), node voltage at t = 5 µs is ≈ 2.5e-4 V.
+    // Assert it is still well below 0.01 V. If cIn was silently ignored
+    // (stayed at default 1e-12, τ = 1 µs), the node would be ~4.97 V.
+    const vIn = fix.engine.getNodeVoltage(inNode);
+    expect(vIn).toBeLessThan(0.01);
   });
 });
 
