@@ -31,6 +31,8 @@ import type {
   RawNgspiceIterationEx,
   RawNgspiceOuterEvent,
   RawNgspiceAcPoint,
+  AcCaptureSession,
+  AcCapturePoint,
   RawNgspiceTopology,
   IntegrationCoefficients,
   MatrixEntry,
@@ -576,6 +578,40 @@ export function buildCaptureSession(
 // ---------------------------------------------------------------------------
 // NgspiceBridge
 // ---------------------------------------------------------------------------
+
+/**
+ * Build an `AcCaptureSession` from the bridge's per-frequency raw points.
+ *
+ * Sibling of `buildCaptureSession` for the AC path. The translation is
+ * mechanical- each `RawNgspiceAcPoint` becomes an `AcCapturePoint` with
+ * the CSC matrix tucked into the optional `matrix` field, plus the loaded
+ * RHS. Topology is caller-supplied (Phase 2 callers pass `emptyTopology()`;
+ * Phase 3 will wire the proper node-name resolution via NgspiceTopology).
+ *
+ * Pure function- unit tests drive it with synthetic raw point arrays.
+ */
+export function buildAcCaptureSession(
+  acPoints: RawNgspiceAcPoint[],
+  topology: TopologySnapshot,
+): AcCaptureSession {
+  const points: AcCapturePoint[] = acPoints.map((p) => ({
+    freq: p.freq,
+    omega: p.omega,
+    matrixSize: p.matrixSize,
+    solRe: p.solRe,
+    solIm: p.solIm,
+    matrix: {
+      nnz: p.nnz,
+      colPtr: p.colPtr,
+      rowIdx: p.rowIdx,
+      valsRe: p.valsRe,
+      valsIm: p.valsIm,
+    },
+    rhsRe: p.rhsRe,
+    rhsIm: p.rhsIm,
+  }));
+  return { source: "ngspice", topology, points };
+}
 
 export class NgspiceBridge {
   private _dllPath: string;

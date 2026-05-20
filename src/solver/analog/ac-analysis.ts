@@ -110,6 +110,23 @@ export interface AcCompiledCircuit {
 export interface AcAnalysisDeps {
   /** Factory returning the SparseSolver used for the frequency sweep. */
   solverFactory?: () => SparseSolver;
+  /**
+   * Optional per-frequency snapshot sink. Called once per successful complex
+   * solve with the post-solve complex solution and `freq`/`omega`/`matrixSize`
+   * metadata. The arrays are defensive copies (sink owns them; safe to retain
+   * past the next frequency point).
+   *
+   * Used by the parity harness to capture our-side AC data for comparison
+   * against ngspice's per-frequency callback. Default `undefined`: zero cost
+   * for production callers.
+   */
+  acSnapshotSink?: (snap: {
+    freq: number;
+    omega: number;
+    matrixSize: number;
+    solRe: Float64Array;
+    solIm: Float64Array;
+  }) => void;
 }
 
 /**
@@ -299,6 +316,20 @@ export class AcAnalysis {
             magnitudeMap.get(label)![fi] = magDb;
             phaseMap.get(label)![fi] = phaseDeg;
           }
+        }
+
+        // Harness snapshot hook: emit a defensive copy of the full complex
+        // solution for this frequency. The bridge mirrors the ngspice
+        // per-frequency callback; pairing happens by frequency index in
+        // ComparisonSession.
+        if (this._deps.acSnapshotSink) {
+          this._deps.acSnapshotSink({
+            freq: f,
+            omega,
+            matrixSize: N,
+            solRe: solRe.slice(),
+            solIm: solIm.slice(),
+          });
         }
       }
       // On solver failure at this frequency: leave arrays at 0 (already initialized)

@@ -24,7 +24,7 @@
  * CSC walk.
  */
 
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { NgspiceBridge } from "./ngspice-bridge.js";
 import { describeIfDll, DLL_PATH } from "../ngspice-parity/parity-helpers.js";
 

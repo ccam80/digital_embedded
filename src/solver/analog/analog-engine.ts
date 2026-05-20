@@ -19,7 +19,7 @@ import type { SetupContext } from "./setup-context.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import { AcAnalysis } from "./ac-analysis.js";
-import type { AcParams, AcResult } from "./ac-analysis.js";
+import type { AcParams, AcResult, AcAnalysisDeps } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
 import { HistoryStore, computeNIcomCof } from "./integration.js";
@@ -1021,7 +1021,7 @@ export class MNAEngine implements AnalogEngine {
    * runs the sweep with the given params, and returns the `AcResult`.
    * The engine must be initialised before calling this method.
    */
-  acAnalysis(params: AcParams): AcResult {
+  acAnalysis(params: AcParams, deps?: AcAnalysisDeps): AcResult {
     if (!this._compiled) {
       const emptyFreqs = new Float64Array(0);
       const empty = new Map<string, Float64Array>();
@@ -1048,7 +1048,7 @@ export class MNAEngine implements AnalogEngine {
       elementsByFamily: this._compiled.elementsByFamily,
       labelToNodeId: this._compiled.labelToNodeId,
     };
-    const ac = new AcAnalysis(adapted, this._params);
+    const ac = new AcAnalysis(adapted, this._params, deps);
     return ac.run(params);
   }
 

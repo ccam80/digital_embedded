@@ -64,6 +64,41 @@ export interface SessionShape {
   largeTimeDeltas: Array<{ stepIndex: number; delta: number }>;
 }
 
+/**
+ * Per-frequency-point shape descriptor for AC sweeps.
+ *
+ * Frequency-axis sanity surface. A frequency-count or per-index frequency
+ * mismatch means the two sides ran different sweeps- every downstream
+ * solution / matrix comparison would be measuring noise, so this surface is
+ * the first thing Phase 3 divergence tooling consults.
+ */
+export interface AcPointShape {
+  pointIndex: number;
+  presence: SidePresence;
+  /** Frequency in Hz as reported by each side; null when absent. */
+  freq: { ours: number | null; ngspice: number | null };
+  /** Angular frequency in rad/s, parallel to `freq`. */
+  omega: { ours: number | null; ngspice: number | null };
+  /** Relative frequency delta |ng-ours|/max(|ours|,|ng|); null if any side absent. */
+  freqRelDelta: number | null;
+  /** Equation count as reported by each side; null when absent. */
+  matrixSize: { ours: number | null; ngspice: number | null };
+}
+
+/**
+ * Whole-AC-session shape descriptor. Mirror of `SessionShape` for the
+ * frequency-axis analysis kind. `analysis` is fixed to `"ac"` so a single
+ * consumer can union over `SessionShape | AcSessionShape` and branch on it.
+ */
+export interface AcSessionShape {
+  analysis: "ac";
+  pointCount: { ours: number; ngspice: number; max: number };
+  presenceCounts: { both: number; oursOnly: number; ngspiceOnly: number };
+  points: AcPointShape[];
+  /** Indices where freqRelDelta exceeds tolerance (reported, not filtered). */
+  largeFreqDeltas: Array<{ pointIndex: number; freqRelDelta: number }>;
+}
+
 /** Bundle of all instrumentation hooks the comparison harness needs. */
 export interface PhaseAwareCaptureHook {
   /** Per-NR-iteration hook (fires inside newton-raphson.ts loop). */
@@ -657,6 +692,60 @@ export interface RawNgspiceAcPoint {
   solIm: Float64Array;    // length rhsBufSize, solution Imag (= CKTirhsOld)
   omega: number;          // CKTomega at this frequency point (rad/s)
   freq: number;           // omega / (2π), Hz
+}
+
+/**
+ * Per-frequency complex snapshot from an AC analysis run, source-agnostic.
+ *
+ * Captures everything one frequency point of an AC sweep observes: the
+ * loaded complex Jacobian, the loaded complex RHS, and the complex
+ * solution, with `freq`/`omega` metadata. ngspice fills every field
+ * (built from `RawNgspiceAcPoint` via `buildAcCaptureSession`); our side
+ * fills `solRe`/`solIm` in Phase 2 and lights up `matrix`/`rhsRe`/`rhsIm`
+ * in Phase 3 once the SparseSolver's complex CSC export lands.
+ */
+export interface AcCapturePoint {
+  /** Frequency in Hz. */
+  freq: number;
+  /** Angular frequency in rad/s. Should equal 2π·freq. */
+  omega: number;
+  /** Equation count: ngspice CKTmaxEqNum+1, ours matrixSize. */
+  matrixSize: number;
+  /** Complex solution Real part. Index 0 = ground. */
+  solRe: Float64Array;
+  /** Complex solution Imag part. Parallel to solRe. */
+  solIm: Float64Array;
+  /**
+   * Loaded complex Jacobian in external-coords CSC. Populated for the
+   * ngspice side from day one (built from RawNgspiceAcPoint); populated
+   * for ours in Phase 3 once SparseSolver gains a complex CSC export.
+   */
+  matrix?: {
+    nnz: number;
+    colPtr: Int32Array;
+    rowIdx: Int32Array;
+    valsRe: Float64Array;
+    valsIm: Float64Array;
+  };
+  /** Loaded complex RHS Real. Phase-2-optional, ngspice populates. */
+  rhsRe?: Float64Array;
+  /** Loaded complex RHS Imag. Phase-2-optional, ngspice populates. */
+  rhsIm?: Float64Array;
+}
+
+/**
+ * Paired-comparison container for an AC sweep, parallel to `CaptureSession`
+ * for DC/transient. `points` is in sweep order (strictly increasing `freq`).
+ * Two `AcCaptureSession`s (ours + ngspice) get paired by frequency index
+ * for divergence analysis in Phase 3.
+ */
+export interface AcCaptureSession {
+  source: "ours" | "ngspice";
+  /** Topology snapshot- same shape as CaptureSession.topology so MCP/diff
+   * tooling can share node-name resolution between AC and DC/TRAN. */
+  topology: TopologySnapshot;
+  /** Frequency-ordered snapshots. */
+  points: AcCapturePoint[];
 }
 
 /**

@@ -27,7 +27,9 @@ import {
 } from "./capture.js";
 import { compareSnapshots, findFirstDivergence } from "./compare.js";
 import { convergenceSummary } from "./query.js";
-import { NgspiceBridge } from "./ngspice-bridge.js";
+import { NgspiceBridge, buildAcCaptureSession } from "./ngspice-bridge.js";
+import type { AcCaptureSession, AcCapturePoint, AcSessionShape, AcPointShape } from "./types.js";
+import type { AcParams } from "../../ac-analysis.js";
 import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
 import { matchSlotPattern } from "./glob.js";
@@ -401,6 +403,9 @@ export class ComparisonSession {
   protected _ourSession: CaptureSession | null = null;
   protected _ngSession: CaptureSession | null = null;
   protected _ngSessionReindexed: CaptureSession | null = null;
+  // AC parity (Phase 2). Populated by runAcSweep; null otherwise.
+  protected _acSession: AcCaptureSession | null = null;
+  protected _ngAcSession: AcCaptureSession | null = null;
 
   // Node mapping
   protected _nodeMap: NodeMapping[] = [];
@@ -424,7 +429,7 @@ export class ComparisonSession {
   protected _comparisons: ComparisonResult[] | null = null;
 
   // Analysis type
-  protected _analysis: "dcop" | "tran" | null = null;
+  protected _analysis: "dcop" | "tran" | "ac" | null = null;
 
   // ComponentRegistry for netlist generation
   private _registry!: ComponentRegistry;
@@ -461,9 +466,10 @@ export class ComparisonSession {
   static async createSelfCompare(opts: {
     dtsPath?: string;
     buildCircuit?: (registry: ComponentRegistry) => Circuit;
-    analysis: "dcop" | "tran";
+    analysis: "dcop" | "tran" | "ac";
     tStop?: number;
     maxStep?: number;
+    acParams?: AcParams;
     params?: Partial<SimulationParams>;
   }): Promise<ComparisonSession> {
     const session = new ComparisonSession({
@@ -478,11 +484,17 @@ export class ComparisonSession {
 
     if (opts.analysis === "dcop") {
       await session.runDcOp();
-    } else {
+    } else if (opts.analysis === "tran") {
       if (opts.tStop === undefined) {
         throw new Error("createSelfCompare: tStop required for transient analysis");
       }
       await session.runTransient(0, opts.tStop, opts.maxStep);
+    } else {
+      // ac
+      if (opts.acParams === undefined) {
+        throw new Error("createSelfCompare: acParams required for AC analysis");
+      }
+      await session.runAcSweep(opts.acParams);
     }
     return session;
   }
@@ -753,6 +765,97 @@ export class ComparisonSession {
 
     this._hasRun = true;
     this._assertMatrixStructuralParity();
+  }
+
+  /**
+   * Run AC small-signal analysis on both engines.
+   *
+   * Phase 2 deliverable. Our side drives `engine.acAnalysis(params, deps)`
+   * with a snapshot sink that captures each per-frequency complex solution
+   * into `_acSession`. The ngspice side runs the same sweep via the bridge's
+   * `ni_ac_*` instrumentation and lands in `_ngAcSession`.
+   *
+   * Pairing semantics: `_acSession.points[i]` pairs with `_ngAcSession.points[i]`
+   * by frequency index. Phase 3 layers per-frequency divergence/diff tooling
+   * (complex-cell matrix diff, solution-magnitude comparison) on top of these
+   * two sessions.
+   *
+   * Notes on the netlist contract:
+   *   - The .dts (ours) wires the synthetic AC stimulus from `params.sourceLabel`.
+   *   - The .cir (ngspice) MUST contain a real AC voltage source (`vX n+ n- ac 1`)
+   *     terminating on the same node, since ngspice's `ACan` reads the
+   *     stimulus from the deck.
+   * Fixtures must keep both sides aligned; mismatch yields trivially divergent
+   * solutions and is a fixture bug, not an engine bug.
+   */
+  async runAcSweep(params: AcParams): Promise<void> {
+    this._ensureInited();
+    if (this._hasRun) return;
+
+    this._analysis = "ac";
+    this._comparisons = null;
+    this._structuralFindings = [];
+
+    // Our side: drive AcAnalysis through the engine with a snapshot sink.
+    // The sink fires once per frequency point after the complex solve;
+    // arrays are already defensive copies (sink owns them).
+    const ourPoints: AcCapturePoint[] = [];
+    this._engine.acAnalysis(params, {
+      acSnapshotSink: (snap) => {
+        ourPoints.push({
+          freq: snap.freq,
+          omega: snap.omega,
+          matrixSize: snap.matrixSize,
+          solRe: snap.solRe,
+          solIm: snap.solIm,
+          // matrix / rhs* deferred to Phase 3 (SparseSolver complex CSC export).
+        });
+      },
+    });
+
+    this._refreshOurTopologyAfterSetup();
+    this._acSession = {
+      source: "ours",
+      topology: this._ourTopology,
+      points: ourPoints,
+    };
+
+    if (!this._opts.selfCompare && this._cirClean) {
+      const bridge = new NgspiceBridge(this._dllPath);
+      try {
+        await bridge.init();
+        bridge.loadNetlist(this._materializeCir());
+        bridge.runAc(params.type, params.numPoints, params.fStart, params.fStop);
+        const raw = bridge.getAcPoints();
+        // Phase 2 uses emptyTopology() on the ngspice side; Phase 3 will
+        // resolve node names via the bridge's NgspiceTopology so MCP tooling
+        // can address points by label.
+        this._ngAcSession = buildAcCaptureSession(raw, emptyTopology());
+      } catch (e: any) {
+        this.errors.push(`ngspice AC sweep failed: ${e.message}`);
+        this._ngAcSession = { source: "ngspice", topology: emptyTopology(), points: [] };
+      } finally {
+        bridge.dispose();
+      }
+    } else if (this._opts.selfCompare) {
+      // Self-compare: deep-clone our points as the ngspice side for zero-drift
+      // unit-testing of the AC query surface (no DLL required).
+      this._ngAcSession = {
+        source: "ngspice",
+        topology: this._acSession.topology,
+        points: this._acSession.points.map((p) => ({
+          freq: p.freq,
+          omega: p.omega,
+          matrixSize: p.matrixSize,
+          solRe: new Float64Array(p.solRe),
+          solIm: new Float64Array(p.solIm),
+        })),
+      };
+    } else {
+      this._ngAcSession = { source: "ngspice", topology: emptyTopology(), points: [] };
+    }
+
+    this._hasRun = true;
   }
 
   /**
@@ -1422,7 +1525,7 @@ export class ComparisonSession {
     }
 
     return {
-      analysis: this._analysis ?? "dcop",
+      analysis: this._analysis === "tran" ? "tran" : "dcop",
       stepCount: { ours: oursLen, ngspice: ngLen, max },
       presenceCounts,
       steps,
@@ -1525,7 +1628,7 @@ export class ComparisonSession {
       return { stepCount: steps.length, steps };
     };
     return {
-      analysis: this._analysis ?? "dcop",
+      analysis: this._analysis === "tran" ? "tran" : "dcop",
       ours: shape(this._ourSession),
       ngspice: shape(this._ngSessionAligned()),
     };
@@ -2384,7 +2487,7 @@ export class ComparisonSession {
     }
 
     return {
-      analysis: this._analysis ?? "dcop",
+      analysis: this._analysis === "tran" ? "tran" : "dcop",
       stepCount: makeComparedValue(
         this._ourSession!.steps.length,
         ngAligned?.steps.length ?? 0,
@@ -2732,7 +2835,7 @@ export class ComparisonSession {
       .filter(s => includeAll || divergentStepIndices.has(s.stepIndex));
 
     return {
-      analysis: this._analysis ?? "dcop",
+      analysis: this._analysis === "tran" ? "tran" : "dcop",
       stepCount: {
         ours: ourSteps.length,
         ngspice: this._ngSessionAligned()?.steps.length ?? 0,
@@ -2764,6 +2867,85 @@ export class ComparisonSession {
   get ourSession(): CaptureSession | null { return this._ourSession; }
   get ngspiceSession(): CaptureSession | null { return this._ngSession; }
   get ngspiceSessionAligned(): CaptureSession | null { return this._ngSessionReindexed; }
+  /** Our-side AC capture session (populated by runAcSweep). */
+  get acSession(): AcCaptureSession | null { return this._acSession; }
+  /** ngspice-side AC capture session (populated by runAcSweep). */
+  get ngspiceAcSession(): AcCaptureSession | null { return this._ngAcSession; }
+
+  /**
+   * Whole-session shape descriptor for an AC sweep. Sibling of
+   * `getSessionShape()` for the DC/TRAN path.
+   *
+   * Returns the frequency-axis sanity surface: point counts per side,
+   * per-index presence + frequency parity (|ng-ours|/max), and a list of
+   * indices where `freqRelDelta` exceeds 1e-9 (essentially "frequencies
+   * disagree at all"- the threshold is tight because both sides build the
+   * sweep from the same {fStart, fStop, n, type} so any deviation past
+   * floating-point noise is a fixture or sweep-config bug, not engine
+   * disagreement).
+   *
+   * Phase 3 divergence tooling will refuse to diff matrices/solutions for
+   * any pair whose `freqRelDelta > 0` because the comparison would
+   * trivially diverge on the omega-dependent stamps. The largeFreqDeltas
+   * list is that gate.
+   */
+  getAcSessionShape(): AcSessionShape {
+    if (!this._acSession) {
+      throw new Error(
+        `getAcSessionShape() requires an AC sweep run; current analysis is ${this._analysis ?? "null"}. ` +
+        "Call runAcSweep(params) first.",
+      );
+    }
+    const ours = this._acSession.points;
+    const ngsp = this._ngAcSession?.points ?? [];
+    const oursLen = ours.length;
+    const ngLen   = ngsp.length;
+    const max     = Math.max(oursLen, ngLen);
+
+    const points: AcPointShape[] = [];
+    const presenceCounts = { both: 0, oursOnly: 0, ngspiceOnly: 0 };
+    const largeFreqDeltas: Array<{ pointIndex: number; freqRelDelta: number }> = [];
+
+    // Match the SessionShape threshold philosophy- ngspice and our sweep
+    // both build frequencies from {fStart, fStop, n, type} via independent
+    // float arithmetic, so true agreement is bit-close (~1e-15). Anything
+    // past 1e-9 relative is a real disagreement worth flagging.
+    const FREQ_REL_TOL = 1e-9;
+
+    for (let i = 0; i < max; i++) {
+      const o = i < oursLen ? ours[i] : null;
+      const n = i < ngLen ? ngsp[i] : null;
+      const presence: "both" | "oursOnly" | "ngspiceOnly" =
+        o && n ? "both" : o ? "oursOnly" : "ngspiceOnly";
+      presenceCounts[presence]++;
+
+      let freqRelDelta: number | null = null;
+      if (o && n) {
+        const denom = Math.max(Math.abs(o.freq), Math.abs(n.freq), Number.MIN_VALUE);
+        freqRelDelta = Math.abs(n.freq - o.freq) / denom;
+        if (freqRelDelta > FREQ_REL_TOL) {
+          largeFreqDeltas.push({ pointIndex: i, freqRelDelta });
+        }
+      }
+
+      points.push({
+        pointIndex: i,
+        presence,
+        freq:  { ours: o ? o.freq  : null, ngspice: n ? n.freq  : null },
+        omega: { ours: o ? o.omega : null, ngspice: n ? n.omega : null },
+        freqRelDelta,
+        matrixSize: { ours: o ? o.matrixSize : null, ngspice: n ? n.matrixSize : null },
+      });
+    }
+
+    return {
+      analysis: "ac",
+      pointCount: { ours: oursLen, ngspice: ngLen, max },
+      presenceCounts,
+      points,
+      largeFreqDeltas,
+    };
+  }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get ourTopology(): TopologySnapshot { return this._ourTopology; }
   get engine(): MNAEngine { return this._engine; }
