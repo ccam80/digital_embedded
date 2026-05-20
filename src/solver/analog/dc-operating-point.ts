@@ -328,6 +328,15 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
       onPhaseBegin?.(phase);
     },
     onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number, converged: boolean): void {
+      if (phase === "dcopInitJct") {
+        // ngspice niiter.c:1205 forces CKTnoncon=1 at iterno==1 regardless of
+        // the load result; niiter.c:1308-1310 then flips MODEINITJCT to
+        // MODEINITFIX. The ngspice bridge labels this attempt's outcome
+        // "nrFailedRetry" (ngspice-bridge.ts:440 maps outerEv.nrFailed=true).
+        // Mirror that here so the harness's per-phase pairing aligns.
+        onPhaseEnd?.("nrFailedRetry", converged);
+        return;
+      }
       const isTerminal = phase === "dcopInitFloat" && converged;
       onPhaseEnd?.(isTerminal ? "dcopSubSolveConverged" : "dcopPhaseHandoff", converged);
     },

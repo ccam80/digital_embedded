@@ -661,7 +661,14 @@ export function createStepCaptureHook(
       if (iterations.length > 0 || pendingAttempts.length === 0) {
         // Derive role from phase and position within the step
         let role: import("./types.js").AttemptRole | undefined;
-        if (currentAttemptPhase === "dcopInitFloat" && pendingAttempts.length === 0) {
+        if (currentAttemptPhase === "dcopInitJct") {
+          // Mirror ngspice-bridge.ts:95 (cktModeToRole): the MODEINITJCT
+          // attempt is unconditionally tagged "junctionPrime". It corresponds
+          // to ngspice's forced-non-converging junction-prime iter
+          // (niiter.c:1205 sets CKTnoncon=1 at iterno==1; niiter.c:1308-1310
+          // flips to MODEINITFIX).
+          role = "junctionPrime";
+        } else if (currentAttemptPhase === "dcopInitFloat" && pendingAttempts.length === 0) {
           role = "coldStart";
         } else if (currentAttemptPhase === "dcopDirect") {
           role = "mainSolve";
