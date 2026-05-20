@@ -99,6 +99,68 @@ export interface AcSessionShape {
   largeFreqDeltas: Array<{ pointIndex: number; freqRelDelta: number }>;
 }
 
+/**
+ * First per-MNA-row complex solution mismatch between paired AC sessions.
+ *
+ * Carries the complex value from both sides plus the magnitude- and
+ * relative-delta. Strict bit-exact is the project bar (see CLAUDE.md), so
+ * `absDelta > 0` is the threshold; the magnitudes are surfaced for
+ * diagnostic classification.
+ */
+export interface AcSolutionDivergenceEntry {
+  pointIndex: number;
+  freq: number;
+  /** MNA row index (0 = ground, always 0 by spClear). */
+  row: number;
+  ours: { re: number; im: number };
+  ngspice: { re: number; im: number };
+  /** |ours - ngspice| in the complex plane (Euclidean). */
+  absDelta: number;
+  /** absDelta / max(|ours|, |ngspice|, MIN_VALUE). */
+  relDelta: number;
+}
+
+/**
+ * First per-frequency-point shape mismatch between paired AC sessions.
+ *
+ * Mirror of the DC/TRAN shape-divergence concept for the frequency axis.
+ * `kind` distinguishes presence (one side missing the point), frequency
+ * mismatch (both present, freq differs past floating-point noise), and
+ * matrix-size mismatch (both present, engines disagreed on equation count-
+ * structural, almost always upstream of any per-row solution disagreement).
+ * `freq` / `matrixSize` carry both sides' values when present so the report
+ * is self-contained.
+ */
+export interface AcShapeDivergenceEntry {
+  pointIndex: number;
+  kind: "ours-missing" | "ngspice-missing" | "frequency-mismatch" | "matrix-size-mismatch";
+  freq: { ours: number | null; ngspice: number | null };
+  matrixSize: { ours: number | null; ngspice: number | null };
+}
+
+/**
+ * Per-class first-divergence report for a paired AC sweep.
+ *
+ * Modeled on `firstDivergence` for DC/TRAN: each class is independently
+ * computed (solution / shape, with matrix arriving in Phase 3b once
+ * SparseSolver gains a complex CSC export), plus an `earliestPointIndex`
+ * across all populated classes. `null` in any class means "no divergence
+ * detected in this class within the paired range."
+ *
+ * Runs unconditionally- a non-empty `largeFreqDeltas` from
+ * `getAcSessionShape()` does not gate this; cross-reference both surfaces
+ * for the full picture (mirrors DC/TRAN's largeTimeDeltas
+ * reported-not-gated pattern).
+ */
+export interface AcDivergenceReport {
+  /** min(pointIndex) across all populated classes, or null if no divergence. */
+  earliestPointIndex: number | null;
+  solution: AcSolutionDivergenceEntry | null;
+  shape: AcShapeDivergenceEntry | null;
+  /** Phase 3b: per-cell complex Jacobian mismatch. Always null in 3a. */
+  matrix: null;
+}
+
 /** Bundle of all instrumentation hooks the comparison harness needs. */
 export interface PhaseAwareCaptureHook {
   /** Per-NR-iteration hook (fires inside newton-raphson.ts loop). */

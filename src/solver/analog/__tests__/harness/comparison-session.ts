@@ -28,7 +28,10 @@ import {
 import { compareSnapshots, findFirstDivergence } from "./compare.js";
 import { convergenceSummary } from "./query.js";
 import { NgspiceBridge, buildAcCaptureSession } from "./ngspice-bridge.js";
-import type { AcCaptureSession, AcCapturePoint, AcSessionShape, AcPointShape } from "./types.js";
+import type {
+  AcCaptureSession, AcCapturePoint, AcSessionShape, AcPointShape,
+  AcDivergenceReport, AcSolutionDivergenceEntry, AcShapeDivergenceEntry,
+} from "./types.js";
 import type { AcParams } from "../../ac-analysis.js";
 import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
@@ -2884,10 +2887,12 @@ export class ComparisonSession {
    * floating-point noise is a fixture or sweep-config bug, not engine
    * disagreement).
    *
-   * Phase 3 divergence tooling will refuse to diff matrices/solutions for
-   * any pair whose `freqRelDelta > 0` because the comparison would
-   * trivially diverge on the omega-dependent stamps. The largeFreqDeltas
-   * list is that gate.
+   * Reported, not gated- mirrors the DC/TRAN `SessionShape.largeTimeDeltas`
+   * pattern. `acFirstDivergence()` and the upcoming matrix-diff tool still
+   * run when freqRelDeltas exist; consumers cross-reference both reports.
+   * A non-empty largeFreqDeltas alongside per-point solution divergence is
+   * diagnostic ("fixture/sweep-config mismatch") rather than grounds to
+   * refuse the diff.
    */
   getAcSessionShape(): AcSessionShape {
     if (!this._acSession) {
@@ -2945,6 +2950,118 @@ export class ComparisonSession {
       points,
       largeFreqDeltas,
     };
+  }
+
+  /**
+   * First per-class divergence between the paired AC sessions.
+   *
+   * Phase 3a: surfaces the earliest `solution` (per-MNA-row complex value
+   * mismatch) and `shape` (presence / frequency / matrix-size mismatch)
+   * divergences across the frequency sweep. Matrix-class divergence is
+   * deferred to Phase 3b (requires the SparseSolver complex CSC export on
+   * the our side; ngspice already provides it via the bridge).
+   *
+   * Walks point indices in order. For each:
+   *   - Records the first `shape` mismatch if any (presence, freq, matrixSize).
+   *   - Records the first `solution` mismatch by scanning all MNA rows for
+   *     a non-zero `|ours - ngspice|` in the complex plane.
+   *   - Stops when both classes have been recorded (subsequent iterations
+   *     cannot land earlier than what's already been captured).
+   *
+   * Bit-exact is the project bar (CLAUDE.md), so `absDelta > 0` is the
+   * solution threshold; magnitudes are surfaced via `absDelta` / `relDelta`
+   * for diagnostic classification rather than as a filter. Reports
+   * unconditionally- consult `getAcSessionShape().largeFreqDeltas` for the
+   * orthogonal frequency-axis-parity context.
+   */
+  acFirstDivergence(): AcDivergenceReport {
+    if (!this._acSession || !this._ngAcSession) {
+      throw new Error(
+        `acFirstDivergence() requires an AC sweep run; current analysis is ${this._analysis ?? "null"}. ` +
+        "Call runAcSweep(params) first.",
+      );
+    }
+    const ours = this._acSession.points;
+    const ngsp = this._ngAcSession.points;
+    const max = Math.max(ours.length, ngsp.length);
+
+    let solution: AcSolutionDivergenceEntry | null = null;
+    let shape: AcShapeDivergenceEntry | null = null;
+
+    for (let i = 0; i < max; i++) {
+      const o = i < ours.length ? ours[i] : null;
+      const n = i < ngsp.length ? ngsp[i] : null;
+
+      // Shape: presence (one side has no point at this index).
+      if (!o || !n) {
+        if (shape === null) {
+          shape = {
+            pointIndex: i,
+            kind: !o ? "ours-missing" : "ngspice-missing",
+            freq: { ours: o ? o.freq : null, ngspice: n ? n.freq : null },
+            matrixSize: { ours: o ? o.matrixSize : null, ngspice: n ? n.matrixSize : null },
+          };
+        }
+        // No paired solution to compare; advance.
+        if (solution !== null && shape !== null) break;
+        continue;
+      }
+
+      // Shape: frequency or matrixSize disagreement (both present).
+      if (shape === null) {
+        if (o.freq !== n.freq) {
+          shape = {
+            pointIndex: i,
+            kind: "frequency-mismatch",
+            freq: { ours: o.freq, ngspice: n.freq },
+            matrixSize: { ours: o.matrixSize, ngspice: n.matrixSize },
+          };
+        } else if (o.matrixSize !== n.matrixSize) {
+          shape = {
+            pointIndex: i,
+            kind: "matrix-size-mismatch",
+            freq: { ours: o.freq, ngspice: n.freq },
+            matrixSize: { ours: o.matrixSize, ngspice: n.matrixSize },
+          };
+        }
+      }
+
+      // Solution: per-MNA-row complex value comparison.
+      if (solution === null) {
+        const rowLimit = Math.min(o.solRe.length, n.solRe.length);
+        for (let k = 0; k < rowLimit; k++) {
+          const dRe = o.solRe[k] - n.solRe[k];
+          const dIm = o.solIm[k] - n.solIm[k];
+          const absDelta = Math.hypot(dRe, dIm);
+          if (absDelta > 0) {
+            const oMag = Math.hypot(o.solRe[k], o.solIm[k]);
+            const nMag = Math.hypot(n.solRe[k], n.solIm[k]);
+            const denom = Math.max(oMag, nMag, Number.MIN_VALUE);
+            solution = {
+              pointIndex: i,
+              freq: o.freq,
+              row: k,
+              ours: { re: o.solRe[k], im: o.solIm[k] },
+              ngspice: { re: n.solRe[k], im: n.solIm[k] },
+              absDelta,
+              relDelta: absDelta / denom,
+            };
+            break;
+          }
+        }
+      }
+
+      if (solution !== null && shape !== null) break;
+    }
+
+    const earliestCandidates: number[] = [];
+    if (solution) earliestCandidates.push(solution.pointIndex);
+    if (shape)    earliestCandidates.push(shape.pointIndex);
+    const earliestPointIndex = earliestCandidates.length === 0
+      ? null
+      : Math.min(...earliestCandidates);
+
+    return { earliestPointIndex, solution, shape, matrix: null };
   }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get ourTopology(): TopologySnapshot { return this._ourTopology; }
