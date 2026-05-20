@@ -59,17 +59,20 @@ const EPS_SIO2 = CONST_EPSR_SIO2 * EPS0;
 // Model parameter declarations
 // ---------------------------------------------------------------------------
 
+// Partitioning mirrors ngspice's CAPparam (capparam.c:30-83) vs CAPmodel
+// (model-level params handled by CAPmParam): instance-level params live in
+// the `instance:` bucket so the harness netlist-generator emits them on the
+// C-card line via instanceParamSuffix; model-level params live in `secondary:`
+// (partition "model") and emit through the `.model` card.
 export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } = defineModelParams({
   primary: {
-    capacitance: { default: 1e-6, unit: "F", description: "Capacitance in farads", min: 1e-15 },
+    // capparam.c:31-36 — CAP_CAP, the positional VALUE on the C-card; the
+    // emitter special-cases it via requireParam, not the partition machinery.
+    capacitance: { default: 1e-6, unit: "F", positional: true, description: "Capacitance in farads (positional VALUE on the C-card per inp2c.c:18)", min: 1e-15 },
   },
   secondary: {
-    IC:   { default: 0.0,    unit: "V",    description: "Initial condition voltage for UIC" },
-    TC1:  { default: 0,                    description: "Linear temperature coefficient" },
-    TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
-    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients", spiceConverter: kelvinToCelsius },
-    SCALE: { default: 1,                   description: "Instance scale factor" },
-    M:    { default: 1,                    description: "Parallel multiplicity" },
+    // Model-level reference temperature — ngspice CAPmodel CAPtnom.
+    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature for TC coefficients", spiceConverter: kelvinToCelsius },
     // Geometric-capacitance model parameters — ngspice CAPmodel
     // (capsetup.c:31-88, captemp.c:55-68).
     cj:     { default: 0.0,     unit: "F/m^2", description: "Junction bottom capacitance per area" },
@@ -81,16 +84,20 @@ export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } =
     del:    { default: 0.0,     unit: "m",     description: "Width/length etch correction" },
     di:     { default: 0.0,                    description: "Relative dielectric constant" },
     thick:  { default: 0.0,     unit: "m",     description: "Dielectric thickness" },
-    mCap:   { default: 0.0,     unit: "F",     description: "Model default capacitance" },
-    // Per-instance geometry — ngspice CAPinstance CAPwidth / CAPlength.
-    // Registered so builder.ts:224-231 promotes a netlisted flat prop into
-    // the model-param partition (and marks it given). The defaults here are
-    // the seeded fallbacks for the !_wGiven / !_lGiven path: w → model defw
-    // (captemp.c:49-51), l → 0 (capsetup.c:95-97).
-    w:     { default: 10e-6, unit: "m", description: "Instance device width" },
-    l:     { default: 0.0,   unit: "m", description: "Instance device length" },
-    // Per-instance temperature parameters — ngspice CAPinstance
-    // (captemp.c:38-47).
+    mCap:   { default: 0.0,     unit: "F",     spiceName: "cap", description: "Model default capacitance (cap.c:40 CAP_MOD_CAP)" },
+  },
+  instance: {
+    // Per-instance params accepted by ngspice CAPparam (capparam.c:37-79).
+    IC:    { default: 0.0,    unit: "V", description: "Initial condition voltage for UIC" },
+    TC1:   { default: 0,                 description: "Linear temperature coefficient" },
+    TC2:   { default: 0,                 description: "Quadratic temperature coefficient" },
+    SCALE: { default: 1,                 description: "Instance scale factor" },
+    M:     { default: 1,                 description: "Parallel multiplicity" },
+    // CAPwidth defaults to model defw when not given (captemp.c:49-51);
+    // CAPlength defaults to 0 (capsetup.c:95-97).
+    w:     { default: 10e-6, unit: "m", spiceName: "W", description: "Instance device width" },
+    l:     { default: 0.0,   unit: "m", spiceName: "L", description: "Instance device length" },
+    // captemp.c:38-47 — CAPtemp / CAPdtemp.
     TEMP:  { default: 300.15, unit: "K", description: "Instance operating temperature", spiceConverter: kelvinToCelsius },
     DTEMP: { default: 0.0,    unit: "K", description: "Instance temperature delta from ambient" },
   },

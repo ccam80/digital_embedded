@@ -1,0 +1,96 @@
+{
+  "circuit": {
+    "description": "Series RC bench for capacitor temperature-sweep T3 parity: AcVoltageSource(1V, 1kHz) -> R1(1kΩ) -> C1(1µF, TC1=0.01) -> Ground. With TC1=0.01 the effective capacitance folds non-trivially with ambient temperature (CAPtemp / captemp.c:72-89). Used at T in {300.15K, 350K, 400K}. Element positions and wire segments mirror polarizedcap-canon-rc-charge.dts.",
+    "elements": [
+      {
+        "id": "c0a01001-0000-0000-0000-000000000001",
+        "position": { "x": 0, "y": 2 },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1,
+            "dcOffset": 0,
+            "fallTime": 1e-12,
+            "frequency": 1000,
+            "noiseSampleTime": 0,
+            "phase": 0,
+            "riseTime": 1e-12
+          },
+          "amplitude": 1,
+          "frequency": 1000,
+          "label": "V1",
+          "position": [0, 0]
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "c0a01001-0000-0000-0000-000000000002",
+        "position": { "x": 12, "y": 1 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "R1",
+          "position": [0, 8],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c0a01001-0000-0000-0000-000000000003",
+        "position": { "x": 24, "y": 0 },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 1e-6,
+            "TC1": 0.01,
+            "TC2": 0,
+            "TNOM": 300.15
+          },
+          "capacitance": 1e-6,
+          "TC1": 0.01,
+          "label": "C1",
+          "position": [0, 16]
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "c0a01001-0000-0000-0000-000000000004",
+        "position": { "x": 36, "y": 2 },
+        "properties": {
+          "label": "gnd",
+          "position": [0, 24]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "capacitor-temp-sweep",
+    "wires": [
+      { "points": [{ "x": 4,  "y": 2 }, { "x": 5,  "y": 2 }] },
+      { "points": [{ "x": 12, "y": 1 }, { "x": 11, "y": 1 }] },
+      { "points": [{ "x": 5,  "y": 2 }, { "x": 8,  "y": 2 }] },
+      { "points": [{ "x": 8,  "y": 2 }, { "x": 8,  "y": 1 }] },
+      { "points": [{ "x": 8,  "y": 1 }, { "x": 11, "y": 1 }] },
+      { "points": [{ "x": 16, "y": 1 }, { "x": 17, "y": 1 }] },
+      { "points": [{ "x": 24, "y": 0 }, { "x": 23, "y": 0 }] },
+      { "points": [{ "x": 17, "y": 1 }, { "x": 20, "y": 1 }] },
+      { "points": [{ "x": 20, "y": 1 }, { "x": 20, "y": 0 }] },
+      { "points": [{ "x": 20, "y": 0 }, { "x": 23, "y": 0 }] },
+      { "points": [{ "x": 28, "y": 0 }, { "x": 29, "y": 0 }] },
+      { "points": [{ "x": 36, "y": 2 }, { "x": 36, "y": 1 }] },
+      { "points": [{ "x": 29, "y": 0 }, { "x": 33, "y": 0 }] },
+      { "points": [{ "x": 33, "y": 0 }, { "x": 33, "y": 1 }] },
+      { "points": [{ "x": 33, "y": 1 }, { "x": 36, "y": 1 }] },
+      { "points": [{ "x": 0,  "y": 2 }, { "x": -1, "y": 2 }] },
+      { "points": [{ "x": -1, "y": 2 }, { "x": -2, "y": 2 }] },
+      { "points": [{ "x": -2, "y": 2 }, { "x": -2, "y": 5 }] },
+      { "points": [{ "x": -2, "y": 5 }, { "x": 12, "y": 5 }] },
+      { "points": [{ "x": 12, "y": 5 }, { "x": 24, "y": 5 }] },
+      { "points": [{ "x": 24, "y": 5 }, { "x": 30, "y": 5 }] },
+      { "points": [{ "x": 30, "y": 5 }, { "x": 30, "y": 1 }] },
+      { "points": [{ "x": 30, "y": 1 }, { "x": 36, "y": 1 }] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
