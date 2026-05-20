@@ -268,18 +268,14 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
   private _dtempGiven: boolean;
 
   // Cached Norton-stamp handles [hPP, hNN, hPN, hNP] allocated in setup()
-  // per capsetup.c:114-117 (TSTALLOC sequence).
+  // per capsetup.c:114-117 (TSTALLOC sequence). Under the unified solver
+  // these four handles address both the real half (stampElement, written by
+  // CAPload at load() time) and the imaginary half (stampElementImag,
+  // written by CAPacLoad at stampAc() time) of the same four matrix cells —
+  // mirroring ngspice's *(CAPposPosPtr) / *(CAPposPosPtr+1) pointer pair.
+  // No separate AC-side handle fields exist: CAPsetup allocates once,
+  // CAPload and CAPacLoad both stamp through the same pointers.
   private _handles: readonly [number, number, number, number] = [-1, -1, -1, -1];
-
-  // AC matrix-cell handles, lazily allocated on the first stampAc() against
-  // the AC analysis's solver instance. cite: capacld.c:32-35 — the same four
-  // (pos,pos)/(neg,neg)/(pos,neg)/(neg,pos) cells as the real-side Norton
-  // stamp; under the unified solver `stampElementImag` writes the `+1`
-  // imaginary half of those cells.
-  protected _hAcPosPos: number = -1;
-  protected _hAcNegNeg: number = -1;
-  protected _hAcPosNeg: number = -1;
-  protected _hAcNegPos: number = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -454,31 +450,31 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
    * The capacitor AC admittance Y = jωC has no conductance: only the
    * susceptance ωC exists, written into the imaginary half of each cell
    * (the `+1` offset in ngspice). Real part of every stamp is 0.
+   *
+   * Allocation lives in setup() (the allocNortonStamp call that returns the
+   * _handles tuple), mirroring ngspice's CAPsetup/CAPacLoad function
+   * boundary: CAPsetup TSTALLOCs the four pointers once (capsetup.c:114-117);
+   * CAPacLoad performs no allocation and writes the imaginary half of the
+   * same pre-allocated cells. Under the unified SparseSolver each of the
+   * four _handles[i] addresses both the real half (written by load()) and
+   * the imaginary half (written here via stampElementImag) of one cell.
    */
   stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
-    const posNode = this.pinNodes.get("pos")!;  // CAPposNode
-    const negNode = this.pinNodes.get("neg")!;  // CAPnegNode
-
     // capacld.c:30 — val = ckt->CKTomega * here->CAPcapac.
     const val = omega * this.C;
     // capacld.c:28 — m = here->CAPm; applied at stamp time, not folded into C.
     const m = this._M;
 
-    // Lazily allocate the four matrix cells against the AC solver on first
-    // stamp. Order matches capsetup.c:114-117 (posPos, negNeg, posNeg, negPos).
-    if (this._hAcPosPos === -1) {
-      this._hAcPosPos = solver.allocElement(posNode, posNode);
-      this._hAcNegNeg = solver.allocElement(negNode, negNode);
-      this._hAcPosNeg = solver.allocElement(posNode, negNode);
-      this._hAcNegPos = solver.allocElement(negNode, posNode);
-    }
-
     // capacld.c:32-35 — `*(...Ptr+1) ±= m*val`: the imaginary half only, the
     // capacitor's AC admittance jωC has no conductance (real part is 0).
-    solver.stampElementImag(this._hAcPosPos,  m * val);  // *(CAPposPosPtr+1) += m*val
-    solver.stampElementImag(this._hAcNegNeg,  m * val);  // *(CAPnegNegPtr+1) += m*val
-    solver.stampElementImag(this._hAcPosNeg, -m * val);  // *(CAPposNegPtr+1) -= m*val
-    solver.stampElementImag(this._hAcNegPos, -m * val);  // *(CAPnegPosPtr+1) -= m*val
+    // _handles is the tuple [hPP, hNN, hPN, hNP] from allocNortonStamp in
+    // setup() — capsetup.c:114-117 TSTALLOC order, the same four matrix
+    // pointers CAPload writes the real half of.
+    const [hPP, hNN, hPN, hNP] = this._handles;
+    solver.stampElementImag(hPP,  m * val);  // *(CAPposPosPtr+1) += m*val
+    solver.stampElementImag(hNN,  m * val);  // *(CAPnegNegPtr+1) += m*val
+    solver.stampElementImag(hPN, -m * val);  // *(CAPposNegPtr+1) -= m*val
+    solver.stampElementImag(hNP, -m * val);  // *(CAPnegPosPtr+1) -= m*val
   }
 
   /**

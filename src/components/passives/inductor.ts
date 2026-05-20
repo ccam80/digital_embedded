@@ -219,16 +219,6 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   protected _hIbrP:   number = -1;
   protected _hIbrIbr: number = -1;
 
-  // AC matrix-cell handles, lazily allocated on the first stampAc() against
-  // the AC analysis's solver instance. cite: indacld.c:31-35 — the same five
-  // (pos,Ibr)/(neg,Ibr)/(Ibr,pos)/(Ibr,neg)/(Ibr,Ibr) cells as the real DC
-  // stamps; the four ±1 connectivity cells are real, the branch diagonal
-  // carries the −ωL imaginary reactance.
-  protected _hAcPIbr:   number = -1;
-  protected _hAcNIbr:   number = -1;
-  protected _hAcIbrN:   number = -1;
-  protected _hAcIbrP:   number = -1;
-  protected _hAcIbrIbr: number = -1;
 
   /**
    * MUT sibling elements registered by MutualInductorElement.setup().
@@ -482,39 +472,36 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    * cite: indacld.c:27-35 —
    *   m = here->INDm;
    *   val = ckt->CKTomega * here->INDinduct / m;
-   *   *(INDposIbrptr)   +=  1;   (real)
-   *   *(INDnegIbrptr)   -=  1;   (real)
-   *   *(INDibrPosptr)   +=  1;   (real)
-   *   *(INDibrNegptr)   -=  1;   (real)
-   *   *(INDibrIbrptr+1) -=  val; (imaginary branch-diagonal: jωL impedance)
+   *   *(INDposIbrPtr)   +=  1;   (real)
+   *   *(INDnegIbrPtr)   -=  1;   (real)
+   *   *(INDibrPosPtr)   +=  1;   (real)
+   *   *(INDibrNegPtr)   -=  1;   (real)
+   *   *(INDibrIbrPtr+1) -=  val; (imaginary branch-diagonal: jωL impedance)
    *
    * _effectiveL already incorporates the /m division from indtemp.c:72.
+   *
+   * Allocation lives in setup() (the five solver.allocElement calls at
+   * indsetup.c:96-100 TSTALLOC order), mirroring ngspice's INDsetup/INDacLoad
+   * function boundary: INDsetup TSTALLOCs the five pointers once;
+   * INDacLoad performs no allocation and stamps through the same
+   * pre-allocated pointers. Under the unified SparseSolver each handle
+   * addresses both the real half (written by load() / stampElement) and the
+   * imaginary half (written here via stampElementImag) of one cell.
    */
   stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
-    const b = this.branchIndex;
-    const posNode = this.pinNodes.get("pos")!;
-    const negNode = this.pinNodes.get("neg")!;
-
     // cite: indacld.c:29 — val = ckt->CKTomega * here->INDinduct / m
     const val = omega * this._effectiveL;
 
-    // Lazily allocate the five matrix cells against the AC solver on first
-    // stamp. Order matches indsetup.c (posIbr, negIbr, ibrPos, ibrNeg, ibrIbr).
-    if (this._hAcPIbr === -1) {
-      this._hAcPIbr   = solver.allocElement(posNode, b);
-      this._hAcNIbr   = solver.allocElement(negNode, b);
-      this._hAcIbrP   = solver.allocElement(b, posNode);
-      this._hAcIbrN   = solver.allocElement(b, negNode);
-      this._hAcIbrIbr = solver.allocElement(b, b);
-    }
-
     // cite: indacld.c:31-34 — 4 real ±1 connectivity stamps (`*ptr ±= 1`).
-    solver.stampElement(this._hAcPIbr,  1);  // *(INDposIbrptr) += 1
-    solver.stampElement(this._hAcNIbr, -1);  // *(INDnegIbrptr) -= 1
-    solver.stampElement(this._hAcIbrP,  1);  // *(INDibrPosptr) += 1
-    solver.stampElement(this._hAcIbrN, -1);  // *(INDibrNegptr) -= 1
-    // cite: indacld.c:35 — `*(INDibrIbrptr+1) -= val`: imaginary branch diagonal.
-    solver.stampElementImag(this._hAcIbrIbr, -val);
+    // The five handles _hPIbr/_hNIbr/_hIbrP/_hIbrN/_hIbrIbr were TSTALLOC'd
+    // once in setup() (inductor.ts above; indsetup.c:96-100 order); INDacLoad
+    // is a pure stamp on those same pointers.
+    solver.stampElement(this._hPIbr,  1);  // *(INDposIbrPtr) += 1
+    solver.stampElement(this._hNIbr, -1);  // *(INDnegIbrPtr) -= 1
+    solver.stampElement(this._hIbrP,  1);  // *(INDibrPosPtr) += 1
+    solver.stampElement(this._hIbrN, -1);  // *(INDibrNegPtr) -= 1
+    // cite: indacld.c:35 — `*(INDibrIbrPtr+1) -= val`: imaginary branch diagonal.
+    solver.stampElementImag(this._hIbrIbr, -val);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
