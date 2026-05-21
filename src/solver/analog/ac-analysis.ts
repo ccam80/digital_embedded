@@ -394,8 +394,9 @@ export class AcAnalysis {
         // post-solve). The bridge mirrors the ngspice per-frequency
         // callback; pairing happens by frequency index in ComparisonSession.
         if (this._deps.acSnapshotSink && snapshotMatrix) {
+          // niiter.c:492 `d.freq = ckt->CKTomega / (2 * M_PI)`.
           this._deps.acSnapshotSink({
-            freq: f,
+            freq: omega / (2 * Math.PI),
             omega,
             matrixSize: N,
             matrix: snapshotMatrix,
