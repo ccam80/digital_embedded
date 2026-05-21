@@ -28,7 +28,6 @@ import { ComparisonSession } from "./comparison-session.js";
 import { describeIfDll, DLL_PATH } from "../ngspice-parity/parity-helpers.js";
 
 const DTS = "src/solver/analog/__tests__/ngspice-parity/fixtures/rc-transient.dts";
-const CIR = "src/solver/analog/__tests__/ngspice-parity/fixtures/rc-transient-ac.cir";
 
 const AC_PARAMS = {
   type: "dec" as const,
@@ -41,9 +40,12 @@ const AC_PARAMS = {
 
 describeIfDll("AC bridge-paired smoke (real ngspice)", () => {
   it("rc_lowpass_ac_runs_both_sides_and_acFirstDivergence_returns_report", async () => {
+    // No `cirPath`: let ComparisonSession auto-generate the ngspice deck
+    // via `generateSpiceNetlist` so both sides see matching element/
+    // terminal labels. Auto-generated AcVoltageSource lines carry `AC 1`
+    // (netlist-generator.ts) for the .ac sweep stimulus.
     const session = await ComparisonSession.create({
       dtsPath: DTS,
-      cirPath: CIR,
       dllPath: DLL_PATH,
       // Defer structural-parity asserts so a permutation does not throw out
       // of `runAcSweep`. We want the smoke to ALWAYS reach acFirstDivergence
