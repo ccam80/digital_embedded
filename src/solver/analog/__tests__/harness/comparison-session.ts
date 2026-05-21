@@ -34,7 +34,7 @@ import type {
   AcMatrixDivergenceEntry,
 } from "./types.js";
 import type { AcParams } from "../../ac-analysis.js";
-import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
+import { buildDirectNodeMapping, reindexNgspiceSession, reindexNgspiceAcSession } from "./node-mapping.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
 import { matchSlotPattern } from "./glob.js";
 import { installUcrtLibmShim, uninstallUcrtLibmShim } from "./ucrt-libm-shim.js";
@@ -410,6 +410,7 @@ export class ComparisonSession {
   // AC parity (Phase 2). Populated by runAcSweep; null otherwise.
   protected _acSession: AcCaptureSession | null = null;
   protected _ngAcSession: AcCaptureSession | null = null;
+  protected _ngAcSessionReindexed: AcCaptureSession | null = null;
 
   // Node mapping
   protected _nodeMap: NodeMapping[] = [];
@@ -843,9 +844,11 @@ export class ComparisonSession {
         // Mirrors what runDcOp + runTransient do via the same helper.
         this._buildNodeMapping(bridge);
         this._buildMatrixMaps();
+        this._reindexNgAcSession();
       } catch (e: any) {
         this.errors.push(`ngspice AC sweep failed: ${e.message}`);
         this._ngAcSession = { source: "ngspice", topology: emptyTopology(), points: [] };
+        this._ngAcSessionReindexed = this._ngAcSession;
       } finally {
         bridge.dispose();
       }
@@ -879,8 +882,13 @@ export class ComparisonSession {
           ...(p.rhsIm && { rhsIm: new Float64Array(p.rhsIm) }),
         })),
       };
+      // selfCompare has no node-mapping (identity by construction). Solution
+      // arrays are already in our coord space- the reindex would be a no-op,
+      // so just point Reindexed at the raw session for downstream uniformity.
+      this._ngAcSessionReindexed = this._ngAcSession;
     } else {
       this._ngAcSession = { source: "ngspice", topology: emptyTopology(), points: [] };
+      this._ngAcSessionReindexed = this._ngAcSession;
     }
 
     this._hasRun = true;
@@ -2880,6 +2888,7 @@ export class ComparisonSession {
     this._ourSession = null;
     this._ngSession = null;
     this._ngSessionReindexed = null;
+    this._ngAcSessionReindexed = null;
     this._comparisons = null;
     this._nodeMap = [];
     if (this._libmShimInstalled) {
@@ -3004,6 +3013,13 @@ export class ComparisonSession {
     }
     const ours = this._acSession.points;
     const ngsp = this._ngAcSession.points;
+    // For the solution walk: use the per-frequency reindexed ngspice points
+    // (solRe/solIm reindexed into our coord space; rhsRe/rhsIm too). The
+    // matrix walk stays on raw `ngsp` and translates (row, col) at compare
+    // time so allocation-order divergence remains visible. Mirrors the
+    // DC/TRAN split (`_ngSessionReindexed` for solution-space comparison;
+    // raw `_ngSession` matrix walked via `_ngMatrixRowMap`).
+    const ngspRe = (this._ngAcSessionReindexed ?? this._ngAcSession).points;
     const max = Math.max(ours.length, ngsp.length);
 
     let solution: AcSolutionDivergenceEntry | null = null;
@@ -3013,6 +3029,7 @@ export class ComparisonSession {
     for (let i = 0; i < max; i++) {
       const o = i < ours.length ? ours[i] : null;
       const n = i < ngsp.length ? ngsp[i] : null;
+      const nRe = i < ngspRe.length ? ngspRe[i] : null;
 
       // Shape: presence (one side has no point at this index).
       if (!o || !n) {
@@ -3044,23 +3061,26 @@ export class ComparisonSession {
         };
       }
 
-      // Solution: per-MNA-row complex value comparison.
-      if (solution === null) {
-        const rowLimit = Math.min(o.solRe.length, n.solRe.length);
+      // Solution: per-MNA-row complex comparison in OUR coord space (nRe is
+      // the reindexed ngspice point). Unmapped rows land as NaN in the
+      // reindexed arrays (surfaces as a divergence rather than silently
+      // aligning unrelated voltages).
+      if (solution === null && nRe) {
+        const rowLimit = Math.min(o.solRe.length, nRe.solRe.length);
         for (let k = 0; k < rowLimit; k++) {
-          const dRe = o.solRe[k] - n.solRe[k];
-          const dIm = o.solIm[k] - n.solIm[k];
+          const dRe = o.solRe[k] - nRe.solRe[k];
+          const dIm = o.solIm[k] - nRe.solIm[k];
           const absDelta = Math.hypot(dRe, dIm);
-          if (absDelta > 0) {
+          if (absDelta > 0 || Number.isNaN(dRe) || Number.isNaN(dIm)) {
             const oMag = Math.hypot(o.solRe[k], o.solIm[k]);
-            const nMag = Math.hypot(n.solRe[k], n.solIm[k]);
+            const nMag = Math.hypot(nRe.solRe[k], nRe.solIm[k]);
             const denom = Math.max(oMag, nMag, Number.MIN_VALUE);
             solution = {
               pointIndex: i,
               freq: o.freq,
               row: k,
               ours: { re: o.solRe[k], im: o.solIm[k] },
-              ngspice: { re: n.solRe[k], im: n.solIm[k] },
+              ngspice: { re: nRe.solRe[k], im: nRe.solIm[k] },
               absDelta,
               relDelta: absDelta / denom,
             };
@@ -3637,6 +3657,21 @@ export class ComparisonSession {
     }
     this._buildMatrixMaps();
     this._backfillNgspiceIntegCoeff();
+  }
+
+  /**
+   * AC sibling of `_reindexNgSession`. Reindexes per-frequency solRe/solIm/
+   * rhsRe/rhsIm; matrix entries pass through raw (translation happens at
+   * comparison time in `acFirstDivergence` via `_ngMatrixRowMap`/
+   * `_ngMatrixColMap` so allocation-order divergence stays visible).
+   */
+  private _reindexNgAcSession(): void {
+    if (this._ngAcSession && this._nodeMap.length > 0) {
+      this._ngAcSessionReindexed = reindexNgspiceAcSession(
+        this._ngAcSession, this._nodeMap, this._ourTopology.matrixSize + 1);
+    } else {
+      this._ngAcSessionReindexed = this._ngAcSession;
+    }
   }
 
   private _buildMatrixMaps(): void {

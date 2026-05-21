@@ -30,6 +30,8 @@ import type {
   CaptureSession,
   IterationSnapshot,
   StepSnapshot,
+  AcCaptureSession,
+  AcCapturePoint,
 } from "./types.js";
 import type { AnalogElement } from "../../element.js";
 import { canonicalizeSpiceLabel } from "./netlist-generator.js";
@@ -339,6 +341,58 @@ export function reindexNgspiceSession(
   return {
     ...ngSession,
     steps: ngSession.steps.map(reindexStep),
+  };
+}
+
+/**
+ * Reindex an ngspice AcCaptureSession's solution/RHS arrays into our
+ * engine's node ordering, parallel to `reindexNgspiceSession` for DC/TRAN.
+ *
+ * Per-point: `solRe`, `solIm`, `rhsRe`, `rhsIm` are reindexed.
+ * Per-point: `matrix` is NOT reindexed- the per-(row, col) cell comparison
+ * in `acFirstDivergence` translates ngspice's external indices through
+ * `_ngMatrixRowMap` / `_ngMatrixColMap` at comparison time. Reindexing the
+ * matrix here would let mismatched allocations look like the same coord,
+ * destroying the harness's ability to surface allocation-order divergence
+ * (forbidden for the same reason as in `reindexNgspiceSession`).
+ *
+ * Unmapped slots get NaN- surfaces missing/extra-node divergence in the
+ * subsequent walk rather than silently aligning unrelated quantities.
+ */
+export function reindexNgspiceAcSession(
+  ngAcSession: AcCaptureSession,
+  mappings: NodeMapping[],
+  ourSize: number,
+): AcCaptureSession {
+  const ngToOur = new Map<number, number>();
+  for (const m of mappings) {
+    ngToOur.set(m.ngspiceIndex, m.ourIndex);
+  }
+
+  function reindexArray(ngArr: Float64Array): Float64Array {
+    const out = new Float64Array(ourSize);
+    out.fill(NaN);
+    ngToOur.forEach((ourIdx, ngIdx) => {
+      if (ngIdx < ngArr.length && ourIdx >= 0 && ourIdx < ourSize) {
+        out[ourIdx] = ngArr[ngIdx];
+      }
+    });
+    return out;
+  }
+
+  function reindexPoint(p: AcCapturePoint): AcCapturePoint {
+    return {
+      ...p,
+      solRe: reindexArray(p.solRe),
+      solIm: reindexArray(p.solIm),
+      ...(p.rhsRe ? { rhsRe: reindexArray(p.rhsRe) } : {}),
+      ...(p.rhsIm ? { rhsIm: reindexArray(p.rhsIm) } : {}),
+    };
+  }
+
+  return {
+    ...ngAcSession,
+    points: ngAcSession.points.map(reindexPoint),
   };
 }
 
