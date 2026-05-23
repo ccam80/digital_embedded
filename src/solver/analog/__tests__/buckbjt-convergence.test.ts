@@ -3,21 +3,10 @@
  * ngspice: compares every NR iteration's rhsOld[], noncon, diagGmin, and
  * srcFact. Requires the instrumented ngspice DLL; gated on its presence.
  */
-import { describe, it, expect } from 'vitest';
-import { resolve } from 'path';
-import { accessSync } from 'fs';
+import { it, expect } from 'vitest';
 import { ComparisonSession } from './harness/comparison-session.js';
+import { describeIfDll, DLL_PATH } from './ngspice-parity/parity-helpers.js';
 import type { NRPhase } from './harness/types.js';
-
-// The ComparisonSession requires the instrumented ngspice DLL; gate the
-// test on its presence so the suite does not produce a false red when
-// run on a machine without the DLL.
-const DLL_PATH = resolve(
-  process.cwd(),
-  'ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll',
-);
-try { accessSync(DLL_PATH); } catch { throw new Error('ngspice DLL required for buckbjt convergence test'); }
-const describeIfDll = describe;
 
 // Phases whose phaseParameter carries diagGmin (ngspice CKTdiagGmin).
 const GMIN_PHASES: ReadonlySet<NRPhase> = new Set([

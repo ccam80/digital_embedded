@@ -34,16 +34,17 @@ const AC_PARAMS = {
   numPoints: 3,
   fStart: 1,
   fStop: 1000,
-  sourceLabel: "V1:pos",
   outputNodes: [] as string[],
 };
 
 describeIfDll("AC bridge-paired smoke (real ngspice)", () => {
   it("rc_lowpass_ac_runs_both_sides_and_acFirstDivergence_returns_report", async () => {
     // No `cirPath`: let ComparisonSession auto-generate the ngspice deck
-    // via `generateSpiceNetlist` so both sides see matching element/
-    // terminal labels. Auto-generated AcVoltageSource lines carry `AC 1`
-    // (netlist-generator.ts) for the .ac sweep stimulus.
+    // via `generateSpiceNetlist` so both sides see matching element /
+    // terminal labels. Auto-generated AcVoltageSource lines emit
+    // `AC <acMagnitude> <acPhase>` (netlist-generator.ts) read directly
+    // from the source's properties — symmetric with our stampAc which
+    // reads the same properties on the digiTS side.
     const session = await ComparisonSession.create({
       dtsPath: DTS,
       dllPath: DLL_PATH,

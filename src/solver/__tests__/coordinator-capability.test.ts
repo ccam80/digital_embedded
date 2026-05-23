@@ -449,7 +449,6 @@ describe('unified execution methods  digital-only coordinator', () => {
       fStart: 1,
       fStop: 1e6,
       numPoints: 10,
-      sourceLabel: '',
       outputNodes: [],
     });
     expect(result).toBeNull();

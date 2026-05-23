@@ -47,7 +47,7 @@ function buildTwoSeriesVoltageSources(facade: DefaultSimulatorFacade): Circuit {
 function buildCurrentSourceWithResistor(facade: DefaultSimulatorFacade): Circuit {
   return facade.build({
     components: [
-      { id: 'i',   type: 'CurrentSource', props: { label: 'I1', current: 1e-3 } },
+      { id: 'i',   type: 'DcCurrentSource', props: { label: 'I1', current: 1e-3 } },
       { id: 'r',   type: 'Resistor',      props: { label: 'R1', resistance: 1000 } },
       { id: 'gnd', type: 'Ground' },
     ],

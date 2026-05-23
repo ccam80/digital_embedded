@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778902241572,
+  "lastScanned": 1779498601533,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npm run build 2>&1 | tail -50",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && npx vitest run --reporter=verbose 2>&1 | tail -10",
+    "buildCommand": "rm -f .tsc-harness.txt .harness-probe.txt; echo \"cleaned\"",
+    "testCommand": "NGSPICE_DLL_PATH=\"C:/local_working_projects/digital_in_browser/ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll\" npx vitest run src/solver/analog/__tests__/harness --disable-console-intercept 2>&1 | tail -50",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778902241466,
+      "lastAccessed": 1779498601503,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1778902241466,
+      "lastAccessed": 1779498601503,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1778902241466,
+      "lastAccessed": 1779498601503,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1778902241467,
+      "lastAccessed": 1779498601504,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778902241467,
+      "lastAccessed": 1779498601518,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1778902241553,
+      "lastAccessed": 1779498601519,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -143,35 +143,41 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1778902241553,
+      "lastAccessed": 1779498601519,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778902241553,
+      "lastAccessed": 1779498601519,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778902241553,
+      "lastAccessed": 1779498601519,
       "keyFiles": []
     },
     "scratch": {
       "path": "scratch",
       "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1778902241554,
-      "keyFiles": []
+      "fileCount": 5,
+      "lastAccessed": 1779498601519,
+      "keyFiles": [
+        "analysis-engine.diff",
+        "baseline-failures.json",
+        "cktop.diff",
+        "task-0.1.1-apply.mjs",
+        "task-0.1.2-apply.mjs"
+      ]
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 14,
-      "lastAccessed": 1778902241554,
+      "lastAccessed": 1779498601519,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -184,7 +190,7 @@
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 16,
-      "lastAccessed": 1778902241554,
+      "lastAccessed": 1779498601520,
       "keyFiles": [
         "bridge-synthesis.md",
         "dig-format-excision.md",
@@ -197,7 +203,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1778902241555,
+      "lastAccessed": 1779498601520,
       "keyFiles": [
         "main.ts"
       ]
@@ -205,18 +211,21 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 3,
-      "lastAccessed": 1778902241555,
+      "fileCount": 15,
+      "lastAccessed": 1779498601522,
       "keyFiles": [
-        "playwright-failures.json",
-        "test-failures.json"
+        "ac.json",
+        "acmig.json",
+        "bridge-smoke.json",
+        "cx2.json",
+        "phaseF.json"
       ]
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1778902241555,
+      "lastAccessed": 1779498601522,
       "keyFiles": [
         "index.json"
       ]
@@ -225,23 +234,23 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1778902241555,
+      "lastAccessed": 1779498601522,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778902241556,
+      "lastAccessed": 1779498601523,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1778902241557,
+      "lastAccessed": 1779498601523,
       "keyFiles": [
-        "main-DuWHuFk1.js",
+        "main-BzvxYKS9.js",
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js"
       ]
@@ -250,7 +259,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1778902241558,
+      "lastAccessed": 1779498601524,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -261,7 +270,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1778902241559,
+      "lastAccessed": 1779498601525,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -272,7 +281,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1778902241559,
+      "lastAccessed": 1779498601525,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -283,27 +292,27 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1778902241559,
+      "lastAccessed": 1779498601525,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 140,
-      "lastAccessed": 1778643742012,
+      "accessCount": 147,
+      "lastAccessed": 1779236224861,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 128,
-      "lastAccessed": 1778978009389,
+      "accessCount": 138,
+      "lastAccessed": 1779270816508,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 54,
-      "lastAccessed": 1778938196315,
+      "accessCount": 55,
+      "lastAccessed": 1779003279510,
       "type": "file"
     },
     {
@@ -320,8 +329,8 @@
     },
     {
       "path": "src\\compile\\partition.ts",
-      "accessCount": 33,
-      "lastAccessed": 1778933882809,
+      "accessCount": 34,
+      "lastAccessed": 1779003278678,
       "type": "file"
     },
     {
@@ -362,8 +371,8 @@
     },
     {
       "path": "src\\components\\memory\\__tests__\\register.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1778936721385,
+      "accessCount": 15,
+      "lastAccessed": 1779014336965,
       "type": "file"
     },
     {
@@ -394,6 +403,12 @@
       "path": "src/components/semiconductors/diode.ts",
       "accessCount": 9,
       "lastAccessed": 1778495589056,
+      "type": "directory"
+    },
+    {
+      "path": "src/components/passives/inductor.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779490184772,
       "type": "directory"
     },
     {
@@ -455,12 +470,6 @@
       "accessCount": 4,
       "lastAccessed": 1778800153409,
       "type": "file"
-    },
-    {
-      "path": "src/components/passives/inductor.ts",
-      "accessCount": 3,
-      "lastAccessed": 1778495890743,
-      "type": "directory"
     },
     {
       "path": "src\\editor\\__tests__\\property-panel-model.test.ts",

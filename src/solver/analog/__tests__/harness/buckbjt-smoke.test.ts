@@ -7,17 +7,11 @@
  * Requires the extended ngspice DLL.
  */
 import { describe, it, expect } from "vitest";
-import { resolve } from "path";
-import { accessSync } from "fs";
 import { ComparisonSession } from "./comparison-session.js";
+import { resolveNgspiceDllPath, ngspiceDllFileExists } from "./ngspice-dll-path.js";
 
-const DLL_PATH = resolve(
-  process.cwd(), "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll",
-);
-
-try { accessSync(DLL_PATH); } catch { throw new Error('ngspice DLL required for buckbjt smoke test'); }
-
-const describeIfDll = describe;
+const DLL_PATH = resolveNgspiceDllPath();
+const describeIfDll = ngspiceDllFileExists() ? describe : describe.skip;
 
 describeIfDll("ComparisonSession- buckbjt smoke test", () => {
   it("transient: CCAP in capacitor and BJT junctions over first steps/retries", async () => {

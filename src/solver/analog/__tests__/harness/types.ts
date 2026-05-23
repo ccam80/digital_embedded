@@ -185,6 +185,15 @@ export interface AcDivergenceReport {
   solution: AcSolutionDivergenceEntry | null;
   shape: AcShapeDivergenceEntry | null;
   matrix: AcMatrixDivergenceEntry | null;
+  /**
+   * First per-MNA-row complex loaded-RHS mismatch. The AC RHS is the excitation
+   * vector the complex solve consumes; an identical complex Jacobian with a
+   * divergent RHS surfaces only as a divergent `solution`, so the RHS class is
+   * the upstream signal that pinpoints the excitation-stamp / source-load path.
+   * Reuses `AcSolutionDivergenceEntry` (per-row complex, same shape as the
+   * solution class); `row` is the MNA row in our coordinate space.
+   */
+  rhs: AcSolutionDivergenceEntry | null;
 }
 
 /** Bundle of all instrumentation hooks the comparison harness needs. */
@@ -1153,6 +1162,16 @@ export interface IterationSideData {
    * (added to NiIterationData; requires DLL rebuild).
    */
   elementStates3Slots: Record<string, Record<string, number>>;
+  /**
+   * Per-pin terminal current at this iteration, keyed by element label then
+   * pin label (e.g. `{ Q1: { B: ..., C: ..., E: ... } }`). Projected from the
+   * captured state slots via `DeviceMapping.pinCurrents`; devices without a
+   * projection (MOSFET, inductor) contribute an empty record. Surfaced so a
+   * `state` divergence the router flags can be read as a terminal current
+   * here without re-deriving the projection by hand. Empty when no device on
+   * the side has a pin-current projection.
+   */
+  pinCurrents: Record<string, Record<string, number>>;
   limitingEvents: LimitingEvent[];
   /**
    * RHS vector b at the start of this iteration (before the linear solve).
@@ -1484,7 +1503,15 @@ export interface TopologyDiffReport {
   structuralFindings: Array<{ kind: string; message: string }>;
 }
 
-export type DivergenceSignalClass = "voltage" | "matrix" | "state" | "shape";
+export type DivergenceSignalClass =
+  | "voltage"
+  | "rhs"
+  | "matrix"
+  | "state"
+  | "integration"
+  | "limiting"
+  | "convergence"
+  | "shape";
 
 export interface FirstDivergenceSignal {
   signalClass: DivergenceSignalClass;
@@ -1497,11 +1524,45 @@ export interface FirstDivergenceSignal {
   absDelta: number;
 }
 
+/**
+ * Per-class first-divergence report. Each class is an independent chronological
+ * walk; `earliest` is the divergence with the lowest `(stepIndex,
+ * iterationIndex)`, ties broken by causal upstream-ness so the router points at
+ * the cause, not a downstream symptom (a divergent `rhs` over an identical
+ * `matrix` shows up as a divergent post-solve `voltage` at the same iteration).
+ *
+ * Causal order (most upstream first): shape -> integration -> state ->
+ * limiting -> rhs -> matrix -> voltage -> convergence.
+ *
+ * Quantities deliberately NOT classified here are reachable per-side via
+ * `harness_get_attempt`: the pre-solve guess (`nodeVoltagesBefore`), the solve
+ * residual (`residual` / `residualInfinityNorm`), and `pinCurrents`. They are
+ * functions of the classified signals; drill into the attempt the router points
+ * at to read them.
+ */
 export interface FirstDivergenceReport {
   voltage: FirstDivergenceSignal | null;
+  /** First preSolveRhs (companion-current / excitation) cell mismatch. */
+  rhs: FirstDivergenceSignal | null;
   matrix: FirstDivergenceSignal | null;
+  /** First element-state slot mismatch, at any vintage (state0 / state1 / state2 / state3). */
   state: FirstDivergenceSignal | null;
+  /**
+   * First per-iteration timestep / integration-coefficient mismatch
+   * (`delta`, `order`, `method`, `ag0`, `ag1`, `lteDt`). Tran steps only;
+   * DCOP steps have no active integration so they are skipped to avoid
+   * comparing inactive-integration zeros.
+   */
+  integration: FirstDivergenceSignal | null;
+  /** First junction-limiting mismatch (applied flag or post-limit voltage). */
+  limiting: FirstDivergenceSignal | null;
+  /**
+   * First iteration where the engines disagree on a matched element's
+   * converged flag (per-element NR blame). Only elements present on both
+   * sides are compared, so label-namespace gaps never false-positive.
+   */
+  convergence: FirstDivergenceSignal | null;
   shape: FirstDivergenceSignal | null;
-  /** Earliest divergence across all classes (lowest stepIndex, then iterationIndex). */
+  /** Earliest divergence across all classes (lowest stepIndex, then iterationIndex, then causal rank). */
   earliest: FirstDivergenceSignal | null;
 }

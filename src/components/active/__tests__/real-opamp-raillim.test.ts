@@ -4,7 +4,6 @@ import path from "node:path";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { REAL_OPAMP_SCHEMA } from "../real-opamp.js";
@@ -332,7 +331,7 @@ describeIfDll("RealOpAmp unity-follower vs ngspice — transient + stamp parity 
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_UNITY_FOLLOWER, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_UNITY_FOLLOWER, analysis: "tran", tStop: 1e-4, maxStep: 1e-5 });
   });
 
   afterAll(async () => {
@@ -363,7 +362,7 @@ describeIfDll("RealOpAmp rail saturation vs ngspice — transient + stamp parity
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_RAIL_SATURATION, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_RAIL_SATURATION, analysis: "tran", tStop: 1e-4, maxStep: 1e-5 });
   });
 
   afterAll(async () => {

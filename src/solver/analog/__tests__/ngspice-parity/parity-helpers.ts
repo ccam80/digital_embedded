@@ -1,18 +1,16 @@
-import { accessSync } from "node:fs";
 import type { CaptureSession, IterationSnapshot } from "../harness/types.js";
 import { DEVICE_MAPPINGS } from "../harness/device-mappings.js";
+import { resolveNgspiceDllPath, ngspiceDllFileExists } from "../harness/ngspice-dll-path.js";
 import { describe, expect } from "vitest";
 
-export const DLL_PATH = "C:/local_working_projects/digital_in_browser/ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll";
+export const DLL_PATH = resolveNgspiceDllPath();
 
-let _dllAvailable: boolean | null = null;
 export function dllAvailable(): boolean {
-  if (_dllAvailable !== null) return _dllAvailable;
-  try { accessSync(DLL_PATH); _dllAvailable = true; }
-  catch { _dllAvailable = false; }
-  return _dllAvailable;
+  return ngspiceDllFileExists();
 }
 
+// The describe gate stays here (this file already imports vitest); the pure
+// resolver module (ngspice-dll-path.ts) must never import vitest.
 export const describeIfDll = dllAvailable() ? describe : describe.skip;
 
 /**

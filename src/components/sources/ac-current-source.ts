@@ -29,6 +29,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
@@ -58,6 +59,8 @@ export const { paramDefs: AC_CURRENT_SOURCE_PARAM_DEFS, defaults: AC_CURRENT_SOU
     riseTime: { default: 1e-12, unit: "s",   description: "Rise time for square wave transitions" },
     fallTime: { default: 1e-12, unit: "s",   description: "Fall time for square/sawtooth wave transitions" },
     noiseSampleTime: { default: 0, unit: "s", description: "Noise sample period TS (ngspice TRNOISE). Default 0 disables breakpoints." },
+    acMagnitude: { default: 1, unit: "A",   description: "AC analysis magnitude (ngspice ISRCacMag, default 1)" },
+    acPhase:     { default: 0, unit: "deg", description: "AC analysis phase in degrees (ngspice ISRCacPhase, default 0)" },
   },
 });
 
@@ -276,6 +279,12 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   private _riseTime: number;
   private _fallTime: number;
   private _noiseSampleTime: number;
+  // AC analysis magnitude / phase. ngspice ISRC mirrors VSRC: srctemp.c sets
+  // ISRCacMag = 1 and ISRCacPhase = 0 when an `AC` token is present without
+  // explicit values, and isrcacld.c:36-50 stamps acReal = mag·cos(phase·π/180),
+  // acImag = mag·sin(...) into CKTrhs / CKTirhs at the terminal nodes.
+  private _acMagnitude: number;
+  private _acPhase: number;
   private readonly _waveform: Waveform;
   private readonly _ext: ExtendedWaveformParams;
   private readonly _getTime: () => number;
@@ -297,6 +306,10 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
       fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
       noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
+      // ISRC AC magnitude / phase defaults mirror ngspice srctemp.c (ISRCacMag = 1,
+      // ISRCacPhase = 0 when an `AC` token is present without explicit values).
+      acMagnitude: props.hasModelParam("acMagnitude") ? props.getModelParam<number>("acMagnitude") : 1,
+      acPhase:     props.hasModelParam("acPhase")     ? props.getModelParam<number>("acPhase")     : 0,
     };
     this._amplitude = this._p.amplitude;
     this._frequency = this._p.frequency;
@@ -305,6 +318,8 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
     this._riseTime = this._p.riseTime;
     this._fallTime = this._p.fallTime;
     this._noiseSampleTime = this._p.noiseSampleTime;
+    this._acMagnitude = this._p.acMagnitude;
+    this._acPhase = this._p.acPhase;
     this._waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
     this._ext = {
       freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -345,6 +360,8 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       this._riseTime = this._p.riseTime;
       this._fallTime = this._p.fallTime;
       this._noiseSampleTime = this._p.noiseSampleTime;
+      this._acMagnitude = this._p.acMagnitude;
+      this._acPhase = this._p.acPhase;
       this._ext.riseTime = this._riseTime;
       this._ext.fallTime = this._fallTime;
       this._ext.noiseSampleTime = this._noiseSampleTime;
@@ -377,6 +394,36 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
     // isrcload.c:33-34: unconditional RHS stamp.
     stampRHS(ctx.rhs, nodePos,  I);
     stampRHS(ctx.rhs, nodeNeg, -I);
+  }
+
+  stampAc(
+    _solver: SparseSolverStamp,
+    _omega: number,
+    _ctx: LoadContext,
+    rhsRe: Float64Array,
+    rhsIm: Float64Array,
+  ): void {
+    // I-source AC stamp — isrcacld.c:43-50. The current source contributes
+    // to RHS only at the terminal nodes (no branch row, no matrix entries):
+    //   CKTrhs [posNode] += m · acReal     CKTrhs [negNode] -= m · acReal
+    //   CKTirhs[posNode] += m · acImag     CKTirhs[negNode] -= m · acImag
+    // m is the parallel-multiplier (`m=...`); digiTS does not expose `m` for
+    // sources, so m ≡ 1 — the stamp collapses to a single ± at each node.
+    //
+    // acReal / acImag derive from ISRCacMag / ISRCacPhase via the same
+    // VSRCtemp formula (vsrctemp.c:68-70 — the ngspice ISRC code path
+    // mirrors the V-source ac-token parser):
+    //   acReal = mag · cos(phase · π / 180)
+    //   acImag = mag · sin(phase · π / 180)
+    const nodePos = this.pinNodes.get("pos")!;
+    const nodeNeg = this.pinNodes.get("neg")!;
+    const radians = this._acPhase * Math.PI / 180.0;
+    const acReal = this._acMagnitude * Math.cos(radians);
+    const acImag = this._acMagnitude * Math.sin(radians);
+    rhsRe[nodePos] += acReal;
+    rhsRe[nodeNeg] -= acReal;
+    rhsIm[nodePos] += acImag;
+    rhsIm[nodeNeg] -= acImag;
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {

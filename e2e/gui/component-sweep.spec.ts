@@ -72,7 +72,7 @@ const SEMICONDUCTORS = [
 ];
 
 const SOURCES = [
-  'AcVoltageSource', 'DcVoltageSource', 'CurrentSource',
+  'AcVoltageSource', 'DcVoltageSource', 'DcCurrentSource',
   'Ground', 'VariableRail',
 ];
 

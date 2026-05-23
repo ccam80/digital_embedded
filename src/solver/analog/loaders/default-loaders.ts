@@ -17,18 +17,22 @@ import type { SparseSolverStamp } from "../sparse-solver.js";
 
 /**
  * Context object passed to the AC stamp handler by the dispatcher.
- * Carries the complex solver, angular frequency, and the DC-OP LoadContext
+ * Carries the complex solver, angular frequency, the DC-OP LoadContext
  * (needed by elements whose small-signal stamps read internal device state
- * stored in the LoadContext's state vectors).
+ * stored in the LoadContext's state vectors), and the complex RHS arrays
+ * (1-based, parallel to ngspice CKTrhs / CKTirhs) that V/I sources stamp
+ * into directly per vsrcacld.c:179-180 and isrcacld.c:43-50.
  *
  * cite: acan.c:409-414 -- DEVacLoad(ckt) receives the full CKTcircuit;
- *   solver, omega, and loadCtx are the three CKTcircuit fields accessed by
- *   every AC-stamp method in this codebase.
+ *   solver, omega, loadCtx, rhsRe, and rhsIm are the five CKTcircuit fields
+ *   accessed by AC-stamp methods in this codebase.
  */
 export interface AcHandlerCtx {
   solver: SparseSolverStamp;
   omega: number;
   loadCtx: LoadContext;
+  rhsRe: Float64Array;
+  rhsIm: Float64Array;
 }
 
 /**
@@ -51,7 +55,8 @@ export const defaultLoadHandler: FamilyHandler = {
 /**
  * Default AC stamp handler -- trivial per-instance walk.
  *
- * For every element in the bucket, calls `el.stampAc?.(solver, omega, loadCtx)`.
+ * For every element in the bucket, calls
+ * `el.stampAc?.(solver, omega, loadCtx, rhsRe, rhsIm)`.
  * The `stampAc` method is optional on AnalogElement; elements that do not
  * implement it are silently skipped (no-op), matching ngspice's NULL function-
  * pointer guard at acan.c:410 (`if (DEVices[i]->DEVacLoad == NULL) continue`).
@@ -60,9 +65,9 @@ export const defaultLoadHandler: FamilyHandler = {
  */
 export const defaultStampAcHandler: FamilyHandler = {
   run(ctx: unknown, instances): void {
-    const { solver, omega, loadCtx } = ctx as AcHandlerCtx;
+    const { solver, omega, loadCtx, rhsRe, rhsIm } = ctx as AcHandlerCtx;
     for (const el of instances) {
-      el.stampAc?.(solver, omega, loadCtx);
+      el.stampAc?.(solver, omega, loadCtx, rhsRe, rhsIm);
     }
   },
 };

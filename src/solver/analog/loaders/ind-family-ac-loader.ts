@@ -65,7 +65,7 @@ export const IndFamilyStampAcHandler: FamilyHandler = {
     // connectivity stamps and 1 imaginary branch-diagonal stamp (−ω·L/m).
     for (const el of elements) {
       if (!hasAcCoupling(el)) {
-        el.stampAc?.(acCtx.solver, acCtx.omega, acCtx.loadCtx);
+        el.stampAc?.(acCtx.solver, acCtx.omega, acCtx.loadCtx, acCtx.rhsRe, acCtx.rhsIm);
       }
     }
 

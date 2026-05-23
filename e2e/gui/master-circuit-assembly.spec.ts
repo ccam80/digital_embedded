@@ -241,18 +241,18 @@ test.describe('Master circuit assembly via UI', () => {
     // Section A: power → switch → divider
     await builder.drawWireExplicit('Vs', 'pos', 'SW', 'in');
     await builder.drawWireExplicit('CTRL', 'out', 'SW', 'ctrl', [[14, 7]]);
-    await builder.drawWireExplicit('SW', 'out', 'R1', 'A');
-    await builder.drawWireFromPinExplicit('R2', 'B', 32, 8);
+    await builder.drawWireExplicit('SW', 'out', 'R1', 'pos');
+    await builder.drawWireFromPinExplicit('R2', 'neg', 32, 8);
     await builder.drawWireFromPinExplicit('Vs', 'neg', 3, 4);
 
     // Divider junction fan-out: R1.B → R2.A first, then P_DIV and R3 tap
-    await builder.drawWireExplicit('R1', 'B', 'R2', 'A');
+    await builder.drawWireExplicit('R1', 'neg', 'R2', 'pos');
     await builder.drawWireFromPinExplicit('P_DIV', 'in', 26, 3);
     // R3.A taps divider net- route via waypoints to avoid crossing
-    await builder.drawWireFromPinExplicit('R3', 'A', 26, 3, [[18, 11], [18, 7], [26, 7]]);
+    await builder.drawWireFromPinExplicit('R3', 'pos', 26, 3, [[18, 11], [18, 7], [26, 7]]);
 
     // Section B: RC filter
-    await builder.drawWireExplicit('R3', 'B', 'C1', 'pos');
+    await builder.drawWireExplicit('R3', 'neg', 'C1', 'pos');
     await builder.drawWireFromPinExplicit('C1', 'neg', 32, 12);
     // RC node fan-out: P_RC and AMP.in+ tap the R3.B-C1.pos wire
     await builder.drawWireFromPinExplicit('P_RC', 'in', 26, 11);
@@ -264,15 +264,15 @@ test.describe('Master circuit assembly via UI', () => {
     // P_AMP taps AMP.out wire
     await builder.drawWireFromPinExplicit('P_AMP', 'in', 35, 19);
     // Rb.A taps AMP output- route down via waypoints
-    await builder.drawWireFromPinExplicit('Rb', 'A', 35, 19, [[19, 25], [19, 23], [35, 23]]);
+    await builder.drawWireFromPinExplicit('Rb', 'pos', 35, 19, [[19, 25], [19, 23], [35, 23]]);
 
     // Section D: BJT
-    await builder.drawWireExplicit('Rb', 'B', 'Q1', 'B');
-    // Collector: Q1.C → Rc.A, P_CE taps collector wire
-    await builder.drawWireExplicit('Q1', 'C', 'Rc', 'A');
-    await builder.drawWireFromPinExplicit('P_CE', 'in', 36, 24, [[36, 23]]);  // above Rc, dogleg down to Rc.A pin
-    // Vcc.pos → Rc.B: straight down same column x=40
-    await builder.drawWireExplicit('Rc', 'B', 'Vcc', 'pos');
+    await builder.drawWireExplicit('Rb', 'neg', 'Q1', 'B');
+    // Collector: Q1.C → Rc.pos, P_CE taps collector wire
+    await builder.drawWireExplicit('Q1', 'C', 'Rc', 'pos');
+    await builder.drawWireFromPinExplicit('P_CE', 'in', 36, 24, [[36, 23]]);  // above Rc, dogleg down to Rc.pos pin
+    // Vcc.pos → Rc.neg: straight down same column x=40
+    await builder.drawWireExplicit('Rc', 'neg', 'Vcc', 'pos');
     // Grounds: Q1.E → GND(32,30), Vcc.neg → GND(32,30)
     await builder.drawWireFromPinExplicit('Q1', 'E', 32, 30);
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 32, 30);
@@ -354,7 +354,7 @@ test.describe('Master circuit assembly via UI', () => {
     expect(Math.abs(pCeC - 11.43012) / 11.43012).toBeLessThan(0.02);
 
     // --- Phase D: Trace/scope on R3 (RC filter input, at divider junction) ---
-    await builder.addTraceViaContextMenu('R3', 'A');
+    await builder.addTraceViaContextMenu('R3', 'pos');
     // Absolute target: current simTime is ~150ms, step 5ms more to collect trace data
     const peaks = await builder.measureAnalogPeaks('155m');
     expect(peaks).not.toBeNull();
@@ -375,7 +375,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.setSpiceParameter('Q1', 'BF', 100);
 
     // Right-click wire near the R1.B pin (R1-R2 junction) to set pin loading
-    const junctionPos = await builder.getPinPagePosition('R1', 'B');
+    const junctionPos = await builder.getPinPagePosition('R1', 'neg');
     await builder.page.mouse.click(junctionPos.x + 5, junctionPos.y, { button: 'right' });
     await builder.page.waitForTimeout(200);
     const loadedItem = builder.page.locator('.ctx-menu-item .ctx-menu-label')
@@ -473,10 +473,10 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireExplicit('D0', 'out', 'DAC1', 'D0', [[5, 8], [5, 10], [13, 10], [13, 13]]);
 
     // DAC output → R1
-    await builder.drawWireExplicit('R1', 'A', 'DAC1', 'OUT');
+    await builder.drawWireExplicit('R1', 'pos', 'DAC1', 'OUT');
 
     // RC filter: R1.B → C1.pos (main bus for fan-out at RC node)
-    await builder.drawWireExplicit('R1', 'B', 'C1', 'pos');
+    await builder.drawWireExplicit('R1', 'neg', 'C1', 'pos');
     // Probe taps RC node
     await builder.drawWireFromPinExplicit('P_DAC', 'in', 31, 15);
     // Comparator in- taps RC node (dogleg left to avoid shorting with in+)

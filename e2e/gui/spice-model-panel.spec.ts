@@ -179,15 +179,15 @@ test.describe('Model parameter panel', () => {
     // Set IS=1e-14 override via model param inputs BEFORE first step
     await builder.setSpiceOverrides('Q1', { IS: 1e-14, BF: 100, VAF: 100 });
 
-    await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
-    await builder.drawWire('Rc', 'B', 'Q1', 'C');
-    await builder.drawWire('Vin', 'pos', 'Rb', 'A');
-    await builder.drawWire('Rb', 'B', 'Q1', 'B');
-    await builder.drawWire('Q1', 'E', 'Re', 'A');
-    await builder.drawWireFromPin('Re', 'B', 24, 20);
+    await builder.drawWire('Vcc', 'pos', 'Rc', 'pos');
+    await builder.drawWire('Rc', 'neg', 'Q1', 'C');
+    await builder.drawWire('Vin', 'pos', 'Rb', 'pos');
+    await builder.drawWire('Rb', 'neg', 'Q1', 'B');
+    await builder.drawWire('Q1', 'E', 'Re', 'pos');
+    await builder.drawWireFromPin('Re', 'neg', 24, 20);
     await builder.drawWireFromPin('Vcc', 'neg', 11, 20);
     await builder.drawWireFromPin('Vin', 'neg', 11, 10);
-    await builder.drawWire('Rc', 'B', 'Pc', 'in');
+    await builder.drawWire('Rc', 'neg', 'Pc', 'in');
 
     await builder.stepViaUI();
     await builder.verifyNoErrors();

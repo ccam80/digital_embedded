@@ -27,7 +27,6 @@ const AC_PARAMS = {
   numPoints: 5,
   fStart: 1,
   fStop: 10000,
-  sourceLabel: "V1:pos",
   outputNodes: [] as string[],
 };
 

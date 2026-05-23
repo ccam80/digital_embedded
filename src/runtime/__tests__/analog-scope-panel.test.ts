@@ -222,10 +222,9 @@ describe("ScopePanel", () => {
 
   it("registers_as_observer_on_construction", () => {
     const { coordinator } = buildCoordinator();
-    const panel = makePanel(coordinator);
+    makePanel(coordinator);
 
-    const observers = (coordinator as unknown as { _observers: Set<unknown> })._observers;
-    expect(observers.has(panel)).toBe(true);
+    expect(coordinator.observerCount).toBe(1);
   });
 
   it("deregisters_as_observer_on_dispose", () => {
@@ -234,8 +233,7 @@ describe("ScopePanel", () => {
 
     panel.dispose();
 
-    const observers = (coordinator as unknown as { _observers: Set<unknown> })._observers;
-    expect(observers.has(panel)).toBe(false);
+    expect(coordinator.observerCount).toBe(0);
   });
 
   it("reads_element_current_via_coordinator", () => {

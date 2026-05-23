@@ -6,7 +6,6 @@ import { COMPARATOR_SCHEMA } from "../comparator.js";
 import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 
@@ -234,7 +233,7 @@ describeIfDll("Comparator transient + iteration parity — OC active (T3)", () =
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_OC_ON, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_OC_ON, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -255,7 +254,7 @@ describeIfDll("Comparator transient + iteration parity — OC inactive (T3)", ()
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_OC_OFF, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_OC_OFF, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -276,7 +275,7 @@ describeIfDll("Comparator transient + iteration parity — PP active (T3)", () =
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_PP_ON, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_PP_ON, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -297,7 +296,7 @@ describeIfDll("Comparator transient + iteration parity — PP inactive (T3)", ()
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_PP_OFF, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_PP_OFF, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {

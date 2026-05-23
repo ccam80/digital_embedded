@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { resolve } from "path";
-import { existsSync } from "fs";
 import { ComparisonSession } from "./comparison-session.js";
+import { resolveNgspiceDllPath, ngspiceDllFileExists } from "./ngspice-dll-path.js";
 
-const DLL_PATH = resolve(process.cwd(), "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll");
-const HAS_DLL = DLL_PATH !== "" && existsSync(DLL_PATH);
-const describeGate = HAS_DLL ? describe : describe.skip;
+const DLL_PATH = resolveNgspiceDllPath();
+const describeGate = ngspiceDllFileExists() ? describe : describe.skip;
 
 describeGate("NPN-CE harness branch value test", () => {
   let session: ComparisonSession;

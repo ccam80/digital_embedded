@@ -176,7 +176,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   // M1.D@(38,5) → supply rail junction at (20,5)- creates horizontal bus
   await builder.drawWireFromPinExplicit('M1', 'D', 20, 5);
   // R1.B@(20,6) → supply rail at (20,5)
-  await builder.drawWireFromPinExplicit('R1', 'B', 20, 5);
+  await builder.drawWireFromPinExplicit('R1', 'neg', 20, 5);
   // Q2.E@(33,8) → supply rail at (33,5)
   await builder.drawWireFromPinExplicit('Q2', 'E', 33, 5);
 
@@ -184,9 +184,9 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   // Vac.pos@(4,15) → Vdc.neg@(9,15)
   await builder.drawWireExplicit('Vac', 'neg', 'Vdc', 'neg');
   // Vdc.neg@(9,15) → R2.B@(33,15)
-  await builder.drawWireExplicit('Vdc', 'neg', 'R2', 'B');
+  await builder.drawWireExplicit('Vdc', 'neg', 'R2', 'neg');
   // R2.B@(33,15) → (57,15) → Rload.A@(57,11)- extends bus and connects load
-  await builder.drawWireExplicit('R2', 'B', 'Rload', 'A', [[57, 15]]);
+  await builder.drawWireExplicit('R2', 'neg', 'Rload', 'pos', [[57, 15]]);
   // Ground@(20,16) → ground bus at (20,15)
   await builder.drawWireByPath([[20, 16], [20, 15]]);
   // Q1.E@(20,13) → ground bus at (20,15)
@@ -202,13 +202,13 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
 
   // --- NPN section ---
   // R1.A@(20,10) → Q1.C@(20,11)
-  await builder.drawWireExplicit('R1', 'A', 'Q1', 'C');
+  await builder.drawWireExplicit('R1', 'pos', 'Q1', 'C');
   // T_NDRV_N@(21,11) → Q1.C@(20,11)- junction at collector
   await builder.drawWireExplicit('T_NDRV_N', 'in', 'Q1', 'C');
 
   // --- PNP section ---
   // R2.A@(33,11) → Q2.C@(33,10)
-  await builder.drawWireExplicit('R2', 'A', 'Q2', 'C');
+  await builder.drawWireExplicit('R2', 'pos', 'Q2', 'C');
   // Q2.C@(33,10) → T_PDRV@(34,10)
   await builder.drawWireExplicit('Q2', 'C', 'T_PDRV', 'in');
 
@@ -218,15 +218,15 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
 
   // --- Switch node ---
   // M1.S@(40,5) → (43,5) → L1.A@(46,5)
-  await builder.drawWireExplicit('M1', 'S', 'L1', 'A', [[43, 5]]);
+  await builder.drawWireExplicit('M1', 'S', 'L1', 'pos', [[43, 5]]);
   // TD.K@(43,8) → switch node junction at (43,5)
   await builder.drawWireFromPinExplicit('TD', 'K', 43, 5);
 
   // --- Output section ---
   // L1.B@(50,5) → (52,5) → C1.neg@(52,7)
-  await builder.drawWireExplicit('L1', 'B', 'C1', 'neg', [[52, 5]]);
+  await builder.drawWireExplicit('L1', 'neg', 'C1', 'neg', [[52, 5]]);
   // Rload.B@(57,7) → (57,5) → output node at (52,5)
-  await builder.drawWireFromPinExplicit('Rload', 'B', 52, 5, [[57, 5]]);
+  await builder.drawWireFromPinExplicit('Rload', 'neg', 52, 5, [[57, 5]]);
 
 }
 
@@ -317,7 +317,7 @@ test.describe('BJT buck converter convergence', () => {
 
     // --- Phase 2: Steady state- last 2 switching cycles (499.8ms–500ms) ---
     await builder.addTraceViaContextMenu('M1', 'S');    // switch node
-    await builder.addTraceViaContextMenu('Rload', 'B'); // output node
+    await builder.addTraceViaContextMenu('Rload', 'neg'); // output node
     await builder.addCurrentTraceViaContextMenu('TD');   // diode current
 
     await builder.stepToTimeViaUI('500m');
@@ -389,7 +389,7 @@ test.describe('BJT buck converter convergence', () => {
     await builder.verifyNoErrors();
 
     // Add traces on output and switch node
-    await builder.addTraceViaContextMenu('Rload', 'B');  // output
+    await builder.addTraceViaContextMenu('Rload', 'neg');  // output
     await builder.addTraceViaContextMenu('M1', 'S');     // switch node
 
     // Step to 1ms- early snapshot

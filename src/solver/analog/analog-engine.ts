@@ -1048,7 +1048,15 @@ export class MNAEngine implements AnalogEngine {
       elementsByFamily: this._compiled.elementsByFamily,
       labelToNodeId: this._compiled.labelToNodeId,
     };
-    const ac = new AcAnalysis(adapted, this._params, deps);
+    // Hand AcAnalysis the engine's setup-allocated solver so the AC sweep
+    // reuses the one TSTALLOC'd matrix structure (ngspice CKTsetup reused by
+    // DC and AC). Every element's setup()-cached matrix handles then address
+    // the right cells in complex mode. A caller-supplied solverFactory (e.g.
+    // a test injecting its own solver) takes precedence.
+    const ac = new AcAnalysis(adapted, this._params, {
+      ...deps,
+      solverFactory: deps?.solverFactory ?? (() => this._solver),
+    });
     return ac.run(params);
   }
 

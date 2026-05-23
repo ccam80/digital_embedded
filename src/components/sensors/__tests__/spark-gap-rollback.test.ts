@@ -5,7 +5,6 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { SPARK_GAP_SCHEMA } from "../spark-gap.js";
 
@@ -264,7 +263,7 @@ describeIfDll("SparkGap blocking-regime paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_BLOCKING, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_BLOCKING, analysis: "tran", tStop: 1e-4, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -297,7 +296,7 @@ describeIfDll("SparkGap conducting-regime paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_CONDUCTING, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_CONDUCTING, analysis: "tran", tStop: 1e-4, maxStep: 1e-6 });
   });
 
   afterAll(async () => {

@@ -306,7 +306,7 @@ describe("Inductor parameter hot-load (T1)", () => {
         components: [
           { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: Vsrc } },
           { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: R } },
-          { id: "l1",  type: "Inductor",        props: { label: "L1", inductance: L, TC1: 0, TNOM: 250 } },
+          { id: "l1",  type: "Inductor",        props: { label: "L1", inductance: L, TC1: 0, modelTnom: 250 } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
@@ -340,7 +340,7 @@ describe("Inductor parameter hot-load (T1)", () => {
         components: [
           { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: Vsrc } },
           { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: R } },
-          { id: "l1",  type: "Inductor",        props: { label: "L1", inductance: L, TC2: 0, TNOM: 250 } },
+          { id: "l1",  type: "Inductor",        props: { label: "L1", inductance: L, TC2: 0, modelTnom: 250 } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
@@ -364,9 +364,10 @@ describe("Inductor parameter hot-load (T1)", () => {
     expect(after).not.toBeCloseTo(before, 3);
   });
 
-  it("hotload_TNOM_changes_effective_inductance_via_dT", () => {
-    // TNOM enters L_eff via dT = T_pool - TNOM. With non-zero TC1 baked in,
-    // moving TNOM changes the effective L and therefore τ.
+  it("hotload_modelTnom_changes_effective_inductance_via_dT", () => {
+    // tnom (model card; ngspice has no instance tnom — ind.c:45 IND_MOD_TNOM)
+    // enters L_eff via dT = T_pool - tnom. With non-zero TC1 baked in, moving
+    // tnom changes the effective L and therefore τ.
     const Vsrc = 1.0, R = 1000, L = 1e-3;
     const tau = L / R;
     const fix = buildFixture({
@@ -374,7 +375,7 @@ describe("Inductor parameter hot-load (T1)", () => {
         components: [
           { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: Vsrc } },
           { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: R } },
-          { id: "l1",  type: "Inductor",        props: { label: "L1", inductance: L, TC1: 0.01, TNOM: 300.15 } },
+          { id: "l1",  type: "Inductor",        props: { label: "L1", inductance: L, TC1: 0.01, modelTnom: 300.15 } },
           { id: "gnd", type: "Ground" },
         ],
         connections: [
@@ -392,7 +393,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(lPosNode);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "TNOM", 250);
+    fix.coordinator.setComponentProperty(getInductorCe(fix), "modelTnom", 250);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -433,6 +434,183 @@ describe("Inductor parameter hot-load (T1)", () => {
     // Closed-form: with IC = Vsrc/R the inductor presents a current source
     // carrying I_steady, so V_R = I_steady · R = Vsrc and V(L_pos) = 0V.
     expect(after).toBeCloseTo(0, 6);
+  });
+});
+
+// ===========================================================================
+// Category 6 — Model-layer parameters (T1)
+//
+// ind#recon/modelParams rebuilds the v26 inductor model layer: the geometric
+// specInd = (mu·µ₀·csect²)/length derivation, the mInd ← nt²·specInd folding,
+// and the instance-overrides-model TC/TNOM selection in computeTemperature.
+//
+// buildFixture runs setup() (Part B specInd/mInd derivation) and the initial
+// temperature pass (Part C computeTemperature) before the first step, so the
+// post-warm-start `.inductance` getter (= _effectiveL) reflects the full
+// derivation. The circuit ambient is REFTEMP = 300.15 K; with modelTnom at its
+// 300.15 K default the temperature difference is 0 and factor = 1, so
+// _effectiveL equals the pure geometry/base derivation under these builds.
+//
+// CONST_MU_ZERO = 4·π·1e-7 (const.h:44).
+// ===========================================================================
+
+const MU0 = 4.0 * Math.PI * 1e-7;
+
+function buildBareInductor(
+  facade: DefaultSimulatorFacade,
+  indProps: Record<string, number>,
+): Circuit {
+  // Inductor across a DC source + series R so the analog domain is well-posed.
+  return facade.build({
+    components: [
+      { id: "vs",  type: "DcVoltageSource", props: { label: "V1", voltage: 1 } },
+      { id: "r1",  type: "Resistor",        props: { label: "R1", resistance: 1000 } },
+      { id: "l1",  type: "Inductor",        props: { label: "L1", ...indProps } },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "r1:pos"],
+      ["r1:neg", "l1:pos"],
+      ["l1:neg", "gnd:out"],
+      ["vs:neg", "gnd:out"],
+    ],
+  });
+}
+
+describe("Inductor model-layer parameters (T1)", () => {
+  it("specind_geometry_drives_base_inductance_via_modNt", () => {
+    // No instance inductance, no instance nt → base = mInd = modNt²·specInd.
+    // specInd = (mu·µ₀·csect²)/length (v26 csect² form, _muGiven branch).
+    // csect=2e-4, length=0.05, mu=100, modNt=200.
+    const csect = 2e-4, length = 0.05, mu = 100, modNt = 200;
+    const specInd = (mu * MU0 * csect * csect) / length;
+    const expectedL = modNt * modNt * specInd;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect, length, mu, modNt }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    // _effectiveL == base·factor·SCALE; factor=1 (T=TNOM), SCALE=1.
+    expect(ind.inductance).toBeCloseTo(expectedL, 18);
+  });
+
+  it("specind_without_mu_uses_csect_squared_only", () => {
+    // mu NOT given → v26 else-branch specInd = (µ₀·csect²)/length (no mu factor).
+    const csect = 1e-4, length = 0.02, modNt = 50;
+    const specInd = (MU0 * csect * csect) / length;
+    const expectedL = modNt * modNt * specInd;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect, length, modNt }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    expect(ind.inductance).toBeCloseTo(expectedL, 18);
+  });
+
+  it("zero_length_yields_zero_specind_and_mInd", () => {
+    // length not given (defaults 0, non-positive) → specInd = 0 → mInd = 0.
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect: 2e-4, mu: 100, modNt: 200 }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    expect(ind.inductance).toBeCloseTo(0, 18);
+  });
+
+  it("instance_nt_selects_specInd_times_nt_squared", () => {
+    // No instance inductance, instance nt given → base = specInd·nt²
+    // (NOT modNt²·specInd). modNt is irrelevant on this path.
+    const csect = 2e-4, length = 0.05, mu = 100, instNt = 10;
+    const specInd = (mu * MU0 * csect * csect) / length;
+    const expectedL = specInd * instNt * instNt;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect, length, mu, modNt: 999, nt: instNt }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    expect(ind.inductance).toBeCloseTo(expectedL, 18);
+  });
+
+  it("explicit_mInd_overrides_turns_folding", () => {
+    // mInd given → the !_mIndGiven recompute is skipped; base = mInd directly.
+    const mInd = 3.3e-3;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect: 2e-4, length: 0.05, mu: 100, modNt: 200, mInd }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    expect(ind.inductance).toBeCloseTo(mInd, 12);
+  });
+
+  it("instance_inductance_overrides_model_geometry", () => {
+    // Instance inductance given → base = _nominalL, geometry ignored.
+    const L = 5e-3;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { inductance: L, csect: 2e-4, length: 0.05, mu: 100, modNt: 200 }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    expect(ind.inductance).toBeCloseTo(L, 12);
+  });
+
+  it("model_TC1_used_when_instance_TC1_absent", () => {
+    // modelTC1 drives the factor when instance TC1 is not given. Offset modelTnom
+    // from ambient so factor ≠ 1: modelTnom=250, ambient≈300.15 ⇒ ΔT≈50.15.
+    const L = 1e-3, modelTC1 = 0.02, modelTnom = 250;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { inductance: L, modelTC1, modelTnom }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    const dT = fix.engine.circuitTemp - modelTnom;
+    const expectedL = L * (1 + modelTC1 * dT);
+    expect(ind.inductance).toBeCloseTo(expectedL, 12);
+  });
+
+  it("instance_TC1_overrides_model_TC1", () => {
+    // Both instance TC1 and modelTC1 given → instance wins (indtemp.c:62-65).
+    const L = 1e-3, instTC1 = 0.05, modelTC1 = 0.02, modelTnom = 250;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { inductance: L, TC1: instTC1, modelTC1, modelTnom }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    const dT = fix.engine.circuitTemp - modelTnom;
+    const expectedL = L * (1 + instTC1 * dT);
+    expect(ind.inductance).toBeCloseTo(expectedL, 12);
+  });
+
+  it("hotload_csect_rebuilds_specInd_without_setup_rerun", () => {
+    // setParam("csect") must rebuild _specInd / _mInd (the engine does not
+    // re-run setup() after setParam). The rebuilt _mInd folds into _effectiveL
+    // on the next temperature pass (computeTemperature), which the engine runs
+    // on setCircuitTemp — the same hot-load path the cap pilot relies on.
+    const length = 0.05, mu = 100, modNt = 200;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect: 1e-4, length, mu, modNt }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    const before = ind.inductance;
+    const expectedBefore = modNt * modNt * (mu * MU0 * 1e-4 * 1e-4) / length;
+    expect(before / expectedBefore).toBeCloseTo(1, 9);
+
+    fix.coordinator.setComponentProperty(getInductorCe(fix), "csect", 2e-4);
+    // Re-run the temperature pass so the rebuilt _mInd folds into _effectiveL.
+    fix.engine.setCircuitTemp(fix.engine.circuitTemp);
+    const after = ind.inductance;
+    const expectedAfter = modNt * modNt * (mu * MU0 * 2e-4 * 2e-4) / length;
+    expect(after / expectedAfter).toBeCloseTo(1, 9);
+    // csect doubled ⇒ csect² quadrupled ⇒ _effectiveL ≈ 4× larger.
+    expect(after / before).toBeCloseTo(4, 6);
+  });
+
+  it("hotload_mu_rebuilds_specInd", () => {
+    const csect = 2e-4, length = 0.05, modNt = 200;
+    const fix = buildFixture({
+      build: (_r, facade) => buildBareInductor(facade, { csect, length, mu: 50, modNt }),
+    });
+    const ind = findInductor(fix.circuit.elements);
+    const before = ind.inductance;
+
+    fix.coordinator.setComponentProperty(getInductorCe(fix), "mu", 200);
+    fix.engine.setCircuitTemp(fix.engine.circuitTemp);
+    const after = ind.inductance;
+    const expectedAfter = modNt * modNt * (200 * MU0 * csect * csect) / length;
+    expect(after / expectedAfter).toBeCloseTo(1, 9);
+    // mu 50 → 200 ⇒ specInd 4× ⇒ _effectiveL 4× larger.
+    expect(after / before).toBeCloseTo(4, 6);
   });
 });
 

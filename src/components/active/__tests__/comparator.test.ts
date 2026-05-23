@@ -4,7 +4,6 @@ import path from "node:path";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { COMPARATOR_SCHEMA } from "../comparator.js";
@@ -402,7 +401,7 @@ describeIfDll("Comparator OC active vs ngspice — transient + stamp parity (T3)
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_OC_ON, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_OC_ON, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -428,7 +427,7 @@ describeIfDll("Comparator OC inactive vs ngspice — transient + stamp parity (T
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_OC_OFF, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_OC_OFF, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -454,7 +453,7 @@ describeIfDll("Comparator PP active vs ngspice — transient + stamp parity (T3)
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_PP_ON, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_PP_ON, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -480,7 +479,7 @@ describeIfDll("Comparator PP inactive vs ngspice — transient + stamp parity (T
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_PP_OFF, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_PP_OFF, analysis: "tran", tStop: 2e-5, maxStep: 1e-6 });
   });
 
   afterAll(async () => {

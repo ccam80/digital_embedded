@@ -4,7 +4,6 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
@@ -277,7 +276,7 @@ describeIfDll("OpAmp voltage-follower rOut=75 paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_BUFFER_ROUT75, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_BUFFER_ROUT75, analysis: "tran", tStop: 1e-4, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -313,7 +312,7 @@ describeIfDll("OpAmp inverting rOut=0 paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_INVERTING_ROUT0, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_INVERTING_ROUT0, analysis: "tran", tStop: 1e-4, maxStep: 1e-6 });
   });
 
   afterAll(async () => {

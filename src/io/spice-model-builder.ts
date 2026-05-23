@@ -187,8 +187,8 @@ function buildElement(
       const netB = netMap.get(el.nodes[1]) ?? 0;
       if (el.value !== undefined) props.push(["resistance", el.value]);
       return makeCircuitElement("Resistor", [
-        { x: netA, y: yRow, label: "A" },
-        { x: netB, y: yRow, label: "B" },
+        { x: netA, y: yRow, label: "pos" },
+        { x: netB, y: yRow, label: "neg" },
       ], props, overrides);
     }
 
@@ -197,8 +197,8 @@ function buildElement(
       const netB = netMap.get(el.nodes[1]) ?? 0;
       if (el.value !== undefined) props.push(["capacitance", el.value]);
       return makeCircuitElement("Capacitor", [
-        { x: netA, y: yRow, label: "A" },
-        { x: netB, y: yRow, label: "B" },
+        { x: netA, y: yRow, label: "pos" },
+        { x: netB, y: yRow, label: "neg" },
       ], props, overrides);
     }
 
@@ -207,8 +207,8 @@ function buildElement(
       const netB = netMap.get(el.nodes[1]) ?? 0;
       if (el.value !== undefined) props.push(["inductance", el.value]);
       return makeCircuitElement("Inductor", [
-        { x: netA, y: yRow, label: "A" },
-        { x: netB, y: yRow, label: "B" },
+        { x: netA, y: yRow, label: "pos" },
+        { x: netB, y: yRow, label: "neg" },
       ], props, overrides);
     }
 

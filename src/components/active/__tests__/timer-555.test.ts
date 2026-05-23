@@ -4,7 +4,6 @@ import path from "node:path";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
@@ -173,7 +172,7 @@ describeIfDll("Timer555 paired vs ngspice — quiescent low (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_QUIESCENT_LOW, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_QUIESCENT_LOW, analysis: "tran", tStop: 1e-3, maxStep: 1e-5 });
   });
 
   afterAll(async () => {
@@ -215,7 +214,7 @@ describeIfDll("Timer555 paired vs ngspice — astable (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_ASTABLE, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_ASTABLE, analysis: "tran", tStop: 3e-1, maxStep: 1e-3 });
   });
 
   afterAll(async () => {
@@ -255,7 +254,7 @@ describeIfDll("Timer555 paired vs ngspice — monostable (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_MONOSTABLE, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_MONOSTABLE, analysis: "tran", tStop: 4e-1, maxStep: 1e-3 });
   });
 
   afterAll(async () => {

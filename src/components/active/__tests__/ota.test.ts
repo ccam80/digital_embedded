@@ -5,7 +5,6 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
@@ -293,7 +292,7 @@ describeIfDll("OTA linear region paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_LINEAR, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_LINEAR, analysis: "tran", tStop: 1e-4, maxStep: 1e-6 });
   });
 
   afterAll(async () => {
@@ -328,7 +327,7 @@ describeIfDll("OTA tanh saturation paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_SATURATED, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_SATURATED, analysis: "tran", tStop: 1e-4, maxStep: 1e-6 });
   });
 
   afterAll(async () => {

@@ -5,7 +5,6 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../../passives/analog-fuse.js";
 
@@ -323,7 +322,7 @@ describeIfDll("Fuse paired vs ngspice - intact low-current (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_INTACT_LOW, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_INTACT_LOW, analysis: "tran", tStop: 1e-3, maxStep: 1e-5 });
   });
 
   afterAll(async () => {
@@ -356,7 +355,7 @@ describeIfDll("Fuse paired vs ngspice - blow overcurrent (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_BLOW_OVERCURRENT, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_BLOW_OVERCURRENT, analysis: "tran", tStop: 5e-3, maxStep: 1e-4 });
   });
 
   afterAll(async () => {

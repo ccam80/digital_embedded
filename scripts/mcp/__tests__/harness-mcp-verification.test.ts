@@ -6,9 +6,11 @@
  * that mirrors the McpServer.registerTool() contract.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { resolve } from "path";
-import { existsSync } from "fs";
 import { ComparisonSession } from "../../../src/solver/analog/__tests__/harness/comparison-session.js";
+import {
+  resolveNgspiceDllPath,
+  ngspiceDllFileExists,
+} from "../../../src/solver/analog/__tests__/harness/ngspice-dll-path.js";
 import { HarnessSessionState } from "../harness-session-state.js";
 import { registerHarnessTools } from "../harness-tools.js";
 
@@ -41,14 +43,8 @@ class ToolCapture {
 // Environment detection
 // ---------------------------------------------------------------------------
 
-const DLL_PATH =
-  process.env.NGSPICE_DLL_PATH ??
-  resolve(
-    process.cwd(),
-    "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll",
-  );
-const HAS_DLL = DLL_PATH !== "" && existsSync(DLL_PATH);
-const describeGate = HAS_DLL ? describe : describe.skip;
+const DLL_PATH = resolveNgspiceDllPath();
+const describeGate = ngspiceDllFileExists() ? describe : describe.skip;
 
 // ---------------------------------------------------------------------------
 // Helpers

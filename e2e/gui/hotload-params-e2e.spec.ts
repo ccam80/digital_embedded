@@ -83,12 +83,12 @@ async function buildMixedCircuitAndGetWireMid(
 
   await builder.drawWire('C1', 'out', 'A1', 'In_1');
   await builder.drawWire('C2', 'out', 'A1', 'In_2');
-  await builder.drawWire('A1', 'out', 'RL', 'A');
-  await builder.drawWire('RL', 'A', 'P1', 'in');
-  await builder.drawWireFromPin('RL', 'B', 20, 14);
+  await builder.drawWire('A1', 'out', 'RL', 'pos');
+  await builder.drawWire('RL', 'pos', 'P1', 'in');
+  await builder.drawWireFromPin('RL', 'neg', 20, 14);
 
   const fromPos = await builder.getPinPagePosition('A1', 'out');
-  const toPos = await builder.getPinPagePosition('RL', 'A');
+  const toPos = await builder.getPinPagePosition('RL', 'pos');
   const wireMidX = Math.round((fromPos.x + toPos.x) / 2);
   const wireMidY = Math.round((fromPos.y + toPos.y) / 2);
 
@@ -140,12 +140,12 @@ test.describe('Hot-loading model params via property popup', () => {
 
     // Wiring
     // Vcc.pos(11,5) → Rc.A(14,5): straight horizontal
-    await builder.drawWireExplicit('Vcc', 'pos', 'Rc', 'A');
-    // Rc.B(18,5) → Q1.C(20,8): L-shape via (20,5)
-    await builder.drawWireExplicit('Rc', 'B', 'Q1', 'C', [[20, 5]]);
-    // Vb.pos(11,12) → Rb.A(12,9): L-shape via (11,9)
-    await builder.drawWireExplicit('Vb', 'pos', 'Rb', 'A', [[11, 9]]);
-    // Rb.B(16,9) auto-connects to Q1.B(16,9)- no wire needed
+    await builder.drawWireExplicit('Vcc', 'pos', 'Rc', 'pos');
+    // Rc.neg(18,5) → Q1.C(20,8): L-shape via (20,5)
+    await builder.drawWireExplicit('Rc', 'neg', 'Q1', 'C', [[20, 5]]);
+    // Vb.pos(11,12) → Rb.pos(12,9): L-shape via (11,9)
+    await builder.drawWireExplicit('Vb', 'pos', 'Rb', 'pos', [[11, 9]]);
+    // Rb.neg(16,9) auto-connects to Q1.B(16,9)- no wire needed
     // Vcc.neg(7,5) → Ground(5,5)
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 5, 5);
     // Vb.neg(7,12) → Ground(7,14)
@@ -233,9 +233,9 @@ test.describe('Hot-loading pin electrical params via property popup', () => {
 
     await builder.drawWire('C1', 'out', 'A1', 'In_1');
     await builder.drawWire('C2', 'out', 'A1', 'In_2');
-    await builder.drawWire('A1', 'out', 'RL', 'A');
-    await builder.drawWire('RL', 'A', 'P1', 'in');
-    await builder.drawWireFromPin('RL', 'B', 22, 14);
+    await builder.drawWire('A1', 'out', 'RL', 'pos');
+    await builder.drawWire('RL', 'pos', 'P1', 'in');
+    await builder.drawWireFromPin('RL', 'neg', 22, 14);
 
     // Baseline measurement with default rOut
     await builder.stepViaUI();

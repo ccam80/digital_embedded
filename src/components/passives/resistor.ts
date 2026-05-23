@@ -24,6 +24,7 @@ import { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -193,6 +194,17 @@ class ResistorAnalogElement extends AnalogElement {
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     // resload.c:34-37- value-side stamps through cached handles.
+    solver.stampElement(this._hPP, this._G);
+    solver.stampElement(this._hNN, this._G);
+    solver.stampElement(this._hPN, -this._G);
+    solver.stampElement(this._hNP, -this._G);
+  }
+
+  stampAc(solver: SparseSolverStamp, _omega: number, _ctx: LoadContext): void {
+    // resload.c:64-67 (RESacload)- the conductance is frequency-independent
+    // and purely real, so the AC stamp writes the same G into the same four
+    // cells as load() through the setup()-allocated handles. No RESacres
+    // support, so g = RESconduct = 1/R (resload.c:62).
     solver.stampElement(this._hPP, this._G);
     solver.stampElement(this._hNN, this._G);
     solver.stampElement(this._hPN, -this._G);

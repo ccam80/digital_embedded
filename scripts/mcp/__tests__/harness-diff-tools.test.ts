@@ -146,13 +146,17 @@ describe("harness_matrix_diff", () => {
 });
 
 describe("harness_first_divergence", () => {
-  it("returns all-null on a self-compare session", async () => {
+  it("returns all-null on a self-compare session (all eight classes + earliest)", async () => {
     const parsed = await tools.call("harness_first_divergence", { handle });
     expect(parsed).toHaveProperty("firstDivergence");
     const f = parsed.firstDivergence;
     expect(f.voltage).toBeNull();
+    expect(f.rhs).toBeNull();
     expect(f.matrix).toBeNull();
     expect(f.state).toBeNull();
+    expect(f.integration).toBeNull();
+    expect(f.limiting).toBeNull();
+    expect(f.convergence).toBeNull();
     expect(f.shape).toBeNull();
     expect(f.earliest).toBeNull();
   });

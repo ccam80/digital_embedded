@@ -1,0 +1,416 @@
+{
+  "circuit": {
+    "description": "Series RLC for AC parity: V1 ac=1 -> L1=1mH -> C1=1uF -> R1=100 -> gnd. Output across R1 (R1:pos) peaks at f0=1/(2*pi*sqrt(LC)).",
+    "elements": [
+      {
+        "id": "7fb98d93-145f-4db7-b17e-e47a02191d2a",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "9567d367-9485-4d17-998f-8cd04307f245",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "inductance": 0.001
+          },
+          "inductance": 0.001,
+          "label": "L1",
+          "position": [
+            0,
+            8
+          ]
+        },
+        "rotation": 0,
+        "type": "Inductor"
+      },
+      {
+        "id": "b78b6db1-850d-493c-aae2-e6d42adcda6e",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.000001
+          },
+          "capacitance": 0.000001,
+          "label": "C1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "9c23c5e6-4df9-4e4b-85b4-da4cddf94442",
+        "position": {
+          "x": 36,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          },
+          "label": "R1",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "b4f01716-e104-42bc-8feb-32ce61f665d5",
+        "position": {
+          "x": 48,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "Series RLC bandpass (AC)",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 1
+          },
+          {
+            "x": 35,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 32,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 0
+          },
+          {
+            "x": 32,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 1
+          },
+          {
+            "x": 35,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 1
+          },
+          {
+            "x": 41,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 2
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 1
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 2
+          },
+          {
+            "x": 48,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 24,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 5
+          },
+          {
+            "x": 42,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 5
+          },
+          {
+            "x": 42,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 0
+          },
+          {
+            "x": 48,
+            "y": 0
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

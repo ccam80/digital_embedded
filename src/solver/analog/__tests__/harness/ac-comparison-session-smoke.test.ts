@@ -13,10 +13,10 @@
  * `ac-bridge-smoke.test.ts` already proves the C->TS bridge round-trip;
  * Phase 3's full divergence smoke will land paired .dts/.cir fixtures.
  *
- * Circuit: the existing `rc-transient.dts`, a single-pole RC. params.sourceLabel
- * = "V1" resolves to the AcVoltageSource's node; ac-analysis.ts stamps a
- * synthetic +1V AC excitation there independent of the source's transient
- * waveform.
+ * Circuit: the existing `rc-transient.dts`, a single-pole RC. The
+ * AcVoltageSource carries default acMagnitude=1, acPhase=0 (vsrctemp.c:39, 42),
+ * so its stampAc (vsrcacld.c:175-180) drives the sweep with acReal = 1,
+ * acImag = 0 independent of the source's transient waveform.
  */
 
 import { it, expect } from "vitest";
@@ -31,7 +31,6 @@ it("ac_self_compare_runs_and_report_is_consistent", async () => {
       numPoints: 5,
       fStart: 1,
       fStop: 10000,
-      sourceLabel: "V1:pos",
       outputNodes: [],
     },
   });

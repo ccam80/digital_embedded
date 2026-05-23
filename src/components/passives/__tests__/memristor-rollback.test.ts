@@ -5,7 +5,6 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import { MemristorElement, MEMRISTOR_SCHEMA } from "../memristor.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 
@@ -186,7 +185,7 @@ describeIfDll("Memristor paired vs ngspice — DC resistive (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_DC_RESISTIVE, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_DC_RESISTIVE, analysis: "tran", tStop: 1e-4, maxStep: 1e-5 });
   });
 
   afterAll(async () => {
@@ -214,7 +213,7 @@ describeIfDll("Memristor paired vs ngspice — AC drift (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_AC_DRIFT, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_AC_DRIFT, analysis: "tran", tStop: 2e-3, maxStep: 1e-5 });
   });
 
   afterAll(async () => {

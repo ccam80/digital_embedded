@@ -10,10 +10,10 @@ import { createDefaultRegistry } from '../../../components/register-all.js';
 import { DefaultSimulationCoordinator } from '../../../solver/coordinator.js';
 import { createIterationCaptureHook } from './harness/capture.js';
 import { NgspiceBridge } from './harness/ngspice-bridge.js';
+import { resolveNgspiceDllPath } from './harness/ngspice-dll-path.js';
 import type { MNAEngine } from '../analog-engine.js';
 
-const DLL_PATH = process.env.NGSPICE_DLL_PATH
-  ?? resolve(__dirname, '../../../../ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll');
+const DLL_PATH = resolveNgspiceDllPath();
 
 const BUCKBJT_CIR = readFileSync(
   resolve(__dirname, '../../../../e2e/spice-ref/buckbjt.cir'), 'utf-8',

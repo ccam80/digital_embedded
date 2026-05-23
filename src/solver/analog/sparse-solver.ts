@@ -841,6 +841,23 @@ export class SparseSolver {
     //   for (I = Size; I > 0; I--)
     //       Solution[*(pExtOrder--)] = Intermediate[I];
     for (let i = n; i >= 1; i--) solution[intToExtCol[i]] = b[i];
+
+    if (process.env.DIGITS_LU_LOG === "1") {
+      const g = globalThis as Record<string, unknown>;
+      const cnt = ((g.__solveN as number) ?? 0) + 1;
+      if (cnt <= 12) {
+        g.__solveN = cnt;
+        const i2e: string[] = [], rhsA: string[] = [], diagA: string[] = [], solA: string[] = [];
+        for (let i = 1; i <= n; i++) {
+          i2e.push(`${intToExtRow[i]}`);
+          rhsA.push(rhs[intToExtRow[i]].toPrecision(17));
+          diagA.push((diag[i] >= 0 ? elVal[diag[i]] : NaN).toPrecision(17));
+          solA.push(solution[intToExtCol[i]].toPrecision(17));
+        }
+        // eslint-disable-next-line no-console
+        console.error(`[SOLVE] n=${cnt} size=${n} i2eRow=[${i2e.join(",")}] rhs=[${rhsA.join(",")}] diag=[${diagA.join(",")}] sol=[${solA.join(",")}]`);
+      }
+    }
   }
 
   /**

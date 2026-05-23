@@ -542,13 +542,14 @@ function emitPrimitive(
     const waveform = props.has("waveform") ? props.get<string>("waveform") : "sine";
     const posNode = nodeAt(nodes, 1, rawLabel, "pos");
     const negNode = nodeAt(nodes, 0, rawLabel, "neg");
-    // `AC 1` carries the unit AC stimulus for .ac sweeps; ours hardcodes
-    // RHS[branch] = 1+0j (ac-analysis.ts) regardless of the transient
-    // amplitude, so the emitted ngspice magnitude must be 1 to match.
-    // Ordering `... AC 1 <transient-spec>` is ngspice-canonical (acan.c
-    // and `V` source parser accept DC/AC tokens before the transient
-    // primitive).
-    return [`${label} ${posNode} ${negNode} AC 1 ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
+    // ngspice V-source AC token: `AC <mag> [<phase>]` (vsrctemp.c:38-42,
+    // 68-70). digiTS's AcVoltageSourceAnalogImpl.stampAc reads these
+    // properties on its element (vsrcacld.c:175-180), so the emitted
+    // ngspice deck must carry the same `acMagnitude` / `acPhase` values
+    // for the .ac sweep stimuli to match bit-exact.
+    const acMag   = requireParam(props, def, modelKey, "acMagnitude", rawLabel);
+    const acPhase = requireParam(props, def, modelKey, "acPhase",     rawLabel);
+    return [`${label} ${posNode} ${negNode} AC ${acMag} ${acPhase} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
   }
   if (typeId === "DcCurrentSource") {
     const I = requireParam(props, def, modelKey, "current", rawLabel);
@@ -562,8 +563,11 @@ function emitPrimitive(
     const waveform = props.has("waveform") ? props.get<string>("waveform") : "sine";
     const posNode = nodeAt(nodes, 1, rawLabel, "pos");
     const negNode = nodeAt(nodes, 0, rawLabel, "neg");
-    // `AC 1` for .ac sweeps (symmetric with AcVoltageSource above).
-    return [`${label} ${posNode} ${negNode} AC 1 ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
+    // ngspice I-source AC token: `AC <mag> [<phase>]` (isrcacld.c:36-50).
+    // Symmetric with AcVoltageSource above.
+    const acMag   = requireParam(props, def, modelKey, "acMagnitude", rawLabel);
+    const acPhase = requireParam(props, def, modelKey, "acPhase",     rawLabel);
+    return [`${label} ${posNode} ${negNode} AC ${acMag} ${acPhase} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
   }
   if (spec.prefix === "D") {
     const modelName = `${label}_${spec.modelType}`;

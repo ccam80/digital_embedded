@@ -41,6 +41,14 @@ import { defaultStampAcHandler, type AcHandlerCtx } from "./loaders/default-load
 
 /**
  * Parameters for an AC frequency sweep.
+ *
+ * The AC stimulus is read directly from each independent V/I source's
+ * `AC <mag> [<phase>]` token (acMagnitude / acPhase properties), stamped
+ * into the complex RHS by each device's `stampAc` per vsrcacld.c:175-180
+ * and isrcacld.c:43-50. There is no separate "source label" — to drive
+ * the sweep, place an AC source in the circuit and set its acMagnitude
+ * to a non-zero value (default 1 mirrors ngspice VSRCacMag default,
+ * vsrctemp.c:39).
  */
 export interface AcParams {
   /** Sweep type: linear, decades, or octaves. */
@@ -51,16 +59,10 @@ export interface AcParams {
   fStart: number;
   /** Stop frequency in Hz. */
   fStop: number;
-  /** Label resolving to the MNA node where the AC stimulus is injected.
-   *  Per the ngspice two-namespace contract: must be a label that maps
-   *  unambiguously to a single node. For a 1-pin labeled element (Port,
-   *  In, Out, Ground) use the bare label. For a multi-pin device (e.g. a
-   *  voltage source `V1`) use the pin-form `V1:pos`- the bare device
-   *  label has no node mapping under labelToNodeId. */
-  sourceLabel: string;
-  /** Labels resolving to MNA nodes to measure. Same contract as
-   *  `sourceLabel`: bare label for 1-pin elements, `label:pinLabel` for
-   *  individual pins on multi-pin devices. */
+  /** Labels resolving to MNA nodes to measure. Per the ngspice two-namespace
+   *  contract: must be a label that maps unambiguously to a single node. For
+   *  a 1-pin labeled element (Port, In, Out) use the bare label; for a
+   *  specific terminal on a multi-pin device use the pin-form `V1:pos`. */
   outputNodes: string[];
 }
 
@@ -196,21 +198,6 @@ export class AcAnalysis {
     // After DC OP, nonlinear elements have their small-signal parameters set.
     // We don't need the DC voltages explicitly- they're baked into element state.
 
-    // Step 2: Find AC source node
-    const sourceNodeId = compiled.labelToNodeId.get(params.sourceLabel);
-    if (sourceNodeId === undefined) {
-      diagnostics.emit(
-        makeDiagnostic("ac-no-source", "error", `AC source '${params.sourceLabel}' not found`, {
-          explanation:
-            `No node with label '${params.sourceLabel}' was found in the circuit. ` +
-            "Specify a label that resolves to a single MNA node: a 1-pin " +
-            "labeled element (Port, In, Out), or pin-form like `V1:pos` " +
-            "for a specific terminal of a multi-pin device.",
-        }),
-      );
-      return this._emptyResult(params, diagnostics.getDiagnostics());
-    }
-
     // Emit diagnostic if DC OP did not converge (warn but proceed)
     if (!dcResult.converged) {
       diagnostics.emit(
@@ -250,32 +237,40 @@ export class AcAnalysis {
 
     // MNA system: nodes and branches occupy 1-based external indices 1..N
     // (ground = 0 = TrashCan, ngspice-faithful, identical to the DC/transient
-    // solver). The ideal AC stimulus is an independent voltage source whose
-    // branch equation gets one fresh index past every real unknown.
+    // solver). The AC stimulus is read directly from each independent V/I
+    // source via its `stampAc` (vsrcacld.c:175-180, isrcacld.c:43-50); there
+    // is no synthetic branch- matrix dimension equals N, not N+1.
     const N = compiled.matrixSize;
-    const branchExt = N + 1;          // synthetic AC source branch (1-based)
 
-    // Caller-owned RHS / solution vectors (length N+2: indices 0..branchExt),
+    // Caller-owned RHS / solution vectors (length N+1: indices 0..N, with
+    // slot 0 = ground sentinel matching ngspice's CKTrhs / CKTirhs layout),
     // reused each frequency. SparseSolver.solve takes the real and imaginary
     // halves as separate parallel arrays (ngspice RHS / iRHS, Solution /
     // iSolution)- the halves are NOT adjacent.
-    const rhsRe = new Float64Array(N + 2);
-    const rhsIm = new Float64Array(N + 2);
-    const solRe = new Float64Array(N + 2);
-    const solIm = new Float64Array(N + 2);
+    const rhsRe = new Float64Array(N + 1);
+    const rhsIm = new Float64Array(N + 1);
+    const solRe = new Float64Array(N + 1);
+    const solIm = new Float64Array(N + 1);
 
     // Step 5: Frequency sweep- one unified SparseSolver in complex mode, the
     // same factor/solve code path as DC and transient (ngspice spSetComplex).
-    const solver = this._deps.solverFactory
-      ? this._deps.solverFactory()
-      : new SparseSolver();
-    solver._initStructure();
+    // ngspice builds one matrix via CKTsetup (TSTALLOC) and reuses it for DC
+    // and AC- CKTacLoad (acan.c -> NIacIter -> CKTacLoad) writes the same
+    // matrix pointers DEVsetup allocated. AcAnalysis mirrors that: it stamps
+    // into the engine's setup-allocated solver (injected by MNAEngine.
+    // acAnalysis via solverFactory), so every element's setup()-cached handles
+    // address the right cells and the AC matrix structure/ordering equals the
+    // DC (= ngspice) ordering. There is no separate "build a fresh AC matrix"
+    // path- AC always reuses the one matrix, exactly as ngspice does.
+    if (!this._deps.solverFactory) {
+      throw new Error(
+        "AcAnalysis requires the engine's setup-allocated solver via " +
+        "deps.solverFactory (injected by MNAEngine.acAnalysis). Run AC through " +
+        "the engine/coordinator- direct construction is unsupported.",
+      );
+    }
+    const solver = this._deps.solverFactory();
     solver.setComplex(true);
-
-    // Handle cache for the AC voltage-source branch incidence stamps.
-    // Allocated once on frequency 0, reused across the sweep.
-    let acBranchHandleA = -1;
-    let acBranchHandleB = -1;
 
     // acan.c:285: CKTmode = (CKTmode & MODEUIC) | MODEAC
     const acLoadCtx = dcCtx.loadCtx;
@@ -286,33 +281,25 @@ export class AcAnalysis {
       const f = frequencies[fi];
       const omega = 2 * Math.PI * f;
 
-      // ngspice spClear- zero matrix values while keeping the linked
-      // structure and pivot order across frequencies. Skipped on fi===0:
-      // the structure does not exist yet; the first stamp pass builds it.
-      if (fi !== 0) solver._resetForAssembly();
+      // ngspice spClear (spbuild.c)- zero matrix values while keeping the
+      // linked structure and pivot order across frequencies. The structure is
+      // the engine's setup-allocated matrix, so it is cleared before every
+      // stamp pass (the engine's prior DC/transient values must not leak into
+      // the first AC frequency).
+      solver._resetForAssembly();
 
-      // Stamp all elements' AC admittances via the family dispatcher.
-      // Elements lazily allocate their matrix cells on the first stamp.
-      // cite: acan.c:409-414 -- per-type DEVacLoad loop.
-      const acHandlerCtx: AcHandlerCtx = { solver, omega, loadCtx: acLoadCtx };
-      runByDeviceFamily(compiled.elementsByFamily, "stampAc", acHandlerCtx, defaultStampAcHandler);
-
-      // Ideal AC voltage source V(sourceNode) = 1+0j (sourceNode → ground):
-      //   (sourceNode, branch) += 1   node KCL picks up the branch current
-      //   (branch, sourceNode) += 1   branch eqn: V(sourceNode) = E
-      //   RHS[branch] = 1+0j          the 1 V AC stimulus (real, imag 0)
-      // Re-stamped every frequency- spClear zeroed the +1 incidence values.
-      if (sourceNodeId >= 1) {
-        if (fi === 0) {
-          acBranchHandleA = solver.allocElement(sourceNodeId, branchExt);
-          acBranchHandleB = solver.allocElement(branchExt, sourceNodeId);
-        }
-        solver.stampElement(acBranchHandleA, 1.0);
-        solver.stampElement(acBranchHandleB, 1.0);
-      }
+      // Zero the complex RHS before stamping. AC sources (V/I) accumulate
+      // their `AC <mag> [<phase>]` contributions via stampAc directly into
+      // these arrays per vsrcacld.c:179-180 and isrcacld.c:43-50.
       rhsRe.fill(0);
       rhsIm.fill(0);
-      rhsRe[branchExt] = 1.0;
+
+      // Stamp all elements' AC admittances and RHS contributions via the
+      // family dispatcher. Elements lazily allocate their matrix cells on
+      // the first stamp.
+      // cite: acan.c:409-414 -- per-type DEVacLoad loop.
+      const acHandlerCtx: AcHandlerCtx = { solver, omega, loadCtx: acLoadCtx, rhsRe, rhsIm };
+      runByDeviceFamily(compiled.elementsByFamily, "stampAc", acHandlerCtx, defaultStampAcHandler);
 
       // Harness matrix capture (pre-factor)- mirrors ngspice's
       // ni_ac_capture_matrix(ckt) hook in niiter.c, fired between CKTacLoad
@@ -333,17 +320,17 @@ export class AcAnalysis {
         // Standard CSC convention (matches ngspice's pre-LU CSC layout in
         // niiter.c): `colPtr[c]` is the END of column c's cells (= start of
         // column c+1); column c's non-zeros live at indices
-        // [colPtr[c-1], colPtr[c]). `colPtr[0]` is always 0; the synthetic
-        // AC source branch occupies column N+1, so `colPtr` has length N+2
-        // (indices 0..N+1) and `colPtr[N+1]` is the terminating `nnz`
-        // sentinel.
-        const colPtr = new Int32Array(N + 2);
+        // [colPtr[c-1], colPtr[c]). `colPtr[0]` is always 0. The matrix
+        // spans columns 1..N (N == compiled.matrixSize), so `colPtr` has
+        // length N+1 (indices 0..N) and `colPtr[N]` is the terminating
+        // `nnz` sentinel.
+        const colPtr = new Int32Array(N + 1);
         const rowIdx = new Int32Array(nnz);
         const valsRe = new Float64Array(nnz);
         const valsIm = new Float64Array(nnz);
         cells.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row);
         let cursor = 0;
-        for (let c = 1; c <= N + 1; c++) {
+        for (let c = 1; c <= N; c++) {
           while (cursor < nnz && cells[cursor].col === c) {
             rowIdx[cursor] = cells[cursor].row;
             valsRe[cursor] = cells[cursor].valueRe;
@@ -410,6 +397,11 @@ export class AcAnalysis {
       // On solver failure at this frequency: leave arrays at 0 (already initialized)
     }
 
+    // Restore the shared engine solver to real mode + cleared values so a
+    // later DC/transient pass is unaffected by the AC sweep's complex state.
+    solver.setComplex(false);
+    solver._resetForAssembly();
+
     return {
       frequencies,
       magnitude: magnitudeMap,
@@ -426,22 +418,6 @@ export class AcAnalysis {
   } {
     const diagnostics = new DiagnosticCollector();
     return { compiled: this._compiled, diagnostics };
-  }
-
-  private _emptyResult(params: AcParams, diagList: Diagnostic[]): AcResult {
-    const frequencies = buildFrequencyArray(params);
-    const n = frequencies.length;
-    const magnitude = new Map<string, Float64Array>();
-    const phase = new Map<string, Float64Array>();
-    const real = new Map<string, Float64Array>();
-    const imag = new Map<string, Float64Array>();
-    for (const label of params.outputNodes) {
-      magnitude.set(label, new Float64Array(n));
-      phase.set(label, new Float64Array(n));
-      real.set(label, new Float64Array(n));
-      imag.set(label, new Float64Array(n));
-    }
-    return { frequencies, magnitude, phase, real, imag, diagnostics: diagList };
   }
 }
 

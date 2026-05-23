@@ -123,7 +123,8 @@
       "Bash(python3 -c ' *)",
       "Bash(echo \"---rc=$?---\")",
       "Bash(rm -rf spec/.locks/tasks/* spec/.locks/files/*)",
-      "Skill(codebase-memory-exploring)"
+      "Skill(codebase-memory-exploring)",
+      "PowerShell(Set-Location C:\\\\local_working_projects\\\\digital_in_browser; $tc=\\(npx tsc --noEmit -p tsconfig.json 2>&1 | Select-String 'error TS' | Measure-Object\\).Count; Write-Output \"typecheck errors: $tc\"; if \\($tc -eq 0\\) { npx vitest run src/solver/analog/__tests__/harness/ac-matrix-divergence-smoke.test.ts src/solver/analog/__tests__/harness/ac-first-divergence-smoke.test.ts src/solver/analog/__tests__/harness/ac-comparison-session-smoke.test.ts src/solver/analog/__tests__/harness/ac-bridge-smoke.test.ts --reporter=verbose 2>&1 | Select-Object -Last 25 })"
     ]
   },
   "enableAllProjectMcpServers": true,

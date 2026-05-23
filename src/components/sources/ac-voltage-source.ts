@@ -31,6 +31,7 @@ import {
 } from "../../core/registry.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
@@ -327,6 +328,8 @@ export const { paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: AC_VOLTAGE_SOU
     riseTime: { default: 1e-12, unit: "s",   description: "Rise time for square wave transitions" },
     fallTime: { default: 1e-12, unit: "s",   description: "Fall time for square/sawtooth wave transitions" },
     noiseSampleTime: { default: 0, unit: "s", description: "Noise sample period TS (ngspice TRNOISE). Default 0 disables breakpoints." },
+    acMagnitude: { default: 1, unit: "V",   description: "AC analysis magnitude (ngspice VSRCacMag, default 1)" },
+    acPhase:     { default: 0, unit: "deg", description: "AC analysis phase in degrees (ngspice VSRCacPhase, default 0)" },
   },
 });
 
@@ -571,6 +574,10 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   private _riseTime: number;
   private _fallTime: number;
   private _noiseSampleTime: number;
+  // AC analysis magnitude / phase (vsrctemp.c:39, 42, 68-70 — VSRCacMag and
+  // VSRCacPhase, with default 1 / 0 deg; stamped each frequency in stampAc).
+  private _acMagnitude: number;
+  private _acPhase: number;
   private readonly _waveform: Waveform;
   private readonly _ext: ExtendedWaveformParams;
   private readonly _getTime: () => number;
@@ -589,6 +596,10 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
       fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
       noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
+      // vsrctemp.c:39, 42 — VSRCacMag defaults to 1 and VSRCacPhase to 0 when
+      // an `AC` token is given without explicit values.
+      acMagnitude: props.hasModelParam("acMagnitude") ? props.getModelParam<number>("acMagnitude") : 1,
+      acPhase:     props.hasModelParam("acPhase")     ? props.getModelParam<number>("acPhase")     : 0,
     };
     this._amplitude = this._p.amplitude;
     this._frequency = this._p.frequency;
@@ -597,6 +608,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     this._riseTime = this._p.riseTime;
     this._fallTime = this._p.fallTime;
     this._noiseSampleTime = this._p.noiseSampleTime;
+    this._acMagnitude = this._p.acMagnitude;
+    this._acPhase = this._p.acPhase;
     this._waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
     this._ext = {
       freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -661,6 +674,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       this._riseTime = this._p.riseTime;
       this._fallTime = this._p.fallTime;
       this._noiseSampleTime = this._p.noiseSampleTime;
+      this._acMagnitude = this._p.acMagnitude;
+      this._acPhase = this._p.acPhase;
       this._ext.riseTime = this._riseTime;
       this._ext.fallTime = this._fallTime;
       this._ext.noiseSampleTime = this._noiseSampleTime;
@@ -703,6 +718,31 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     solver.stampElement(this._hBrNeg, -1.0);
     // vsrcload.c:416- RHS
     ctx.rhs[this.branchIndex] += v;
+  }
+
+  stampAc(
+    solver: SparseSolverStamp,
+    _omega: number,
+    _ctx: LoadContext,
+    rhsRe: Float64Array,
+    rhsIm: Float64Array,
+  ): void {
+    // V-source AC stamp — vsrcacld.c:175-180. The ±1 incidence pattern mirrors
+    // the DC/transient stamp (vsrcload.c:43-46) and reuses the same four matrix
+    // handles allocated in setup() (vsrcset.c TSTALLOC order); AC analysis runs
+    // against the engine's setup-allocated solver in complex mode, so the
+    // cached handles address the same cells CKTacLoad writes.
+    //
+    // acReal / acImag derive from VSRCacMag and VSRCacPhase per vsrctemp.c:68-70:
+    //   VSRCacReal = VSRCacMag * cos(VSRCacPhase * π / 180)
+    //   VSRCacImag = VSRCacMag * sin(VSRCacPhase * π / 180)
+    solver.stampElement(this._hPosBr, +1.0);
+    solver.stampElement(this._hNegBr, -1.0);
+    solver.stampElement(this._hBrPos, +1.0);
+    solver.stampElement(this._hBrNeg, -1.0);
+    const radians = this._acPhase * Math.PI / 180.0;
+    rhsRe[this.branchIndex] += this._acMagnitude * Math.cos(radians);
+    rhsIm[this.branchIndex] += this._acMagnitude * Math.sin(radians);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

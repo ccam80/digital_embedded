@@ -4,7 +4,6 @@ import path from "node:path";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
-  DLL_PATH,
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { MEMRISTOR_SCHEMA, MemristorElement } from "../memristor.js";
@@ -279,7 +278,7 @@ describeIfDll("Memristor mid-state vs ngspice — transient + stamp parity (T3)"
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_DC_MID_STATE, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_DC_MID_STATE, analysis: "tran", tStop: 1e-5, maxStep: 1e-7 });
   });
 
   afterAll(async () => {
@@ -309,7 +308,7 @@ describeIfDll("Memristor edge-state vs ngspice — transient + stamp parity (T3)
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_DC_EDGE_STATE, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_DC_EDGE_STATE, analysis: "tran", tStop: 1e-5, maxStep: 1e-7 });
   });
 
   afterAll(async () => {

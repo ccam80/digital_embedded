@@ -54,6 +54,13 @@ export interface MutSiblingNotifiable {
 }
 
 // ---------------------------------------------------------------------------
+// Physical constants — ngspice const.h
+// ---------------------------------------------------------------------------
+
+// const.h:44 — CONSTmuZero = 4·π·1e-7 H/m (vacuum permeability).
+const CONST_MU_ZERO = 4.0 * Math.PI * 1e-7;
+
+// ---------------------------------------------------------------------------
 // Model parameter declarations
 // ---------------------------------------------------------------------------
 
@@ -62,12 +69,32 @@ export const { paramDefs: INDUCTOR_PARAM_DEFS, defaults: INDUCTOR_DEFAULTS } = d
     inductance: { default: 1e-3, unit: "H", positional: true, description: "Inductance in henries (positional VALUE on the L-card per inp2l.c)", min: 1e-12 },
   },
   secondary: {
+    // Model-card geometry / temperature parameters — ngspice INDmPTable
+    // (ind.c:42-50). These emit on the `.model L …` card; defaults seeded in
+    // setup() (indsetup.c:32-58). The derived INDspecInd is computed in
+    // setup(), not a netlist parameter (no INDmPTable row).
+    mInd:      { default: 0.0, unit: "H",  spiceName: "ind",    description: "Model inductance (ind.c:42 IND_MOD_IND)" },
+    modelTnom: { default: 300.15, unit: "K", spiceName: "tnom", description: "Model nominal temperature (ind.c:45 IND_MOD_TNOM)", spiceConverter: kelvinToCelsius },
+    modelTC1:  { default: 0.0,             spiceName: "tc1",    description: "Model first-order temperature coefficient (ind.c:43 IND_MOD_TC1)" },
+    modelTC2:  { default: 0.0,             spiceName: "tc2",    description: "Model second-order temperature coefficient (ind.c:44 IND_MOD_TC2)" },
+    csect:     { default: 0.0, unit: "m^2", spiceName: "csect", description: "Inductor cross section (ind.c:46 IND_MOD_CSECT)" },
+    length:    { default: 0.0, unit: "m",  spiceName: "length", description: "Inductor length (ind.c:48 IND_MOD_LENGTH)" },
+    modNt:     { default: 0.0,             spiceName: "nt",     description: "Model number of turns (ind.c:49 IND_MOD_NT)" },
+    mu:        { default: 0.0,             spiceName: "mu",     description: "Relative magnetic permeability (ind.c:50 IND_MOD_MU)" },
+  },
+  instance: {
     IC:   { default: NaN,    unit: "A",    description: "Initial condition current for UIC" },
     TC1:  { default: 0,                    description: "Linear temperature coefficient" },
     TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
-    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients", spiceConverter: kelvinToCelsius },
     SCALE: { default: 1,                   description: "Instance scale factor" },
     M:    { default: 1,                    description: "Parallel multiplicity" },
+    // Per-instance number of turns — ngspice here->INDnt (inddefs.h:46), card
+    // row IND_NT (ind.c:24). Distinct from the model-side modNt.
+    nt:   { default: 0,                    description: "Instance number of turns" },
+    // Per-instance temperature — ngspice here->INDtemp / INDdtemp
+    // (inddefs.h:43-44), card rows IND_TEMP / IND_DTEMP (ind.c:17-19).
+    TEMP:  { default: 300.15, unit: "K", description: "Instance operating temperature", spiceConverter: kelvinToCelsius },
+    DTEMP: { default: 0.0,    unit: "K", description: "Instance temperature delta from ambient" },
   },
 });
 
@@ -203,16 +230,58 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;
 
+  // Raw instance-line inductance — ngspice here->INDinductinst (inddefs.h:39).
   private _nominalL: number;
-  // Effective inductance after temperature derating, SCALE, and /M.
-  // Corresponds to ngspice `here->INDinduct/m` after indtemp.c:71-72.
+  // Working inductance after temperature derating and SCALE — ngspice
+  // here->INDinduct after indtemp.c:74. Does NOT carry /M: the parallel
+  // multiplier is applied at each stamp site (load / stampAc / stampAcCoupling),
+  // matching indload.c:43 / indacld.c:29 / indpzld.c:30.
   private _effectiveL: number;
   private _IC: number;
   private _TC1: number;
   private _TC2: number;
-  private _TNOM: number;
   private _SCALE: number;
   private _M: number;
+  // Instance-side *Given guards — ngspice here->INDxxxGiven (inddefs.h:60-68).
+  private _indGiven: boolean;
+  private _TC1Given: boolean;
+  private _TC2Given: boolean;
+  private _scaleGiven: boolean;
+  private _mGiven: boolean;
+
+  // Instance-side number of turns — ngspice here->INDnt (inddefs.h:46).
+  private _instanceNt: number;
+  private _instanceNtGiven: boolean;
+  // Instance-side temperature — ngspice here->INDtemp / INDdtemp
+  // (inddefs.h:43-44).
+  private _TEMP: number;
+  private _DTEMP: number;
+  private _tempGiven: boolean;
+  private _dtempGiven: boolean;
+
+  // Model-card parameters — ngspice sINDmodel fields (inddefs.h:100-118).
+  private _mInd: number;
+  private _modelTnom: number;
+  private _modelTC1: number;
+  private _modelTC2: number;
+  private _csect: number;
+  private _length: number;
+  private _modNt: number;
+  private _mu: number;
+  // Model-card *Given guards — ngspice model->INDxxxGiven (inddefs.h:110-118).
+  private _mIndGiven: boolean;
+  private _modelTnomGiven: boolean;
+  private _modelTC1Given: boolean;
+  private _modelTC2Given: boolean;
+  private _csectGiven: boolean;
+  private _lengthGiven: boolean;
+  private _modNtGiven: boolean;
+  private _muGiven: boolean;
+  // Derived specific (one-turn) inductance — ngspice model->INDspecInd
+  // (inddefs.h:120). Computed in setup() from mu/csect/length; not a netlist
+  // parameter (no INDmPTable row).
+  private _specInd: number = 0.0;
+
   protected _hPIbr:   number = -1;
   protected _hNIbr:   number = -1;
   protected _hIbrN:   number = -1;
@@ -231,18 +300,58 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._nominalL = props.getModelParam<number>("inductance");
-    this._IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
-    this._TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : INDUCTOR_DEFAULTS["TC1"]!;
-    this._TC2   = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : INDUCTOR_DEFAULTS["TC2"]!;
-    this._TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
-    this._SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
-    this._M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
-    // cite: indtemp.c:55-72 — initial effective L at construction uses TNOM as
-    // the reference temperature (difference = 0), so factor = 1 and
-    // _effectiveL = _nominalL * SCALE / M. computeTemperature() will update
-    // this before load() runs.
-    this._effectiveL = this._nominalL * this._SCALE / this._M;
+    // *Given guards mirror ngspice's per-instance/model `<x>Given` flags
+    // (inddefs.h:60-118): true only when the netlist actually supplied `<x>`.
+    // isModelParamGiven reads the property bag's given-set, matching the cap
+    // pilot (capacitor.ts:293-333).
+    this._indGiven = props.isModelParamGiven("inductance");
+    this._nominalL = this._indGiven ? props.getModelParam<number>("inductance") : INDUCTOR_DEFAULTS["inductance"]!;
+    this._IC    = props.isModelParamGiven("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
+    this._TC1Given   = props.isModelParamGiven("TC1");
+    this._TC1   = this._TC1Given   ? props.getModelParam<number>("TC1")   : INDUCTOR_DEFAULTS["TC1"]!;
+    this._TC2Given   = props.isModelParamGiven("TC2");
+    this._TC2   = this._TC2Given   ? props.getModelParam<number>("TC2")   : INDUCTOR_DEFAULTS["TC2"]!;
+    this._scaleGiven = props.isModelParamGiven("SCALE");
+    this._SCALE = this._scaleGiven ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
+    this._mGiven     = props.isModelParamGiven("M");
+    this._M     = this._mGiven     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
+
+    // Instance-side number of turns + temperature — inddefs.h:46, 43-44.
+    this._instanceNtGiven = props.isModelParamGiven("nt");
+    this._instanceNt = this._instanceNtGiven ? props.getModelParam<number>("nt") : INDUCTOR_DEFAULTS["nt"]!;
+    this._tempGiven  = props.isModelParamGiven("TEMP");
+    this._TEMP       = this._tempGiven  ? props.getModelParam<number>("TEMP")  : INDUCTOR_DEFAULTS["TEMP"]!;
+    this._dtempGiven = props.isModelParamGiven("DTEMP");
+    this._DTEMP      = this._dtempGiven ? props.getModelParam<number>("DTEMP") : INDUCTOR_DEFAULTS["DTEMP"]!;
+
+    // Model-card parameters — sINDmodel fields (inddefs.h:100-118). Defaults
+    // from INDUCTOR_DEFAULTS; the !*Given seeding in setup() (indsetup.c:32-58)
+    // reapplies them idempotently.
+    this._mIndGiven      = props.isModelParamGiven("mInd");
+    this._mInd           = this._mIndGiven      ? props.getModelParam<number>("mInd")      : INDUCTOR_DEFAULTS["mInd"]!;
+    // Nominal temperature the TC factor is measured against (indtemp.c:58,
+    // model->INDtnom). Model-card only — ind.c:45 IND_MOD_TNOM; ngspice has no
+    // instance tnom (ind.c:13-22 instance table carries only tc1/tc2).
+    this._modelTnomGiven = props.isModelParamGiven("modelTnom");
+    this._modelTnom      = this._modelTnomGiven ? props.getModelParam<number>("modelTnom") : INDUCTOR_DEFAULTS["modelTnom"]!;
+    this._modelTC1Given  = props.isModelParamGiven("modelTC1");
+    this._modelTC1       = this._modelTC1Given  ? props.getModelParam<number>("modelTC1")  : INDUCTOR_DEFAULTS["modelTC1"]!;
+    this._modelTC2Given  = props.isModelParamGiven("modelTC2");
+    this._modelTC2       = this._modelTC2Given  ? props.getModelParam<number>("modelTC2")  : INDUCTOR_DEFAULTS["modelTC2"]!;
+    this._csectGiven     = props.isModelParamGiven("csect");
+    this._csect          = this._csectGiven     ? props.getModelParam<number>("csect")     : INDUCTOR_DEFAULTS["csect"]!;
+    this._lengthGiven    = props.isModelParamGiven("length");
+    this._length         = this._lengthGiven    ? props.getModelParam<number>("length")    : INDUCTOR_DEFAULTS["length"]!;
+    this._modNtGiven     = props.isModelParamGiven("modNt");
+    this._modNt          = this._modNtGiven     ? props.getModelParam<number>("modNt")     : INDUCTOR_DEFAULTS["modNt"]!;
+    this._muGiven        = props.isModelParamGiven("mu");
+    this._mu             = this._muGiven        ? props.getModelParam<number>("mu")        : INDUCTOR_DEFAULTS["mu"]!;
+
+    // indtemp.c:74 — at construction the reference temperature equals tnom, so
+    // difference = 0, factor = 1, and _effectiveL = _nominalL * SCALE. The /M
+    // division is applied at the stamp sites, not folded here. setup() and
+    // computeTemperature() overwrite this before load() runs.
+    this._effectiveL = this._nominalL * this._SCALE;
   }
 
   /**
@@ -261,21 +370,99 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     const posNode = pinNodes.get("pos")!;  // INDposNode
     const negNode = pinNodes.get("neg")!;  // INDnegNode
 
-    // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
+    // ----------------------------------------------------------------------
+    // INDsetup model-default processing (indsetup.c:31-58).
+    // ----------------------------------------------------------------------
+
+    // indsetup.c:32-34 — !INDmIndGiven → INDmInd = 0.0
+    if (!this._mIndGiven) {
+      this._mInd = 0.0;
+    }
+    // indsetup.c:35-37 — !INDtnomGiven → INDtnom = ckt->CKTnomTemp
+    if (!this._modelTnomGiven) {
+      this._modelTnom = ctx.nomTemp;
+    }
+    // indsetup.c:38-40 — !INDtc1Given → INDtempCoeff1 = 0.0
+    if (!this._modelTC1Given) {
+      this._modelTC1 = 0.0;
+    }
+    // indsetup.c:41-43 — !INDtc2Given → INDtempCoeff2 = 0.0
+    if (!this._modelTC2Given) {
+      this._modelTC2 = 0.0;
+    }
+    // indsetup.c:44-46 — !INDcsectGiven → INDcsect = 0.0
+    if (!this._csectGiven) {
+      this._csect = 0.0;
+    }
+    // indsetup.c:50-52 — !INDlengthGiven → INDlength = 0.0
+    if (!this._lengthGiven) {
+      this._length = 0.0;
+    }
+    // indsetup.c:53-55 — !INDmodNtGiven → INDmodNt = 0.0
+    if (!this._modNtGiven) {
+      this._modNt = 0.0;
+    }
+    // indsetup.c:56-58 — !INDmuGiven → INDmu = 0.0
+    if (!this._muGiven) {
+      this._mu = 0.0;
+    }
+
+    // Specific-inductance + turns-folding derivation (indsetup.c:65-85).
+    // Extracted so the geometry hot-load path (setParam csect/length/
+    // mu/modNt) can rebuild _specInd / _mInd without a full setup() re-run.
+    this._deriveSpecIndAndMInd();
+
+    // indsetup.c:91-92 — *states += INDnumStates (INDflux = state+0,
+    // INDvolt = state+1)
     this._stateBase = ctx.allocStates(this.stateSize);
 
-    // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
+    // indsetup.c:97-101 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
-    // indsetup.c:96-100 — TSTALLOC sequence, line-for-line.
+    // indsetup.c:112-116 — TSTALLOC sequence, line-for-line.
     this._hPIbr   = solver.allocElement(posNode, b);  // (INDposNode, INDbrEq)
     this._hNIbr   = solver.allocElement(negNode, b);  // (INDnegNode, INDbrEq)
     this._hIbrN   = solver.allocElement(b, negNode);  // (INDbrEq,    INDnegNode)
     this._hIbrP   = solver.allocElement(b, posNode);  // (INDbrEq,    INDposNode)
     this._hIbrIbr = solver.allocElement(b, b);        // (INDbrEq,    INDbrEq)
+  }
+
+  /**
+   * _deriveSpecIndAndMInd — model-side specific-inductance + turns-folding
+   * derivation. ngspice INDsetup (indsetup.c):
+   *   if (INDlengthGiven && INDlength > 0) {
+   *     if (INDmuGiven)
+   *       INDspecInd = (INDmu * CONSTmuZero * INDcsect * INDcsect) / INDlength;
+   *     else
+   *       INDspecInd =       (CONSTmuZero * INDcsect * INDcsect) / INDlength;
+   *   } else INDspecInd = 0.0;
+   *   if (!INDmIndGiven) INDmInd = INDmodNt * INDmodNt * INDspecInd;
+   *
+   * Folded into a helper so the geometry hot-load path (setParam) rebuilds it
+   * without a setup() re-run, which the engine does not perform after setParam
+   * (analog-engine.ts:1389).
+   */
+  private _deriveSpecIndAndMInd(): void {
+    // INDsetup — specific inductance for one turn.
+    if (this._lengthGiven && this._length > 0.0) {
+      if (this._muGiven) {
+        this._specInd = (this._mu * CONST_MU_ZERO * this._csect * this._csect)
+                        / this._length;
+      } else {
+        this._specInd = (CONST_MU_ZERO * this._csect * this._csect)
+                        / this._length;
+      }
+    } else {
+      this._specInd = 0.0;
+    }
+
+    // INDsetup — fold the turns count into the model inductance.
+    if (!this._mIndGiven) {
+      this._mInd = this._modNt * this._modNt * this._specInd;
+    }
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
@@ -287,30 +474,90 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   }
 
   /**
-   * computeTemperature — per-instance temperature derating.
+   * computeTemperature — per-instance temperature pass (INDtemp body).
    *
-   * cite: indtemp.c:55-72 —
-   *   difference = (here->INDtemp + here->INDdtemp) - model->INDtnom
-   *   factor = 1.0 + tc1*difference + tc2*difference*difference
-   *   here->INDinduct = here->INDinduct * factor * INDscale / INDm
+   * cite: indtemp.c:33-74 — instance default-value processing, base-inductance
+   * selection (instance value / model mInd / specInd·nt²), the
+   * instance-overrides-model TC selection, and the TC/SCALE fold.
    *
-   * Our instance TNOM (_TNOM) maps to ngspice’s model->INDtnom for the case
-   * where the instance does not override temperature (indtemp.c:35-43).
-   * ctx.cktTemp maps to (here->INDtemp + here->INDdtemp) = ckt->CKTtemp.
+   * The /M division is applied at the stamp sites, not folded into the working
+   * inductance here. The body rebuilds _effectiveL from a fresh base on every
+   * call — no in-place compounding.
    */
   computeTemperature(ctx: TempContext): void {
-    // cite: indtemp.c:55 — difference = (INDtemp + INDdtemp) - INDtnom
-    const difference = ctx.cktTemp - this._TNOM;
-    // cite: indtemp.c:69 — factor = 1.0 + tc1*difference + tc2*difference*difference
-    const factor = 1.0 + this._TC1 * difference + this._TC2 * difference * difference;
-    // cite: indtemp.c:71-72 — INDinduct = INDinduct * factor * INDscale / INDm
-    this._effectiveL = this._nominalL * factor * this._SCALE / this._M;
+    // indtemp.c:35-43 — per-instance temperature override. When temp is given
+    // the instance uses its absolute TEMP and dtemp is forced 0 (ngspice warns
+    // if dtemp was also supplied); otherwise temp is ambient and dtemp is the
+    // additive delta.
+    let effectiveTemp: number;
+    if (this._tempGiven) {
+      // indtemp.c:38-42 — instance temperature specified; dtemp forced 0.
+      this._DTEMP = 0.0;
+      if (this._dtempGiven) {
+        // indtemp.c:40-41 — printf warning, delegated to the host console.
+        console.warn(`${this.label}: Instance temperature specified, dtemp ignored`);
+      }
+      effectiveTemp = this._TEMP;
+    } else {
+      // indtemp.c:35-37 — instance ambient = circuit ambient; dtemp default 0.
+      this._TEMP = ctx.cktTemp;
+      if (!this._dtempGiven) {
+        this._DTEMP = 0.0;
+      }
+      effectiveTemp = this._TEMP + this._DTEMP;
+    }
+
+    // indtemp.c:45-47 — instance default-value processing.
+    if (!this._scaleGiven)      this._SCALE = 1.0;
+    if (!this._mGiven)          this._M = 1.0;
+    if (!this._instanceNtGiven) this._instanceNt = 0.0;
+
+    // indtemp.c:49-56 — base-inductance selection. When no instance
+    // inductance is given, the base is specInd·nt² (instance turns) or the
+    // model mInd; otherwise the base is the raw instance value (_nominalL,
+    // ngspice's INDinductinst). The indtemp.c:56 `else INDinduct =
+    // INDinductinst` reset is the right-hand-side _nominalL read here.
+    let base: number;
+    if (!this._indGiven) {
+      if (this._instanceNtGiven) {
+        // indtemp.c:50-51 — INDinduct = INDspecInd * INDnt * INDnt.
+        base = this._specInd * this._instanceNt * this._instanceNt;
+      } else {
+        // indtemp.c:52-53 — INDinduct = model->INDmInd.
+        base = this._mInd;
+      }
+    } else {
+      // indtemp.c:56 — INDinduct = INDinductinst.
+      base = this._nominalL;
+    }
+
+    // indtemp.c:58 — difference = (INDtemp + INDdtemp) - INDtnom. effectiveTemp
+    // already folds INDtemp+INDdtemp per the branch above.
+    const difference = effectiveTemp - this._modelTnom;
+
+    // indtemp.c:62-70 — instance parameters tc1/tc2 override model parameters.
+    const tc1 = this._TC1Given ? this._TC1 : this._modelTC1;
+    const tc2 = this._TC2Given ? this._TC2 : this._modelTC2;
+
+    // indtemp.c:72 — factor = 1.0 + tc1*difference + tc2*difference*difference.
+    const factor = 1.0 + tc1 * difference + tc2 * difference * difference;
+
+    // indtemp.c:74 — INDinduct = INDinduct * factor * INDscale. The /M division
+    // is applied at the stamp sites, not folded in here. Rebuilt from `base`,
+    // not an in-place mutation.
+    this._effectiveL = base * factor * this._SCALE;
   }
 
   setParam(key: string, value: number): void {
     if (key === "inductance" || key === "L") {
-      this._nominalL = value;
-      this._effectiveL = this._nominalL * this._SCALE / this._M;
+      // indparam.c — the chained assignment
+      //   here->INDinductinst = here->INDinduct = value->rValue;
+      // as two statements in right-to-left evaluation order.
+      this._effectiveL = value;   // INDinduct = rValue
+      this._nominalL  = value;    // INDinductinst = INDinduct (= rValue)
+      // indparam.c:25-26 — !INDmGiven → INDm = 1.0.
+      this._indGiven  = true;
+      if (!this._mGiven) this._M = 1.0;
       // Cascade to MUT siblings so MUTfactor = k·√(L1·L2) stays current.
       // cite: muttemp.c:35-41 — MUTfactor depends on both partner INDinduct values.
       for (const m of this._mutSiblings) {
@@ -320,16 +567,64 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
       this._IC = value;
     } else if (key === "TC1") {
       this._TC1 = value;
+      this._TC1Given = true;
     } else if (key === "TC2") {
       this._TC2 = value;
-    } else if (key === "TNOM") {
-      this._TNOM = value;
+      this._TC2Given = true;
     } else if (key === "SCALE") {
       this._SCALE = value;
-      this._effectiveL = this._nominalL * this._SCALE / this._M;
+      this._scaleGiven = true;
+      // No /M here — it is applied at the stamp sites.
+      this._effectiveL = this._nominalL * this._SCALE;
     } else if (key === "M") {
       this._M = value;
-      this._effectiveL = this._nominalL * this._SCALE / this._M;
+      this._mGiven = true;
+      // /M is applied at the stamp sites, so _effectiveL is unchanged here.
+    } else if (key === "nt") {
+      this._instanceNt = value;
+      this._instanceNtGiven = true;
+    } else if (key === "TEMP") {
+      this._TEMP = value;
+      this._tempGiven = true;
+    } else if (key === "DTEMP") {
+      this._DTEMP = value;
+      this._dtempGiven = true;
+    } else if (key === "mInd") {
+      // indmpar.c:20-23 — case IND_MOD_IND.
+      this._mInd = value;
+      this._mIndGiven = true;
+    } else if (key === "modelTnom") {
+      // indmpar.c:24-27 — case IND_MOD_TNOM.
+      this._modelTnom = value;
+      this._modelTnomGiven = true;
+    } else if (key === "modelTC1") {
+      // indmpar.c:28-31 — case IND_MOD_TC1.
+      this._modelTC1 = value;
+      this._modelTC1Given = true;
+    } else if (key === "modelTC2") {
+      // indmpar.c:32-35 — case IND_MOD_TC2.
+      this._modelTC2 = value;
+      this._modelTC2Given = true;
+    } else if (key === "csect") {
+      // indmpar.c:36-39 — case IND_MOD_CSECT.
+      this._csect = value;
+      this._csectGiven = true;
+      this._deriveSpecIndAndMInd();
+    } else if (key === "length") {
+      // indmpar.c:44-47 — case IND_MOD_LENGTH.
+      this._length = value;
+      this._lengthGiven = true;
+      this._deriveSpecIndAndMInd();
+    } else if (key === "modNt") {
+      // indmpar.c:48-51 — case IND_MOD_NT.
+      this._modNt = value;
+      this._modNtGiven = true;
+      this._deriveSpecIndAndMInd();
+    } else if (key === "mu") {
+      // indmpar.c:52-55 — case IND_MOD_MU.
+      this._mu = value;
+      this._muGiven = true;
+      this._deriveSpecIndAndMInd();
     }
   }
 
@@ -351,17 +646,21 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     const { rhsOld, cktMode: mode } = ctx;
     const b = this.branchIndex;
     const L = this._effectiveL;
+    // indload.c:39 — m = here->INDm. /M is applied at the stamp site, not
+    // folded into _effectiveL.
+    const m = this._M;
     const base = this._stateBase;
     const s0 = this._pool.states[0];
 
-    // cite: indload.c:43 — if(!(ckt->CKTmode & (MODEDC|MODEINITPRED)))
+    // cite: indload.c:41 — if(!(ckt->CKTmode & (MODEDC|MODEINITPRED)))
     if (!(mode & (MODEDC | MODEINITPRED))) {
       if ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC)) {
-        // cite: indload.c:44-46 — UIC seed: INDflux = INDinduct/m * INDinitCond
-        s0[base + _SLOT_PHI] = L * this._IC;
+        // cite: indload.c:43-44 — INDflux = INDinduct / m * INDinitCond.
+        // Operand order: (INDinduct / m) * INDinitCond (C left-to-right).
+        s0[base + _SLOT_PHI] = L / m * this._IC;
       } else {
-        // cite: indload.c:48-50 — INDflux = INDinduct/m * CKTrhsOld[INDbrEq]
-        s0[base + _SLOT_PHI] = L * rhsOld[b];
+        // cite: indload.c:46-47 — INDflux = INDinduct / m * CKTrhsOld[INDbrEq].
+        s0[base + _SLOT_PHI] = L / m * rhsOld[b];
       }
     }
   }
@@ -402,6 +701,9 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     const { solver, ag, cktMode: mode } = ctx;
     const b = this.branchIndex;
     const L = this._effectiveL;
+    // indload.c:111 — m = here->INDm; the parallel divisor is applied at the
+    // stamp site (newmind = INDinduct/m), not folded into _effectiveL.
+    const m = this._M;
     const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
@@ -425,8 +727,10 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
         // BEFORE NIintegrate so the order-2 history is seeded.
         s1[base + _SLOT_PHI] = s0[base + _SLOT_PHI];
       }
-      // cite: indload.c:106-109 — NIintegrate(ckt, &geq, &ceq, newmind, here->INDflux).
+      // cite: indload.c:112-113 — newmind = INDinduct/m;
+      //   NIintegrate(ckt, &req, &veq, newmind, here->INDflux).
       // niinteg.c writes state0[INDvolt] = state0[ccap] = s0[_SLOT_CCAP].
+      const newmind = L / m;
       const phi0 = s0[base + _SLOT_PHI];
       const phi1 = s1[base + _SLOT_PHI];
       const phi2 = s2[base + _SLOT_PHI];
@@ -435,7 +739,7 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
       const ni = niIntegrate(
         ctx.method,
         ctx.order,
-        L,
+        newmind,
         ag,
         phi0, phi1,
         [phi2, phi3, 0, 0, 0],
@@ -478,7 +782,8 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    *   *(INDibrNegPtr)   -=  1;   (real)
    *   *(INDibrIbrPtr+1) -=  val; (imaginary branch-diagonal: jωL impedance)
    *
-   * _effectiveL already incorporates the /m division from indtemp.c:72.
+   * The /m divisor is applied here at the stamp statement (omega * L / m),
+   * not folded into _effectiveL.
    *
    * Allocation lives in setup() (the five solver.allocElement calls at
    * indsetup.c:96-100 TSTALLOC order), mirroring ngspice's INDsetup/INDacLoad
@@ -489,8 +794,10 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    * imaginary half (written here via stampElementImag) of one cell.
    */
   stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
-    // cite: indacld.c:29 — val = ckt->CKTomega * here->INDinduct / m
-    const val = omega * this._effectiveL;
+    // cite: indacld.c:29 — val = ckt->CKTomega * here->INDinduct / m.
+    // Operand order ((omega * INDinduct) / m), C left-to-right; /M is applied
+    // here at the stamp, not folded into _effectiveL.
+    const val = omega * this._effectiveL / this._M;
 
     // cite: indacld.c:31-34 — 4 real ±1 connectivity stamps (`*ptr ±= 1`).
     // The five handles _hPIbr/_hNIbr/_hIbrP/_hIbrN/_hIbrIbr were TSTALLOC'd

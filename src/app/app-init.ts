@@ -213,20 +213,15 @@ export function initApp(search?: string): void {
     const numPoints = parseInt((document.getElementById('ac-sweep-points') as HTMLInputElement).value, 10) || 50;
     const fStart = parseFloat((document.getElementById('ac-sweep-fstart') as HTMLInputElement).value) || 1;
     const fStop = parseFloat((document.getElementById('ac-sweep-fstop') as HTMLInputElement).value) || 1e6;
-    const sourceLabel = (document.getElementById('ac-sweep-source') as HTMLInputElement).value.trim();
     const outputNodes = (document.getElementById('ac-sweep-outputs') as HTMLInputElement).value
       .split(',').map(s => s.trim()).filter(s => s.length > 0);
 
-    if (!sourceLabel) {
-      showStatus('AC Sweep: please specify an AC source label', true);
-      return;
-    }
     if (outputNodes.length === 0) {
       showStatus('AC Sweep: please specify at least one output node', true);
       return;
     }
 
-    const acParams: AcParams = { type: sweepType, numPoints, fStart, fStop, sourceLabel, outputNodes };
+    const acParams: AcParams = { type: sweepType, numPoints, fStart, fStop, outputNodes };
 
     try {
       const result = coordinator.acAnalysis(acParams)!;

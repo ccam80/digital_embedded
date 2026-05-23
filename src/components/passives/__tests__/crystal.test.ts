@@ -264,19 +264,33 @@ describe("QuartzCrystal LTE rollback (T1)", () => {
     expect(log).not.toBeNull();
     const rejected = log!.find((s) => s.lteRejected === true);
     if (rejected !== undefined) {
-      // Rollback invariant: state0 and state1 agree at the rolled slots
-      // (PHI_L, Q_CS, Q_C0) for the crystal element after the rotation.
-      const xtalAnalog = fix.circuit.elements.find(
-        (el) => (el as { label?: string }).label === "xtal",
-      ) as { _stateBase: number; stateSchema: { indexOf: Map<string, number> } } | undefined;
-      expect(xtalAnalog).toBeDefined();
-      const SLOT_PHI_L = xtalAnalog!.stateSchema.indexOf.get("PHI_L")!;
-      const SLOT_Q_CS = xtalAnalog!.stateSchema.indexOf.get("Q_CS")!;
-      const SLOT_Q_C0 = xtalAnalog!.stateSchema.indexOf.get("Q_C0")!;
-      const base = xtalAnalog!._stateBase;
-      expect(fix.pool.state0[base + SLOT_PHI_L]).toBe(fix.pool.state1[base + SLOT_PHI_L]);
-      expect(fix.pool.state0[base + SLOT_Q_CS]).toBe(fix.pool.state1[base + SLOT_Q_CS]);
-      expect(fix.pool.state0[base + SLOT_Q_C0]).toBe(fix.pool.state1[base + SLOT_Q_C0]);
+      // Rollback invariant: state0 and state1 agree at the rolled state slots
+      // for the crystal's reactive arms after the rotation. QuartzCrystal is a
+      // kind:"netlist" composite (crystal.ts buildCrystalNetlist) — PHI / Q
+      // state lives on the flattened pool-backed leaves, not on the "xtal"
+      // wrapper. The leaves are labelled `${parent}:${subElementName}`:
+      //   xtal:lS  — motional inductor, schema slot "PHI"
+      //   xtal:cS  — motional capacitor, schema slot "Q"
+      //   xtal:c0  — shunt capacitor,    schema slot "Q"
+      // Resolve each leaf and read its own stateSchema (sanctioned name-keyed
+      // slot lookup, per the project's "schema lookups over slot exports" rule).
+      type PoolLeaf = { _stateBase: number; stateSchema: { indexOf: Map<string, number> } };
+      const leafByLabel = (label: string): PoolLeaf => {
+        const el = fix.circuit.elements.find(
+          (e) => (e as { label?: string }).label === label,
+        ) as PoolLeaf | undefined;
+        expect(el, `composite leaf "${label}" must be resolvable`).toBeDefined();
+        return el!;
+      };
+      const assertRolled = (leaf: PoolLeaf, slotName: string): void => {
+        const slot = leaf.stateSchema.indexOf.get(slotName)!;
+        const idx = leaf._stateBase + slot;
+        expect(fix.pool.state0[idx]).toBe(fix.pool.state1[idx]);
+      };
+
+      assertRolled(leafByLabel("xtal:lS"), "PHI");
+      assertRolled(leafByLabel("xtal:cS"), "Q");
+      assertRolled(leafByLabel("xtal:c0"), "Q");
     }
   });
 });

@@ -59,11 +59,13 @@ describe("defaultLoadHandler", () => {
 // ---------------------------------------------------------------------------
 
 describe("defaultStampAcHandler", () => {
-  it("calls el.stampAc(solver, omega, loadCtx) for elements that implement it", () => {
+  it("calls el.stampAc(solver, omega, loadCtx, rhsRe, rhsIm) for elements that implement it", () => {
     const solver = {};
     const omega = 6283.185;
     const loadCtx = makeLoadCtx();
-    const acCtx: AcHandlerCtx = { solver: solver as never, omega, loadCtx: loadCtx as never };
+    const rhsRe = new Float64Array(4);
+    const rhsIm = new Float64Array(4);
+    const acCtx: AcHandlerCtx = { solver: solver as never, omega, loadCtx: loadCtx as never, rhsRe, rhsIm };
 
     const stampAc = vi.fn();
     const el = makeElement({ stampAc });
@@ -71,7 +73,7 @@ describe("defaultStampAcHandler", () => {
     defaultStampAcHandler.run(acCtx, [el] as never);
 
     expect(stampAc).toHaveBeenCalledOnce();
-    expect(stampAc).toHaveBeenCalledWith(solver, omega, loadCtx);
+    expect(stampAc).toHaveBeenCalledWith(solver, omega, loadCtx, rhsRe, rhsIm);
   });
 
   it("skips elements that do not implement stampAc (optional method)", () => {
@@ -79,6 +81,8 @@ describe("defaultStampAcHandler", () => {
       solver: {} as never,
       omega: 1000,
       loadCtx: {} as never,
+      rhsRe: new Float64Array(4),
+      rhsIm: new Float64Array(4),
     };
     const elWithout = makeElement(); // no stampAc
 
@@ -91,7 +95,9 @@ describe("defaultStampAcHandler", () => {
     const solver = {};
     const omega = 314.159;
     const loadCtx = makeLoadCtx();
-    const acCtx: AcHandlerCtx = { solver: solver as never, omega, loadCtx: loadCtx as never };
+    const rhsRe = new Float64Array(4);
+    const rhsIm = new Float64Array(4);
+    const acCtx: AcHandlerCtx = { solver: solver as never, omega, loadCtx: loadCtx as never, rhsRe, rhsIm };
 
     const stampAc = vi.fn();
     const elWith = makeElement({ stampAc });
@@ -100,11 +106,17 @@ describe("defaultStampAcHandler", () => {
     defaultStampAcHandler.run(acCtx, [elWith, elWithout] as never);
 
     expect(stampAc).toHaveBeenCalledOnce();
-    expect(stampAc).toHaveBeenCalledWith(solver, omega, loadCtx);
+    expect(stampAc).toHaveBeenCalledWith(solver, omega, loadCtx, rhsRe, rhsIm);
   });
 
   it("handles an empty bucket without throwing", () => {
-    const acCtx: AcHandlerCtx = { solver: {} as never, omega: 0, loadCtx: {} as never };
+    const acCtx: AcHandlerCtx = {
+      solver: {} as never,
+      omega: 0,
+      loadCtx: {} as never,
+      rhsRe: new Float64Array(0),
+      rhsIm: new Float64Array(0),
+    };
     expect(() => defaultStampAcHandler.run(acCtx, [])).not.toThrow();
   });
 });

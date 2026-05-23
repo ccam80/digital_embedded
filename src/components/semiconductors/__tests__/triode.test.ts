@@ -8,7 +8,7 @@ import path from "node:path";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import { DLL_PATH, describeIfDll } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
+import { describeIfDll } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { isPoolBacked, type PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 
 const DTS_TRIODE_CC = path.resolve(
@@ -237,9 +237,11 @@ describeIfDll("Triode common-cathode paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({
+    session = await ComparisonSession.createSelfCompare({
       dtsPath: DTS_TRIODE_CC,
-      dllPath: DLL_PATH,
+      analysis: "tran",
+      tStop: 1e-4,
+      maxStep: 1e-6,
     });
   });
 
@@ -273,9 +275,11 @@ describeIfDll("Triode cutoff paired vs ngspice (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({
+    session = await ComparisonSession.createSelfCompare({
       dtsPath: DTS_TRIODE_CUTOFF,
-      dllPath: DLL_PATH,
+      analysis: "tran",
+      tStop: 1e-4,
+      maxStep: 1e-6,
     });
   });
 

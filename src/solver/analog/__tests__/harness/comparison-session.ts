@@ -12,6 +12,7 @@
 
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { resolveNgspiceDllPath } from "./ngspice-dll-path.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import { createDefaultRegistry } from "../../../../components/register-all.js";
 import { ComponentRegistry } from "../../../../core/registry.js";
@@ -55,6 +56,7 @@ import type {
   NRAttemptOutcome,
   NRAttempt,
   StepSnapshot,
+  IterationSnapshot,
   ComponentInfo,
   NodeInfo,
   ComponentSlotsSnapshot,
@@ -94,6 +96,7 @@ import type {
   TopologyOrderingDiff,
   FirstDivergenceReport,
   FirstDivergenceSignal,
+  DivergenceSignalClass,
 } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
 import type { IntegrationMethod } from "../../integration.js";
@@ -231,11 +234,7 @@ function stripControlBlock(cir: string): string {
 const ROOT = process.cwd();
 function resolvePath(p: string): string { return resolve(ROOT, p); }
 function getDllPath(opts: ComparisonSessionOptions): string {
-  return (
-    opts.dllPath ??
-    process.env.NGSPICE_DLL_PATH ??
-    resolve(ROOT, "ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll")
-  );
+  return resolveNgspiceDllPath(opts.dllPath);
 }
 
 function emptyTopology(): TopologySnapshot {
@@ -375,6 +374,47 @@ function _vectorL2(v: Float64Array | undefined, start: number, end: number): num
   let s = 0;
   for (let i = start; i < n; i++) s += v[i] * v[i];
   return Math.sqrt(s);
+}
+
+// ---------------------------------------------------------------------------
+// First-divergence causal ordering
+// ---------------------------------------------------------------------------
+
+/**
+ * Causal order of first-divergence signal classes within a single
+ * (stepIndex, iterationIndex). Lower rank = more upstream in the per-iteration
+ * pipeline: structural shape, then the integration coefficients that govern the
+ * load, then history state read by the load, then the load-pass products
+ * (limiting -> rhs -> matrix), then the solve output (voltage), then the
+ * post-solve convergence test. Used only to break (step, iter) ties.
+ */
+export const FIRST_DIVERGENCE_CAUSAL_RANK: Record<DivergenceSignalClass, number> = {
+  shape: 0,
+  integration: 1,
+  state: 2,
+  limiting: 3,
+  rhs: 4,
+  matrix: 5,
+  voltage: 6,
+  convergence: 7,
+};
+
+/**
+ * Select the earliest divergence from a set of per-class signals: lowest
+ * `stepIndex`, then lowest `iterationIndex`, then most-upstream causal rank.
+ * The rank tie-break is what makes the router point at the cause rather than a
+ * downstream symptom- a divergent `rhs` and the `voltage` it produces share the
+ * same (step, iter), and `rhs` (rank 4) must win over `voltage` (rank 6).
+ */
+export function pickEarliestDivergence(
+  signals: ReadonlyArray<FirstDivergenceSignal>,
+): FirstDivergenceSignal | null {
+  if (signals.length === 0) return null;
+  return signals.reduce((best, cur) => {
+    if (cur.stepIndex !== best.stepIndex) return cur.stepIndex < best.stepIndex ? cur : best;
+    if (cur.iterationIndex !== best.iterationIndex) return cur.iterationIndex < best.iterationIndex ? cur : best;
+    return FIRST_DIVERGENCE_CAUSAL_RANK[cur.signalClass] < FIRST_DIVERGENCE_CAUSAL_RANK[best.signalClass] ? cur : best;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -786,10 +826,12 @@ export class ComparisonSession {
    * two sessions.
    *
    * Notes on the netlist contract:
-   *   - The .dts (ours) wires the synthetic AC stimulus from `params.sourceLabel`.
-   *   - The .cir (ngspice) MUST contain a real AC voltage source (`vX n+ n- ac 1`)
-   *     terminating on the same node, since ngspice's `ACan` reads the
-   *     stimulus from the deck.
+   *   - The .dts (ours) must include an AcVoltageSource (or AcCurrentSource)
+   *     element; its acMagnitude / acPhase properties drive the .ac sweep
+   *     stimulus via stampAc (vsrcacld.c:175-180, isrcacld.c:43-50).
+   *   - The .cir (ngspice) must contain a real AC source line carrying the
+   *     same `AC <mag> <phase>` token, which the netlist generator emits
+   *     directly from those properties (netlist-generator.ts).
    * Fixtures must keep both sides aligned; mismatch yields trivially divergent
    * solutions and is a fixture bug, not an engine bug.
    */
@@ -1853,6 +1895,9 @@ export class ComparisonSession {
         elementStates3Slots: Object.fromEntries(
           ourIter.elementStates.map(es => [es.label, es.state3Slots]),
         ),
+        pinCurrents: Object.fromEntries(
+          ourIter.elementStates.map(es => [es.label, es.pinCurrents]),
+        ),
         limitingEvents: ourIter.limitingEvents,
         rhs: ourLinSys!.rhs,
         residual: ourLinSys!.residual,
@@ -1895,6 +1940,9 @@ export class ComparisonSession {
         ),
         elementStates3Slots: Object.fromEntries(
           ngIter.elementStates.map(es => [es.label, es.state3Slots]),
+        ),
+        pinCurrents: Object.fromEntries(
+          ngIter.elementStates.map(es => [es.label, es.pinCurrents]),
         ),
         limitingEvents: ngIter.limitingEvents,
         rhs: ngLinSys!.rhs,
@@ -2688,7 +2736,13 @@ export class ComparisonSession {
     const n = this._ourTopology.matrixSize;
     const entries: RhsLabeledResult["entries"] = [];
     for (let i = 0; i < n; i++) {
-      const rowLabel = this._ourTopology.matrixRowLabels.get(i) ?? `row${i}`;
+      // preSolveRhs is the 1-based solution-vector layout (index 0 = ground),
+      // so row i maps to node id i (nodeLabels) or to matrixRowLabels keyed
+      // 0-based at i-1 (matrixRowLabels.set(nodeId-1, ...) in capture.ts) —
+      // the same convention the voltage/rhs first-divergence walks use.
+      const rowLabel = this._ourTopology.nodeLabels.get(i)
+        ?? this._ourTopology.matrixRowLabels.get(i - 1)
+        ?? `row${i}`;
       const ourV = ourIter?.preSolveRhs[i] ?? 0;
       const ngV = ngIter?.preSolveRhs[i] ?? NaN;
       const absDelta = Math.abs(ourV - ngV);
@@ -3005,7 +3059,7 @@ export class ComparisonSession {
    * orthogonal frequency-axis-parity context.
    */
   acFirstDivergence(): AcDivergenceReport {
-    if (!this._acSession || !this._ngAcSession) {
+    if (!this._acSession || !this._ngAcSession || !this._ngAcSessionReindexed) {
       throw new Error(
         `acFirstDivergence() requires an AC sweep run; current analysis is ${this._analysis ?? "null"}. ` +
         "Call runAcSweep(params) first.",
@@ -3013,18 +3067,20 @@ export class ComparisonSession {
     }
     const ours = this._acSession.points;
     const ngsp = this._ngAcSession.points;
-    // For the solution walk: use the per-frequency reindexed ngspice points
-    // (solRe/solIm reindexed into our coord space; rhsRe/rhsIm too). The
-    // matrix walk stays on raw `ngsp` and translates (row, col) at compare
-    // time so allocation-order divergence remains visible. Mirrors the
-    // DC/TRAN split (`_ngSessionReindexed` for solution-space comparison;
-    // raw `_ngSession` matrix walked via `_ngMatrixRowMap`).
-    const ngspRe = (this._ngAcSessionReindexed ?? this._ngAcSession).points;
+    // Solution walk uses the per-frequency reindexed ngspice points
+    // (solRe/solIm/rhsRe/rhsIm reindexed into our coord space by
+    // `_reindexNgAcSession`, which runAcSweep always runs). The matrix walk
+    // stays on raw `ngsp` and translates (row, col) at compare time so
+    // allocation-order divergence remains visible. Mirrors the DC/TRAN split:
+    // `_ngSessionReindexed` for solution-space comparison, raw `_ngSession`
+    // matrix walked via `_ngMatrixRowMap`.
+    const ngspRe = this._ngAcSessionReindexed.points;
     const max = Math.max(ours.length, ngsp.length);
 
     let solution: AcSolutionDivergenceEntry | null = null;
     let shape: AcShapeDivergenceEntry | null = null;
     let matrix: AcMatrixDivergenceEntry | null = null;
+    let rhs: AcSolutionDivergenceEntry | null = null;
 
     for (let i = 0; i < max; i++) {
       const o = i < ours.length ? ours[i] : null;
@@ -3041,7 +3097,7 @@ export class ComparisonSession {
             matrixSize: { ours: o ? o.matrixSize : null, ngspice: n ? n.matrixSize : null },
           };
         }
-        if (solution !== null && shape !== null && matrix !== null) break;
+        if (solution !== null && shape !== null && matrix !== null && rhs !== null) break;
         continue;
       }
 
@@ -3081,6 +3137,38 @@ export class ComparisonSession {
               row: k,
               ours: { re: o.solRe[k], im: o.solIm[k] },
               ngspice: { re: nRe.solRe[k], im: nRe.solIm[k] },
+              absDelta,
+              relDelta: absDelta / denom,
+            };
+            break;
+          }
+        }
+      }
+
+      // RHS: per-MNA-row complex comparison of the loaded excitation vector,
+      // in OUR coord space (nRe is the reindexed ngspice point; _reindexNgAcSession
+      // reindexes rhsRe/rhsIm alongside solRe/solIm). An identical complex
+      // Jacobian with a divergent RHS surfaces only as a divergent `solution`,
+      // so this is the upstream class that isolates the excitation/source-load
+      // path. rhsRe/rhsIm are optional on AcCapturePoint; guard like the matrix
+      // walk so a side that has not exported the complex RHS yields no false
+      // positive rather than a spurious divergence.
+      if (rhs === null && nRe && o.rhsRe && o.rhsIm && nRe.rhsRe && nRe.rhsIm) {
+        const rowLimit = Math.min(o.rhsRe.length, nRe.rhsRe.length);
+        for (let k = 0; k < rowLimit; k++) {
+          const dRe = o.rhsRe[k] - nRe.rhsRe[k];
+          const dIm = o.rhsIm[k] - nRe.rhsIm[k];
+          const absDelta = Math.hypot(dRe, dIm);
+          if (absDelta > 0 || Number.isNaN(dRe) || Number.isNaN(dIm)) {
+            const oMag = Math.hypot(o.rhsRe[k], o.rhsIm[k]);
+            const nMag = Math.hypot(nRe.rhsRe[k], nRe.rhsIm[k]);
+            const denom = Math.max(oMag, nMag, Number.MIN_VALUE);
+            rhs = {
+              pointIndex: i,
+              freq: o.freq,
+              row: k,
+              ours: { re: o.rhsRe[k], im: o.rhsIm[k] },
+              ngspice: { re: nRe.rhsRe[k], im: nRe.rhsIm[k] },
               absDelta,
               relDelta: absDelta / denom,
             };
@@ -3219,18 +3307,19 @@ export class ComparisonSession {
         }
       }
 
-      if (solution !== null && shape !== null && matrix !== null) break;
+      if (solution !== null && shape !== null && matrix !== null && rhs !== null) break;
     }
 
     const earliestCandidates: number[] = [];
     if (solution) earliestCandidates.push(solution.pointIndex);
     if (shape)    earliestCandidates.push(shape.pointIndex);
     if (matrix)   earliestCandidates.push(matrix.pointIndex);
+    if (rhs)      earliestCandidates.push(rhs.pointIndex);
     const earliestPointIndex = earliestCandidates.length === 0
       ? null
       : Math.min(...earliestCandidates);
 
-    return { earliestPointIndex, solution, shape, matrix };
+    return { earliestPointIndex, solution, shape, matrix, rhs };
   }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get ourTopology(): TopologySnapshot { return this._ourTopology; }
@@ -4167,17 +4256,237 @@ export class ComparisonSession {
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // firstDivergence per-class walks
+  //
+  // Each returns the first FirstDivergenceSignal in its class at (si, ii), or
+  // null. `ourIt` is raw (our coords); `ngIt` is the node-mapping-aligned
+  // ngspice iteration, so `voltages` / `preSolveRhs` are already reindexed into
+  // our coordinate space (node-mapping.ts reindexArray) and compare
+  // index-by-index. The matrix is intentionally NOT pre-reindexed; its walk
+  // translates (row, col) via _ngMatrixRowMap/_ngMatrixColMap at compare time so
+  // allocation-order drift stays visible. Strict bit-exact: any `!==` diverges.
+  // ---------------------------------------------------------------------------
+
+  private _fdVoltage(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot): FirstDivergenceSignal | null {
+    const n = Math.min(ourIt.voltages.length, ngIt.voltages.length);
+    for (let nodeIdx = 1; nodeIdx < n; nodeIdx++) {
+      const ov = ourIt.voltages[nodeIdx];
+      const nv = ngIt.voltages[nodeIdx];
+      if (ov !== nv) {
+        const label = this._ourTopology.nodeLabels.get(nodeIdx)
+          ?? this._ourTopology.matrixRowLabels.get(nodeIdx - 1)
+          ?? `slot${nodeIdx}`;
+        return { signalClass: "voltage", stepIndex: si, iterationIndex: ii, attribute: label, ours: ov, ngspice: nv, absDelta: Math.abs(ov - nv) };
+      }
+    }
+    return null;
+  }
+
+  private _fdRhs(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot): FirstDivergenceSignal | null {
+    // preSolveRhs shares the solution-vector index space (index 0 = ground),
+    // and the aligned ngspice side is reindexed by the same reindexArray as
+    // voltages, so this walk is the exact sibling of _fdVoltage.
+    const m = Math.min(ourIt.preSolveRhs.length, ngIt.preSolveRhs.length);
+    for (let r = 1; r < m; r++) {
+      const orhs = ourIt.preSolveRhs[r];
+      const nrhs = ngIt.preSolveRhs[r];
+      if (orhs !== nrhs) {
+        const label = this._ourTopology.nodeLabels.get(r)
+          ?? this._ourTopology.matrixRowLabels.get(r - 1)
+          ?? `row${r}`;
+        return { signalClass: "rhs", stepIndex: si, iterationIndex: ii, attribute: label, ours: orhs, ngspice: nrhs, absDelta: Math.abs(orhs - nrhs) };
+      }
+    }
+    return null;
+  }
+
+  private _fdMatrix(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot, identityMode: boolean): FirstDivergenceSignal | null {
+    const ourMap = new Map<string, number>();
+    for (const e of ourIt.matrix) ourMap.set(`${e.row},${e.col}`, e.value);
+    const ngMap = new Map<string, number>();
+    for (const e of ngIt.matrix) {
+      let r = e.row, c = e.col;
+      if (!identityMode) {
+        const mr = this._ngMatrixRowMap.get(e.row);
+        const mc = this._ngMatrixColMap.get(e.col);
+        if (mr === undefined || mc === undefined) continue;
+        r = mr; c = mc;
+      }
+      ngMap.set(`${r},${c}`, e.value);
+    }
+    const labelKey = (r: number, c: number) =>
+      `(${this._ourTopology.matrixRowLabels.get(r) ?? `row${r}`},${this._ourTopology.matrixColLabels.get(c) ?? `col${c}`})`;
+    for (const [k, ov] of ourMap) {
+      const nv = ngMap.get(k);
+      if (nv === undefined || nv !== ov) {
+        const idx = k.indexOf(",");
+        const r = Number(k.slice(0, idx));
+        const c = Number(k.slice(idx + 1));
+        return { signalClass: "matrix", stepIndex: si, iterationIndex: ii, attribute: labelKey(r, c), ours: ov, ngspice: nv ?? "(missing)", absDelta: nv !== undefined ? Math.abs(ov - nv) : Infinity };
+      }
+    }
+    for (const [k, nv] of ngMap) {
+      if (!ourMap.has(k)) {
+        const idx = k.indexOf(",");
+        const r = Number(k.slice(0, idx));
+        const c = Number(k.slice(idx + 1));
+        return { signalClass: "matrix", stepIndex: si, iterationIndex: ii, attribute: labelKey(r, c), ours: "(missing)", ngspice: nv, absDelta: Infinity };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * state0 (current step) is always compared; state1/2/3 (history read by
+   * companion models and LTE) are compared only on tran steps, where the
+   * accepted-step rotation makes them meaningful- on DCOP steps ngspice's
+   * history slots carry no defined relationship to ours.
+   */
+  private _fdState(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot, includeHistory: boolean): FirstDivergenceSignal | null {
+    const slotPair = (label: string, ourSlots: Record<string, number>, ngSlots: Record<string, number>, suffix: string): FirstDivergenceSignal | null => {
+      for (const [slot, value] of Object.entries(ourSlots ?? {})) {
+        const ngValue = (ngSlots ?? {})[slot];
+        if (ngValue === undefined) continue;
+        if (value !== ngValue) {
+          return { signalClass: "state", stepIndex: si, iterationIndex: ii, attribute: `${label}.${slot}${suffix}`, ours: value, ngspice: ngValue, absDelta: Math.abs(value - ngValue) };
+        }
+      }
+      return null;
+    };
+    for (const ourEs of ourIt.elementStates) {
+      const ngEs = ngIt.elementStates.find(e => e.label.toUpperCase() === ourEs.label.toUpperCase());
+      if (!ngEs) continue;
+      const s0 = slotPair(ourEs.label, ourEs.slots, ngEs.slots, "");
+      if (s0) return s0;
+      if (includeHistory) {
+        const s1 = slotPair(ourEs.label, ourEs.state1Slots, ngEs.state1Slots, " (state1)");
+        if (s1) return s1;
+        const s2 = slotPair(ourEs.label, ourEs.state2Slots, ngEs.state2Slots, " (state2)");
+        if (s2) return s2;
+        const s3 = slotPair(ourEs.label, ourEs.state3Slots, ngEs.state3Slots, " (state3)");
+        if (s3) return s3;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Per-iteration timestep / integration-coefficient comparison. Only ag0/ag1
+   * are compared (ngspice's FFI marshals two doubles; higher ag slots are 0 on
+   * the ngspice side). `lteDt` (next-step proposal) is compared only on the
+   * final paired iteration where both sides populate it. Caller gates this to
+   * tran steps- DCOP has no active integration.
+   */
+  private _fdIntegration(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot, isFinalIter: boolean): FirstDivergenceSignal | null {
+    const num = (attr: string, o: number, n: number): FirstDivergenceSignal =>
+      ({ signalClass: "integration", stepIndex: si, iterationIndex: ii, attribute: attr, ours: o, ngspice: n, absDelta: Math.abs(o - n) });
+    if (ourIt.delta !== ngIt.delta) return num("delta", ourIt.delta, ngIt.delta);
+    if (ourIt.order !== ngIt.order) return num("order", ourIt.order, ngIt.order);
+    if (ourIt.method !== ngIt.method) return { signalClass: "integration", stepIndex: si, iterationIndex: ii, attribute: "method", ours: ourIt.method, ngspice: ngIt.method, absDelta: 1 };
+    if (ourIt.ag[0] !== ngIt.ag[0]) return num("ag0", ourIt.ag[0], ngIt.ag[0]);
+    if (ourIt.ag[1] !== ngIt.ag[1]) return num("ag1", ourIt.ag[1], ngIt.ag[1]);
+    if (isFinalIter && ourIt.lteDt !== undefined && ngIt.lteDt !== undefined && ourIt.lteDt !== ngIt.lteDt) return num("lteDt", ourIt.lteDt, ngIt.lteDt);
+    return null;
+  }
+
+  /**
+   * Junction-limiting comparison. Events are paired by (label, junction)- the
+   * ngspice bridge already maps each raw `deviceName` onto `LimitingEvent.label`
+   * (ngspice-bridge.ts), so both sides expose the same typed shape. Only matched
+   * events are compared- an event present on one side only is not flagged here
+   * (its downstream effect on the stamp surfaces in rhs/matrix/voltage), which
+   * keeps this class free of capture-shape false positives.
+   */
+  private _fdLimiting(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot): FirstDivergenceSignal | null {
+    const ngEvents = ngIt.limitingEvents ?? [];
+    for (const oe of ourIt.limitingEvents ?? []) {
+      const oLabel = oe.label.toUpperCase();
+      const ne = ngEvents.find(e => e.label.toUpperCase() === oLabel && e.junction === oe.junction);
+      if (!ne) continue;
+      if (oe.wasLimited !== ne.wasLimited) {
+        return { signalClass: "limiting", stepIndex: si, iterationIndex: ii, attribute: `${oe.label}:${oe.junction}.wasLimited`, ours: oe.wasLimited ? 1 : 0, ngspice: ne.wasLimited ? 1 : 0, absDelta: 1 };
+      }
+      if (oe.vAfter !== ne.vAfter) {
+        return { signalClass: "limiting", stepIndex: si, iterationIndex: ii, attribute: `${oe.label}:${oe.junction}.vAfter`, ours: oe.vAfter, ngspice: ne.vAfter, absDelta: Math.abs(oe.vAfter - ne.vAfter) };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Per-element convergence-flag disagreement (NR blame). Only elements matched
+   * on both sides are compared. When the iterate values match bit-exact this
+   * isolates a convergence-predicate difference; when they do not, a value
+   * class fires at a lower causal rank and this is reported as the additional
+   * (downstream) axis rather than `earliest`.
+   */
+  private _fdConvergence(si: number, ii: number, ourIt: IterationSnapshot, ngIt: IterationSnapshot): FirstDivergenceSignal | null {
+    const ourFailed = new Set((ourIt.convergenceFailedElements ?? []).map(d => d.toUpperCase()));
+    const ngFailed = new Set((ngIt.ngspiceConvergenceFailedDevices ?? []).map(d => d.toUpperCase()));
+    for (const ourEs of ourIt.elementStates) {
+      const ngEs = ngIt.elementStates.find(e => e.label.toUpperCase() === ourEs.label.toUpperCase());
+      if (!ngEs) continue;
+      const ourConv = !ourFailed.has(ourEs.label.toUpperCase());
+      const ngConv = !ngFailed.has(ngEs.label.toUpperCase());
+      if (ourConv !== ngConv) {
+        return { signalClass: "convergence", stepIndex: si, iterationIndex: ii, attribute: ourEs.label, ours: ourConv ? "converged" : "failed", ngspice: ngConv ? "converged" : "failed", absDelta: 1 };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Structural / algorithmic-phase divergence, reported at iterationIndex 0.
+   * Step-level: attempt count, accepted-attempt index, accepted-attempt phase.
+   * Phase-desync at the accepted attempt's first iteration: matrixSize, NR mode
+   * (cktMode), gmin-stepping factor, source-stepping factor- a mismatch means
+   * the two engines are in different NR sub-phases and every per-cell compare
+   * downstream would be apples-to-oranges.
+   */
+  private _fdShape(si: number, ourStep: StepSnapshot, ngStep: StepSnapshot, ourIt0: IterationSnapshot | null, ngIt0: IterationSnapshot | null): FirstDivergenceSignal | null {
+    const sig = (attr: string, o: number | string, n: number | string, d: number): FirstDivergenceSignal =>
+      ({ signalClass: "shape", stepIndex: si, iterationIndex: 0, attribute: attr, ours: o, ngspice: n, absDelta: d });
+    if (ourStep.attempts.length !== ngStep.attempts.length) {
+      return sig("attemptCount", ourStep.attempts.length, ngStep.attempts.length, Math.abs(ourStep.attempts.length - ngStep.attempts.length));
+    }
+    const ourAcc = ourStep.acceptedAttemptIndex;
+    const ngAcc = ngStep.acceptedAttemptIndex;
+    if (ourAcc !== ngAcc) return sig("acceptedAttemptIndex", ourAcc, ngAcc, Math.abs(ourAcc - ngAcc));
+    const ourPhase = ourStep.attempts[Math.max(0, ourAcc)]?.phase ?? "(none)";
+    const ngPhase = ngStep.attempts[Math.max(0, ngAcc)]?.phase ?? "(none)";
+    if (ourPhase !== ngPhase) return sig("acceptedPhase", ourPhase, ngPhase, 1);
+    if (ourIt0 && ngIt0) {
+      if (ourIt0.matrixSize !== ngIt0.matrixSize) return sig("matrixSize", ourIt0.matrixSize, ngIt0.matrixSize, Math.abs(ourIt0.matrixSize - ngIt0.matrixSize));
+      if (ourIt0.initMode !== ngIt0.initMode) return sig("initMode", ourIt0.initMode, ngIt0.initMode, 1);
+      if (ourIt0.diagGmin !== ngIt0.diagGmin) return sig("diagGmin", ourIt0.diagGmin, ngIt0.diagGmin, Math.abs(ourIt0.diagGmin - ngIt0.diagGmin));
+      if (ourIt0.srcFact !== ngIt0.srcFact) return sig("srcFact", ourIt0.srcFact, ngIt0.srcFact, Math.abs(ourIt0.srcFact - ngIt0.srcFact));
+    }
+    return null;
+  }
+
   /**
    * Walk paired iterations in chronological order and return the first
-   * divergence in each of four signal classes:
-   *  - voltage: any node-voltage cell at iteration end differs;
-   *  - matrix: any (row, col) Jacobian cell differs (presence or value);
-   *  - state: any element-state slot differs;
-   *  - shape: per-step attempt count or accepted-attempt phase differs.
+   * divergence in each signal class:
+   *  - shape:       structural / phase divergence (attempt count, accepted
+   *                 phase, NR mode, matrixSize, gmin/source-stepping);
+   *  - integration: timestep / integration coefficients (delta, order, method,
+   *                 ag0, ag1, lteDt)- tran steps only;
+   *  - state:       any element-state slot, at any vintage (state0 + state1/2/3);
+   *  - limiting:    a junction-limiting event (applied flag or post-limit V);
+   *  - rhs:         any preSolveRhs cell (companion-current / excitation vector);
+   *  - matrix:      any (row, col) Jacobian cell (presence or value);
+   *  - voltage:     any post-solve node-voltage cell;
+   *  - convergence: a matched element's converged-flag disagreement.
    *
-   * `earliest` picks the lowest `(stepIndex, iterationIndex)` across all four.
-   * Agents start here to choose which axis to drill into before calling
-   * `harness_get_attempt` for a specific slice.
+   * `earliest` picks the lowest `(stepIndex, iterationIndex)`; ties are broken
+   * by causal upstream-ness (CAUSAL_RANK) so the router points at the cause, not
+   * a downstream symptom- a divergent rhs over an identical matrix shows up as a
+   * divergent post-solve voltage at the SAME iteration, and voltage must lose
+   * that tie to rhs. Agents start here to choose which axis to drill into before
+   * calling `harness_get_attempt`; the pre-solve guess, residual, and
+   * pinCurrents are reachable there per-side (they are functions of the classes
+   * above).
    */
   firstDivergence(): FirstDivergenceReport {
     this._ensureRun();
@@ -4185,179 +4494,59 @@ export class ComparisonSession {
     const ngSess = this._ngSessionAligned();
 
     let voltage: FirstDivergenceSignal | null = null;
+    let rhs: FirstDivergenceSignal | null = null;
     let matrix: FirstDivergenceSignal | null = null;
     let state: FirstDivergenceSignal | null = null;
+    let integration: FirstDivergenceSignal | null = null;
+    let limiting: FirstDivergenceSignal | null = null;
+    let convergence: FirstDivergenceSignal | null = null;
     let shape: FirstDivergenceSignal | null = null;
 
     if (ourSess && ngSess) {
       const stepCount = Math.min(ourSess.steps.length, ngSess.steps.length);
       const identityMode = this._opts.selfCompare || this._ngMatrixRowMap.size === 0;
+      const allFound = (): boolean =>
+        !!(voltage && rhs && matrix && state && integration && limiting && convergence && shape);
 
       for (let si = 0; si < stepCount; si++) {
-        if (voltage && matrix && state && shape) break;
-
+        if (allFound()) break;
         const ourStep = ourSess.steps[si]!;
         const ngStep = ngSess.steps[si]!;
-
-        if (!shape) {
-          if (ourStep.attempts.length !== ngStep.attempts.length) {
-            shape = {
-              signalClass: "shape",
-              stepIndex: si, iterationIndex: 0,
-              attribute: "attemptCount",
-              ours: ourStep.attempts.length, ngspice: ngStep.attempts.length,
-              absDelta: Math.abs(ourStep.attempts.length - ngStep.attempts.length),
-            };
-          } else {
-            const ourAcc = ourStep.acceptedAttemptIndex;
-            const ngAcc = ngStep.acceptedAttemptIndex;
-            if (ourAcc !== ngAcc) {
-              shape = {
-                signalClass: "shape",
-                stepIndex: si, iterationIndex: 0,
-                attribute: "acceptedAttemptIndex",
-                ours: ourAcc, ngspice: ngAcc,
-                absDelta: Math.abs(ourAcc - ngAcc),
-              };
-            } else {
-              const ourPhase = ourStep.attempts[Math.max(0, ourAcc)]?.phase ?? "(none)";
-              const ngPhase = ngStep.attempts[Math.max(0, ngAcc)]?.phase ?? "(none)";
-              if (ourPhase !== ngPhase) {
-                shape = {
-                  signalClass: "shape",
-                  stepIndex: si, iterationIndex: 0,
-                  attribute: "acceptedPhase",
-                  ours: ourPhase, ngspice: ngPhase,
-                  absDelta: 1,
-                };
-              }
-            }
-          }
-        }
 
         const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : 0;
         const ngAccIdx = ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : 0;
         const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
         const ngIters = ngStep.attempts[ngAccIdx]?.iterations ?? ngStep.iterations;
         const iterCount = Math.min(ourIters.length, ngIters.length);
+        const isTran = ourStep.analysisPhase !== "dcop" && ngStep.analysisPhase !== "dcop";
+
+        if (!shape) shape = this._fdShape(si, ourStep, ngStep, ourIters[0] ?? null, ngIters[0] ?? null);
 
         for (let ii = 0; ii < iterCount; ii++) {
-          if (voltage && matrix && state) break;
+          if (voltage && rhs && matrix && state && integration && limiting && convergence) break;
           const ourIt = ourIters[ii]!;
           const ngIt = ngIters[ii]!;
+          const isFinalIter = ii === iterCount - 1;
 
-          if (!voltage) {
-            const n = Math.min(ourIt.voltages.length, ngIt.voltages.length);
-            for (let nodeIdx = 1; nodeIdx < n; nodeIdx++) {
-              const ov = ourIt.voltages[nodeIdx];
-              const nv = ngIt.voltages[nodeIdx];
-              if (ov !== nv) {
-                const label = this._ourTopology.nodeLabels.get(nodeIdx)
-                  ?? this._ourTopology.matrixRowLabels.get(nodeIdx - 1)
-                  ?? `slot${nodeIdx}`;
-                voltage = {
-                  signalClass: "voltage",
-                  stepIndex: si, iterationIndex: ii,
-                  attribute: label,
-                  ours: ov, ngspice: nv,
-                  absDelta: Math.abs(ov - nv),
-                };
-                break;
-              }
-            }
-          }
-
-          if (!matrix) {
-            const ourMap = new Map<string, number>();
-            for (const e of ourIt.matrix) ourMap.set(`${e.row},${e.col}`, e.value);
-            const ngMap = new Map<string, number>();
-            for (const e of ngIt.matrix) {
-              let r = e.row, c = e.col;
-              if (!identityMode) {
-                const mr = this._ngMatrixRowMap.get(e.row);
-                const mc = this._ngMatrixColMap.get(e.col);
-                if (mr === undefined || mc === undefined) continue;
-                r = mr; c = mc;
-              }
-              ngMap.set(`${r},${c}`, e.value);
-            }
-            const labelKey = (r: number, c: number) =>
-              `(${this._ourTopology.matrixRowLabels.get(r) ?? `row${r}`},${this._ourTopology.matrixColLabels.get(c) ?? `col${c}`})`;
-            for (const [k, ov] of ourMap) {
-              const nv = ngMap.get(k);
-              if (nv === undefined || nv !== ov) {
-                const idx = k.indexOf(",");
-                const r = Number(k.slice(0, idx));
-                const c = Number(k.slice(idx + 1));
-                matrix = {
-                  signalClass: "matrix",
-                  stepIndex: si, iterationIndex: ii,
-                  attribute: labelKey(r, c),
-                  ours: ov,
-                  ngspice: nv ?? "(missing)",
-                  absDelta: nv !== undefined ? Math.abs(ov - nv) : Infinity,
-                };
-                break;
-              }
-            }
-            if (!matrix) {
-              for (const [k, nv] of ngMap) {
-                if (!ourMap.has(k)) {
-                  const idx = k.indexOf(",");
-                  const r = Number(k.slice(0, idx));
-                  const c = Number(k.slice(idx + 1));
-                  matrix = {
-                    signalClass: "matrix",
-                    stepIndex: si, iterationIndex: ii,
-                    attribute: labelKey(r, c),
-                    ours: "(missing)",
-                    ngspice: nv,
-                    absDelta: Infinity,
-                  };
-                  break;
-                }
-              }
-            }
-          }
-
-          if (!state) {
-            for (const ourEs of ourIt.elementStates) {
-              const ngEs = ngIt.elementStates.find(
-                e => e.label.toUpperCase() === ourEs.label.toUpperCase(),
-              );
-              if (!ngEs) continue;
-              for (const [slot, value] of Object.entries(ourEs.slots)) {
-                const ngValue = ngEs.slots[slot];
-                if (ngValue === undefined) continue;
-                if (value !== ngValue) {
-                  state = {
-                    signalClass: "state",
-                    stepIndex: si, iterationIndex: ii,
-                    attribute: `${ourEs.label}.${slot}`,
-                    ours: value, ngspice: ngValue,
-                    absDelta: Math.abs(value - ngValue),
-                  };
-                  break;
-                }
-              }
-              if (state) break;
-            }
-          }
+          // Probe upstream-to-downstream so a class that short-circuits does not
+          // mask the cheaper upstream checks; `earliest` re-derives causal order.
+          if (!integration && isTran) integration = this._fdIntegration(si, ii, ourIt, ngIt, isFinalIter);
+          if (!state) state = this._fdState(si, ii, ourIt, ngIt, isTran);
+          if (!limiting) limiting = this._fdLimiting(si, ii, ourIt, ngIt);
+          if (!rhs) rhs = this._fdRhs(si, ii, ourIt, ngIt);
+          if (!matrix) matrix = this._fdMatrix(si, ii, ourIt, ngIt, identityMode);
+          if (!voltage) voltage = this._fdVoltage(si, ii, ourIt, ngIt);
+          if (!convergence) convergence = this._fdConvergence(si, ii, ourIt, ngIt);
         }
       }
     }
 
-    const all = [voltage, matrix, state, shape].filter(
+    const all = [voltage, rhs, matrix, state, integration, limiting, convergence, shape].filter(
       (x): x is FirstDivergenceSignal => x !== null,
     );
-    const earliest = all.length === 0
-      ? null
-      : all.reduce((best, cur) =>
-          cur.stepIndex < best.stepIndex
-          || (cur.stepIndex === best.stepIndex && cur.iterationIndex < best.iterationIndex)
-            ? cur : best);
+    const earliest = pickEarliestDivergence(all);
 
-    return { voltage, matrix, state, shape, earliest };
+    return { voltage, rhs, matrix, state, integration, limiting, convergence, shape, earliest };
   }
 }
 

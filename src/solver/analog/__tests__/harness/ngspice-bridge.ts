@@ -41,6 +41,7 @@ import type { IntegrationMethod } from "../../integration.js";
 import type { LimitingEvent } from "../../newton-raphson.js";
 import { bitsToName } from "../../ckt-mode.js";
 import { DEVICE_MAPPINGS, projectPinCurrents } from "./device-mappings.js";
+import { assertNgspiceDllHasAc } from "./ngspice-dll-path.js";
 
 // ---------------------------------------------------------------------------
 // CKTmode constants (from ref/ngspice/src/include/ngspice/cktdefs.h:166-182)
@@ -633,6 +634,11 @@ export class NgspiceBridge {
   }
 
   async init(): Promise<void> {
+    // Fail loudly with an actionable message if the resolved DLL is stale
+    // (missing the AC-capture export ni_ac_register, niiter.c:334) before the
+    // opaque koffi.func throw deep in callback registration below.
+    await assertNgspiceDllHasAc(this._dllPath);
+
     const koffiModule = await import("koffi");
     const koffi = (koffiModule as any).default ?? koffiModule;
     this._lib = koffi.load(this._dllPath);

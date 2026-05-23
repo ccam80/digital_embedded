@@ -115,11 +115,17 @@ export abstract class AnalogElement {
     lteParams: LteParams,
   ): number;
 
-  /** Stamp frequency-domain small-signal model for AC analysis. Matches ngspice ACload. */
+  /** Stamp frequency-domain small-signal model for AC analysis. Matches ngspice ACload.
+   *  `rhsRe` / `rhsIm` are 1-based (slot 0 = ground sentinel), parallel to ngspice's
+   *  CKTrhs / CKTirhs (vsrcacld.c:179-180, isrcacld.c:43-50). V and I sources
+   *  stamp their `AC <mag> [<phase>]` contributions directly into these arrays
+   *  during `stampAc`; passive devices leave them alone. */
   stampAc?(
     solver: SparseSolverStamp,
     omega: number,
     ctx: LoadContext,
+    rhsRe: Float64Array,
+    rhsIm: Float64Array,
   ): void;
 
   /** Return the next breakpoint strictly after `afterTime`, or null if exhausted. */

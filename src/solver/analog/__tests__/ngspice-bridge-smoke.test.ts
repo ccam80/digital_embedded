@@ -1,13 +1,12 @@
 /**
  * Smoke test for the ngspice FFI bridge.
- * Requires NGSPICE_DLL_PATH env var pointing to instrumented spice.dll.
+ * Resolves the instrumented ngspice DLL via resolveNgspiceDllPath().
  */
 import { describe, it } from 'vitest';
 import { NgspiceBridge } from './harness/ngspice-bridge.js';
-import { resolve } from 'path';
+import { resolveNgspiceDllPath } from './harness/ngspice-dll-path.js';
 
-const DLL_PATH = process.env.NGSPICE_DLL_PATH
-  ?? resolve(__dirname, '../../../../ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll');
+const DLL_PATH = resolveNgspiceDllPath();
 
 describe('ngspice bridge smoke test', () => {
   it('loads DLL and runs voltage divider DC OP', async () => {

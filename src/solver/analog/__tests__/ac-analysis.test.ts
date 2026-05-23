@@ -1,264 +1,159 @@
 /**
- * AC Analysis Engine tests.
+ * AC analysis tests.
  *
- * Tests use inline AnalogElement implementations with stampAc methods, run
- * through the unified SparseSolver in complex mode (the same factor/solve
- * path as DC and transient). The test circuit is a simple RC lowpass filter:
+ * Tier 1 (`buildFixture` from a `.dts` fixture): every circuit is the real
+ * production topology authored via the circuit MCP tools and read from disk-
+ * the same `.dts` source-of-truth a T3 ngspice-paired run would consume. The
+ * sweep runs through `coordinator.acAnalysis(...)`, the engine path the app
+ * and MCP use; the AC stimulus comes from each AcVoltageSource's `stampAc`
+ * (default acMagnitude 1, acPhase 0). Transfer functions are checked against
+ * their closed-form magnitude/phase, the T1 analogue of a category-2
+ * analytical DC operating point.
  *
- *   V_ac --- R --- node_out --- C --- GND
- *
- * MNA node layout (1-based; node 0 = ground = TrashCan):
- *   node 1: V_source (AC excitation node)
- *   node 2: V_out    (output measurement node)
- *
- * For the RC lowpass analysis:
- *   H(jω) = V_out / V_in = 1 / (1 + jωRC)
- *
- * The -3dB point is at f_c = 1/(2π·R·C).
+ * `buildFrequencyArray` is an exported pure function (sweep point generation)
+ * and is unit-tested directly- it constructs no engine state.
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
-import type { AcCompiledCircuit } from "../ac-analysis.js";
-import { AnalogElement } from "../element.js";
-import type { DeviceFamily } from "../ngspice-load-order.js";
-import type { LoadContext } from "../load-context.js";
-import { SparseSolver, type SparseSolverStamp } from "../sparse-solver.js";
+import { describe, it, expect } from "vitest";
+import * as path from "path";
+import { buildFixture } from "./fixtures/build-fixture.js";
+import { buildFrequencyArray } from "../ac-analysis.js";
 
-// ---------------------------------------------------------------------------
-// Inline test element helpers
-//
-// All addressing is 1-based with node 0 = ground = TrashCan (ngspice-faithful,
-// identical to the DC/transient solver). allocElement(0, x) returns the
-// TrashCan handle 0; stamping there is discarded- exactly the MNA treatment
-// of the ground row/column, so no per-node ground guards are needed.
-// ---------------------------------------------------------------------------
+const FIXTURES = "src/solver/analog/__tests__/ngspice-parity/fixtures";
+// RC lowpass: V1(ac 1) -> R1=1k -> OUT -> C1=1uF -> GND. Junction = R1:neg.
+const DTS_RC_LOWPASS = path.resolve(FIXTURES, "rc-lowpass-ac.dts");
+// Series RLC: V1(ac 1) -> L1=1mH -> C1=1uF -> R1=100 -> GND. Output = R1:pos.
+const DTS_RLC_BANDPASS = path.resolve(FIXTURES, "rlc-bandpass-ac.dts");
+// Divider lowpass: V1(ac 1) -> R1=9k -> OUT -> {R2=1k, C1=1uF} -> GND. Out = R1:neg.
+const DTS_DIVIDER_LOWPASS = path.resolve(FIXTURES, "divider-lowpass-ac.dts");
 
-/** Resistor: real conductance G = 1/R at (A,A),(B,B) and -G at (A,B),(B,A). */
-function makeAcResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class AcResistor extends AnalogElement {
-    readonly ngspiceLoadOrder = 0;
-    readonly deviceFamily: DeviceFamily = "RES";
-    setup(_ctx: import("../setup-context.js").SetupContext): void {}
-    load(_ctx: LoadContext): void {}
-    setParam(_key: string, _value: number): void {}
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
-    stampAc(solver: SparseSolverStamp, _omega: number, _ctx: LoadContext): void {
-      solver.stampElement(solver.allocElement(nodeA, nodeA),  G);
-      solver.stampElement(solver.allocElement(nodeB, nodeB),  G);
-      solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
-      solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
-    }
+function findClosestIndex(arr: Float64Array, target: number): number {
+  let bestIdx = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const d = Math.abs(arr[i] - target);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
   }
-  return new AcResistor(pinNodes);
-}
-
-/** Capacitor: imaginary admittance jωC at the same four positions. */
-function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): AnalogElement {
-  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class AcCapacitor extends AnalogElement {
-    readonly ngspiceLoadOrder = 0;
-    readonly deviceFamily: DeviceFamily = "CAP";
-    setup(_ctx: import("../setup-context.js").SetupContext): void {}
-    load(_ctx: LoadContext): void {}
-    setParam(_key: string, _value: number): void {}
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
-    stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
-      const wC = omega * capacitance;
-      solver.stampElementImag(solver.allocElement(nodeA, nodeA),  wC);
-      solver.stampElementImag(solver.allocElement(nodeB, nodeB),  wC);
-      solver.stampElementImag(solver.allocElement(nodeA, nodeB), -wC);
-      solver.stampElementImag(solver.allocElement(nodeB, nodeA), -wC);
-    }
-  }
-  return new AcCapacitor(pinNodes);
-}
-
-/** Inductor (test nodal model): admittance 1/(jωL) = -j/(ωL). */
-function makeAcInductor(nodeA: number, nodeB: number, inductance: number): AnalogElement {
-  const pinNodes = new Map([["pos", nodeA], ["neg", nodeB]]);
-  class AcInductor extends AnalogElement {
-    readonly ngspiceLoadOrder = 0;
-    readonly deviceFamily: DeviceFamily = "IND";
-    setup(_ctx: import("../setup-context.js").SetupContext): void {}
-    load(_ctx: LoadContext): void {}
-    setParam(_key: string, _value: number): void {}
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; }
-    stampAc(solver: SparseSolverStamp, omega: number, _ctx: LoadContext): void {
-      const admIm = -1 / (omega * inductance);
-      solver.stampElementImag(solver.allocElement(nodeA, nodeA),  admIm);
-      solver.stampElementImag(solver.allocElement(nodeB, nodeB),  admIm);
-      solver.stampElementImag(solver.allocElement(nodeA, nodeB), -admIm);
-      solver.stampElementImag(solver.allocElement(nodeB, nodeA), -admIm);
-    }
-  }
-  return new AcInductor(pinNodes);
-}
-
-// ---------------------------------------------------------------------------
-// Circuit fixtures
-// ---------------------------------------------------------------------------
-
-/**
- * RC lowpass: node 1 (source) --- R --- node 2 (out) --- C --- GND.
- * matrixSize = 2 (two non-ground nodes); the AC source branch is index 3.
- */
-function makeRcLowpassCircuit(R: number, C: number): AcCompiledCircuit {
-  const labelToNodeId = new Map<string, number>([
-    ["source", 1],
-    ["out", 2],
-  ]);
-  const elements: AnalogElement[] = [
-    makeAcResistor(1, 2, R),
-    makeAcCapacitor(2, 0, C),
-  ];
-  const elementsByFamily = new Map<DeviceFamily, readonly AnalogElement[]>([
-    ["RES", [elements[0]]],
-    ["CAP", [elements[1]]],
-  ]);
-  return { nodeCount: 2, matrixSize: 2, elements, elementsByFamily, labelToNodeId };
-}
-
-/**
- * Series RLC: node1 (source) --- L --- node2 --- C --- node3 --- R --- GND.
- * Output across R at node3 → bandpass; resonance f0 = 1/(2π√(LC)).
- */
-function makeRlcSeriesCircuit(R: number, L: number, C: number): AcCompiledCircuit {
-  const labelToNodeId = new Map<string, number>([
-    ["source", 1],
-    ["out", 3],
-  ]);
-  const elements: AnalogElement[] = [
-    makeAcInductor(1, 2, L),
-    makeAcCapacitor(2, 3, C),
-    makeAcResistor(3, 0, R),
-  ];
-  const elementsByFamily = new Map<DeviceFamily, readonly AnalogElement[]>([
-    ["IND", [elements[0]]],
-    ["CAP", [elements[1]]],
-    ["RES", [elements[2]]],
-  ]);
-  return { nodeCount: 3, matrixSize: 3, elements, elementsByFamily, labelToNodeId };
+  return bestIdx;
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("AC", () => {
-  it("rc_lowpass_rolloff- -3dB point at f_c = 1/(2π·RC) ±5%", () => {
-    const R = 1000;
-    const C = 1e-6;
-    const fC = 1 / (2 * Math.PI * R * C); // ≈ 159.15 Hz
+describe("AC analysis- RC lowpass", () => {
+  const R = 1000;
+  const C = 1e-6;
+  const fC = 1 / (2 * Math.PI * R * C); // ≈ 159.15 Hz
 
-    const ac = new AcAnalysis(makeRcLowpassCircuit(R, C));
-    const result = ac.run({
-      type: "dec", numPoints: 50, fStart: 1, fStop: 100000,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
+  it("minus_3db_at_corner_frequency", () => {
+    const fix = buildFixture({ dtsPath: DTS_RC_LOWPASS });
+    const result = fix.coordinator.acAnalysis({
+      type: "dec", numPoints: 50, fStart: 1, fStop: 100000, outputNodes: ["R1:neg"],
+    })!;
+    expect(result).not.toBeNull();
 
     const freqs = result.frequencies;
-    const mag = result.magnitude.get("out")!;
-
+    const mag = result.magnitude.get("R1:neg")!;
     let minDiff = Infinity;
     let actualF3db = 0;
     for (let i = 0; i < freqs.length; i++) {
       const diff = Math.abs(mag[i] - (-3.01));
       if (diff < minDiff) { minDiff = diff; actualF3db = freqs[i]; }
     }
-
     expect(actualF3db).toBeGreaterThan(fC * 0.95);
     expect(actualF3db).toBeLessThan(fC * 1.05);
   });
 
-  it("rc_lowpass_slope- above f_c, magnitude rolls off at -20dB/decade ±2dB", () => {
-    const R = 1000;
-    const C = 1e-6;
-    const fC = 1 / (2 * Math.PI * R * C);
-
-    const ac = new AcAnalysis(makeRcLowpassCircuit(R, C));
-    const result = ac.run({
-      type: "dec", numPoints: 20, fStart: 1, fStop: 100000,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
-
+  it("rolls_off_at_minus_20db_per_decade_above_corner", () => {
+    const fix = buildFixture({ dtsPath: DTS_RC_LOWPASS });
+    const result = fix.coordinator.acAnalysis({
+      type: "dec", numPoints: 20, fStart: 1, fStop: 100000, outputNodes: ["R1:neg"],
+    })!;
     const freqs = result.frequencies;
-    const mag = result.magnitude.get("out")!;
+    const mag = result.magnitude.get("R1:neg")!;
     const idx1 = findClosestIndex(freqs, fC * 10);
     const idx2 = findClosestIndex(freqs, fC * 100);
-
     const slope = (mag[idx2] - mag[idx1]) / Math.log10(freqs[idx2] / freqs[idx1]);
     expect(slope).toBeGreaterThan(-22);
     expect(slope).toBeLessThan(-18);
   });
 
-  it("rc_lowpass_phase- at f_c, phase ≈ -45° ±5°", () => {
-    const R = 1000;
-    const C = 1e-6;
-    const fC = 1 / (2 * Math.PI * R * C);
-
-    const ac = new AcAnalysis(makeRcLowpassCircuit(R, C));
-    const result = ac.run({
-      type: "dec", numPoints: 50, fStart: 1, fStop: 100000,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
-
+  it("phase_is_minus_45_degrees_at_corner", () => {
+    const fix = buildFixture({ dtsPath: DTS_RC_LOWPASS });
+    const result = fix.coordinator.acAnalysis({
+      type: "dec", numPoints: 50, fStart: 1, fStop: 100000, outputNodes: ["R1:neg"],
+    })!;
     const idx = findClosestIndex(result.frequencies, fC);
-    const phaseAtFc = result.phase.get("out")![idx];
+    const phaseAtFc = result.phase.get("R1:neg")![idx];
     expect(phaseAtFc).toBeGreaterThan(-50);
     expect(phaseAtFc).toBeLessThan(-40);
   });
+});
 
-  it("rlc_bandpass_resonance- series RLC; peak gain at f_0 = 1/(2π·√(LC))", () => {
-    const R = 100;
+describe("AC analysis- series RLC bandpass", () => {
+  it("peaks_at_resonant_frequency", () => {
+    // L1=1mH, C1=1uF in the fixture; R1 sets bandwidth, not centre frequency.
     const L = 1e-3;
     const C = 1e-6;
     const f0 = 1 / (2 * Math.PI * Math.sqrt(L * C)); // ≈ 5033 Hz
 
-    const ac = new AcAnalysis(makeRlcSeriesCircuit(R, L, C));
-    const result = ac.run({
-      type: "dec", numPoints: 50, fStart: 100, fStop: 200000,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
-
+    const fix = buildFixture({ dtsPath: DTS_RLC_BANDPASS });
+    const result = fix.coordinator.acAnalysis({
+      type: "dec", numPoints: 50, fStart: 100, fStop: 200000, outputNodes: ["R1:pos"],
+    })!;
     const freqs = result.frequencies;
-    const mag = result.magnitude.get("out")!;
+    const mag = result.magnitude.get("R1:pos")!;
 
     let peakIdx = 0;
     let peakMag = -Infinity;
     for (let i = 0; i < freqs.length; i++) {
       if (mag[i] > peakMag) { peakMag = mag[i]; peakIdx = i; }
     }
-
     const peakFreq = freqs[peakIdx];
     expect(peakFreq).toBeGreaterThan(f0 * 0.90);
     expect(peakFreq).toBeLessThan(f0 * 1.10);
   });
+});
 
-  it("no_source_emits_diagnostic- ac-no-source diagnostic with error severity", () => {
-    const ac = new AcAnalysis(makeRcLowpassCircuit(1000, 1e-6));
-    const result = ac.run({
-      type: "dec", numPoints: 10, fStart: 1, fStop: 1000,
-      sourceLabel: "nonexistent_source",
-      outputNodes: ["out"],
-    });
+describe("AC analysis- single-pole divider", () => {
+  it("dc_gain_and_pole_match_closed_form", () => {
+    const R1 = 9000;
+    const R2 = 1000;
+    const C = 1e-6;
+    const gainDc = R2 / (R1 + R2);
+    const rParallel = (R1 * R2) / (R1 + R2);
+    const fPole = 1 / (2 * Math.PI * C * rParallel);
 
-    const diag = result.diagnostics.find(d => d.code === "ac-no-source");
-    expect(diag).toBeDefined();
-    expect(diag!.severity).toBe("error");
+    const fix = buildFixture({ dtsPath: DTS_DIVIDER_LOWPASS });
+    const result = fix.coordinator.acAnalysis({
+      type: "dec", numPoints: 30, fStart: 1, fStop: 1e6, outputNodes: ["R1:neg"],
+    })!;
+    const freqs = result.frequencies;
+    const mag = result.magnitude.get("R1:neg")!;
+    const expectedDcGainDb = 20 * Math.log10(gainDc); // ≈ -20 dB
+
+    const lowFreqIdx = findClosestIndex(freqs, 1);
+    expect(mag[lowFreqIdx]).toBeGreaterThan(expectedDcGainDb - 1);
+    expect(mag[lowFreqIdx]).toBeLessThan(expectedDcGainDb + 1);
+
+    const highFreqIdx = findClosestIndex(freqs, fPole * 10);
+    expect(mag[highFreqIdx]).toBeLessThan(expectedDcGainDb - 17);
+
+    const poleIdx = findClosestIndex(freqs, fPole);
+    const expected3dbGain = expectedDcGainDb - 3.01;
+    expect(mag[poleIdx]).toBeGreaterThan(expected3dbGain - 2);
+    expect(mag[poleIdx]).toBeLessThan(expected3dbGain + 2);
   });
+});
 
-  it("decade_sweep_points- type='dec', numPoints=10, 1Hz to 1MHz; 61 points (endpoint inclusive, ngspice-faithful)", () => {
+describe("buildFrequencyArray- sweep point generation", () => {
+  it("decade_sweep_emits_num_steps_plus_one_points", () => {
     const result = buildFrequencyArray({
-      type: "dec", numPoints: 10, fStart: 1, fStop: 1e6,
-      sourceLabel: "s", outputNodes: [],
+      type: "dec", numPoints: 10, fStart: 1, fStop: 1e6, outputNodes: [],
     });
-
-    // ngspice acan.c:89 num_steps = floor(log10(1e6/1) * 10) = 60; the sweep
-    // loop emits num_steps + 1 = 61 frequencies, with the last point at
-    // exactly fStop (modulo float rounding).
+    // num_steps = floor(log10(1e6/1) * 10) = 60; the sweep emits num_steps + 1
+    // = 61 frequencies, last point at fStop (modulo float rounding).
     expect(result.length).toBe(61);
     expect(result[0]).toBeCloseTo(1, 10);
     expect(result[result.length - 1]).toBeCloseTo(1e6, 5);
@@ -268,12 +163,10 @@ describe("AC", () => {
     expect(ratio0).toBeCloseTo(Math.pow(10, 1 / 10), 10);
   });
 
-  it("linear_sweep_points- type='lin', numPoints=100, 0 to 1kHz", () => {
+  it("linear_sweep_is_endpoint_inclusive", () => {
     const result = buildFrequencyArray({
-      type: "lin", numPoints: 100, fStart: 0, fStop: 1000,
-      sourceLabel: "s", outputNodes: [],
+      type: "lin", numPoints: 100, fStart: 0, fStop: 1000, outputNodes: [],
     });
-
     expect(result.length).toBe(100);
     expect(result[0]).toBeCloseTo(0, 10);
     expect(result[result.length - 1]).toBeCloseTo(1000, 10);
@@ -282,134 +175,4 @@ describe("AC", () => {
     expect(step0).toBeCloseTo(step1, 10);
     expect(step0).toBeCloseTo((1000 - 0) / (result.length - 1), 10);
   });
-
-  it("opamp_gain_bandwidth- single-pole divider; -3dB at the pole", () => {
-    const R1 = 9000;
-    const R2 = 1000;
-    const C = 1e-6;
-
-    const gain_dc = R2 / (R1 + R2);
-    const R_parallel = (R1 * R2) / (R1 + R2);
-    const f_pole = 1 / (2 * Math.PI * C * R_parallel);
-
-    const labelToNodeId = new Map<string, number>([
-      ["source", 1],
-      ["out", 2],
-    ]);
-    const elements: AnalogElement[] = [
-      makeAcResistor(1, 2, R1),
-      makeAcResistor(2, 0, R2),
-      makeAcCapacitor(2, 0, C),
-    ];
-    const elementsByFamily = new Map<DeviceFamily, readonly AnalogElement[]>([
-      ["RES", [elements[0], elements[1]]],
-      ["CAP", [elements[2]]],
-    ]);
-    const circuit: AcCompiledCircuit = {
-      nodeCount: 2, matrixSize: 2, elements, elementsByFamily, labelToNodeId,
-    };
-
-    const ac = new AcAnalysis(circuit);
-    const result = ac.run({
-      type: "dec", numPoints: 30, fStart: 1, fStop: 1e6,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
-
-    const freqs = result.frequencies;
-    const mag = result.magnitude.get("out")!;
-    const expectedDcGainDb = 20 * Math.log10(gain_dc); // -20 dB
-
-    const lowFreqIdx = findClosestIndex(freqs, 1);
-    expect(mag[lowFreqIdx]).toBeGreaterThan(expectedDcGainDb - 1);
-    expect(mag[lowFreqIdx]).toBeLessThan(expectedDcGainDb + 1);
-
-    const highFreqIdx = findClosestIndex(freqs, f_pole * 10);
-    expect(mag[highFreqIdx]).toBeLessThan(expectedDcGainDb - 17);
-
-    const poleIdx = findClosestIndex(freqs, f_pole);
-    const expected3dbGain = expectedDcGainDb - 3.01;
-    expect(mag[poleIdx]).toBeGreaterThan(expected3dbGain - 2);
-    expect(mag[poleIdx]).toBeLessThan(expected3dbGain + 2);
-  });
 });
-
-// ---------------------------------------------------------------------------
-// Solver-lifecycle tests- the real AcAnalysis.run() path with a spied solver
-// injected through the solver-factory dep.
-// ---------------------------------------------------------------------------
-
-describe("AC- solver lifecycle", () => {
-  it("ac_sweep_caller_reuses_branch_handles_across_frequencies", () => {
-    const circuit = makeRcLowpassCircuit(1000, 1e-6);
-    const injectedSolver = new SparseSolver();
-    const allocSpy = vi.spyOn(injectedSolver, "allocElement");
-
-    const ac = new AcAnalysis(circuit, undefined, {
-      solverFactory: () => injectedSolver,
-    });
-
-    ac.run({
-      type: "lin", numPoints: 3, fStart: 100, fStop: 10000,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
-
-    // The AC voltage-source branch cells (sourceNode↔branch, both directions)
-    // must be allocated exactly once- on fi===0- and reused from the handle
-    // cache afterwards. sourceLabel "source" → node 1; branch = matrixSize+1.
-    const sourceNodeId = 1;
-    const branchExt = circuit.matrixSize + 1; // 3
-    const branchAllocCalls = allocSpy.mock.calls.filter(
-      c => (c[0] === sourceNodeId && c[1] === branchExt) ||
-           (c[0] === branchExt && c[1] === sourceNodeId),
-    );
-    expect(branchAllocCalls.length).toBe(2);
-
-    allocSpy.mockRestore();
-  });
-
-  it("ac_sweep_single_reorder_across_frequencies", () => {
-    const circuit = makeRcLowpassCircuit(1000, 1e-6);
-    const injectedSolver = new SparseSolver();
-
-    // Record whether each factor() walked the reorder body. ngspice reuses
-    // the pivot order across AC frequencies: frequency 0 reorders
-    // (spOrderAndFactor), every later frequency reuses it (FactorComplexMatrix).
-    const reorderFlags: boolean[] = [];
-    const realFactor = injectedSolver.factor.bind(injectedSolver);
-    injectedSolver.factor = (pivTol?: number, gmin?: number) => {
-      const err = realFactor(pivTol, gmin);
-      reorderFlags.push(injectedSolver.lastFactorWalkedReorder);
-      return err;
-    };
-
-    const ac = new AcAnalysis(circuit, undefined, {
-      solverFactory: () => injectedSolver,
-    });
-
-    const numFreq = 5;
-    ac.run({
-      type: "lin", numPoints: numFreq, fStart: 100, fStop: 10000,
-      sourceLabel: "source", outputNodes: ["out"],
-    });
-
-    expect(reorderFlags.length).toBe(numFreq);
-    expect(reorderFlags[0]).toBe(true);
-    for (let fi = 1; fi < numFreq; fi++) {
-      expect(reorderFlags[fi]).toBe(false);
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function findClosestIndex(freqs: Float64Array, target: number): number {
-  let minDiff = Infinity;
-  let idx = 0;
-  for (let i = 0; i < freqs.length; i++) {
-    const diff = Math.abs(freqs[i] - target);
-    if (diff < minDiff) { minDiff = diff; idx = i; }
-  }
-  return idx;
-}

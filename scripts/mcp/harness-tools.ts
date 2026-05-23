@@ -7,6 +7,7 @@ import { z } from "zod";
 import { wrapTool } from "./tool-helpers.js";
 import { HarnessSessionState } from "./harness-session-state.js";
 import { ComparisonSession } from "../../src/solver/analog/__tests__/harness/comparison-session.js";
+import { resolveNgspiceDllPath } from "../../src/solver/analog/__tests__/harness/ngspice-dll-path.js";
 import { formatNumber, formatComparedValue, suggestComponents } from "./harness-format.js";
 import { writeFileSync } from "fs";
 import type { SessionSummary, NRPhase } from "../../src/solver/analog/__tests__/harness/types.js";
@@ -79,8 +80,8 @@ export function registerHarnessTools(
           .string()
           .optional()
           .describe(
-            "Absolute path to the ngspice shared library (spice.dll / libngspice.so). " +
-              "Defaults to NGSPICE_DLL_PATH env var, then the standard build location.",
+            "Absolute path to the ngspice shared library (ngspice.dll / libngspice.so). " +
+              "Defaults to NGSPICE_DLL_PATH env var, then the in-tree build location.",
           ),
         tolerance: z
           .object({
@@ -130,16 +131,19 @@ export function registerHarnessTools(
         throw new Error(`harness_start: file not found: ${args.dtsPath}`);
       }
 
-      // Validate dllPath if provided
-      if (args.dllPath && !existsSync(resolve(args.dllPath))) {
+      // Resolve the DLL path under the single-source precedence (explicit
+      // dllPath override → NGSPICE_DLL_PATH → in-tree default) and validate it
+      // exists, so ComparisonSession does not re-resolve a different path.
+      const dllPath = resolveNgspiceDllPath(args.dllPath);
+      if (!existsSync(dllPath)) {
         throw new Error(
-          `harness_start: ngspice DLL not found: ${args.dllPath}. Set NGSPICE_DLL_PATH or pass dllPath.`,
+          `harness_start: ngspice DLL not found: ${dllPath}. Set NGSPICE_DLL_PATH or pass dllPath.`,
         );
       }
 
       const session = new ComparisonSession({
         dtsPath: args.dtsPath,
-        dllPath: args.dllPath,
+        dllPath,
         tolerance: args.tolerance,
         maxOurSteps: args.maxOurSteps,
         // Structural-parity asserts throw inside runDcOp/runTransient, which
@@ -567,7 +571,13 @@ export function registerHarnessTools(
         "with '<component>#' or '<component>:'.\n\n" +
         "When a slice is active the response shape is " +
         "{ handle, attempt, slice: { matrixIndices, labels, fullMatrixSize } }. " +
-        "Without a slice: { handle, attempt }.",
+        "Without a slice: { handle, attempt }.\n\n" +
+        "Each paired iteration carries, per side, the quantities harness_first_divergence " +
+        "does NOT classify but that pinpoint a faulty derivation: nodeVoltagesBefore " +
+        "(pre-solve guess / predictor), residual + residualInfinityNorm (A·v-b: solve-stage " +
+        "sanity- nonzero on one side means that engine failed to solve its own system), and " +
+        "pinCurrents (terminal currents projected from state slots). Drill here after " +
+        "first_divergence points at a step/iteration.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle"),
         stepIndex: z.number().int().min(0).describe("Step index (0-based)"),
@@ -875,10 +885,19 @@ export function registerHarnessTools(
       title: "First Divergence (multi-signal)",
       description:
         "Walk paired iterations in chronological order and return the first " +
-        "divergence in each of four signal classes: " +
-        "voltage (node-voltage cell), matrix (Jacobian cell), state " +
-        "(element-state slot), shape (attempt count / accepted-attempt phase). " +
-        "Plus `earliest`: the lowest (stepIndex, iterationIndex) across all four. " +
+        "divergence in each of eight signal classes: " +
+        "shape (attempt count / accepted phase / NR mode / matrixSize / gmin- / " +
+        "source-stepping), integration (delta, order, method, ag0, ag1, lteDt; " +
+        "tran steps only), state (element-state slot at any vintage state0/1/2/3), " +
+        "limiting (junction-limiting applied flag or post-limit voltage), rhs " +
+        "(preSolveRhs companion-current / excitation cell), matrix (Jacobian " +
+        "cell), voltage (post-solve node-voltage cell), convergence (matched " +
+        "element's converged-flag disagreement). " +
+        "Plus `earliest`: the lowest (stepIndex, iterationIndex) across all eight, " +
+        "ties broken by causal upstream-ness (shape < integration < state < " +
+        "limiting < rhs < matrix < voltage < convergence) so the result points at " +
+        "the cause, not a downstream symptom- e.g. a divergent rhs over an " +
+        "identical matrix wins the tie against the voltage it produces. " +
         "Use this first to choose which axis to drill into before fetching a " +
         "full attempt via harness_get_attempt with a slice.",
       inputSchema: z.object({

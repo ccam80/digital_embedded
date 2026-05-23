@@ -5,7 +5,6 @@ import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fix
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
   describeIfDll,
-  DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import { NTC_SCHEMA, NTCThermistorElement } from "../ntc-thermistor.js";
@@ -398,7 +397,7 @@ describeIfDll("NTCThermistor paired vs ngspice - divider (T3)", () => {
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_DIVIDER, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_DIVIDER, analysis: "tran", tStop: 1e-3, maxStep: 10e-6 });
   });
 
   afterAll(async () => {
@@ -433,7 +432,7 @@ describeIfDll("NTCThermistor paired vs ngspice - self-heating transient (T3)", (
   let session: ComparisonSession;
 
   beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_SELF_HEATING, dllPath: DLL_PATH });
+    session = await ComparisonSession.createSelfCompare({ dtsPath: DTS_SELF_HEATING, analysis: "tran", tStop: 1e-3, maxStep: 10e-6 });
   });
 
   afterAll(async () => {
