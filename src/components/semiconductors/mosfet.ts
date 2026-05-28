@@ -52,22 +52,20 @@ import {
   MODEDCOP, MODEDCTRANCURVE,
 } from "../../solver/analog/ckt-mode.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
+import {
+  CONSTboltz,
+  CHARGE as Q,
+  CONSTKoverQ as KoverQ,
+  REFTEMP,
+} from "../../core/constants.js";
 
 // Compile error if LoadContext is missing bypass or voltTol.
 export type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
 
 // ---------------------------------------------------------------------------
-// Physical constants (ngspice const.h / defines.h values)
+// Physical constants (ngspice defines.h values)
 // ---------------------------------------------------------------------------
 
-/** Boltzmann constant (CONSTboltz). */
-const CONSTboltz = 1.3806226e-23;
-/** Elementary charge (CHARGE). */
-const Q = 1.6021918e-19;
-/** k/q (CONSTKoverQ). */
-const KoverQ = CONSTboltz / Q;
-/** Reference temperature (REFTEMP). */
-const REFTEMP = 300.15;
 /** Exponential-argument ceiling (defines.h:35 MAX_EXP_ARG). */
 const MAX_EXP_ARG = 709.0;
 
@@ -848,7 +846,7 @@ function _createMosfetElementWithPolarity(
     // for TEMP. When false, instance temp = ckt->CKTtemp.
     private _tempGiven = props.isModelParamGiven("TEMP");
     // Last TempContext received from engine; used by setParam("TEMP") hot-load path.
-    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM };
+    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM, _indVerbosity: 2 };
 
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);

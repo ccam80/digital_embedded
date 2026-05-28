@@ -49,14 +49,17 @@ import {
   MODETRAN, MODEAC, MODETRANOP, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
 
+import {
+  CONSTboltz,
+  CHARGE,
+  CONSTKoverQ,
+  REFTEMP,
+} from "../../core/constants.js";
+
 // ---------------------------------------------------------------------------
-// Physical constants (ngspice const.h values)
+// Physical constants
 // ---------------------------------------------------------------------------
 
-const CONSTboltz = 1.3806226e-23;
-const CHARGE = 1.6021918e-19;
-const CONSTKoverQ = CONSTboltz / CHARGE;
-const REFTEMP = 300.15;
 const CONSTroot2 = Math.SQRT2;
 
 // ---------------------------------------------------------------------------

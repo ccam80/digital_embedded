@@ -22,6 +22,7 @@ import type { IntegrationMethod } from "./integration.js";
 import { MODEDCOP, MODEINITFLOAT, MODEUIC } from "./ckt-mode.js";
 import type { TempContext } from "./temp-context.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
+import { REFTEMP, VT } from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // LoadCtxImpl- concrete LoadContext with live state-ring access
@@ -324,6 +325,16 @@ export class CKTCircuitContext {
    */
   cktNomTemp: number = 300.15;
 
+  /**
+   * ngspice CKTindverbosity (cktdefs.h:111). Integer diagnostic gate for the
+   * MUTtemp inductive-system Cholesky-verify pass: 0 disables it, 1 enables
+   * the positive-definite / duplicate-K checks, 2 additionally enables the
+   * incomplete-K coupling-set check.
+   * cite: cktdefs.h:111 — int CKTindverbosity; control check of inductive couplings
+   * cite: cktinit.c:65   — sckt->CKTindverbosity = 2;
+   */
+  cktIndVerbosity: number = 2;
+
   /** Cached TempContext instance. Null until first access of `tempCtx`. */
   private _tempCtx: TempContext | null = null;
 
@@ -337,7 +348,12 @@ export class CKTCircuitContext {
    */
   get tempCtx(): TempContext {
     if (this._tempCtx === null) {
-      this._tempCtx = { cktTemp: this.cktTemp, cktNomTemp: this.cktNomTemp };
+      this._tempCtx = {
+        cktTemp: this.cktTemp,
+        cktNomTemp: this.cktNomTemp,
+        _indVerbosity: this.cktIndVerbosity,
+        diagnostics: this.diagnostics,
+      };
     }
     return this._tempCtx;
   }
@@ -699,10 +715,10 @@ export class CKTCircuitContext {
 
     // Load context- pre-allocated once, mutated in place each NR iteration
     const nonconRef = { value: 0 };
-    // CKTtemp default (300.15 K = REFTEMP) matches ngspice CONSTreftemp.
-    const ctxTemp = 300.15;
-    // vt = k*T/q where k=1.380649e-23, q=1.602176634e-19
-    const ctxVt = (1.380649e-23 * ctxTemp) / 1.602176634e-19;
+    // CKTtemp default (REFTEMP = 300.15 K) per ckttemp.c:26 which then sets
+    // CKTvt = CONSTKoverQ * CKTtemp; at REFTEMP that product is VT.
+    const ctxTemp = REFTEMP;
+    const ctxVt = VT;
     // LoadCtxImpl gets a placeholder empty StatePool here; the real pool is
     // bound in allocateStateBuffers via setStatePool(). The state0..state3
     // getters resolve through whichever pool is currently bound, so post-
@@ -759,6 +775,13 @@ export class CKTCircuitContext {
     this.maxIterations = params.maxIterations;
     this.transientMaxIterations = params.transientMaxIterations;
     this.dcTrcvMaxIter = params.dcTrcvMaxIter;
+
+    // cite: cktinit.c:65 — sckt->CKTindverbosity = 2. The user-settable
+    // SimulationParams.indVerbosity overrides the field default; when omitted,
+    // the ngspice-faithful default of 2 stands (DEFAULT_SIMULATION_PARAMS).
+    if (params.indVerbosity !== undefined) {
+      this.cktIndVerbosity = params.indVerbosity;
+    }
 
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;
@@ -871,6 +894,14 @@ export class CKTCircuitContext {
     this.maxIterations = params.maxIterations;
     this.transientMaxIterations = params.transientMaxIterations;
     this.dcTrcvMaxIter = params.dcTrcvMaxIter;
+
+    // cite: cktinit.c:65 — CKTindverbosity. Re-read on configure() so the
+    // diagnostic gate is hot-loadable (Decision (i)). Invalidate the cached
+    // TempContext below so the next verify pass observes the new value.
+    if (params.indVerbosity !== undefined) {
+      this.cktIndVerbosity = params.indVerbosity;
+    }
+    this.resetTempCtx();
 
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;

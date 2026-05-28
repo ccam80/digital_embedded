@@ -45,6 +45,10 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   PnpBJT:          { prefix: "Q", modelType: "PNP" },
   NMOS:            { prefix: "M", modelType: "NMOS" },
   PMOS:            { prefix: "M", modelType: "PMOS" },
+  // VDMOS: ngspice `M<name> nd ng ns <model>` with `.model <name> VDMOS(...)`.
+  // The N/P-ness is a model-card flag (nchan/pchan), not a separate model type.
+  VDMOSN:          { prefix: "M", modelType: "VDMOS" },
+  VDMOSP:          { prefix: "M", modelType: "VDMOS" },
   NJFET:           { prefix: "J", modelType: "NJF" },
   PJFET:           { prefix: "J", modelType: "PJF" },
   VCVS:            { prefix: "E" },
@@ -247,6 +251,7 @@ export function generateSpiceNetlist(
   registry: ComponentRegistry,
   elementLabels: Map<number, string>,
   title?: string,
+  nodesets?: ReadonlyMap<number, number>,
 ): string {
   const lines: string[] = [];
 
@@ -320,6 +325,29 @@ export function generateSpiceNetlist(
   // Emit model cards
   for (const card of modelCards.values()) {
     lines.push(card);
+  }
+
+  // Emit the .nodeset card (ngspice-only DC operating-point GUESS). Each listed
+  // node is clamped to its value with a 1e10 conductance during the
+  // MODEINITJCT / MODEINITFIX passes and RELEASED before the final
+  // MODEINITFLOAT solve (cktload.c:107-120: nsGiven nodes get
+  // CKTrhs[number] = 1e10 * nodeset * CKTsrcFact and *(node->ptr) = 1e10). On a
+  // circuit with more than one stable DC operating point the guess steers the
+  // solver into one state. The deck emits stringified digiTS node IDs as node
+  // names, so V(<id>) targets the same node digiTS allocated. Node 0 is ground;
+  // a nodeset on ground is meaningless and rejected.
+  if (nodesets && nodesets.size > 0) {
+    const parts: string[] = [];
+    for (const [nodeId, value] of nodesets) {
+      if (nodeId === 0) {
+        throw new Error(
+          `netlist-generator: .nodeset on node 0 (ground) is meaningless; ` +
+          `ground is fixed at 0 V. Remove the ground entry from the nodesets map.`
+        );
+      }
+      parts.push(`V(${nodeId})=${value}`);
+    }
+    lines.push(`.nodeset ${parts.join(" ")}`);
   }
 
   lines.push(".end");
@@ -582,6 +610,29 @@ function emitPrimitive(
     const line = `${label} ${nodeAt(nodes, 1, rawLabel, "C")} ${nodeAt(nodes, 0, rawLabel, "B")} ${nodeAt(nodes, 2, rawLabel, "E")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+    }
+    return [line];
+  }
+  if (spec.prefix === "M" && (typeId === "VDMOSN" || typeId === "VDMOSP")) {
+    // ngspice VDMOS instance line: `M<name> nd ng ns <model>` (3 external
+    // nodes; the body diode and prime nodes are internal). The model card is
+    // `.model <name> VDMOS (nchan|pchan ...)` (vdmosmpar.c VDMOS_MOD_NMOS/PMOS).
+    //
+    // The model NAME must NOT contain the substring "vdmos" (any case). The
+    // LTspice-VDMOS preprocessor `inp_vdmos_model` (inpcom.c:7947-7992) locates
+    // VDMOS `.model` cards with a naive `strstr(line, "vdmos")` and cuts at the
+    // FIRST occurrence (inpcom.c:7971-7972): a name like `m1_vdmos` would make
+    // it cut inside the model NAME instead of at the `VDMOS` type keyword,
+    // corrupting the rewritten card. Using `${label}MOD` keeps the only
+    // "vdmos" occurrence at the legitimate `.model <name> VDMOS (...)` type word,
+    // so the preprocessor latches onto the type keyword and emits `vdmosn (`.
+    const modelName = `${label}MOD`;
+    const d = nodeAt(nodes, 2, rawLabel, "D");
+    const g = nodeAt(nodes, 0, rawLabel, "G");
+    const s = nodeAt(nodes, 1, rawLabel, "S");
+    const line = `${label} ${d} ${g} ${s} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, vdmosModelCard(modelName, typeId === "VDMOSN", paramDefs, props));
     }
     return [line];
   }
@@ -939,6 +990,55 @@ function modelCardSuffix(
 
   if (parts.length === 0) return `.model ${modelName} ${spiceModelType}`;
   return `.model ${modelName} ${spiceModelType} (${parts.join(" ")})`;
+}
+
+// ---------------------------------------------------------------------------
+// VDMOS model card — maps the uppercase digiTS param keys to the lowercase
+// ngspice VDMOS model-card parameter names (vdmos.c VDMOSmPTable) and emits the
+// nchan/pchan device-type flag (vdmosmpar.c VDMOS_MOD_NMOS/VDMOS_MOD_PMOS).
+// ---------------------------------------------------------------------------
+
+const VDMOS_PARAM_SPICE_NAMES: Record<string, string> = {
+  VTH: "vto", KP: "kp", LAMBDA: "lambda", PHI: "phi", THETA: "theta",
+  RD: "rd", RS: "rs", RG: "rg", TNOM: "tnom", KF: "kf", AF: "af",
+  RQ: "rq", VQ: "vq", MTRIODE: "mtriode",
+  TCVTH: "tcvth", MU: "mu", TEXP0: "texp0", TEXP1: "texp1",
+  TRD1: "trd1", TRD2: "trd2", TRG1: "trg1", TRG2: "trg2", TRS1: "trs1", TRS2: "trs2",
+  SUBSHIFT: "subshift", KSUBTHRES: "ksubthres",
+  TKSUBTHRES1: "tksubthres1", TKSUBTHRES2: "tksubthres2",
+  BV: "bv", IBV: "ibv", NBV: "nbv", RDS: "rds", RB: "rb", N: "n", TT: "tt",
+  EG: "eg", XTI: "xti", IS: "is", VJ: "vj", TRB1: "trb1", TRB2: "trb2",
+  // Body-diode grading coefficient: ngspice names this model-card param `m`
+  // (vdmos.c:121 `IOP("m", VDIO_MOD_MJ, ...)`), NOT `mj`. Emitting `mj=…`
+  // is an unrecognized param and ngspice rejects it.
+  CJO: "cjo", MJ: "m", FC: "fc",
+  CGDMIN: "cgdmin", CGDMAX: "cgdmax", A: "a", CGS: "cgs",
+  RTHJC: "rthjc", RTHCA: "rthca", CTHJ: "cthj",
+  VGS_MAX: "vgs_max", VGD_MAX: "vgd_max", VDS_MAX: "vds_max",
+  VGSR_MAX: "vgsr_max", VGDR_MAX: "vgdr_max", PD_MAX: "pd_max",
+  ID_MAX: "id_max", IDR_MAX: "idr_max", TE_MAX: "te_max",
+  RTH_EXT: "rth_ext", DERATING: "derating",
+};
+
+function vdmosModelCard(
+  modelName: string,
+  isNchan: boolean,
+  paramDefs: readonly ParamDef[],
+  props: PropertyBag,
+): string {
+  // vdmosmpar.c VDMOS_MOD_NMOS / VDMOS_MOD_PMOS — the device-type flag.
+  const parts: string[] = [isNchan ? "nchan" : "pchan"];
+  for (const def of paramDefs) {
+    if (def.partition === "instance") continue;
+    if (!props.isModelParamGiven(def.key)) continue;
+    const spiceName = VDMOS_PARAM_SPICE_NAMES[def.key];
+    if (spiceName === undefined) continue;
+    const raw = props.getModelParam<number>(def.key);
+    if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    const v = def.spiceConverter ? def.spiceConverter(raw) : raw;
+    parts.push(`${spiceName}=${v}`);
+  }
+  return `.model ${modelName} VDMOS (${parts.join(" ")})`;
 }
 
 // ---------------------------------------------------------------------------

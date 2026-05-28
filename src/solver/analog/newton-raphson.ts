@@ -257,6 +257,68 @@ export function limvds(vnew: number, vold: number): number {
   return vnew;
 }
 
+/**
+ * Result of a limitlog call. `value` is the damped deltemp; `check` mirrors
+ * ngspice DEVlimitlog's `*check` output (1 when damping or the NaN guard
+ * engaged, else 0).
+ */
+export interface LimitlogResult {
+  value: number;
+  check: number;
+}
+
+/**
+ * Module-level reusable result object for limitlog(). Mutated and returned on
+ * every call -- callers MUST extract .value and .check before the next
+ * limitlog() call, as the object is shared. Single-threaded, safe.
+ */
+const _limitlogResult: LimitlogResult = { value: 0, check: 0 };
+
+/**
+ * Module-level one-shot latch for the NaN warning. Mirrors the C
+ * `static bool shown` in DEVlimitlog: persists across calls so the warning
+ * prints at most once per process.
+ */
+let _limitlogShown = false;
+
+/**
+ * Logarithmic temperature-step limiter (limitlog).
+ *
+ * Logarithmically damps the per-iteration change of deltemp once it moves
+ * beyond limTol from deltempOld, and guards against a NaN deltemp by zeroing
+ * it and warning once.
+ *
+ * cite: devsup.c:153-184 (DEVlimitlog). deltemp/deltempOld are this and the
+ * previous iteration's temperature delta; limTol is the per-step bound; the
+ * `*check` output is the `check` field here.
+ */
+export function limitlog(
+  deltemp: number,
+  deltempOld: number,
+  limTol: number,
+): LimitlogResult {
+  let check = 0;
+  if (!_limitlogShown && (Number.isNaN(deltemp) || Number.isNaN(deltempOld))) {
+    console.error("\n\nThe temperature limiting function received NaN.\n");
+    console.error("Please check your power dissipation and improve your heat sink Rth!\n");
+    console.error("    This message will be shown only once.\n\n");
+    deltemp = 0.0;
+    check = 1;
+    _limitlogShown = true;
+  }
+  /* Logarithmic damping of deltemp beyond limTol */
+  if (deltemp > deltempOld + limTol) {
+    deltemp = deltempOld + limTol + Math.log10((deltemp - deltempOld) / limTol);
+    check = 1;
+  } else if (deltemp < deltempOld - limTol) {
+    deltemp = deltempOld - limTol - Math.log10((deltempOld - deltemp) / limTol);
+    check = 1;
+  }
+  _limitlogResult.value = deltemp;
+  _limitlogResult.check = check;
+  return _limitlogResult;
+}
+
 export interface RailLimResult { value: number; limited: boolean; }
 
 const _railLimResult: RailLimResult = { value: 0, limited: false };
@@ -288,6 +350,36 @@ export function railLim(
   _railLimResult.value = vnew;
   _railLimResult.limited = limited;
   return _railLimResult;
+}
+
+// ---------------------------------------------------------------------------
+// devCapVdmos  LTspice VDMOS nonlinear gate capacitances (devsup.c:653-665)
+// ---------------------------------------------------------------------------
+
+/**
+ * Evaluate the LTspice VDMOS nonlinear gate capacitances. Sibling of devQmeyer
+ * (mosfet.ts) and the limiters above. Returns HALF the gate-source/gate-drain
+ * capacitances; the caller doubles (MODETRANOP / MODEINITSMSIG) or adds the
+ * previous-step half (normal MODETRAN), exactly as DevCapVDMOS's callers do.
+ *
+ * cite: devsup.c:653-665 — DevCapVDMOS. Operand order and the tanh/atan branch
+ * (vgd > 0) are line-for-line v41:
+ *   s = (cgdmax - cgdmin) / (1 + M_PI / 2);
+ *   y = cgdmax - s;
+ *   if (vgd > 0) *capgd = 0.5 * (s * tanh(a * vgd) + y);
+ *   else         *capgd = 0.5 * (s * atan(a * vgd) + y);
+ *   *capgs = 0.5 * cgs;
+ */
+export function devCapVdmos(
+  vgd: number, cgdmin: number, cgdmax: number, a: number, cgs: number,
+): { capgs: number; capgd: number } {
+  const s = (cgdmax - cgdmin) / (1 + Math.PI / 2);
+  const y = cgdmax - s;
+  const capgd = vgd > 0
+    ? 0.5 * (s * Math.tanh(a * vgd) + y)
+    : 0.5 * (s * Math.atan(a * vgd) + y);
+  const capgs = 0.5 * cgs;
+  return { capgs, capgd };
 }
 
 // ---------------------------------------------------------------------------
@@ -344,6 +436,16 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   const statePool = ctx.statePool ?? null;
   let oldState0: Float64Array | null = null;
   let ipass = 0;
+
+  // ngspice CKTniState NISHOULDREORDER bit (cktdefs.h:144). This is NI-layer
+  // state, not matrix state: niiter.c:1093-1142 routes each factor to SMPreorder
+  // (solver.orderAndFactor) when the bit is set and SMPluFac (solver.factor)
+  // otherwise, clearing it at the dispatch (niiter.c:1119). Set on
+  // MODEINITJCT/MODEINITTRAN (niiter.c:1087-1091), the MODEINITJCT→FIX
+  // transition, and the E_SINGULAR retry (niiter.c:1128). Whether the chosen
+  // routine actually re-derives the pivot order is a separate matrix concern
+  // (SparseSolver._needsReorder / NeedsOrdering).
+  let shouldReorder = false;
 
   // Step D state: preorder runs at most once per CKT lifetime. ngspice
   // NIDIDPREORDER (cktdefs.h:143) is a CKT-state bit cleared only by
@@ -422,12 +524,17 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // has already been incremented at this point in niiter.c (niiter.c:670),
     // so ngspice's `iterno == 1` corresponds to our `iteration === 0`.
     //
-    // forceReorder() sets _needsReorder = true, which factor() below then
-    // routes through factorWithReorder (ngspice SMPreorder path).
+    // Set the NISHOULDREORDER routing bit so STEP E dispatches this factor to
+    // solver.orderAndFactor() (ngspice SMPreorder). That routine re-derives the
+    // pivot order only when NeedsOrdering is set; at MODEINITTRAN NeedsOrdering
+    // is already NO from the operating-point factor, so the first transient
+    // factor re-factors against the existing order via the reuse loop
+    // (spfactor.c:223) instead of re-deriving it- the operating-point ordering
+    // carries into the transient, matching ngspice.
     const curInitfNow = initf(ctx.cktMode);
     if (curInitfNow === MODEINITJCT ||
         (curInitfNow === MODEINITTRAN && iteration === 0)) {
-      solver.forceReorder();
+      shouldReorder = true;
     }
 
     // ---- STEP E: Factorize (gmin stamped atomically inside factor()) ----
@@ -440,14 +547,14 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     //
     // H2 (Phase 2.5 W2.2)- NR owns the diagonal-Gmin decision points
     // mirroring niiter.c::NIiter:
-    //   (a) forceReorder() dispatch- niiter.c:856-859 NISHOULDREORDER
-    //       trigger on INITJCT/INITTRAN (see lines 353-357 above).
+    //   (a) NISHOULDREORDER routing- niiter.c:856-859 sets the bit on
+    //       INITJCT/INITTRAN; STEP E then dispatches to orderAndFactor().
     //   (b) diagGmin forwarded every factor call- niiter.c:863-864 and
     //       :883-884 pass ckt->CKTdiagGmin into SMPreorder/SMPluFac every
     //       iteration. Our factor(ctx.diagonalGmin) below mirrors that.
     //   (c) E_SINGULAR retry loop- niiter.c:888-891 sets NISHOULDREORDER
-    //       and `continue`s; we mirror with forceReorder() + continue
-    //       below (lines ~380-383).
+    //       and `continue`s; we mirror with `shouldReorder = true` + continue
+    //       below.
     // The gmin-stepping ladder (setting ctx.diagonalGmin across multiple
     // NR invocations) lives in dc-operating-point.ts::dynamicGmin /
     // spice3Gmin / gillespieSrc, matching ngspice's cktop.c::dynamicgmin
@@ -461,24 +568,33 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // construction) matches ngspice's per-call semantic and lets hot-loaded
     // params propagate without an engine rebuild.
     solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol);
-    // ngspice niiter.c:883-884- SMPluFac(Matrix, CKTpivotAbsTol, CKTdiagGmin).
-    const errorCode = solver.factor(ctx.pivotAbsTol, ctx.diagonalGmin);
+    // ngspice niiter.c:1093-1142 dispatch- when NISHOULDREORDER is set, call
+    // SMPreorder (orderAndFactor) and clear the bit (niiter.c:1119); otherwise
+    // call SMPluFac (factor). Both forward CKTpivotAbsTol / CKTdiagGmin
+    // (niiter.c:863-864, 883-884).
+    let errorCode: number;
+    if (shouldReorder) {
+      shouldReorder = false;
+      errorCode = solver.orderAndFactor(ctx.pivotAbsTol, ctx.diagonalGmin);
+    } else {
+      errorCode = solver.factor(ctx.pivotAbsTol, ctx.diagonalGmin);
+    }
     if (errorCode !== spOKAY) {
       // H2 (Phase 2.5 W2.2)- mirror niiter.c:881-902 in full.
       //
-      // The else arm of `if (NISHOULDREORDER)` calls SMPluFac (the reuse
-      // path) and on `error == E_SINGULAR` sets NISHOULDREORDER and
-      // `continue`s. The if arm calls SMPreorder (the full reorder path)
-      // and surfaces every error verbatim. digiTS folds the dispatch into
-      // factor(); the per-call `lastFactorWalkedReorder` flag tells us
-      // which arm ran. The retry gate combines both halves of ngspice's
-      // condition- error code AND structural arm- so non-singular reuse
-      // failures (spZERO_DIAG, spNO_MEMORY) and any reorder failure
-      // surface as a singular-matrix diagnostic instead of looping.
-      // niiter.c:888-891: on E_SINGULAR in the reuse (SMPluFac) arm,
-      // set NISHOULDREORDER and continue to retry with full reorder.
+      // The else arm of `if (NISHOULDREORDER)` ran SMPluFac (factor, the reuse
+      // path); on `error == E_SINGULAR` ngspice sets NISHOULDREORDER and
+      // `continue`s so the next pass takes SMPreorder (orderAndFactor). The if
+      // arm (orderAndFactor) surfaces every error verbatim. The per-call
+      // `lastFactorWalkedReorder` flag tells us which arm just ran. The retry
+      // gate combines both halves of ngspice's condition- error code AND
+      // structural arm- so non-singular reuse failures (spZERO_DIAG,
+      // spNO_MEMORY) and any reorder failure surface as a singular-matrix
+      // diagnostic instead of looping.
+      // niiter.c:888-891: on E_SINGULAR in the reuse (SMPluFac) arm, set
+      // NISHOULDREORDER and continue to retry through orderAndFactor.
       if (errorCode === spSINGULAR && !solver.lastFactorWalkedReorder) {
-        solver.forceReorder();
+        shouldReorder = true;
         continue;
       }
       diagnostics.emit(
@@ -722,7 +838,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
     } else if (curInitf === MODEINITJCT) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
-      solver.forceReorder();
+      shouldReorder = true;
       if (ladder) {
         ladder.onModeEnd("dcopInitJct", iteration, false);
         ladder.onModeBegin("dcopInitFix", iteration + 1);

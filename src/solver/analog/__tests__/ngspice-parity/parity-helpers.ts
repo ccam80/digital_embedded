@@ -109,7 +109,12 @@ export function assertIterationMatch(
   }
 
   for (const ourEs of ours.elementStates) {
-    const deviceType = _inferDeviceType(ourEs.label);
+    // Route by the device type recorded at capture time (a DEVICE_MAPPINGS
+    // key). VDMOS and MOSFET both use the `M` label prefix, so a prefix-only
+    // classifier would mis-route a VDMOS's 18-slot state through MOSFET's
+    // 17-slot layout. Fall back to label-prefix inference only for synthetic
+    // snapshots that predate the recorded-type field.
+    const deviceType = ourEs.deviceType ?? _inferDeviceType(ourEs.label);
     const mapping = deviceType ? DEVICE_MAPPINGS[deviceType] : undefined;
     if (!mapping) continue;
 

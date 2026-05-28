@@ -10,7 +10,7 @@ import { ComparisonSession } from "../../src/solver/analog/__tests__/harness/com
 import { resolveNgspiceDllPath } from "../../src/solver/analog/__tests__/harness/ngspice-dll-path.js";
 import { formatNumber, formatComparedValue, suggestComponents } from "./harness-format.js";
 import { writeFileSync } from "fs";
-import type { SessionSummary, NRPhase } from "../../src/solver/analog/__tests__/harness/types.js";
+import type { SessionSummary, NRPhase, AcSessionShape } from "../../src/solver/analog/__tests__/harness/types.js";
 import { resolveSlice, applySliceToIteration } from "../../src/solver/analog/__tests__/harness/slice.js";
 import type { SliceFilter } from "../../src/solver/analog/__tests__/harness/slice.js";
 import { isPoolBacked } from "../../src/solver/analog/element.js";
@@ -52,6 +52,37 @@ function serializeSummary(summary: SessionSummary) {
       : null,
     totals: summary.totals,
   };
+}
+
+/**
+ * Compact frequency-axis-parity summary for an AC sweep, parallel to
+ * `serializeSummary` for DC/TRAN. Carries the point counts, presence breakdown,
+ * and the reported-not-gated `largeFreqDeltas`; the full per-point detail and
+ * per-class divergence live in `harness_first_divergence` (AC branch).
+ */
+function serializeAcShape(shape: AcSessionShape) {
+  return {
+    pointCount: shape.pointCount,
+    presenceCounts: shape.presenceCounts,
+    largeFreqDeltas: shape.largeFreqDeltas,
+  };
+}
+
+/**
+ * Guard the DC/TRAN-only investigation tools against an AC session. AC captures
+ * per-frequency complex points, not the per-step / per-attempt NR structure
+ * these tools read, so calling them on an AC handle would dereference the absent
+ * DC/TRAN capture. AC investigation goes through harness_first_divergence (which
+ * dispatches to the AC classes) and the harness_run_ac shape.
+ */
+function assertDcTranSession(analysis: string | null, tool: string): void {
+  if (analysis === "ac") {
+    throw new Error(
+      `${tool}: not available for AC sessions. Use harness_first_divergence ` +
+        `(AC branch: solution / shape / matrix / rhs) and the harness_run_ac shape; ` +
+        `the per-step, per-attempt, matrix-diff, and export surfaces are DC/TRAN-only.`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +319,107 @@ export function registerHarnessTools(
   );
 
   // -------------------------------------------------------------------------
+  // harness_run_ac
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_run_ac",
+    {
+      title: "Run AC Sweep",
+      description:
+        "Run a small-signal AC frequency sweep on both engines (ours + ngspice). " +
+        "A session runs one analysis kind- call this OR harness_run (transient), not " +
+        "both, on the same handle; start a fresh session to switch. After this, " +
+        "harness_first_divergence dispatches to the AC classes (solution / shape / " +
+        "matrix / rhs). The response is the frequency-axis-parity shape; per-class " +
+        "divergence comes from harness_first_divergence.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle from harness_start"),
+        type: z
+          .enum(["lin", "dec", "oct"])
+          .optional()
+          .describe("Sweep spacing: linear, per-decade, or per-octave. Default: dec."),
+        numPoints: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe(
+            "Points per decade/octave ('dec'/'oct') or total points ('lin'). Default: 10.",
+          ),
+        fStart: z.number().positive().optional().describe("Start frequency in Hz. Default: 1."),
+        fStop: z.number().positive().optional().describe("Stop frequency in Hz. Default: 1e6."),
+        outputNodes: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional node labels to measure (e.g. 'out', 'V1:pos'). The harness compares " +
+              "the full complex solution vector regardless; default [].",
+          ),
+      }),
+    },
+    wrapTool("harness_run_ac", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_run_ac");
+      const { session } = entry;
+
+      await session.runAcSweep({
+        type: args.type ?? "dec",
+        numPoints: args.numPoints ?? 10,
+        fStart: args.fStart ?? 1,
+        fStop: args.fStop ?? 1e6,
+        outputNodes: args.outputNodes ?? [],
+      });
+
+      entry.lastRunAt = new Date();
+      entry.analysis = "ac";
+
+      return JSON.stringify({
+        handle: args.handle,
+        analysis: "ac",
+        shape: serializeAcShape(session.getAcSessionShape()),
+        errors: session.errors,
+      });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
+  // harness_ac_session_shape
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_ac_session_shape",
+    {
+      title: "AC Session Shape (per-frequency-point)",
+      description:
+        "Return the full frequency-axis-parity shape for an AC session (after " +
+        "harness_run_ac): per-point presence, freq, omega, and matrixSize for each " +
+        "side, plus pointCount, presenceCounts, and the reported-not-gated " +
+        "largeFreqDeltas. This is the AC analog of harness_session_map- the " +
+        "structural surface to consult before drilling per-class divergence with " +
+        "harness_first_divergence (AC branch). A non-empty largeFreqDeltas means " +
+        "the two sides swept different frequencies and downstream complex compares " +
+        "are measuring noise.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle from harness_start"),
+      }),
+    },
+    wrapTool("harness_ac_session_shape", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_ac_session_shape");
+      if (entry.analysis !== "ac") {
+        throw new Error(
+          `harness_ac_session_shape: requires an AC session- run harness_run_ac first ` +
+            `(current analysis is ${entry.analysis ?? "none"}).`,
+        );
+      }
+      return JSON.stringify({
+        handle: args.handle,
+        analysis: "ac",
+        shape: entry.session.getAcSessionShape(),
+      });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
   // harness_describe
   // -------------------------------------------------------------------------
 
@@ -472,6 +604,7 @@ export function registerHarnessTools(
       if (!entry.analysis) {
         throw new Error("harness_session_map: run harness_run first");
       }
+      assertDcTranSession(entry.analysis, "harness_session_map");
       const map = entry.session.sessionMap();
       return JSON.stringify({ handle: args.handle, sessionMap: map });
     }),
@@ -507,6 +640,7 @@ export function registerHarnessTools(
       if (!entry.analysis) {
         throw new Error("harness_get_step: run harness_run first");
       }
+      assertDcTranSession(entry.analysis, "harness_get_step");
       if (args.index !== undefined && args.time !== undefined) {
         throw new Error("harness_get_step: provide either 'index' or 'time', not both");
       }
@@ -607,6 +741,7 @@ export function registerHarnessTools(
       if (!entry.analysis) {
         throw new Error("harness_get_attempt: run harness_run first");
       }
+      assertDcTranSession(entry.analysis, "harness_get_attempt");
       const detail = entry.session.getAttempt({
         stepIndex: args.stepIndex,
         phase: args.phase as NRPhase,
@@ -698,6 +833,7 @@ export function registerHarnessTools(
       if (!entry.analysis) {
         throw new Error(`harness_export: run harness_run first before exporting`);
       }
+      assertDcTranSession(entry.analysis, "harness_export");
 
       const topology = session.ourTopology;
       const engine = session.engine;
@@ -867,6 +1003,7 @@ export function registerHarnessTools(
       if (!entry.analysis) {
         throw new Error("harness_matrix_diff: run harness_run first");
       }
+      assertDcTranSession(entry.analysis, "harness_matrix_diff");
       const report = entry.session.matrixDiff({
         stepIndex: args.stepIndex,
         iterationIndex: args.iterationIndex,
@@ -899,7 +1036,13 @@ export function registerHarnessTools(
         "the cause, not a downstream symptom- e.g. a divergent rhs over an " +
         "identical matrix wins the tie against the voltage it produces. " +
         "Use this first to choose which axis to drill into before fetching a " +
-        "full attempt via harness_get_attempt with a slice.",
+        "full attempt via harness_get_attempt with a slice.\n\n" +
+        "For an AC session (after harness_run_ac) this dispatches to the AC " +
+        "first-divergence classes instead, returned under `acFirstDivergence`: " +
+        "solution (per-MNA-row complex solution), shape (point presence / " +
+        "frequency / matrixSize), matrix (complex Jacobian cell), rhs (complex " +
+        "loaded excitation cell), plus `earliestPointIndex`. The response's " +
+        "`analysis` field says which shape to read.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle from harness_start"),
       }),
@@ -907,10 +1050,14 @@ export function registerHarnessTools(
     wrapTool("harness_first_divergence", async (args) => {
       const entry = harnessState.get(args.handle, "harness_first_divergence");
       if (!entry.analysis) {
-        throw new Error("harness_first_divergence: run harness_run first");
+        throw new Error("harness_first_divergence: run harness_run or harness_run_ac first");
+      }
+      if (entry.analysis === "ac") {
+        const acReport = entry.session.acFirstDivergence();
+        return JSON.stringify({ handle: args.handle, analysis: "ac", acFirstDivergence: acReport });
       }
       const report = entry.session.firstDivergence();
-      return JSON.stringify({ handle: args.handle, firstDivergence: report });
+      return JSON.stringify({ handle: args.handle, analysis: entry.analysis, firstDivergence: report });
     }),
   );
 }

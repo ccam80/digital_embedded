@@ -42,17 +42,16 @@ import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { createDiodeElement } from "./diode.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
+import {
+  CONSTKoverQ,
+  REFTEMP,
+} from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
-// Physical constants (ngspice ngspice.h / const.h values)
+// Physical constants
 // ---------------------------------------------------------------------------
 
-const CONSTboltz = 1.3806226e-23;
-const CHARGE = 1.6021918e-19;
-// ngspice main.c:515 — precomputed to match diotemp.c:104 vt ordering
-const CONSTKoverQ = CONSTboltz / CHARGE;
-const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
-const REFTEMP = 300.15;         // 27 °C reference temperature
+const CONSTe = Math.E;          // Euler's number, used in cubic approximation (dioload.c:254)
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations

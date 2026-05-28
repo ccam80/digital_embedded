@@ -30,6 +30,9 @@ import { describeIfDll, DLL_PATH } from "../ngspice-parity/parity-helpers.js";
 
 describeIfDll("ngspice AC bridge- round-trip smoke", () => {
   it("ac_callback_fires_once_per_frequency_point", async () => {
+    // Deliberately UNGUARDED, in-process bridge: in-repo parity smoke off the
+    // MCP path, not the agent-facing harness_run surface. Must never be pointed
+    // at a VDMOS deck; crash-prone / agent-driven runs go through runNgspiceGuarded.
     const bridge = new NgspiceBridge(DLL_PATH);
     await bridge.init();
     try {

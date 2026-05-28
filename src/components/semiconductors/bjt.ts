@@ -44,10 +44,12 @@ import {
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
-
-// ---------------------------------------------------------------------------
-// Physical constants
-// ---------------------------------------------------------------------------
+import {
+  CONSTboltz as k,
+  CHARGE as q_charge,
+  CONSTKoverQ as KoverQ,
+  REFTEMP,
+} from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -353,11 +355,6 @@ function computeBjtTempParams(p: {
   PTF: number; TF: number; TR: number;
   ISS: number; TEMP: number;
 }, T: number): BjtTempParams {
-  const REFTEMP = 300.15;
-  const k = 1.3806226e-23;
-  const q_charge = 1.6021918e-19;
-  const KoverQ = k / q_charge;
-
   const vt = T * KoverQ;
   const fact1 = p.TNOM / REFTEMP;
   const fact2 = T / REFTEMP;

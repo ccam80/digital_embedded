@@ -1,0 +1,227 @@
+[BLOCK] e2e/fixtures/ui-circuit-builder.ts:88: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        () => (window as any).__test !== undefined,
+[BLOCK] e2e/fixtures/ui-circuit-builder.ts:129: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const b = (window as any).__test;
+[BLOCK] e2e/fixtures/ui-circuit-builder.ts:251: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        () => !!(window as any).__test?.isPlacementActive?.(),
+[BLOCK] e2e/fixtures/ui-circuit-builder.ts:1563: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const b = (window as any).__test;
+[warn ] e2e/fixtures/ui-circuit-builder.ts:777: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * @param stepsOrTime - SI time string (e.g. "5m", "100u") or legacy step count (ignored)
+[warn ] e2e/fixtures/ui-circuit-builder.ts:778: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * @param targetTime - SI time string when stepsOrTime is a number (legacy call form)
+[warn ] e2e/fixtures/ui-circuit-builder.ts:1295: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Fallback: simple L (horizontal-first)- should rarely be reached
+[warn ] e2e/fixtures/ui-circuit-builder.ts:1320: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        return []; // fallback: direct
+[warn ] e2e/fixtures/ui-circuit-builder.ts:1343: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        return []; // fallback: direct
+[warn ] e2e/fixtures/ui-circuit-builder.ts:1528: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Case-insensitive prefix fallback: find the row whose label starts with the given text
+[BLOCK] e2e/gui/analog-ui-fixup.spec.ts:73: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const bridge = (iframe.contentWindow as any).__test;
+[BLOCK] e2e/gui/analog-ui-fixup.spec.ts:280: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const bridge = (window as any).__test;
+[BLOCK] e2e/gui/app-loads.spec.ts:14: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (page as any).__consoleErrors = errors;
+[BLOCK] e2e/gui/app-loads.spec.ts:22: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const errors = (page as any).__consoleErrors as string[];
+[BLOCK] e2e/gui/circuit-building.spec.ts:84: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const bridge = (iframe.contentWindow as any).__test;
+[BLOCK] e2e/gui/circuit-building.spec.ts:119: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:147: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:188: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:227: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const bridge = (iframe.contentWindow as any).__test;
+[BLOCK] e2e/gui/circuit-building.spec.ts:259: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:285: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:315: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:353: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/circuit-building.spec.ts:368: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[warn ] e2e/gui/master-circuit-assembly.spec.ts:9: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Each circuit covers multiple verification points that previously required
+[BLOCK] e2e/gui/stepping-perf.spec.ts:33: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const bridge = (iframe.contentWindow as any).__test;
+[BLOCK] e2e/gui/stress-speed.spec.ts:21: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test?.getAnalogState()?.simTime ?? 0;
+[BLOCK] e2e/gui/subcircuit-creation.spec.ts:385: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/subcircuit-creation.spec.ts:442: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        return (iframe.contentWindow as any).__test.getCircuitInfo();
+[BLOCK] e2e/gui/workflow-tests.spec.ts:104: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const b = (window as any).__test;
+[BLOCK] scripts/vitest-live-setup.ts:76: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        emit(`FILE_START ${fileOf((globalThis as any).__vitest_worker__?.current ?? {})}`);
+[BLOCK] scripts/vitest-live-setup.ts:80: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        emit(`FILE_END   ${fileOf((globalThis as any).__vitest_worker__?.current ?? {})}`);
+[BLOCK] src/app/render-pipeline.ts:115: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (window as any)._enableFrameProfile = () => { _frameProfileEnabled = true; _frameProfileSamples = []; };
+[BLOCK] src/app/render-pipeline.ts:116: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (window as any)._disableFrameProfile = () => {
+[warn ] src/app/tutorial/tutorial-runner.ts:8: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        *   - Step validation (test-vectors, compile-only, manual, equivalence fallback)
+[warn ] src/components/passives/__tests__/capacitor.test.ts:396: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // state0 and previously accepted state1 are populated (rotation
+[warn ] src/components/sources/__tests__/ac-voltage-source.test.ts:47: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // 1kHz square 0V↔3.3V → 1kΩ load (no cap). Migrated from clock-canon-1khz-loaded.dts
+[warn ] src/components/sources/__tests__/ac-voltage-source.test.ts:55: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Migrated from clock-canon-2khz-rc.dts.
+[warn ] src/components/sources/__tests__/ac-voltage-source.test.ts:571: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // 1kHz square 0V↔3.3V driving a 1kΩ load — migrated from analog-clock.test.ts
+[warn ] src/components/sources/__tests__/ac-voltage-source.test.ts:612: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // 2kHz square 0V↔3.3V driving R=10kΩ + C=1µF RC low-pass — migrated from
+[warn ] src/components/subcircuit/__tests__/subcircuit.test.ts:323: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // deriveInterfacePins — label-fallback rule
+[warn ] src/core/__tests__/resolve-simulation-params.test.ts:8: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * auto-derivation across sequential calls (the previously-resolved baseline
+[warn ] src/core/engine-interface.ts:265: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Remove a previously registered listener. No-op if the listener was not
+[warn ] src/core/engine-interface.ts:350: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Remove a previously registered measurement observer.
+[warn ] src/core/properties.ts:123: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Typed read with a fallback default when the key is absent.
+[warn ] src/editor/context-menu.ts:51: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Any previously shown menu is hidden first.
+[warn ] src/editor/edit-operations.ts:193: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // were previously masked by a component pin at the same position.
+[warn ] src/editor/si-format.ts:70: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Fallback: try plain parseFloat for scientific notation etc.
+[warn ] src/editor/slider-panel.ts:78: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * - If `currentValue === 0`: fallback `[1e-12, 1e-3]` (pF–mF / pΩ–mΩ range)
+[warn ] src/editor/wire-current-resolver.ts:301: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // 2-terminal element (or fallback): single path pin0 → pin1
+[warn ] src/editor/wire-current-resolver.ts:530: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Fallback: no identified tunnel- inject at BFS root
+[warn ] src/headless/auto-layout.ts:1182: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // clean fallback that makes coincident-corner emission impossible.
+[warn ] src/i18n/index.ts:5: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * fallback chains, and locale change events.
+[warn ] src/io/ctz-parser.ts:59: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * so we use the 'deflate-raw' format where supported, with a fallback to
+[warn ] src/io/ctz-parser.ts:70: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Dual-format fallback: polyfill environments only support zlib-wrapped
+[warn ] src/io/dig-serializer.ts:67: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Dual-format fallback (JSON-encoded vs raw string). Per
+[warn ] src/io/dig-serializer.ts:79: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Dual-format fallback (JSON-encoded vs raw string). Per
+[warn ] src/io/dig-serializer.ts:94: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Dual-format fallback (JSON-encoded vs raw string). Per
+[warn ] src/io/dts-deserializer.ts:31: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        *  Also recovers `null` values- these are legacy artifacts from JSON.stringify
+[warn ] src/runtime/program-formats.ts:55: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Dual-detector fallback: unknown extension → content heuristic.
+[BLOCK] src/solver/analog/__tests__/buckbjt-nr-probe.test.ts:110: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        console.log(`Step ${s}: ${snaps.length} NR iters, simTime=${engine.simTime.toExponential(4)}, dt=${(engine as any)._dt?.toExponential?.(4) ?? '?'}`);
+[warn ] src/solver/analog/__tests__/default-loaders.test.ts:7: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * These handlers are the fallback path in `runByDeviceFamily` for any
+[warn ] src/solver/analog/__tests__/harness/netlist-generator.ts:889: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // no per-test workaround that doesn't either pollute the breakpoint
+[warn ] src/solver/analog/__tests__/harness/ngspice-dll-path.ts:16: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * callback registration entry point the AC harness depends on. A stale legacy
+[warn ] src/solver/analog/__tests__/harness/ngspice-guarded-roundtrip.test.ts:36: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // `NGSPICE_DLL_PATH` may be pointed at the legacy stale build, so resolve the
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:60: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const topology = (session as any)._ourTopology;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:340: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (session as any)._comparisons = [{
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:382: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (session as any)._comparisons = fakeComparisons;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:433: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const stepCount = (session as any)._ourSession.steps.length;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:471: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const steps = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:581: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const steps = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:591: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const steps = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:637: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const stepCount = (session as any)._ourSession.steps.length;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:769: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ourSteps = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:784: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ourSteps: any[] = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:785: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ngSession = (session as any)._ngSession;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:786: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ngReindexed = (session as any)._ngSessionReindexed;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:809: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ourSteps: any[] = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:810: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ngSession = (session as any)._ngSession;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:811: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ngReindexed = (session as any)._ngSessionReindexed;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:828: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ourSteps: any[] = (session as any)._ourSession.steps;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:829: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ngSession = (session as any)._ngSession;
+[BLOCK] src/solver/analog/__tests__/harness/query-methods.test.ts:830: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const ngReindexed = (session as any)._ngSessionReindexed;
+[BLOCK] src/solver/analog/__tests__/harness/stream-verification.test.ts:48: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        }> = (session as any)._nodeMap;
+[BLOCK] src/solver/analog/__tests__/harness/stream-verification.test.ts:64: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const elements: Array<{ type: string }> = (session as any)._ourTopology
+[BLOCK] src/solver/analog/__tests__/harness/stream-verification.test.ts:77: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        const topo = (session as any)._ourTopology;
+[BLOCK] src/solver/analog/__tests__/harness/stream-verification.test.ts:235: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+[BLOCK] src/solver/analog/__tests__/harness/stream-verification.test.ts:253: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+[BLOCK] src/solver/analog/__tests__/harness/stream-verification.test.ts:287: B1-private-tunneling — (x as any)._private field tunneling — ss0 hard rule #2
+        (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+[warn ] src/solver/analog/__tests__/harness/ucrt-libm-shim.ts:2: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * ucrt libm shim — replaces every implementation-defined Math transcendental
+[warn ] src/solver/analog/__tests__/harness/ucrt-libm-shim.ts:79: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Install the ucrt-libm shim. Safe to call multiple times — refcounted with
+[warn ] src/solver/analog/__tests__/harness/ucrt-libm-shim.ts:80: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * matching `uninstallUcrtLibmShim()` calls. Returns true if the shim is
+[warn ] src/solver/analog/__tests__/harness/ucrt-libm-shim.ts:81: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * active after this call, false if the platform / load failed and the shim
+[warn ] src/solver/analog/__tests__/harness/ucrt-libm-shim.ts:102: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Remove one shim refcount. When refcount drops to zero, the original
+[warn ] src/solver/analog/dc-operating-point.ts:2: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * DC operating point solver- ngspice CKTop three-level fallback.
+[warn ] src/solver/analog/dc-operating-point.ts:303: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * three-level fallback stack (cktop.c:20-79).
+[warn ] src/solver/analog/dc-operating-point.ts:624: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // branch before it rewrites diagGmin. Previously this passed `gshunt`, which
+[warn ] src/solver/analog/diagnostics.ts:58: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Unregister a previously registered diagnostic listener.
+[warn ] src/solver/analog/family-dispatch.ts:88: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * @param defaultHandler - Fallback when no registered handler covers (family, callback).
+[warn ] src/solver/analog/loaders/default-loaders.ts:5: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * `defaultHandler` fallback in `runByDeviceFamily` for any (family, callback)
+[warn ] src/solver/analog/model-parser.ts:119: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Try plain parse as fallback
+[warn ] src/solver/analog/sparse-solver.ts:1193: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // @instrumentation- Stage 8 prefix-marker fallback (spec ss8.3 lines 965-967)
+[warn ] src/solver/analog/sparse-solver.ts:1200: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // wrapper; the methods stay here as the prefix-marker fallback because
+[warn ] src/solver/analog/timestep.ts:114: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * XSPICE temporary breakpoint (g_mif_info.breakpoint.current).
+[warn ] src/solver/analog/timestep.ts:277: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // non-XSPICE fallback (maxStep * 5e-5, dctran.c:157) is ~500× larger
+[warn ] src/solver/analog/timestep.ts:805: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * Push an XSPICE-style temporary breakpoint (g_mif_info.breakpoint.current).
+[warn ] src/solver/coordinator-types.ts:309: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * - 'discrete': digital-only (legacy, not used in UI).
+[warn ] src/solver/digital/__tests__/bus-resolution.test.ts:13: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        * - Switch split: opening a previously-closed switch separates the nets again
+[warn ] src/solver/digital/delay.ts:7: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        *   3. DEFAULT_GATE_DELAY (10ns global fallback)
+[warn ] src/solver/digital/digital-engine.ts:1121: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // environments, use setImmediate/setTimeout as fallback.
+[warn ] src/solver/digital/noise-mode.ts:140: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Evaluate ALL components on a temporary buffer seeded from the snapshot.
+[warn ] src/testing/parser.ts:957: B5-banned-vocab-in-comment — historical-provenance comment ban (legacy/fallback/etc.)
+        // Priority: explicit inputCount > "|" separator > all-inputs fallback.
+
+[lint-bans] 52 blocking, 60 warning across 1023 file(s).
+[lint-bans] commit blocked. Fix the BLOCK lines above, or escalate to spec/architectural-alignment.md if you believe the rule is wrong.

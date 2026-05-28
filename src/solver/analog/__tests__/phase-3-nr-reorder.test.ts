@@ -1,14 +1,14 @@
-// Tests NR loop-top forceReorder citation hygiene in newton-raphson.ts and dc-operating-point.ts.
+// Tests NR loop-top NISHOULDREORDER-routing citation hygiene in newton-raphson.ts and dc-operating-point.ts.
 
 import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
 // ---------------------------------------------------------------------------
-// Task 3.1.2- non-top-of-loop forceReorder citations
+// Task 3.1.2- non-top-of-loop NISHOULDREORDER-routing citations
 // ---------------------------------------------------------------------------
 
-describe("Task 3.1.2- non-top-of-loop forceReorder citations", () => {
+describe("Task 3.1.2- non-top-of-loop NISHOULDREORDER-routing citations", () => {
   it("cites niiter.c:856-859 in the loop-top gate comment", () => {
     // Read the newton-raphson.ts file and verify the citation is present
     const nrPath = path.join(
@@ -17,15 +17,16 @@ describe("Task 3.1.2- non-top-of-loop forceReorder citations", () => {
     );
     const content = fs.readFileSync(nrPath, "utf-8");
 
-    // Find the forceReorder call within the loop-top gate (around lines 354-357)
+    // Find the NISHOULDREORDER trigger within the loop-top mode gate
     const lines = content.split("\n");
     let foundCitation = false;
 
-    // Search for the comment block before solver.forceReorder() call
-    // The citation should appear within 30 lines before the first forceReorder() call in the NR loop
+    // Search for the comment block before the NISHOULDREORDER routing assignment
+    // The citation should appear within 30 lines before the first `shouldReorder = true`
+    // set in the NR loop (the loop-top mode-gate).
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes("solver.forceReorder()")) {
-        // This is a forceReorder call; check the preceding 30 lines for the citation
+      if (lines[i].includes("shouldReorder = true")) {
+        // This is a NISHOULDREORDER trigger; check the preceding 30 lines for the citation
         const searchStart = Math.max(0, i - 30);
         const searchText = lines.slice(searchStart, i).join("\n");
         if (searchText.includes("niiter.c:856-859")) {
@@ -49,10 +50,10 @@ describe("Task 3.1.2- non-top-of-loop forceReorder citations", () => {
 
     let foundCitation = false;
 
-    // Find the forceReorder call within the E_SINGULAR retry block
-    // It should be preceded by a check for !factorResult.success or !solver.lastFactorUsedReorder
+    // Find the NISHOULDREORDER trigger within the E_SINGULAR retry block
+    // It should be preceded by a check on solver.lastFactorWalkedReorder.
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes("solver.forceReorder()") && i > 0) {
+      if (lines[i].includes("shouldReorder = true") && i > 0) {
         // Check if this is in the E_SINGULAR retry block by looking for preceding context
         const contextStart = Math.max(0, i - 10);
         const contextText = lines.slice(contextStart, i).join("\n");

@@ -1,0 +1,591 @@
+{
+  "circuit": {
+    "description": "AC sine drive through R1 into transformer primary; secondary loaded by R2 to gnd (no breakpoints)",
+    "elements": [
+      {
+        "id": "dcdcfbb6-40d3-4622-8f3f-9d8a399cb248",
+        "position": {
+          "x": 0,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "acMagnitude": 1,
+            "acPhase": 0,
+            "amplitude": 5,
+            "dcOffset": 0,
+            "frequency": 2000,
+            "phase": 0
+          },
+          "acMagnitude": 1,
+          "acPhase": 0,
+          "amplitude": 5,
+          "dcOffset": 0,
+          "frequency": 2000,
+          "label": "V1",
+          "phase": 0,
+          "position": [
+            0,
+            0
+          ],
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "39f3eac8-75da-4426-89f7-8fe45afbb7c9",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 50
+          },
+          "label": "R1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 50
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "bfda2e38-70b0-4317-b08b-398a1d4b11ad",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "couplingCoefficient": 0.98,
+            "primaryInductance": 0.01,
+            "turnsRatio": 2
+          },
+          "couplingCoefficient": 0.98,
+          "label": "T1",
+          "position": [
+            0,
+            16
+          ],
+          "primaryInductance": 0.01,
+          "turnsRatio": 2
+        },
+        "rotation": 0,
+        "type": "Transformer"
+      },
+      {
+        "id": "6a97e212-6882-471f-9a2b-4f412506671f",
+        "position": {
+          "x": 36,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R2",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "59d988bb-8197-413b-bcfc-1d2c09c06ccc",
+        "position": {
+          "x": 36,
+          "y": 4
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "Transformer coupled inductors sine",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 1
+          },
+          {
+            "x": 5,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 1
+          },
+          {
+            "x": 20,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 3
+          },
+          {
+            "x": 38,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": 3
+          },
+          {
+            "x": 38,
+            "y": -2.375
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": -2.375
+          },
+          {
+            "x": 22,
+            "y": -2.375
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": -2.375
+          },
+          {
+            "x": 22,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 1
+          },
+          {
+            "x": -1,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 1
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 24,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 0
+          },
+          {
+            "x": 41,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 0
+          },
+          {
+            "x": 42,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 0
+          },
+          {
+            "x": 42,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 7
+          },
+          {
+            "x": 26,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 7
+          },
+          {
+            "x": 26,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 2
+          },
+          {
+            "x": 29,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 2
+          },
+          {
+            "x": 31,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 34,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

@@ -9,9 +9,31 @@
  *
  * Spec ref: spec/refactor-per-type-orchestration.md §4.2 / §4.3
  */
+
+import type { DiagnosticCollector } from "./diagnostics.js";
+
 export interface TempContext {
   /** Ambient circuit temperature in Kelvin (ngspice: CKTtemp). */
   cktTemp: number;
   /** Nominal (reference) temperature in Kelvin (ngspice: CKTnomTemp). */
   cktNomTemp: number;
+  /**
+   * ngspice CKTindverbosity (cktdefs.h:111). Diagnostic-level integer
+   * controlling the `MUTtemp` Cholesky-verify pass:
+   *   0 = no verification;
+   *   1 = verify, emit on non-positive-definite / duplicate K / |K|>1 / L<0;
+   *   2 = also emit on incomplete K coupling sets (missing K's implicitly 0).
+   * Default 2 per cktinit.c:65.
+   */
+  _indVerbosity: number;
+  /**
+   * Diagnostic collector the MUTtemp verify pass routes its emissions through
+   * (muttemp.c:184-203). Forwarded from CKTCircuitContext.diagnostics by the
+   * lazy `tempCtx` accessor so Pass 3 of IndFamilyTempHandler can emit without
+   * reaching the full CKTcircuit. Optional because device-local hot-load
+   * recomputes (diode/MOSFET setParam paths) construct an ad-hoc TempContext
+   * that never reaches the IND-family verify pass; the verify driver only runs
+   * when the lazy accessor (which always populates this) supplies the context.
+   */
+  diagnostics?: DiagnosticCollector;
 }

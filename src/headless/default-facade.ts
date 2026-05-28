@@ -394,6 +394,16 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._coordinator.setCircuitTemp(K);
   }
 
+  /**
+   * Merge solver parameters into the active SimulationParams and apply them to
+   * the analog engine via the coordinator. Forwards engine knobs such as
+   * `indVerbosity`, `reltol`, and `gmin` along the same hot-load path the
+   * streaming params take (coordinator → analog.configure → refreshTolerances).
+   */
+  configure(params: Partial<import('../core/analog-engine-interface.js').SimulationParams>): void {
+    this._coordinator.configure(params);
+  }
+
   /** Enable or disable convergence step recording on the analog engine. */
   setConvergenceLogEnabled(enabled: boolean): void {
     if (this._captureHook !== null && enabled === false) {

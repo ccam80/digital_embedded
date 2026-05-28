@@ -695,8 +695,7 @@ describe("SparseSolver factor dispatch", () => {
     const rhs = new Float64Array(3);
     stampRHS(rhs, 1, 1);
     stampRHS(rhs, 2, 2);
-    solver.forceReorder();
-    const result = solver.factor();
+    const result = solver.orderAndFactor();
     expect(result).toBe(0);
     expect(solver.reordered).toBe(true);
   });
@@ -713,9 +712,8 @@ describe("SparseSolver factor dispatch", () => {
     stampRHS(rhs1, 2, 2);
 
     // First factor: _needsReorder starts true (allocElement sets it).
-    // Force reorder explicitly then factor to establish pivot order.
-    solver.forceReorder();
-    solver.factor();
+    // orderAndFactor() is the reorder-capable entry (ngspice SMPreorder).
+    solver.orderAndFactor();
     expect(solver.reordered).toBe(true);
 
     // Second factor with same pattern: numerical path
@@ -743,9 +741,8 @@ describe("SparseSolver factor dispatch", () => {
     stampRHS(rhs1, 1, 1);
     stampRHS(rhs1, 2, 2);
 
-    // Establish pivot order via reorder path
-    solver.forceReorder();
-    const r1 = solver.factor();
+    // Establish pivot order via the reorder entry (ngspice SMPreorder).
+    const r1 = solver.orderAndFactor();
     expect(r1).toBe(0);
     const x1 = new Float64Array(3);
     solver.solve(rhs1, x1);
@@ -1190,8 +1187,7 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
     solver.stampElement(solver.allocElement(3, 3), 2);
     const rhs = new Float64Array(4);
     stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1);
-    solver.forceReorder();
-    const result = solver.factor();
+    const result = solver.orderAndFactor();
     expect(result).toBe(0);
     const x = new Float64Array(4);
     solver.solve(rhs, x);
@@ -1219,8 +1215,7 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
     const rhsBuf = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) rhsBuf[i + 1] += rhsVals[i];
-    solver.forceReorder();
-    const result = solver.factor();
+    const result = solver.orderAndFactor();
     expect(result).toBe(0);
     const x = new Float64Array(n + 1);
     solver.solve(rhsBuf, x);
@@ -1940,7 +1935,7 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
 });
 
 describe("SparseSolver NISHOULDREORDER lifecycle", () => {
-  it("factor_uses_numeric_path_without_forceReorder", () => {
+  it("factor_uses_numeric_path_without_reorder_trigger", () => {
     // After one successful factorWithReorder(), subsequent factor() calls must
     // use the numeric-only path. Stage 6.3.3- `lastFactorUsedReorder` instance
     // field deleted; verified via `FactorResult.usedReorder` returned by factor().
@@ -1972,59 +1967,49 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     solver.stampElement(solver.allocElement(3, 2), -1);
     solver.stampElement(solver.allocElement(3, 3), 2);
 
-    // Second factor() must use numeric-only path (no forceReorder called)
+    // Second factor() must use numeric-only path (no reorder trigger)
     const r2 = solver.factor();
     expect(r2).toBe(0);
     expect(solver.lastFactorWalkedReorder).toBe(false);
   });
 
-  it("forceReorder_triggers_full_pivot_search", () => {
-    // After forceReorder(), the next factor() call must use the reorder path.
-    // Stage 6.3.3- usedReorder reported on each FactorResult.
-    // 1-based external API: rows/cols 1..n.
+  it("orderAndFactor reorders when NeedsOrdering is set, reuses otherwise", () => {
+    // orderAndFactor() is ngspice SMPreorder → spOrderAndFactor. It walks a full
+    // pivot search only when NeedsOrdering is set (initial assembly, or after a
+    // topology change via invalidateTopology); a value-only re-assembly leaves
+    // NeedsOrdering NO, so it re-factors against the existing order
+    // (spfactor.c:223). 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
+    const stamp = () => {
+      solver.stampElement(solver.allocElement(1, 1), 2);
+      solver.stampElement(solver.allocElement(1, 2), -1);
+      solver.stampElement(solver.allocElement(2, 1), -1);
+      solver.stampElement(solver.allocElement(2, 2), 3);
+      solver.stampElement(solver.allocElement(2, 3), -1);
+      solver.stampElement(solver.allocElement(3, 2), -1);
+      solver.stampElement(solver.allocElement(3, 3), 2);
+    };
     solver._initStructure();
-    solver.stampElement(solver.allocElement(1, 1), 2);
-    solver.stampElement(solver.allocElement(1, 2), -1);
-    solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 3);
-    solver.stampElement(solver.allocElement(2, 3), -1);
-    solver.stampElement(solver.allocElement(3, 2), -1);
-    solver.stampElement(solver.allocElement(3, 3), 2);
+    stamp();
 
-    // First factor- builds pivot order
-    solver.factor();
+    // First factor- NeedsOrdering set by allocElement, so a full pivot search runs.
+    solver.orderAndFactor();
     expect(solver.reordered).toBe(true);
+    expect(solver.lastFactorWalkedReorder).toBe(true);
 
-    // Re-assemble using _resetForAssembly (spClear) to preserve pivot order.
+    // Value-only re-assembly (spClear): NeedsOrdering stays NO, orderAndFactor reuses.
     solver._resetForAssembly();
-    solver.stampElement(solver.allocElement(1, 1), 2);
-    solver.stampElement(solver.allocElement(1, 2), -1);
-    solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 3);
-    solver.stampElement(solver.allocElement(2, 3), -1);
-    solver.stampElement(solver.allocElement(3, 2), -1);
-    solver.stampElement(solver.allocElement(3, 3), 2);
-
-    // Second factor without forceReorder- numeric path
-    solver.factor();
+    stamp();
+    solver.orderAndFactor();
     expect(solver.lastFactorWalkedReorder).toBe(false);
 
-    // Re-assemble, then forceReorder
-    solver._resetForAssembly();
-    solver.stampElement(solver.allocElement(1, 1), 2);
-    solver.stampElement(solver.allocElement(1, 2), -1);
-    solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 3);
-    solver.stampElement(solver.allocElement(2, 3), -1);
-    solver.stampElement(solver.allocElement(3, 2), -1);
-    solver.stampElement(solver.allocElement(3, 3), 2);
-    solver.forceReorder();
-
-    // Third factor after forceReorder- must use full pivot search
-    const r3 = solver.factor();
+    // Topology change (spStripMatrix): NeedsOrdering set again, full pivot search reruns.
+    solver.invalidateTopology();
+    solver._initStructure();
+    stamp();
+    const r3 = solver.orderAndFactor();
     expect(r3).toBe(0);
-    expect(solver.reordered).toBe(true);
+    expect(solver.lastFactorWalkedReorder).toBe(true);
   });
 });
 

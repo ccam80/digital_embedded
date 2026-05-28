@@ -28,7 +28,9 @@ import {
 } from "./capture.js";
 import { compareSnapshots, findFirstDivergence } from "./compare.js";
 import { convergenceSummary } from "./query.js";
-import { NgspiceBridge, buildAcCaptureSession } from "./ngspice-bridge.js";
+import { buildAcCaptureSession } from "./ngspice-bridge.js";
+import type { NgspiceJobSpec } from "./ngspice-bridge.js";
+import { runNgspiceGuarded } from "./ngspice-guarded.js";
 import type {
   AcCaptureSession, AcCapturePoint, AcSessionShape, AcPointShape,
   AcDivergenceReport, AcSolutionDivergenceEntry, AcShapeDivergenceEntry,
@@ -276,6 +278,17 @@ export interface ComparisonSessionOptions {
    * is unaffected: that is a hard internal invariant and continues to throw.
    */
   deferStructuralAsserts?: boolean;
+  /**
+   * ngspice-only DC operating-point guesses, keyed by net/pin NAME (e.g.
+   * "Q1:C") mapped to volts. Resolved to digiTS node IDs at init time and
+   * emitted as a `.nodeset` card on the auto-generated deck (cktload.c:107-120).
+   * digiTS never populates its own nodesets, so a nodeset on a bistable circuit
+   * steers ONLY the ngspice side into one DC state while digiTS lands wherever
+   * its own NR settles — surfacing digiTS's lack of nodeset support as a genuine
+   * ours-vs-ngspice divergence. Ignored when `cirPath` is supplied (the author
+   * owns the deck) or when `selfCompare` is true (no ngspice side).
+   */
+  nodesets?: ReadonlyMap<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -657,7 +670,16 @@ export class ComparisonSession {
       this._cirClean = stripControlBlock(cirRaw);
     } else if (!this._opts.selfCompare) {
       this._assertAllComponentsPairedSpiceEquivalent(compiled);
-      this._cirClean = generateSpiceNetlist(compiled, this._registry, this._elementLabels);
+      // Resolve author-supplied nodeset NAMES to the digiTS node IDs the deck
+      // uses. The author knows net/pin names ("Q1:C"); the generator keys on
+      // numeric IDs because the emitted deck writes stringified IDs as node
+      // names (buildDirectNodeMapping correlates them back). _ourTopology was
+      // captured above, so its nodeLabels map carries the same name->id pairing
+      // the deck emits.
+      const resolvedNodesets = this._resolveNodesetNames();
+      this._cirClean = generateSpiceNetlist(
+        compiled, this._registry, this._elementLabels, undefined, resolvedNodesets,
+      );
     }
 
     this._inited = true;
@@ -783,18 +805,18 @@ export class ComparisonSession {
     };
 
     if (!this._opts.selfCompare && this._cirClean) {
-      const bridge = new NgspiceBridge(this._dllPath);
       try {
-        await bridge.init();
-        bridge.loadNetlist(this._materializeCir());
-        bridge.runDcOp();
-        this._ngSession = bridge.getCaptureSession();
-        this._buildNodeMapping(bridge);
+        const spec: NgspiceJobSpec = {
+          dllPath: this._dllPath,
+          netlist: this._materializeCir(),
+          analysis: { kind: "dcop" },
+        };
+        const runResult = await runNgspiceGuarded(spec);
+        this._ngSession = runResult.session ?? { source: "ngspice", topology: emptyTopology(), steps: [] };
+        this._buildNodeMapping(runResult.ngspiceTopology);
       } catch (e: any) {
         this.errors.push(`ngspice DC OP failed: ${e.message}`);
         this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
-      } finally {
-        bridge.dispose();
       }
     } else if (this._opts.selfCompare) {
       this._ngSession = deepCloneSession(this._ourSession, "ngspice");
@@ -870,12 +892,20 @@ export class ComparisonSession {
     };
 
     if (!this._opts.selfCompare && this._cirClean) {
-      const bridge = new NgspiceBridge(this._dllPath);
       try {
-        await bridge.init();
-        bridge.loadNetlist(this._materializeCir());
-        bridge.runAc(params.type, params.numPoints, params.fStart, params.fStop);
-        const raw = bridge.getAcPoints();
+        const spec: NgspiceJobSpec = {
+          dllPath: this._dllPath,
+          netlist: this._materializeCir(),
+          analysis: {
+            kind: "ac",
+            type: params.type,
+            n: params.numPoints,
+            fStart: params.fStart,
+            fStop: params.fStop,
+          },
+        };
+        const runResult = await runNgspiceGuarded(spec);
+        const raw = runResult.acPoints ?? [];
         this._ngAcSession = buildAcCaptureSession(raw, emptyTopology());
         // Populate _nodeMap + _ngMatrixRowMap/_ngMatrixColMap so
         // acFirstDivergence's matrix walk can translate ngspice's external
@@ -884,15 +914,13 @@ export class ComparisonSession {
         // CKTmaxEqNum-style +1 offset and ngspice-specific permutation)
         // against our raw indices, producing meaningless false positives.
         // Mirrors what runDcOp + runTransient do via the same helper.
-        this._buildNodeMapping(bridge);
+        this._buildNodeMapping(runResult.ngspiceTopology);
         this._buildMatrixMaps();
         this._reindexNgAcSession();
       } catch (e: any) {
         this.errors.push(`ngspice AC sweep failed: ${e.message}`);
         this._ngAcSession = { source: "ngspice", topology: emptyTopology(), points: [] };
         this._ngAcSessionReindexed = this._ngAcSession;
-      } finally {
-        bridge.dispose();
       }
     } else if (this._opts.selfCompare) {
       // Self-compare: deep-clone our points as the ngspice side for zero-drift
@@ -1067,18 +1095,23 @@ export class ComparisonSession {
     };
 
     if (!this._opts.selfCompare && this._cirClean) {
-      const bridge = new NgspiceBridge(this._dllPath);
       try {
-        await bridge.init();
-        bridge.loadNetlist(this._materializeCir());
-        bridge.runTran(stopStr, stepStr, tMaxStr);
-        this._ngSession = bridge.getCaptureSession();
-        this._buildNodeMapping(bridge);
+        const spec: NgspiceJobSpec = {
+          dllPath: this._dllPath,
+          netlist: this._materializeCir(),
+          analysis: {
+            kind: "tran",
+            tStop: stopStr,
+            tStep: stepStr,
+            ...(tMaxStr !== undefined ? { tMax: tMaxStr } : {}),
+          },
+        };
+        const runResult = await runNgspiceGuarded(spec);
+        this._ngSession = runResult.session ?? { source: "ngspice", topology: emptyTopology(), steps: [] };
+        this._buildNodeMapping(runResult.ngspiceTopology);
       } catch (e: any) {
         this.errors.push(`ngspice transient failed: ${e.message}`);
         this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
-      } finally {
-        bridge.dispose();
       }
     } else if (this._opts.selfCompare) {
       this._ngSession = deepCloneSession(this._ourSession, "ngspice");
@@ -3207,7 +3240,17 @@ export class ComparisonSession {
             oMap.set(cellKey(row, c), { row, col: c, re: oM.valsRe[idx], im: oM.valsIm[idx] });
           }
         }
-        // ngspice: same CSC convention; apply row/col map translation.
+        // ngspice: canonical END-of-column CSC convention (colPtr[c] = end of
+        // col c), identical to the `oMap` loop above. The raw C-side AC matrix
+        // capture (ni_ac_capture_matrix, niiter.c:432) emits a START-of-column
+        // offset array, but `buildAcCaptureSession` (ngspice-bridge.ts)
+        // normalizes that to the END-of-column convention at the FFI boundary -
+        // mirroring how the DC/TRAN bridge decoder dissolves the same START
+        // layout into flat {row,col} triples (ngspice-bridge.ts:932-934). Both
+        // matrix sources reaching this walk (real-ngspice via the normalized
+        // bridge, selfCompare via the deep clone of our END-convention export)
+        // therefore share one convention; reading them identically keeps the
+        // ngspice Jacobian column-aligned with ours before row/col translation.
         const ngRowMap = this._ngMatrixRowMap;
         const ngColMap = this._ngMatrixColMap;
         const haveMaps = ngRowMap.size > 0 && ngColMap.size > 0;
@@ -3719,8 +3762,7 @@ export class ComparisonSession {
     return ours.stepStartTime - ng.stepStartTime;
   }
 
-  private _buildNodeMapping(bridge: NgspiceBridge): void {
-    const ngTopo = bridge.getTopology();
+  private _buildNodeMapping(ngTopo: import("./types.js").NgspiceTopology | null): void {
     if (ngTopo) {
       this._ngTopology = ngTopo;
       this._nodeMap = buildDirectNodeMapping(
@@ -3843,6 +3885,31 @@ export class ComparisonSession {
         : [];
     }
     return this._comparisons;
+  }
+
+  /**
+   * Resolve the author-supplied `nodesets` map (net/pin NAME -> volts) into the
+   * id-keyed map `generateSpiceNetlist` consumes (digiTS node id -> volts).
+   * Returns undefined when no nodesets were supplied. Throws naming any
+   * unresolved name rather than silently dropping it — a nodeset that targets
+   * no node would steer nothing and quietly defeat the test's purpose.
+   */
+  private _resolveNodesetNames(): ReadonlyMap<number, number> | undefined {
+    const authored = this._opts.nodesets;
+    if (!authored || authored.size === 0) return undefined;
+    const resolved = new Map<number, number>();
+    for (const [name, value] of authored) {
+      const nodeId = this._findNodeIdByLabel(name, this._ourTopology.nodeLabels);
+      if (nodeId === null) {
+        const known = [...this._ourTopology.nodeLabels.values()].join(", ");
+        throw new Error(
+          `ComparisonSession: nodeset name '${name}' did not resolve to any ` +
+          `compiled node. Known node labels: [${known}].`
+        );
+      }
+      resolved.set(nodeId, value);
+    }
+    return resolved;
   }
 
   private _findNodeIdByLabel(label: string, nodeLabels: Map<number, string>): number | null {

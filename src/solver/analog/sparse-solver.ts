@@ -284,11 +284,20 @@ export class SparseSolver {
   //     * _initStructure- initial alloc (spalloc.c:170)
   //     * allocElement (new A-entry, not fill-in)- spbuild.c:788 inside
   //       spcCreateElement (B4 trigger: mid-assembly A-matrix insertion)
-  //     * forceReorder()- niiter.c:858 NISHOULDREORDER on (MODEINITJCT ||
-  //       (MODEINITTRAN && iterno==1))
   //     * invalidateTopology()- spStripMatrix path (sputils.c:1112)
   //   _needsReorder = false:
   //     * factorWithReorder() success- spfactor.c:279 `NeedsOrdering = NO`
+  //
+  // NeedsOrdering decides only whether a factor *re-derives* the pivot order;
+  // it does NOT decide which factor routine runs. That choice is the CKTniState
+  // NISHOULDREORDER bit (cktdefs.h:144), which lives in the NI layer, not here:
+  // niiter.c:1093-1142 calls SMPreorder (orderAndFactor) when NISHOULDREORDER is
+  // set and SMPluFac (factor) otherwise. digiTS keeps that routing in the NR
+  // loop (newton-raphson.ts), which calls orderAndFactor() vs factor()
+  // accordingly. The two entry points share this NeedsOrdering gate: with
+  // NeedsOrdering = NO, orderAndFactor() re-factors against the existing order
+  // via the reuse loop (spfactor.c:223), and factor() likewise defers to
+  // spOrderAndFactor only when NeedsOrdering is set (spfactor.c:333-335).
   //
   //   _factored = true (ngspice Factored = YES):
   //     * factorWithReorder() success- spfactor.c:281 `Factored = YES`
@@ -707,6 +716,26 @@ export class SparseSolver {
   }
 
   /**
+   * ngspice SMPreorder (spsmp.c:194-198) → spOrderAndFactor. The reorder-capable
+   * entry point: spOrderAndFactor re-derives the pivot order when NeedsOrdering
+   * (_needsReorder) is set, otherwise re-factors against the existing order via
+   * its reuse loop (spfactor.c:223). The NI layer (newton-raphson.ts) calls this
+   * instead of factor() when its NISHOULDREORDER routing bit is set
+   * (niiter.c:1093-1095); cf. SMPluFac → spFactor in factor() above.
+   */
+  orderAndFactor(pivTol: number = 0, gmin: number = 0): number {
+    // ngspice spsmp.c:194- NG_IGNORE(PivTol); thresholds arrive via
+    // setPivotTolerances, so passing 0.0 keeps the stored values
+    // (spfactor.c:204-211).
+    void pivTol;
+    // ngspice spsmp.c:197- LoadGmin before the factor.
+    this._loadGmin(gmin);
+    this._lastFactorWalkedReorder = false;
+    // ngspice spsmp.c:198- SMPreorder calls spOrderAndFactor.
+    return this._spOrderAndFactor(null, 0.0, 0.0, DIAG_PIVOTING_AS_DEFAULT);
+  }
+
+  /**
    * ngspice MatrixFrame.Reordered (spdefs.h:770)- true iff the most
    * recent factor pass walked the reorder loop in `_spOrderAndFactor`.
    * Sticky once set; mirrors `Matrix->Reordered` lifetime.
@@ -841,23 +870,6 @@ export class SparseSolver {
     //   for (I = Size; I > 0; I--)
     //       Solution[*(pExtOrder--)] = Intermediate[I];
     for (let i = n; i >= 1; i--) solution[intToExtCol[i]] = b[i];
-
-    if (process.env.DIGITS_LU_LOG === "1") {
-      const g = globalThis as Record<string, unknown>;
-      const cnt = ((g.__solveN as number) ?? 0) + 1;
-      if (cnt <= 12) {
-        g.__solveN = cnt;
-        const i2e: string[] = [], rhsA: string[] = [], diagA: string[] = [], solA: string[] = [];
-        for (let i = 1; i <= n; i++) {
-          i2e.push(`${intToExtRow[i]}`);
-          rhsA.push(rhs[intToExtRow[i]].toPrecision(17));
-          diagA.push((diag[i] >= 0 ? elVal[diag[i]] : NaN).toPrecision(17));
-          solA.push(solution[intToExtCol[i]].toPrecision(17));
-        }
-        // eslint-disable-next-line no-console
-        console.error(`[SOLVE] n=${cnt} size=${n} i2eRow=[${i2e.join(",")}] rhs=[${rhsA.join(",")}] diag=[${diagA.join(",")}] sol=[${solA.join(",")}]`);
-      }
-    }
   }
 
   /**
@@ -1014,20 +1026,12 @@ export class SparseSolver {
    *
    * Relative threshold must satisfy 0 < rel <= 1 to match ngspice semantics;
    * ngspice silently falls back to the stored default when the value is
-   * out of range (spfactor.c:204-208). We mirror that fallback here so
+   * out of range (spfactor.c:204-208). We mirror that clamp-to-default here so
    * per-call tolerance mistakes never disable pivoting.
    */
   setPivotTolerances(relThreshold: number, absThreshold: number): void {
     if (relThreshold > 0 && relThreshold <= 1) this._relThreshold = relThreshold;
     if (absThreshold >= 0) this._absThreshold = absThreshold;
-  }
-
-  /**
-   * Force full symbolic reorder on next factor() call.
-   * ngspice: NISHOULDREORDER trigger (niiter.c:858, 861-880).
-   */
-  forceReorder(): void {
-    this._needsReorder = true;
   }
 
   /**
@@ -2794,7 +2798,7 @@ export class SparseSolver {
   /**
    * ngspice SearchEntireMatrix (spfactor.c:1730-1809)- line-for-line port.
    * Last-resort search across every column in [step, n). Records the largest-
-   * magnitude element pre-emptively so the spSMALL_PIVOT fallback returns it
+   * magnitude element pre-emptively so the spSMALL_PIVOT path returns it
    * when no acceptable pivot meets RelThreshold * LargestInCol.
    */
   private _searchEntireMatrix(step: number): number {

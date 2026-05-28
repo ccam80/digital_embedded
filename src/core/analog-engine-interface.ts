@@ -166,6 +166,16 @@ export interface SimulationParams {
    * transient DC-OP solve. Default: false.
    */
   copyNodesets?: boolean;
+  /**
+   * Inductive-coupling diagnostic verbosity (ngspice CKTindverbosity,
+   * cktdefs.h:111). Gates the MUTtemp Cholesky positive-definite verification
+   * pass over coupled-inductor systems:
+   *   0 = no verification;
+   *   1 = emit on non-positive-definite / duplicate K / |K|>1 / L<0;
+   *   2 = also emit on incomplete K coupling sets (missing K's implicitly 0).
+   * Default: 2 (ngspice cktinit.c:65). Hot-loadable via configure().
+   */
+  indVerbosity?: number;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
@@ -204,6 +214,7 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   temp: 300.15,
   nomTemp: 300.15,
   copyNodesets: false,
+  indVerbosity: 2,
 };
 
 /**
@@ -355,9 +366,9 @@ export interface AnalogEngine extends Engine {
   /**
    * Find the DC operating point of the circuit.
    *
-   * Attempts direct Newton-Raphson first; falls back to Gmin stepping, then
-   * source stepping. Emits `Diagnostic` records for every fallback or
-   * failure via the `onDiagnostic` callback.
+   * Attempts direct Newton-Raphson first; if that does not converge it tries
+   * Gmin stepping, then source stepping. Emits `Diagnostic` records for each
+   * stepping stage or failure via the `onDiagnostic` callback.
    */
   dcOperatingPoint(): DcOpResult;
 
@@ -507,7 +518,7 @@ export interface AnalogEngine extends Engine {
   addMeasurementObserver(observer: MeasurementObserver): void;
 
   /**
-   * Remove a previously registered measurement observer.
+   * Remove a measurement observer registered via addMeasurementObserver.
    */
   removeMeasurementObserver(observer: MeasurementObserver): void;
 }

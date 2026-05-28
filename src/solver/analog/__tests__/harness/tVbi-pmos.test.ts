@@ -25,12 +25,15 @@ import {
 } from '../../../../components/semiconductors/mosfet.js';
 
 // ---------------------------------------------------------------------------
-// Physical constants (matching mosfet.ts / ngspice const.h)
+// Physical constants (imported from the canonical core source so the expected
+// Vbi is computed from the same constants the production code uses)
 // ---------------------------------------------------------------------------
-const CONSTboltz = 1.3806226e-23;
-const Q = 1.6021918e-19;
-const KoverQ = CONSTboltz / Q;
-const REFTEMP = 300.15;
+import {
+  CONSTboltz,
+  CHARGE as Q,
+  CONSTKoverQ as KoverQ,
+  REFTEMP,
+} from '../../../../core/constants.js';
 
 /**
  * Implements the ngspice mos1temp.c tVbi formula directly.

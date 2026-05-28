@@ -171,6 +171,8 @@ function canonicalizeNgspiceDeviceType(ngspiceType: string): string | null {
     "capacitor": "capacitor", "inductor": "inductor",
     "diode": "diode", "bjt": "bjt",
     "mos1": "mosfet", "mosfet": "mosfet", "jfet": "jfet",
+    // ngspice VDMOSinfo.name = "VDMOS" (vdmosinit.c:12), lowercased here.
+    "vdmos": "vdmos",
     "switch": "vswitch",
   };
   return map[lower] ?? null;
@@ -189,7 +191,7 @@ function unpackElementStates(
   for (const dev of topology.devices) {
     const deviceType = canonicalizeNgspiceDeviceType(dev.typeName);
     const mapping = deviceType ? DEVICE_MAPPINGS[deviceType] : undefined;
-    if (!mapping) continue;
+    if (!deviceType || !mapping) continue;
 
     const slots: Record<string, number> = {};
     const state1Slots: Record<string, number> = {};
@@ -210,6 +212,9 @@ function unpackElementStates(
       snapshots.push({
         elementIndex: -1,
         label: dev.name.toUpperCase(),
+        // Record the canonical device type so the comparator routes slot
+        // mapping by type rather than label prefix (VDMOS/MOSFET share `M`).
+        deviceType,
         slots, state1Slots, state2Slots, state3Slots,
         pinCurrents,
       });
@@ -581,13 +586,45 @@ export function buildCaptureSession(
 // ---------------------------------------------------------------------------
 
 /**
+ * Convert the raw ngspice AC matrix `colPtr` from its START-of-column layout
+ * to the canonical END-of-column layout our SparseSolver export and every
+ * downstream CSC consumer use.
+ *
+ * The C-side capture `ni_ac_capture_matrix` (niiter.c:432) builds colPtr with
+ * `colPtr[ec+1]++`, yielding a START offset array of length `matrixSize+1`:
+ * external column `col`'s non-zeros live at indices [colPtr[col], colPtr[col+1])
+ * and the leading entry colPtr[0] is always 0. Our solver's export
+ * (ac-analysis.ts:391-398) instead makes colPtr[c] the END of column c, so
+ * column c spans [colPtr[c-1], colPtr[c]) with colPtr[0]=0 and colPtr[N]=nnz.
+ *
+ * The two layouts differ by exactly one position: reading raw column c as
+ * [raw[c], raw[c+1]) equals reading the dropped-leading array as
+ * [out[c-1], out[c]). So the normalization is `out[k] = raw[k+1]` for all k -
+ * drop the leading element. The rowIdx/vals* arrays are already column-major
+ * (the C scatter walks columns in order) and are reused verbatim.
+ *
+ * This mirrors how the DC/TRAN bridge decoder dissolves the same START layout
+ * into flat {row,col} triples (ngspice-bridge.ts in the iteration callback):
+ * the FFI boundary owns the convention translation so no downstream comparator
+ * has to special-case the ngspice CSC.
+ */
+function normalizeAcColPtr(rawColPtr: Int32Array): Int32Array {
+  if (rawColPtr.length <= 1) return rawColPtr;
+  const out = new Int32Array(rawColPtr.length - 1);
+  for (let k = 0; k < out.length; k++) out[k] = rawColPtr[k + 1];
+  return out;
+}
+
+/**
  * Build an `AcCaptureSession` from the bridge's per-frequency raw points.
  *
  * Sibling of `buildCaptureSession` for the AC path. The translation is
  * mechanical- each `RawNgspiceAcPoint` becomes an `AcCapturePoint` with
- * the CSC matrix tucked into the optional `matrix` field, plus the loaded
- * RHS. Topology is caller-supplied (Phase 2 callers pass `emptyTopology()`;
- * Phase 3 will wire the proper node-name resolution via NgspiceTopology).
+ * the CSC matrix tucked into the optional `matrix` field (its colPtr
+ * normalized to the canonical END-of-column convention via
+ * `normalizeAcColPtr`), plus the loaded RHS. Topology is caller-supplied
+ * (Phase 2 callers pass `emptyTopology()`; Phase 3 wires the proper node-name
+ * resolution via NgspiceTopology).
  *
  * Pure function- unit tests drive it with synthetic raw point arrays.
  */
@@ -607,7 +644,7 @@ export function buildAcCaptureSession(
     solIm: p.solIm,
     matrix: {
       nnz: p.nnz,
-      colPtr: p.colPtr,
+      colPtr: normalizeAcColPtr(p.colPtr),
       rowIdx: p.rowIdx,
       valsRe: p.valsRe,
       valsIm: p.valsIm,
@@ -1120,5 +1157,108 @@ export class NgspiceBridge {
       this._lib.func("void ni_topology_register(void*)")(null);
       this._lib = null;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// In-process run entry point (single koffi load site)
+//
+// `runNgspiceInProcess` is the ONLY place in the harness that drives an
+// `NgspiceBridge` end to end (init → loadNetlist → run → capture → dispose).
+// Both the in-process call path and the out-of-process worker
+// (`ngspice-worker.ts`) funnel through it, so the FFI loading + callback
+// registration logic lives in exactly one place. The crash-prone callers
+// (MCP `harness_run`, `ComparisonSession`) route here through the guard
+// (`ngspice-guarded.ts`) which spawns the worker; the worker then calls
+// THIS function in its isolated child process.
+// ---------------------------------------------------------------------------
+
+/** The analysis to run, plus its parameters, in a serialization-friendly shape. */
+export type NgspiceJobAnalysis =
+  | { kind: "dcop" }
+  | { kind: "tran"; tStop: string; tStep: string; tMax?: string }
+  | { kind: "ac"; type: "dec" | "oct" | "lin"; n: number; fStart: number; fStop: number };
+
+/**
+ * Fully self-describing ngspice run request. Carries everything the worker
+ * needs to reproduce one bridge run in an isolated process: the resolved DLL
+ * path, the materialized netlist deck (already TEMP-injected / control-stripped
+ * by the caller), and the analysis spec. No engine objects, file handles, or
+ * closures — it round-trips through JSON unchanged.
+ */
+export interface NgspiceJobSpec {
+  dllPath: string;
+  netlist: string;
+  analysis: NgspiceJobAnalysis;
+}
+
+/**
+ * Result of an in-process ngspice run. For DC/TRAN the `session` carries the
+ * full `CaptureSession` (with topology). For AC the `acPoints` carry the raw
+ * per-frequency points (the caller builds the `AcCaptureSession` via
+ * `buildAcCaptureSession`, since topology resolution is caller-owned). The
+ * `topology` (raw + parsed) is returned alongside so the AC path can reuse the
+ * same node-mapping the DC/TRAN path gets for free inside `CaptureSession`.
+ */
+export interface NgspiceRunResult {
+  analysis: "dcop" | "tran" | "ac";
+  /** Populated for dcop / tran. */
+  session: CaptureSession | null;
+  /** Populated for ac. */
+  acPoints: RawNgspiceAcPoint[] | null;
+  /** Raw + parsed ngspice topology (needed by AC caller for node mapping). */
+  ngspiceTopology: NgspiceTopology | null;
+  rawNgspiceTopology: RawNgspiceTopology | null;
+}
+
+/**
+ * Drive one full ngspice bridge run in the CURRENT process.
+ *
+ * This is the pure FFI work shared by the in-process path and the guarded
+ * worker child. It throws on any bridge error (DLL load failure, missing AC
+ * symbol, ngspice command failure) — callers wrap it (the worker serializes
+ * the throw to an error JSON; the guard surfaces it as a typed error).
+ *
+ * SAFETY: this loads ngspice via koffi in-process and has NO timeout / memory
+ * cap of its own. A runaway native deck (e.g. VDMOS) can exhaust the host. Do
+ * not call this directly for untrusted/crash-prone decks — go through
+ * `runNgspiceGuarded` (ngspice-guarded.ts) which runs the worker that calls
+ * this in an isolated, Job-Object-capped child.
+ */
+export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<NgspiceRunResult> {
+  const bridge = new NgspiceBridge(spec.dllPath);
+  try {
+    await bridge.init();
+    bridge.loadNetlist(spec.netlist);
+    if (spec.analysis.kind === "dcop") {
+      bridge.runDcOp();
+      return {
+        analysis: "dcop",
+        session: bridge.getCaptureSession(),
+        acPoints: null,
+        ngspiceTopology: bridge.getTopology(),
+        rawNgspiceTopology: bridge.getRawTopology(),
+      };
+    } else if (spec.analysis.kind === "tran") {
+      bridge.runTran(spec.analysis.tStop, spec.analysis.tStep, spec.analysis.tMax);
+      return {
+        analysis: "tran",
+        session: bridge.getCaptureSession(),
+        acPoints: null,
+        ngspiceTopology: bridge.getTopology(),
+        rawNgspiceTopology: bridge.getRawTopology(),
+      };
+    } else {
+      bridge.runAc(spec.analysis.type, spec.analysis.n, spec.analysis.fStart, spec.analysis.fStop);
+      return {
+        analysis: "ac",
+        session: null,
+        acPoints: bridge.getAcPoints(),
+        ngspiceTopology: bridge.getTopology(),
+        rawNgspiceTopology: bridge.getRawTopology(),
+      };
+    }
+  } finally {
+    bridge.dispose();
   }
 }

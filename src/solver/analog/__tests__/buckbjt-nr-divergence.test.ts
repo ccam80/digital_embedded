@@ -24,6 +24,10 @@ const registry = createDefaultRegistry();
 describe('buckbjt NR divergence: per-iteration voltages', () => {
   it('step 0 and step 1 iteration-by-iteration', async () => {
     // --- ngspice ---
+    // Deliberately UNGUARDED, in-process bridge: this is an in-repo parity test
+    // off the MCP path, not the agent-facing harness_run surface. It must never
+    // be pointed at a VDMOS deck (the unbounded native run the guard exists to
+    // contain). Crash-prone / agent-driven runs go through runNgspiceGuarded.
     const bridge = new NgspiceBridge(DLL_PATH);
     await bridge.init();
     const circuitOnly = BUCKBJT_CIR

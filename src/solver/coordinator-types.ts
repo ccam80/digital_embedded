@@ -11,7 +11,7 @@
 
 import type { MeasurementObserver, SnapshotId } from "../core/engine-interface.js";
 import { EngineState } from "../core/engine-interface.js";
-import type { DcOpResult } from "../core/analog-engine-interface.js";
+import type { DcOpResult, SimulationParams } from "../core/analog-engine-interface.js";
 import type { StepRecord } from "./analog/convergence-log.js";
 import type { Diagnostic, SignalAddress, SignalValue } from "../compile/types.js";
 import type { LimitingEvent } from "./analog/newton-raphson.js";
@@ -234,6 +234,14 @@ export interface SimulationCoordinator {
   setCircuitTemp(K: number): void;
 
   /**
+   * Merge solver parameters into the active SimulationParams and apply them to
+   * the analog engine (the same hot-load path tolerances take). No-op for
+   * digital-only circuits. Used to forward engine knobs such as `indVerbosity`,
+   * `reltol`, and `gmin` from the headless / MCP / postMessage surfaces.
+   */
+  configure(params: Partial<SimulationParams>): void;
+
+  /**
    * Step until simTime >= targetSimTime, with optional wall-clock budget.
    * Returns the number of steps taken. No-op (returns 0) for discrete-only circuits.
    * @param targetSimTime - Target simulation time in seconds
@@ -439,7 +447,7 @@ export interface SimulationCoordinator {
   saveSnapshot(): SnapshotId;
 
   /**
-   * Restore engine state from a previously saved snapshot.
+   * Restore engine state from a snapshot saved by saveSnapshot().
    * No-op if no digital backend is active or the ID is unknown.
    */
   restoreSnapshot(id: SnapshotId): void;

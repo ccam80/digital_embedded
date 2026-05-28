@@ -150,6 +150,7 @@ import { NpnBjtDefinition } from "./semiconductors/bjt.js";
 import { PnpBjtDefinition } from "./semiconductors/bjt.js";
 import { NmosfetDefinition } from "./semiconductors/mosfet.js";
 import { PmosfetDefinition } from "./semiconductors/mosfet.js";
+import { VdmosNDefinition, VdmosPDefinition } from "./semiconductors/vdmos.js";
 import { NJfetDefinition } from "./semiconductors/njfet.js";
 import { PJfetDefinition } from "./semiconductors/pjfet.js";
 import { SchottkyDiodeDefinition } from "./semiconductors/schottky.js";
@@ -446,6 +447,8 @@ export function createDefaultRegistry(
   registry.register(PnpBjtDefinition);
   registry.register(NmosfetDefinition);
   registry.register(PmosfetDefinition);
+  registry.register(VdmosNDefinition);
+  registry.register(VdmosPDefinition);
   registry.register(NJfetDefinition);
   registry.register(PJfetDefinition);
   registry.register(ScrDefinition);

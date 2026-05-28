@@ -1056,6 +1056,14 @@ export class MNAEngine implements AnalogEngine {
     const ac = new AcAnalysis(adapted, this._params, {
       ...deps,
       solverFactory: deps?.solverFactory ?? (() => this._solver),
+      // ngspice runs CKTop + CKTacLoad on one ckt over the one TSTALLOC'd
+      // matrix (CKTsetup). Hand AcAnalysis the engine's setup-allocated context
+      // so the DC-OP that precedes the sweep stamps through each element's
+      // setup()-cached handles into this solver- leaving finite gm/gds/cap
+      // operating-point state in the element slots the per-frequency acLoad
+      // reads. A separate fresh context would have no handles and mis-stamp
+      // every nonlinear device (all-NaN AC solution).
+      cktContext: deps?.cktContext ?? this._ctx!,
     });
     return ac.run(params);
   }
@@ -1245,6 +1253,17 @@ export class MNAEngine implements AnalogEngine {
       // just entered the transient loop with the new finalTime.
       const finalTime = this._params.tStop ?? Number.POSITIVE_INFINITY;
       this._timestep.restartTransientLoop(finalTime);
+    }
+
+    // CKTindverbosity is consumed inside MUTtemp (muttemp.c:58), which the DC
+    // flow re-runs via CKTtemp (cktdojob.c:161-170 — CKTsetup → CKTtemp →
+    // solve). When configure() changes the gate post-setup, re-run the
+    // temperature pass so the inductive-system verify re-fires with the new
+    // verbosity (refreshTolerances has already pushed the value into the ctx and
+    // invalidated the cached TempContext above).
+    if ("indVerbosity" in params && this._ctx && this._isSetup) {
+      const cac = this._compiled as ConcreteCompiledAnalogCircuit | null;
+      if (cac) cktTemp(this._ctx, cac.elementsByFamily);
     }
   }
 

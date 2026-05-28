@@ -12,15 +12,31 @@ export const MAX_INPUT_BITS = 20;
 export const MAX_DEPTH = 30;
 
 // ---------------------------------------------------------------------------
-// Physical constants (ngspice CONSTroot / const.h values)
+// Physical constants (ngspice const.h)
 // ---------------------------------------------------------------------------
+// Single source of truth for the SPICE physical constants. Every analog device
+// model imports these so vt / vcrit / Vbi / temperature-scaled quantities are
+// bit-identical to ngspice. Do not redefine these literals anywhere else.
+
+/** Elementary charge in coulombs (ref/ngspice/src/include/ngspice/const.h:32). */
+export const CHARGE = 1.6021766208e-19;
+
+/** Boltzmann constant in J/K (ref/ngspice/src/include/ngspice/const.h:37). */
+export const CONSTboltz = 1.38064852e-23;
 
 /**
- * Thermal voltage at REFTEMP (300.15 K): REFTEMP * CONSTKoverQ.
- *
- * Uses ngspice's exact Boltzmann and electron-charge values from const.h:
- *   CONSTboltz  = 1.3806226e-23  J/K
- *   CHARGE      = 1.6021918e-19  C
- *   REFTEMP     = 300.15         K   (27 °C)
+ * Boltzmann constant divided by elementary charge (k/q), in V/K.
+ * Formed as CONSTboltz / CHARGE, matching ref/ngspice/src/main.c:498
+ * (`double CONSTKoverQ = CONSTboltz / CHARGE;`). ckttemp.c:26 then computes
+ * the circuit thermal voltage as `CKTvt = CONSTKoverQ * CKTtemp`.
  */
-export const VT = 300.15 * 1.3806226e-23 / 1.6021918e-19;
+export const CONSTKoverQ = CONSTboltz / CHARGE;
+
+/** Celsius-to-Kelvin offset (ref/ngspice/src/include/ngspice/const.h:25). */
+export const CONSTCtoK = 273.15;
+
+/** Reference temperature in K: 27 °C (ref/ngspice/src/include/ngspice/const.h:54, `27.0 + CONSTCtoK`). */
+export const REFTEMP = 27.0 + CONSTCtoK;
+
+/** Thermal voltage at REFTEMP (300.15 K): REFTEMP * CONSTKoverQ, in volts. */
+export const VT = REFTEMP * CONSTKoverQ;

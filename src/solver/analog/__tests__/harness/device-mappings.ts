@@ -312,6 +312,72 @@ export const JFET_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
+// VDMOS (LTspice-compatible vertical DMOS power MOSFET, ngspice VDMOS)
+// ---------------------------------------------------------------------------
+// ngspice vdmos state offsets (vdmosdefs.h:251-274, VDMOSnumStates=18):
+//   VDMOSvgs=0, VDMOSvds=1, VDMOSdelTemp=2,
+//   VDMOScapgs=3, VDMOSqgs=4, VDMOScqgs=5,
+//   VDMOScapgd=6, VDMOSqgd=7, VDMOScqgd=8,
+//   VDIOvoltage=9, VDIOcurrent=10, VDIOconduct=11,
+//   VDIOcapCharge=12, VDIOcapCurrent=13,
+//   VDMOScapth=14, VDMOSqth=15, VDMOScqth=16,
+//   VDIOdIdio_dT=17
+//
+// digiTS schema (vdmos.ts VDMOS_SCHEMA): VGS=0, VDS=1, DELTEMP=2, CAPGS=3,
+// QGS=4, CQGS=5, CAPGD=6, QGD=7, CQGD=8, VDIO_V=9, VDIO_I=10, VDIO_G=11,
+// VDIO_QCAP=12, VDIO_CCAP=13, CAPTH=14, QTH=15, CQTH=16, VDIO_DIDT=17 —
+// same offsets, ngspice-exact 1:1 index map.
+//
+// VDMOS pin currents: NOT projectable from CKTstate. Like MOSFET, the
+// terminal currents live on the per-instance struct (VDMOSid etc.), not in
+// CKTstate — the 18 state slots are gate-cap charges/currents, body-diode
+// voltage/current/conductance, and self-heating thermal terms, none of which
+// is a clean drain/gate/source terminal current. `pinCurrents` is omitted.
+export const VDMOS_MAPPING: DeviceMapping = {
+  deviceType: "vdmos",
+  slotToNgspice: {
+    VGS:       0,
+    VDS:       1,
+    DELTEMP:   2,
+    CAPGS:     3,
+    QGS:       4,
+    CQGS:      5,
+    CAPGD:     6,
+    QGD:       7,
+    CQGD:      8,
+    VDIO_V:    9,
+    VDIO_I:    10,
+    VDIO_G:    11,
+    VDIO_QCAP: 12,
+    VDIO_CCAP: 13,
+    CAPTH:     14,
+    QTH:       15,
+    CQTH:      16,
+    VDIO_DIDT: 17,
+  },
+  ngspiceToSlot: {
+    0:  "VGS",
+    1:  "VDS",
+    2:  "DELTEMP",
+    3:  "CAPGS",
+    4:  "QGS",
+    5:  "CQGS",
+    6:  "CAPGD",
+    7:  "QGD",
+    8:  "CQGD",
+    9:  "VDIO_V",
+    10: "VDIO_I",
+    11: "VDIO_G",
+    12: "VDIO_QCAP",
+    13: "VDIO_CCAP",
+    14: "CAPTH",
+    15: "QTH",
+    16: "CQTH",
+    17: "VDIO_DIDT",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Voltage-controlled switch (ngspice SW / VSWITCH)
 // ---------------------------------------------------------------------------
 // ngspice sw state offsets (swdefs.h:56, swload.c:140-141):
@@ -348,6 +414,7 @@ export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
   bjt: BJT_MAPPING,
   mosfet: MOSFET_MAPPING,
   jfet: JFET_MAPPING,
+  vdmos: VDMOS_MAPPING,
   vswitch: VSWITCH_MAPPING,
 };
 
@@ -360,6 +427,8 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
   PnpBJT: "bjt",
   NMOS: "mosfet",
   PMOS: "mosfet",
+  VDMOSN: "vdmos",
+  VDMOSP: "vdmos",
   NJFET: "jfet",
   PJFET: "jfet",
   Diode: "diode",

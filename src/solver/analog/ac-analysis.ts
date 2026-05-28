@@ -26,12 +26,11 @@ import { SparseSolver } from "./sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { CKTCircuitContext } from "./ckt-context.js";
-import { MODEAC, MODEUIC } from "./ckt-mode.js";
+import { MODEAC, MODEUIC, MODEDCOP, MODEINITJCT } from "./ckt-mode.js";
 import type { AnalogElement } from "./element.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import type { SimulationParams } from "../../core/analog-engine-interface.js";
 import type { Diagnostic } from "../../compile/types.js";
-import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
 import { runByDeviceFamily } from "./family-dispatch.js";
 import { defaultStampAcHandler, type AcHandlerCtx } from "./loaders/default-loaders.js";
 
@@ -113,6 +112,26 @@ export interface AcAnalysisDeps {
   /** Factory returning the SparseSolver used for the frequency sweep. */
   solverFactory?: () => SparseSolver;
   /**
+   * The engine's setup-allocated circuit context, used for the DC operating
+   * point that precedes the frequency sweep.
+   *
+   * ngspice runs CKTop (DC-OP) and CKTacLoad on the SAME `ckt` over the SAME
+   * matrix: CKTsetup builds one matrix (TSTALLOC) that DC and AC reuse, so the
+   * DC-OP linearizes every nonlinear device into the exact element-state slots
+   * (`VDMOSgm`, `VDMOScapgs`, …) that the per-frequency acLoad later reads. The
+   * AC analysis MUST share that one context: each element's setup()-cached
+   * matrix handles address cells in this context's solver, and only a DC-OP run
+   * against this same solver leaves finite gm/gds/cap state behind.
+   *
+   * Injected by `MNAEngine.acAnalysis` (`deps.cktContext = this._ctx`). The
+   * caller is responsible for having run `_setup()` (TSTALLOC + buffer sizing)
+   * before handing the context over; AcAnalysis sets the DC-OP analysis mode
+   * and runs `solveDcOperatingPoint` on it. Required- there is no fresh-context
+   * path, because a fresh `SparseSolver` has none of the element handles
+   * and would silently mis-stamp every nonlinear device (all-NaN solution).
+   */
+  cktContext?: CKTCircuitContext;
+  /**
    * Optional per-frequency snapshot sink. Called once per successful complex
    * solve with the loaded complex matrix CSC (captured pre-factor), the
    * loaded complex RHS (captured pre-solve), and the post-solve complex
@@ -163,16 +182,24 @@ export interface AcAnalysisDeps {
  */
 export class AcAnalysis {
   private readonly _compiled: AcCompiledCircuit;
-  private readonly _params: SimulationParams;
   private readonly _deps: AcAnalysisDeps;
 
+  /**
+   * @param compiled - Adapted compiled-circuit view (matrixSize, elements, …).
+   * @param _params  - Simulation params. Retained on the constructor signature
+   *   for call-site symmetry with the engine, but unused: the DC operating
+   *   point runs on `deps.cktContext`, whose params the engine has already
+   *   resolved and bound (ngspice runs CKTop + CKTacLoad on one ckt that owns
+   *   the option set). The per-frequency sweep reads no analysis tolerances of
+   *   its own.
+   * @param deps - solver / DC-OP context / snapshot-sink injection.
+   */
   constructor(
     compiled: AcCompiledCircuit,
-    params?: Partial<SimulationParams>,
+    _params?: Partial<SimulationParams>,
     deps?: AcAnalysisDeps,
   ) {
     this._compiled = compiled;
-    this._params = { ...DEFAULT_SIMULATION_PARAMS, ...params };
     this._deps = deps ?? {};
   }
 
@@ -188,10 +215,41 @@ export class AcAnalysis {
   run(params: AcParams): AcResult {
     const { compiled, diagnostics } = this._setupAnalysis();
 
-    // Step 1: Solve DC operating point
-    const dcCtx = new CKTCircuitContext(compiled, resolveSimulationParams(this._params), () => {}, new SparseSolver());
+    // Step 1: Solve DC operating point on the engine's setup-allocated context.
+    //
+    // ngspice acan.c calls CKTop(ckt, ...) (the DC-OP) and then CKTacLoad on
+    // the SAME ckt over the SAME matrix that CKTsetup built (TSTALLOC). The
+    // DC-OP linearizes every nonlinear device into its element-state slots
+    // (VDMOSgm / VDMOScapgs / …) and the per-frequency acLoad reads those exact
+    // slots back. We mirror that by running the DC-OP on the engine context
+    // injected via deps.cktContext: its solver is the one each element's
+    // setup()-cached matrix handles address, so the DC-OP stamps land in the
+    // right cells and leave finite gm/gds/cap state behind. A fresh
+    // SparseSolver has none of those handles- stamping through them mis-routes
+    // every nonlinear device and yields an all-NaN AC solution.
+    const dcCtx = this._deps.cktContext;
+    if (!dcCtx) {
+      throw new Error(
+        "AcAnalysis requires the engine's setup-allocated context via " +
+        "deps.cktContext (injected by MNAEngine.acAnalysis). The DC operating " +
+        "point that precedes the sweep must run on the same TSTALLOC'd matrix " +
+        "the elements' setup() handles address- a fresh context mis-stamps " +
+        "nonlinear devices. Run AC through the engine/coordinator.",
+      );
+    }
     // Share the AC sweep's diagnostic collector so DC-OP diagnostics surface upstream.
     dcCtx.diagnostics = diagnostics;
+    // dcop.c:82 — firstmode = (CKTmode & MODEUIC) | MODEDCOP | MODEINITJCT.
+    // Mirror MNAEngine.dcOperatingPoint()'s analysis-mode and integration-state
+    // preconditions: standalone .OP is MODEDCOP (not MODETRANOP); ag[0]=ag[1]=0
+    // and srcFact=1 and loadCtx.dt=0 are the implicit DCOP-entry invariants
+    // ngspice maintains (dctran.c:348 zeroes CKTag; CKTsrcFact enters at 1).
+    const uicBit = dcCtx.cktMode & MODEUIC;
+    dcCtx.cktMode = uicBit | MODEDCOP | MODEINITJCT;
+    dcCtx.srcFact = 1;
+    dcCtx.ag[0] = 0;
+    dcCtx.ag[1] = 0;
+    dcCtx.loadCtx.dt = 0;
     solveDcOperatingPoint(dcCtx);
     const dcResult = dcCtx.dcopResult;
 
@@ -342,10 +400,19 @@ export class AcAnalysis {
         snapshotMatrix = { nnz, colPtr, rowIdx, valsRe, valsIm };
       }
 
-      // ngspice spFactor: fi===0 reorders (spOrderAndFactor, complex path);
-      // subsequent frequencies reuse the pivot order (FactorComplexMatrix).
-      // spOKAY === 0; any nonzero is an error (singular etc.).
-      const err = solver.factor();
+      // ngspice acan.c: the first AC point re-derives the pivot order in the
+      // complex domain (NIacIter -> SMPcReorder -> spOrderAndFactor), then each
+      // subsequent point reuses that order (SMPcLUfac -> FactorComplexMatrix).
+      // The reorder at fi===0 is mandatory here even though the shared solver
+      // already carries a factorization: the preceding DC-OP factored it in the
+      // REAL domain (real-only L/U + a real-derived pivot order), so the matrix
+      // arrives at the sweep with _needsReorder=false. spFactor's reuse loop
+      // would refactor the real LU without ever building the complex
+      // factorization, leaving every solve NaN. orderAndFactor() (spOrderAndFactor)
+      // re-derives the order against the freshly-stamped complex matrix, which
+      // is what ngspice does at the first AC frequency. spOKAY === 0; any
+      // nonzero is an error (singular etc.).
+      const err = fi === 0 ? solver.orderAndFactor() : solver.factor();
 
       if (err === 0) {
         // Harness RHS capture (pre-solve)- mirrors ni_ac_capture_loaded_rhs.

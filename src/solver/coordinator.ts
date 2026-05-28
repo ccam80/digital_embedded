@@ -13,7 +13,7 @@
 
 import type { SimulationEngine, MeasurementObserver, SnapshotId } from '../core/engine-interface.js';
 import { EngineState } from '../core/engine-interface.js';
-import type { AnalogEngine, DcOpResult } from '../core/analog-engine-interface.js';
+import type { AnalogEngine, DcOpResult, SimulationParams } from '../core/analog-engine-interface.js';
 import { DigitalEngine } from './digital/digital-engine.js';
 import type { ConcreteCompiledCircuit } from './digital/digital-engine.js';
 import { ClockManager } from './digital/clock.js';
@@ -491,6 +491,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   setCircuitTemp(K: number): void {
     if (this._analog === null) return;
     this._analog.setCircuitTemp(K);
+  }
+
+  configure(params: Partial<SimulationParams>): void {
+    if (this._analog === null) return;
+    this._analog.configure(params);
   }
 
   async stepToTime(targetSimTime: number, budgetMs = 5000): Promise<number> {

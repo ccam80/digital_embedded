@@ -280,17 +280,34 @@ export function registerSimulationTools(
       description:
         "Compute the DC operating point of the compiled analog or mixed-signal circuit. " +
         "Returns node voltages and convergence information. " +
-        "Returns an error if the circuit has no analog domain.",
+        "Returns an error if the circuit has no analog domain. " +
+        "Optional indVerbosity (ngspice CKTindverbosity, default 2) gates the " +
+        "coupled-inductor Cholesky positive-definiteness verification pass: " +
+        "0 disables it, 1 enables non-positive-definite/duplicate-K checks, " +
+        "2 also enables the incomplete-K coupling-set check.",
       inputSchema: {
         handle: z.string().describe("Circuit handle"),
+        indVerbosity: z
+          .number()
+          .int()
+          .min(0)
+          .max(2)
+          .optional()
+          .describe("Inductive-coupling diagnostic verbosity (ngspice CKTindverbosity). 0/1/2; default 2."),
       },
     },
-    wrapTool<{ handle: string }>(
+    wrapTool<{ handle: string; indVerbosity?: number }>(
       "circuit_dc_op error",
-      ({ handle }) => {
+      ({ handle, indVerbosity }) => {
         const coordinator = ensureEngine(handle, facade, session);
         if (!coordinator.supportsDcOp()) {
           return "DC operating point not available (no analog domain)";
+        }
+        // Forward the engine knob along the existing params-forwarding contract
+        // (coordinator.configure → analog.configure → refreshTolerances), the
+        // same path reltol/gmin/tnom take.
+        if (indVerbosity !== undefined) {
+          coordinator.configure({ indVerbosity });
         }
         const result = coordinator.dcOperatingPoint();
         if (!result) {
@@ -308,10 +325,18 @@ export function registerSimulationTools(
             lines.push(`    node[${i}] = ${result.nodeVoltages[i]!.toFixed(6)} V`);
           }
         }
-        if (result.diagnostics.length > 0) {
+        // Merge DC-OP diagnostics with the coordinator's runtime collector so
+        // temperature-pass emissions (e.g. the inductive-system Cholesky verify
+        // pass routed through ctx.diagnostics) surface on this agent-facing tool.
+        const seen = new Set(result.diagnostics);
+        const diags = [
+          ...result.diagnostics,
+          ...coordinator.getRuntimeDiagnostics().filter((d) => !seen.has(d)),
+        ];
+        if (diags.length > 0) {
           lines.push(`  Diagnostics:`);
-          for (const d of result.diagnostics) {
-            lines.push(`    [${d.severity}] ${d.message}`);
+          for (const d of diags) {
+            lines.push(`    [${d.severity}] ${d.code}: ${d.message}`);
           }
         }
         return lines.join("\n");

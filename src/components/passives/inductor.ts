@@ -37,6 +37,11 @@ import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
 import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
+// Type-only import: erased at compile time, so the inductor↔mutual-inductor
+// reference is structural only and introduces no runtime import cycle. Mirrors
+// ngspice's forward-declared `struct INDsystem *system;` in inddefs.h:72, whose
+// full definition (inddefs.h:169-174) lives alongside the MUTtemp verify pass.
+import type { IndSystem } from "./mutual-inductor.js";
 
 // ---------------------------------------------------------------------------
 // MutSiblingNotifiable — interface for MUT elements that notify partner inductors
@@ -60,6 +65,48 @@ export interface MutSiblingNotifiable {
 // const.h:44 — CONSTmuZero = 4·π·1e-7 H/m (vacuum permeability).
 const CONST_MU_ZERO = 4.0 * Math.PI * 1e-7;
 
+// indsetup.c:13 — #define PI 3.141592654. The geometry derivation and Lundin's
+// correction factor use this truncated literal, NOT Math.PI; matching it
+// bit-for-bit is required for csect ← π·dia²/4 and the Lundin x ratio.
+const PI = 3.141592654;
+
+// indsetup.c:142-173 — Lundin(): Nagaoka's coefficient via Lundin's handbook
+// formula (D: W. Knight, https://g3ynh.info/zdocs/magnetics/Solenoids.pdf p.36).
+// `l` is the coil length, `csec` its cross-section area; returns the geometry
+// correction factor multiplied into INDspecInd. Returns 1 (no correction) when
+// the coil geometry is below the 1um floor.
+function Lundin(l: number, csec: number): number {
+  // x = solenoid diam. / length
+  let num: number, den: number, kk: number, x: number, xx: number, xxxx: number;
+
+  // indsetup.c:151-155 — geometry below the floor: no correction.
+  if (csec < 1e-12 || l < 1e-6) {
+    console.warn("Warning: coil geometries too small (< 1um length dimensions),");
+    console.warn("    Lundin's correction factor will not be calculated");
+    return 1;
+  }
+
+  // indsetup.c:157 — x = sqrt(csec / PI) * 2. / l.
+  x = Math.sqrt(csec / PI) * 2.0 / l;
+
+  // indsetup.c:159-160 — xx = x*x; xxxx = xx*xx.
+  xx = x * x;
+  xxxx = xx * xx;
+
+  if (x < 1) {
+    // indsetup.c:162-166 — slender-solenoid branch.
+    num = 1 + 0.383901 * xx + 0.017108 * xxxx;
+    den = 1 + 0.258952 * xx;
+    return num / den - 4 * x / (3 * PI);
+  } else {
+    // indsetup.c:167-172 — short-solenoid branch.
+    num = (Math.log(4 * x) - 0.5) * (1 + 0.383901 / xx + 0.017108 / xxxx);
+    den = 1 + 0.258952 / xx;
+    kk = 0.093842 / xx + 0.002029 / xxxx - 0.000801 / (xx * xxxx);
+    return 2 * (num / den + kk) / (PI * x);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Model parameter declarations
 // ---------------------------------------------------------------------------
@@ -78,6 +125,7 @@ export const { paramDefs: INDUCTOR_PARAM_DEFS, defaults: INDUCTOR_DEFAULTS } = d
     modelTC1:  { default: 0.0,             spiceName: "tc1",    description: "Model first-order temperature coefficient (ind.c:43 IND_MOD_TC1)" },
     modelTC2:  { default: 0.0,             spiceName: "tc2",    description: "Model second-order temperature coefficient (ind.c:44 IND_MOD_TC2)" },
     csect:     { default: 0.0, unit: "m^2", spiceName: "csect", description: "Inductor cross section (ind.c:46 IND_MOD_CSECT)" },
+    dia:       { default: 0.0, unit: "m",  spiceName: "dia",    description: "Inductor diameter (ind.c:47 IND_MOD_DIA)" },
     length:    { default: 0.0, unit: "m",  spiceName: "length", description: "Inductor length (ind.c:48 IND_MOD_LENGTH)" },
     modNt:     { default: 0.0,             spiceName: "nt",     description: "Model number of turns (ind.c:49 IND_MOD_NT)" },
     mu:        { default: 0.0,             spiceName: "mu",     description: "Relative magnetic permeability (ind.c:50 IND_MOD_MU)" },
@@ -265,6 +313,9 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   private _modelTC1: number;
   private _modelTC2: number;
   private _csect: number;
+  // Coil diameter — ngspice model->INDdia (inddefs.h:105). Drives the
+  // csect ← π·dia²/4 derivation in setup() (indsetup.c:61-63).
+  private _dia: number;
   private _length: number;
   private _modNt: number;
   private _mu: number;
@@ -274,6 +325,8 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   private _modelTC1Given: boolean;
   private _modelTC2Given: boolean;
   private _csectGiven: boolean;
+  // ngspice model->INDdiaGiven (inddefs.h:114).
+  private _diaGiven: boolean;
   private _lengthGiven: boolean;
   private _modNtGiven: boolean;
   private _muGiven: boolean;
@@ -297,6 +350,42 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    * recomputed whenever a partner inductance changes.
    */
   _mutSiblings: MutSiblingNotifiable[] = [];
+
+  // INDsystem bookkeeping for the MUTtemp Cholesky verify pass.
+  // cite: inddefs.h:72-74 — struct INDsystem *system; INDinstance
+  //   *system_next_ind; int system_idx. Initialised in setup() per
+  //   indsetup.c:103-104; system_idx is (re)assigned inside the verify pass at
+  //   muttemp.c:146 and read only there, so -1 is the between-passes sentinel.
+  private _system: IndSystem | null = null;
+  private _systemNextInd: AnalogInductorElement | null = null;
+  private _systemIdx: number = -1;
+
+  // -------------------------------------------------------------------------
+  // Package-private accessors consumed by verifyInductiveSystems
+  // (ind-family-temperature.ts). Coupled surface used only by the MUTtemp
+  // verify pass — no public surface, mirroring the _mutSiblings pattern above.
+  // -------------------------------------------------------------------------
+
+  /** ngspice INDinstance.system — INDsystem the inductor belongs to, or null. */
+  get _systemPtr(): IndSystem | null { return this._system; }
+  set _systemPtr(s: IndSystem | null) { this._system = s; }
+
+  /** ngspice INDinstance.system_next_ind — next IND in same system, or null. */
+  get _systemNextIndPtr(): AnalogInductorElement | null { return this._systemNextInd; }
+  set _systemNextIndPtr(n: AnalogInductorElement | null) { this._systemNextInd = n; }
+
+  /** ngspice INDinstance.system_idx — index within the system matrix. */
+  get _systemIdxPtr(): number { return this._systemIdx; }
+  set _systemIdxPtr(i: number) { this._systemIdx = i; }
+
+  /**
+   * Effective inductance the verify pass reads for the system-matrix diagonal.
+   * cite: muttemp.c:145 — INDmatrix[i*sz+i] = ind->INDinduct (the post-Pass-1
+   * temperature-folded inductance). digiTS's `_effectiveL` carries no /M after
+   * Q-IND-LDIVM (ind-review §6e Directive 2), which is the same value the rest
+   * of the analysis sees; alias to the existing `inductance` getter for read.
+   */
+  get _effectiveLForVerify(): number { return this._effectiveL; }
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
@@ -340,6 +429,8 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     this._modelTC2       = this._modelTC2Given  ? props.getModelParam<number>("modelTC2")  : INDUCTOR_DEFAULTS["modelTC2"]!;
     this._csectGiven     = props.isModelParamGiven("csect");
     this._csect          = this._csectGiven     ? props.getModelParam<number>("csect")     : INDUCTOR_DEFAULTS["csect"]!;
+    this._diaGiven       = props.isModelParamGiven("dia");
+    this._dia            = this._diaGiven       ? props.getModelParam<number>("dia")       : INDUCTOR_DEFAULTS["dia"]!;
     this._lengthGiven    = props.isModelParamGiven("length");
     this._length         = this._lengthGiven    ? props.getModelParam<number>("length")    : INDUCTOR_DEFAULTS["length"]!;
     this._modNtGiven     = props.isModelParamGiven("modNt");
@@ -362,6 +453,19 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    */
   get inductance(): number {
     return this._effectiveL;
+  }
+
+  /**
+   * Raw initial-condition current — ngspice here->INDinitCond (inddefs.h:47).
+   * The MUT MODEUIC IC-seeding branch (indload.c:64-68) reads the partner's
+   * INDinitCond unconditionally; ngspice leaves INDinitCond at its 0.0 struct
+   * default when no IC card is given (only INDicGiven flips). digiTS stores the
+   * NaN sentinel for "not given", so map that back to 0.0 here to reproduce the
+   * raw field value the MUT branch reads.
+   * cite: indload.c:65 — muthere->MUTind2->INDinitCond.
+   */
+  get ic(): number {
+    return isNaN(this._IC) ? 0.0 : this._IC;
   }
 
   setup(ctx: SetupContext): void {
@@ -394,6 +498,10 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     if (!this._csectGiven) {
       this._csect = 0.0;
     }
+    // indsetup.c:47-49 — !INDdiaGiven → INDdia = 0.0
+    if (!this._diaGiven) {
+      this._dia = 0.0;
+    }
     // indsetup.c:50-52 — !INDlengthGiven → INDlength = 0.0
     if (!this._lengthGiven) {
       this._length = 0.0;
@@ -402,9 +510,9 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     if (!this._modNtGiven) {
       this._modNt = 0.0;
     }
-    // indsetup.c:56-58 — !INDmuGiven → INDmu = 0.0
+    // indsetup.c:56-58 — !INDmuGiven → INDmu = 1.0
     if (!this._muGiven) {
-      this._mu = 0.0;
+      this._mu = 1.0;
     }
 
     // Specific-inductance + turns-folding derivation (indsetup.c:65-85).
@@ -422,6 +530,12 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
     }
     const b = this.branchIndex;
 
+    // cite: indsetup.c:103-104 — per-instance INDsystem bookkeeping init. The
+    // two assignments sit between CKTmkCur (above) and the five TSTALLOC
+    // allocElement calls (below). Operation order is line-for-line as v41.
+    this._system = null;
+    this._systemNextInd = null;
+
     // indsetup.c:112-116 — TSTALLOC sequence, line-for-line.
     this._hPIbr   = solver.allocElement(posNode, b);  // (INDposNode, INDbrEq)
     this._hNIbr   = solver.allocElement(negNode, b);  // (INDnegNode, INDbrEq)
@@ -431,14 +545,14 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
   }
 
   /**
-   * _deriveSpecIndAndMInd — model-side specific-inductance + turns-folding
-   * derivation. ngspice INDsetup (indsetup.c):
-   *   if (INDlengthGiven && INDlength > 0) {
-   *     if (INDmuGiven)
-   *       INDspecInd = (INDmu * CONSTmuZero * INDcsect * INDcsect) / INDlength;
-   *     else
-   *       INDspecInd =       (CONSTmuZero * INDcsect * INDcsect) / INDlength;
-   *   } else INDspecInd = 0.0;
+   * _deriveSpecIndAndMInd — model-side geometry → specific-inductance →
+   * turns-folding derivation. ngspice INDsetup (indsetup.c:60-85):
+   *   if (INDdiaGiven) INDcsect = PI * INDdia * INDdia / 4.;
+   *   if (INDlengthGiven && INDlength > 0.0)
+   *     INDspecInd = (INDmu * CONSTmuZero * INDcsect) / INDlength;
+   *   else INDspecInd = 0.0;
+   *   if (INDlengthGiven && (INDdiaGiven || INDcsectGiven))
+   *     INDspecInd *= Lundin(INDlength, INDcsect);
    *   if (!INDmIndGiven) INDmInd = INDmodNt * INDmodNt * INDspecInd;
    *
    * Folded into a helper so the geometry hot-load path (setParam) rebuilds it
@@ -446,20 +560,24 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
    * (analog-engine.ts:1389).
    */
   private _deriveSpecIndAndMInd(): void {
-    // INDsetup — specific inductance for one turn.
+    // indsetup.c:60-63 — diameter takes preference over cross section.
+    if (this._diaGiven) {
+      this._csect = PI * this._dia * this._dia / 4.0;
+    }
+
+    // indsetup.c:65-71 — precompute specific inductance (one turn).
     if (this._lengthGiven && this._length > 0.0) {
-      if (this._muGiven) {
-        this._specInd = (this._mu * CONST_MU_ZERO * this._csect * this._csect)
-                        / this._length;
-      } else {
-        this._specInd = (CONST_MU_ZERO * this._csect * this._csect)
-                        / this._length;
-      }
+      this._specInd = (this._mu * CONST_MU_ZERO * this._csect) / this._length;
     } else {
       this._specInd = 0.0;
     }
 
-    // INDsetup — fold the turns count into the model inductance.
+    // indsetup.c:73-75 — Lundin's geometry correction factor.
+    if (this._lengthGiven && (this._diaGiven || this._csectGiven)) {
+      this._specInd *= Lundin(this._length, this._csect);
+    }
+
+    // indsetup.c:83-85 — fold the turns count into the model inductance.
     if (!this._mIndGiven) {
       this._mInd = this._modNt * this._modNt * this._specInd;
     }
@@ -609,6 +727,11 @@ export class AnalogInductorElement extends PoolBackedAnalogElement {
       // indmpar.c:36-39 — case IND_MOD_CSECT.
       this._csect = value;
       this._csectGiven = true;
+      this._deriveSpecIndAndMInd();
+    } else if (key === "dia") {
+      // indmpar.c:40-43 — case IND_MOD_DIA.
+      this._dia = value;
+      this._diaGiven = true;
       this._deriveSpecIndAndMInd();
     } else if (key === "length") {
       // indmpar.c:44-47 — case IND_MOD_LENGTH.

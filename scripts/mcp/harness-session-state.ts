@@ -7,7 +7,7 @@ export interface HarnessEntry {
   dtsPath: string;
   createdAt: Date;
   lastRunAt: Date | null;
-  analysis: "dcop" | "tran" | null;
+  analysis: "dcop" | "tran" | "ac" | null;
 }
 
 /**

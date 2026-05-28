@@ -69,6 +69,9 @@ export type DiagnosticCode =
   | 'unconnected-analog-pin'
   | 'floating-terminal'
   | 'reactive-state-outside-pool'
+  | 'inductive-system-not-positive-definite'
+  | 'inductive-system-duplicate-k'
+  | 'inductive-system-incomplete-k'
   | 'internal-error';
 
 /**

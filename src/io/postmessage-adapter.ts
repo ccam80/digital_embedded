@@ -22,6 +22,7 @@
  *     sim-read-signal      - read a signal value by label (analog or digital)
  *     sim-read-all-signals - snapshot all labeled signals
  *     sim-get-circuit      - export current circuit as base64 DTS JSON
+ *     sim-configure        - forward SimulationParams (indVerbosity, reltol, gmin, ...) to the engine
  *     sim-set-base         - update resolver base path
  *     sim-set-locked       - enable / disable locked mode
  *     sim-load-memory      - load hex/binary data into RAM/ROM
@@ -43,6 +44,7 @@
  *     sim-signals     - response to sim-read-all-signals
  *     sim-test-result - response to sim-test / sim-run-tests
  *     sim-circuit-data- response to sim-get-circuit
+ *     sim-configured  - response to sim-configure (echoes applied params)
  *     sim-tutorial-loaded      - tutorial manifest accepted, runner active
  *     sim-tutorial-step-changed- step navigation occurred
  *     sim-tutorial-check-result- validation result for a step
@@ -275,6 +277,9 @@ export class PostMessageAdapter {
           break;
 
         // --- Core: configuration ---
+        case 'sim-configure':
+          this._handleConfigure(msg);
+          break;
         case 'sim-set-base':
           this._handleSetBase(msg);
           break;
@@ -422,6 +427,22 @@ export class PostMessageAdapter {
   // -------------------------------------------------------------------------
   // Convergence log handler
   // -------------------------------------------------------------------------
+
+  /**
+   * `sim-configure`- forward SimulationParams into the analog engine.
+   *
+   * Carries the engine knobs (indVerbosity, reltol, gmin, tnom, ...) into the
+   * iframe core along the same hot-load path the headless and MCP surfaces use
+   * (coordinator.configure → analog.configure → refreshTolerances). `params`
+   * is a partial SimulationParams object on the message.
+   */
+  private _handleConfigure(msg: { params?: unknown }): void {
+    const params = (msg.params ?? {}) as Partial<import('../core/analog-engine-interface.js').SimulationParams>;
+    const facade = this._hooks.getFacade?.() as import('../headless/default-facade.js').DefaultSimulatorFacade | undefined
+      ?? this._getOwnFacade();
+    facade.getCoordinator().configure(params);
+    this._post({ type: 'sim-configured', params });
+  }
 
   private _handleConvergenceLog(msg: { action?: unknown; lastN?: unknown }): void {
     const action = String(msg.action ?? 'read');

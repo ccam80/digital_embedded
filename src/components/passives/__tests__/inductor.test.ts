@@ -440,9 +440,10 @@ describe("Inductor parameter hot-load (T1)", () => {
 // ===========================================================================
 // Category 6 — Model-layer parameters (T1)
 //
-// ind#recon/modelParams rebuilds the v26 inductor model layer: the geometric
-// specInd = (mu·µ₀·csect²)/length derivation, the mInd ← nt²·specInd folding,
-// and the instance-overrides-model TC/TNOM selection in computeTemperature.
+// ind#recon/modelParams rebuilds the inductor model layer: the geometric
+// specInd = (mu·µ₀·csect)/length × Lundin(length, csect) derivation
+// (indsetup.c specInd/Lundin), the mInd ← nt²·specInd folding, and the
+// instance-overrides-model TC/TNOM selection in computeTemperature.
 //
 // buildFixture runs setup() (Part B specInd/mInd derivation) and the initial
 // temperature pass (Part C computeTemperature) before the first step, so the
@@ -455,6 +456,27 @@ describe("Inductor parameter hot-load (T1)", () => {
 // ===========================================================================
 
 const MU0 = 4.0 * Math.PI * 1e-7;
+
+// indsetup.c:13 — truncated PI literal used by the geometry/Lundin derivation.
+const IND_PI = 3.141592654;
+
+// indsetup.c:142-173 — Lundin's geometry correction factor, mirroring
+// inductor.ts Lundin() so the model-layer expectations match specInd exactly.
+function Lundin(l: number, csec: number): number {
+  if (csec < 1e-12 || l < 1e-6) return 1;
+  const x = Math.sqrt(csec / IND_PI) * 2.0 / l;
+  const xx = x * x;
+  const xxxx = xx * xx;
+  if (x < 1) {
+    const num = 1 + 0.383901 * xx + 0.017108 * xxxx;
+    const den = 1 + 0.258952 * xx;
+    return num / den - 4 * x / (3 * IND_PI);
+  }
+  const num = (Math.log(4 * x) - 0.5) * (1 + 0.383901 / xx + 0.017108 / xxxx);
+  const den = 1 + 0.258952 / xx;
+  const kk = 0.093842 / xx + 0.002029 / xxxx - 0.000801 / (xx * xxxx);
+  return 2 * (num / den + kk) / (IND_PI * x);
+}
 
 function buildBareInductor(
   facade: DefaultSimulatorFacade,
@@ -480,10 +502,11 @@ function buildBareInductor(
 describe("Inductor model-layer parameters (T1)", () => {
   it("specind_geometry_drives_base_inductance_via_modNt", () => {
     // No instance inductance, no instance nt → base = mInd = modNt²·specInd.
-    // specInd = (mu·µ₀·csect²)/length (v26 csect² form, _muGiven branch).
+    // specInd = (mu·µ₀·csect)/length × Lundin(length, csect) (indsetup.c
+    // specInd/Lundin, single-csect form).
     // csect=2e-4, length=0.05, mu=100, modNt=200.
     const csect = 2e-4, length = 0.05, mu = 100, modNt = 200;
-    const specInd = (mu * MU0 * csect * csect) / length;
+    const specInd = (mu * MU0 * csect) / length * Lundin(length, csect);
     const expectedL = modNt * modNt * specInd;
     const fix = buildFixture({
       build: (_r, facade) => buildBareInductor(facade, { csect, length, mu, modNt }),
@@ -493,10 +516,11 @@ describe("Inductor model-layer parameters (T1)", () => {
     expect(ind.inductance).toBeCloseTo(expectedL, 18);
   });
 
-  it("specind_without_mu_uses_csect_squared_only", () => {
-    // mu NOT given → v26 else-branch specInd = (µ₀·csect²)/length (no mu factor).
+  it("specind_mu_defaults_to_one_single_csect_with_lundin", () => {
+    // mu NOT given → defaults to 1.0 (indsetup.c:56-58); specInd =
+    // (1.0·µ₀·csect)/length × Lundin(length, csect) (single-csect form).
     const csect = 1e-4, length = 0.02, modNt = 50;
-    const specInd = (MU0 * csect * csect) / length;
+    const specInd = (1.0 * MU0 * csect) / length * Lundin(length, csect);
     const expectedL = modNt * modNt * specInd;
     const fix = buildFixture({
       build: (_r, facade) => buildBareInductor(facade, { csect, length, modNt }),
@@ -518,7 +542,7 @@ describe("Inductor model-layer parameters (T1)", () => {
     // No instance inductance, instance nt given → base = specInd·nt²
     // (NOT modNt²·specInd). modNt is irrelevant on this path.
     const csect = 2e-4, length = 0.05, mu = 100, instNt = 10;
-    const specInd = (mu * MU0 * csect * csect) / length;
+    const specInd = (mu * MU0 * csect) / length * Lundin(length, csect);
     const expectedL = specInd * instNt * instNt;
     const fix = buildFixture({
       build: (_r, facade) => buildBareInductor(facade, { csect, length, mu, modNt: 999, nt: instNt }),
@@ -583,17 +607,20 @@ describe("Inductor model-layer parameters (T1)", () => {
     });
     const ind = findInductor(fix.circuit.elements);
     const before = ind.inductance;
-    const expectedBefore = modNt * modNt * (mu * MU0 * 1e-4 * 1e-4) / length;
+    const expectedBefore =
+      modNt * modNt * ((mu * MU0 * 1e-4) / length) * Lundin(length, 1e-4);
     expect(before / expectedBefore).toBeCloseTo(1, 9);
 
     fix.coordinator.setComponentProperty(getInductorCe(fix), "csect", 2e-4);
     // Re-run the temperature pass so the rebuilt _mInd folds into _effectiveL.
     fix.engine.setCircuitTemp(fix.engine.circuitTemp);
     const after = ind.inductance;
-    const expectedAfter = modNt * modNt * (mu * MU0 * 2e-4 * 2e-4) / length;
+    const expectedAfter =
+      modNt * modNt * ((mu * MU0 * 2e-4) / length) * Lundin(length, 2e-4);
     expect(after / expectedAfter).toBeCloseTo(1, 9);
-    // csect doubled ⇒ csect² quadrupled ⇒ _effectiveL ≈ 4× larger.
-    expect(after / before).toBeCloseTo(4, 6);
+    // specInd is linear in csect, modulated by Lundin(length, csect); doubling
+    // csect scales _effectiveL by ≈1.9266 (single-csect + Lundin), not 4.
+    expect(after / before).toBeCloseTo(1.9266, 4);
   });
 
   it("hotload_mu_rebuilds_specInd", () => {
@@ -607,9 +634,11 @@ describe("Inductor model-layer parameters (T1)", () => {
     fix.coordinator.setComponentProperty(getInductorCe(fix), "mu", 200);
     fix.engine.setCircuitTemp(fix.engine.circuitTemp);
     const after = ind.inductance;
-    const expectedAfter = modNt * modNt * (200 * MU0 * csect * csect) / length;
+    const expectedAfter =
+      modNt * modNt * ((200 * MU0 * csect) / length) * Lundin(length, csect);
     expect(after / expectedAfter).toBeCloseTo(1, 9);
-    // mu 50 → 200 ⇒ specInd 4× ⇒ _effectiveL 4× larger.
+    // specInd is linear in mu (Lundin is geometry-only); mu 50 → 200 ⇒
+    // specInd 4× ⇒ _effectiveL 4× larger.
     expect(after / before).toBeCloseTo(4, 6);
   });
 });

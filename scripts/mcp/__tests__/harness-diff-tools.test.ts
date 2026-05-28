@@ -176,3 +176,74 @@ describe("ComparisonSession direct API (matrixDiff / topologyDiff / firstDiverge
     expect(session.structuralFindings.length).toBe(0);
   });
 });
+
+describe("harness AC first-divergence branch", () => {
+  // Proven no-DLL AC self-compare setup (mirrors ac-first-divergence-smoke.test.ts).
+  const DTS = "src/solver/analog/__tests__/ngspice-parity/fixtures/rc-transient.dts";
+  const AC_PARAMS = { type: "dec" as const, numPoints: 5, fStart: 1, fStop: 1e4, outputNodes: [] as string[] };
+
+  let acHandle: string;
+  let acTools: ToolCapture;
+
+  beforeAll(async () => {
+    const acSession = await ComparisonSession.createSelfCompare({
+      dtsPath: DTS,
+      analysis: "ac",
+      acParams: AC_PARAMS,
+    });
+    const acState = new HarnessSessionState();
+    acHandle = acState.store({
+      session: acSession,
+      dtsPath: DTS,
+      createdAt: new Date(),
+      lastRunAt: new Date(),
+      analysis: "ac", // createSelfCompare already ran the AC sweep
+    });
+    acTools = new ToolCapture();
+    registerHarnessTools(acTools as any, acState);
+  }, 30_000);
+
+  it("registers harness_run_ac and harness_ac_session_shape", () => {
+    expect(acTools.has("harness_run_ac")).toBe(true);
+    expect(acTools.has("harness_ac_session_shape")).toBe(true);
+  });
+
+  it("harness_ac_session_shape returns full per-frequency-point detail", async () => {
+    const res = await acTools.call("harness_ac_session_shape", { handle: acHandle });
+    expect(res.analysis).toBe("ac");
+    expect(res.shape.pointCount.ours).toBeGreaterThan(0);
+    expect(Array.isArray(res.shape.points)).toBe(true);
+    expect(res.shape.points.length).toBe(res.shape.pointCount.max);
+    // self-compare clone: no frequency-axis divergence.
+    expect(res.shape.largeFreqDeltas).toEqual([]);
+  });
+
+  it("harness_run_ac sets analysis=ac and returns a frequency-axis shape", async () => {
+    const res = await acTools.call("harness_run_ac", { handle: acHandle, ...AC_PARAMS });
+    expect(res.analysis).toBe("ac");
+    expect(res.shape.pointCount.ours).toBeGreaterThan(0);
+    // self-compare clone: both sides have identical point counts.
+    expect(res.shape.pointCount.ours).toBe(res.shape.pointCount.ngspice);
+  });
+
+  it("harness_first_divergence dispatches to the AC branch- all-null on self-compare", async () => {
+    const res = await acTools.call("harness_first_divergence", { handle: acHandle });
+    expect(res.analysis).toBe("ac");
+    expect(res).toHaveProperty("acFirstDivergence");
+    expect(res).not.toHaveProperty("firstDivergence");
+    const f = res.acFirstDivergence;
+    expect(f.solution).toBeNull();
+    expect(f.shape).toBeNull();
+    expect(f.matrix).toBeNull();
+    expect(f.rhs).toBeNull();
+    expect(f.earliestPointIndex).toBeNull();
+  });
+
+  it("DC/TRAN-only tools reject an AC handle with a clear error", async () => {
+    await expect(acTools.call("harness_matrix_diff", { handle: acHandle })).rejects.toThrow(/not available for AC/);
+    await expect(
+      acTools.call("harness_get_attempt", { handle: acHandle, stepIndex: 0, phase: "tranNR", phaseAttemptIndex: 0 }),
+    ).rejects.toThrow(/not available for AC/);
+    await expect(acTools.call("harness_session_map", { handle: acHandle })).rejects.toThrow(/not available for AC/);
+  });
+});

@@ -28,6 +28,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import { AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
@@ -221,6 +222,29 @@ class DcVoltageSourceAnalogElement extends AnalogElement {
       ? ctx.srcFact
       : 1.0;
     ctx.rhs[this.branchIndex] += this._voltage * ramp;
+  }
+
+  stampAc(
+    solver: SparseSolverStamp,
+    _omega: number,
+    _ctx: LoadContext,
+    _rhsRe: Float64Array,
+    _rhsIm: Float64Array,
+  ): void {
+    // V-source AC stamp — vsrcacld.c:175-180. VSRCacLoad runs for EVERY voltage
+    // source (CKTacLoad's per-type loop, acan.c:409-414); the ±1 branch
+    // incidence is stamped unconditionally so the branch row stays nonsingular.
+    // A DC source carries no `AC` token, so VSRCacGiven is false and the RHS
+    // excitation block (vsrcacld.c:178-180) is skipped- VSRCacReal / VSRCacImag
+    // are 0. The incidence stamps still MUST happen: without them the branch
+    // diagonal is empty and spOrderAndFactor reports spSINGULAR at the branch
+    // row, collapsing the whole complex solve to NaN. The four handles are the
+    // same setup()-cached cells load() writes (vsrcset.c TSTALLOC order); AC
+    // runs against the engine's setup-allocated solver in complex mode.
+    solver.stampElement(this._hPosBr, +1.0);
+    solver.stampElement(this._hNegBr, -1.0);
+    solver.stampElement(this._hBrPos, +1.0);
+    solver.stampElement(this._hBrNeg, -1.0);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

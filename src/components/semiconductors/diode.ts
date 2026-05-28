@@ -54,16 +54,12 @@ import {
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import type { TempContext } from "../../solver/analog/temp-context.js";
-
-// ---------------------------------------------------------------------------
-// Physical constants (ngspice const.h values)
-// ---------------------------------------------------------------------------
-
-const CONSTboltz = 1.3806226e-23;
-const CHARGE = 1.6021918e-19;
-// ngspice main.c:515 — precomputed to match diotemp.c:104 vt ordering
-const CONSTKoverQ = CONSTboltz / CHARGE;
-const REFTEMP = 300.15;
+import {
+  CONSTboltz,
+  CHARGE,
+  CONSTKoverQ,
+  REFTEMP,
+} from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // State schemas
@@ -969,11 +965,11 @@ export function createDiodeElement(
           // cite: diotemp.c:82-87 — per-instance TEMP triggers DIOtemp() recompute.
           // Route through computeTemperature so the engine dispatch path and the
           // hot-load path share identical logic.
-          this.computeTemperature({ cktTemp: value, cktNomTemp: params.TNOM });
+          this.computeTemperature({ cktTemp: value, cktNomTemp: params.TNOM, _indVerbosity: 2 });
         } else {
           // All other param changes also require a temperature recompute because
           // IS, VJ, CJO, EG, XTI, etc. feed directly into the dioTemp() formulas.
-          this.computeTemperature({ cktTemp: params.TEMP, cktNomTemp: params.TNOM });
+          this.computeTemperature({ cktTemp: params.TEMP, cktNomTemp: params.TNOM, _indVerbosity: 2 });
         }
       }
     }

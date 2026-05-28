@@ -20,6 +20,7 @@ import type {
   PatchResult,
 } from './netlist-types.js';
 import type { Diagnostic } from '../compile/types.js';
+import type { SimulationParams } from '../core/analog-engine-interface.js';
 
 /**
  * The primary interface for programmatic circuit building and simulation
@@ -164,6 +165,15 @@ export interface SimulatorFacade {
    */
   setCircuitTemp(K: number): void;
 
+  /**
+   * Merge solver parameters into the active SimulationParams and apply them to
+   * the analog engine via the hot-load path (same path tolerances take). Used
+   * to forward engine knobs such as `indVerbosity`, `reltol`, and `gmin`.
+   *
+   * @param params - Partial SimulationParams to merge
+   */
+  configure(params: Partial<SimulationParams>): void;
+
   // ============================================
   // Testing: Run automated test vectors
   // ============================================
@@ -207,7 +217,7 @@ export interface SimulatorFacade {
 
   /**
    * Deserialize a circuit from JSON
-   * Restores a previously serialized circuit.
+   * Restores a circuit produced by serialize().
    *
    * @param json - JSON string from serialize()
    * @returns Restored Circuit

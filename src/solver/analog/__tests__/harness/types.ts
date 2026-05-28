@@ -377,6 +377,17 @@ export interface IterationSnapshot {
 export interface ElementStateSnapshot {
   elementIndex: number;
   label: string;
+  /**
+   * Canonical device type for this element (a `DEVICE_MAPPINGS` key, e.g.
+   * "bjt" / "mosfet" / "vdmos" / "diode"), recorded at capture time on both
+   * sides: our side from the `normalizeDeviceType(typeId)` topology type,
+   * ngspice from `canonicalizeNgspiceDeviceType(dev.typeName)`. Consumers MUST
+   * route slot↔ngspice-offset mapping by this recorded type rather than by
+   * label prefix — VDMOS and MOSFET both use the `M` prefix, so a prefix-only
+   * classifier would compare VDMOS's 18-slot state through MOSFET's 17-slot
+   * layout. `undefined` only on synthetic snapshots that predate the field.
+   */
+  deviceType?: string;
   slots: Record<string, number>;
   state1Slots: Record<string, number>;
   state2Slots: Record<string, number>;

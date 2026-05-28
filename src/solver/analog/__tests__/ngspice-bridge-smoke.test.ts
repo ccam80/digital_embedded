@@ -12,6 +12,9 @@ describe('ngspice bridge smoke test', () => {
   it('loads DLL and runs voltage divider DC OP', async () => {
     console.log(`DLL path: ${DLL_PATH}`);
 
+    // Deliberately UNGUARDED, in-process bridge: in-repo smoke test off the MCP
+    // path, not the agent-facing harness_run surface. Must never be pointed at a
+    // VDMOS deck; crash-prone / agent-driven runs go through runNgspiceGuarded.
     const bridge = new NgspiceBridge(DLL_PATH);
     await bridge.init();
     console.log('Bridge initialized');

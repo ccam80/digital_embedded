@@ -13,6 +13,15 @@
  */
 import type { Page } from '@playwright/test';
 
+declare global {
+  interface Window {
+    /** Test bridge installed by harness.html: posts a message to the simulator iframe. */
+    __postToSim(msg: Record<string, unknown>): void;
+    /** Test bridge installed by harness.html: resolves with the next message of `type`. */
+    __waitForMessage<T = unknown>(type: string, timeoutMs?: number): Promise<T>;
+  }
+}
+
 export interface TestResultMessage {
   type: 'sim-test-result';
   passed: number;
@@ -42,8 +51,19 @@ export class SimulatorHarness {
   /** Send a postMessage to the simulator iframe. */
   async postToSim(msg: Record<string, unknown>): Promise<void> {
     await this.page.evaluate((m) => {
-      (window as any).__postToSim(m);
+      window.__postToSim(m);
     }, msg);
+  }
+
+  /**
+   * Fire `count` sim-step messages in a single browser round-trip. sim-step
+   * emits no response, so batching them inside one evaluate avoids per-step
+   * round-trip latency.
+   */
+  async step(count = 1): Promise<void> {
+    await this.page.evaluate((n) => {
+      for (let i = 0; i < n; i++) window.__postToSim({ type: 'sim-step' });
+    }, count);
   }
 
   /** Wait for a specific message type from the simulator. */
@@ -52,7 +72,7 @@ export class SimulatorHarness {
     timeoutMs = 10_000,
   ): Promise<T> {
     return this.page.evaluate(
-      ({ type, timeoutMs }) => (window as any).__waitForMessage(type, timeoutMs),
+      ({ type, timeoutMs }) => window.__waitForMessage(type, timeoutMs),
       { type, timeoutMs },
     ) as Promise<T>;
   }

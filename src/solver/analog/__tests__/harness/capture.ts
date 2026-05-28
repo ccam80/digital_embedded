@@ -320,6 +320,7 @@ export function captureElementStates(
       snapshots.push({
         elementIndex: i,
         label: `${baseLabel}_AB`,
+        deviceType: "vswitch",
         slots: abSlots,
         state1Slots: abState1,
         state2Slots: abState2,
@@ -334,6 +335,7 @@ export function captureElementStates(
       snapshots.push({
         elementIndex: i,
         label: `${baseLabel}_AC`,
+        deviceType: "vswitch",
         slots: acSlots,
         state1Slots: acState1,
         state2Slots: acState2,
@@ -363,6 +365,9 @@ export function captureElementStates(
     snapshots.push({
       elementIndex: i,
       label: baseLabel,
+      // Record the canonical device type so consumers route slot mapping by
+      // type, not by label prefix (VDMOS and MOSFET share the `M` prefix).
+      ...(deviceType !== undefined ? { deviceType } : {}),
       slots,
       state1Slots,
       state2Slots,

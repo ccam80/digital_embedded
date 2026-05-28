@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1779498601533,
+  "lastScanned": 1780005619130,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "rm -f .tsc-harness.txt .harness-probe.txt; echo \"cleaned\"",
-    "testCommand": "NGSPICE_DLL_PATH=\"C:/local_working_projects/digital_in_browser/ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll\" npx vitest run src/solver/analog/__tests__/harness --disable-console-intercept 2>&1 | tail -50",
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -87,14 +87,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1779498601503,
+      "lastAccessed": 1780005619079,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 6,
-      "lastAccessed": 1779498601503,
+      "lastAccessed": 1780005619080,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -107,7 +107,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1779498601503,
+      "lastAccessed": 1780005619081,
       "keyFiles": [
         "index.html"
       ]
@@ -116,21 +116,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1779498601504,
+      "lastAccessed": 1780005619081,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779498601518,
+      "lastAccessed": 1780005619082,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1779498601519,
+      "lastAccessed": 1780005619105,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -143,28 +143,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1779498601519,
+      "lastAccessed": 1780005619106,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779498601519,
+      "lastAccessed": 1780005619106,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1779498601519,
+      "lastAccessed": 1780005619106,
       "keyFiles": []
     },
     "scratch": {
       "path": "scratch",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1779498601519,
+      "lastAccessed": 1780005619107,
       "keyFiles": [
         "analysis-engine.diff",
         "baseline-failures.json",
@@ -177,7 +177,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 14,
-      "lastAccessed": 1779498601519,
+      "lastAccessed": 1780005619107,
       "keyFiles": [
         "categorize-failures.mjs",
         "circuit-mcp-server.ts",
@@ -190,7 +190,7 @@
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 16,
-      "lastAccessed": 1779498601520,
+      "lastAccessed": 1780005619108,
       "keyFiles": [
         "bridge-synthesis.md",
         "dig-format-excision.md",
@@ -203,7 +203,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1779498601520,
+      "lastAccessed": 1780005619108,
       "keyFiles": [
         "main.ts"
       ]
@@ -211,21 +211,18 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 15,
-      "lastAccessed": 1779498601522,
+      "fileCount": 3,
+      "lastAccessed": 1780005619109,
       "keyFiles": [
-        "ac.json",
-        "acmig.json",
-        "bridge-smoke.json",
-        "cx2.json",
-        "phaseF.json"
+        "playwright-failures.json",
+        "test-failures.json"
       ]
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1779498601522,
+      "lastAccessed": 1780005619109,
       "keyFiles": [
         "index.json"
       ]
@@ -234,21 +231,21 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 0,
-      "lastAccessed": 1779498601522,
+      "lastAccessed": 1780005619110,
       "keyFiles": []
     },
     "dist\\app": {
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1779498601523,
+      "lastAccessed": 1780005619111,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1779498601523,
+      "lastAccessed": 1780005619112,
       "keyFiles": [
         "main-BzvxYKS9.js",
         "memory-editor-DEA45Iu0.js",
@@ -259,7 +256,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1779498601524,
+      "lastAccessed": 1780005619112,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -270,7 +267,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1779498601525,
+      "lastAccessed": 1780005619114,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -281,7 +278,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1779498601525,
+      "lastAccessed": 1780005619114,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -292,21 +289,21 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1779498601525,
+      "lastAccessed": 1780005619115,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 147,
-      "lastAccessed": 1779236224861,
+      "accessCount": 156,
+      "lastAccessed": 1779660166656,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 138,
-      "lastAccessed": 1779270816508,
+      "accessCount": 139,
+      "lastAccessed": 1779624802032,
       "type": "file"
     },
     {
@@ -394,6 +391,12 @@
       "type": "file"
     },
     {
+      "path": "src/components/passives/inductor.ts",
+      "accessCount": 10,
+      "lastAccessed": 1779781887115,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
       "accessCount": 9,
       "lastAccessed": 1778476011023,
@@ -406,9 +409,9 @@
       "type": "directory"
     },
     {
-      "path": "src/components/passives/inductor.ts",
+      "path": "src/solver",
       "accessCount": 9,
-      "lastAccessed": 1779490184772,
+      "lastAccessed": 1779781822064,
       "type": "directory"
     },
     {
@@ -416,12 +419,6 @@
       "accessCount": 8,
       "lastAccessed": 1778582497526,
       "type": "file"
-    },
-    {
-      "path": "src/solver",
-      "accessCount": 8,
-      "lastAccessed": 1778725727661,
-      "type": "directory"
     },
     {
       "path": "src\\app\\menu-toolbar.ts",

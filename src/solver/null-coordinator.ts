@@ -18,7 +18,7 @@ import { EngineState } from '../core/engine-interface.js';
 import type { MeasurementObserver, SnapshotId } from '../core/engine-interface.js';
 import type { StepRecord } from './analog/convergence-log.js';
 import { FacadeError } from '../headless/types.js';
-import type { DcOpResult } from '../core/analog-engine-interface.js';
+import type { DcOpResult, SimulationParams } from '../core/analog-engine-interface.js';
 import type { SignalAddress, SignalValue } from '../compile/types.js';
 import type { AcParams, AcResult } from './analog/ac-analysis.js';
 import type { Wire } from '../core/circuit.js';
@@ -120,6 +120,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   getConvergenceLog(_lastN?: number): StepRecord[] | null { return null; }
   clearConvergenceLog(): void { /* no-op */ }
   setCircuitTemp(_K: number): void { /* no-op */ }
+  configure(_params: Partial<SimulationParams>): void { /* no-op */ }
 
   async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
   async sampleAtTimes<T>(_times: readonly number[], _capture: () => T, _wallBudgetMs?: number): Promise<readonly T[]> { return []; }

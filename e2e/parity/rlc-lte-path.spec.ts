@@ -37,7 +37,7 @@ test.describe('RLC LTE path- postMessage (E2E) surface', () => {
     await harness.load();
   });
 
-  test('RC zero-crossing progression through the postMessage bridge', async ({ page }) => {
+  test('RC zero-crossing progression through the postMessage bridge', async () => {
     // Circuit: R=1kΩ, C=1µF, AC source at 20 Hz, 1 V amplitude.
     // At f=20 Hz << fc≈159 Hz: |Vc/Vs| ≈ 0.992, phase lag ≈ 7.2°.
     // Vc closely tracks the source and must cross zero twice per period.
@@ -69,13 +69,9 @@ test.describe('RLC LTE path- postMessage (E2E) surface', () => {
       signals: Record<string, number>;
       simTime: number | null;
     }> {
-      // Fire N sim-step messages synchronously inside the browser
-      await page.evaluate((count) => {
-        for (let i = 0; i < count; i++) {
-          (window as any).__postToSim({ type: 'sim-step' });
-        }
-        // Drain the pending sim-step response queue (sim-step emits no response)
-      }, n);
+      // Fire N sim-step messages synchronously inside the browser (sim-step
+      // emits no response, so they batch into one round-trip).
+      await harness.step(n);
 
       // Now request a signal read
       await harness.postToSim({ type: 'sim-read-all-signals' });

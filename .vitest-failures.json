@@ -1,47 +1,10 @@
 {
   "summary": {
-    "passed": 0,
-    "failed": 3,
-    "skipped": 23,
-    "totalFiles": 1,
-    "durationSeconds": 4.1
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "totalFiles": 2,
+    "durationSeconds": 3.3
   },
-  "failures": [
-    {
-      "message": "step 0 node C1:pos/L1:neg: ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "transient_step_end_paired_rlc_oscillator",
-          "line": 29,
-          "column": 9
-        }
-      ]
-    },
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
-          "test": "dcop_paired_rlc_oscillator",
-          "line": 177,
-          "column": 78
-        }
-      ]
-    },
-    {
-      "message": "9970 per-iteration divergence(s); first: voltage step 0/iter 0 L1:pos/R1:neg ours=1.0001819157212534e-9 ngspice=1.0001819157212532e-9 absDelta=2.0679515313825692e-25: expected 9970 to be +0 // Object....",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
-          "test": "full_iteration_paired_rlc_oscillator",
-          "line": 63,
-          "column": 31
-        }
-      ]
-    }
-  ]
+  "failures": []
 }
