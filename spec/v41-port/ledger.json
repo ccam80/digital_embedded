@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-29T22:31:53.680Z",
+    "generated": "2026-05-29T22:44:45.761Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 85,
+    "progressEntriesApplied": 95,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -32751,10 +32751,12 @@
         684
       ],
       "hunkHash": "40c749168a0cf2bd",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.load (resistor.ts:194-201), the four conductance stamps through the setup()-allocated handles. The v41 hunk is the model/instance linked-list-walk accessor rename plus removal of the `m *` factor from the four stamps (v41 folds RESm into RESconduct in RESupdate_conduct, so RESload stamps RESconduct directly). digiTS's load() already stamps _G with no separate m factor, matching the v41 shape; the m fold into _G is supplied by res#recon/computeConductance. Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resload.c:15-38 (RESload), v41 hunk res.md docLineRange 652-684. Identifier correspondence re-derived independently (rename-maps NOT consulted): RESconduct<->_G, RESposPosPtr/RESnegNegPtr/RESposNegPtr/RESnegPosPtr<->_hPP/_hNN/_hPN/_hNP, REScurrent<->getPinCurrents return. Tier1: the v41 hunk drops `double m;`, drops `m = (here->RESm);`, renames the model/instance walk accessors (C iteration plumbing, no TS counterpart -> allowed sec4), and removes the `m *` factor from the four stamps so they become bare `here->RESconduct`. Our delta (resistor.ts:598-606) removes `const g = this._M * this._G` and stamps `this._G` directly into _hPP/_hNN (+) and _hPN/_hNP (-); getPinCurrents (resistor.ts:629-631) drops `this._M *` so `I = this._G*(vA-vB)`, matching the unchanged REScurrent=(V+ - V-)*RESconduct line. Line-isomorphic. Tier2 bijective: REScurrent (resload.c:28-29) <-> getPinCurrents _G*(vA-vB); four ±RESconduct stamps (resload.c:31-34) <-> four ±_G stampElement calls in posPos/negNeg/posNeg/negPos order. M-fold into _G supplied by res#recon/computeConductance (APPLIED), so the bare-stamp shape is correct. FILE-SCOPE: git diff --name-only source change is solely src/components/passives/resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -32782,10 +32784,12 @@
         728
       ],
       "hunkHash": "ea3573ff0bacec3b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.stampAc (resistor.ts:203-212), the AC small-signal conductance stamp. The v41 hunk (RESacload) is the accessor rename + the new `g = RESacresGiven ? RESacConduct : RESconduct` selection of the separate AC conductance + removal of the `m *` factor from the four stamps. digiTS's stampAc currently stamps _G unconditionally with no RESacConduct/acres path; the reconstruction supplies RESacConduct and the M fold. Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resload.c:43-71 (RESacload), v41 hunk res.md docLineRange 685-728. Correspondence re-derived independently: RESacConduct<->_Gac, RESconduct<->_G, RESacresGiven<->_acresGiven, four ...Ptr<->_hPP/_hNN/_hPN/_hNP. Tier1: v41 adds `double g;`, drops `double m;` and `m=(here->RESm);`, renames walk accessors, and replaces the v26 `if(RESacresGiven){4 stamps m*RESacConduct}else{4 stamps m*RESconduct}` with `if(RESacresGiven) g=RESacConduct; else g=RESconduct;` then four bare `±g` stamps. Our delta (resistor.ts:608-622) replaces `const g=this._M*this._Gac` with `let g; if(this._acresGiven) g=this._Gac; else g=this._G;` then four `±g` stampElement calls. Line-isomorphic (the acres branch + four ±g stamps map 1:1). Tier2 bijective: acres-gated g selection (resload.c:59-62) <-> resistor.ts:613-616; four ±g stamps (resload.c:64-67) <-> resistor.ts:618-621 in posPos/negNeg/posNeg/negPos order. M-fold into _G/_Gac supplied by res#recon/computeConductance. FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -32813,10 +32817,12 @@
         742
       ],
       "hunkHash": "bf5de429612432f9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — model-parameter read path for `tce`. digiTS has no integer-id model-ask API; the read counterpart is the reconstructed model parameter `tce` (REStempCoeffe) exposed as a class accessor / param-bag read. The v41 hunk adds case RES_MOD_TCE returning model->REStempCoeffe. The model param `tce` is introduced by res#recon/computeConductance (it is the exponential temperature coefficient feeding the conductance fold). Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resmask.c:36-38 (RESmodAsk RES_MOD_TCE case), v41 hunk res.md docLineRange 733-742. Correspondence re-derived independently: model->REStempCoeffe<->modTce (param-bag read path). RESmodAsk is the C integer-id model-ask getter; digiTS has no integer-id ask API (REVIEW-CLASS), so the read counterpart is the reconstructed model param `modTce` declared in RESISTOR_PARAM_DEFS.secondary (resistor.ts:57, spiceName 'tce'), readable via the param bag. This is the sanctioned C-parser-getter -> TS-param-declaration surface form, identical disposition to the APPLIED ind/indmask and cap precedents. The v41 case returns model->REStempCoeffe; our modTce (REStempCoeffe) is now declared + readable + ctor-loaded (resistor.ts:332-333). Read path present, bijective at the per-param level. FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -32906,10 +32912,12 @@
         817
       ],
       "hunkHash": "bc9b35bd63494912",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — reconstructed model defineModelParams + setParam for `tce`. The v41 hunk adds case RES_MOD_TCE storing model->REStempCoeffe + REStceGiven. The model param `tce` (exponential temperature coefficient) is introduced by res#recon/computeConductance and feeds the conductance temperature fold (factor = pow(1.01, tce·ΔT)). Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resmpar.c:33-36 (RESmParam RES_MOD_TCE case), v41 hunk res.md docLineRange 807-817. Correspondence re-derived independently: REStempCoeffe<->_modTce, REStceGiven<->_modTceGiven. Tier1: v41 adds `case RES_MOD_TCE: model->REStempCoeffe = value->rValue; model->REStceGiven = TRUE; break;`. Our delta (resistor.ts:574-577) adds `case \"modTce\": this._modTce = value; this._modTceGiven = true; break;` plus the modTce secondary param def (resistor.ts:57), the _modTce/_modTceGiven fields (resistor.ts:239,251), and the ctor read (resistor.ts:332-333). Line-isomorphic (field assign + Given flag). Tier2 bijective: RES_MOD_TCE case <-> setParam 'modTce' case. Trailing updateConduct(false) (resistor.ts:595) is the unified-setParam recompute established by res#recon/computeConductance and required for hot-loadable params; the hunk's own content (field+Given) is bijective. FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33154,10 +33162,12 @@
         950
       ],
       "hunkHash": "73c4e563116f83a2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.setParam / constructor, the RES_TEMP instance-parameter application. The portable body is the new RES_TEMP clamp `if (REStemp < 1e-6) REStemp = 0` after `REStemp = value + CONSTCtoK` — part of the per-instance TEMP handling introduced by the reconstruction. The hunk also contains the C `cp_getvar(\"scale\", CP_REAL, &scale, 0)` 4th-argument signature change (no digiTS counterpart — no cp_getvar, no ngspice global `scale` variable); that line is recorded as a proposed split (res-review.md §5, sub-range res.md 939-941 NO-COUNTERPART). Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resparam.c:28-33 (RESparam RES_TEMP clamp), v41 hunk res.md docLineRange 943-950 (sub-item; the cp_getvar 4th-arg line is h001a NO-COUNTERPART, correctly excluded and not ported). Correspondence re-derived independently: REStemp<->_TEMP (Kelvin; +CONSTCtoK handled by the kelvinToCelsius spiceConverter so the value reaching setParam is already Kelvin), REStempGiven<->_tempGiven. Tier1: v41 adds `if(here->REStemp < 1e-6) here->REStemp = 0;` between the temp assignment and the Given flag. Our delta (resistor.ts:497-502) adds `if(this._TEMP < 1e-6) this._TEMP = 0;` between `this._TEMP = value` and `this._tempGiven = true`. Line-isomorphic for the clamp. Tier2 bijective: clamp construct present, same condition (<1e-6) and same zeroing. FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33185,10 +33195,12 @@
         961
       ],
       "hunkHash": "2cf6cec0fdf03eb4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.setParam, the RES_TCE instance-parameter case (`REStce = value; REStceGiven = TRUE`). The instance `tce` parameter is introduced by res#recon/computeConductance (per-instance exponential temperature coefficient that overrides the model REStempCoeffe in the conductance fold). Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resparam.c:75-78 (RESparam RES_TCE case), v41 hunk res.md docLineRange 951-961. Correspondence re-derived independently: REStce<->_tce, REStceGiven<->_tceGiven. Tier1: v41 adds `case RES_TCE: here->REStce = value->rValue; here->REStceGiven = TRUE; break;`. Our delta (resistor.ts:532-535) adds `case \"tce\": this._tce = value; this._tceGiven = true; break;` plus the tce instance param def (resistor.ts:74), _tce/_tceGiven fields (resistor.ts:214,227), ctor read (resistor.ts:310-311). Line-isomorphic. Tier2 bijective: RES_TCE case <-> setParam 'tce' case. FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33216,10 +33228,12 @@
         968
       ],
       "hunkHash": "1e9171a3aa999dcc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.setParam tail. The v41 hunk adds the trailing `RESupdate_conduct(here, FALSE)` call so that any instance-parameter change recomputes the conductance. digiTS's setParam currently recomputes _G = 1/R inline only for `resistance`; res#recon/computeConductance introduces the conductance-recompute helper (the RESupdate_conduct counterpart) that setParam must invoke after every param change. Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/resparam.c:90 (RESparam trailing RESupdate_conduct), v41 hunk res.md docLineRange 962-968. Correspondence re-derived independently: RESupdate_conduct(here,FALSE)<->updateConduct(false). Tier1: v41 adds `RESupdate_conduct(here, FALSE);` before `return(OK)`. Our setParam ends with `this.updateConduct(false);` (resistor.ts:595) on every param change. Line-isomorphic (the trailing recompute call). Tier2 bijective: RESparam re-runs RESupdate_conduct after the switch <-> setParam re-runs updateConduct(false) after the switch. The FALSE/false suppresses the degenerate-resistance spill warning identically. The helper itself is the res#recon/computeConductance reconstruction (APPLIED). FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33309,10 +33323,12 @@
         1099
       ],
       "hunkHash": "0c5fcb7c70e82e35",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.setup (resistor.ts:175-185). This hunk mixes three kinds of content (proposed split in res-review.md §5): (1) the model+instance default-value-processing block (REStnom/sheetRes/defW/defL/tc1/tc2/tce/narrow/short + instance width/length/scale/m/noisy/bv_max defaults) moved from REStemp into RESsetup — part of the reconstructed model setup, blocked by res#recon/computeConductance; (2) the RESeffNoiseArea computation — noise-only (proposed-split sub-range NO-COUNTERPART); (3) the four TSTALLOC `ptr`→`Ptr` capitalisation renames — a cosmetic delta on digiTS's existing four solver.allocElement calls (resistor.ts:181-184), which are already in posPos/negNeg/posNeg/negPos order. The parent is PENDING blocked by res#recon/computeConductance pending the cut.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/ressetup.c:28-58 (RESsetup default-value processing), v41 hunk res.md docLineRange 1057-1099 (sub-item; the RESeffNoiseArea block is h001b NO-COUNTERPART, correctly absent). Correspondence re-derived independently: model->REStempCoeffe<->_modTce, REStceGiven<->_modTceGiven. The only portable v41-new default beyond the v26 setup block (established by res#recon/computeConductance) is `if(!model->REStceGiven) model->REStempCoeffe = 0.0;` (ressetup.c:35). Our delta (resistor.ts:366) adds `if(!this._modTceGiven) this._modTce = 0.0;` at the matching position (after modTc2 ressetup.c:34, before narrow ressetup.c:36). Line-isomorphic for portable content. The noise defaults fNcoef/fNexp/lf/wf/ef (ressetup.c:38-42) and RESeffNoiseArea are NO-COUNTERPART (noise unimplemented per analysis-scope.md) and correctly not ported. Tier2: setup() default block bijective with ressetup.c:29-58 for all implemented-analysis params (tnom/sheetRes/defWidth/defLength/tc1/tc2/tce/narrow/short/bv_max model + width/length/scale/m/bv_max instance). FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33371,10 +33387,12 @@
         1122
       ],
       "hunkHash": "b0e414c5395a5b7a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — ResistorAnalogElement.setup (resistor.ts:175-185). This hunk mixes three kinds of content (proposed split in res-review.md §5): (1) the model+instance default-value-processing block (REStnom/sheetRes/defW/defL/tc1/tc2/tce/narrow/short + instance width/length/scale/m/noisy/bv_max defaults) moved from REStemp into RESsetup — part of the reconstructed model setup, blocked by res#recon/computeConductance; (2) the RESeffNoiseArea computation — noise-only (proposed-split sub-range NO-COUNTERPART); (3) the four TSTALLOC `ptr`→`Ptr` capitalisation renames — a cosmetic delta on digiTS's existing four solver.allocElement calls (resistor.ts:181-184), which are already in posPos/negNeg/posNeg/negPos order. The parent is PENDING blocked by res#recon/computeConductance pending the cut.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/ressetup.c:72-75 (RESsetup TSTALLOC block), v41 hunk res.md docLineRange 1106-1122 (sub-item). Correspondence re-derived independently: RESposPosPtr/RESnegNegPtr/RESposNegPtr/RESnegPosPtr<->_hPP/_hNN/_hPN/_hNP. Tier1: the four hunk lines are pure `ptr`->`Ptr` capitalisation renames on C struct matrix-pointer field names (RESposPosptr->RESposPosPtr etc.); these are identifier renames with no TS counterpart (the handles are opaque ints), absorbed by the handle abstraction. Zero-delta rule satisfied: every +/- line is an allowed identifier rename. Our setup() (resistor.ts:378-381) issues four solver.allocElement calls in (posNode,posNode)/(negNode,negNode)/(posNode,negNode)/(negNode,posNode) order, matching the TSTALLOC sequence line-for-line. Tier2 bijective: four TSTALLOC <-> four allocElement, same coordinate pairs, same order. FILE-SCOPE: source change solely resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33526,10 +33544,12 @@
         1373
       ],
       "hunkHash": "57b08f086eab13d4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/passives/resistor.ts — the conductance/temperature recompute path that res#recon/computeConductance introduces (a ResistorAnalogElement.computeTemperature + a RESupdate_conduct-equivalent conductance-recompute helper). The v41 hunk is the v26→v41 delta for REStemp: it (1) moves the model/instance default-value processing out of REStemp into RESsetup (now ressetup.c#h001), (2) factors the per-instance conductance recompute (geometry-derived resistance, TC1/TC2 polynomial fold, SCALE, RESm fold into RESconduct, acres→RESacConduct) into the new file-scope RESupdate_conduct(here, spill_warnings), and (3) adds the TCE exponential-temperature path `factor = pow(1.01, tce·difference)` selected when tce is given. Blocked by res#recon/computeConductance.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/res/restemp.c:13-113 (REStemp + RESupdate_conduct), v41 hunk res.md docLineRange 1216-1373. Correspondence re-derived independently: RESlength<->_l, RESwidth<->_w, RESsheetRes<->_rsh, RESshort<->_short, RESnarrow<->_narrow, RESresist<->_resistance, REStc1/REStc2/REStce<->_tc1/_tc2/_tce, REStempCoeff1/2/e<->_modTc1/_modTc2/_modTce, REStceGiven<->_tceGiven, model->REStceGiven<->_modTceGiven, RESscale/RESscaleGiven<->_SCALE/_scaleGiven, RESm<->_M, RESconduct<->_G, RESacConduct<->_Gac, RESacResist<->_acResist, REStemp/RESdtemp/REStnom<->_TEMP/_DTEMP/_tnom. Tier1 (v41 delta onto the recon's v26 baseline): geometry changes from v26 `RESsheetRes*(L-RESshort)/(W-RESnarrow)` to v41 `(L-2*RESshort)/(W-2*RESnarrow)*RESsheetRes` -> resistor.ts:432-435 `(this._l-2*this._short)/(this._w-2*this._narrow)*this._rsh`, operand-for-operand incl. the 2* factors and the left-to-right grouping; tce override added (restemp.c:91-94 -> resistor.ts:462-465); factor changes from v26 literal `1.0+tc1*difference+tc2*difference*difference` to v41 `if(tceGiven||model.tceGiven) factor=pow(1.01,tce*difference) else factor=(((tc2*difference)+tc1)*difference)+1.0` -> resistor.ts:469-472 with Math.pow(1.01,tce*difference) and the Horner grouping byte-identical; scale guard `if(!RESscaleGiven) RESscale=1` added (restemp.c:101-102 -> resistor.ts:475-476); conduct gains the m fold `RESm/(RESresist*factor*RESscale)` (restemp.c:104 -> resistor.ts:479 this._M/(this._resistance*factor*this._SCALE)); acres branch gains m fold and switches to RESacResist `RESm/(RESacResist*factor*RESscale)` (restemp.c:108 -> resistor.ts:484 this._M/(this._acResist*factor*this._SCALE)). All +/- lines map 1:1. Tier2 full bijection vs the fresh-read v41 RESupdate_conduct: geometry guard !resGiven + L*W*rsh>0 (restemp.c:61-62 <-> :429-430); geometry/model-r/spill-1e-3 fallback (restemp.c:63-74 <-> :432-445); difference (restemp.c:77 <-> :449); tc1/tc2/tce instance-overrides-model (restemp.c:81-94 <-> :452-465); factor tce-vs-Horner branch (restemp.c:96-99 <-> :469-472); scale guard (restemp.c:101-102 <-> :475-476); conduct m-fold (restemp.c:104 <-> :479); acres-gated acConduct/acResist (restemp.c:107-112 <-> :483-488). REStemp body (restemp.c:33-46) <-> computeTemperature (resistor.ts:393-411): temp-override + updateConduct(true). The v26 default-value block moved out of REStemp into RESsetup (the ressetup.c#h001a content). No v41 construct unmapped, no digiTS construct unmapped. FILE-SCOPE: source change solely src/components/passives/resistor.ts."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",

@@ -54,6 +54,7 @@ export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = d
     defl:     { default: 10e-6,  unit: "m",      spiceName: "defl",   description: "Default length (ressetup.c:32 RESdefLength)" },
     modTc1:   { default: 0.0,    unit: "1/K",    spiceName: "tc1",    description: "Model first-order temperature coefficient (ressetup.c:33 REStempCoeff1)" },
     modTc2:   { default: 0.0,    unit: "1/K^2",  spiceName: "tc2",    description: "Model second-order temperature coefficient (ressetup.c:34 REStempCoeff2)" },
+    modTce:   { default: 0.0,    unit: "%/K",    spiceName: "tce",    description: "Model exponential temperature coefficient (ressetup.c:35 REStempCoeffe)" },
     tnom:     { default: 300.15, unit: "K",      spiceName: "tnom",   description: "Model nominal temperature (ressetup.c:29 REStnom)", spiceConverter: kelvinToCelsius },
     r:        { default: 0.0,    unit: "Ohm",    spiceName: "r",      description: "Model default resistance (RESres)" },
     modBvMax: { default: 1e99,   unit: "V",      spiceName: "bv_max", description: "Model maximum voltage over resistor (ressetup.c:44-45 RESbv_max)" },
@@ -70,6 +71,7 @@ export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = d
     M:     { default: 1.0,               description: "Parallel multiplicity (RESm)" },
     tc1:   { default: 0.0,    unit: "1/K",   description: "Instance first-order temperature coefficient (resparam.c RES_TC1, overrides model)" },
     tc2:   { default: 0.0,    unit: "1/K^2", description: "Instance second-order temperature coefficient (resparam.c RES_TC2, overrides model)" },
+    tce:   { default: 0.0,    unit: "%/K",   description: "Instance exponential temperature coefficient (resparam.c RES_TCE, overrides model)" },
     acres: { default: 0.0,    unit: "Ohm",   description: "AC resistance (resparam.c RES_ACRESIST)" },
     bv_max: { default: 1e99,  unit: "V", description: "Instance maximum voltage, defaults to model bv_max (RESbv_max)" },
   },
@@ -190,10 +192,10 @@ class ResistorAnalogElement extends AnalogElement {
   // Per-instance resistance the temperature pass derates — ngspice
   // here->RESresist (resdefs.h). When a resistance is supplied on the instance
   // line this is the netlisted value; otherwise updateConduct() derives it from
-  // the geometry (rsh·(L−short)/(W−narrow)) or the model default.
+  // the geometry ((L−2·short)/(W−2·narrow)·rsh) or the model default.
   private _resistance: number;
-  // DC/transient conductance — ngspice here->RESconduct. Carries NO multiplicity
-  // (RESm is applied at the stamp sites in load()/stampAc()).
+  // DC/transient conductance — ngspice here->RESconduct. Carries the RESm fold
+  // (restemp.c:104 RESconduct = RESm/(resist·factor·scale)).
   private _G: number;
   // AC conductance — ngspice here->RESacConduct. Equals _G unless acres is given.
   private _Gac: number;
@@ -209,6 +211,7 @@ class ResistorAnalogElement extends AnalogElement {
   private _M: number;
   private _tc1: number;
   private _tc2: number;
+  private _tce: number;
   private _acres: number;
   private _bvMax: number;
   // Instance-side *Given guards — ngspice here->RESxxxGiven.
@@ -221,6 +224,7 @@ class ResistorAnalogElement extends AnalogElement {
   private _mGiven: boolean;
   private _tc1Given: boolean;
   private _tc2Given: boolean;
+  private _tceGiven: boolean;
   private _acresGiven: boolean;
   private _bvMaxGiven: boolean;
 
@@ -232,6 +236,7 @@ class ResistorAnalogElement extends AnalogElement {
   private _defl: number;
   private _modTc1: number;
   private _modTc2: number;
+  private _modTce: number;
   private _tnom: number;
   private _modRes: number;
   private _modBvMax: number;
@@ -243,13 +248,14 @@ class ResistorAnalogElement extends AnalogElement {
   private _deflGiven: boolean;
   private _modTc1Given: boolean;
   private _modTc2Given: boolean;
+  private _modTceGiven: boolean;
   private _tnomGiven: boolean;
   private _modResGiven: boolean;
   private _modBvMaxGiven: boolean;
 
   // Cached element-pool handles allocated in setup() and consumed by
   // load() via solver.stampElement. Mirror ngspice RES instance pointers
-  // RESposPosptr / RESnegNegptr / RESposNegptr / RESnegPosptr.
+  // RESposPosPtr / RESnegNegPtr / RESposNegPtr / RESnegPosPtr.
 
   /**
    * AC resistance the acres branch derates — ngspice here->RESacResist
@@ -301,6 +307,8 @@ class ResistorAnalogElement extends AnalogElement {
     this._tc1        = this._tc1Given   ? props.getModelParam<number>("tc1")   : RESISTOR_DEFAULTS["tc1"]!;
     this._tc2Given   = props.isModelParamGiven("tc2");
     this._tc2        = this._tc2Given   ? props.getModelParam<number>("tc2")   : RESISTOR_DEFAULTS["tc2"]!;
+    this._tceGiven   = props.isModelParamGiven("tce");
+    this._tce        = this._tceGiven   ? props.getModelParam<number>("tce")   : RESISTOR_DEFAULTS["tce"]!;
     this._acresGiven = props.isModelParamGiven("acres");
     this._acres      = this._acresGiven ? props.getModelParam<number>("acres") : RESISTOR_DEFAULTS["acres"]!;
     this._bvMaxGiven = props.isModelParamGiven("bv_max");
@@ -321,6 +329,8 @@ class ResistorAnalogElement extends AnalogElement {
     this._modTc1        = this._modTc1Given   ? props.getModelParam<number>("modTc1")   : RESISTOR_DEFAULTS["modTc1"]!;
     this._modTc2Given   = props.isModelParamGiven("modTc2");
     this._modTc2        = this._modTc2Given   ? props.getModelParam<number>("modTc2")   : RESISTOR_DEFAULTS["modTc2"]!;
+    this._modTceGiven   = props.isModelParamGiven("modTce");
+    this._modTce        = this._modTceGiven   ? props.getModelParam<number>("modTce")   : RESISTOR_DEFAULTS["modTce"]!;
     this._tnomGiven     = props.isModelParamGiven("tnom");
     this._tnom          = this._tnomGiven     ? props.getModelParam<number>("tnom")     : RESISTOR_DEFAULTS["tnom"]!;
     this._modResGiven   = props.isModelParamGiven("r");
@@ -329,11 +339,12 @@ class ResistorAnalogElement extends AnalogElement {
     this._modBvMax      = this._modBvMaxGiven ? props.getModelParam<number>("modBvMax") : RESISTOR_DEFAULTS["modBvMax"]!;
 
     // At construction the reference temperature equals tnom, so difference = 0,
-    // factor = 1 and _G = 1/(resist·scale). setup() and computeTemperature()
-    // overwrite this with the geometry/TC/SCALE fold before load() runs. _G
-    // carries no multiplicity — RESm is applied at the stamp sites.
-    this._acResist = this._resistance;
-    this._G = 1.0 / (this._resistance * this._SCALE);
+    // factor = 1 and _G = RESm/(resist·scale). setup() and computeTemperature()
+    // overwrite this with the geometry/TC/SCALE fold before load() runs. RESm is
+    // folded into RESconduct by RESupdate_conduct (restemp.c:104). _acResist
+    // mirrors ngspice RESacResist, set from acres by RESparam (resparam.c:45).
+    this._acResist = this._acresGiven ? this._acres : this._resistance;
+    this._G = this._M / (this._resistance * this._SCALE);
     this._Gac = this._G;
   }
 
@@ -352,6 +363,7 @@ class ResistorAnalogElement extends AnalogElement {
     if (!this._deflGiven)     this._defl     = 10e-6;             // ressetup.c:32
     if (!this._modTc1Given)   this._modTc1   = 0.0;               // ressetup.c:33
     if (!this._modTc2Given)   this._modTc2   = 0.0;               // ressetup.c:34
+    if (!this._modTceGiven)   this._modTce   = 0.0;               // ressetup.c:35
     if (!this._narrowGiven)   this._narrow   = 0.0;               // ressetup.c:36
     if (!this._shortGiven)    this._short    = 0.0;               // ressetup.c:37
     if (!this._modBvMaxGiven) this._modBvMax = 1e99;              // ressetup.c:44-45
@@ -401,18 +413,26 @@ class ResistorAnalogElement extends AnalogElement {
   /**
    * updateConduct — geometry/temperature conductance recompute
    * (RESupdate_conduct body). Rebuilds _resistance (geometry), _G and _Gac from
-   * the stored parameters; never mutated in place. Carries no multiplicity —
-   * RESm is applied at the stamp sites in load()/stampAc().
+   * the stored parameters; never mutated in place. RESm is folded into the
+   * conductance (restemp.c:104), so the stamp sites carry no separate m.
    *
    * cite: restemp.c:53-113 (RESupdate_conduct). spill_warnings gates the
    * "resistance too low" warning so the setParam recompute (FALSE) stays quiet.
    */
   private updateConduct(spillWarning: boolean): void {
+    let factor: number;
+    let tc1: number;
+    let tc2: number;
+    let tce: number;
+
     // restemp.c:61-75 — geometry-derived resistance when no resistance supplied.
     if (!this._resGiven) {
       if (this._l * this._w * this._rsh > 0.0) {
-        // restemp.c:63-66 — rsh · (L − short) / (W − narrow), left-to-right.
-        this._resistance = this._rsh * (this._l - this._short) / (this._w - this._narrow);
+        // restemp.c:63-66 — (L − 2·short) / (W − 2·narrow) · rsh.
+        this._resistance =
+          (this._l - 2 * this._short) /
+          (this._w - 2 * this._narrow) *
+          this._rsh;
       } else if (this._modResGiven) {
         // restemp.c:67-68 — model default resistance.
         this._resistance = this._modRes;
@@ -428,24 +448,40 @@ class ResistorAnalogElement extends AnalogElement {
     // restemp.c:77 — difference = (REStemp + RESdtemp) − REStnom.
     const difference = (this._TEMP + this._DTEMP) - this._tnom;
 
-    // restemp.c:81-89 — instance tc1/tc2 override model tempCoeff1/tempCoeff2.
-    const tc1 = this._tc1Given ? this._tc1 : this._modTc1;
-    const tc2 = this._tc2Given ? this._tc2 : this._modTc2;
+    // restemp.c:79-94 — instance tc1/tc2/tce override model coefficients.
+    if (this._tc1Given)
+      tc1 = this._tc1; // instance
+    else
+      tc1 = this._modTc1; // model
 
-    // restemp.c — factor = 1.0 + tc1·difference + tc2·difference·difference.
-    // Literal polynomial form (no Horner factoring): the operand order is
-    // load-bearing for bit-exact parity.
-    const factor = 1.0 + tc1 * difference + tc2 * difference * difference;
+    if (this._tc2Given)
+      tc2 = this._tc2;
+    else
+      tc2 = this._modTc2;
 
-    // restemp.c:104 — conductance = 1.0 / (resist · factor · scale),
-    // left-to-right. No RESm — the multiplicity is applied at the stamp sites.
-    this._G = 1.0 / (this._resistance * factor * this._SCALE);
+    if (this._tceGiven)
+      tce = this._tce;
+    else
+      tce = this._modTce;
 
-    // restemp.c:107-112 — Paolo Nenzi AC value: when acres is given the AC
+    // restemp.c:96-99 — tce path: factor = 1.01^(tce·difference); otherwise the
+    // Horner-form polynomial (((tc2·diff)+tc1)·diff)+1.0.
+    if (this._tceGiven || this._modTceGiven)
+      factor = Math.pow(1.01, tce * difference);
+    else
+      factor = (((tc2 * difference) + tc1) * difference) + 1.0;
+
+    // restemp.c:101-102 — scale defaults to 1 when not given.
+    if (!this._scaleGiven)
+      this._SCALE = 1;
+
+    // restemp.c:104 — conductance = RESm / (resist · factor · scale).
+    this._G = this._M / (this._resistance * factor * this._SCALE);
+
+    // restemp.c:106-112 — Paolo Nenzi AC value: when acres is given the AC
     // conductance derates the separate acResist; otherwise it equals _G.
     if (this._acresGiven) {
-      this._acResist = this._acres;
-      this._Gac = 1.0 / (this._acres * factor * this._SCALE);
+      this._Gac = this._M / (this._acResist * factor * this._SCALE);
     } else {
       this._Gac = this._G;
       this._acResist = this._resistance;
@@ -459,7 +495,10 @@ class ResistorAnalogElement extends AnalogElement {
         this._resGiven = true;
         break;
       case "TEMP":
+        // resparam.c:29-32 — REStemp = value + CONSTCtoK; clamp to 0 below 1e-6 K.
         this._TEMP = value;
+        if (this._TEMP < 1e-6)
+          this._TEMP = 0;
         this._tempGiven = true;
         break;
       case "DTEMP":
@@ -490,8 +529,14 @@ class ResistorAnalogElement extends AnalogElement {
         this._tc2 = value;
         this._tc2Given = true;
         break;
+      case "tce":
+        this._tce = value;
+        this._tceGiven = true;
+        break;
       case "acres":
+        // resparam.c:44-46 — RES_ACRESIST stores acres into RESacResist.
         this._acres = value;
+        this._acResist = value;
         this._acresGiven = true;
         break;
       case "bv_max":
@@ -526,6 +571,10 @@ class ResistorAnalogElement extends AnalogElement {
         this._modTc2 = value;
         this._modTc2Given = true;
         break;
+      case "modTce":
+        this._modTce = value;
+        this._modTceGiven = true;
+        break;
       case "tnom":
         this._tnom = value;
         this._tnomGiven = true;
@@ -548,20 +597,24 @@ class ResistorAnalogElement extends AnalogElement {
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    // resload.c:31-34- value-side stamps through cached handles. RESm is applied
-    // at the stamp (m·RESconduct), matching the v26 multiplicity placement.
-    const g = this._M * this._G;
-    solver.stampElement(this._hPP, g);
-    solver.stampElement(this._hNN, g);
-    solver.stampElement(this._hPN, -g);
-    solver.stampElement(this._hNP, -g);
+    // resload.c:31-34 — value-side stamps through cached handles. RESm is folded
+    // into RESconduct by RESupdate_conduct, so the stamps carry no separate m.
+    solver.stampElement(this._hPP, this._G);
+    solver.stampElement(this._hNN, this._G);
+    solver.stampElement(this._hPN, -this._G);
+    solver.stampElement(this._hNP, -this._G);
   }
 
   stampAc(solver: SparseSolverStamp, _omega: number, _ctx: LoadContext): void {
-    // resload.c:59-67 (RESacload)- the conductance is frequency-independent and
-    // purely real. g is the acres-gated RESacConduct, multiplied by RESm at the
-    // stamp site.
-    const g = this._M * this._Gac;
+    // resload.c:59-67 (RESacload) — the conductance is frequency-independent and
+    // purely real. RESm is folded into RESacConduct/RESconduct, so the stamps
+    // carry no separate m.
+    let g: number;
+    if (this._acresGiven)
+      g = this._Gac;
+    else
+      g = this._G;
+
     solver.stampElement(this._hPP, g);
     solver.stampElement(this._hNN, g);
     solver.stampElement(this._hPN, -g);
@@ -573,10 +626,9 @@ class ResistorAnalogElement extends AnalogElement {
     const n1 = this.pinNodes.get("neg")!;
     const vA = rhs[n0];
     const vB = rhs[n1];
-    // resload.c:28-29 — REScurrent = (Vpos − Vneg) · RESconduct. RESconduct
-    // carries no multiplicity in this baseline; the current the matrix solution
-    // reflects is the m·G stamp, so the terminal current scales by m.
-    const I = this._M * this._G * (vA - vB);
+    // resload.c:28-29 — REScurrent = (Vpos − Vneg) · RESconduct. RESconduct now
+    // carries the RESm fold (restemp.c:104), matching the m·G matrix stamp.
+    const I = this._G * (vA - vB);
     return [I, -I];
   }
 }
