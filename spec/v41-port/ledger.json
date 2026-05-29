@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-29T23:40:09.508Z",
+    "generated": "2026-05-29T23:48:29.463Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 113,
+    "progressEntriesApplied": 117,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -13615,10 +13615,12 @@
         75
       ],
       "hunkHash": "c8b600481cf9268e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/ccvs.ts CCVSAnalogElement instance fields (branchIndex, _contBranch; node ids via pinNodes 'out+'/'out-')",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1: hunk ccvs.md docLineRange[52,75]. All +/- lines are allowed differences: hand-rolled generic-struct prefix (CCVSmodPtr/CCVSnextInstance/CCVSname/CCVSstate) replaced by struct GENinstance gen + accessor macros = C-struct plumbing engine-managed in digiTS (no per-element field); int->const int on CCVSposNode/CCVSnegNode = const-qualifier<->ReadonlyMap C<->TS syntax. CCVScontName/CCVSbranch/CCVScontBranch are context lines. Zero-line TS delta valid. Tier2: independently re-derived from ref/ngspice/src/spicelib/devices/ccvs/ccvsdefs.h:27-32 (fresh read, rename-map NOT consulted): CCVSbranch(:31 equation number of branch eq added for v source)<->branchIndex (own output-VSRC branch); CCVScontBranch(:32 number of branch eq of controlling source)<->_contBranch(ccvs.ts:129); CCVSposNode(:27 positive node of source)<->pinNodes.get(\"out+\")(ccvs.ts:141); CCVSnegNode(:28 negative node)<->pinNodes.get(\"out-\")(ccvs.ts:142). Bijective on behavioral fields; GEN-embedding has no TS counterpart by architecture. v41 ccvsdefs.h:18-51."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -13646,10 +13648,12 @@
         96
       ],
       "hunkHash": "283775da7366d054",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/ccvs.ts CCVSAnalogElement TSTALLOC handle fields (_hPIbr, _hNIbr, _hIbrN, _hIbrP, _hIbrCtBr; ccvs.ts:133-137)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1: hunk ccvs.md docLineRange[76,96] is the pure ptr->Ptr capitalisation rename on the 5 matrix-element pointers (identifier rename, allowed). Zero-line TS delta valid. Tier2: independently re-derived from ref/ngspice/src/spicelib/devices/ccvs/ccvsdefs.h:36-44 comments (fresh read): CCVSposIbrPtr(positive node,branch eq)<->_hPIbr(// G[posNode,ownBranch], ccvs.ts:133); CCVSnegIbrPtr(negative node,branch eq)<->_hNIbr(:134); CCVSibrPosPtr(branch eq,positive node)<->_hIbrP(:136); CCVSibrNegPtr(branch eq,negative node)<->_hIbrN(:135); CCVSibrContBrPtr(branch eq,control branch eq)<->_hIbrCtBr(:137). All 5 bijective on (row,col). v41 ccvsdefs.h:36-44."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -13801,10 +13805,12 @@
         274
       ],
       "hunkHash": "c8372cada7e5db25",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/ccvs.ts ControlledSourceElement.findBranchFor (controlled-source-base.ts:136-141) reached via ctx.findBranch (ccvs.ts:156)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1: hunk ccvs.md docLineRange[262,274] +/- lines are loop-walk accessor renames only: model->CCVSnextModel=>CCVSnextModel(model), model->CCVSinstances=>CCVSinstances(model), here->CCVSnextInstance=>CCVSnextInstance(here) (C<->TS engine-managed walk, allowed). The CCVSname==name match, CCVSbranch==0 guard, CKTmkCur, and return(CCVSbranch) are unchanged context lines. Zero-line TS delta valid. Tier2: re-derived fresh from ref/ngspice/src/spicelib/devices/ccvs/ccvsfbr.c:26-32: per-instance body if(CCVSname==name){if(CCVSbranch==0){CKTmkCur;CCVSbranch=tmp->number;}return(CCVSbranch);} <-> ControlledSourceElement.findBranchFor (controlled-source-base.ts:136-141): if(branchIndex===-1){branchIndex=ctx.makeCur(label,\"branch\");}return branchIndex; reached via ctx.findBranch (ccvs.ts:156). The name-match is the engine label-dispatch to the right instance; idempotent makeCur guard (==0<->===-1). Model/instance walk engine-managed. Bijective on the resolve construct. v41 ccvsfbr.c:23-36."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -13863,10 +13869,12 @@
         433
       ],
       "hunkHash": "47108e0137fc2624",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/ccvs.ts CCVSAnalogElement._stampLinear (B/C +-1 incidence, ccvs.ts:178-185) + stampOutput (-coeff control-branch coupling, ccvs.ts:204-217)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1: hunk ccvs.md docLineRange[408,433] +/- lines are loop-walk accessor renames (model->CCVSnextModel/CCVSinstances/here->CCVSnextInstance => accessor-macro form) plus ptr->Ptr on the 5 stamp lines; the += 1.0 / -= 1.0 / -= CCVScoeff arithmetic is unchanged across v26->v41. Zero-line TS delta valid. Tier2: re-derived fresh from ref/ngspice/src/spicelib/devices/ccvs/ccvsload.c:35-39: *(CCVSposIbrPtr)+=1.0<->stampElement(_hPIbr,1)(ccvs.ts:181); *(CCVSnegIbrPtr)-=1.0<->stampElement(_hNIbr,-1)(:182); *(CCVSibrPosPtr)+=1.0<->stampElement(_hIbrP,1)(:184); *(CCVSibrNegPtr)-=1.0<->stampElement(_hIbrN,-1)(:183); *(CCVSibrContBrPtr)-=CCVScoeff<->stampElement(_hIbrCtBr,-rm)(ccvs.ts:214) with rm=derivative. The TS _stampLinear order (posIbr,negIbr,ibrNeg,ibrPos) swaps ibrNeg/ibrPos vs ngspice but these are distinct (row,col) cells so float accumulation is identical. The stampOutput RHS term rhs[branch]+=vNR with vNR=value-derivative*ctrlValue is the general-NR extension; for linear CCVS value=rm*I0, derivative=rm => vNR=0, reproducing ngspice matrix-only load. Bijective: each v41 stamp<->one stampElement; CCVScoeff<->rm. v41 ccvsload.c:29-42."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
