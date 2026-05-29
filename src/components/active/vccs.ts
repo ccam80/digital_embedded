@@ -61,6 +61,8 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: VCCS_PARAM_DEFS, defaults: VCCS_DEFAULTS } = defineModelParams({
   primary: {
     transconductance: { default: 0.001, unit: "S", description: "Linear transconductance gm" },
+    // VCCSmValue, vccs.c:14 IOP("m", VCCS_M, ...) — parallel multiplier, default 1
+    M: { default: 1, description: "Parallel multiplier" },
   },
 });
 
@@ -311,6 +313,7 @@ const VCCS_PROPERTY_DEFS: PropertyDefinition[] = [
 const VCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "expression",       propertyKey: "expression",       convert: (v) => v },
   { xmlName: "transconductance", propertyKey: "transconductance", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "m",                propertyKey: "M",                convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",            propertyKey: "label",            convert: (v) => v },
 ];
 
@@ -342,9 +345,13 @@ export const VCCSDefinition: StandaloneComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const transconductance = props.getModelParam<number>("transconductance");
+        const m = props.getModelParam<number>("M"); // VCCSmValue, default 1
+        // vccspar.c:27-28 — VCCScoeff *= VCCSmValue (m defaults to 1, so the
+        // product is the bare transconductance when m is not netlisted).
+        const effectiveGm = transconductance * m;
         const rawExpr = parseExpression(expression === "V(ctrl)"
-          ? `${transconductance} * V(ctrl)`
-          : expression);
+          ? `${effectiveGm} * V(ctrl)`
+          : `(${m}) * (${expression})`);
         const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
         return new VCCSAnalogElement(pinNodes, rawExpr, deriv, "V(ctrl)", "voltage");
       },

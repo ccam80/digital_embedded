@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-29T22:44:45.761Z",
+    "generated": "2026-05-29T23:02:19.479Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 95,
+    "progressEntriesApplied": 96,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -62773,9 +62773,11 @@
         "vccs/vccsdefs.h#h002"
       ],
       "hunkHash": "c4170aa33b302b7f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Reconstruction item. VERIFICATION.md sec1a satisfied on both legs: (a) source isomorphic to the spec's ngspice baseline (re-derived independently from spec/v41-port/reconstruction/vccs-multiplierAndIc.md and fresh reads of ref/ngspice/src/spicelib/devices/vccs/{vccspar.c,vccs.c,vccsload.c}; rename-maps NOT consulted) AND (b) harness gate clean. ngspice->digiTS correspondence independently re-derived: VCCSmValue (m) <-> M model param in VCCS_PARAM_DEFS; VCCSmGiven <-> props isModelParamGiven('M') pattern; VCCScoeff (the effective transconductance fed to the stamp/expression) <-> effectiveGm = transconductance * M; VCCSparam VCCS_TRANS+VCCS_M fold <-> the behavioral model factory. PART A (params): VCCS_PARAM_DEFS (vccs.ts:61-67) adds M:{default:1, description:'Parallel multiplier'} citing vccs.c:14 IOP('m', VCCS_M, IF_REAL, 'Parallel multiplier') -- verified verbatim against the fresh read of vccs.c:14. The ic param + VCCSinitCond + VCCSvOld/VCCScontVOld state slots are correctly NOT reconstructed: confirmed against fresh read of vccspar.c that there is NO case VCCS_IC (only VCCS_TRANS/VCCS_M/VCCS_TRANS_SENS), so ic is parsed-and-discarded C plumbing with no behavioral content (PLANNING.md sec5 case (a)); the VCCS is a purely algebraic Norton element. PART B (attribute mapping): VCCS_ATTRIBUTE_MAPPINGS (vccs.ts:316) adds {xmlName:'m', propertyKey:'M', convert: parseFloat, modelParam:true}, mirroring the transconductance mapping (vccs.ts:315). PART C (the fold): behavioral factory (vccs.ts:345-357) reads m=props.getModelParam('M') (default 1), computes effectiveGm = transconductance * m, and for the default 'V(ctrl)' expression emits `${effectiveGm} * V(ctrl)` (vccs.ts:352-353). This is bijective with vccspar.c:24-29: VCCS_TRANS sets VCCScoeff=value then `if (VCCSmGiven) VCCScoeff *= VCCSmValue` -- because digiTS reads M with default 1, the unconditional product reproduces the conditional multiply exactly (m=1 when not netlisted -> bare transconductance, matching the untaken-branch case). The downstream stamp (stampOutput vccs.ts:184-204, vccsload.c:34-37) loads the coefficient unchanged with NO second *m or /m, matching vccsload.c which loads VCCScoeff verbatim -- the whole multiplier effect lives in the parameter-application step, as the spec requires (spec lines 63-66). For a user-supplied non-default expression the factory wraps `(${m}) * (${expression})` (vccs.ts:354), scaling the output current by the parallel-device count per spec criterion 3 / lines 108-112 (m is a topology fact applied to the whole output, sanctioned by the spec for the general transfer function). Acceptance criteria 1-7 all satisfied: (1) M default 1 declared; (2) m->M modelParam mapping; (3) default-expr output transconductance*M*V(ctrl), user-expr output expression scaled by M; (4) M unset -> identical to prior VCCS (product is bare transconductance); (5) M hot-loadable via the same props.getModelParam factory path transconductance uses (setParam is a no-op stub in the entire ControlledSourceElement family, unchanged by this recon -- consistent with how transconductance is handled); (6) the two blocked vccsdefs.h#h001/#h002 hunks now apply onto an element that owns M; (7) harness gate below. HARNESS GATE (server_restart -> harness_start dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll on src/solver/analog/__tests__/ngspice-parity/fixtures/vccs-gate.dts [the task's spec/v41-port/fixtures/vccs-gate.dts path does not exist; this is the only vccs-gate.dts in tree -- a Vin=1V control -> G1 gm=0.001 VCCS -> Rload=1k Norton gate] -> harness_run -> harness_first_divergence): firstDivergence NULL across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape, earliest null); 107/107 tran steps converged, 0 failed, avgIterations 2.028 both engines, stepCount delta 0. The gate exercises m=1 (default) so the bare-transconductance path is bit-exact against ngspice's G device. FILE-SCOPE CHECK: `git diff --name-only` source change is solely src/components/active/vccs.ts (the recon's sole tsFile); the diff is exactly the three prescribed additions (M param def, m->M mapping, factory fold) and nothing else (setParam untouched). Other diffed paths (.omc/*, .vitest-failures.json, ref/ngspice submodule pointer, spec/v41-port/*, .claude/worktrees/*) are orchestration/env state, not source over-application."
+      ],
       "rationale": null,
       "escalation": null
     },
