@@ -1230,6 +1230,51 @@
         "MISMATCH (group-level Tier2; this hunk own Tier1 PASSES). functionGroup vcvs/vcvsset.c::VCVSsetup. Tier1 of hunk #h002 PASSES: the six +/- lines are pure ptr->Ptr capitalisation renames on the first TSTALLOC macro argument (TSTALLOC(VCVSposIbrptr,...) -> TSTALLOC(VCVSposIbrPtr,...) etc.); the second/third TSTALLOC args (node-index coordinate pairs) and the call order are byte-identical v26->v41 -> empty TS delta is line-isomorphic. The six TSTALLOC calls map bijectively onto the six allocElement calls vcvs.ts:173-178 (posNode,branch / negNode,branch / branch,posNode / branch,negNode / branch,ctrlPosNode / branch,ctrlNegNode -- same coordinate pairs, same allocation order). However the functionGroup as a whole FAILS Tier2 because of the missing degenerate-topology guard (vcvsset.c:35-39 shorted-VCVS check) documented on vcvs/vcvsset.c#h001 -- the two hunks share the VCVSsetup functionGroup and the group verdict is MISMATCH until the guard is ported. This hunk stays PENDING with #h001; no change required to the TSTALLOC sequence itself. TARGET: see vcvs/vcvsset.c#h001 note (add shorted-VCVS guard to VCVSAnalogElement.setup)."
       ],
       "escalation": null
+    },
+    "cccs/cccsdefs.h#h001": {
+      "state": "APPLIED",
+      "hunkHash": "320c6d4fb9da7b71",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. Tier1: hunk cccs.md docLineRange[63,87] +/- lines are all allowed differences - the GENinstance-embedding + accessor-macro replacement of the hand-rolled generic-struct prefix (CCCSmodPtr/CCCSnextInstance/CCCSname/CCCSstate) is C-struct plumbing engine-managed in digiTS (no per-element field), and int->const int on CCCSposNode/CCCSnegNode is the const-qualifier<->ReadonlyMap C<->TS syntax. CCCScontBranch is a context line. Zero-line TS delta valid. Tier2: independently re-derived from ref/ngspice/src/spicelib/devices/cccs/cccsdefs.h:27-33 - CCCScontBranch(:29 number of branch eq of controlling source)<->_contBranch(cccs.ts:135); CCCSposNode(:27)<->pinNodes.get(\"out+\")(cccs.ts:144); CCCSnegNode(:28)<->pinNodes.get(\"out-\")(cccs.ts:145). Bijective on behavioral fields; GEN-embedding has no TS counterpart by architecture (REVIEW-CLASS). v41 cccsdefs.h:18-47."
+      ],
+      "escalation": null
+    },
+    "cccs/cccsdefs.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "ee4f51aa5768ae50",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. Tier1: hunk cccs.md docLineRange[88,99] is the pure ptr->Ptr capitalisation rename on CCCSposContBrptr->CCCSposContBrPtr and CCCSnegContBrptr->CCCSnegContBrPtr (an identifier rename, allowed). Zero-line TS delta valid. Tier2: independently re-derived from ref/ngspice/src/spicelib/devices/cccs/cccsdefs.h:37-40 comments - CCCSposContBrPtr(*(positive node, control branch eq))<->_hPCtBr(// G[posNode, contBranch], cccs.ts:139); CCCSnegContBrPtr(*(negative node, control branch eq))<->_hNCtBr(// G[negNode, contBranch], cccs.ts:140). Bijective. v41 cccsdefs.h:37-40."
+      ],
+      "escalation": null
+    },
+    "cccs/cccsload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "77465f82f3135f35",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. blockedBy cccs#recon/multiplier is APPLIED (commit f7f5bf5f) -> unblocked. Tier1: hunk cccs.md docLineRange[395,414] 5 +/- lines are all allowed differences - loop-walk accessor renames model->CCCSnextModel=>CCCSnextModel(model), model->CCCSinstances=>CCCSinstances(model), here->CCCSnextInstance=>CCCSnextInstance(here) (C<->TS engine-managed walk) and ptr->Ptr on the two stamp lines; the += CCCScoeff / -= CCCScoeff arithmetic is unchanged across the v26->v41 delta. Zero-line TS delta valid. Tier2: re-derived fresh from ref/ngspice/src/spicelib/devices/cccs/cccsload.c:35-36 - per-instance body is exactly *(CCCSposContBrPtr)+=CCCScoeff and *(CCCSnegContBrPtr)-=CCCScoeff (matrix-only, no RHS). digiTS stampOutput(cccs.ts:205-206) stamps +gm at _hPCtBr=G[posNode,contBranch] and -gm at _hNCtBr=G[negNode,contBranch]. CCCS is a linear F-element: CCCScoeff is constant, so gm=f(I)=derivative=CCCScoeff and iNR=f(I0)-f-prime*I0=0; the digiTS RHS terms (rhs[posNode]-=iNR/+=iNR, cccs.ts:211-212) are the general-NR extension established+harness-gated null by the recon item and vanish (iNR=0) for the linear case, reproducing ngspice matrix-only load bit-identically. Bijective: each v41 stamp<->one digiTS stampElement; v41 CCCScoeff<->digiTS gm; model/instance walk=engine-managed. v41 cccsload.c:29-37."
+      ],
+      "escalation": null
+    },
+    "cccs/cccsset.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "917ef76dc42ed2a3",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. Tier1: hunk cccs.md docLineRange[509,523] +/- lines are loop-walk accessor renames only - model->CCCSnextModel=>CCCSnextModel(model), model->CCCSinstances=>CCCSinstances(model), here->CCCSnextInstance=>CCCSnextInstance(here) (C<->TS engine-managed walk, allowed); the CCCScontBranch=CKTfndBranch(...) resolve and the ==0 error check are unchanged context lines. Zero-line TS delta valid. Tier2: re-derived fresh from ref/ngspice/src/spicelib/devices/cccs/cccsset.c:36-41 - here->CCCScontBranch=CKTfndBranch(ckt,here->CCCScontName)<->ctx.findBranch(this._senseSourceLabel)(cccs.ts:153); if(CCCScontBranch==0){IFerrorf(ERR_FATAL,...);return(E_BADPARM);}<->if(contBranch===0)throw(cccs.ts:154-158). The extra digiTS empty-label guard(cccs.ts:150-152) guards the same precondition ngspice assumes via CCCScontName being parse-time populated; input-validation, not a matrix-build divergence. Bijective on the resolve+error constructs. v41 cccsset.c:30-41."
+      ],
+      "escalation": null
+    },
+    "cccs/cccsset.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "f2f32b18cfa66226",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. Tier1: hunk cccs.md docLineRange[524,534] is the pure ptr->Ptr rename on TSTALLOC(CCCSposContBrptr,...)->Ptr and TSTALLOC(CCCSnegContBrptr,...)->Ptr (identifier rename, allowed). Zero-line TS delta valid. Tier2: re-derived fresh from ref/ngspice/src/spicelib/devices/cccs/cccsset.c:44-50 - TSTALLOC expands to SMPmakeElt(matrix,here->first,here->second) at (row,col); TSTALLOC(CCCSposContBrPtr,CCCSposNode,CCCScontBranch):49<->solver.allocElement(posNode,contBranch)(cccs.ts:162); TSTALLOC(CCCSnegContBrPtr,CCCSnegNode,CCCScontBranch):50<->solver.allocElement(negNode,contBranch)(cccs.ts:163). Alloc order pos-then-neg preserved bit-for-bit, matching cccsset.c:49-50. Bijective. v41 cccsset.c:44-50."
+      ],
+      "escalation": null
     }
   }
 }
