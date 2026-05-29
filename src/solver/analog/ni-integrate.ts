@@ -31,20 +31,30 @@ export function niIntegrate(
     if (order === 1) {
       // niinteg.c:28-29
       ccap = ag[0] * q0 + ag[1] * q1;
-    } else {
+    } else if (order === 2) {
       // niinteg.c:32-34- RECURSIVE in ccapPrev
       ccap = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+    } else {
+      // niinteg.c:36-39- default: return(E_ORDER)
+      throw new Error(`niIntegrate: unsupported TRAP order ${order} (ngspice E_ORDER)`);
     }
   } else if (method === "gear") {
-    // GEAR- niinteg.c:43, 47-63.
-    // capload.c:69: NIintegrate returns E_ORDER for invalid order; mirror that here.
-    if (order < 1) {
+    // GEAR- niinteg.c:43-64. CKTstate0[ccap]=0, then the case fall-through
+    // accumulates from the highest order down to ag[0] last (highest-order term
+    // first, ag[0]*state0 last). niinteg.c:66-67 returns E_ORDER when CKTorder
+    // matches no case 1..6 (order<1 or order>6).
+    if (order < 1 || order > 6) {
       throw new Error(`niIntegrate: unsupported BDF/GEAR order ${order} (ngspice E_ORDER)`);
     }
-    ccap = ag[0] * q0 + ag[1] * q1;
-    for (let k = 2; k <= order; k++) {
+    // niinteg.c:43
+    ccap = 0;
+    // niinteg.c:47-59- case <order> ... case 2 fall-through, highest order first
+    for (let k = order; k >= 2; k--) {
       ccap += ag[k] * (qHistory[k - 2] ?? 0);
     }
+    // niinteg.c:62-63- case 1: ag[1]*state1 then ag[0]*state0
+    ccap += ag[1] * q1;
+    ccap += ag[0] * q0;
   } else {
     // capload.c:69 error path: method integer unrecognised- ngspice returns E_METHOD.
     throw new Error(`niIntegrate: unsupported integration method "${method as string}" (ngspice E_METHOD)`);

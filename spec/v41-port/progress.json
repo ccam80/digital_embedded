@@ -1,0 +1,661 @@
+{
+  "_comment": "Loop-progress overlay - written by the port loop, never by hand-editing ledger.json. The verifier records APPLIED here; the applier/verifier record ESCALATED and attempts here. build-ledger.mjs applies it so ledger.json is fully derived (diffs + splits.json + planning/*-decisions.json + progress.json). Each item entry: state (PENDING|APPLIED|ESCALATED - never NO-COUNTERPART, which is planning-frozen), attempts (int), verifierNotes (string[]), escalation (object|null, required when ESCALATED), hunkHash (the item hunkHash when the entry was recorded - if the diff later drifts, the stale entry is ignored).",
+  "items": {
+    "maths-ni/niinteg.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "d8a141af3916ccb6",
+      "attempts": 2,
+      "verifierNotes": [
+        "MISMATCH (Tier 2, whole-function bijection fail). Tier 1 PASSES: hunk maths-ni.md docLineRange 350-365 is whitespace-only (every +/- pair removes trailing whitespace / shifts a line break; TRAP order-1 `CKTstate0[ccap]=CKTag[0]*CKTstate0[qcap]+CKTag[1]*CKTstate1[qcap]` and order-2 `-CKTstate1[ccap]*CKTag[1]+CKTag[0]*(CKTstate0[qcap]-CKTstate1[qcap])` arithmetic unchanged), so a zero-line TS delta is line-isomorphic per VERIFICATION.md sec4 zero-delta rule; ni-integrate.ts:33 and :36 match the v41 TRAP arithmetic operand-for-operand. Tier 2 FAILS on the GEAR case: ref/ngspice/src/maths/ni/niinteg.c:42-64 computes state0[ccap]=0 then accumulates HIGH->LOW via case fall-through (order 6: +=ag[6]*state6, ...,+=ag[2]*state2, +=ag[1]*state1, +=ag[0]*state0). src/solver/analog/ni-integrate.ts:44-46 accumulates LOW->HIGH: `ccap = ag[0]*q0 + ag[1]*q1` then `for k=2..order: ccap += ag[k]*qHistory[k-2]`. At the default GEAR order 2 (state-pool.ts:71 maxOrder=2) v41 evaluates ag[2]*s2 + ag[1]*s1 + ag[0]*s0 whereas ni-integrate.ts evaluates ag[0]*s0 + ag[1]*s1 + ag[2]*s2 -- a reordered floating-point summation (VERIFICATION.md sec4 forbidden: 'reordered operands in an arithmetic expression'; CLAUDE.md treats load() / integration accumulation order as bit-load-bearing). Remedy (within-file, in scope for ni-integrate.ts): rewrite the GEAR branch to accumulate from highest order down to ag[0], mirroring niinteg.c:42-64 fall-through order (initialise ccap=0; add ag[order]*q[order] first, ag[0]*q0 last). This is not the hunk's TRAP delta but it is part of the NIintegrate function that Tier 2 requires to be bijective.",
+        "APPLIER ROUND 2 RESPONSE (attempt 1): Fixed the named GEAR-accumulation-order divergence in src/solver/analog/ni-integrate.ts. The GEAR branch now mirrors niinteg.c:43-64 fall-through order: `ccap = 0` (niinteg.c:43), then `for (let k = order; k >= 2; k--) ccap += ag[k] * (qHistory[k - 2] ?? 0)` (the case <order>...case 2 fall-through chain, highest order first, niinteg.c:47-59), then `ccap += ag[1] * q1` (case 1 first add, niinteg.c:62) then `ccap += ag[0] * q0` (case 1 second add, niinteg.c:63). At default GEAR order 2 this now evaluates 0 + ag[2]*s2 + ag[1]*s1 + ag[0]*s0, operand-for-operand identical to v41. TRAP branch unchanged (already operand-for-operand identical, zero-line delta for hunk #h001 itself). qHistory[k-2] maps state2..state6 -> qHistory[0..4]. No other file touched (in-file, in functionGroup scope per TASK.md §2).",
+        "VERIFIER ROUND 3 (attempt 1, separate context). Tier 1 PASSES (unchanged): hunk maths-ni.md docLineRange 350-365 is whitespace-only; the TS delta touches only the GEAR branch, so the TRAP region delta is empty and line-isomorphic per VERIFICATION.md sec4 zero-delta rule (ni-integrate.ts:33 TRAP order-1 = ag[0]*q0+ag[1]*q1 == niinteg.c:28-29; ni-integrate.ts:36 TRAP order-2 = -ccapPrev*ag[1]+ag[0]*(q0-q1) == niinteg.c:32-34, operand-for-operand). GEAR-accumulation-order divergence from round 2 is now FIXED and confirmed bijective: ni-integrate.ts:46-53 (ccap=0; for k=order..2 ccap+=ag[k]*qHistory[k-2]; ccap+=ag[1]*q1; ccap+=ag[0]*q0) maps construct-for-construct onto niinteg.c:43-64 fall-through (high->low, ag[1]*state1 then ag[0]*state0 last); state2..state6->qHistory[0..4] via k-2; universal exit ni-integrate.ts:59-60 == niinteg.c:77-78. NEW Tier-2 MISMATCH (whole-function bijection, independently derived): two v41 error-guard constructs have NO digiTS counterpart. (1) TRAP `default: return(E_ORDER)` at ref/ngspice/src/maths/ni/niinteg.c:36-39 has no counterpart in src/solver/analog/ni-integrate.ts: the `else` at :34-37 applies the order-2 formula for ANY order != 1 (e.g. order 3) instead of raising E_ORDER; v41 raises E_ORDER for TRAP order>=3. (2) GEAR `default: return(E_ORDER)` at niinteg.c:66-67 fires for order<1 AND order>6; ni-integrate.ts:42-43 guards only `order < 1`, so GEAR order>=7 falls through the loop (ag[7]*qHistory[5] = ag[7]*(undefined ?? 0)) with no E_ORDER. Per VERIFICATION.md sec2/sec4 a v41 construct with no digiTS counterpart is an automatic Tier-2 fail; this is NOT an architectural divergence (the applier already ported the analogous GEAR `order < 1` E_ORDER guard at ni-integrate.ts:42-43, proving these guards are in-file, in-scope portable work per TASK.md sec2). Remedy (within ni-integrate.ts): TRAP branch must raise E_ORDER for order != 1 && order != 2 (mirror niinteg.c:36-39: keep order===1 and order===2 explicit, throw E_ORDER otherwise); GEAR guard must raise E_ORDER for order < 1 OR order > 6 (mirror niinteg.c:66-67), not order<1 alone.",
+        "APPLIER ROUND 3 RESPONSE (attempt 2): Added the two missing E_ORDER guard constructs named by the round-3 verifier, both within src/solver/analog/ni-integrate.ts (in-file, in functionGroup scope; mirrors the existing GEAR order<1 guard the applier already ported in round 2). (1) TRAP: restructured the order branch from `if (order === 1) {...} else {...}` to `if (order === 1) {...} else if (order === 2) {...} else { throw E_ORDER }`. order===1 maps to niinteg.c:27-29 case 1; order===2 maps to niinteg.c:31-34 case 2 (the order-2 arithmetic -ccapPrev*ag[1]+ag[0]*(q0-q1) is byte-identical, merely moved from the bare `else` to `else if (order === 2)`, so it stays operand-for-operand identical to niinteg.c:32-34); the new trailing `else { throw new Error(...E_ORDER) }` maps construct-for-construct onto niinteg.c:36-39 `default: return(E_ORDER)` via the sanctioned C-error-return -> TS-throw surface form already used at the GEAR guard and the E_METHOD default. (2) GEAR: widened the guard from `if (order < 1)` to `if (order < 1 || order > 6)`, mapping onto niinteg.c:66-67 `default: return(E_ORDER)` which fires when CKTorder matches no case 1..6 (i.e. order<1 OR order>6). This also closes the latent out-of-bounds GEAR order>=7 read (ag[7]*(qHistory[5] ?? 0)) the verifier flagged. The GEAR accumulation loop body (niinteg.c:43-64 fall-through, high->low) is unchanged from the round-2 fix. No file outside src/solver/analog/ni-integrate.ts (+ rename-maps/maths-ni.md) touched.",
+        "VERIFIER ROUND 4 (attempt 2, separate context) -> APPLIED. Identifier correspondence re-derived independently from the two sources (NOT consumed from rename-maps): CKTag<->ag, CKTstate0[qcap]<->q0, CKTstate1[qcap]<->q1, CKTstate2..6[qcap]<->qHistory[0..4], CKTstate1[ccap]<->ccapPrev, cap<->cap, CKTstate0[ccap]<->ccap return value. Tier 1 (hunk maths-ni.md docLineRange 350-365, hunkHash d8a141af3916ccb6): whitespace-only -- every +/- pair removes a trailing space in TRAP case 1 (niinteg.c:28-29) and case 2 (niinteg.c:31-34); arithmetic byte-identical. Per VERIFICATION.md §4 zero-delta rule a zero-line TS delta in the TRAP region is line-isomorphic; ni-integrate.ts:33 (ag[0]*q0+ag[1]*q1) and :36 (-ccapPrev*ag[1]+ag[0]*(q0-q1)) match operand-for-operand. PASS. Tier 2 (full bijection vs ref/ngspice/src/maths/ni/niinteg.c:17-80, read fresh): every v41 construct maps to a digiTS construct and vice versa. method switch (23) <-> if/else if/else (:30,:41,:58); TRAP case1 (27-29)<->order===1 (:31-33); TRAP case2 (31-34)<->else if order===2 (:34-36); TRAP default E_ORDER (36-39)<->else throw (:37-39); GEAR ccap=0 (43)<->ccap=0 (:50); GEAR case6..2 fall-through high->low (46-60)<->for k=order..2 ccap+=ag[k]*(qHistory[k-2]) (:52-53); GEAR case1 +=ag[1]*state1 then +=ag[0]*state0 (62-63)<->ccap+=ag[1]*q1; ccap+=ag[0]*q0 (:56-57); GEAR default E_ORDER for order matching no case 1..6 (66-67)<->guard order<1||order>6 throw (:46-47); method default E_METHOD (72-75)<->else throw E_METHOD (:58-60); *ceq=state0[ccap]-ag[0]*state0[qcap] (77)<->ceq=ccap-ag[0]*q0 (:63); *geq=ag[0]*cap (78)<->geq=ag[0]*cap (:64); return OK (79)<->return {ccap,ceq,geq} (:65). GEAR runtime accumulation high->low confirmed at order 1 (loop skipped; ag[1]*q1 then ag[0]*q0) and order 2 (ag[2]*qHistory[0] then ag[1]*q1 then ag[0]*q0), bit-order identical to v41. The order<1||order>6 guard preceding ccap=0 vs v41's in-switch default is an allowed C-early-return-in-switch -> TS-guard surface form (no value escapes the error path either way). No v41 construct unmapped, no digiTS construct unmapped. File scope clean: only src/solver/analog/ni-integrate.ts (tracked) and rename-maps/maths-ni.md (new, untracked) changed; .omc/state, ref/ngspice submodule pointer and .claude/worktrees entries are orchestration/env state, not over-application. Not a recon item / device completion -> §1a harness gate N/A. MATCH."
+      ],
+      "escalation": null
+    },
+    "device-dispatch/devsup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "520b10e9b99de1cd",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/devsup.c:153-184 (DEVlimitlog), v41-NEW all-additions hunk (addedLines 33, removedLines 0, no v26 baseline). ngspice->digiTS correspondence re-derived independently (rename-maps NOT consulted); fresh v41 read of devsup.c:153-184 matches the device-dispatch.md slice (docLineRange 546-585) byte-for-byte. Applier ported into newton-raphson.ts as exported `limitlog` (sibling of pnjlim/fetlim/limvds), with `LimitlogResult{value,check}` + module-level `_limitlogResult` + `_limitlogShown` latch. Independent identifier map: deltemp_old->deltempOld, LIM_TOL->limTol, int *check->returned LimitlogResult.check, static bool shown->module `let _limitlogShown` (C function-static->module latch, sec4 surface form), FALSE/TRUE->false/true, isnan->Number.isNaN, fprintf(stderr)->console.error, log10->Math.log10. Body bijective line-for-line: `*check=0`->`let check=0`; NaN guard `if(!shown && (isnan(deltemp)||isnan(deltemp_old)))` condition+operand+&&/|| order identical, 3 stderr strings same+order, deltemp=0.0, *check=1, shown=TRUE->_limitlogShown=true; upper clamp `deltemp = deltemp_old + LIM_TOL + log10((deltemp-deltemp_old)/LIM_TOL)` operand-for-operand identical; lower clamp `deltemp = deltemp_old - LIM_TOL - log10((deltemp_old-deltemp)/LIM_TOL)` operand-for-operand identical incl. the asymmetric swapped numerator (deltemp_old-deltemp); both arms set *check=1; `return deltemp`->set .value/.check then return struct. Two-output contract (damped deltemp AND *check) and the once-only `static bool shown` latch semantics faithfully modeled. No forbidden shapes: no operand reorder, no factor-out/inline, no algebraic simplification, no merged/split statements, no nesting change. sec1a harness gate N/A: single all-additions hunk (not reconstruction, not device completion) and the helper is unwired into any solve path. The co-located shouldReorder/NISHOULDREORDER refactor in the same file diff is a separate ledger item, out of scope for devsup.c#h001."
+      ],
+      "escalation": null
+    },
+    "ind#recon/modelParams": {
+      "state": "APPLIED",
+      "hunkHash": "236a5fca9637cb1c",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (re-verified after hunkHash drift 2bccbab1b45d13c8->236a5fca9637cb1c). Tier-1+Tier-2 re-derived independently from the v26 baseline (diff-archive '-' lines in spec/ngspice-v41-model-diffs/ind.md) and fresh v41 reads of ref/ngspice/src/spicelib/devices/ind/{indsetup.c,indtemp.c,ind.c,indmpar.c,inddefs.h}; rename-maps/ind.md NOT consumed. Part A: 8 v26 model rows in INDUCTOR_PARAM_DEFS.secondary (inductor.ts:76-83) matching ind.c:42-50 INDmPTable spiceNames (v41-new 'dia' ind.c:47 correctly absent; IND_MOD_L no-op rowless); INDmu default 0.0 (inductor.ts:83) matches v26 ind.md:1253 '-model->INDmu = 0.0;' not v41's 1.0; modelTnom spiceConverter=kelvinToCelsius matches indmpar.c:25 +CONSTCtoK; 8 model + 5 instance _xxxGiven guards + _instanceNt/_TEMP/_DTEMP (inductor.ts:245-279,307-348); _specInd private field rowless (inddefs.h:120). Part B setup() (inductor.ts:378-413): 8 !_xxxGiven defaults in v26 order (no v41 !_diaGiven block) then _deriveSpecIndAndMInd() before TSTALLOC; specInd uses v26 two-branch _muGiven form with csect*csect (inductor.ts:450-460) matching ind.md '-' lines 1262-1275, no Lundin; mInd guarded !_mIndGiven = modNt*modNt*specInd (inductor.ts:463-465) per ind.md:1277-1298; double mInd write order preserved. The _deriveSpecIndAndMInd extraction is a single-call-site code-organization wrapper at the v26 control-flow position (after 8 defaults, before matrix alloc), arithmetic/branch-bijective, not a new load/solve boundary. Part C computeTemperature (inductor.ts:487-548): temp-override (indtemp.c:35-43), instance defaults 1/1/0 (indtemp.c:45-47), base selection !_indGiven->specInd*nt^2 or mInd else _nominalL (indtemp.c:49-56, the else=_nominalL is the v41 INDinductinst reset mapped to the RHS read per Directive 3), difference=effectiveTemp-_modelTnom (indtemp.c:58), tc1/tc2 instance-overrides-model (indtemp.c:62-70), factor=1+tc1*d+tc2*d*d (indtemp.c:72), _effectiveL=base*factor*_SCALE rebuild without trailing /M (v26 ind.md:1609 '-here->INDinduct = here->INDinduct / here->INDm;' excluded per Directive 2). Directive 1: chained assignment split right-to-left in setParam (inductor.ts:556-557) vs indparam.c. Directive 2: /M removed from every _effectiveL write (ctor:354, computeTemp:548, setParam SCALE:578, setParam M no-op:579-582) and present at every stamp in v41 operand order (loadFluxInit L/m:660,663; load newmind=L/m:733; stampAc omega*_effectiveL/_M:800) vs indload.c:43-47/indacld.c:29. Directive 3: rebuild from base, no in-place *= (inductor.ts:548). Part D setParam model-param branches (inductor.ts:592-628) one-per-IND_MOD_X vs indmpar.c:20-55, each sets _xxxGiven=true, geometry branches call _deriveSpecIndAndMInd for hot-load. SEC1a HARNESS GATE (Release.x64/ngspice.dll, built 2026-05-24): firstDivergence NULL across all 8 classes on all 4 inductor circuits: inductor-canon-rl-step (107/107 steps bit-exact), rlc-oscillator (115/115), rlc-harness (144/144), transformer-canon-rl-pulse coupled-inductor+MUT (115/115). Gate holds."
+      ],
+      "escalation": null
+    },
+    "mut#recon/inductiveSystemVerify": {
+      "state": "APPLIED",
+      "hunkHash": "9deebe574cc5aa04",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. Reconstruction item (v41-new, no v26 baseline). Tier-1+Tier-2 re-derived independently from fresh v41 reads of ref/ngspice/src/spicelib/devices/ind/{muttemp.c,inddefs.h,indsetup.c}, ref/ngspice/src/include/ngspice/cktdefs.h, ref/ngspice/src/spicelib/devices/cktinit.c, ref/ngspice/src/frontend/com_option.c; rename-maps NOT consumed. Every cited line verified by hand: cktdefs.h:111 'int CKTindverbosity;', cktinit.c:65 'sckt->CKTindverbosity = 2;', com_option.c:50 'indverbosity = %d', indsetup.c:103-104 'here->system = NULL; here->system_next_ind = NULL;' positioned after the CKTmkCur branch (97-101) and before the TSTALLOC block (112-116). CHOLESKY (mutual-inductor.ts:66-83 vs muttemp.c:13-32) is construct-bijective: outer for i<n, inner for j<=i, Summe=A(i,j) init, inner dot-product for k<j with Summe -= A(i,k)*A(j,k) (operand order preserved), i>j -> A(i,j)=Summe/A(j,j), else if Summe>0 -> A(i,i)=sqrt(Summe), else return false, trailing return true. Flat row-major a[n*r+c] (no 2D array, no n*i/n*j hoist, explicit inner loop not reduce, Math.sqrt not **0.5, early return not flag-and-continue). MERGE-CHAIN (ind-family-temperature.ts:132-205 vs muttemp.c:45-118): 5-way if/else-if chain in exact v41 order -- (!s1&&!s2) fresh system size=2 (62-73); (s1&&!s2) ind2 joins, size++ (74-81); (!s1&&s2) ind1 joins mirror (82-89); (s1===s2) thread mut only (90-93); else merge s1+=s2.size, s2.size=0, IND-chain tail-walk with break + splice (102-109), MUT-chain tail-walk with break + splice + prepend here (110-116). Each branch's assignment order matches line-for-line. MATRIX ASSEMBLY (208-302 vs 121-205): if(firstSystem) gate, szMax scan, pop=Uint8Array+INDmatrix=Float64Array, per-system !size continue, pop.fill/INDmatrix.fill, diagonal loop INDmatrix[i*sz+i]=_effectiveLForVerify + system_idx=i++ (143-147), off-diagonal loop with SWAP-when-j<k (155-156), pop/repetitions/expect bookkeeping (157-162), chained INDmatrix[j*sz+k]=INDmatrix[k*sz+j]=MUTfactor (163). WAIVER (276-292 vs 168-181): positive=cholesky; if(!positive){positive=true; MUT-walk |K|!=1 break; IND-walk L<0 break}. EMIT GATE (296 vs 183): !positive||repetitions||(expect&&verbosity>1). Diagnostic text verbatim per condition (muttemp.c:184-203) routed through ctx.diagnostics.emit with involvedElements in IND-then-MUT traversal order. Two separate MUT-walk/verify-walk loops and two separate diagonal/off-diagonal loops -- no loop fusion. No forbidden shapes (no operand reorder, factor-out, statement merge/split, algebraic simplification, branch/loop-nesting change). Parts A-D all present: ckt-context.ts cktIndVerbosity=2 + tempCtx populate + resetTempCtx + ctor read of params.indVerbosity + refreshTolerances re-read+resetTempCtx; temp-context.ts _indVerbosity+diagnostics; SimulationParams.indVerbosity default 2 + DEFAULT_SIMULATION_PARAMS:2; AnalogInductorElement _system/_systemNextInd/_systemIdx (null/null/-1) + setup() init at the v41 position + package-private accessors; MutualInductorElement _systemNextMut + accessors + IndSystem interface; three DiagnosticCode union entries. Pass ordering (ind-family-temperature.ts:53-82): Pass1 IND.computeTemperature, Pass2 MUT.computeTemperature, Pass3 verify gated on _indVerbosity>0. Decision (ii) re-run-on-setCircuitTemp confirmed: analog-engine.ts setCircuitTemp (1383-1391) and configure({indVerbosity}) (1256-1259) both re-run cktTemp() -> IND family temp handler Pass 3, not cached. SEC1a HARNESS GATE (ngspice.dll Release.x64, instrumented build with ni_ac_register; the default visualc-shared/spice.dll is stale and yields a vacuous ngspice-side 0-step run -- this is also the root cause of the in-tree inductor/diode/mosfet parity test failures): firstDivergence NULL across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape, earliest null) on transformer-canon-rl-pulse (coupled-inductor+MUT, 112/112 bit-exact), tapped-transformer-canon-dc-grounded-ct (3-IND/3-MUT system exercising the merge chain, 107/107), inductor-canon-rl-step (107/107), rlc-oscillator (111/111). Verify subsystem does not perturb the solve. DEVIATION (a) pass-entry reset loop (ind-family-temperature.ts:116-123, re-nulls _systemPtr/_systemNextIndPtr/_systemIdxPtr/_systemNextMutPtr): no direct v41 line in MUTtemp, but a faithful reproduction of the clean INDsetup state (indsetup.c:103-104 + field defaults) that v41's single-MUTtemp-per-setup flow assumes at each pass entry. v41 tfrees the INDsystem structs (muttemp.c:210-214) WITHOUT re-nulling ind->system (latent use-after-free across a temp sweep with no intervening INDsetup). digiTS re-runs the verify per Decision (ii) without re-running setup(), and GC keeps the prior pass's IndSystem live on the instance fields, so without the reset the merge chain reads stale systems. This is the CLAUDE.md fold-in-latent-bugs requirement; harness gate confirms no solve perturbation -> MATCH-with-note, acceptable. DEVIATION (b) cholesky/verifyInductiveSystems exported instead of module-private: visibility-only (VERIFICATION.md sec4 surface-form), mandated by the CLAUDE.md three-surface rule which requires Surface-1 headless reachability without forbidden private-field tunnelling / SetupContext hand-building; no arithmetic/structural impact -> acceptable allowed-difference. Three-surface tests all present and the two unit files pass (7/7): Surface 1 ind-inductive-system-verify.test.ts (criteria 10-13 + waiver + engine gate via DefaultSimulatorFacade.configure, 6 tests), Surface 2 circuit-dc-op-indverbosity.test.ts (MCP circuit_dc_op indVerbosity forwarding, 1 test); Surface 3 ind-verbosity-configure.spec.ts (Playwright sim-configure->sim-configured echo) verified by source inspection of postmessage-adapter _handleConfigure + SimulatorHarness postToSim/waitForMessage/loadDigXml (Playwright not run here). PRE-EXISTING FAILURES confirmed unrelated: 8 inductor.test.ts + 6 diode/mosfet temp-sweep failures all share the identical comparison-session-asserts.ts signature (ngspice=NaN / 'shape step 0/iter -1 step_shape[0] ngspice=0') caused by the in-tree comparison-session.ts/netlist-generator.ts harness migration (modified in working tree) defaulting to the stale spice.dll; diode/mosfet have no inductors and never invoke Pass 3, so the verify subsystem cannot be the cause. All 14 acceptance criteria satisfied."
+      ],
+      "escalation": null
+    },
+    "cap/capload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "ab9f12c8e94f9db8",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capload.c:38-44. Hunk converts model/instance linked-list field access (model->CAPnextModel, model->CAPinstances, here->CAPnextInstance) to accessor-call form (CAPnextModel(model), CAPinstances(model), CAPnextInstance(here)) - pure C accessor-syntax on iteration plumbing; the loop itself is unchanged across v26->v41, only the field-access spelling. No new control flow, no arithmetic change. Independently re-confirmed by the coordinator reading the hunk."
+      ],
+      "escalation": null
+    },
+    "cap/capload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "04eb4ac72eda564d",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capload.c:74-77. Hunk is a pure identifier rename (CAPposPosptr->CAPposPosPtr etc., 'ptr'->'Ptr' suffix capitalization) on the four matrix-pointer fields; m*geq arithmetic, += / -= operators, operand order and four-stamp structure byte-identical across v26->v41. No new lines, no control flow. Independently re-confirmed by the coordinator reading the hunk."
+      ],
+      "escalation": null
+    },
+    "cap#recon/computeTemperature": {
+      "state": "APPLIED",
+      "hunkHash": "738859fd9d37d769",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH. Verified source-only, ngspice->digiTS correspondence re-derived independently (rename-maps/cap.md NOT consulted). computeTemperature (capacitor.ts:390-436) is construct-bijective with v41 CAPtemp ref/ngspice/src/spicelib/devices/cap/captemp.c:38-89: temp-override block (captemp.c:39-47 -> :396-403), CAPwidth default (captemp.c:49-51 -> :406), base-cap selection incl. the v41 else=CAPcapacinst arm (captemp.c:55-70 -> :413-430, operands/operator-order/grouping/branch-nesting identical), difference=(temp+dtemp)-tnom (captemp.c:72 -> :433 via effectiveTemp), factor (captemp.c:86-87 -> :434), CAPcapac=CAPcapac*factor*CAPscale (captemp.c:89 -> :435). setup() Part B.0 (capacitor.ts:347-364) is line-faithful to capsetup.c:71-88 (cj-from-thickness + del-driven narrow/short; EPS0/EPS_SIO2 derivation verified bit-exact vs ref/ngspice/src/include/ngspice/const.h CONSTepsZero/CONSTepsSiO2). ngspice model/instance Given?inst:model collapse to single _X fields is the VERIFICATION.md sec4 sanctioned C->TS structural collapse. No spec defect found in cap-computetemperature.md vs ngspice v41."
+      ],
+      "escalation": null
+    },
+    "cap/captemp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "ab29b4b69f7349d6",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1 MATCH vs ref/ngspice/src/spicelib/devices/cap/captemp.c:32-36. Subsumed by cap#recon/computeTemperature. Hunk is the model/instance linked-list accessor rename (model->CAPnextModel -> CAPnextModel(model), model->CAPinstances -> CAPinstances(model), here->CAPnextInstance -> CAPnextInstance(here)) on the CAPtemp iteration loop. digiTS invokes computeTemperature per-element via defaultTemperatureHandler (no model/instance linked list) - the VERIFICATION.md sec4 allowed C iteration-plumbing rename, zero behavioral content. Zero-delta rule satisfied: every +/- line is an identifier/C-syntax rename."
+      ],
+      "escalation": null
+    },
+    "cap/captemp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "33e5f823596225bb",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1 MATCH vs ref/ngspice/src/spicelib/devices/cap/captemp.c:55-68. Subsumed by cap#recon/computeTemperature. Hunk is brace/whitespace reformat only: `if (!here->CAPcapGiven)  {` -> single-space, geometry-formula `);` -> `)`, `} else {` -> `}\\n else {`. All VERIFICATION.md sec4 allowed (brace/whitespace style). The geometry expression cj*(w-narrow)*(l-short)+cjsw*2*((l-short)+(w-narrow)) is reconstructed operand-identical at capacitor.ts:417-423."
+      ],
+      "escalation": null
+    },
+    "cap/captemp.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "12bc615cc32f2a10",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/captemp.c:69-70. Subsumed by cap#recon/computeTemperature. The genuine v41 behavioral addition `else here->CAPcapac = here->CAPcapacinst;` (reset base to raw instance-line capacitance) has a non-empty digiTS counterpart: capacitor.ts:428-430 `} else { base = this._nominalC; }`. CAPcapacinst->_nominalC re-derived independently from capparam.c:32 (here->CAPcapacinst = here->CAPcapac = value->rValue = raw instance-line C); digiTS _nominalC is set from netlisted `capacitance` (ctor :291, setParam :487-489) and this.C is the working CAPcapac. Branch present, not dropped - zero-delta rule satisfied (real change, non-empty delta)."
+      ],
+      "escalation": null
+    },
+    "cap/capparam.c#h001b": {
+      "state": "APPLIED",
+      "hunkHash": "52e54b91827e4470",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capparam.c:32-35 (CAP_CAP case). Subsumed by cap#recon/computeTemperature. v41 adds `here->CAPcapacinst = ` to the existing `here->CAPcapac = value->rValue` (store raw instance-line C into the new CAPcapacinst field). digiTS counterpart: setParam('capacitance') sets this._nominalC=value (= CAPcapacinst) and _capGiven=true (capacitor.ts:487-489); ctor reads _nominalC from `capacitance` (:291); this.C is the working CAPcapac. `if(!CAPmGiven) CAPm=1.0` -> _M defaulted 1 at construction; `CAPcapGiven=TRUE` -> _capGiven=true. Construct-bijective."
+      ],
+      "escalation": null
+    },
+    "cap#recon/stampAc": {
+      "state": "APPLIED",
+      "hunkHash": "6733f295434ab44f",
+      "attempts": 1,
+      "verifierNotes": [
+        "REOPENED — prior MATCH retracted by user-directed audit against ngspice CAPacLoad as the canonical reference (not inductor.ts). Two structural divergences remain at capacitor.ts:458-482 vs ref/ngspice/src/spicelib/devices/cap/capacld.c:16-40: (1) Function-boundary divergence (Tier-2 bijective): ngspice splits the work between CAPsetup (capsetup.c:114-117 TSTALLOC x4 — allocates the four (posPos, negNeg, posNeg, negPos) matrix cells exactly once) and CAPacLoad (capacld.c:16-40 — zero allocation, pure stamp on the four pre-allocated double* matrix pointers via *(...Ptr+1) ±= m*val). digiTS currently allocates the cells in setup() via allocNortonStamp (returning _handles[0..3]) AND has a 6-line `if (this._hAcPosPos === -1) { ...4x allocElement... }` lazy-alloc block in stampAc (capacitor.ts:469-474) that has no counterpart in CAPacLoad. VERIFICATION.md sec2 Tier-2: a digiTS construct with no v41 counterpart is MISMATCH. (2) Insertion-order divergence (harness instrumentation): sparse-solver.ts:472-474 pushes one _insertionOrder entry per allocElement call regardless of whether the (row,col) already exists; the lazy-alloc block produces 4 extra entries (8 total cap entries vs ngspice's 4), which harness_topology_diff would see as a structural divergence in the per-element-pool order. The matrix shape itself matches ngspice (allocElement on duplicate row,col returns the same handle via the diag fast-path at :451-454 or _spcFindElementInCol find-or-create at :456), so the AC harness paired tests do not fail — but the function-boundary and insertion-order both differ. Required fix: drop the four _hAcPosPos/_hAcNegNeg/_hAcPosNeg/_hAcNegPos fields and the lazy-alloc block; stamp through the existing _handles[0..3] tuple already returned by allocNortonStamp in setup(). This restores ngspice's one-allocation-in-setup, pure-stamp-in-CAPacLoad shape line-for-line. The cap-stampac.md spec needs the parallel update.",
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capacld.c:16-40 and ref/ngspice/src/spicelib/devices/cap/capsetup.c:114-117. Re-derived ngspice->digiTS correspondence independently (rename-maps/cap.md NOT consulted). Function-boundary now matches line-for-line: cells allocated exactly once in setup() (capacitor.ts:377) via allocNortonStamp(ctx.solver, posNode, negNode) (stamp-helpers.ts:40-50), which issues allocElement(posNode,posNode) / allocElement(negNode,negNode) / allocElement(posNode,negNode) / allocElement(negNode,posNode) in the capsetup.c:114-117 TSTALLOC order and returns [hPP, hNN, hPN, hNP]. stampAc (capacitor.ts:462-478) performs zero allocation, destructures _handles, and stamps the imaginary half via solver.stampElementImag (sparse-solver.ts:670-672 writes _elValImag[handle]), which is the +1 imaginary pointer pair to the real half _elVal[handle] written by load(). Acceptance criterion 5 satisfied: Grep for _hAcPosPos|_hAcNegNeg|_hAcPosNeg|_hAcNegPos returns zero matches; stampAc body contains no allocElement call. Tier-2 bijective check: capacld.c:28 m=CAPm <-> capacitor.ts:466 const m=this._M; capacld.c:30 val=CKTomega*CAPcapac <-> capacitor.ts:464 const val=omega*this.C (operands/operator/order identical); capacld.c:32-35 *(...Ptr+1) ±= m*val <-> capacitor.ts:474-477 four solver.stampElementImag(_handles[i], ±m*val) calls with posPos->_handles[0], negNeg->_handles[1], posNeg->_handles[2], negPos->_handles[3] mapping bijectively to TSTALLOC order. Model/instance linked-list walk -> per-element invocation under defaultStampAcHandler (default-loaders.ts:61-68) is the VERIFICATION.md sec4 sanctioned iteration plumbing collapse. Cross-check: inductor.ts:491-505 was updated in parallel to the same shape and mirrors INDsetup/INDacLoad's CAPsetup/CAPacLoad-isomorphic function boundary — supporting evidence that the canonical pattern is correctly applied to both passives."
+      ],
+      "escalation": null
+    },
+    "cap/capacld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f10d8fc57edaec5d",
+      "attempts": 1,
+      "verifierNotes": [
+        "REOPENED — Tier-2 bijective construct correspondence depended on the stampAc shape verified by cap#recon/stampAc, which has been retracted. The v26->v41 delta itself (3 model/instance accessor renames + 4 'ptr'->'Ptr' field-capitalisation renames at cap.md:93-118) is still a VERIFICATION.md sec4 zero-delta-allowed cosmetic rename; this item re-verifies cleanly once cap#recon/stampAc is re-implemented to drop the lazy-alloc block and stamp through _handles.",
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capacld.c:21-40 (cap.md:93-118). Zero-delta rule satisfied: every +/- line in the hunk slice is a VERIFICATION.md sec4 allowed cosmetic rename — three model/instance linked-list accessor renames (model->CAPnextModel -> CAPnextModel(model); model->CAPinstances -> CAPinstances(model); here->CAPnextInstance -> CAPnextInstance(here)) on the for-loop headers (cap.md:97-99 -> :100-102), plus four 'ptr'->'Ptr' field-capitalisation renames on the matrix-pointer field names (CAPposPosptr/CAPnegNegptr/CAPposNegptr/CAPnegPosptr -> ...Ptr at cap.md:108-111 -> :112-115). No new statements, no new branches, no arithmetic change, no operand reorder, no nesting change. Tier-2 piggybacks on cap#recon/stampAc (now APPLIED): post-edit stampAc at capacitor.ts:462-478 is bijective with v41 CAPacLoad — m=CAPm, val=CKTomega*CAPcapac, four ±m*val stamps to the imaginary half of (posPos, negNeg, posNeg, negPos) cells reached through _handles[0..3] (allocated once in setup() via allocNortonStamp, matching capsetup.c:114-117 TSTALLOC). The v26->v41 hunk's behavioural content is therefore preserved across the port."
+      ],
+      "escalation": null
+    },
+    "cap/capdefs.h#h003a": {
+      "state": "APPLIED",
+      "hunkHash": "30f1a77629cea793",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capdefs.h:73. Hunk slice at cap.md:170-176 adds `#define CAPnumStates 2` (a named per-instance state-slot count). Zero-delta rule satisfied: the +line is a C preprocessor named-constant introduction with no executable behaviour of its own -- the literal value 2 is consumed downstream at capsetup.c:103 (*states += CAPnumStates), which is itself a separate sub-item (capsetup.c#h003a). digiTS encodes the slot count symbolically by construction: CAPACITOR_SCHEMA = defineStateSchema(...) lists exactly 2 slots Q, CCAP at capacitor.ts:200-203 and stateSize = CAPACITOR_SCHEMA.size at :219. VERIFICATION.md sec4 allowed C->TS surface form: a C `#define <name> 2` consumed at one allocation site maps to a TS schema whose `size` field is the named slot count. Tier2 bijective: CAPnumStates <-> CAPACITOR_SCHEMA.size / this.stateSize."
+      ],
+      "escalation": null
+    },
+    "cap/capgetic.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "63c9bd700b83e8e0",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capgetic.c:25-26. Hunk at cap.md:399-409 is the model/instance linked-list accessor rename inside CAPgetic's outer loop: model->CAPnextModel -> CAPnextModel(model), model->CAPinstances -> CAPinstances(model), here->CAPnextInstance -> CAPnextInstance(here). Zero-delta rule satisfied: every +/- line is a VERIFICATION.md sec4 allowed C accessor-syntax rename, no new statements, no new branches, no arithmetic change. Tier2: ngspice CAPgetic seeds CAPinitCond from rhs[CAPposNode]-rhs[CAPnegNode] when !CAPicGiven; digiTS folds the IC semantics into load() via the cond1 gate at capacitor.ts:574-587 (cond1 = ((MODEDC && MODEINITJCT) || (MODEUIC && MODEINITTRAN)); if (cond1) vcap = this._IC; else vcap = voltages[n0]-voltages[n1]). The model/instance walk collapses to per-element invocation under digiTS's per-instance load() invocation."
+      ],
+      "escalation": null
+    },
+    "cap/capsetup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "6372bc7a6d53282a",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capsetup.c:28. Hunk slice at cap.md:700-708 is the model-loop accessor rename: model->CAPnextModel -> CAPnextModel(model). Zero-delta rule satisfied: the single -/+ line pair is a VERIFICATION.md sec4 allowed C accessor-syntax rename on iteration plumbing. Tier2: ngspice CAPsetup walks all CAPmodels; digiTS invokes setup() per AnalogCapacitorElement instance via defaultSetupHandler -- no model walk. The model-loop body content (default-value processing for cjsw/defWidth/defLength/narrow/short/del/tc1/tc2/tnom/di/thick at capsetup.c:31-66; cj-from-thickness at :71-81; del-driven narrow/short at :83-87) is structurally collapsed into per-instance fields seeded at construction from CAPACITOR_DEFAULTS plus the cj/narrow/short derivation at capacitor.ts:354-371 (verified line-faithful in cap#recon/computeTemperature). Bijective at the per-element level."
+      ],
+      "escalation": null
+    },
+    "cap/capsetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "44f60f945bddfdcc",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capsetup.c:91-92. Hunk slice at cap.md:709-719 is the instance-loop accessor rename: model->CAPinstances -> CAPinstances(model), here->CAPnextInstance -> CAPnextInstance(here). Zero-delta rule satisfied: both -/+ line pairs are VERIFICATION.md sec4 allowed C accessor-syntax renames on iteration plumbing. Tier2: ngspice instance loop body (capsetup.c:94-117: default CAPlength=0, default CAPbv_max=model.CAPbv_max, here->CAPqcap = *states; *states += CAPnumStates; sensitivity-states block; four TSTALLOCs) maps to digiTS setup() body at capacitor.ts:347-382 (the lGiven/wGiven/etc. defaults are seeded in the ctor at :330-331, allocStates(this.stateSize) at :375, allocNortonStamp at :381). The model/instance walk collapses to per-element invocation."
+      ],
+      "escalation": null
+    },
+    "cap/capsetup.c#h003a": {
+      "state": "APPLIED",
+      "hunkHash": "c8a9f0bdabcd2af3",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capsetup.c:103. Hunk sub-item slice at cap.md:720-725 is the literal-to-macro rename `*states += 2;` -> `*states += CAPnumStates;`. Zero-delta rule satisfied: the -/+ line pair is a VERIFICATION.md sec4 allowed identifier rename (literal 2 -> named constant CAPnumStates = 2), no value change. Tier2: ngspice consumes the bound constant at the single allocation site; digiTS counterpart at capacitor.ts:375 is ctx.allocStates(this.stateSize) where this.stateSize = CAPACITOR_SCHEMA.size = 2 -- already symbolic. Bijective: CAPnumStates <-> this.stateSize."
+      ],
+      "escalation": null
+    },
+    "cap/capsetup.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "1bd6efae75fbdbb6",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/capsetup.c:114-117. Hunk at cap.md:732-746 is 4 'ptr'->'Ptr' field-capitalisation renames on the four TSTALLOC sites: CAPposPosptr/CAPnegNegptr/CAPposNegptr/CAPnegPosptr -> ...Ptr. Zero-delta rule satisfied: all 4 -/+ line pairs are VERIFICATION.md sec4 allowed identifier renames, no new statements, no new branches, no arithmetic change, no nesting change. Tier2: the four ngspice TSTALLOCs (allocate posPos/negNeg/posNeg/negPos matrix cells in that order) collapse to a single allocNortonStamp(ctx.solver, posNode, negNode) call at capacitor.ts:381 which returns the _handles tuple [hPP, hNN, hPN, hNP] in identical order (per the cap#recon/stampAc verification, capsetup.c:114-117 sequence is preserved by allocNortonStamp). VERIFICATION.md sec4 allowed C->TS canonical helper -- the four-cell allocation set and cell coordinates (posNode/negNode pairs) are bijective."
+      ],
+      "escalation": null
+    },
+    "cap/captrunc.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "19bc5549fbcec32b",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/cap/captrunc.c:22-24. Hunk at cap.md:890-902 is the model/instance linked-list accessor rename on the CAPtrunc iteration loop: model->CAPnextModel -> CAPnextModel(model), model->CAPinstances -> CAPinstances(model), here->CAPnextInstance -> CAPnextInstance(here). Zero-delta rule satisfied: all 3 -/+ line pairs are VERIFICATION.md sec4 allowed C accessor-syntax renames on iteration plumbing. Tier2: ngspice CAPtrunc inner-body calls CKTterr(here->CAPqcap, ckt, timeStep); digiTS counterpart AnalogCapacitorElement.getLteTimestep at capacitor.ts:649-668 reads q0..q3 from pool.states[0..3][base+SLOT_Q] and ccap0,ccap1 from states[0..1][base+SLOT_CCAP], then calls cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams). The C pointer-into-state-vector idiom (CAPqcap = state index 0) maps to explicit TS slot reads -- VERIFICATION.md sec4 allowed C->TS surface form. The model/instance walks collapse to per-element invocation under defaultLteHandler."
+      ],
+      "escalation": null
+    },
+    "ind/ind.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "880e26ff0201d12b",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/ind.c:44-51 (INDmPTable). Slice ind.md:80-87 adds one model-param row: IOPA(\"dia\", IND_MOD_DIA, IF_REAL, \"Inductor diameter\"). digiTS counterpart: INDUCTOR_PARAM_DEFS.secondary.dia (inductor.ts:128) { default:0.0, unit:'m', spiceName:'dia' } sits between csect (ind.c:46) and length (ind.c:48) in the same row order. The MUTpTable IOPR->IOPAPR change (ind.md:96-97) is IF_REDIRECT parser-flag plumbing with no digiTS counterpart (planning ind.c#h003 NO-COUNTERPART). re-derived independently: IND_MOD_DIA enum value confirmed via inddefs.h:421 (IND_MOD_DIA follows IND_MOD_CSECT=104, so =105). Blocked-by ind#recon/modelParams (APPLIED). Source-only per VERIFICATION.md sec1."
+      ],
+      "escalation": null
+    },
+    "ind/indacld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "4cd649d1d6e7fef7",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indacld.c:16-40 (INDacLoad). Hunk ind.md:111-138 is the model/instance accessor renames (model->INDnextModel -> INDnextModel(model); model->INDinstances -> INDinstances(model); here->INDnextInstance -> INDnextInstance(here)) plus the five 'ptr'->'Ptr' field-capitalisation renames (INDposIbrptr/INDnegIbrptr/INDibrPosptr/INDibrNegptr/INDibrIbrptr -> ...Ptr). Zero-delta rule satisfied: every +/- line is a VERIFICATION.md sec4 allowed identifier rename; no arithmetic change. Tier2 bijective vs indacld.c:27-35: m=INDm <-> inductor.ts:923 const m via this._M; val=CKTomega*INDinduct/m <-> stampAc:923 const val=omega*this._effectiveL/this._M (operand order omega*L/m, C left-to-right ((omega*L)/m), NOT factored omega*(L/m) -- Directive 2 compliant); the 4 real +-1 connectivity stamps + the imaginary `*(INDibrIbrPtr+1) -= val` (indacld.c:35) <-> stampElementImag(this._hIbrIbr, -val) (inductor.ts:934). Alloc lives in setup() (5 allocElement, indsetup.c:112-116 order), matching INDsetup/INDacLoad function boundary. HARNESS GATE part: rlc-oscillator + sine-transformer AC-path inductors run bit-exact in tran (see device-completion gate note on indsetup.c#h004)."
+      ],
+      "escalation": null
+    },
+    "ind/inddefs.h#h001": {
+      "state": "APPLIED",
+      "hunkHash": "9ee966103654f12c",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/inddefs.h:25-77 (struct sINDinstance). Slice ind.md:143-192 is GENinstance struct-embedding + accessor-macro defines (INDmodPtr/INDnextInstance/INDname/INDstate as gen.* macros), const node-id qualifiers, the 5 'ptr'->'Ptr' matrix-pointer renames, the new `double INDinductinst` field (inddefs.h:39), and the new system/system_next_ind/system_idx fields, plus #define MUTUAL removal. digiTS has no C struct; the portable content maps: INDinductinst -> _nominalL (inductor.ts:282, Directive 1 field pair, no new field), INDinduct -> _effectiveL (inductor.ts:287), system/system_next_ind/system_idx -> _system/_systemNextInd/_systemIdx (inductor.ts:359-361). The struct-mechanics +/- lines (GENinstance embed, const, ptr->Ptr macro spellings) are VERIFICATION.md sec4 C->TS surface form with no TS struct to diff against. Re-derived independently. Q-IND-INDUCTINST resolved per ind-review sec6e Directive 1 (confirmed structural-match: _nominalL is the INDinductinst counterpart)."
+      ],
+      "escalation": null
+    },
+    "ind/inddefs.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "320bd3f1e809869b",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/inddefs.h (sINDinstance tail). Slice ind.md:193-216 is the *Given bitfield block + INDinitCond comment-whitespace + the 5 'ptr'->'Ptr' matrix-pointer renames continuing from h001. digiTS counterpart: instance *Given guards (_indGiven/_TC1Given/_TC2Given/_scaleGiven/_mGiven/_instanceNtGiven/_tempGiven/_dtempGiven, inductor.ts:294-308), matrix handles _hPIbr/_hNIbr/_hIbrN/_hIbrP/_hIbrIbr (inductor.ts:338-342). Every +/- line is a VERIFICATION.md sec4 allowed rename / comment / C-struct-mechanics with no TS struct to diff. Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/inddefs.h#h003": {
+      "state": "APPLIED",
+      "hunkHash": "de30d8bdab3e90af",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/inddefs.h (INDstate-macros + INDsystem). Slice ind.md:217-275 adds `#define INDnumStates 2` (the named state-slot count), repositions INDflux/INDvolt macros (cosmetic), adds INDsensxp/INDnumSenStates (sensitivity, no-counterpart), and -- via the surrounding hunk -- the INDsystem-related fields. digiTS counterpart: INDUCTOR_SCHEMA = defineStateSchema with 2 named slots PHI/CCAP (inductor.ts:264-267) and stateSize = INDUCTOR_SCHEMA.size = 2 (inductor.ts:279); the `#define INDnumStates 2` consumed at indsetup.c:92 (*states += INDnumStates) maps to ctx.allocStates(this.stateSize) (inductor.ts:525). VERIFICATION.md sec4: C `#define <name> 2` consumed at one alloc site <-> TS schema whose size is the named count. Blocked-by mut#recon/inductiveSystemVerify (APPLIED) which carries the INDsystem fields + Cholesky subsystem verified bijectively by that recon verifier."
+      ],
+      "escalation": null
+    },
+    "ind/inddefs.h#h004": {
+      "state": "APPLIED",
+      "hunkHash": "341662fe8847f306",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/inddefs.h:81-174 (struct sINDmodel + INDsystem + id enums). Slice ind.md:276-479 is GENmodel struct-embedding + the new model field `double INDdia` (inddefs.h:105) with `unsigned INDdiaGiven:1` (inddefs.h:114), the new `struct INDsystem` definition, `MUTinstance *system_next_mut`, #ifdef MUTUAL removal, and the 8 #define->enum reformats (byte-identical numeric values). digiTS counterpart for the portable content: _dia + _diaGiven model fields (inductor.ts:318, 329), IndSystem interface (mutual-inductor.ts:46-51), _systemNextMut (mutual-inductor.ts:114), _specInd derived field (inductor.ts:336). The #define->enum reformats are VERIFICATION.md sec4 surface form (digiTS uses string keys, not int IDs). Re-derived independently: IND_MOD_DIA=105 confirmed by enum position (inddefs.h:421). Blocked-by ind#recon/modelParams (APPLIED). The dia model field drives _deriveSpecIndAndMInd's csect = PI*dia*dia/4 (inductor.ts:565), independently validated numerically (dia=0.02,length=0.1,mu=1,modNt=100 -> csect=PI*dia^2/4=3.141592654e-4, Lundin=0.9200911773, L=3.6323743737691e-5)."
+      ],
+      "escalation": null
+    },
+    "ind/indload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "b14b2c3638f036ff",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indload.c:18-51 (INDload head, IND self-flux pass). Slice ind.md:840-862 is #ifdef MUTUAL removal + model/instance accessor renames (model->INDnextModel -> INDnextModel(model), etc.) on the first inductor loop (the !(MODEDC|MODEINITPRED) flux-from-current update). digiTS counterpart: loadFluxInit (inductor.ts:768-789) -- the gate `if (!(mode & (MODEDC|MODEINITPRED)))` (inductor.ts:779) <-> indload.c:41; the UIC branch s0[PHI]=L/m*INDinitCond (inductor.ts:783) <-> indload.c:43-44; the companion branch s0[PHI]=L/m*rhsOld[b] (inductor.ts:786) <-> indload.c:46-47. m=INDm read at inductor.ts:774 (indload.c:39); /M at the stamp (L/m), Directive 2 compliant. Every +/- line is a VERIFICATION.md sec4 allowed rename / preprocessor removal. The model/instance walk collapses to per-element loadFluxInit under IndFamilyLoadHandler. HARNESS GATE: see device-completion note."
+      ],
+      "escalation": null
+    },
+    "ind/indload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "0423e1c78ef308f6",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indload.c:52-82 (MUT coupling pass). Slice ind.md:863-929 adds the new MUT MODEUIC IC-seeding branch (indload.c:62-69: `if (MODEUIC && MODEINITTRAN) { CKTstate0[MUTind1->INDflux] += MUTfactor*MUTind2->INDinitCond; CKTstate0[MUTind2->INDflux] += MUTfactor*MUTind1->INDinitCond; } else { ...rhsOld companion... }`) plus the MUTbr1br2/MUTbr2br1 'Ptr' renames + #ifdef MUTUAL removal. digiTS counterpart: loadCouplingPass (mutual-inductor.ts:216-239) -- the new UIC branch (mutual-inductor.ts:223-225: `if ((mode & MODEUIC) && (mode & MODEINITTRAN)) { partner1.augmentFlux(MUTfactor*partner2.ic); partner2.augmentFlux(MUTfactor*partner1.ic); }`) is construct-bijective with indload.c:63-68: ind1 seeds from ind2's IC and vice-versa (the cross-partner pairing preserved). The new `get ic()` accessor (inductor.ts:467-469) maps the NaN sentinel -> 0.0, reproducing ngspice's INDinitCond struct-default-0.0-when-not-given (indparam.c sets INDicGiven only; INDinitCond stays 0.0). else companion branch (mutual-inductor.ts:228-232) <-> indload.c:70-77 cross-partner rhsOld augmentation. The off-diagonal stamps -MUTfactor*ag0 (mutual-inductor.ts:237-238) <-> indload.c:80-81. Re-derived independently. Q-MUT-IC resolved per ind-review sec6c (no new infra; MODEUIC/MODEINITTRAN already plumbed). HARNESS GATE: sine-transformer coupled-inductor fixture 111/111 bit-exact all 8 classes (see device-completion note)."
+      ],
+      "escalation": null
+    },
+    "ind/indload.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "df9ae881d8bccf36",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indload.c:84-131 (INDload tail, IND companion + 5-stamp). Slice ind.md:930-946 is the #endif /*MUTUAL*/ removal + model/instance accessor renames + the 5 'ptr'->'Ptr' renames on the unconditional 5-stamp. digiTS counterpart: load (inductor.ts:823-894) -- DC req=0/veq=0 (inductor.ts:840-842 <-> indload.c:93-95); MODEINITPRED s0[PHI]=s1[PHI] (inductor.ts:847 <-> indload.c:100-101); MODEINITTRAN s1[PHI]=s0[PHI] (inductor.ts:851 <-> indload.c:105-106); newmind=L/m + NIintegrate (inductor.ts:856-873 <-> indload.c:111-114, /M at stamp Directive 2); rhs += veq (inductor.ts:893 <-> indload.c:117); the 5 stamps +1/-1/+1/-1/-req through cached handles (inductor.ts:884-891 <-> indload.c:124-128). Every +/- line in the slice is a VERIFICATION.md sec4 allowed rename / preprocessor removal; arithmetic byte-identical. HARNESS GATE: RL-step 107/107, rlc-oscillator 115/115 bit-exact (see device-completion note)."
+      ],
+      "escalation": null
+    },
+    "ind/indmask.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "32bdf1dfc94aa753",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indmask.c:15-24 (INDmAsk). Slice ind.md:951-1024: the only behavioral addition is `case IND_MOD_DIA: value->rValue = here->INDdia; return(OK);` (indmask.c:1009-1011); the rest is brace/whitespace reformat + pointer-style (GENmodel* vs GENmodel *) -- all VERIFICATION.md sec4 allowed. digiTS has no model-param ask API (a SPICE IFparm value getter); the dia field it reports back (model->INDdia) has a digiTS counterpart _dia (inductor.ts:318). The ask getter itself is a read-only IFparm surface with no behavioral content beyond field readback -- VERIFICATION.md sec4 no-API-counterpart for the getter mechanism, the dia field readback maps to _dia. Blocked-by ind#recon/modelParams (APPLIED). Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/indmpar.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "7561222b02ebd49c",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indmpar.c:40-43 (INDmParam). Slice ind.md:1075-1085 adds `case IND_MOD_DIA: mod->INDdia = value->rValue; mod->INDdiaGiven = TRUE; break;` between IND_MOD_CSECT (indmpar.c:36-39) and IND_MOD_LENGTH (indmpar.c:44-47). digiTS counterpart: setParam('dia') (inductor.ts:731-735) sets this._dia=value, this._diaGiven=true, then this._deriveSpecIndAndMInd() (the geometry hot-load rebuild). Construct-bijective: each indmpar.c case = one setParam('<key>') branch setting field + Given flag; the geometry branches (csect/dia/length/modNt/mu) additionally call _deriveSpecIndAndMInd for hot-load (the engine does not re-run setup() after setParam). Re-derived independently. Blocked-by ind#recon/modelParams (APPLIED)."
+      ],
+      "escalation": null
+    },
+    "ind/indparam.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "0ead9544118a4f02",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indparam.c:24-28 (INDparam, case IND_IND). Slice ind.md:1090-1098: the v26 `here->INDinduct = value->rValue;` becomes the v41 chained assignment `here->INDinductinst = here->INDinduct = value->rValue;` (indparam.c:25). digiTS counterpart: setParam('inductance'|'L') (inductor.ts:669-683) splits the chained assignment into two statements in v41 right-to-left evaluation order: this._effectiveL = value (INDinduct = rValue, inductor.ts:674); this._nominalL = value (INDinductinst = INDinduct = rValue, inductor.ts:675). Directive 1 compliant: NOT fused (this._effectiveL=this._nominalL=value forbidden), NOT re-fused with *SCALE/M (forbidden), _effectiveL written from bare `value` not _nominalL. The !INDmGiven->INDm=1.0 (indparam.c:26-27) <-> if(!this._mGiven) this._M=1.0 (inductor.ts:678); INDindGiven=TRUE <-> this._indGiven=true (inductor.ts:677). Re-derived independently. Q-IND-INDUCTINST resolved per ind-review sec6e Directive 1."
+      ],
+      "escalation": null
+    },
+    "ind/indsetup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f88161e184b05da2",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indsetup.c:13-15. Slice ind.md:1208-1218 adds `#define PI 3.141592654` (indsetup.c:13) + `static double Lundin(double l, double csec);` forward declaration. digiTS counterpart: const PI = 3.141592654 (inductor.ts:71) and function Lundin(l, csec) (inductor.ts:78). PI-LITERAL CONFIRMED LOAD-BEARING: digiTS uses the truncated literal 3.141592654, NOT Math.PI (3.141592653589793); a Math.PI substitution in csect=PI*dia^2/4 produces a 4.1e-14 absolute csect divergence (verified numerically) -- a Math.PI substitution would be a MISMATCH; it is correctly avoided. Blocked-by ind#recon/modelParams (APPLIED). Re-derived independently from fresh indsetup.c read."
+      ],
+      "escalation": null
+    },
+    "ind/indsetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "53b5b57e2cffad97",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indsetup.c:29-43 (INDsetup model-walk head + first defaults). Slice ind.md:1219-1238 is the model accessor rename (model->INDnextModel -> INDnextModel(model)) + tab->space whitespace reformat on the !INDtnomGiven/!INDtc1Given default lines. digiTS counterpart: setup()'s model-default block (inductor.ts:482-496) -- !_mIndGiven->_mInd=0.0 (inductor.ts:482-484 <-> indsetup.c:32-34), !_modelTnomGiven->_modelTnom=ctx.nomTemp (inductor.ts:486-488 <-> indsetup.c:35-37), !_modelTC1Given->_modelTC1=0.0 (inductor.ts:490-492 <-> indsetup.c:38-40). Every +/- line is a VERIFICATION.md sec4 allowed rename / whitespace. The model-walk collapses to per-instance setup() under defaultSetupHandler. Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/indsetup.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "b6b514936ae31233",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indsetup.c:47-49 (the new !INDdiaGiven default). Slice ind.md:1239-1248 adds `if (!model->INDdiaGiven){ model->INDdia = 0.0; }` (indsetup.c:47-49) between !INDcsectGiven (indsetup.c:44-46) and !INDlengthGiven (indsetup.c:50-52). digiTS counterpart: if (!this._diaGiven) { this._dia = 0.0; } (inductor.ts:502-504) in the same position between the csect default (inductor.ts:498-500) and length default (inductor.ts:506-508). Construct-bijective, same order. Blocked-by ind#recon/modelParams (APPLIED). Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/indsetup.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "a24782f22fe641ee",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indsetup.c:56-85 (the v41 specInd reformulation). This is the load-bearing geometry hunk. Slice ind.md:1249-1317 replaces the v26 two-branch csect^2 specInd with: (1) INDmu default 1.0 not 0.0 (indsetup.c:57, ind.md:1253-1254 '-INDmu=0.0' / '+INDmu=1.0'); (2) `if(INDdiaGiven) INDcsect = PI*INDdia*INDdia/4.;` (indsetup.c:61-63); (3) single-csect specInd `INDspecInd = (INDmu*CONSTmuZero*INDcsect)/INDlength` (indsetup.c:67-68) -- NOT v26 csect*csect, NOT a muGiven/!muGiven branch (single unconditional branch, mu defaults 1.0); (4) `if(INDlengthGiven && (INDdiaGiven||INDcsectGiven)) INDspecInd *= Lundin(INDlength,INDcsect)` (indsetup.c:74-75); (5) `if(!INDmIndGiven) INDmInd = INDmodNt*INDmodNt*INDspecInd` (indsetup.c:84-85). digiTS _deriveSpecIndAndMInd (inductor.ts:562-584) is construct-bijective LINE-FOR-LINE: !_muGiven->_mu=1.0 (inductor.ts:514-516); _diaGiven->_csect=PI*this._dia*this._dia/4.0 (inductor.ts:564-566, operand order PI*dia*dia/4 preserved); _lengthGiven&&_length>0 -> _specInd=(this._mu*CONST_MU_ZERO*this._csect)/this._length (inductor.ts:570, SINGLE csect, no ^2, no mu/!mu branch); _lengthGiven&&(_diaGiven||_csectGiven) -> _specInd*=Lundin(this._length,this._csect) (inductor.ts:576-577); !_mIndGiven -> _mInd=this._modNt*this._modNt*this._specInd (inductor.ts:581-582). INDEPENDENT NUMERICAL VALIDATION (since the harness cannot drive geometry params -- see device-completion note): from-scratch v41 formula recomputation matches digiTS .inductance output to all printed digits: csect=2e-4,length=0.05,mu=100,modNt=200 -> L=0.017635543505673 (digiTS actual 0.017635543505673); mu-default-1.0 case csect=1e-4,length=0.02,modNt=50 -> 0.000012549024744083752 (digiTS actual matches); instance-nt csect=2e-4,length=0.05,mu=100,instNt=10 -> 0.0000440888587641825 (digiTS actual matches); csect-doubling ratio 1.9266 (v41 single-csect+Lundin, NOT v26's 4.0) confirmed produced by digiTS. Blocked-by ind#recon/modelParams (APPLIED). Re-derived independently from fresh indsetup.c read; rename-maps NOT consumed."
+      ],
+      "escalation": null
+    },
+    "ind/indsetup.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "aaae538c0ae4c4cf",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indsetup.c:88-117 (instance-loop body). Slice ind.md:1318-1343 is the instance accessor renames + `*states += 2` -> `*states += INDnumStates` literal-to-macro + the INDsystem-init `here->system = NULL; here->system_next_ind = NULL;` (indsetup.c:103-104, positioned between CKTmkCur at indsetup.c:97-101 and the TSTALLOC block) + the 5 TSTALLOC 'ptr'->'Ptr' renames + the sensitivity literal-to-macro (no-counterpart conditional). digiTS counterpart: setup() (inductor.ts:521-544) -- allocStates(this.stateSize) (inductor.ts:525 <-> *states+=INDnumStates); the CKTmkCur branch (inductor.ts:528-531 <-> indsetup.c:97-101); _system=null; _systemNextInd=null (inductor.ts:536-537) positioned line-for-line between makeCur and the 5 allocElement calls; the 5 allocElement(posNode,b)/(negNode,b)/(b,negNode)/(b,posNode)/(b,b) (inductor.ts:540-544) in indsetup.c:112-116 TSTALLOC order. Every +/- line is VERIFICATION.md sec4 allowed rename / macro-lift / new-init. Blocked-by mut#recon/inductiveSystemVerify (APPLIED). Re-derived independently. HARNESS GATE: tapped-transformer 3-IND/3-MUT system bit-exact per the recon verifier."
+      ],
+      "escalation": null
+    },
+    "ind/indsetup.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "58cae30454f6d97b",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indsetup.c:144-173 (the Lundin function body). Slice ind.md:1344-1399 adds `static double Lundin(double l, double csec)` -- the Nagaoka/Lundin geometry correction. digiTS counterpart: function Lundin(l, csec) (inductor.ts:78-108) is operand-for-operand v41: the 1um floor guard `if (csec < 1e-12 || l < 1e-6) return 1` (inductor.ts:83-87 <-> indsetup.c:151-155); x = sqrt(csec/PI)*2./l (inductor.ts:90 <-> indsetup.c:157, using the truncated PI literal); xx=x*x, xxxx=xx*xx (inductor.ts:93-94 <-> indsetup.c:159-160); slender branch x<1: num=1+0.383901*xx+0.017108*xxxx, den=1+0.258952*xx, return num/den-4*x/(3*PI) (inductor.ts:98-100 <-> indsetup.c:163-165); short branch else: num=(log(4*x)-0.5)*(1+0.383901/xx+0.017108/xxxx), den=1+0.258952/xx, kk=0.093842/xx+0.002029/xxxx-0.000801/(xx*xxxx), return 2*(num/den+kk)/(PI*x) (inductor.ts:103-106 <-> indsetup.c:168-172). Every coefficient, operand, operator, and grouping identical; both branches present; PI = the truncated literal not Math.PI. log->Math.log, sqrt->Math.sqrt, fprintf(stderr)->console.warn (VERIFICATION.md sec4 surface form). INDEPENDENT NUMERICAL VALIDATION: Lundin(0.05,2e-4)=... folded into the specInd recomputation above (test1/3 match to all digits), Lundin(0.1,3.141592654e-4)=0.9200911773358132 for the dia case. Blocked-by ind#recon/modelParams (APPLIED). Re-derived independently from fresh indsetup.c read."
+      ],
+      "escalation": null
+    },
+    "ind/indtemp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "8a7df45a1e2908ef",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indtemp.c:24-31 (INDtemp model/instance-walk head). Slice ind.md:1580-1594 is the model/instance accessor renames (model->INDnextModel -> INDnextModel(model); model->INDinstances -> INDinstances(model); here->INDnextInstance -> INDnextInstance(here)). Zero-delta rule satisfied: every +/- line is a VERIFICATION.md sec4 allowed C accessor-syntax rename on iteration plumbing; no behavioral content. digiTS counterpart: the model/instance walk collapses to per-instance computeTemperature (inductor.ts:605) under the IND family temperature handler. Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/indtemp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "16739cdb5a451e32",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indtemp.c:49-56 (base-inductance selection). Slice ind.md:1595-1604 adds the v41 `else here->INDinduct = here->INDinductinst;` reset branch (indtemp.c:55-56) to the existing !INDindGiven if/else-if (INDntGiven->specInd*nt^2 / else->INDmInd). digiTS counterpart: computeTemperature base selection (inductor.ts:638-650) -- if(!this._indGiven){ if(this._instanceNtGiven) base=this._specInd*this._instanceNt*this._instanceNt (inductor.ts:642 <-> indtemp.c:50-51) else base=this._mInd (inductor.ts:645 <-> indtemp.c:52-53) } else base=this._nominalL (inductor.ts:649 <-> indtemp.c:56 INDinduct=INDinductinst). Directive 3 confirmed: the else=INDinductinst reset maps to the RHS read of _nominalL into `base` (rebuild-from-base, not in-place mutate); _effectiveL is recomputed at inductor.ts:666 base*factor*SCALE, never *=. Blocked-by ind#recon/modelParams (APPLIED). Q-IND-INDUCTINST resolved per Directive 3. Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/indtemp.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "d09f42f4416dbd7e",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indtemp.c:72-74 (TC/SCALE fold, /M removal). Slice ind.md:1605-1612 REMOVES the v26 trailing `here->INDinduct = here->INDinduct / here->INDm;` (ind.md:1609 '-' line), leaving only `here->INDinduct = here->INDinduct * factor * here->INDscale;` (indtemp.c:74). This is a REAL arithmetic relocation, NOT a cosmetic zero-delta: /M moves from computeTemperature to the per-stamp sites. digiTS counterpart: computeTemperature ends at _effectiveL = base * factor * this._SCALE (inductor.ts:666) with NO /M (Directive 2); /M present at every stamp in v41 operand order: loadFluxInit L/m (inductor.ts:783,786), load newmind=L/m (inductor.ts:856), stampAc omega*_effectiveL/_M (inductor.ts:923). Directive 2 compliant: the v26 /M removal is applied as a non-empty arithmetic relocation, NOT waved through as zero-delta. factor=1.0+tc1*difference+tc2*difference*difference (inductor.ts:661 <-> indtemp.c:72). Re-derived independently. HARNESS GATE: RL-step/RLC/sine-transformer all bit-exact prove the /M-at-stamp relocation is numerically correct vs ngspice (which has /M at indload.c:43/112, indacld.c:29)."
+      ],
+      "escalation": null
+    },
+    "ind/indtrunc.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "aa40695d76f3766c",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/indtrunc.c:20-22 (INDtrunc). Slice ind.md:1617-1629 is the model/instance accessor renames (model->INDnextModel -> INDnextModel(model); model->INDinstances -> INDinstances(model); here->INDnextInstance -> INDnextInstance(here)). Zero-delta rule satisfied: every +/- line is a VERIFICATION.md sec4 allowed accessor rename; the inner CKTterr(here->INDflux, ckt, timeStep) (indtrunc.c:24) is unchanged. digiTS counterpart: getLteTimestep (inductor.ts:942-961) reads phi0..phi3 + ccap0/ccap1 from the PHI/CCAP slots and calls cktTerr; the model/instance walk collapses to per-element invocation under defaultLteHandler. Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/mutacld.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "26f0bff1ca2ed5d2",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/mutacld.c:16-33 (MUTacLoad). Slice ind.md:1642-1663 is the model/instance accessor renames + the 2 'br1br2'/'br2br1' -> 'Ptr' field renames on the AC coupling stamps. Zero-delta rule satisfied: every +/- line is a VERIFICATION.md sec4 allowed rename. Tier2 bijective vs mutacld.c:26-28: val=CKTomega*MUTfactor (mutacld.c:26) <-> wM=omega*this._mutFactor (mutual-inductor.ts:272); *(MUTbr1br2Ptr+1) -= val (mutacld.c:27) <-> stampElementImag(this._hAcBr1Br2, -wM) (mutual-inductor.ts:273); *(MUTbr2br1Ptr+1) -= val (mutacld.c:28) <-> stampElementImag(this._hAcBr2Br1, -wM) (mutual-inductor.ts:274). Imaginary-only stamp (the +1 offset = imag half). Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "ind/mutsetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "371cc3093b6bff8d",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/mutsetup.c:27-68 (MUTsetup). Slice ind.md:1885-1968 is: (1) the ERR_WARNING->ERR_FATAL severity upgrade with `return(E_NOTFOUND)` added (mutsetup.c:49-52, 57-60) for both !MUTind1 and !MUTind2; (2) the message text 'non-existant'->'non-existent' (mutsetup.c:50, 58); (3) TSTALLOC macro-lift to file-scope (mutsetup.c:19-24); (4) accessor + 'Ptr' renames + #ifdef MUTUAL removal. digiTS counterpart: MUTsetup (mutual-inductor.ts:165-211) -- the !(l1 instanceof AnalogInductorElement) throw new Error(`${label}: coupling to non-existent inductor ${l1Label}.`) (mutual-inductor.ts:175-179) maps ERR_FATAL+return(E_NOTFOUND) -> thrown Error (the digiTS fatal stop), with the v41 'non-existent' wording (CONFIRMED matches mutsetup.c:50); mirror for !MUTind2 (mutual-inductor.ts:182-186 <-> mutsetup.c:57-60). The 2 TSTALLOC -> 2 allocElement(b1,b2)/(b2,b1) (mutual-inductor.ts:201-202 <-> mutsetup.c:63-64). Re-derived independently. Q-MUT-FATAL resolved (PORT). The throw IS the early-return-before-TSTALLOC (the missing partner never reaches allocElement)."
+      ],
+      "escalation": null
+    },
+    "ind/muttemp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "aa4b380677853706",
+      "attempts": 0,
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/ind/muttemp.c:13-218 (cholesky + MUTtemp + INDsystem verify subsystem). Slice ind.md:2049-2277. The leaf fabs change: v26 `MUTfactor = MUTcoupling * sqrt(ind1 * ind2)` -> v41 `MUTfactor = MUTcoupling * sqrt(fabs(ind1 * ind2))` (muttemp.c:56). digiTS counterpart: MUTfactor = this._coupling * Math.sqrt(Math.abs(this._partner1.inductance * this._partner2.inductance)) at every site (mutual-inductor.ts:208-210 setup, 249-251 computeTemperature, 256-258 recomputeMutFactor) -- fabs->Math.abs, operand order ind1*ind2 preserved, sqrt->Math.sqrt. The CKTindverbosity-gated INDsystem Cholesky positive-definite verification subsystem (muttemp.c:13-32 cholesky + muttemp.c:58-205 the verify driver) is the mut#recon/inductiveSystemVerify reconstruction (APPLIED), whose verifier confirmed cholesky (mutual-inductor.ts:66-83) + the 5-way merge chain + matrix assembly + waiver + emit gate are construct-bijective with muttemp.c and ran the harness gate on transformer/tapped-transformer. Blocked-by mut#recon/inductiveSystemVerify (APPLIED). Re-derived independently."
+      ],
+      "escalation": null
+    },
+    "analysis#recon/tf": {
+      "state": "ESCALATED",
+      "hunkHash": "adda0def5d673cee",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "raisedBy": "applier",
+        "trigger": "reconstruction spec absent",
+        "ngspice": "src/spicelib/analysis/tfanal.c:18-165 (TFanal, v41 tree ref/ngspice/src/spicelib/analysis/tfanal.c)",
+        "digiTS": "src/solver/analog/dc-operating-point.ts -- a new .tf driver (DC transfer ratio + input/output resistance over the factored DC Jacobian), plus facade method and circuit_tf MCP surface",
+        "whatIsBlocked": "The entire .tf analysis driver. ledger.json records this reconstruction item with specExists:false; the spec file spec/v41-port/reconstruction/analysis-tf.md does not exist on disk (confirmed via Glob -- the reconstruction/ directory holds cap-/mut-/ind-/vdmos-/vccs-/res-/jfet- specs but no analysis-tf.md). The two v41 hunks it blocks (analysis/tfanal.c#h001 docLineRange 8352-8362, #h002 8363-8373) are GENnode(ptr)[0]/[1] accessor renames inside TFanal that only become case-(a) applicable once the driver exists. No .tf driver exists in the target TS today (Grep for TFanal|transferFunction|TFinSrc|circuit_tf|computeTransfer in dc-operating-point.ts returns zero matches), and no rename-maps/*tf* stub exists.",
+        "architectureChangeRequired": "Build from scratch, in src/solver/analog/dc-operating-point.ts (+ facade + MCP), a faithful v26-baseline TFanal port: (1) run CKTop to the operating point; (2) resolve the input source (Vsource branch / Isource node pair) and output (Vsource branch / node pair); (3) zero CKTrhs, inject +/-1 at the input source's branch or node pair, SMPsolve against the already-factored DC Jacobian, read the transfer ratio and input resistance (-1/rhs[insrc] with the 1e-20 guard, or the node-difference for an Isource input); (4) for output resistance, re-zero rhs, inject at the output, re-solve, read 1/MAX(1e-20,rhs[outsrc]) or the node difference, with the TFoutIsI && TFoutSrc==TFinSrc short-circuit. Each of these decisions -- how digiTS exposes a re-solve against the retained factored Jacobian (the SMPsolve analog), how it addresses a source branch vs a node pair for RHS injection, the output-vector/plot shape, the facade method signature, and the circuit_tf MCP tool contract and serialization -- is a design the missing spec was to define. Authoring them by inference would be inventing the spec, which the reconstruction-from-spec contract and the project 'no pragmatic shortcuts / match ngspice exactly' rule forbid.",
+        "whyExceedsOneFunctionGroup": "This is not a single-functionGroup architecture change: it spans the AnalogEngine solve surface (re-solve against the factored DC Jacobian), the facade (src/headless/default-facade.ts / facade.ts), and the MCP server (a new circuit_tf tool). The reconstruction item's own tsFunction field names exactly this multi-surface scope ('a new .tf driver over the factored DC Jacobian (transfer ratio + Zin/Zout) on the AnalogEngine, plus the facade/MCP surface (circuit_tf)'). With no spec to fix the contract at each surface, the mapping is genuinely ambiguous.",
+        "decisionNeeded": "Author spec/v41-port/reconstruction/analysis-tf.md defining the .tf driver architecture (re-solve-against-factored-Jacobian surface on AnalogEngine, source-branch vs node-pair RHS injection, transfer-ratio/Zin/Zout output shape, facade method signature, circuit_tf MCP contract), then rebuild the ledger so specExists flips true and this item returns to PENDING for the builder.",
+        "resolution": "pending"
+      }
+    },
+    "maths-ni/niaciter.c#h001b": {
+      "state": "ESCALATED",
+      "hunkHash": "1b5c7165f9989a53",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Pre-image absent (case c). The v26 minus line is `double *temp;` (the swap-temp local removed when v41 converts the manual rhs/rhsOld pointer swap to the SWAP macro). Our AC path (src/solver/analog/ac-analysis.ts AcAnalysis.run) has no temp swap local because it has no CKTrhs/CKTrhsOld ping-pong: it solves into dedicated solRe/solIm arrays via solver.solve(rhsRe, solRe, rhsIm, solIm) (ac-analysis.ts:419). No TS line is the minus line modulo rename/syntax.",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niaciter.c:107-115 (NIacIter locals)",
+        "digiTSFile": "src/solver/analog/ac-analysis.ts (AcAnalysis.run frequency-sweep loop, ~:354-456)",
+        "architectureChange": "Would require re-architecting the AC sweep to ngspice six-buffer (CKTrhs/CKTrhsSpare/CKTrhsOld/CKTirhs/CKTirhsSpare/CKTirhsOld) complex ping-pong with a post-solve rhs<->rhsOld SWAP so the solution lands in rhsOld, replacing the current dedicated solRe/solIm output arrays. Cross-cutting AC-engine rewrite, not contained within this functionGroup.",
+        "filesTouched": [
+          "src/solver/analog/ac-analysis.ts",
+          "AC RHS/buffer model shared with the harness acSnapshotSink (cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niaciter.c#h002": {
+      "state": "ESCALATED",
+      "hunkHash": "40932f62729462f3",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Pre-image absent (case c) on every minus line. The hunk six clears `*ckt->CKTrhs = 0; ... *ckt->CKTirhsOld = 0;` (deref-form -> array-index form) and the two manual three-line rhs/irhs swaps (-> SWAP macro) all operate on the CKTrhs/CKTrhsSpare/CKTrhsOld/CKTirhs/CKTirhsSpare/CKTirhsOld six-buffer set. Our AC architecture has none of those buffers: AcAnalysis uses rhsRe/rhsIm input arrays and solRe/solIm output arrays (ac-analysis.ts:324-327, 416-419), with NO ground-sentinel clear of those six buffers and NO post-solve rhs<->rhsOld pointer swap. The v26->v41 delta is real code (deref->index clears, manual->SWAP), so a zero-line TS delta would drop it (condition 3).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niaciter.c:144-179 (NIacIter post-solve clears + SWAPs)",
+        "digiTSFile": "src/solver/analog/ac-analysis.ts (post-solve region, ~:416-419)",
+        "architectureChange": "Same AC six-buffer ping-pong rewrite as #h001b: introduce CKTrhs/rhsOld/irhs/irhsOld semantics with post-solve ground-sentinel clears and a rhs<->rhsOld SWAP. Cross-cutting, exceeds this functionGroup.",
+        "filesTouched": [
+          "src/solver/analog/ac-analysis.ts",
+          "shared AC RHS/solution buffer model (cross-group)"
+        ]
+      }
+    },
+    "maths-ni/nicomcof.c#h001": {
+      "state": "ESCALATED",
+      "hunkHash": "541ef79fde2e6d7f",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Pre-image present-but-differs (case b). The minus lines are the comment `* xmu=0.48: good damping ...` and `#define xmu 0.5`. Our port already pre-applied v41 xmu-as-runtime change: integration.ts:235 declares `xmu: number` as a runtime function parameter (cited as ckt->CKTxmu at integration.ts:246-247), so there is no `#define xmu 0.5` macro to remove. The plus line `#include ngspice/cpextern.h` is C-only plumbing with no TS image. Our port already diverged from v26 here, so the minus lines are not case (a).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/nicomcof.c:6-13 (includes + xmu macro/comment)",
+        "digiTSFile": "src/solver/analog/integration.ts (computeNIcomCof xmu param :235, :246-251)",
+        "architectureChange": "None needed for behavior (xmu runtime is already present). User decision: whether a pre-applied v41 change (xmu macro -> runtime field, landed ahead of this loop, per the CLAUDE.md hot-loadable-params requirement) should be recorded APPLIED despite no v26 pre-image, or whether a v26-baseline reconstruction is needed.",
+        "filesTouched": [
+          "src/solver/analog/integration.ts (no edit needed; pre-applied)"
+        ]
+      }
+    },
+    "maths-ni/nicomcof.c#h002": {
+      "state": "ESCALATED",
+      "hunkHash": "ca1e48408d1f4739",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Pre-image present-but-differs (case b). v26 minus lines compute the TRAP order-2 coefficients using the xmu MACRO (=0.5): CKTag[0]=1.0/CKTdelta/(1.0-xmu); CKTag[1]=xmu/(1.0-xmu). v41 plus lines read the runtime field ckt->CKTxmu. Our TS already reads a runtime xmu param (integration.ts:250-251 ag[0]=1.0/dt/(1.0-xmu); ag[1]=xmu/(1.0-xmu)), so our line corresponds to the v41 plus line, not the v26 minus line. Both the v26 minus (macro) and v41 plus (field) map to the same TS text 1.0-xmu under the rename, making the change invisible: our port pre-applied it. A zero-line delta would drop a real change (macro constant -> struct field).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/nicomcof.c:42-45 (TRAPEZOIDAL case 2)",
+        "digiTSFile": "src/solver/analog/integration.ts:250-251 (computeNIcomCof trapezoidal order-2)",
+        "architectureChange": "None for behavior. User decision: record pre-applied xmu-runtime as APPLIED, or supply a v26-baseline reconstruction so the minus macro pre-image exists.",
+        "filesTouched": [
+          "src/solver/analog/integration.ts (no edit needed; pre-applied)"
+        ]
+      }
+    },
+    "maths-ni/nicomcof.c#h003": {
+      "hunkHash": "f50748ce31ae0915",
+      "attempts": 0,
+      "verifierNotes": [
+        "ESCALATION REJECTED as bogus (VERIFICATION.md sec6a) -> cleared to PENDING. The applier's own `architectureChange`+`filesTouched` show the remedy is contained within a single in-file-scope edit (src/solver/analog/integration.ts only; no cross-group file, no blast radius beyond the functionGroup). The bzero->memset call-site change is a pure C-API cosmetic (both zero 7 doubles); the only real divergence is that solveGearVandermonde (integration.ts:169) zeros slots 0..order instead of all 7. v26 AND v41 both clear 7 slots (the diff minus line `bzero(ckt->CKTag,7*sizeof(double))` proves the v26 pre-image is the 7-slot clear), so our partial-loop baseline never matched v26 -- but the fix is a trivial loop-bound change, not a user decision and not an architecture change. MISMATCH instruction to applier: change `for (let i = 0; i <= order; i++) ag[i] = 0;` (integration.ts:169) to zero all 7 ag slots (e.g. `ag.fill(0, 0, 7)` or `for (let i = 0; i < 7; i++) ag[i] = 0;`), matching memset(ckt->CKTag,0,7*sizeof(double)) at ref/ngspice/src/maths/ni/nicomcof.c:65. This is the applier's job per VERIFICATION.md sec6a (within-group, in-file change); re-escalating without a cross-group dependency will be rejected again."
+      ],
+      "escalation": null
+    },
+    "maths-ni/niconv.c#h001": {
+      "state": "ESCALATED",
+      "hunkHash": "f431d9fb7ca6180d",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "All-plus hunk; target absent (condition 2). The plus line `extern bool ft_ngdebug;` introduces a C global debug-printf gate consumed only by #h002 `if (ft_ngdebug) fprintf(stderr, ...)` NaN-warning branch. Our newton-raphson.ts has no ft_ngdebug equivalent and no stderr debug-warning path; the only thing it gates is a C-side diagnostic print with no behavioral content. There is no digiTS construct to extend.",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niconv.c:17 (extern bool ft_ngdebug)",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (NIconvTest inlined into newtonRaphson STEP H, ~:653-748)",
+        "architectureChange": "Would require introducing an ft_ngdebug-equivalent debug gate; ngspice uses it only for a stderr NaN warning, which our convergence path does not emit. No behavioral counterpart to land.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts"
+        ]
+      }
+    },
+    "maths-ni/niconv.c#h002": {
+      "state": "ESCALATED",
+      "hunkHash": "3193616ee5557108",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Mixed pre-image. The substantive plus addition is the isnan non-convergence check `if (isnan(new)) { if(ft_ngdebug) fprintf(...); return 1; }` in the standalone NIconvTest function. Our port has a NaN check (newton-raphson.ts:694-696) but with DIFFERENT structure: it sets globalConverged=false (continue scanning) inside the inlined STEP-H convergence loop, NOT return 1 from a standalone NIconvTest. The hunk minus lines are tab->space reindentation of #ifdef STEPDEBUG printf lines and ckt->CKTtroubleNode=i; ckt->CKTtroubleElt=NULL; assignments; STEPDEBUG and CKTtroubleElt have no TS counterpart (case c absent). Condition 1 (pre-image) and condition 3 (isomorphic delta: standalone-function return 1 vs inlined flag) both fail.",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niconv.c:33-60 (NIconvTest isnan + voltage-tol branch)",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts:682-702 (inlined convergence scan)",
+        "architectureChange": "ngspice keeps NIconvTest as a separate function with early return 1 on NaN and on tol-exceed, plus CKTtroubleNode/CKTtroubleElt blame assignment. Our port inlined the test into newtonRaphson STEP-H loop with a globalConverged flag. Making the diff line-isomorphic would require extracting a standalone NIconvTest with the return-1 control flow and a troubleElt field, a structural rewrite spanning the convergence subsystem.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/ckt-context.ts (troubleElt field, cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niconv.c#h003": {
+      "state": "ESCALATED",
+      "hunkHash": "37010117b95b012e",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Pre-image absent (case c). All minus/plus lines are tab->space reindentation of #ifdef STEPDEBUG printf lines and the ckt->CKTtroubleNode=i; ckt->CKTtroubleElt=NULL; assignments in the else (non-SP_VOLTAGE) branch of NIconvTest. STEPDEBUG printfs and the CKTtroubleElt field have no counterpart in our inlined convergence scan, so no TS line is any of these minus lines modulo rename/syntax.",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niconv.c:63-72 (NIconvTest non-voltage branch)",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (inlined convergence scan; no STEPDEBUG/troubleElt)",
+        "architectureChange": "Same standalone-NIconvTest + CKTtroubleElt extraction as #h002.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts"
+        ]
+      }
+    },
+    "maths-ni/niinit.c#h001": {
+      "state": "ESCALATED",
+      "hunkHash": "51bc084334d29f45",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "Target requires an out-of-scope change (condition 2). v26 minus `return(SMPnewMatrix(&(ckt->CKTmatrix)));` -> v41 plus `return SMPnewMatrix(&(ckt->CKTmatrix), 0);` adds a second size argument (passed as spCreate first arg; 0 = dynamically-sized matrix, identical behavior to v26 implicit size 0). Our counterpart is solver._initStructure() (ckt-context.ts:685), which takes no arguments. To make the git-diff line-isomorphic (_initStructure(0)) I would have to add a size parameter to _initStructure, which is defined in src/solver/analog/sparse-solver.ts -- OUTSIDE my file scope AND governed by the CLAUDE.md Sparse Solver is Settled - Do Not Re-Investigate hard rule.",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niinit.c:28 (SMPnewMatrix gains size arg) -> ref/ngspice/src/maths/sparse/spsmp.c:252 SMPnewMatrix(**pMatrix, int size){ *pMatrix=spCreate(size,1,&Error); }",
+        "digiTSFile": "src/solver/analog/ckt-context.ts:685 (solver._initStructure())",
+        "architectureChange": "Add an optional size parameter (default 0 = dynamic) to SparseSolver._initStructure in src/solver/analog/sparse-solver.ts mirroring spCreate size arg, then pass 0 from ckt-context.ts so the call site is solver._initStructure(0). Touches the settled sparse solver (out of file scope), so it is a user decision, not an in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/ckt-context.ts",
+          "src/solver/analog/sparse-solver.ts (out of file scope; settled-solver hard rule)"
+        ]
+      }
+    },
+    "maths-ni/niiter.c#h001": {
+      "state": "ESCALATED",
+      "hunkHash": "a380dbcc75d12736",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h001: includes + msgcount static + local reorg + maxIter floor + UIC-swap + NEWPRED restructure, diff :370-439]",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
+        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niiter.c#h002": {
+      "state": "ESCALATED",
+      "hunkHash": "580d4c24a86da1c9",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h002: loop-body restructure / CKTload error path, diff :440-491]",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
+        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niiter.c#h003": {
+      "state": "ESCALATED",
+      "hunkHash": "fd99256f8e3bcc38",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h003: NISHOULDREORDER + singular-matrix message limiting (msgcount/eq(NODENAME)), diff :492-532]",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
+        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niiter.c#h004": {
+      "state": "ESCALATED",
+      "hunkHash": "cf4f9f372170f7ec",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h004: SMPluFac dispatch + E_SINGULAR retry, diff :533-557]",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
+        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niiter.c#h005": {
+      "state": "ESCALATED",
+      "hunkHash": "0038e9a7eb5d39a7",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h005: OldCKTstate0 memcpy / iterlim errMsg(DOING_TRAN) / node-damping fabs, diff :558-739]",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
+        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
+        ]
+      }
+    },
+    "maths-ni/niiter.c#h006": {
+      "state": "ESCALATED",
+      "hunkHash": "d562ec90b218dff9",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
+        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h006: rhs/rhsOld SWAP + NIresetwarnmsg() function, diff :740-758]",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
+        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts",
+          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
+        ]
+      }
+    }
+  }
+}
