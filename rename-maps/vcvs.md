@@ -29,6 +29,12 @@ etc., so the rename renders as a zero-line TS delta.
 | `const int VCVScontNegNode` | `int VCVScontNegNode` | `this.pinNodes.get("ctrl-")` | control negative node |
 | `VCVSbranch` | `VCVSbranch` | `this.branchIndex` | branch equation row index (unchanged v26→v41) |
 
+## Runtime validation (degenerate topology)
+
+| ngspice (v41) | digiTS | Notes |
+|---|---|---|
+| `if(VCVSposNode == VCVSnegNode){ IFerrorf(ERR_FATAL,"instance %s is a shorted VCVS",VCVSname); return(E_UNSUPP); }` (`vcvsset.c:35-39`) | `if (posNode === negNode) throw new Error(\`instance ${label} is a shorted VCVS\`)` (`vcvs.ts` setup) | `IFerrorf(ERR_FATAL) + return(E_UNSUPP)` ↔ thrown Error (the digiTS fatal stop); v41 message wording preserved. Same precedent as `mutual-inductor.ts` porting `mutsetup.c` ERR_FATAL early-returns. |
+
 ## Coefficient
 
 | ngspice | digiTS | Notes |

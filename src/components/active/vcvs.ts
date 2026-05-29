@@ -163,6 +163,14 @@ export class VCVSAnalogElement extends ControlledSourceElement {
     const ctrlPosNode = this.pinNodes.get("ctrl+")!;  // VCVScontPosNode
     const ctrlNegNode = this.pinNodes.get("ctrl-")!;  // VCVScontNegNode
 
+    // vcvsset.c:35-39 — VCVSposNode == VCVSnegNode → ERR_FATAL "instance %s is a
+    // shorted VCVS", then return(E_UNSUPP) so the degenerate instance never
+    // reaches branch allocation / TSTALLOC. The ERR_FATAL + early-return maps to
+    // a thrown Error (the digiTS fatal stop); the message text is the v41 wording.
+    if (posNode === negNode) {
+      throw new Error(`instance ${this.label ?? "vcvs"} is a shorted VCVS`);
+    }
+
     // Branch row allocation: vcvsset.c:41-44 (idempotent guard)
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label ?? "vcvs", "branch");
