@@ -62,6 +62,8 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: CCCS_PARAM_DEFS, defaults: CCCS_DEFAULTS } = defineModelParams({
   primary: {
     currentGain: { default: 1.0, description: "Linear current gain β" },
+    // CCCSmValue, cccs.c:14 IOP("m", CCCS_M, ...) — parallel multiplier, default 1
+    M: { default: 1, description: "Parallel multiplier" },
   },
 });
 
@@ -347,6 +349,7 @@ const CCCS_PROPERTY_DEFS: PropertyDefinition[] = [
 const CCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "expression",       propertyKey: "expression",       convert: (v) => v },
   { xmlName: "currentGain",      propertyKey: "currentGain",      convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "m",                propertyKey: "M",                convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "senseSourceLabel", propertyKey: "senseSourceLabel", convert: (v) => v },
   { xmlName: "Label",            propertyKey: "label",            convert: (v) => v },
 ];
@@ -379,9 +382,13 @@ export const CCCSDefinition: StandaloneComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const currentGain = props.getModelParam<number>("currentGain");
+        const m = props.getModelParam<number>("M"); // CCCSmValue, default 1
+        // cccspar.c:25-26 — CCCScoeff *= CCCSmValue (m defaults to 1, so the
+        // product is the bare currentGain when m is not netlisted).
+        const effectiveGain = currentGain * m;
         const rawExpr = parseExpression(expression === "I(sense)"
-          ? `${currentGain} * I(sense)`
-          : expression);
+          ? `${effectiveGain} * I(sense)`
+          : `(${m}) * (${expression})`);
         const deriv = simplify(differentiate(rawExpr, "I(sense)"));
         const el = new CCCSAnalogElement(pinNodes, rawExpr, deriv, "I(sense)", "current");
         // Wire the sense-source link via the public setParam path so the
