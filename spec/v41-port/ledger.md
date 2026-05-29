@@ -1,6 +1,6 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-05-29T22:06:40.006Z
+Generated: 2026-05-29T22:31:53.680Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
@@ -19,9 +19,9 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 702 |
-| APPLIED        | 45 |
-| ESCALATED      | 15 |
+| PENDING        | 679 |
+| APPLIED        | 46 |
+| ESCALATED      | 37 |
 | NO-COUNTERPART | 1040 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-29T22:06:40.006Z",
+    "generated": "2026-05-29T22:31:53.680Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 61,
+    "progressEntriesApplied": 85,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -43603,12 +43603,21 @@
         274
       ],
       "hunkHash": "0db62333e0fec24b",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ac-analysis.ts (AcParams.type \"lin\"|\"dec\"|\"oct\" sweep-type, frequency-sweep loop). The AC_START/AC_STOP/AC_STEPS entries are .ac card-parser param indices with no deck parser in digiTS, and the #ifdef RFSPICE/SPDEFS guard is no-counterpart; flagged as an open question for sub-split if the user wants the card-param ids carved out.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). The hunk converts the C card-parser index macros `#define DECADE 1 / OCTAVE 2 / LINEAR 3` and `#define AC_DEC 1 ... AC_STEPS 6` into C `enum`s with identical values. None of these minus lines exists in our TS modulo rename/syntax: our AC sweep type is a STRING UNION `AcParams.type: \"lin\" | \"dec\" | \"oct\"` (ac-analysis.ts:54), not numeric constants DECADE/OCTAVE/LINEAR; and AC_START/AC_STOP/AC_STEPS are `.ac` deck-card parameter indices (consumed by ngspice's INP card parser) for which digiTS has no deck-parser counterpart at all. The planning tsFunction note on this item itself flags the AC_* card-param ids as having no deck parser and the `#ifdef RFSPICE/SPDEFS` guard as no-counterpart, with an explicit 'open question for sub-split'. Only frozen Phase-0 planning may assign NO-COUNTERPART; the applier may not, so this is an escalation.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/acdefs.h:25-53 (DECADE/OCTAVE/LINEAR + AC_DEC..AC_STEPS define->enum)",
+        "digiTSFile": "src/solver/analog/ac-analysis.ts (AcParams.type string union :52-66; buildFrequencyArray sweep loop :511-556)",
+        "architectureChange": "To make the delta line-isomorphic would require replacing the AcParams string-union sweep-type with a numeric DECADE/OCTAVE/LINEAR enum AND introducing an `.ac` deck-card parameter-index table (AC_START/AC_STOP/AC_STEPS) plus the deck card parser that consumes it. digiTS has no deck-card parser, so the AC_* indices have no landing construct; carving the sweep-type enum out from the card-param indices is the 'sub-split' the planning note raised. Both are user decisions (a Phase-0 NO-COUNTERPART carve for the card-param indices, and/or a sweep-type-enum architecture change), not an in-functionGroup edit.",
+        "filesTouched": [
+          "src/solver/analog/ac-analysis.ts",
+          "deck-card parser for .ac AC_START/AC_STOP/AC_STEPS (does not exist in digiTS; cross-group / out of scope)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -43882,12 +43891,21 @@
         442
       ],
       "hunkHash": "a5e20873d1993ac6",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts (node initial-condition / nodeset handling). PARM_NS/PARM_IC/PARM_NODETYPE node-parameter ids reindexed to an enum; consumed by CKTsetNodeParm for .nodeset/.ic. digiTS supports IC/nodeset, but addresses nodes via CircuitSpec rather than these card-param ids -- flagged as an open question in the review doc.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). The hunk converts `#define PARM_NS 1 / PARM_IC 2 / PARM_NODETYPE 3` (CKT node-parameter card indices) into an `enum` of identical values. Grep across src/ finds no PARM_NS / PARM_IC / PARM_NODETYPE anywhere in our TS: these are .nodeset/.ic node-parameter indices consumed by ngspice's CKTsetParm / card parser, and digiTS has no such node-parameter-index table (node IC/nodeset constraints are carried as Map<number,number> ics/nodesets on CompiledAnalogCircuit, analog-engine-interface.ts:329-335, not as indexed PARM_* codes). No minus line maps to a TS line modulo rename/syntax.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:56-60 (PARM_NS/PARM_IC/PARM_NODETYPE define->enum)",
+        "digiTSFile": "src/solver/analog/ckt-context.ts (no node-parameter-index table; ics/nodesets carried as Maps)",
+        "architectureChange": "Would require introducing a CKT node-parameter-index enum (PARM_NS/PARM_IC/PARM_NODETYPE) and the CKTsetParm-style dispatch that consumes it, replacing the Map<nodeId,voltage> ics/nodesets model. That is a node-constraint subsystem redesign spanning ckt-context.ts + the compiler's node-constraint plumbing, not contained in this functionGroup. User decision: Phase-0 NO-COUNTERPART for these card-parser indices, or the redesign.",
+        "filesTouched": [
+          "src/solver/analog/ckt-context.ts",
+          "node-constraint / card-parameter dispatch (cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -43913,12 +43931,21 @@
         451
       ],
       "hunkHash": "3d37dafc7d060c9f",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/state-pool.ts + src/solver/analog/ckt-context.ts (the 8 state-history banks). CKTstates[8] declaration de-parenthesized; this is the per-step state-history memory the digiTS StatePool + integration history mirror.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). The minus line `double *(CKTstates[8]);` is a C struct-member declaration inside `struct CKTcircuit`; the plus line `double *CKTstates[8];` is the same field with the redundant parentheses dropped (pure C declaration syntax) plus reworded `/* ... */` comments on adjacent fields. digiTS has no `struct CKTcircuit` and no `CKTstates[8]` field declaration: per-step history banks live in the StatePool ring (state-pool.ts) addressed by named schema slots, not as an 8-pointer C array member. No TS line is the minus line modulo rename/syntax, and the construct (a C struct field declaration) has no separable TS image.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:81-92 (CKTstates[8] member decl + CKTtime/CKTdelta/... comments)",
+        "digiTSFile": "src/solver/analog/state-pool.ts (history banks as schema-addressed ring) / ckt-context.ts",
+        "architectureChange": "No TS edit can be line-isomorphic to a C struct-field-declaration reformat because digiTS does not declare CKTcircuit as a struct; the StatePool ring is the behavioral counterpart of CKTstates[8] but its declaration does not line up with the C member. User decision: Phase-0 NO-COUNTERPART for this header struct-declaration reformat, or a directive on how a C struct-member decl maps to the StatePool.",
+        "filesTouched": [
+          "src/solver/analog/ckt-context.ts",
+          "src/solver/analog/state-pool.ts (CKTstates ring; cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -43944,12 +43971,20 @@
         468
       ],
       "hunkHash": "4eb5b91a4b274253",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts + integration.ts (transient time/step state: CKTtime, CKTdelta, CKTdeltaOld[7], CKTtemp, CKTnomTemp; CKTstate0..7 access shortcuts). Comment-clarification + the documented transient state fields the timestep/integration controller carries.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). Every minus/plus line is a C struct-member declaration in `struct CKTcircuit` whose only change is comment rewording (`/* ??? */` -> descriptive text) on CKTtime/CKTdelta/CKTdeltaOld/CKTtemp/CKTnomTemp. digiTS has no CKTcircuit struct; cktTemp/cktNomTemp are TS class fields on CKTCircuitContext (ckt-context.ts:319,326) and CKTtime/CKTdelta/CKTdeltaOld are not declared as struct members at all. The minus lines (C struct member declarations) are not present in our TS modulo rename/syntax, so the pre-image fails even though the delta is comment-only.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:92-100 (CKTtime/CKTdelta/CKTdeltaOld/CKTtemp/CKTnomTemp comment rewording)",
+        "digiTSFile": "src/solver/analog/ckt-context.ts (cktTemp :319, cktNomTemp :326; no CKTtime/CKTdelta/CKTdeltaOld struct decls)",
+        "architectureChange": "A C header struct-member comment-reword has no line-isomorphic TS image because digiTS does not declare these as struct fields in one place. User decision: Phase-0 NO-COUNTERPART for the header comment reformat, or a directive on the C-struct-decl -> TS-class-field comment mapping.",
+        "filesTouched": [
+          "src/solver/analog/ckt-context.ts"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -43975,12 +44010,21 @@
         477
       ],
       "hunkHash": "0c33169d79246e01",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (integrateMethod/maxOrder) + integration.ts (trapezoidal CKTxmu) + inductor coupling-check verbosity (CKTindverbosity). Adds CKTxmu (trapezoidal-rule mu) and CKTindverbosity (inductive-coupling check control, tied to the ind IN-class coupling verify).",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "All-plus hunk (target/pre-image is a C struct declaration). It adds two struct members to `struct CKTcircuit`: `double CKTxmu; /* for trapezoidal method */` and `int CKTindverbosity; /* control check of inductive couplings */`. The BEHAVIORAL counterparts are already present in digiTS (xmu in analog-engine-interface.ts SimulationParams.xmu :143 + DEFAULT :213; CKTindverbosity as cktIndVerbosity in ckt-context.ts:336, landed by the earlier mut#recon/inductiveSystemVerify item). But there is no `struct CKTcircuit` declaration in digiTS to add two C struct-member-declaration lines to; the constructs already exist as TS class/interface fields in a different file with different grouping. A line-isomorphic struct-member-addition delta therefore has no landing site (condition 2 fails for this header), and recording it APPLIED with a zero-line delta would mis-claim a header decl was ported when the field already pre-existed.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:109-110 (CKTxmu + CKTindverbosity member additions)",
+        "digiTSFile": "src/core/analog-engine-interface.ts (xmu :143) / src/solver/analog/ckt-context.ts (cktIndVerbosity :336)",
+        "architectureChange": "The behavior is fully present (pre-applied for the hot-loadable-params + inductive-verify requirements). User decision: record these header struct-member additions APPLIED against the already-present TS fields (xmu / cktIndVerbosity) despite there being no CKTcircuit struct decl to mutate, or treat the header decl as NO-COUNTERPART since the field already exists. Mirrors the nicomcof.c#h001/h002 pre-applied-xmu escalation precedent.",
+        "filesTouched": [
+          "src/core/analog-engine-interface.ts (no edit needed; pre-applied)",
+          "src/solver/analog/ckt-context.ts (no edit needed; pre-applied)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -44006,12 +44050,20 @@
         485
       ],
       "hunkHash": "73715d8d12a05acf",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/compiler.ts / ckt-context.ts (node-list bookkeeping across model setup). prev_CKTlastNode records the node-list tail just before model setup so model-internal nodes can be distinguished -- the first-encounter node-allocation order the compiler reproduces.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Target out of file scope. The all-plus hunk adds `CKTnode *prev_CKTlastNode; /* just before model setup */` to `struct CKTcircuit`. The mapping note routes this to compiler.ts (prev_CKTlastNode node-list bookkeeping), which is NOT in this unit's file scope (ac-analysis.ts / ckt-context.ts / constants.ts / newton-raphson.ts / expression.ts / analog-engine-interface.ts / sparse-solver.ts / coordinator.ts). digiTS has no CKTcircuit struct and no prev_CKTlastNode field; the node-list bookkeeping it supports lives in expandCompositeInstance / node-ID allocation in compiler.ts. There is no in-scope construct to extend.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:175 (prev_CKTlastNode member addition)",
+        "digiTSFile": "src/compile/compiler.ts (node-list bookkeeping; OUT of this unit's file scope)",
+        "architectureChange": "Adding a prev_CKTlastNode-equivalent node-list snapshot belongs in compiler.ts's node-allocation path (expandCompositeInstance / CKTlastNode bookkeeping), which this unit may not edit. Cross-group / out of file scope per the unit's FILE SCOPE list -> escalate per TASK.md §8 case 2.",
+        "filesTouched": [
+          "src/compile/compiler.ts (out of this unit's file scope)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -44099,12 +44151,22 @@
         554
       ],
       "hunkHash": "31f89c6a73ce31cf",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (AnalogEngineConfig: gmin/gshunt/trtol/finalTime/step/maxStep/initTime/omega/srcFact/diagGmin/numSrcSteps/numGminSteps/gminFactor/defaultMos*) + ckt-context.ts (CKTnoncon non-convergence flag). Adds CKTcshunt (shunt capacitance to ground). Core DC/TRAN/AC engine tolerances + stepping config; comment-clarification on existing fields.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Mixed pre-image (case b + case c) on a C struct-declaration block. The hunk reworks the CKTgmin/CKTgshunt/CKTdelmin/CKTtrtol/CKTfinalTime/... member block of `struct CKTcircuit`: comment rewording on existing members PLUS new member additions `double CKTcshunt; /* .options CSHUNT */`, an `#ifdef RFSPICE` CMat* block (RF S-param, no digiTS counterpart), `double CKTepsmin;`, and `GENinstance *noise_input;`. digiTS has no CKTcircuit struct; these fields map to scattered TS class fields (gmin/gshunt/trtol are SimulationParams in analog-engine-interface.ts) or are entirely absent (CKTcshunt, CKTepsmin, noise_input, the RFSPICE CMat* block). The minus lines (C struct member decls with `/* ??? */` comments) are not present in our TS modulo rename/syntax (case b for the renamed-comment members, case c for the absent ones). No line-isomorphic delta exists, and several added members (RFSPICE, noise_input) are out of the device-class scope frozen for v41.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:222-335 (CKTgmin..noise_input member block rewrite + CKTcshunt/CKTepsmin/RFSPICE/noise_input additions)",
+        "digiTSFile": "src/solver/analog/ckt-context.ts / src/core/analog-engine-interface.ts (gmin/gshunt/trtol as SimulationParams; CKTcshunt/CKTepsmin/noise_input absent)",
+        "architectureChange": "No TS edit is line-isomorphic to a C struct-declaration block reformat (digiTS has no CKTcircuit struct). The genuinely-new behavioral fields (CKTcshunt shunt capacitor, CKTepsmin log floor) would need new SimulationParams/CKTCircuitContext fields wired into the load/integration path; the RFSPICE CMat* block and noise_input are outside the frozen v41 device-class scope. User decision: per-field disposition (which are Phase-0 NO-COUNTERPART vs which get new TS fields and where).",
+        "filesTouched": [
+          "src/solver/analog/ckt-context.ts",
+          "src/core/analog-engine-interface.ts",
+          "RFSPICE S-param + noise subsystem (outside frozen v41 device-class scope)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -44161,12 +44223,21 @@
         586
       ],
       "hunkHash": "51bc2cdfe2feb446",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts (CKTepsmin: minimum argument floor for log() in junction saturation-current evaluation; default 1e-28 -> no default-behavior change per #58). DEVnameHash/MODnameHash are unchanged context (shell device/model symbol tables), not added lines.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "All-plus sub-item adding the C struct member `double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/` to `struct CKTcircuit`. digiTS has no CKTcircuit struct and no CKTepsmin field anywhere (Grep finds none in src/). The mapping note (CKTepsmin log floor) describes a behavioral quantity that has not been ported; there is no TS construct to extend with a line-isomorphic struct-member addition (condition 2 fails). This is the cktdefs sub-item of the same CKTepsmin field that also appears in the h010 block.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:322 (CKTepsmin member addition)",
+        "digiTSFile": "src/solver/analog/ckt-context.ts (no CKTepsmin field)",
+        "architectureChange": "Porting CKTepsmin (a per-circuit minimum-log-argument floor used to clamp diode saturation-current logs) would require a new CKTCircuitContext / SimulationParams field plus wiring it into the diode/log consumers; that consumer wiring spans device load() code outside this functionGroup. User decision: where CKTepsmin lives and which consumers read it, or Phase-0 NO-COUNTERPART.",
+        "filesTouched": [
+          "src/solver/analog/ckt-context.ts",
+          "diode / log-floor consumers (cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -44657,12 +44728,20 @@
         975
       ],
       "hunkHash": "9d1c1fe177fece7c",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/constants.ts (CHARGE, CONSTCtoK, CONSTboltz, CONSTepsZero, CONSTepsSiO2, CONSTmuZero, REFTEMP, CONSTKoverQ, VT module constants)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image differs (case b). The minus lines are the v26 physical-constant macros `#define CHARGE (1.6021918e-19)`, `#define CONSTboltz (1.3806226e-23)`, `#define CONSTepsZero (8.854214871e-12)`, `#define REFTEMP 300.15`, etc. Our TS counterparts already hold the v41 VALUES, not the v26 ones: constants.ts:22 `export const CHARGE = 1.6021766208e-19;`, :25 `CONSTboltz = 1.38064852e-23;`, :39 `REFTEMP = 27.0 + CONSTCtoK;`. So each minus line has a clear TS counterpart that is NOT that minus line modulo rename/syntax -> case (b). Per TASK.md §6, do not edit on top of a case-(b) pre-image. Additionally the hunk introduces many new constants absent from our TS (CONSTsqrt2, CONSTpi, CONSTnap, CONSTlog10e, CONSTlog2e, CONSTc, CONSTplanck, CONSTKtoC, CONSTepsrSiO2) and derives CONSTmuZero/CONSTepsZero/CONSTepsSiO2 from formulas rather than literals.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/const.h:7-63 (full v26->v41 constants rewrite: derived muZero/epsZero/epsSiO2, new CONSTpi/c/planck/etc.)",
+        "digiTSFile": "src/core/constants.ts (CHARGE :22, CONSTboltz :25, CONSTKoverQ :33, CONSTCtoK :36, REFTEMP :39 — already at v41 values)",
+        "architectureChange": "Our constants.ts already landed the v41 numeric values (the behavioral end-state) but its line structure does not match either the v26 minus side (so the delta cannot be applied against a v26 baseline) or the full v41 plus side (it omits CONSTpi/c/planck/sqrt2/log*/Ktoc and the derived-from-formula muZero/epsZero/epsSiO2 forms). User decision: either (a) record the value changes as pre-applied/APPLIED despite the absent v26 pre-image (mirrors nicomcof.c pre-applied precedent), or (b) supply a v26-baseline reconstruction of constants.ts so the minus pre-image is case (a), then apply the full v41 constants block including the new derived constants. Whether digiTS should add the unused-by-engine constants (CONSTplanck, CONSTc, CONSTpi, ...) is itself a scope question.",
+        "filesTouched": [
+          "src/core/constants.ts"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -45153,12 +45232,21 @@
         1338
       ],
       "hunkHash": "fd98031555f15f64",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/constants.ts (physical constants block; MAX_EXP_ARG diode-exp clamp guard). The .spiceinit/DIR_PATHSEP/TEMPFORMAT lines in this hunk are CLI/file-path plumbing with no engine counterpart, but the hunk is dominated by the const.h-include refactor + MAX_EXP_ARG.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent / CLI-plumbing (case c). The minus lines are C preprocessor macros in defines.h: M_PI/M_E/M_LOG2E/M_LOG10E numeric literals, DBL_EPSILON/DBL_MAX/.../INT_MAX/LONG_MAX float-limit fallbacks, a DUPLICATE block of the v26 physical-constant defines (CHARGE/CONSTCtoK/...), MAXPOSINT, and INITSTR/ALT_INITSTR/DIR_PATHSEP/TEMPFORMAT/SYSTEM_* file-and-CLI-path macros (the mapping note states .spiceinit/DIR_PATHSEP/TEMPFORMAT are CLI/file plumbing with no engine counterpart). None of these minus lines appears in our TS modulo rename/syntax: digiTS uses Math.PI/Math.E directly (not M_PI macros), has no float-limit fallback macros, no duplicate const.h block, and no CLI path macros. The only fragment the mapping ties to constants.ts (MAX_EXP_ARG 709.0 diode-exp clamp) is itself ABSENT from constants.ts (Grep finds no MAX_EXP_ARG in src/), so even that target does not exist.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/defines.h:13-104 (M_* macros, float limits, duplicate consts, MAX_EXP_ARG, DIR_/TEMP/SYSTEM_ path macros)",
+        "digiTSFile": "src/core/constants.ts (no M_* / float-limit / path macros; no MAX_EXP_ARG)",
+        "architectureChange": "The bulk of this hunk is CLI/file-path and C-preprocessor float-limit plumbing the mapping itself calls no-counterpart; the M_* macros map to JS Math.* already; MAX_EXP_ARG would be a new constants.ts entry but is not currently present and its consumers (diode exp clamp) live in device load() code outside this functionGroup. User decision: Phase-0 NO-COUNTERPART for the CLI/limit/macro plumbing, and a directive on whether MAX_EXP_ARG should be added to constants.ts plus where its clamp consumers are.",
+        "filesTouched": [
+          "src/core/constants.ts",
+          "diode exp-clamp consumers + CLI/file-path plumbing (cross-group / no-counterpart)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -45246,12 +45334,20 @@
         1385
       ],
       "hunkHash": "52ef9a14c8a656fc",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/newton-raphson.ts / load-context.ts (DEVlimitlog generic NR limiter) and src/components/semiconductors/vdmos.ts (DevCapVDMOS). DEVlimitlog is a generic NR limiting helper callable by any device (device-class-scope.md: PORT); DevCapVDMOS is the VDMOS capacitance helper -- VDMOS is IN (device-class-scope.md) and its whole-class reconstruction (vdmos#recon/wholeClass) carries this. DEVcmeyer/DEVqmeyer/DEVpred context unchanged.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "All-plus hunk; target is a C forward-prototype declaration with no separable TS image. It adds two prototypes to devdefs.h: `double DEVlimitlog(double, double, double, int*);` and `void DevCapVDMOS(double, double, double, double, double, double*, double*);`. The BEHAVIORAL functions already exist as full TS definitions: limitlog (newton-raphson.ts:295) and devCapVdmos (newton-raphson.ts:373), landed by the earlier device-dispatch/devsup.c#h001 and the vdmos device pass. But a C header forward-declaration has no separate TS counterpart line (a TS function is its own declaration; there is no devdefs.h prototype file), so there is nothing to add a line-isomorphic prototype delta to (condition 2 fails for this header). Recording a zero-line delta here would mis-claim a prototype was ported when the function already pre-existed.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/devdefs.h:19,24-25 (DEVlimitlog + DevCapVDMOS prototypes)",
+        "digiTSFile": "src/solver/analog/newton-raphson.ts (limitlog :295, devCapVdmos :373 — already defined)",
+        "architectureChange": "The functions are fully present; only the C prototype lines have no TS landing site. User decision: record APPLIED against the already-present limitlog/devCapVdmos definitions (the prototype is satisfied by the definition), or treat the header prototype as NO-COUNTERPART since digiTS has no separate prototype declarations. Mirrors the cktdefs.h#h006 pre-applied-field situation.",
+        "filesTouched": [
+          "src/solver/analog/newton-raphson.ts (no edit needed; functions already defined)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -45277,12 +45373,20 @@
         1405
       ],
       "hunkHash": "0e94ffb1445a7052",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/element.ts (AnalogElement.setup() signature; the DEVsetup/DEVpzSetup/DEVtemperature/DEVtrunc vtable slots). Whitespace-only reformatting of the SPICEdev function-pointer signatures (DEVsetup, DEVpzSetup, DEVtemperature, DEVtrunc) -- the device entry-point contract digiTS expresses as AnalogElement abstract methods.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). The hunk is whitespace-only reformatting of four C function-pointer members in `typedef struct SPICEdev` (DEVsetup/DEVpzSetup/DEVtemperature/DEVtrunc) — collapsing trailing spaces and aligning the `(SMPmatrix *, GENmodel *, ...)` pointer-arg spacing. digiTS has no SPICEdev vtable struct: setup()/temperature()/trunc() are TS methods on AnalogElement (element.ts, OUT of this unit's file scope) with their own TS signatures, not C function-pointer struct members. No minus line is present in our TS modulo rename/syntax, and the target file (element.ts AnalogElement.setup signature) is outside the unit's FILE SCOPE.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/devdefs.h:56-72 (SPICEdev DEVsetup/DEVpzSetup/DEVtemperature/DEVtrunc whitespace reformat)",
+        "digiTSFile": "src/solver/analog/element.ts (AnalogElement.setup/temperature/trunc methods; OUT of this unit's file scope)",
+        "architectureChange": "A C function-pointer-struct whitespace reformat has no line-isomorphic image in digiTS's method-based AnalogElement; and element.ts is not in this unit's FILE SCOPE. Cross-group / out of scope per TASK.md §8 case 2.",
+        "filesTouched": [
+          "src/solver/analog/element.ts (out of this unit's file scope)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -48067,12 +48171,21 @@
         3719
       ],
       "hunkHash": "31a77c1f09da788e",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/expression.ts / expression-evaluate.ts (parse-tree function table; ddt time-derivative function). PTF_DDT adds the ddt() behavioral-expression function id.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Target absent (condition 2). The all-plus hunk adds `#define PTF_DDT 37` to the C parse-tree-function code enum (PTF_* table). digiTS's expression engine does NOT use an integer PTF_* function-code table: it dispatches built-in functions via a STRING-keyed JS map `BUILTIN_FUNCTIONS: Record<string, (...args:number[])=>number>` (expression.ts:108) holding sin/cos/exp/log/floor/ceil/... There is no PTF_DDT, no PTF_NINT/FLOOR/CEIL integer codes, and no ddt() time-derivative function in our TS (Grep: no PTF_ in expression.ts). The construct the plus line extends (the integer PTF function-code enum) does not exist; creating it would require re-architecting expression dispatch from a string map to an integer-code table.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/inpptree.h:132 (PTF_DDT 37 in the PTF_* function-code enum)",
+        "digiTSFile": "src/solver/analog/expression.ts (BUILTIN_FUNCTIONS string-keyed map :108; no PTF_* integer codes, no ddt)",
+        "architectureChange": "Adding PTF_DDT line-isomorphically requires an integer PTF_* function-code enum mirroring inpptree.h (PTF_ACOS..PTF_NINT..PTF_DDT) and the ddt() time-derivative evaluation, replacing the string-keyed BUILTIN_FUNCTIONS dispatch in expression.ts/expression-evaluate.ts. That is a parse-tree-function-table redesign exceeding a single-define in-functionGroup edit. User decision required.",
+        "filesTouched": [
+          "src/solver/analog/expression.ts",
+          "src/solver/analog/expression-evaluate.ts (function-code dispatch redesign)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -48098,12 +48211,21 @@
         3730
       ],
       "hunkHash": "bc89346002d54862",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/expression-evaluate.ts (exp() overflow clamp). EXPARGMAX (14.) / EXPMAX (1202604.284) bound the behavioral exp() to avoid overflow during NR.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Target absent (condition 2). The all-plus hunk adds `#define EXPARGMAX 14.` and `#define EXPMAX 1202604.284` — the exp() overflow clamp used by the inpptree expression evaluator. digiTS's expression.ts has no EXPARGMAX/EXPMAX constants (Grep: absent) and no clamped-exp path: `exp` maps directly to `Math.exp` in the BUILTIN_FUNCTIONS map (expression.ts:116) with no 14./1202604.284 overflow guard. There is no digiTS construct to extend with these two clamp constants.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/inpptree.h:170-172 (EXPARGMAX 14. / EXPMAX 1202604.284)",
+        "digiTSFile": "src/solver/analog/expression.ts (exp -> Math.exp :116; no EXPARGMAX/EXPMAX clamp)",
+        "architectureChange": "Landing EXPARGMAX/EXPMAX requires adding the clamped-exp evaluation to the expression evaluator (if arg>EXPARGMAX return EXPMAX*(arg-EXPARGMAX+1) per ngspice PTexp), which means replacing the bare Math.exp entry with a guarded evaluator in expression-evaluate.ts. Tied to the same PTF function-code redesign as #h001. User decision required.",
+        "filesTouched": [
+          "src/solver/analog/expression.ts",
+          "src/solver/analog/expression-evaluate.ts (clamped exp evaluator)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -49710,12 +49832,21 @@
         4891
       ],
       "hunkHash": "1d92492ac765d9bf",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (AnalogEngineConfig: reltol/abstol/vntol/trtol/gmin/maxOrder/gminSteps/srcSteps; new OPT_XMU->trapezoidal mu, OPT_INDVERBOSITY->inductive-coupling check verbosity, OPT_EPSMIN->log-arg floor, OPT_CSHUNT->shunt capacitance). The #ifdef XSPICE OPT_ENH_*/OPT_EVT_* entries and the STATistics profiling ids in this hunk have no engine counterpart -- a sub-split is proposed in the review doc to carve them out; left PENDING pending that cut.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). The sub-item converts the `.options` card-parser parameter-index macros `#define OPT_GMIN 1 ... OPT_TOTALNZ 54` and `#define OPT_SYNCTIME 58 ... OPT_NOOPAC 68` into two C `enum`s, and adds new indices OPT_XMU/OPT_INDVERBOSITY/OPT_EPSMIN/OPT_CSHUNT. digiTS has NO OPT_* parameter-index constants anywhere (Grep: none in src/): option values are typed fields on SimulationParams (reltol/abstol/gmin/maxOrder/xmu/indVerbosity/... in analog-engine-interface.ts), set by name through configure(), not by integer OPTtable index. These OPT_* codes are consumed by ngspice's OPTsetParm / .options card parser, which digiTS does not have. No minus line maps to a TS line modulo rename/syntax.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/optdefs.h:51-145 (OPT_* define->enum + OPT_XMU/OPT_INDVERBOSITY/OPT_EPSMIN/OPT_CSHUNT)",
+        "digiTSFile": "src/core/analog-engine-interface.ts (SimulationParams typed fields; no OPT_* index table)",
+        "architectureChange": "Making this delta line-isomorphic requires introducing an OPT_* option-parameter-index enum and the OPTsetParm/.options card-parser dispatch that consumes it, replacing the by-name SimulationParams.configure() model. That is an options-subsystem redesign + a deck-card parser digiTS lacks, spanning far beyond this functionGroup. The new XMU/INDVERBOSITY behaviors are already present by name (xmu :143, indVerbosity :178). User decision: Phase-0 NO-COUNTERPART for the card-parser indices.",
+        "filesTouched": [
+          "src/core/analog-engine-interface.ts",
+          ".options card-parser / OPTsetParm dispatch (does not exist in digiTS; cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50485,12 +50616,20 @@
         5550
       ],
       "hunkHash": "652b9830f118c8ac",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/sparse-solver.ts (matrix construction / complex-mode allocation selector). SMPnewMatrix gains an int arg selecting real-vs-complex element pool, which the AC complex-mode solve relies on.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image differs / out of scope (case b + settled-solver). The minus line is the C prototype `int SMPnewMatrix( SMPmatrix ** );`; the plus line is `int SMPnewMatrix( SMPmatrix **, int );` (gains a `size` arg selecting the real-vs-complex element pool). digiTS has no SMPnewMatrix free-function prototype: matrix creation is SparseSolver._initStructure() (a class method, ckt-context.ts:685 call site), with complex mode toggled separately via setComplex(). The minus prototype line is not present in our TS modulo rename/syntax. This is the prototype-declaration twin of the already-escalated maths-ni/niinit.c#h001 (which escalated the SMPnewMatrix size-arg call-site change as touching the settled sparse solver, out of file scope per the CLAUDE.md settled-solver hard rule).",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/smpdefs.h:30 (SMPnewMatrix gains int size arg) -> spsmp.c SMPnewMatrix(**pMatrix,int size){*pMatrix=spCreate(size,...);}",
+        "digiTSFile": "src/solver/analog/sparse-solver.ts (SparseSolver._initStructure / setComplex)",
+        "architectureChange": "Add a size parameter to SparseSolver._initStructure mirroring spCreate's size arg. This modifies the settled sparse solver, which the CLAUDE.md 'Sparse Solver is Settled' hard rule and the niinit.c#h001 escalation precedent both treat as a user decision, not an in-functionGroup edit.",
+        "filesTouched": [
+          "src/solver/analog/sparse-solver.ts (settled-solver hard rule -> user decision)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50516,12 +50655,21 @@
         5558
       ],
       "hunkHash": "1f83d4385be921ab",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/sparse-solver.ts (matrix scalar-multiply / matrix-vector multiply helpers, SMPconstMult / SMPmultiply).",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Target absent (condition 2). The all-plus hunk adds two C prototypes to smpdefs.h: `void SMPconstMult(SMPmatrix *, double);` (scalar-multiply every matrix element) and `void SMPmultiply(SMPmatrix *, double *, double *, double *, double *);` (matrix-vector product). digiTS's SparseSolver (sparse-solver.ts) has no SMPconstMult / SMPmultiply equivalents (Grep: absent) — these are RF/S-param and PSS helpers with no current consumer in our engine. There is no digiTS construct to extend, and adding them would touch the settled sparse solver.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/smpdefs.h:42-43 (SMPconstMult / SMPmultiply prototypes)",
+        "digiTSFile": "src/solver/analog/sparse-solver.ts (no SMPconstMult / SMPmultiply)",
+        "architectureChange": "Implementing SMPconstMult/SMPmultiply adds new methods to the settled SparseSolver with no current caller in the ported scope (they back RF S-param / PSS analyses outside the frozen v41 device-class scope). Touches the settled solver -> user decision per the CLAUDE.md settled-solver hard rule; and the callers are out of scope.",
+        "filesTouched": [
+          "src/solver/analog/sparse-solver.ts (settled-solver hard rule)",
+          "RF S-param / PSS consumers (outside frozen v41 scope)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50671,12 +50819,21 @@
         5837
       ],
       "hunkHash": "d74d9c540e511ed9",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/coordinator.ts (transient run config: start/stop/step/maxStep/UIC) and src/solver/analog/timestep.ts (TMAX honoring). TRANan struct + TRAN_TSTART..TRAN_UIC enum reindex.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Pre-image absent (case c). The hunk converts the `.tran` card-parser parameter-index macros `#define TRAN_TSTART 1 / TRAN_TSTOP 2 / TRAN_TSTEP 3 / TRAN_TMAX 4 / TRAN_UIC 5` into a C `enum` of identical values. digiTS has no TRAN_* parameter-index constants (Grep: none in src/): transient run config is carried as typed fields (tStop/outputStep/maxTimeStep/uic on SimulationParams and the coordinator's run config), set by name, not by TRANan-struct integer index. These TRAN_* codes are consumed by ngspice's TRANsetParm / .tran card parser, which digiTS lacks. No minus line maps to a TS line modulo rename/syntax.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/trandefs.h:30-34 (TRAN_TSTART..TRAN_UIC define->enum)",
+        "digiTSFile": "src/solver/coordinator.ts (transient run config) / src/core/analog-engine-interface.ts (tStop/outputStep/maxTimeStep/uic)",
+        "architectureChange": "Line-isomorphic application requires a TRAN_* parameter-index enum and the TRANsetParm/.tran card-parser dispatch consuming it, replacing the by-name transient config. digiTS has no deck-card parser, so the TRAN_* indices have no landing construct. User decision: Phase-0 NO-COUNTERPART for these card-parser indices.",
+        "filesTouched": [
+          "src/solver/coordinator.ts",
+          ".tran card-parser / TRANsetParm dispatch (does not exist in digiTS; cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50733,12 +50890,21 @@
         5882
       ],
       "hunkHash": "17c1dde9e796d9f3",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (integration config) + integration.ts. Adds TSKxmu (trapezoidal mu) and TSKindverbosity (inductive-system check verbosity) to the per-task config -- the task-level mirror of CKTxmu/CKTindverbosity.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "All-plus hunk; target is a C struct declaration with no digiTS counterpart. It adds two members to `struct TSKtask`: `double TSKxmu; /* for trapezoidal method */` and `int TSKindverbosity; /* control check of inductive systems */`. digiTS has NO TSKtask struct (Grep: no TSKxmu/TSKindverbosity/TSKtask in src/). TSKtask is ngspice's per-analysis task mirror of CKTcircuit fields, populated by CKTnewTask/cktntask.c; digiTS carries the equivalent values as SimulationParams (xmu :143, indVerbosity :178) and CKTCircuitContext fields, with no separate task struct. No construct exists to add a line-isomorphic struct-member-addition delta to (condition 2 fails).",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:23-24 (TSKxmu + TSKindverbosity member additions)",
+        "digiTSFile": "src/core/analog-engine-interface.ts (xmu/indVerbosity as SimulationParams; no TSKtask struct)",
+        "architectureChange": "digiTS deliberately has no TSKtask/CKTnewTask task-struct layer (SimulationParams is the single config surface); the xmu/indVerbosity values these mirror already exist. User decision: Phase-0 NO-COUNTERPART for the TSKtask task-mirror struct fields, or a directive on introducing a task-struct layer (a large engine-config redesign).",
+        "filesTouched": [
+          "src/core/analog-engine-interface.ts",
+          "task-struct / CKTnewTask layer (does not exist in digiTS)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50795,12 +50961,21 @@
         5901
       ],
       "hunkHash": "05e73bab33ee0402",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (dc max-iteration / break-time config). Comment-only clarification on TSKminBreak (minimum time difference between breakpoints) -- the breakpoint-spacing knob the transient breakpoint logic uses.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "All-plus hunk; target absent. It adds an `#ifdef RFSPICE` guarded `#define DOING_SP 16` to the TSKcurrentAnalysis value set in `struct TSKtask`. digiTS has no TSKtask struct, no DOING_DC/DOING_TRCV/DOING_AC/DOING_TRAN current-analysis bitfield (Grep: absent), and no RFSPICE S-param analysis (DOING_SP) at all — S-param is outside the frozen v41 device-class scope. No digiTS construct to extend.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:32-34 (#ifdef RFSPICE DOING_SP 16)",
+        "digiTSFile": "src/core/analog-engine-interface.ts (no TSKcurrentAnalysis bitfield; no S-param)",
+        "architectureChange": "DOING_SP is an RFSPICE S-parameter analysis code; the whole TSKcurrentAnalysis enumeration is absent from digiTS and S-param is outside the frozen v41 scope. User decision: Phase-0 NO-COUNTERPART.",
+        "filesTouched": [
+          "src/core/analog-engine-interface.ts",
+          "RFSPICE S-param analysis (outside frozen v41 scope)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50826,12 +51001,21 @@
         5909
       ],
       "hunkHash": "79a564823a09aabc",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (shunt config). Adds TSKcshunt (shunt capacitor to ground) beside TSKgshunt -- the task-level mirror of CKTcshunt.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Mixed pre-image (case b + case c) on a C struct declaration. The hunk rewords a comment on the existing `double TSKminBreak;` member (`-> /* minimum time difference between breakpoints */`) and adds `double TSKcshunt; /* shunt capacitor to ground */` to `struct TSKtask`. digiTS has no TSKtask struct (Grep: no TSKminBreak/TSKcshunt in src/); the minBreak value maps to a SimulationParams/timestep concept, and TSKcshunt (shunt capacitor) is entirely absent. The minus line (a C struct member decl with a `/* ... */` comment) is not present in our TS modulo rename/syntax. No line-isomorphic struct-member delta exists.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:44,57 (TSKminBreak comment + TSKcshunt member addition)",
+        "digiTSFile": "src/core/analog-engine-interface.ts / src/solver/analog/integration.ts (no TSKtask struct)",
+        "architectureChange": "Same as tskdefs.h#h001: no TSKtask layer in digiTS, and TSKcshunt (shunt capacitor to ground) is an unported behavioral field needing a new SimulationParams field + load-path wiring (mirrors CKTcshunt in cktdefs.h#h010). User decision: Phase-0 NO-COUNTERPART for the task-mirror comment, plus a disposition for the new cshunt field.",
+        "filesTouched": [
+          "src/core/analog-engine-interface.ts",
+          "shunt-capacitor (CKTcshunt/TSKcshunt) load-path wiring (cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -50857,12 +51041,21 @@
         5921
       ],
       "hunkHash": "925fc8b3c7d558e4",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/core/analog-engine-interface.ts (AC no-op flag + log-arg floor). Reorders TSKnoopac (no-OP-before-AC flag, an AC knob) and adds TSKepsmin (minimum value for log) -- the task-level mirror of CKTepsmin.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "reason": "Mixed pre-image (case b + case c) on a C struct declaration with a member REORDER. The hunk adds `unsigned int TSKnoopac:1;` earlier in the bitfield block, removes the later `unsigned int TSKnoopac:1;` declaration (moving it above TSKabsDv/TSKrelDv), and adds `double TSKepsmin; /* minimum value for log */` to `struct TSKtask`. digiTS has no TSKtask struct (Grep: no TSKnoopac/TSKepsmin/TSKabsDv as struct members); noopac maps to SimulationParams.noOpIter-adjacent concepts and epsmin (log floor, twin of CKTepsmin) is absent. The minus lines (C struct member decls) are not present in our TS modulo rename/syntax. The member reorder + additions have no line-isomorphic image in a TS that has no such struct.",
+        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:72,74-75 (TSKnoopac move + TSKepsmin member addition)",
+        "digiTSFile": "src/core/analog-engine-interface.ts (no TSKtask struct; no TSKnoopac/TSKepsmin members)",
+        "architectureChange": "Same TSKtask-layer absence as tskdefs.h#h001/h004, plus TSKepsmin is the task-mirror of the unported CKTepsmin log floor (cktdefs.h#h010/#h012a). User decision: Phase-0 NO-COUNTERPART for the task-mirror reorder, plus a disposition for the epsmin log floor.",
+        "filesTouched": [
+          "src/core/analog-engine-interface.ts",
+          "epsmin log floor (CKTepsmin/TSKepsmin) consumers (cross-group)"
+        ]
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -62297,7 +62490,9 @@
       "hunkHash": "66bda1d328258acf",
       "state": "PENDING",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MISMATCH (recon not applied; left PENDING). VERIFICATION.md sec1a requires for APPLIED both (a) source isomorphic to the spec's ngspice baseline and (b) a clean harness gate. Neither can be evaluated because the recon was never built. (1) SPEC ABSENT: spec/v41-port/reconstruction/maths-sparse-nodeset-ic-rowzero.md (the `spec` field of this recon in planning/maths-sparse-decisions.json:98) does not exist on disk -- the reconstruction/ directory holds 9 files (cap-computetemperature, cap-stampac, ind-modelParams, jfet-initialConditions, jfet-tempModelParams, mut-inductiveSystemVerify, res-computeconductance, vccs-multiplierAndIc, vdmos-wholeClass) and none is the nodeset-ic-rowzero spec. With no spec there is no authored ngspice baseline to re-derive isomorphism against. (2) NO SOURCE CHANGE: `git diff --name-only` on branch v41-port does NOT include src/solver/analog/ckt-load.ts (the recon's sole tsFile); the only diffed paths are orchestration/env state (.claude/worktrees/*, .omc/state/mission-state.json, ref/ngspice submodule pointer, spec/v41-port/{ledger.json,ledger.md,progress.json}). ckt-load.ts is unmodified and still applies the unconditional 1e10 soft-pin for BOTH nodeset (ckt-load.ts:130-135: stampElement(nodesetHandles.get(node), CKTNS_PIN=1e10) + stampRHS(node, 1e10*value*srcFact)) and IC (ckt-load.ts:145-150: same shape via icHandles) with NO row-zeroing pass. This is exactly the pre-recon state the item targets to replace (decisions.json title: ngspice cktload.c:167-186 ZeroNoncurRow zeroes the non-current row and stamps exact 1*v=value for pure-voltage nodeset/ic rows, 1e10 only in the currents=1 branch; #68 per-iteration parity divergence). The ZeroNoncurRow row-zero/exact-constraint path and the read-only column lookup (_spcFindElementInCol consumer) named in the recon are absent. (3) blocks-target spsmp.c#h002 (SMPfindElt Col==-1 guard) remains PENDING in decisions.json, consistent with the recon being unapplied. HARNESS GATE not run: it is moot -- the sec1a gate is necessary ON TOP OF source isomorphism, which already fails (no spec, no edit), so APPLIED is impossible regardless of harness output; and running it against the unconditional-1e10 baseline would, per the recon's own #68 description, surface a real per-iteration nodeset/IC matrix divergence that is itself non-waveable (banned closing verdicts: settled-solver/pre-existing/tolerance). FILE-SCOPE CHECK: `git diff --name-only` contains no tsFile of this recon (ckt-load.ts unmodified) and no out-of-scope ts source file -- no over-application, but also no application. Remedy for the applier: author spec/v41-port/reconstruction/maths-sparse-nodeset-ic-rowzero.md from the ngspiceBaseline (cktload.c:105-158 + ZeroNoncurRow :167-186 + spsmp.c SMPfindElt read-only lookup), then implement in ckt-load.ts: replace the unconditional CKTNS_PIN stamp with ngspice's ZeroNoncurRow (zero the non-current row + exact 1*v=value for pure-voltage rows; 1e10 soft-pin only in the currents=1 case) plus the _spcFindElementInCol read-only column lookup the row-zero walk requires. Until built, this stays PENDING."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -62415,9 +62610,11 @@
         "res/restemp.c#h001"
       ],
       "hunkHash": "c4b020705acc850a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Reconstruction item. VERIFICATION.md sec1a satisfied on both legs: (a) source isomorphic to the spec's ngspice baseline (re-derived independently from spec/v41-port/reconstruction/res-computeconductance.md and fresh reads of ref/ngspice/src/spicelib/devices/res/{restemp.c,ressetup.c}; rename-maps NOT consulted) AND (b) harness gate clean. ngspice->digiTS identifier correspondence independently re-derived: RESsheetRes<->_rsh, RESnarrow<->_narrow, RESshort<->_short, RESdefWidth<->_defw, RESdefLength<->_defl, REStempCoeff1<->_modTc1, REStempCoeff2<->_modTc2, REStnom<->_tnom, RESres<->_modRes, RESbv_max<->_modBvMax (model); REStemp<->_TEMP, RESdtemp<->_DTEMP, RESwidth<->_w, RESlength<->_l, RESscale<->_SCALE, RESm<->_M, REStc1<->_tc1, REStc2<->_tc2, RESacResist/RESacres<->_acres/_acResist, RESresist<->_resistance, RESconduct<->_G, RESacConduct<->_Gac. PART A (params): RESISTOR_PARAM_DEFS (resistor.ts:50-75) carries the full v26 model stanza (rsh/narrow/short/defw/defl/modTc1/modTc2/tnom/r/modBvMax) and per-instance set (TEMP/DTEMP/w/l/SCALE/M/tc1/tc2/acres/bv_max), each with its *Given guard (ctor :283-329); noise params kf/af/lf/wf/ef and RESeffNoiseArea correctly ABSENT (NO-COUNTERPART, noise unimplemented). PART B.0 (setup defaults resistor.ts:349-363): bijective with the spec v26 default block / ressetup.c:29-58 -- tnom->nomTemp, rsh->0, defw/defl->10e-6, modTc1/modTc2->0, narrow/short->0, modBvMax->1e99, then w->defw, l->defl, SCALE->1, M->1, bv_max->modBvMax; TSTALLOC posPos/negNeg/posNeg/negPos (resistor.ts:366-369) matches ressetup.c:72-75 line-for-line. PART B computeTemperature (resistor.ts:381-399) bijective with restemp.c:35-45 / spec lines 119-126: !tempGiven -> TEMP=cktTemp + dtemp defaults 0; else dtemp=0 + both-supplied warning; then updateConduct(true). updateConduct (resistor.ts:410-453) bijective with the spec's stated v26 RESupdate_conduct body (spec lines 156-187): geometry guard !resGiven + inner L*W*rsh>0 (resistor.ts:412-413); geometry formula rsh*(L-short)/(W-narrow) left-to-right (resistor.ts:415) matching spec line 159-161 operand-for-operand; model-r fallback then spillWarning-gated 1e-3 fallback (resistor.ts:416-425); difference=(TEMP+DTEMP)-tnom (resistor.ts:429); tc1/tc2 instance-overrides-model (resistor.ts:432-433); factor=1.0+tc1*difference+tc2*difference*difference literal polynomial, no Horner factoring (resistor.ts:438) matching spec line 177; _G=1.0/(resist*factor*scale) no m (resistor.ts:442) matching spec line 179; acres-gated _Gac (resistor.ts:446-452) matching spec lines 182-187. STAMP SITES: load() stamps m*_G (resistor.ts:553-557), stampAc() stamps m*_Gac (resistor.ts:564-568), matching the spec's v26 m-placement (spec lines 233-238). setParam re-runs updateConduct(false) (resistor.ts:546) per spec line 228. MIN_RESISTANCE=1e-9 clamp preserved (resistor.ts:35,285,458). Acceptance criteria 1-8 all satisfied. INTENTIONAL v26 BASELINE (not a divergence): the spec reconstructs the v26 form, so the geometry formula uses rsh*(L-short)/(W-narrow) NOT v41's (L-2*short)/(W-2*narrow)*rsh, the factor is the literal sum NOT v41's Horner (((tc2*d)+tc1)*d)+1.0, and m is applied at the stamps NOT folded into RESconduct; the tce exponential path is also absent. These exact v41 deltas are enumerated downstream hunks this recon BLOCKS (ledger blocks[]: res/restemp.c#h001, res/resload.c#h001, res/resload.c#h002, res/resmask.c#h001, res/resmpar.c#h001, res/resparam.c#h001b/#h002/#h003, res/ressetup.c#h001a/#h001c) -- all PENDING, awaiting this recon APPLIED first per the spec's stated trajectory. HARNESS GATE (server_restart -> harness_start dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll on src/solver/analog/__tests__/ngspice-parity/fixtures/resistive-divider.dts [the task's spec/v41-port/fixtures/resistive-divider.dts path does not exist; this is the only resistive-divider.dts in tree, a V1=5V/R1=1k/R2=1k divider exercising RES load+stampAc] -> harness_run -> harness_first_divergence): firstDivergence NULL across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape, earliest null); 107/107 tran steps bit-exact, avgIterations 2.028 both engines. Both resistors have resistance given (_resGiven=true) so the geometry/factor v26-vs-v41 differences are not numerically exercised (_G=1/1000 under either form) -- the gate confirms the load/stampAc m-placement and conductance pass do not perturb the assembled solve. FILE-SCOPE CHECK: `git diff --name-only` source change is solely src/components/passives/resistor.ts (the recon's sole tsFile); other diffed paths (.omc/*, .vitest-failures.json, ref/ngspice submodule pointer, spec/v41-port/{ledger,progress}.json, .claude/worktrees/*) are orchestration/env state, not source over-application."
+      ],
       "rationale": null,
       "escalation": null
     },
