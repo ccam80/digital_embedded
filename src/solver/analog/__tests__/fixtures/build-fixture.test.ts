@@ -22,8 +22,6 @@ import { AnalogCapacitorElement } from "../../../../components/passives/capacito
 import type { Circuit } from "../../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 
-const CAP_SLOT_V = 2;
-
 function buildVrcCircuit(facade: DefaultSimulatorFacade): Circuit {
   return facade.build({
     components: [
@@ -60,13 +58,15 @@ describe("buildFixture", () => {
     const vCapPos = fix.engine.getNodeVoltage(posNode);
     expect(vCapPos).toBeCloseTo(5.0, 6);
 
-    // Pool slot inspection: the capacitor's V slot in state0 carries the
-    // same DCOP voltage (bottom-of-load CKTstate0 idiom).
-    expect(fix.pool.state0[cap._stateBase + CAP_SLOT_V]!).toBeCloseTo(5.0, 6);
+    // Pool slot inspection: the capacitor stores charge Q = C*V (ngspice
+    // CAPqcap, CAPstate+0), not the node voltage. In DC steady state
+    // Q = 1µF * 5V = 5µC.
+    const slotQ = cap.stateSchema.indexOf.get("Q")!;
+    expect(fix.pool.state0[cap._stateBase + slotQ]!).toBeCloseTo(5e-6, 9);
 
     // state1 carries the seeded post-DCOP snapshot. _seedFromDcop runs as
-    // part of the warm-start, so state1[V] mirrors the converged state0[V].
-    expect(fix.pool.state1[cap._stateBase + CAP_SLOT_V]!).toBeCloseTo(5.0, 6);
+    // part of the warm-start, so state1[Q] mirrors the converged state0[Q].
+    expect(fix.pool.state1[cap._stateBase + slotQ]!).toBeCloseTo(5e-6, 9);
   });
 
   it("matrix stamps are populated after warm-start (resistor conductance present)", () => {
@@ -78,7 +78,7 @@ describe("buildFixture", () => {
     // and the resistor's 4 conductance entries (2 diagonals + 2 off-diagonals)
     // have been stamped into the matrix.
     expect(fix.engine.solver).not.toBeNull();
-    const nzs = fix.engine.solver!.getCSCNonZeros();
+    const nzs = fix.engine.solver!.createInstrumentation().getCSCNonZeros();
     expect(nzs.length).toBeGreaterThan(0);
     // Resistor conductance G = 1e-3 stamps a +G diagonal entry on each
     // non-ground node. Look for at least one entry whose value is exactly +G.

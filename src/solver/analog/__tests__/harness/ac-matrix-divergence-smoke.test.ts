@@ -1,10 +1,11 @@
 /**
  * AC matrix-class divergence smoke test (Phase 3b).
  *
- * Phase 3b extended `AcCapturePoint` with the loaded complex matrix CSC
- * (now captured pre-factor on our side via `SparseSolver.getComplexCSCNonZeros`
- * + the ac-analysis snapshot sink, and on the ngspice side via the bridge's
- * `ni_ac_capture_matrix` hook from Phase 1b). This smoke exercises the
+ * `AcCapturePoint` carries the loaded complex matrix CSC, captured pre-factor
+ * on our side by the harness `captureAcMatrix` closure (which reads the solver's
+ * instrumentation wrapper) feeding the ac-analysis snapshot sink, and on the
+ * ngspice side via the bridge's `ni_ac_capture_matrix` hook. This smoke
+ * exercises the
  * matrix class in `acFirstDivergence`:
  *   - happy path: selfCompare clone matches bit-exact -> matrix is null.
  *   - value-mismatch: mutate a single cell's real part.

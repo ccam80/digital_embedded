@@ -7,7 +7,7 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 // ---------------------------------------------------------------------------
 // allocates_all_buffers_after_setup
 // Verifies via public-surface checks that buffers are allocated after setup:
-//   engine.solver.getCSCNonZeros().length > 0  (matrix allocated)
+//   engine.solver.createInstrumentation().getCSCNonZeros().length > 0  (matrix allocated)
 //   pool.state0.length > 0                      (state pool allocated)
 // ---------------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ describe("CKTCircuitContext", () => {
     // Matrix must be populated after warm-start
     const solver = engine.solver;
     expect(solver).not.toBeNull();
-    expect(solver!.getCSCNonZeros().length).toBeGreaterThan(0);
+    expect(solver!.createInstrumentation().getCSCNonZeros().length).toBeGreaterThan(0);
     // State pool must be allocated
     expect(pool.state0.length).toBeGreaterThan(0);
     // Node voltage at a known node must be set (DCOP ran successfully)

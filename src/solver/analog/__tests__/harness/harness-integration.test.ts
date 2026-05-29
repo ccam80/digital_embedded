@@ -316,8 +316,9 @@ describe("harness integration", () => {
     const { engine } = buildHwrFixture();
     const solver = engine.solver!;
     engine.dcOperatingPoint();
-    expect(solver.dimension).toBe(3);
-    const nz = solver.getCSCNonZeros();
+    const instr = solver.createInstrumentation();
+    expect(instr.dimension).toBe(3);
+    const nz = instr.getCSCNonZeros();
     expect(nz.length).toBeGreaterThan(0);
     expect(nz[0]).toHaveProperty("row");
     expect(nz[0]).toHaveProperty("col");

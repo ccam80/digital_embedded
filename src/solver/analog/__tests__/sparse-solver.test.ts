@@ -774,13 +774,14 @@ describe("SparseSolver Markowitz data structures", () => {
     // first factor() reorder pass (ngspice spcCreateInternalVectors). They do not
     // exist after _initStructure alone- trigger allocation via factor().
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     for (let i = 1; i <= 5; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     solver.factor();
     // After factor(), arrays are sized n+2 (ngspice spfactor.c:715-726).
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(5);
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(5);
-    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(5);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(5);
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(5);
+    expect(instr.markowitzProd.length).toBeGreaterThanOrEqual(5);
   });
 
   it("initializes all Markowitz arrays to zero on beginAssembly", () => {
@@ -790,6 +791,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // which JS zero-initializes. Verify via a factor call on a diagonal matrix
     // (cleanest post-factor Markowitz state: all off-diagonal counts = 0).
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 1);
@@ -798,28 +800,29 @@ describe("SparseSolver Markowitz data structures", () => {
     // After factor() the Markowitz arrays exist with length >= n+1.
     // _countMarkowitz counts off-diagonals; a diagonal matrix has 0 for all.
     for (let i = 1; i <= 3; i++) {
-      expect(solver.markowitzRow[i]).toBe(0);
-      expect(solver.markowitzCol[i]).toBe(0);
+      expect(instr.markowitzRow[i]).toBe(0);
+      expect(instr.markowitzCol[i]).toBe(0);
     }
-    expect(solver.singletons).toBe(0);
+    expect(instr.singletons).toBe(0);
   });
 
   it("re-allocates Markowitz arrays when size changes", () => {
     // Arrays only exist after factor() runs _allocateWorkspace internally.
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     for (let i = 1; i <= 3; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     solver.factor();
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(3);
 
     // Invalidate so next _initStructure+factor() re-allocates for the new size.
     solver.invalidateTopology();
     solver._initStructure();
     for (let i = 1; i <= 7; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     solver.factor();
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(7);
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(7);
-    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(7);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(7);
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(7);
+    expect(instr.markowitzProd.length).toBeGreaterThanOrEqual(7);
   });
 
   it("resets Markowitz arrays to zero when same size is reused", () => {
@@ -828,6 +831,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // factor+_initStructure+factor cycle the Markowitz arrays reflect the new
     // assembly, not stale values from the prior pass.
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
 
     // First factor- establishes off-diagonal Markowitz counts.
     solver._initStructure();
@@ -850,20 +854,22 @@ describe("SparseSolver Markowitz data structures", () => {
     solver.factor();
     // After factoring a purely diagonal matrix, off-diagonal counts are 0.
     for (let i = 1; i <= 3; i++) {
-      expect(solver.markowitzRow[i]).toBe(0);
-      expect(solver.markowitzCol[i]).toBe(0);
+      expect(instr.markowitzRow[i]).toBe(0);
+      expect(instr.markowitzCol[i]).toBe(0);
     }
-    expect(solver.singletons).toBe(0);
+    expect(instr.singletons).toBe(0);
   });
 
   it("singletons is zero after beginAssembly", () => {
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
-    expect(solver.singletons).toBe(0);
+    expect(instr.singletons).toBe(0);
   });
 
   it("Markowitz arrays survive a full factor cycle without error", () => {
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
@@ -877,9 +883,9 @@ describe("SparseSolver Markowitz data structures", () => {
     const result = solver.factor();
     expect(result).toBe(0);
 
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(3);
-    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzProd.length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -900,6 +906,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // Markowitz arrays are populated by _countMarkowitz() inside factor().
     // Read them after factor() completes.
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
@@ -917,8 +924,8 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // loop and then decremented by _updateMarkowitzNumbers() as pivots are applied.
     // Post-factor the arrays reflect end-of-elimination state (all entries consumed),
     // so individual slot values are >= 0 (non-negative residuals).
-    const mRow = solver.markowitzRow;
-    const mCol = solver.markowitzCol;
+    const mRow = instr.markowitzRow;
+    const mCol = instr.markowitzCol;
     expect(mRow.length).toBeGreaterThanOrEqual(4); // allocated n+2
     expect(mCol.length).toBeGreaterThanOrEqual(4);
     for (let i = 1; i <= 3; i++) {
@@ -934,6 +941,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // This test verifies: (a) arrays exist after factor(), (b) products are non-negative,
     // (c) the factor succeeds (solver is correct).
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
@@ -947,9 +955,9 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     expect(result).toBe(0);
 
     // Post-factor: arrays exist with correct length.
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(4); // n+2 per ngspice
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(4);
-    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(4);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(4); // n+2 per ngspice
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(4);
+    expect(instr.markowitzProd.length).toBeGreaterThanOrEqual(4);
     // Markowitz product slots may contain pivot-search sentinels (-1) after
     // elimination completes. The array length and factor success are the
     // observable invariants; per-slot sign is not guaranteed post-factor.
@@ -960,6 +968,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // For a purely diagonal matrix every row/col has 0 off-diagonals.
     // Post-factor the counts remain 0 (no elimination updates needed for a diagonal).
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(2, 2), 3);
@@ -970,13 +979,13 @@ describe("SparseSolver Markowitz counts from finalize", () => {
 
     // Diagonal matrix: zero off-diagonal entries per row and column (1-based).
     for (let i = 1; i <= 3; i++) {
-      expect(solver.markowitzRow[i]).toBe(0);
-      expect(solver.markowitzCol[i]).toBe(0);
-      expect(solver.markowitzProd[i]).toBe(0);
+      expect(instr.markowitzRow[i]).toBe(0);
+      expect(instr.markowitzCol[i]).toBe(0);
+      expect(instr.markowitzProd[i]).toBe(0);
     }
     // All 3 rows are singletons (mProd=0)- singletons counter reflects this
     // (they are consumed during pivot selection, ending at 0 post-factor).
-    expect(solver.singletons).toBe(0);
+    expect(instr.singletons).toBe(0);
   });
 
   it("counts correctly for a dense 2x2 matrix", () => {
@@ -987,6 +996,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // (a) factor succeeds, (b) arrays exist and have non-negative values,
     // (c) singletons counter is non-negative integer.
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
@@ -997,15 +1007,15 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     expect(result).toBe(0);
 
     // Post-factor: arrays exist.
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3); // n+2
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(3); // n+2
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(3);
     // All entries non-negative.
     for (let i = 1; i <= 2; i++) {
-      expect(solver.markowitzRow[i]).toBeGreaterThanOrEqual(0);
-      expect(solver.markowitzCol[i]).toBeGreaterThanOrEqual(0);
-      expect(solver.markowitzProd[i]).toBeGreaterThanOrEqual(0);
+      expect(instr.markowitzRow[i]).toBeGreaterThanOrEqual(0);
+      expect(instr.markowitzCol[i]).toBeGreaterThanOrEqual(0);
+      expect(instr.markowitzProd[i]).toBeGreaterThanOrEqual(0);
     }
-    expect(solver.singletons).toBeGreaterThanOrEqual(0);
+    expect(instr.singletons).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -1056,6 +1066,7 @@ describe("SparseSolver pivot selection", () => {
     // factorisation succeeds (correct pivot selection) rather than by reading the
     // post-factor singleton count (which is always 0 after elimination).
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(1, 2), 1);
@@ -1070,7 +1081,7 @@ describe("SparseSolver pivot selection", () => {
     const result = solver.factor();
     expect(result).toBe(0);
     // singletons is 0 after full elimination (all singleton pivots consumed).
-    expect(solver.singletons).toBeGreaterThanOrEqual(0);
+    expect(instr.singletons).toBeGreaterThanOrEqual(0);
     // Verify correct solution as the real proof of correct pivot ordering.
     const x = new Float64Array(4);
     solver.solve(rhs, x);
@@ -1125,6 +1136,7 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
     // matrix succeeds (returns 0) and produces a correct solution, which is only
     // possible if Markowitz counts are tracked correctly throughout elimination.
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
@@ -1140,8 +1152,8 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
     expect(result).toBe(0);
 
     // Markowitz arrays are allocated after factor() and reflect end-of-elimination state.
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(4);
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(4);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(4);
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(4);
 
     // Verify correct solution- proof that Markowitz-driven pivot selection worked.
     const x = new Float64Array(4);
@@ -1156,6 +1168,7 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
 describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
   it("factorWithReorder populates Markowitz data after factoring", () => {
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
@@ -1170,9 +1183,9 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
     expect(result).toBe(0);
 
     // After factorWithReorder, Markowitz arrays should exist with proper length
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(3);
-    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(3);
+    expect(instr.markowitzProd.length).toBeGreaterThanOrEqual(3);
   });
 
   it("factorWithReorder produces correct solution on 3x3 tridiagonal", () => {
@@ -1331,6 +1344,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     // Its effect is verified indirectly: factor() on a 4x4 sparse matrix succeeds and
     // produces a correct solution, demonstrating that Markowitz tracking works end-to-end.
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(1, 2), 1);
@@ -1349,8 +1363,8 @@ describe("SparseSolver Markowitz linked structure", () => {
     expect(result).toBe(0);
 
     // Markowitz arrays are allocated and populated during factor().
-    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(5);
-    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(5);
+    expect(instr.markowitzRow.length).toBeGreaterThanOrEqual(5);
+    expect(instr.markowitzCol.length).toBeGreaterThanOrEqual(5);
 
     // Verify correct solution- proof that Markowitz tracking worked throughout elimination.
     const x = new Float64Array(5);

@@ -499,7 +499,9 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // (niiter.c:667) and SMPpreOrder (niiter.c:844). The unique window where
     // the assembled MNA holds post-load, pre-LU values- solver.preorder() may
     // exchange columns and solver.factor() overwrites _elVal[] with LU. Harness
-    // consumers register a hook that calls solver.getCSCNonZeros() here.
+    // consumers register a hook that reads the assembled matrix via the
+    // solver's instrumentation wrapper (createInstrumentation().getCSCNonZeros())
+    // here.
     // No-op when null; same optional-chain shape as the postIterationHook
     // gate below.
     ctx.preFactorHook?.(ctx);

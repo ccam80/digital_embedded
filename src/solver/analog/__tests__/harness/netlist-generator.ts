@@ -886,7 +886,7 @@ function emitPrimitive(
     // PULSE(0 vdd 0 0 0 ...) cannot achieve bit-exact parity because ngspice's
     // vsrcload.c:81-86 unconditionally substitutes CKTstep for any TR=0 / TF=0,
     // producing a finite ramp window the digiTS clock does not model. There is
-    // no per-test workaround that doesn't either pollute the breakpoint
+    // no per-test override that doesn't either pollute the breakpoint
     // sequence or force digiTS's clock to grow rise/fall semantics it
     // shouldn't have. For analog square-wave parity fixtures, use
     // AcVoltageSource with waveform="square" and explicit non-zero

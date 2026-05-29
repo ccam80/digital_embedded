@@ -22,7 +22,7 @@ function buildAndFactor(
 /** Count fill-in elements via the ngspice-mirrored `Matrix->Fillins` counter
  * exposed as `fillinCount` (spalloc.c:885 spFillinCount). */
 function countFillIns(solver: SparseSolver): number {
-  return solver.fillinCount;
+  return solver.createInstrumentation().fillinCount;
 }
 
 // ---------------------------------------------------------------------------

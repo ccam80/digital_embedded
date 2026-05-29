@@ -189,6 +189,7 @@ describe("SparseSolver expandable matrix (A1.8)", () => {
   // -------------------------------------------------------------------------
   it("case8: _getInsertionOrder returns pairs in allocElement encounter order", () => {
     const solver = new SparseSolver();
+    const instr = solver.createInstrumentation();
     solver._initStructure();
 
     // Allocate several elements; insertionOrder must track the calls in order.
@@ -197,7 +198,7 @@ describe("SparseSolver expandable matrix (A1.8)", () => {
     solver.allocElement(3, 2);
     solver.allocElement(1, 3);
 
-    const order = solver._getInsertionOrder();
+    const order = instr.getInsertionOrder();
     expect(order).toHaveLength(4);
     expect(order[0]).toEqual({ extRow: 1, extCol: 1 });
     expect(order[1]).toEqual({ extRow: 2, extCol: 3 });
@@ -208,14 +209,14 @@ describe("SparseSolver expandable matrix (A1.8)", () => {
     solver.allocElement(0, 1);
     solver.allocElement(1, 0);
     // Still 4 entries- ground calls skip _translate entirely.
-    expect(solver._getInsertionOrder()).toHaveLength(4);
+    expect(instr.getInsertionOrder()).toHaveLength(4);
 
     // _resetForAssembly does NOT reset insertionOrder.
     solver._resetForAssembly();
-    expect(solver._getInsertionOrder()).toHaveLength(4);
+    expect(instr.getInsertionOrder()).toHaveLength(4);
 
     // _initStructure() does reset insertionOrder.
     solver._initStructure();
-    expect(solver._getInsertionOrder()).toHaveLength(0);
+    expect(instr.getInsertionOrder()).toHaveLength(0);
   });
 });

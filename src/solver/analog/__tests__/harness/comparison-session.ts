@@ -870,6 +870,34 @@ export class ComparisonSession {
     // arrays are already defensive copies (sink owns them).
     const ourPoints: AcCapturePoint[] = [];
     this._engine.acAnalysis(params, {
+      // Pre-factor complex-matrix capture. The white-box read of the assembled
+      // Jacobian belongs to the harness, not production ac-analysis: walk the
+      // solver's instrumentation wrapper and build the external-coords CSC
+      // (sort by col asc then row asc; colPtr by prefix-sum), matching ngspice's
+      // pre-LU CSC layout in niiter.c.
+      captureAcMatrix: () => {
+        const solver = this._engine.solver;
+        if (!solver) return null;
+        const cells = solver.createInstrumentation().getComplexCSCNonZeros();
+        const N = this._engine.matrixSize;
+        const nnz = cells.length;
+        const colPtr = new Int32Array(N + 1);
+        const rowIdx = new Int32Array(nnz);
+        const valsRe = new Float64Array(nnz);
+        const valsIm = new Float64Array(nnz);
+        cells.sort((a, b) => (a.col !== b.col ? a.col - b.col : a.row - b.row));
+        let cursor = 0;
+        for (let c = 1; c <= N; c++) {
+          while (cursor < nnz && cells[cursor].col === c) {
+            rowIdx[cursor] = cells[cursor].row;
+            valsRe[cursor] = cells[cursor].valueRe;
+            valsIm[cursor] = cells[cursor].valueIm;
+            cursor++;
+          }
+          colPtr[c] = cursor;
+        }
+        return { nnz, colPtr, rowIdx, valsRe, valsIm };
+      },
       acSnapshotSink: (snap) => {
         ourPoints.push({
           freq: snap.freq,

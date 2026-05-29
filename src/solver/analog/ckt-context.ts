@@ -525,7 +525,8 @@ export class CKTCircuitContext {
    * `ni_instrument_cb` gate at niiter.c:704- fires AFTER cktLoad refreshes
    * stamps and BEFORE solver.preorder()/factor() overwrite the matrix with
    * LU values. The unique window where the assembled MNA holds post-load,
-   * pre-LU values; harness consumers read it via solver.getCSCNonZeros().
+   * pre-LU values; harness consumers read it via the solver's instrumentation
+   * wrapper (`solver.createInstrumentation().getCSCNonZeros()`).
    */
   preFactorHook: ((ctx: CKTCircuitContext) => void) | null;
   /** When true, checkAllConvergedDetailed is called instead of checkAllConverged. */

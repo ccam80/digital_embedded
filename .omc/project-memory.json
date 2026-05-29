@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "npm run build",
-    "testCommand": "npm test",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run src/solver/analog/__tests__/fixtures/build-fixture.test.ts 2>&1 | tail -20",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -296,14 +296,14 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 156,
-      "lastAccessed": 1779660166656,
+      "accessCount": 164,
+      "lastAccessed": 1780043978861,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 139,
-      "lastAccessed": 1779624802032,
+      "accessCount": 141,
+      "lastAccessed": 1780044992242,
       "type": "file"
     },
     {
@@ -397,6 +397,12 @@
       "type": "directory"
     },
     {
+      "path": "src/solver",
+      "accessCount": 10,
+      "lastAccessed": 1780028353535,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
       "accessCount": 9,
       "lastAccessed": 1778476011023,
@@ -406,12 +412,6 @@
       "path": "src/components/semiconductors/diode.ts",
       "accessCount": 9,
       "lastAccessed": 1778495589056,
-      "type": "directory"
-    },
-    {
-      "path": "src/solver",
-      "accessCount": 9,
-      "lastAccessed": 1779781822064,
       "type": "directory"
     },
     {

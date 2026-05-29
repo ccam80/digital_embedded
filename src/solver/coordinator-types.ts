@@ -306,7 +306,7 @@ export interface SimulationCoordinator {
 
   /**
    * Timing model active in this coordinator.
-   * - 'discrete': digital-only (legacy, not used in UI).
+   * - 'discrete': digital-only timing; not surfaced as a speed metric in the UI.
    * - 'continuous': analog or mixed-signal. Speed = sim-s/wall-s.
    * - 'mixed': both digital and analog backends active.
    */

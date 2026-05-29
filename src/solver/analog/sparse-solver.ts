@@ -42,6 +42,7 @@
  */
 
 import { getProjectConfig } from "../project-config.js";
+import { SparseSolverInstrumentation } from "./sparse-solver-instrumentation.js";
 
 // factor() returns the ngspice error code directly (one of spOKAY,
 // spSMALL_PIVOT, spZERO_DIAG, spSINGULAR, spNO_MEMORY, spPANIC). Mirrors
@@ -1190,65 +1191,56 @@ export class SparseSolver {
   }
 
   // =========================================================================
-  // @instrumentation- Stage 8 prefix-marker fallback (spec ss8.3 lines 965-967)
+  // Instrumentation factory- the single white-box access path
   // =========================================================================
   //
-  // Every method/getter in the block below is **test-only** harness
-  // instrumentation. Production code (anything outside `__tests__/` and the
-  // ngspice comparison harness) MUST NOT call these. The long-term home is
-  // `sparse-solver-instrumentation.ts`'s `SparseSolverInstrumentation`
-  // wrapper; the methods stay here as the prefix-marker fallback because
-  // the file split would require migrating 20+ test files in one stage.
+  // White-box reads of internal solver state (Markowitz bookkeeping, element
+  // counts, insertion order, pre-factor CSC exports) are reached only through
+  // `SparseSolverInstrumentation`, obtained via `createInstrumentation()`. None
+  // of that state is on the production ABI: the factory runs inside the class
+  // body, so its closure view reads the private fields directly with no cast.
   //
-  // ngspice has no analogue: `MatrixFrame.Markowitz*` etc. live inside the
-  // C struct; ngspice's harness reads them by including `spdefs.h` directly.
-  // Our wrapper plays the same role: a controlled side channel separate
-  // from the production ABI.
-  //
-  // Lint-rule note: a future ESLint rule may enforce that production code
-  // (i.e. files not under `__tests__/` or `sparse-solver-instrumentation.ts`
-  // and not the comparison harness) MUST NOT reference the symbols below
-  // by name. Until that lint rule lands, the `@instrumentation` JSDoc
-  // tag on each method is the marker.
-  // =========================================================================
-
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  get dimension(): number { return this._size; }
-
-  /** Test-only: return (extRow, extCol) pairs in the order Translate
-   *  first encountered them. Used by setup-stamp-order invariant tests
-   *  to verify TSTALLOC ordering against ngspice's *setup.c line
-   *  ordering. Not part of the runtime API. */
-  _getInsertionOrder(): ReadonlyArray<{ extRow: number; extCol: number }> {
-    return this._insertionOrder;
-  }
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  get markowitzRow(): Int32Array { return this._markowitzRow; }
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  get markowitzCol(): Int32Array { return this._markowitzCol; }
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  get markowitzProd(): Int32Array { return this._markowitzProd; }
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  get singletons(): number { return this._singletons; }
+  // ngspice has no analogue: `MatrixFrame.Markowitz*` etc. live inside the C
+  // struct; ngspice's harness reads them by including `spdefs.h` directly. The
+  // wrapper plays the same role: a controlled side channel separate from the
+  // production ABI.
 
   /**
-   * @instrumentation Test-only. Use SparseSolverInstrumentation in new code.
-   *
-   * Return assembled matrix as array of non-zero entries in original
-   * ordering. Used by the ngspice comparison harness. Post-factor reads
-   * report LU-overwritten data- there is no pre-factor snapshot path
-   * (B.30 deleted the in-class capture; the harness can checkpoint
-   * externally if needed).
+   * Build the test/harness instrumentation view over this solver. Consumed by
+   * the ngspice comparison harness and the solver unit tests; production code
+   * does not call this.
    */
-  getCSCNonZeros(): Array<{ row: number; col: number; value: number }> {
+  createInstrumentation(): SparseSolverInstrumentation {
+    return new SparseSolverInstrumentation(this, {
+      dimension: () => this._size,
+      markowitzRow: () => this._markowitzRow,
+      markowitzCol: () => this._markowitzCol,
+      markowitzProd: () => this._markowitzProd,
+      singletons: () => this._singletons,
+      elementCount: () => this._originals,
+      fillinCount: () => this._fillins,
+      totalElementCount: () => this._elements,
+      insertionOrder: () => this._insertionOrder,
+      cscNonZeros: () => this._computeCscNonZeros(),
+      complexCscNonZeros: () => this._computeComplexCscNonZeros(),
+    });
+  }
+
+  /**
+   * Assembled matrix as non-zero entries in external (MNA) ordering. Walks
+   * slots 1..n; slot 0 is the ground sentinel and never linked. Reports
+   * ngspice-external indices, not internal sparse-matrix indices, so the
+   * harness comparison aligns with ngspice's niiter.c:813,830 which exports
+   * ExtCol/ExtRow. Without this, two engines that walk elements in different
+   * orders during setup get different internal index assignments via
+   * _translate even though their external (MNA) layout is identical.
+   *
+   * Post-factor this reflects LU-overwritten data, not the pre-factor A
+   * matrix- the harness reads it at the post-load / pre-factor boundary.
+   */
+  private _computeCscNonZeros(): Array<{ row: number; col: number; value: number }> {
     const n = this._size;
     const result: Array<{ row: number; col: number; value: number }> = [];
-    // Walk slots 1..n; slot 0 is the ground sentinel and never linked.
-    // Report ngspice-external (MNA) indices, not internal sparse-matrix indices,
-    // so the harness comparison aligns with ngspice's niiter.c:813,830 which
-    // exports ExtCol/ExtRow. Without this, two engines that walk elements in
-    // different orders during setup get different internal index assignments
-    // via _translate, even though their external (MNA) layout is identical.
     const intToExtRow = this._intToExtRow;
     const intToExtCol = this._intToExtCol;
     for (let col = 1; col <= n; col++) {
@@ -1266,26 +1258,20 @@ export class SparseSolver {
   }
 
   /**
-   * @instrumentation Test-only. Use SparseSolverInstrumentation in new code.
+   * Complex sibling of `_computeCscNonZeros()`. Returns the assembled complex
+   * matrix as `{row, col, valueRe, valueIm}` per non-zero element in external
+   * (MNA) ordering. `_elVal` and `_elValImag` are parallel arrays per element
+   * (see the SparseSolver class commentary).
    *
-   * Complex sibling of `getCSCNonZeros()`. Returns the assembled complex
-   * matrix as `{row, col, valueRe, valueIm}` per non-zero element in
-   * external (MNA) ordering. Same walking pattern as the real export-
-   * `_elVal` and `_elValImag` are parallel arrays per element (see
-   * the SparseSolver class commentary).
-   *
-   * Must be called BEFORE `factor()`; once factorisation runs in complex
-   * mode the per-element `.Real`/`.Imag` fields hold L/U bytes, not the
-   * loaded admittance. Mirrors ngspice's pre-LU CSC capture in niiter.c
-   * (the AC bridge instrumentation block) which walks the matrix before
-   * SMPcLUfac overwrites the values.
-   *
-   * Real-mode use produces all-zero imag parts (a real matrix has
-   * `_elValImag` left untouched at 0 per the field comment), so the
-   * harness can use this uniformly for AC capture without checking
-   * `isComplex` first.
+   * Must be read BEFORE `factor()` in complex mode; once factorisation runs the
+   * per-element `.Real`/`.Imag` fields hold L/U bytes, not the loaded
+   * admittance. Mirrors ngspice's pre-LU CSC capture in niiter.c (the AC bridge
+   * instrumentation block) which walks the matrix before SMPcLUfac overwrites
+   * the values. Real-mode use produces all-zero imag parts (`_elValImag` stays
+   * 0 for a real matrix), so the harness uses this uniformly for AC capture
+   * without checking `isComplex` first.
    */
-  getComplexCSCNonZeros(): Array<{ row: number; col: number; valueRe: number; valueIm: number }> {
+  private _computeComplexCscNonZeros(): Array<{ row: number; col: number; valueRe: number; valueIm: number }> {
     const n = this._size;
     const result: Array<{ row: number; col: number; valueRe: number; valueIm: number }> = [];
     const intToExtRow = this._intToExtRow;
@@ -3365,33 +3351,6 @@ export class SparseSolver {
         if (diag >= 0) this._elVal[diag] += gmin;
       }
     }
-  }
-
-  // =========================================================================
-  // Accessors for tests that probe internal structure
-  // =========================================================================
-
-  /**
-   * Count of A-matrix entries (originals only, fillins excluded). Mirrors
-   * ngspice spOriginalCount (spalloc.c:879) which returns Matrix->Originals.
-   */
-  get elementCount(): number {
-    return this._originals;
-  }
-
-  /**
-   * Count of fill-in entries. Mirrors ngspice spFillinCount (spalloc.c:885).
-   */
-  get fillinCount(): number {
-    return this._fillins;
-  }
-
-  /**
-   * Total live element count (originals + fillins). Mirrors ngspice
-   * spElementCount (spalloc.c:859).
-   */
-  get totalElementCount(): number {
-    return this._elements;
   }
 
   /**

@@ -33,7 +33,7 @@ const DIVIDER_DTS = resolve(FIXTURES, "resistive-divider.dts");
 const RC_LOWPASS_AC_DTS = resolve(FIXTURES, "rc-lowpass-ac.dts");
 
 // This round-trip needs the INSTRUMENTED DLL (the one with ni_ac_register).
-// `NGSPICE_DLL_PATH` may be pointed at the legacy stale build, so resolve the
+// `NGSPICE_DLL_PATH` may be pointed at a stale build, so resolve the
 // in-tree default explicitly rather than via the env-driven DLL_PATH. Skip
 // cleanly if even that is absent.
 const DLL_PATH = DEFAULT_NGSPICE_DLL_PATH;

@@ -108,6 +108,19 @@ export interface AcCompiledCircuit {
  * this and get a default SparseSolver. The factory's solver is reset
  * (_initStructure) and switched to complex mode (setComplex) by the analysis.
  */
+/**
+ * Assembled complex Jacobian in external-coords CSC, captured pre-factor.
+ * `colPtr` has length matrixSize+1; column c's non-zeros span
+ * `[colPtr[c-1], colPtr[c])`.
+ */
+export interface AcPreFactorMatrix {
+  nnz: number;
+  colPtr: Int32Array;
+  rowIdx: Int32Array;
+  valsRe: Float64Array;
+  valsIm: Float64Array;
+}
+
 export interface AcAnalysisDeps {
   /** Factory returning the SparseSolver used for the frequency sweep. */
   solverFactory?: () => SparseSolver;
@@ -155,13 +168,7 @@ export interface AcAnalysisDeps {
     omega: number;
     matrixSize: number;
     /** Complex Jacobian in external-coords CSC, pre-factor. */
-    matrix: {
-      nnz: number;
-      colPtr: Int32Array;
-      rowIdx: Int32Array;
-      valsRe: Float64Array;
-      valsIm: Float64Array;
-    };
+    matrix: AcPreFactorMatrix;
     /** Complex RHS real part, pre-solve. */
     rhsRe: Float64Array;
     /** Complex RHS imag part, pre-solve. */
@@ -171,6 +178,15 @@ export interface AcAnalysisDeps {
     /** Post-solve complex solution imag part. */
     solIm: Float64Array;
   }) => void;
+  /**
+   * Harness-injected pre-factor complex-matrix capture. Invoked at the
+   * post-stampAc / pre-factor boundary for each frequency point when an
+   * `acSnapshotSink` is installed; returns the assembled complex Jacobian in
+   * external-coords CSC. The harness reads the solver's instrumentation wrapper
+   * and assembles the CSC, keeping that white-box access out of production.
+   * Production callers leave this undefined- no CSC walk, no allocation.
+   */
+  captureAcMatrix?: () => AcPreFactorMatrix | null;
 }
 
 /**
@@ -365,39 +381,14 @@ export class AcAnalysis {
       // after solve so all per-frequency data lands in one call. The CSC
       // build (sort by col asc, then row asc; colPtr by prefix-sum) matches
       // ngspice's pre-LU CSC layout in the C-side ni_ac_capture_matrix.
-      let snapshotMatrix: {
-        nnz: number;
-        colPtr: Int32Array;
-        rowIdx: Int32Array;
-        valsRe: Float64Array;
-        valsIm: Float64Array;
-      } | null = null;
+      // Pre-factor complex-matrix capture. The white-box read of the assembled
+      // Jacobian lives in the harness-injected `captureAcMatrix` closure (which
+      // walks the solver's instrumentation wrapper and builds the CSC), so this
+      // production path never touches solver internals. Window: post-stampAc,
+      // pre-factor- factor() overwrites `.Real`/`.Imag` with L/U.
+      let snapshotMatrix: AcPreFactorMatrix | null = null;
       if (this._deps.acSnapshotSink) {
-        const cells = solver.getComplexCSCNonZeros();
-        const nnz = cells.length;
-        // Standard CSC convention (matches ngspice's pre-LU CSC layout in
-        // niiter.c): `colPtr[c]` is the END of column c's cells (= start of
-        // column c+1); column c's non-zeros live at indices
-        // [colPtr[c-1], colPtr[c]). `colPtr[0]` is always 0. The matrix
-        // spans columns 1..N (N == compiled.matrixSize), so `colPtr` has
-        // length N+1 (indices 0..N) and `colPtr[N]` is the terminating
-        // `nnz` sentinel.
-        const colPtr = new Int32Array(N + 1);
-        const rowIdx = new Int32Array(nnz);
-        const valsRe = new Float64Array(nnz);
-        const valsIm = new Float64Array(nnz);
-        cells.sort((a, b) => a.col !== b.col ? a.col - b.col : a.row - b.row);
-        let cursor = 0;
-        for (let c = 1; c <= N; c++) {
-          while (cursor < nnz && cells[cursor].col === c) {
-            rowIdx[cursor] = cells[cursor].row;
-            valsRe[cursor] = cells[cursor].valueRe;
-            valsIm[cursor] = cells[cursor].valueIm;
-            cursor++;
-          }
-          colPtr[c] = cursor;
-        }
-        snapshotMatrix = { nnz, colPtr, rowIdx, valsRe, valsIm };
+        snapshotMatrix = this._deps.captureAcMatrix?.() ?? null;
       }
 
       // ngspice acan.c: the first AC point re-derives the pivot order in the

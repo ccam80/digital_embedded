@@ -4,6 +4,7 @@
  */
 
 import type { SparseSolver } from "../../sparse-solver.js";
+import type { PreFactorEntry } from "../../sparse-solver-instrumentation.js";
 import type { AnalogElement } from "../../element.js";
 import { isPoolBacked } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";
@@ -433,6 +434,9 @@ export function createIterationCaptureHook(
   const getStatePool: () => StatePool | null =
     typeof statePool === "function" ? statePool : () => statePool;
 
+  // Single white-box access path to the solver's pre-factor CSC export.
+  const instr = solver.createInstrumentation();
+
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
@@ -440,7 +444,7 @@ export function createIterationCaptureHook(
   // Mirrors ngspice's static ni_mxColPtr / ni_mxRowIdx / ni_mxVals / ni_preSolveRhs
   // (niiter.c:170-175, 166-167)- one snapshot per NR iteration, overwritten
   // each iteration before the post-iteration hook reads it.
-  let preFactorMatrix: ReturnType<SparseSolver["getCSCNonZeros"]> = [];
+  let preFactorMatrix: PreFactorEntry[] = [];
   let preSolveRhs: Float64Array = new Float64Array(0);
 
   // Build a map from raw el.label (used by newton-raphson convergenceFailedElements)
@@ -461,7 +465,7 @@ export function createIterationCaptureHook(
     // solver._elVal[] holds post-load, pre-LU MNA values. ngspice
     // niiter.c:704-842 (matrix) + niiter.c:915-924 (pre-solve RHS)- both
     // captures land in this window since factor() does not write RHS.
-    preFactorMatrix = solver.getCSCNonZeros();
+    preFactorMatrix = instr.getCSCNonZeros();
     if (preSolveRhs.length !== ctx.rhs.length) {
       preSolveRhs = new Float64Array(ctx.rhs.length);
     }
