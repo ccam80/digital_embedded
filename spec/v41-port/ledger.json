@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-29T23:48:29.463Z",
+    "generated": "2026-05-29T23:54:44.238Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 117,
+    "progressEntriesApplied": 119,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -13995,10 +13995,13 @@
         547
       ],
       "hunkHash": "fd00fa7e78c5af66",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/ccvs.ts CCVSAnalogElement.setup (branch makeCur + controlling-branch resolve + shorted/unknown-control fatal checks; ccvs.ts:139-162)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "ROUND-2 APPLIER RESPONSE to prior rejection (group ccvs/ccvsset.c::CCVSsetup left PENDING). Rejection: Tier2 (whole-method bijective construct match) failed because the shorted-source fatal guard `if(here->CCVSposNode == here->CCVSnegNode){ IFerrorf(ERR_FATAL,\"instance %s is a shorted CCVS\"); return(E_UNSUPP); }` (ccvsset.c:34-38) appears as a CONTEXT line inside this hunk (docLines 546-547) but had NO counterpart in CCVSAnalogElement.setup. FIX APPLIED: added `if (posNode === negNode) throw new Error(`instance ${this.label ?? \"ccvs\"} is a shorted CCVS`);` before branch allocation in ccvs.ts:setup() (now ccvs.ts:144-150), mirroring the sibling vcvs.ts:170-172 shorted-VCVS guard, citing ccvsset.c:34-38. The ERR_FATAL + return(E_UNSUPP) maps to a thrown Error (digiTS fatal stop); message text is v41 wording. The h001 +/- lines themselves remain loop-walk accessor renames (model->CCVSnextModel=>CCVSnextModel(model), model->CCVSinstances=>CCVSinstances(model), here->CCVSnextInstance=>CCVSnextInstance(here)) = engine-managed C walk, no per-element landing (zero-line image on those). Setup() is now bijective with the CCVSsetup loop body: shorted-guard -> idempotent makeCur branch -> findBranch controlling-branch resolve + unknown-control fatal -> 5 TSTALLOC. Did NOT resubmit the same edit; this is a new construct addition addressing the named divergence.",
+        "MATCH (verifier, round 2). Tier1: ccvs.md docLineRange[533-547] hunk1 +/- lines are loop-walk accessor renames only (model->CCVSnextModel=>CCVSnextModel(model); model->CCVSinstances=>CCVSinstances(model); here->CCVSnextInstance=>CCVSnextInstance(here)) — engine-managed C linked-list walk with no per-element TS landing, allowed §4, zero-line TS image correct. The shorted-guard at ccvsset.c:34-38 is a CONTEXT (unchanged) line in this hunk, so Tier1 itself is satisfied by the zero delta on the +/- lines; the guard is a Tier2 concern. Tier2: re-derived fresh from ref/ngspice/src/spicelib/devices/ccvs/ccvsset.c:18-66 (independent of rename-maps): (1) shorted guard CCVSposNode==CCVSnegNode -> ERR_FATAL\"instance %s is a shorted CCVS\"/return E_UNSUPP (34-38) <-> ccvs.ts:148-150 if(posNode===negNode) throw Error(`instance ${label} is a shorted CCVS`), posNode=pinNodes.get('out+')=CCVSposNode, negNode=CCVSnegNode, %s<-label, fatal+return<->throw — NOW PRESENT, the prior round-1 gap is closed; (2) if(CCVSbranch==0){CKTmkCur;CCVSbranch=tmp->number} (40-44) <-> ccvs.ts:153-156 if(branchIndex===-1) branchIndex=ctx.makeCur(label,'branch'); (3) CCVScontBranch=CKTfndBranch + if(==0){ERR_FATAL\"unknown controlling source\"/return E_BADPARM} (45-50) <-> ccvs.ts:164-169 findBranch + if(===0) throw 'unknown controlling source'; (4) five TSTALLOC (58-62) <-> five allocElement (173-177). The only extra digiTS construct is the _senseSourceLabel!=='' precondition (161-163) guarding the digiTS setParam wiring before findBranch — a guard on a digiTS-specific input, adds no matrix/branch construct, does not break bijectivity. Whole method bijective. v41 ccvsset.c:18-66."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14026,10 +14029,13 @@
         564
       ],
       "hunkHash": "cd32a3e888c23e34",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/ccvs.ts CCVSAnalogElement.setup TSTALLOC block (five solver.allocElement calls; ccvs.ts:165-169)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "ROUND-2 APPLIER RESPONSE (same functionGroup ccvs/ccvsset.c::CCVSsetup as #h001). This hunk's own +/- content is the pure ptr->Ptr capitalisation rename on the five TSTALLOC calls (CCVSposIbrptr->CCVSposIbrPtr, CCVSnegIbrptr->CCVSnegIbrPtr, CCVSibrNegptr->CCVSibrNegPtr, CCVSibrPosptr->CCVSibrPosPtr, CCVSibrContBrptr->CCVSibrContBrPtr); the (row,col) coordinate pairs and call order are byte-identical v26->v41. digiTS already has the five solver.allocElement(...) calls in identical order (ccvs.ts:165-169: posNode/ownBranch, negNode/ownBranch, ownBranch/negNode, ownBranch/posNode, ownBranch/contBranch) -> zero-line TS delta on this hunk. The group's Tier2 failure was the missing shorted-guard construct carried as a context line in #h001; that construct is now added by this round's edit (see #h001 note), so the whole-method bijective match for the group now holds. No edit to the TSTALLOC block itself was needed or made.",
+        "MATCH (verifier, round 2). Tier1: ccvs.md docLineRange[548-562] hunk2 +/- lines are the pure ptr->Ptr capitalisation rename on the five TSTALLOC calls — identifier rename, allowed §4. The (row,col) pairs and call order are byte-identical v26->v41 (verified against ref/ngspice/src/spicelib/devices/ccvs/ccvsset.c:58-62). digiTS has the five solver.allocElement calls in identical order at ccvs.ts:173-177: (posNode,ownBranch)<->TSTALLOC(CCVSposIbrPtr,CCVSposNode,CCVSbranch):58; (negNode,ownBranch)<->:59; (ownBranch,negNode)<->:60; (ownBranch,posNode)<->:61; (ownBranch,contBranch)<->:62 — zero-line TS image correct. Tier2 for the whole CCVSsetup group passes via the #h001 verifier note (shorted-guard now present; bijective). v41 ccvsset.c:58-62."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",

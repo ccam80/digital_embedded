@@ -141,6 +141,14 @@ export class CCVSAnalogElement extends ControlledSourceElement {
     const posNode = this.pinNodes.get("out+")!;  // CCVSposNode  (pinNodeIds[2])
     const negNode = this.pinNodes.get("out-")!;  // CCVSnegNode  (pinNodeIds[3])
 
+    // ccvsset.c:34-38 — CCVSposNode == CCVSnegNode → ERR_FATAL "instance %s is a
+    // shorted CCVS", then return(E_UNSUPP) so the degenerate instance never
+    // reaches branch allocation / TSTALLOC. The ERR_FATAL + early-return maps to
+    // a thrown Error (the digiTS fatal stop); the message text is the v41 wording.
+    if (posNode === negNode) {
+      throw new Error(`instance ${this.label ?? "ccvs"} is a shorted CCVS`);
+    }
+
     // Own branch row: ccvsset.c:40-43 (idempotent guard)
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label ?? "ccvs", "branch");
