@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-30T00:05:38.754Z",
+    "generated": "2026-05-30T00:17:24.758Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 122,
+    "progressEntriesApplied": 137,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -33632,10 +33632,12 @@
         99
       ],
       "hunkHash": "e67eb81b56cb7c0f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — ANALOG_SWITCH_PARAM_DEFS (defineModelParams: rOn/rOff/vThreshold/vHysteresis). The hunk realigns the pre-existing SWpTable (on/off/pos_node/neg_node/cont_p_node/cont_n_node/i/p) and SWmPTable (sw/vt/vh/ron/roff/gon/goff) IFparm rows; no row added/removed, no numeric id changed. Model-param rows map to the param defs; the SWpTable on/off IC rows have no digiTS param (see sw#recon/icParam). digiTS keys params by name string, so the IFparm integer-id table itself has no counterpart, but the hunk is reformat-only.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/sw.c:12-31 (SWpTable[]/SWmPTable[] IFparm tables), v41 hunk sw.md docLineRange 56-99 (hunkHash e67eb81b56cb7c0f). Correspondence re-derived independently (rename-maps NOT consulted): SW_MOD_RON/SW_MOD_ROFF/SW_MOD_VTH/SW_MOD_VHYS IFparm rows (ron/roff/vt/vh) <-> ANALOG_SWITCH_PARAM_DEFS.primary rOn/rOff/vThreshold/vHysteresis (analog-switch.ts:71-75), keyed by name; on/off IC rows (SW_IC_ON/SW_IC_OFF) <-> instance on/off params (83-84); cont_p_node/cont_n_node/i/p (SW_POS_CONT_NODE/SW_NEG_CONT_NODE/SW_CURRENT/SW_POWER) are IFparm getter-only rows with no behavioral digiTS param (node ids/current/power are read via getPinCurrents, not user params). TIER1 (zero-delta rule VERIFICATION.md sec4): analog-switch.ts zero working-tree delta vs HEAD. Every +/- line of the hunk is an allowed difference: the entire hunk is whitespace/column-alignment reformat of the SWpTable[]/SWmPTable[] rows (`IP(\"on\", SW_IC_ON,  IF_FLAG,...)` -> aligned-column `IP(\"on\", SW_IC_ON, IF_FLAG, ...)`); NO row added/removed, NO numeric id changed, NO IF_* type changed, verified row-for-row against fresh sw.c:12-31. The IFparm-table-to-named-param-def mapping has no per-row TS line, so a reformat of the C table produces a zero-line TS delta. PASS. TIER2 (bijective, fresh v41 read): the four behavioral model rows (ron/roff/vt/vh) map one-to-one onto the four primary param defs; gon/goff are derived-conductance getter rows (digiTS derives 1/rOn,1/rOff in load(), no separate param); sw is the model-flag row (no value). No behavioral row unmapped. FILE-SCOPE: git diff --name-only shows no analog-switch.ts working-tree change (committed at recon) and no stray source file; rename-maps/sw.md untracked. Not a recon/device-completion -> sec1a harness gate N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33663,10 +33665,12 @@
         113
       ],
       "hunkHash": "0a5b39906a4aa958",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — terminal layout is buildSPSTPinDeclarations / buildSPDTPinDeclarations; SWnSize/SWpTSize/SWmPTSize/SWiSize/SWmSize have no digiTS counterpart (sizes are derived from the schema/param-def objects). The hunk only converts the SWnames[] terminal-name array realignment and the int size-global tab→space; reformat-only, no behavioral content.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/sw.c:33-44 (SWnames[] terminal-name array + SWnSize/SWpTSize/SWmPTSize/SWiSize/SWmSize size globals), v41 hunk sw.md docLineRange 100-113 (hunkHash 0a5b39906a4aa958). Correspondence re-derived independently (rename-maps NOT consulted): SWnames[] {S+,S-,SC+,SC-} <-> buildSPSTPinDeclarations in/out/ctrl (analog-switch.ts:652-682) / buildSPDTPinDeclarations (684-723); SWnSize/SWpTSize/SWmPTSize/SWiSize/SWmSize (NUMELEMS/sizeof) have no digiTS counterpart (sizes derived from the schema/param-def objects at runtime). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is a tab->space whitespace reformat: the SWnames[] string-array body realignment and the five `int\tSW*Size`->`int SW*Size` size-global declarations; NO terminal name changed, NO size expression changed, verified against fresh sw.c:33-44. The C terminal-name array / sizeof globals have no per-line TS counterpart -> zero-line TS delta. PASS. TIER2 (bijective): terminal-name array <-> pin declarations; the five size globals are C-runtime sizing with no behavioral content (digiTS derives pin count and state size from the schema). No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked. Not a recon/device-completion -> sec1a harness gate N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33694,10 +33698,12 @@
         126
       ],
       "hunkHash": "e9a3e1a9f33f98d7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — NEW stampAc method on AnalogSwitchSPSTElement and AnalogSwitchSPDTElement (and the helper that reads CKTstate0[SWswitchstate] and stamps g_now into the four ±conductance cells). Absent today; reconstructed under sw#recon/acLoad, onto which this rename/state-read hunk then applies.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/sw/swacload.c:1-11 (file-header region), v41 hunk sw.md docLineRange 118-126 (hunkHash e9a3e1a9f33f98d7). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. The hunk removes only the file-header `/*\\n */` source comment block (2 `-` lines, 0 `+`); a C source-comment removal is an allowed difference (sec4) with no TS counterpart. PASS. This hunk has no behavioral content of its own; the SWacLoad body is hunk #h002 (same functionGroup), Tier2 verified there. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33725,10 +33731,12 @@
         172
       ],
       "hunkHash": "7d22e73dfed57fb4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — file-header comment removal; lands as part of the sw#recon/acLoad SWacLoad port (no behavioral content of its own).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swacload.c:13-37 (SWacLoad body), v41 hunk sw.md docLineRange 127-172 (hunkHash 7d22e73dfed57fb4). Correspondence re-derived independently (rename-maps NOT consulted): SWswitchstate (=SWstate+0, swdefs.h) <-> SLOT_STATE=0; SWonConduct/SWoffConduct <-> 1/rOnNow : 1/rOffNow; SWposPosPtr/SWposNegPtr/SWnegPosPtr/SWnegNegPtr <-> the four setup() handles _hPP/_hPN/_hNP/_hNN (SPST) and _hNO_*/_hNC_* (SPDT). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) the prototype-comment block + `loop the current values...` comments removed (C comments); (b) `(SWmodel *)inModel`->`(SWmodel *) inModel` space; (c) the model/instance walk `for(;model!=NULL;model=model->SWnextModel){for(here=model->SWinstances;...)}`->`for(;model;model=SWnextModel(model)) for(here=SWinstances(model);...)` is C linked-list accessor renames + iteration plumbing with no digiTS counterpart (per-element invocation); (d) `current_state=(int)*(ckt->CKTstate0+here->SWstate)`->`(int) ckt->CKTstate0[here->SWswitchstate]` is pointer-arith->index + SWstate->SWswitchstate macro rename; (e) `g_now=current_state?(model->SWonConduct):(model->SWoffConduct)`->ternary paren removal; (f) four `*(here->SWposPosptr)+=g_now`->`*(here->SWposPosPtr)+=g_now` ptr->Ptr renames; (g) `return(OK)`->`return OK`. No +/- line changes arithmetic, sign pattern, cell order, or control flow. PASS. TIER2 (bijective, fresh v41 read): SWacLoad body (swacload.c:26-33) maps construct-for-construct onto stampAc SPST (analog-switch.ts:333-344) and SPDT (538-556): current_state=(int)CKTstate0[SWswitchstate] <-> (states[0][base+SLOT_STATE])|0 (the |0 reproduces the (int) truncation); g_now=current_state?SWonConduct:SWoffConduct <-> current_state?1/rOnNow:1/rOffNow (truthiness, any non-zero state -> on, exactly the C ternary -- not the REALLY_ON/HYST_ON DC test); four ±g_now stamps at posPos(+)/posNeg(-)/negPos(-)/negNeg(+) <-> stampElement hPP(+)/hPN(-)/hNP(-)/hNN(+), same sign pattern and order; purely resistive (no imaginary part), matching swacload.c. SPDT runs the SWacLoad body once per complementary path (base+0, base+2), each with its own state slot and handle quad -- the SPDT is a digiTS two-instance extension so SWacLoad runs per instance, mirroring ngspice's per-instance loop. The C model/instance walk loops have no digiTS counterpart (per-element). No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33818,10 +33826,12 @@
         386
       ],
       "hunkHash": "5472020f7d8e7c9f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — SW_SCHEMA / SLOT_STATE(=0) / SLOT_V_CTRL(=1) (analog-switch.ts:86-97) plus AnalogSwitch*Element instance fields (_nIn/_nOut/_nCtrl, the matrix handles). The new SWswitchstate(=SWstate+0) / SWctrlvalue(=SWstate+1) state-offset macros map directly to SLOT_STATE/SLOT_V_CTRL. The GENinstance-embedding, const node-id qualifiers, and ptr→Ptr matrix-pointer renames are C struct mechanics with no behavioral content (digiTS holds matrix cells as handle ints, not double*).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swdefs.h (struct sSWinstance + SWswitchstate/SWctrlvalue macros), v41 hunk sw.md docLineRange 291-386 (hunkHash 5472020f7d8e7c9f). Correspondence re-derived independently (rename-maps NOT consulted): SWstate (start of element state slice) <-> _stateBase; SWswitchstate(=SWstate+0) <-> SLOT_STATE=0; SWctrlvalue(=SWstate+1) <-> SLOT_V_CTRL=1 (analog-switch.ts:99-100); SWposPosPtr/SWnegPosPtr/SWposNegPtr/SWnegNegPtr <-> _hPP/_hNP/_hPN/_hNN; SWposNode/SWnegNode/SWposCntrlNode/SWnegCntrlNode <-> _nIn/_nOut/_nCtrl (negCntrl=ground, single-ended); SWzero_stateGiven <-> _zeroStateGiven; SWcond <-> the loaded g_now. TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) the GENinstance struct-embedding refactor -- `struct sSWmodel *SWmodPtr`/`struct sSWinstance *SWnextInstance`/`IFuid SWname`/`int SWstate` replaced by `struct GENinstance gen;` + the `#define SWmodPtr(inst)...`/`SWnextInstance(inst)`/`SWname gen.GENname`/`SWstate gen.GENstate` accessor macros -- C struct-layout/iteration plumbing with no digiTS counterpart; (b) `int SWposNode`->`const int SWposNode` (x4) C const-qualifier-only; (c) `SWposPosptr`->`SWposPosPtr` (x4) ptr->Ptr capitalisation renames; (d) `SW_NUM_STATES 2   `->`SW_NUM_STATES 2` whitespace; (e) NEW `#define SWswitchstate SWstate+0` / `#define SWctrlvalue SWstate+1` -- C macro definitions that map to the SLOT_STATE=0/SLOT_V_CTRL=1 constants (analog-switch.ts:99-100), no new statement; (f) `#else /* NONOISE */`->`#else`, `#endif /* NONOISE */`->`#endif`, `} SWinstance ;`->`} SWinstance;`, the leading-indent comment dedent -- comment/whitespace. The SWnVar noise field (NSTATVARS) is NO-COUNTERPART (noise unimplemented). No +/- line is a new behavioral statement, branch, or arithmetic change -> zero-line TS delta is line-isomorphic. PASS. TIER2 (bijective, fresh v41 read): surviving instance state maps construct-for-construct -- four matrix-element pointers <-> four TSTALLOC handles; four node indices <-> _nIn/_nOut/_nCtrl(+ground); SWzero_stateGiven <-> _zeroStateGiven; SWswitchstate/SWctrlvalue macros <-> SLOT_STATE/SLOT_V_CTRL; SWcond <-> g_now. GENinstance/IFuid/SWnVar are C-runtime/noise plumbing with no digiTS counterpart (sec4-allowed). No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33849,10 +33859,12 @@
         439
       ],
       "hunkHash": "63cb0facf7223ebc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — model fields map to ANALOG_SWITCH_PARAM_DEFS (SWonResistance/SWoffResistance/SWvThreshold/SWvHysteresis) and the derived SWonConduct/SWoffConduct (computed 1/Ron, 1/Roff in load()). The #define→enum reformat of the device-param ids (SW_IC_ON..SW_POWER) and model-param ids (SW_MOD_SW..SW_MOD_GOFF) is byte-identical numeric values; digiTS keys params by name, so the integer ids have no counterpart, but the hunk is reformat + GENmodel-embedding C mechanics.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swdefs.h (struct sSWmodel + device-parameter enum + model-parameter enum), v41 hunk sw.md docLineRange 387-439 (hunkHash 63cb0facf7223ebc). Correspondence re-derived independently (rename-maps NOT consulted): SWonResistance/SWoffResistance/SWvThreshold/SWvHysteresis <-> ANALOG_SWITCH_PARAM_DEFS rOn/rOff/vThreshold/vHysteresis (analog-switch.ts:71-75); SWonConduct/SWoffConduct <-> derived 1/rOnNow,1/rOffNow in load() (analog-switch.ts:317-318); SW_IC_ON/SW_IC_OFF device-param ids <-> on/off instance params (83-84). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) GENmodel struct-embedding -- `int SWmodType`/`struct sSWmodel *SWnextModel`/`SWinstance *SWinstances`/`IFuid SWmodName` + the `/* --- end of generic struct GENmodel --- */` comment replaced by `struct GENmodel gen;` + `#define SWmodType gen.GENmodType`/`SWnextModel(inst)`/`SWinstances(inst)`/`SWmodName gen.GENmodName` accessor macros -- C model linked-list plumbing, no digiTS counterpart; (b) the device-param list `#define SW_IC_ON 1 ... #define SW_POWER 8`->`enum { SW_IC_ON=1, SW_IC_OFF, ..., SW_POWER, }` -- #define-vs-enum surface form; the enum auto-increment reproduces IDENTICAL values (SW_IC_ON=1..SW_POWER=8), verified by hand against the fresh read; (c) the model-param list `#define SW_MOD_SW 101 ... #define SW_MOD_GOFF 107`->`enum { SW_MOD_SW=101, ..., SW_MOD_GOFF, }` -- same #define-vs-enum, identical values 101..107; (d) the four `unsigned SW*Given : 1` bitfield comment-column realignment -- whitespace. NO value changed, NO new param id. PASS. TIER2 (bijective, fresh v41 read): the SWmodel behavioral fields (SWonResistance/SWoffResistance/SWvThreshold/SWvHysteresis) map to the four primary param defs; SWonConduct/SWoffConduct are derived at stamp time (1/Ron,1/Roff); the *Given flags + GENmodel embedding are C-runtime plumbing (digiTS keys by name, no per-model struct). SW_MOD_GON/GOFF are getter-only conductance ids. No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -33880,10 +33892,12 @@
         445
       ],
       "hunkHash": "a92feff688154e51",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — trailing `#endif /*SW*/`→`#endif` comment cleanup at the swdefs.h tail. No digiTS construct; C include-guard mechanics, no behavioral content.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/sw/swdefs.h tail (include-guard), v41 hunk sw.md docLineRange 440-445 (hunkHash a92feff688154e51). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. The hunk's single -/+ pair is `#endif /*SW*/`->`#endif` -- a C include-guard trailing-comment cleanup, an allowed difference (sec4 comment wording) with no digiTS counterpart (C preprocessor mechanics). PASS. No behavioral content. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34097,12 +34111,19 @@
         960
       ],
       "hunkHash": "7de382dcef68836c",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/components/active/analog-switch.ts — swLoadHandles (analog-switch.ts:116-237) called from AnalogSwitchSPSTElement.load (288-302) and AnalogSwitchSPDTElement.load (403-432). The v41 hunk applies as accessor renames (model->SWinstances → SWinstances(model)), SWstate→SWswitchstate/SWctrlvalue macro substitution, ptr→Ptr matrix-pointer renames, and brace/whitespace reflow over the already-ported mode-dispatched state machine + state write-back + four-cell conductance stamp.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "id": "ESC-012",
+        "raisedBy": "applier",
+        "trigger": "pre-image failure (case b, present-but-differs)",
+        "ngspice": "src/spicelib/devices/sw/swload.c:90 (MODEINITFLOAT negative-hysteresis bad-previous-state default: else internalerror(\"bad value for previous state in swload\")); v41 diff sw.md docLineRange 801-960, the -/+ pair at diff lines 828-829/854-855 (line changed whitespace-only v26->v41, so it is a - line of the hunk)",
+        "digiTS": "src/components/active/analog-switch.ts:200 - swLoadHandles MODEINITFLOAT branch final else { current_state = HYST_OFF; } (analog-switch.ts:193-201)",
+        "summary": "SWload MODEINITFLOAT bad-previous-state branch: pre-existing port substituted current_state = HYST_OFF for ngspice internalerror(...). Every other - line of #h002 is case (a) (paren/whitespace/CKTstates[0]+SWstate->CKTstate0[SWswitchstate]/ptr->Ptr/return(OK)->return OK), so the v26->v41 delta there is a zero-line TS delta; this single line is case (b). Per TASK.md sec6 a case-(b) - line escalates the whole sw/swload.c::SWload group (#h001+#h002). Divergence pre-dates v26 baseline (it is in the pre-existing SWload port, not in the acLoad/trunc/icParam recons, all APPLIED). Decision needed: directive to make the bad-previous-state default match ngspice internalerror(...) (restoring case-(a) pre-image so #h002 applies as a clean zero-line cosmetic delta), or a sequenced v26-baseline restore item ahead of #h002. See ESCALATIONS.md ESC-012."
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -34221,10 +34242,12 @@
         1090
       ],
       "hunkHash": "e988bf7597ac9b7b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — file-header comment removal in swmparam.c; lands with the SWmParam body port. No behavioral content of its own.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/sw/swmparam.c:1-11 (file-header region), v41 hunk sw.md docLineRange 1082-1090 (hunkHash e988bf7597ac9b7b). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. The hunk removes only the file-header `/*\\n */` source comment (2 `-` lines, 0 `+`); a C source-comment removal is allowed (sec4) with no TS counterpart. PASS. No behavioral content of its own; the SWmParam body is hunk #h002 (same functionGroup), Tier2 verified there. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34252,10 +34275,12 @@
         1158
       ],
       "hunkHash": "312fe69efb128267",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — AnalogSwitch*Element constructor (reads rOn/rOff/vThreshold/vHysteresis via props.getModelParam, analog-switch.ts:271-274, 380-383) + setParam (319-324, 451-456) + the 1/Ron, 1/Roff conductance derivation in load() (294-295, 406-407). The v41 hunk is the SWmParam switch-body reformat (RON/ROFF/VTH/VHYS setters) + the 1.0/(value->rValue) → 1.0 / value->rValue spacing.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swmparam.c:13-50 (SWmParam body), v41 hunk sw.md docLineRange 1091-1158 (hunkHash 312fe69efb128267). Correspondence re-derived independently (rename-maps NOT consulted): SW_MOD_RON sets SWonResistance + SWonConduct=1/R <-> rOn param (analog-switch.ts:288) + load() 1/rOnNow (312/317); SW_MOD_ROFF <-> rOff + 1/rOffNow; SW_MOD_VTH <-> vThreshold (290); SW_MOD_VHYS <-> vHysteresis (291). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) `(SWmodel *)inModel`->`(SWmodel *) inModel` space; (b) the switch-body dedent (`switch(param){ case ...:`->`switch (param) { case ...:`) brace/indent reformat; (c) `model->SWonConduct = 1.0/(value->rValue)`->`1.0 / value->rValue` paren removal + spacing (NOT a reassociation -- 1.0/(x) and 1.0/x are the same operation, single division); (d) `return(OK)`/`return(E_BADPARM)`->`return OK`/`return E_BADPARM`; (e) the commented-out `//model->SWvHysteresis=(value<0)?-value:value` reindent (a comment). No +/- line changes arithmetic operands/order, the R->G reciprocal, or control flow. The SWmParam model-param-setter is C plumbing; digiTS stores rOn/rOff/vThreshold/vHysteresis by name (ctor/setParam) and derives 1/Ron,1/Roff at stamp time -- the setter has no separable TS line, so the reformat is a zero-line TS delta. PASS. TIER2 (bijective, fresh v41 read): the RON/ROFF cases set resistance + conductance=1/R + Given flag <-> rOn/rOff params + the 1/rOnNow,1/rOffNow derivation in load() (recon-established); VTH/VHYS set threshold/hysteresis + Given <-> vThreshold/vHysteresis params; SW_MOD_SW is the model-flag no-op (digiTS has no model-flag param, no behavior). The *Given flags are C default-fill plumbing handled by defineModelParams defaults. No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34345,10 +34370,12 @@
         1428
       ],
       "hunkHash": "428b52a788d9c96f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — the on/off IC instance keyword that sets the zeroStateGiven flag. The flag and its MODEINITFIX/JCT branch are already implemented in swLoadHandles (param `zeroStateGiven`, branch at analog-switch.ts:149-163), but every call site hardcodes false (298,414,428) and there is no on/off instance parameter wired into ANALOG_SWITCH_PARAM_DEFS / ANALOG_SWITCH_ATTRIBUTE_MAPPINGS. Reconstructed under sw#recon/icParam (add the on/off boolean instance param + thread it to the load call), onto which this SWparam IC-setter hunk then applies.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swparam.c:13-34 (SWparam body), v41 hunk sw.md docLineRange 1387-1428 (hunkHash 428b52a788d9c96f). Correspondence re-derived independently (rename-maps NOT consulted): SW_IC_ON: if(value->iValue) SWzero_stateGiven=TRUE <-> setParam 'on' case `if(value) this._zeroStateGiven=true` (analog-switch.ts:410) + ctor (296); SW_IC_OFF: if(value->iValue) SWzero_stateGiven=FALSE <-> setParam 'off' (412) + ctor (297). SWzero_stateGiven <-> _zeroStateGiven. TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) `/*ARGSUSED*/` comment removed; (b) `(SWinstance *)inst`->`(SWinstance *) inst` space; (c) the switch-body dedent + brace removal `case SW_IC_ON: if(value->iValue){ here->SWzero_stateGiven=TRUE; } break;`->`case SW_IC_ON: if (value->iValue) here->SWzero_stateGiven=TRUE; break;` -- the `if(value->iValue)` guard is PRESERVED on both keywords (a zero value is a no-op), exactly mirrored by the TS `if(value)` guard; (d) `return(OK)`/`return(E_BADPARM)`->no-paren. No +/- line changes the guard, the TRUE/FALSE assignment, or control flow. The IC-setter behavior was reconstructed under sw#recon/icParam (APPLIED); this cosmetic hunk applies onto it as a zero-line TS delta. PASS. TIER2 (bijective, fresh v41 read): SW_IC_ON guarded-TRUE / SW_IC_OFF guarded-FALSE map construct-for-construct onto the setParam on/off cases (hot-load) AND the ctor on-then-off apply order (296-297, so a netlisted off wins over on, matching keyword parse order). The default E_BADPARM is C dispatch plumbing. No behavioral construct unmapped. (Note: swparam.c#h001 is NO-COUNTERPART/frozen, not in this verdict; only #h002 assigned.) FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34438,10 +34465,12 @@
         1505
       ],
       "hunkHash": "4d37cacb4e9f1829",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — AnalogSwitchSPSTElement.setup (analog-switch.ts:277-286) and AnalogSwitchSPDTElement.setup (386-401): ctx.allocStates(stateSize) for the state slots (SWstate=*states, *states+=SW_NUM_STATES) and the four ctx.solver.allocElement calls in the TSTALLOC order (SWposPos/SWposNeg/SWnegPos/SWnegNeg, documented swsetup.c:59-62). The model default-value processing (vThreshold/vHysteresis default, SW_ON_CONDUCTANCE, off-conductance) maps to defineModelParams defaults. The v41 hunk lifts the TSTALLOC macro to file scope, applies accessor renames and ptr→Ptr renames over the existing setup body.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/sw/swsetup.c:1-11 (file-header region), v41 hunk sw.md docLineRange 1497-1505 (hunkHash 4d37cacb4e9f1829). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. The hunk removes only the file-header `/*\\n */` source comment (2 `-` lines, 0 `+`); a C source-comment removal is allowed (sec4) with no TS counterpart. PASS. No behavioral content of its own; the SWsetup body is hunk #h002 (same functionGroup), Tier2 verified there. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34469,10 +34498,12 @@
         1583
       ],
       "hunkHash": "4b1fd91c3fddfd74",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — file-header comment removal in swsetup.c; lands with the SWsetup body port. No behavioral content of its own.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swsetup.c:13-58 (SWsetup body incl. file-scope TSTALLOC macro + 4 TSTALLOC calls), v41 hunk sw.md docLineRange 1506-1583 (hunkHash 4b1fd91c3fddfd74). Correspondence re-derived independently (rename-maps NOT consulted): `here->SWstate=*states; *states+=SW_NUM_STATES` <-> this._stateBase=ctx.allocStates(this.stateSize) (analog-switch.ts:302); TSTALLOC(SWposPosPtr,SWposNode,SWposNode) <-> ctx.solver.allocElement(_nIn,_nIn) (305), TSTALLOC(SWposNegPtr,SWposNode,SWnegNode) <-> allocElement(_nIn,_nOut) (306), TSTALLOC(SWnegPosPtr,SWnegNode,SWposNode) <-> allocElement(_nOut,_nIn) (307), TSTALLOC(SWnegNegPtr,SWnegNode,SWnegNode) <-> allocElement(_nOut,_nOut) (308); model default-value processing (SWvThreshold=0/SWvHysteresis=0/SWonConduct=SW_ON_CONDUCTANCE/SWoffConduct=SW_OFF_CONDUCTANCE) <-> defineModelParams defaults (analog-switch.ts:71-75 rOn=1/rOff=1e9/vThreshold/vHysteresis). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) the model/instance walk accessor renames (model->SWnextModel->SWnextModel(model), model->SWinstances/here->SWnextInstance->SWinstances(model)/SWnextInstance(here)) -- C iteration plumbing, no TS counterpart; (b) the default-value `if(!model->SWthreshGiven){X;}`->`if(!model->SWthreshGiven) X;` brace removal + `1.0/model->SWonConduct`->`1.0 / model->SWonConduct` spacing; (c) the TSTALLOC macro HOISTED from inside the instance loop to file scope (swsetup.c:13-17) -- the macro is C preprocessor mechanics with no TS counterpart, the hoist changes only where the macro is textually defined, not the four expanded allocElement calls; (d) the four `TSTALLOC(SWposPosptr,...)`->`TSTALLOC(SWposPosPtr,...)` ptr->Ptr renames on the first macro arg; (e) `(SWmodel *)inModel`->space, comment dedent, `return(OK)`->`return OK`. CRITICAL: the four TSTALLOC node-coordinate pairs (posNode,posNode)/(posNode,negNode)/(negNode,posNode)/(negNode,negNode) and their ORDER are byte-identical v26->v41 (verified against fresh swsetup.c:50-53), matching the four allocElement calls' coordinate pairs and order line-for-line -- element-pool order structurally identical (CLAUDE.md TSTALLOC-sequence parity). No alloc added/removed/reordered. PASS. TIER2 (bijective, fresh v41 read): state-slot reservation (allocStates) <-> SWstate=*states/*states+=SW_NUM_STATES; four allocElement <-> four TSTALLOC, same coordinates same order; model default fill <-> param-def defaults. The walk loops + TSTALLOC macro are C plumbing (per-element setup() + handle abstraction). No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34500,10 +34531,12 @@
         1596
       ],
       "hunkHash": "3be5790663557d5e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — NEW getLteTimestep method on AnalogSwitchSPSTElement / AnalogSwitchSPDTElement (the AnalogElement.getLteTimestep hook, element.ts:110-116). Implements the SWtrunc timestep-limiter: read CKTstate0[SWctrlvalue]/CKTstate1[SWctrlvalue], compare against SWvThreshold ± SWvHysteresis with sign-of-change gate, shrink *timeStep by maxChange/lastChange · CKTdeltaOld[0]. Absent today; reconstructed under sw#recon/trunc, onto which this hunk then applies.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/sw/swtrunc.c:1-11 (file-header region), v41 hunk sw.md docLineRange 1588-1596 (hunkHash 3be5790663557d5e). TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. The hunk removes only the file-header `/*\\n */` source comment (2 `-` lines, 0 `+`); a C source-comment removal is allowed (sec4) with no TS counterpart. PASS. No behavioral content of its own; the SWtrunc body is hunk #h002 (same functionGroup), Tier2 verified there. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34531,10 +34564,12 @@
         1661
       ],
       "hunkHash": "17187ee8e59000be",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — file-header comment removal in swtrunc.c; lands with the SWtrunc reconstruction (sw#recon/trunc). No behavioral content of its own.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/sw/swtrunc.c:13-50 (SWtrunc body), v41 hunk sw.md docLineRange 1597-1661 (hunkHash 17187ee8e59000be). Correspondence re-derived independently (rename-maps NOT consulted): SWctrlvalue(=SWstate+1) <-> SLOT_V_CTRL=1; SWswitchstate(=SWstate+0) <-> SLOT_STATE=0; SWvThreshold/SWvHysteresis <-> _vThreshold/_vHysteresis; CKTdeltaOld[0] <-> deltaOld[0]; CKTstate0/CKTstate1 <-> states[0]/states[1]. TIER1 (zero-delta rule sec4): analog-switch.ts zero delta vs HEAD. Every +/- line is an allowed difference: (a) `(SWmodel*)inModel`->`(SWmodel *) inModel` space; (b) the model/instance walk accessor renames (model->SWnextModel->SWnextModel(model) etc.) -- C iteration plumbing; (c) `*(ckt->CKTstate0+(here->SWstate+1))`->`ckt->CKTstate0[here->SWctrlvalue]` pointer-arith->index + SWstate+1->SWctrlvalue macro rename; `*(ckt->CKTstate0+(here->SWstate))`->`ckt->CKTstate0[here->SWswitchstate]` likewise; (d) the `if((cond)){X;}`->`if (cond) X;` brace removal and the `maxChange=(ref - X)*0.75+0.05` line-wrap reflow (the expression operands/operators/grouping are byte-identical: (ref-ctrl)*0.75+0.05 and (ref-ctrl)*0.75-0.05 verified against fresh swtrunc.c:29-31/39-41). No +/- line reorders operands, refactors a subexpression, or changes control flow. PASS. TIER2 (bijective, fresh v41 read): getLteTimestep SPST (analog-switch.ts:358-386) and _truncPath SPDT (581-609) map construct-for-construct onto SWtrunc body: lastChange=CKTstate0[SWctrlvalue]-CKTstate1[SWctrlvalue] (swtrunc.c:23-25) <-> ctrl0-ctrl1 (363/587); if(CKTstate0[SWswitchstate]==0) off-branch (swtrunc.c:26) <-> s0[base+SLOT_STATE]===0 (371/594); off ref=vTh+vHyst (27)<->372/595, if(ctrl0<ref && lastChange>0)(28)<->373/596, maxChange=(ref-ctrl0)*0.75+0.05 (29-31)<->374/597, maxStep=maxChange/lastChange*CKTdeltaOld[0] (32)<->375/598; on ref=vTh-vHyst (37)<->379/602, if(ctrl0>ref && lastChange<0)(38)<->380/603, maxChange=(ref-ctrl0)*0.75-0.05 (39-41)<->381/605 -- operand-for-operand, sign-for-sign. The `if(*timeStep>maxStep) *timeStep=maxStep` running-min across instances (swtrunc.c:33-34/43-44) <-> the digiTS controller taking min over per-element returns (Infinity=no constraint, element.ts hook); SPDT folds both paths via Math.min(noStep,ncStep) (573), mirroring SWtrunc's loop-over-instances MIN. No behavioral construct unmapped. FILE-SCOPE: no analog-switch.ts working-tree change, no stray source file; rename-maps/sw.md untracked."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
