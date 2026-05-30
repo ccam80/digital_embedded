@@ -46,7 +46,7 @@ import {
 } from "../../solver/analog/state-schema.js";
 import {
   MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
-  MODETRAN, MODEAC, MODETRANOP, MODEUIC,
+  MODETRAN, MODEAC, MODETRANOP, MODEUIC, MODEDCTRANCURVE,
 } from "../../solver/analog/ckt-mode.js";
 
 import {
@@ -222,7 +222,10 @@ export interface JfetTempParams {
  * Port of `jfettemp.c::JFETtemp`. Instance operating temperature is taken
  * from `p.TEMP` (maps to ngspice JFETtemp, configurable per device).
  */
-export function computeJfetTempParams(p: JfetParams): JfetTempParams {
+export function computeJfetTempParams(
+  p: JfetParams,
+  given: { xtiGiven: boolean; vtotcGiven: boolean; betatceGiven: boolean },
+): JfetTempParams {
   // jfettemp.c:43-49: model-level constants at TNOM.
   const vtnom = CONSTKoverQ * p.TNOM;
   const fact1 = p.TNOM / REFTEMP;
@@ -250,7 +253,14 @@ export function computeJfetTempParams(p: JfetParams): JfetTempParams {
   const vt = temp * CONSTKoverQ;
   const fact2 = temp / REFTEMP;
   const ratio1 = temp / p.TNOM - 1;
-  let tSatCur = p.IS * Math.exp(ratio1 * 1.11 / vt);
+  // jfettemp.c:92-96: gate saturation current temperature scaling. The xti
+  // branch adds the (ratio1+1)^xti factor; both legs read the bandgap eg.
+  let tSatCur: number;
+  if (given.xtiGiven) {
+    tSatCur = p.IS * Math.exp(ratio1 * p.EG / vt) * Math.pow(ratio1 + 1, p.XTI);
+  } else {
+    tSatCur = p.IS * Math.exp(ratio1 * p.EG / vt);
+  }
   let tCGS = p.CGS * cjfact;
   let tCGD = p.CGD * cjfact;
   const kt = CONSTboltz * temp;
@@ -268,9 +278,20 @@ export function computeJfetTempParams(p: JfetParams): JfetTempParams {
   const f1 = tGatePot * (1 - Math.exp((1 - 0.5) * xfc)) / (1 - 0.5);
   const vcrit = vt * Math.log(vt / (CONSTroot2 * tSatCur));
 
-  // jfettemp.c:111-112.
-  const tThreshold = p.VTO - p.TCV * (temp - p.TNOM);
-  const tBeta = p.BETA * Math.pow(temp / p.TNOM, p.BEX);
+  // jfettemp.c:115-124: threshold and beta temperature scaling. The vtotc/
+  // betatce legs select the alternative linear/exponential coefficient forms.
+  let tThreshold: number;
+  if (given.vtotcGiven) {
+    tThreshold = p.VTO + p.VTOTC * (temp - p.TNOM);
+  } else {
+    tThreshold = p.VTO - p.TCV * (temp - p.TNOM);
+  }
+  let tBeta: number;
+  if (given.betatceGiven) {
+    tBeta = p.BETA * Math.pow(1.01, p.BETATCE * (temp - p.TNOM));
+  } else {
+    tBeta = p.BETA * Math.pow(temp / p.TNOM, p.BEX);
+  }
 
   return {
     vt, tSatCur, tGatePot, tCGS, tCGD,
@@ -377,7 +398,11 @@ class NJFETElement extends PoolBackedAnalogElement {
       ICVDS:  props.getModelParam<number>("ICVDS"),
       ICVGS:  props.getModelParam<number>("ICVGS"),
     };
-    this._tp = computeJfetTempParams(this._params);
+    this._tp = computeJfetTempParams(this._params, {
+      xtiGiven: this._xtiGiven,
+      vtotcGiven: this._vtotcGiven,
+      betatceGiven: this._betatceGiven,
+    });
   }
 
   get _p(): JfetParams {
@@ -718,7 +743,7 @@ class NJFETElement extends PoolBackedAnalogElement {
     cd = cdrain - cgd;
 
     // jfetload.c:425-494: charge storage + NIintegrate for transient.
-    const capGate = (mode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0
+    const capGate = (mode & (MODEDCTRANCURVE | MODETRAN | MODEAC | MODEINITSMSIG)) !== 0
       || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0);
 
     if (capGate) {
@@ -909,7 +934,11 @@ class NJFETElement extends PoolBackedAnalogElement {
     // cite: jfettemp.c:83-88 — if(!JFETtempGiven) JFETtemp = CKTtemp + JFETdtemp
     const effectiveT = this._tempGiven ? this._params.TEMP : ctx.cktTemp;
     this._params.TEMP = effectiveT;
-    this._tp = computeJfetTempParams(this._params);
+    this._tp = computeJfetTempParams(this._params, {
+      xtiGiven: this._xtiGiven,
+      vtotcGiven: this._vtotcGiven,
+      betatceGiven: this._betatceGiven,
+    });
   }
 
   setParam(key: string, value: number): void {
@@ -917,7 +946,11 @@ class NJFETElement extends PoolBackedAnalogElement {
       this._params.TEMP = value;
       this._tempGiven = true;
       // cite: jfettemp.c:83-88 — per-instance TEMP given overrides circuit temp.
-      this._tp = computeJfetTempParams(this._params);
+      this._tp = computeJfetTempParams(this._params, {
+        xtiGiven: this._xtiGiven,
+        vtotcGiven: this._vtotcGiven,
+        betatceGiven: this._betatceGiven,
+      });
       return;
     }
     // jfet.c:71-75 JFET_MOD_VTOTC/BETATCE/XTI/EG — a hot-loaded temperature/
@@ -932,7 +965,11 @@ class NJFETElement extends PoolBackedAnalogElement {
     else if (key === "ICVGS") this._icVGSGiven = true;
     if (key in this._params) {
       this._params[key] = value;
-      this._tp = computeJfetTempParams(this._params);
+      this._tp = computeJfetTempParams(this._params, {
+        xtiGiven: this._xtiGiven,
+        vtotcGiven: this._vtotcGiven,
+        betatceGiven: this._betatceGiven,
+      });
     }
   }
 

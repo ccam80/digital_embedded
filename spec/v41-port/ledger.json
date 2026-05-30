@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-30T01:09:56.497Z",
+    "generated": "2026-05-30T01:28:49.689Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 143,
+    "progressEntriesApplied": 166,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -21243,10 +21243,12 @@
         75
       ],
       "hunkHash": "a2b7f3a1dadf7fa0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFET_PARAM_DEFS (and PJFET_PARAM_DEFS in pjfet.ts)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfet.c:49-80 (IFparm JFETmPTable[]), v41 hunk jfet.md docLineRange 59-75. Correspondence re-derived independently (rename-maps NOT consulted): the hunk's 6 added lines add IOP rows vtotc(JFET_MOD_VTOTC)/betatce(JFET_MOD_BETATCE)/xti(JFET_MOD_XTI)/eg(JFET_MOD_EG) and re-position kf/af AFTER bex; the 2 removed lines drop kf/af from the old slot before tcv. digiTS NJFET_PARAM_DEFS.secondary (njfet.ts:85-92) declares TCV,VTOTC,BEX,BETATCE,XTI,EG,KF,AF with spiceName vtotc/betatce/xti/eg and descriptions matching the IFparm strings (eg='Bandgap voltage'). Defaults VTOTC=0.0/BETATCE=0.0/XTI=3.0/EG=1.11 confirmed against jfetset.c:75-89. TIER1: an IFparm model-param table maps to named param-def rows with no per-row C line, so the table edit renders as the registry rows present; every +/- line is an allowed table-to-defs mapping. TIER2: every behavioral model row maps one-to-one onto a NJFET_PARAM_DEFS row; no row unmapped. FILE-SCOPE: njfet.ts param-def block committed at recon c8dbef88; no stray source file. Not recon/device-completion so sec1a harness gate N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21277,7 +21279,9 @@
       "state": "PENDING",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement (JFET AC small-signal load path)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MISMATCH (Tier 2). ngspice ref/ngspice/src/spicelib/devices/jfet/jfetacld.c:16-73 (JFETacLoad), v41 hunk jfet.md docLineRange 80-93 (hunkHash 4ad72ce944da6249). Our file: src/components/semiconductors/njfet.ts. TIER1 of the assigned hunk h001 PASSES in isolation: the hunk's only change is the loop-accessor macro rename (model->JFETnextModel to JFETnextModel(model); model->JFETinstances/here->JFETnextInstance to JFETinstances(model)/JFETnextInstance(here)), which is iteration plumbing so a zero-line TS delta that is line-isomorphic per VERIFICATION.md sec4. BUT TIER 2 FAILS: the functionGroup is jfetacld.c::JFETacLoad (JFET AC small-signal load path), and the whole JFETacLoad function HAS NO digiTS COUNTERPART. NJFETElement implements no stampAc method (search stampAc in njfet.ts = 0 matches), whereas the AC analysis driver calls element.stampAc(solver,omega,loadCtx,rhsRe,rhsIm) per element (ac-analysis.ts:376 runByDeviceFamily('stampAc',...)) and elements without stampAc are SILENTLY SKIPPED (default-loaders.ts:60-61). ngspice's JFET DEVacLoad is JFETacLoad (NOT NULL), so the 'NULL implies skip' equivalence does not apply: a JFET in an AC sweep currently contributes ZERO to the complex matrix. JFETacLoad stamps 22 admittance terms with both real and imaginary parts: real conductances gdpr/gspr and state0 gm/gds/ggs/ggd (jfetacld.c:36-42,47-68), AND the omega-scaled junction-charge susceptances xgs = state0[JFETqgs]*CKTomega and xgd = state0[JFETqgd]*CKTomega stamped into the +1 (imaginary) cells (jfetacld.c:41,43,49,52,54,57,59,63,66). None of these are produced by digiTS. The sibling ported devices DO implement this: bjt.ts, mosfet.ts, vdmos.ts all have stampAc methods (njfet.ts absent). The jfet planning review (spec/v41-port/planning/jfet-review.md:60-62) FROZE the scope as 'DC operating point, transient, AND AC small-signal' and asserted (line 92) 'AC is implemented' for jfetacld.c; that assertion is FALSE for JFET (bad baseline / Tier-2 trap): no AC small-signal path exists in njfet.ts. REMEDY (applier, within functionGroup so not an escalation per sec6): add a stampAc(solver,omega,loadCtx,rhsRe,rhsIm) method to NJFETElement in njfet.ts that mirrors JFETacLoad jfetacld.c:36-68 line-by-line; read gdpr=drainConduct*area, gspr=sourceConduct*area, gm/gds/ggs/ggd from state0 slots GM/GDS/GGS/GGD, xgs=state0[QGS]*omega, xgd=state0[QGD]*omega, and stamp all 22 real/imag terms via the cached TSTALLOC handles (reuse the bjt/mosfet stampAc pattern). The handles already exist in setup() (_hGG,_hGDP,_hGSP,_hDPG,_hDPDP,_hDPSP,_hSPG,_hSPDP,_hSPSP,_hDDP,_hDPD,_hDD,_hSSP,_hSPS,_hSS). After porting, re-verify h001 Tier 2 against jfetacld.c."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21367,10 +21371,12 @@
         161
       ],
       "hunkHash": "8d6911037ef816e3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::JFET_SCHEMA.size (JFETnumStates=13 state-vector count; the use site `*states += JFETnumStates` is jfet/jfetset.c#h005)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice jfetdefs.h sub-item h003a (#define JFETnumStates 13), v41 hunk jfet.md docLineRange 156-161. Independent re-derivation: JFETnumStates=13 is the JFET state-vector slot count. digiTS JFET_SCHEMA (njfet.ts:157-171) defines exactly 13 named slots (VGS,VGD,CG,CD,CGD,GM,GDS,GGS,GGD,QGS,CQGS,QGD,CQGD) = jfetdefs.h JFETvgs..JFETcqgd offsets 0..12; JFET_SCHEMA.size=13. The use site '*states += JFETnumStates' (jfetset.c:125, item jfetset.c#h005) maps to ctx.allocStates(this.stateSize) with stateSize=JFET_SCHEMA.size=13 (njfet.ts:317,419). TIER1: the #define is a named constant mapped to schema-derived size; allowed difference. TIER2: 13 to 13 bijective. FILE-SCOPE: schema committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21460,10 +21466,12 @@
         215
       ],
       "hunkHash": "5f4417d51df8e1b1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFET_PARAM_DEFS / JfetParams interface (and PJFET equivalents in pjfet.ts)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice jfetdefs.h sJFETmodel fields (v41 207-213 region), v41 hunk jfet.md docLineRange 197-215. Independent re-derivation: hunk adds double JFETvtotc/JFETbetatce/JFETxti/JFETeg model fields (the 2 removed lines are whitespace recomment of JFETtnom + repositioned bex). digiTS JfetParams interface declares VTOTC/BEX/BETATCE/XTI/EG number (njfet.ts:123-127) and ctor reads each via props.getModelParam<number> (njfet.ts:386-390). TIER1: struct double fields map to JfetParams number members; allowed C to TS. TIER2: every added model field has a JfetParams counterpart; no field unmapped. FILE-SCOPE: committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21491,10 +21499,12 @@
         348
       ],
       "hunkHash": "360d50d6a6aea0ba",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFET_PARAM_DEFS *Given guards (constructor isModelParamGiven reads)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice jfetdefs.h sJFETmodel *Given bits (v41 229-244 region) + device/model id enums, v41 hunk jfet.md docLineRange 216-348. Independent re-derivation: hunk adds JFETtcvGiven/JFETvtotcGiven/JFETbexGiven/JFETbetatceGiven/JFETxtiGiven/JFETegGiven : 1 bitfields (repositioning tcv/bex givens up) and converts the #define id blocks to enums (no numeric change: JFET_AREA=1.., JFET_MOD_VTO=101.. with VTOTC/BETATCE/XTI/EG inserted, device/model questions 301..). digiTS reads the temp-consuming givens: _vtotcGiven/_betatceGiven/_xtiGiven/_egGiven (njfet.ts:334-337) from props.isModelParamGiven in ctor (366-369). The id enums map to spiceName-keyed param defs (jfet.c#h001), not numeric constants in TS. TIER1: bitfield-givens map to boolean isModelParamGiven reads; enum renumber is a no-op vs the #defines (same values); allowed. TIER2: the four temp-branch givens (consumed in jfettemp.c#h002/#h004) each have a digiTS counterpart; tcvGiven/bexGiven givenness is not consumed in digiTS (defaults seed via param defs) consistent with the property-bag architecture. FILE-SCOPE: committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21739,10 +21749,12 @@
         519
       ],
       "hunkHash": "ec3a10f58066de64",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement (UIC initial-condition capture; load() MODEINITJCT+MODETRANOP+MODEUIC branch njfet.ts:454-460)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetic.c:25-26 (JFETgetic model/instance loop), v41 hunk jfet.md docLineRange 509-519. Independent re-derivation: the hunk's only change is the loop-accessor macro rename model->JFETnextModel to JFETnextModel(model) and model->JFETinstances/here->JFETnextInstance to JFETinstances(model)/JFETnextInstance(here); the JFETgetic body (icVDS=rhs[drain]-rhs[source], icVGS=rhs[gate]-rhs[source] when not given) is unchanged v26 to v41. TIER1 (zero-delta rule sec4): the C model/instance linked-list walk is iteration plumbing with no per-element digiTS counterpart (engine invokes each element directly) so a zero-line TS delta is line-isomorphic since every +/- line is an accessor-macro rename (allowed sec4). The whole-function JFETgetic (DEVsetic rhs-capture) gap was adjudicated and APPLIED at the jfet#recon/initialConditions level (no DEVsetic element vtable hook in the analog engine; open question Q-JFET-IC-GETIC resolved); this per-hunk item only verifies the v26 to v41 delta, which is the no-op accessor rename. FILE-SCOPE: njfet.ts UIC branch committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21801,10 +21813,12 @@
         668
       ],
       "hunkHash": "fd0912ed01476c30",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.load (model/instance walk; njfet.ts:403)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetload.c:86-90 (JFETload model/instance loop), v41 hunk jfet.md docLineRange 654-668. Independent re-derivation: hunk's only change is the loop-accessor macro rename (model->JFETnextModel to JFETnextModel(model); model->JFETinstances/here->JFETnextInstance to JFETinstances(model)/JFETnextInstance(here)). TIER1 (zero-delta sec4): iteration plumbing with no per-element digiTS counterpart (NJFETElement.load is invoked per-element); every +/- line is an accessor-macro rename (allowed) so a zero-line TS delta is line-isomorphic. FILE-SCOPE: no njfet.ts delta in this region; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21832,10 +21846,12 @@
         677
       ],
       "hunkHash": "2595d4b4a28d97d4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.load (charge-storage gate; njfet.ts:681 capGate)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetload.c:400-405 (charge-storage gate), v41 hunk jfet.md docLineRange 669-677. Independent re-derivation: hunk adds MODEDCTRANCURVE to the capacitance-enable mask: v26 'if ((CKTmode & (MODETRAN|MODEAC|MODEINITSMSIG)) || ((CKTmode & MODETRANOP) && (CKTmode & MODEUIC)))' to v41 'if ((CKTmode & (MODEDCTRANCURVE|MODETRAN|MODEAC|MODEINITSMSIG)) || ...)'. digiTS njfet.ts:746-747: const capGate = (mode & (MODEDCTRANCURVE | MODETRAN | MODEAC | MODEINITSMSIG)) !== 0 || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0). MODEDCTRANCURVE imported njfet.ts:49. TIER1: the single added line (MODEDCTRANCURVE added to mask) maps one-to-one onto the working-tree delta adding MODEDCTRANCURVE; the removed line maps onto the prior mask line. line-isomorphic. TIER2: condition operands/structure identical (bitwise-OR mask, then TRANOP&&UIC clause). FILE-SCOPE: njfet.ts working-tree delta touches only njfet.ts; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21863,10 +21879,12 @@
         724
       ],
       "hunkHash": "865d6f5f1edd1a0b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFET_PARAM_DEFS (model-param read via property bag; no model-getter method)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetmask.c:71-106 (JFETmAsk model-param getter), v41 hunk jfet.md docLineRange 682-724. Independent re-derivation: hunk adds getter cases JFET_MOD_VTOTC/BETATCE/XTI/EG (value->rValue=model->JFETx; return OK) and re-positions KF/AF cases after TYPE. digiTS has no model-getter vtable method; model params are read via props.getModelParam(...) directly by the engine (rename-map note confirmed independently: every JFETmAsk case is C accessor-plumbing for a getter the analog engine does not route through a per-device callback). The four params VTOTC/BETATCE/XTI/EG are present in NJFET_PARAM_DEFS (njfet.ts:86-90) and thus property-bag-readable. TIER1 (zero-delta sec4): every +/- line is a 'case X: value->rValue=model->JFETx; return(OK)' getter accessor with no per-line digiTS counterpart (property-bag read) so a zero-line TS delta is line-isomorphic. TIER2: each readable model param has a param-def; no value-bearing getter unmapped. FILE-SCOPE: param defs committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21925,10 +21943,12 @@
         789
       ],
       "hunkHash": "f7311733c075002a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setParam (model-param hot-load branch)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetmpar.c:72-80 (JFETmParam), v41 hunk jfet.md docLineRange 775-789. Independent re-derivation: hunk's 8 removed lines REMOVE the JFET_MOD_KF/JFET_MOD_AF cases from their old position (before JFET_MOD_B), to be re-added after EG in h002. digiTS JFETmParam maps to NJFETElement.setParam; KF/AF have no explicit setParam branch and flow through the generic 'if (key in this._params) { this._params[key]=value; recompute }' (njfet.ts:966-973), which both stores the value and re-runs computeJfetTempParams (hot-loadable per MEMORY.md). KF/AF givenness (ngspice JFETfNcoefGiven/JFETfNexpGiven) is consumed ONLY by jfetset.c defaulting (fNcoef=0,fNexp=1), realized in digiTS by param defaults KF=0/AF=1 (njfet.ts:91-92), so no *Given tracking is required for KF/AF. TIER1: removing the two C cases corresponds to digiTS routing KF/AF through the generic branch (no dedicated branch); the removed lines have no behavioral TS counterpart beyond the generic path. TIER2: the case removal/relocation is position-only; net JFETmParam handles the same set of params, all mapped in setParam. FILE-SCOPE: setParam committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21956,10 +21976,12 @@
         824
       ],
       "hunkHash": "0e3134fd84a3dc6e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setParam (model-param hot-load branch)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetmpar.c:85-112 (JFETmParam), v41 hunk jfet.md docLineRange 790-824. Independent re-derivation: hunk's 24 added lines ADD cases JFET_MOD_VTOTC/BETATCE/XTI/EG (each: model->JFETxGiven=TRUE; model->JFETx=value->rValue) plus the re-added KF/AF cases, after the TCV/BEX cases. digiTS NJFETElement.setParam (njfet.ts:958-961) sets _vtotcGiven/_betatceGiven/_xtiGiven/_egGiven=true on key VTOTC/BETATCE/XTI/EG, then the generic 'if (key in this._params)' branch (966-967) stores the value, then recomputes temp params. The four *Given booleans are read by computeJfetTempParams branches (jfettemp.c#h002/#h004). TIER1: each ngspice added case (set Given TRUE + store value) maps one-to-one onto the setParam Given-assignment + generic-store; line-isomorphic at the construct level (C switch-case to TS if-else-chain is allowed surface form sec4). TIER2: VTOTC/BETATCE/XTI/EG each set their Given and store; KF/AF store via generic branch; bijective over the value-bearing params. FILE-SCOPE: setParam committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22080,10 +22102,12 @@
         902
       ],
       "hunkHash": "a9ea8f2fa6a51ec4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setParam (instance-param hot-load: TEMP/AREA/M/OFF)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetpar.c:24 (JFETparam switch), v41 hunk jfet.md docLineRange 894-902. Independent re-derivation: the only change is whitespace 'switch(param)' to 'switch (param)'. digiTS realizes JFETparam as NJFETElement.setParam if/else chain (TEMP/VTOTC.../ICVDS/ICVGS/generic). TIER1 (sec4): a brace/whitespace-only C edit with a TS if-else-chain realization is an allowed surface-form difference so a zero-line behavioral TS delta is line-isomorphic. FILE-SCOPE: setParam committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22111,10 +22135,12 @@
         917
       ],
       "hunkHash": "1a1c94c61150a298",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setParam (JFET_IC vector parse -> icVDS/icVGS)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetpar.c:52-67 (JFETparam JFET_IC case), v41 hunk jfet.md docLineRange 903-917. Independent re-derivation: hunk's behavioral content is ONLY two added /* FALLTHROUGH */ comments (suppress -Wimplicit-fallthrough) plus 'switch(value->v.numValue)' to 'switch (value->v.numValue)' whitespace; the case2 to case1 fallthrough (numValue 2: icVGS=vec[1]+Given; FALL; numValue 1: icVDS=vec[0]+Given) is unchanged v26 to v41. digiTS reproduces JFET_IC via emitGroup{name:IC,index:0/1} on ICVDS(vec[0])/ICVGS(vec[1]) (njfet.ts:100-101) and setParam ICVDS/ICVGS branches set _icVDSGiven/_icVGSGiven=true (njfet.ts:964-965) then store via generic branch; the IC=vds,vgs vector split is the canonical registry ascending-index group parse. TIER1 (sec4): the added lines are comment-only (allowed) and a whitespace change so the registry IC-group + setParam realization is the behavioral counterpart; line-isomorphic. TIER2: icVDS<-vec[0], icVGS<-vec[1], both Given set; bijective with the fallthrough. FILE-SCOPE: IC params + setParam committed at recon c0fbbe1f/c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22173,10 +22199,12 @@
         948
       ],
       "hunkHash": "97c8cb74e752a8c4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setup (model walk + JFETtype default)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetset.c:30 (JFETsetup model loop), v41 hunk jfet.md docLineRange 940-948. Independent re-derivation: only change is loop-accessor macro rename model->JFETnextModel to JFETnextModel(model); the JFETtype-default guard 'if((JFETtype!=NJF)&&(JFETtype!=PJF)) JFETtype=NJF' is unchanged (digiTS NJFET fixes polarity literal +1, njfet.ts:320, N-channel by construction). TIER1 (zero-delta sec4): model-walk iteration plumbing, no per-element TS counterpart; every +/- line is an accessor-macro rename (allowed). FILE-SCOPE: no njfet.ts delta in this region; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22235,10 +22263,12 @@
         989
       ],
       "hunkHash": "77a1bb7a0923fcc0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::computeJfetTempParams + NJFET_PARAM_DEFS defaults (vtotc/betatce/xti/eg model-param default seeding)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetset.c:75-89 (JFETsetup model defaults), v41 hunk jfet.md docLineRange 962-989. Independent re-derivation: hunk's 18 added lines add default-seeding 'if(!JFETvtotcGiven) JFETvtotc=0.0; if(!JFETbetatceGiven) JFETbetatce=0.0; if(!JFETxtiGiven) JFETxti=3.0; if(!JFETegGiven) JFETeg=1.11;' (plus repositioned fNcoef=0/fNexp=1). digiTS realizes these as per-row param-def defaults: VTOTC default 0.0, BETATCE 0.0, XTI 3.0, EG 1.11 (njfet.ts:86-90) bit-exact 0.0/0.0/3.0/1.11. TIER1 (sec4): an 'if(!Given) x=default' setup seed maps to the param-def default value with no separate TS statement (mirrors the recon-confirmed TCV/BEX seeding); allowed. TIER2: each defaulted model field has a matching param-def default; no default unmapped. FILE-SCOPE: param defs committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22266,10 +22296,12 @@
         1000
       ],
       "hunkHash": "08aaee072a326da4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFET_PARAM_DEFS defaults (nlev/gdsnoi + relocated fNcoef/fNexp defaults block)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetset.c:115-116 (JFETsetup instance loop), v41 hunk jfet.md docLineRange 990-1000. Independent re-derivation: only change is instance-loop accessor rename model->JFETinstances/here->JFETnextInstance to JFETinstances(model)/JFETnextInstance(here). TIER1 (zero-delta sec4): iteration plumbing, NJFETElement.setup is per-element; every +/- line is an accessor-macro rename (allowed). FILE-SCOPE: no njfet.ts delta here; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22297,10 +22329,12 @@
         1009
       ],
       "hunkHash": "2535527ead3a4406",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setup (allocStates) + JFET_SCHEMA.size (jfetset.c `*states += JFETnumStates`)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfetset.c:124-125 (state-vector alloc), v41 hunk jfet.md docLineRange 1001-1009. Independent re-derivation: hunk changes '*states += 13' to '*states += JFETnumStates' (=13, jfetdefs.h#h003a). digiTS allocates via ctx.allocStates(this.stateSize) with stateSize=JFET_SCHEMA.size=13 (njfet.ts:317,419). TIER1: literal-13 to named-constant-13 is value-preserving; the digiTS realization uses the schema-derived size; allowed. TIER2: 13 to JFETnumStates(13) to JFET_SCHEMA.size(13) bijective. FILE-SCOPE: schema+setup committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22328,12 +22362,21 @@
         1043
       ],
       "hunkHash": "52b5279307eef581",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.setup (internal-node allocation order: source-prime before drain-prime, njfet.ts:358-393)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "id": "ESC-JFET-UNSETUP",
+        "raisedBy": "applier",
+        "trigger": "target absent (TASK.md sec5 cond 2) — the v41 + lines modify JFETunsetup, a function with no digiTS counterpart",
+        "ngspice": "src/spicelib/devices/jfet/jfetset.c:198-221 (JFETunsetup); v41 diff jfet.md docLineRange 1010-1043, hunk @@ -190,23 +202,20 @@. The changed lines are the internal-prime-node teardown: v26 deletes JFETsourcePrimeNode first then JFETdrainPrimeNode (each guarded `node && node != externalNode`, then set =0 inside the if); v41 reverses to drain-prime first then source-prime, changes each guard to `node > 0 && node != externalNode`, drops the braces, and sets `node = 0` unconditionally after the (now braceless) CKTdltNNum call.",
+        "digiTS": "src/components/semiconductors/njfet.ts — NJFETElement has setup() (njfet.ts:412-456, allocates source-prime BEFORE drain-prime via ctx.makeVolt) but NO unsetup/teardown method. PoolBackedAnalogElement / AnalogElement expose no unsetup/teardown/dispose hook and the engine exposes no per-element CKTdltNNum equivalent (verified: zero matches for unsetup/teardown/dltNNum across src/solver/analog/element.ts and src/components/semiconductors/). digiTS rebuilds a fresh engine per compile() (CLAUDE.md Headless Architecture) and is GC-managed.",
+        "summary": "JFETunsetup is the C matrix-node-lifecycle teardown: it frees the internal drain-prime/source-prime nodes from the SMP matrix when a device is torn down, mirroring the order in which JFETsetup allocated them. digiTS has no teardown surface — the same architectural reason the planner marked jfetdel.c/jfetdest.c/jfetmdel.c (the deleted C-heap destructor functions) NO-COUNTERPART. This hunk (#h006) was instead left PENDING with tsFunction pointing at NJFETElement.setup 'internal-node allocation order: source-prime before drain-prime'. That mapping does not fit: v41 changes only the UNSETUP teardown order/guards, not the SETUP allocation order. The setup-side allocation order is unchanged across v26->v41 (the v41 jfetset.c#h001 setup hunk is a model-walk accessor rename only; no allocation reordering), and digiTS already allocates source-prime before drain-prime (njfet.ts:412-456), matching v26 AND v41 setup. There is no JFETunsetup body in digiTS for the +/- teardown lines to land in: the construct the v41 + lines modify is absent (sec5 cond 2 fails). The four prior + lines are not identifier rename / C<->TS syntax / comment (the closed allowed-difference list), so a zero-line TS delta would drop a real change. Decision needed: either (a) reclassify jfet/jfetset.c#h006 as NO-COUNTERPART alongside the JFET C-heap/lifecycle teardown family (jfetdel.c/jfetdest.c/jfetmdel.c) — a Phase-0 planning action, not an applier action; or (b) author a digiTS device-teardown surface (unsetup hook on AnalogElement + engine-side internal-node release) so the teardown reorder has a body to land in — a cross-file architecture change beyond this functionGroup (touches src/solver/analog/element.ts and the engine), out of the jfet applier file scope (njfet.ts only). See ESCALATIONS.md ESC-JFET-UNSETUP.",
+        "decisionNeeded": "Reclassify #h006 NO-COUNTERPART with the JFET teardown/destructor family (planning action), or stand up a digiTS element-unsetup/internal-node-release surface (cross-file, beyond this functionGroup) for the teardown reorder to land in.",
+        "resolution": "pending"
+      },
       "kind": "hunk",
       "blockedBy": null
     },
@@ -22359,10 +22402,12 @@
         1056
       ],
       "hunkHash": "b06c18c157036559",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::computeJfetTempParams (model-level constants; njfet.ts:213-235)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfettemp.c:38 (JFETtemp model loop), v41 hunk jfet.md docLineRange 1048-1056. Independent re-derivation: only change is loop-accessor macro rename model->JFETnextModel to JFETnextModel(model). digiTS computeJfetTempParams is invoked per-element (ctor/computeTemperature). TIER1 (zero-delta sec4): model-walk iteration plumbing, no per-element TS counterpart; accessor-macro rename (allowed). FILE-SCOPE: no njfet.ts delta here; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22390,10 +22435,12 @@
         1067
       ],
       "hunkHash": "0669ed12d6777d7b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::computeJfetTempParams (tSatCur; njfet.ts:241) + NJFETElement.computeTemperature",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfettemp.c:92-96 (tSatCur temperature scaling), v41 hunk jfet.md docLineRange 1057-1067. Independent re-derivation: v26 'tSatCur = gateSatCurrent * exp(ratio1*1.11/vt)' to v41 'if (JFETxtiGiven) tSatCur = gateSatCurrent*exp(ratio1*eg/vt)*pow(ratio1+1,xti); else tSatCur = gateSatCurrent*exp(ratio1*eg/vt);'. digiTS njfet.ts:258-263: if (given.xtiGiven) tSatCur = p.IS*Math.exp(ratio1*p.EG/vt)*Math.pow(ratio1+1,p.XTI); else tSatCur = p.IS*Math.exp(ratio1*p.EG/vt). TIER1: the 2 removed lines (single-literal-1.11 form) and 2 added lines (xti branch) map one-to-one onto the working-tree delta replacing the 'ratio1*1.11' literal with the if(xtiGiven) branch using p.EG and pow(ratio1+1,p.XTI). line-isomorphic. TIER2 (fresh read): exp argument ratio1*eg/vt, pow base ratio1+1 exponent xti, multiplicative factor; operands/operators/order identical; both legs read eg (=p.EG default 1.11). FILE-SCOPE: njfet.ts working-tree delta touches only njfet.ts; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22421,10 +22468,12 @@
         1080
       ],
       "hunkHash": "1d7ae29e2547de7c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::computeJfetTempParams (instance temp + caps/corDepCap/vcrit; njfet.ts:237-257)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfettemp.c:89-96 (vt/fact2/ratio1 + tSatCur block), v41 hunk jfet.md docLineRange 1068-1080. Independent re-derivation: this hunk's context-region brackets the tSatCur if/else (the +5/-1 reflecting the expanded branch). digiTS njfet.ts:253-263: vt=temp*CONSTKoverQ, fact2=temp/REFTEMP, ratio1=temp/p.TNOM-1, then the xtiGiven if/else for tSatCur; operands/order match jfettemp.c:89-96. TIER1: the expanded-branch added lines map onto the working-tree tSatCur if/else delta; the context lines (vt,fact2,ratio1) are unchanged and present identically. line-isomorphic with h002. TIER2: vt,fact2,ratio1 assignments bijective; tSatCur branch as h002. FILE-SCOPE: njfet.ts only; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22452,10 +22501,12 @@
         1100
       ],
       "hunkHash": "bff5941f1e7b35e5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::computeJfetTempParams (tThreshold/tBeta; njfet.ts:260-261)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfettemp.c:115-124 (tThreshold/tBeta temperature scaling), v41 hunk jfet.md docLineRange 1081-1100. Independent re-derivation: v26 'tThreshold = threshold - tcv*(temp-tnom); tBeta = beta*pow(temp/tnom,bex)' to v41 'if (JFETvtotcGiven) tThreshold = threshold + vtotc*(temp-tnom); else tThreshold = threshold - tcv*(temp-tnom); if (JFETbetatceGiven) tBeta = beta*pow(1.01,betatce*(temp-tnom)); else tBeta = beta*pow(temp/tnom,bex)'. digiTS njfet.ts:283-294: if (given.vtotcGiven) tThreshold = p.VTO + p.VTOTC*(temp-p.TNOM); else tThreshold = p.VTO - p.TCV*(temp-p.TNOM); if (given.betatceGiven) tBeta = p.BETA*Math.pow(1.01,p.BETATCE*(temp-p.TNOM)); else tBeta = p.BETA*Math.pow(temp/p.TNOM,p.BEX). TIER1: the 10 added lines (two if/else branches) and 3 removed lines (single-form tThreshold/tBeta) map one-to-one onto the working-tree delta. line-isomorphic. TIER2 (fresh read): vtotc leg + operator with +vtotc*(temp-tnom); tcv leg - operator with -tcv*(temp-tnom); betatce leg pow(1.01, betatce*(temp-tnom)); bex leg pow(temp/tnom, bex); operands/operators/order/grouping identical. FILE-SCOPE: njfet.ts only; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22483,10 +22534,12 @@
         1115
       ],
       "hunkHash": "931d57053cbba21e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/njfet.ts::NJFETElement.getLteTimestep (njfet.ts:887-915)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. Tier1+Tier2 vs fresh ref/ngspice/src/spicelib/devices/jfet/jfettrun.c:21-25 (JFETtrunc), v41 hunk jfet.md docLineRange 1105-1115. Independent re-derivation: hunk's only change is the loop-accessor macro rename (model->JFETnextModel/here->JFETnextInstance/model->JFETinstances to JFETnextModel(model)/JFETnextInstance(here)/JFETinstances(model)); the body 'CKTterr(JFETqgs,...); CKTterr(JFETqgd,...)' is unchanged. digiTS NJFETElement.getLteTimestep (njfet.ts:976-1004) calls cktTerr over pairs [QGS,CQGS] and [QGD,CQGD], taking the min; bijective with the two CKTterr calls on JFETqgs/JFETqgd. TIER1 (zero-delta sec4): iteration plumbing accessor rename (allowed); the two CKTterr to cktTerr calls are present and unchanged. TIER2: CKTterr(JFETqgs)<->cktTerr QGS/CQGS, CKTterr(JFETqgd)<->cktTerr QGD/CQGD; the min-over-pairs is the engine's getLteTimestep contract (returns the limiting dt). bijective. FILE-SCOPE: getLteTimestep committed at recon c8dbef88; no stray file. Not recon/device-completion so sec1a N/A."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
