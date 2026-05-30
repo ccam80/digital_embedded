@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-30T00:17:24.758Z",
+    "generated": "2026-05-30T00:49:55.048Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 137,
+    "progressEntriesApplied": 138,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -62916,9 +62916,11 @@
         "device-dispatch/devsup.c#h004"
       ],
       "hunkHash": "eaeade1705930639",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH (reconstruction + device-completion). Source isomorphism re-derived independently (rename-maps NOT consulted) against fresh ref/ngspice/src/spicelib/devices/vdmos/ v41 source; PLUS sec1a harness gate clean. tsFile src/components/semiconductors/vdmos.ts. TIER2 bijective construct correspondence verified part-by-part: (Part A) VDMOS_SCHEMA 18 slots in vdmosdefs.h:251-276 order, stateSize 18 <-> harness reported 18 slots. (Part B) model defaults vdmosset.c:31-252: kp=25+10*type, vth0=3*type, is=1e-14, vj=.8, cjo=5e-10, gradCoeff(mj)=.5, fc=.5, phi=.6, cgdmin=2e-11, cgdmax=2e-9, cgs=1.4e-9, a=1, ksubthres=.1, mtr=1, bv=1e99, ibv=1e-10, nbv=1, rds=1e15, n=1, eg=1.11, xti=3, rthjc=1, rthca=1000, cthj=10e-6, mu=-1.5, texp0=1.5, texp1=.3, SOA 1e99, derating=0, tnom=nomTemp -- all match; mj->zero gradCoeffTemp1/2, tt->zero tranTimeTemp1/2 (vdmosmpar.c:82-83,166-167); temp/tnom +CONSTCtoK (vdmospar.c:34, vdmosmpar.c:20); qsGiven=rqGiven&&vqGiven (vdmosset.c:217-220). (Part C) conductances vdmosset.c:277-305 incl dsConductance rdsGiven-gate + 1e-15 fallback; prime-node alloc gates rd>0/rg>0/rs>0/rb>0; self-heat nodes+vcktTbranch under (thermal&&rthjcGiven); TSTALLOC 25 base cells (:433-460) then 22 thermal cells (:463-486) in exact line order. (Part D) VDMOStempUpdate vdmostemp.c:17-180 + VDMOStemp:194-199 construct-for-construct incl 25-iter breakdown match under bvGiven, tDepCap>2.5 clamp, Math.pow(ratio,mu); operand grouping of egfet/arg/pbfact matches :34-37,69-72. (Part E) VDMOSload vdmosload.c:17-929: voltage recovery (SMSIG/TRAN/JCT/off/predictor/general incl selfheat delTemp), fetlim/limvds/limitlog, self-heat temp re-eval :279-284, Beta/rd0T/rd1T scaling, drain-current model :332-381 (von/vgst/vdss/t0/t1/betap/dbetap*/softplus/sat-lin branches operands matched, no re-association), quasi-sat :406-424, GmT, self-heat power terms :434-448, DevCapVDMOS gate caps double/add-half :453-515, NIintegrate companions :516-554 (gs/gd ceq-adjust on independent vars, no shared-cell accumulation), 20-cell base + 22-cell thermal MOS Y-stamp :611-660 in exact ptr order, inlined body diode :662-925 (DEVpred predictor, DEVpnjlim breakdown/normal limiting, forward/reverse/breakdown current regions, junction-charge NIintegrate, type-polarity RHS, 7-cell diode+gspr stamp, diode thermal stamp); convTest folded inline ctx.noncon++ (D6), MODEINITSMSIG continue handled via smsigContinue. (Part F) VDMOSacLoad vdmosacld.c:17-156: 2x-doubled cap admittances, imag gate stamps :91-97 in order, real MOS conductances, gate resistor, body-diode real+imag, thermal under selfheat; cgT/cdT==0 (never written in load) hardcoded. (Part G) VDMOStrunc vdmostrun.c:24-26 cktTerr on QGS/QGD/VDIO_QCAP only, no QTH. (Part H) devCapVdmos already in newton-raphson.ts:373 line-for-line devsup.c:653-665 (Math.PI, vgd>0, 0.5). (Part I) register-all.ts:450-451 registers VdmosN/PDefinition. No v41 construct without a digiTS counterpart; no digiTS construct without a v41 counterpart; no forbidden operand re-association/region-reorder/TSTALLOC-reorder/in-load-alloc. SEC1A HARNESS GATE: server_restart -> harness_start(dll Release.x64/ngspice.dll) -> harness_run -> harness_first_divergence on src/solver/analog/__tests__/ngspice-parity/fixtures/vdmos-power-switch.dts (contract path spec/v41-port/fixtures/ absent; ran the actual representative fixture): firstDivergence null across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape), earliest null; 107/107 tran steps passed, ours+ngspice identical iteration counts (avg 2.065, max 9). topology_diff orderingDiffs are a 3-node label permutation resolved by the harness node-mapping pass and the structuralFinding is the harness's own raw-coord caveat (MCP path defers structural-parity asserts per CLAUDE.md); the authoritative firstDivergence is null -> bit-exact parity. FILE-SCOPE: git diff --name-only shows only vdmos.ts among the recon tsFiles; bjt.ts/mosfet.ts working-tree changes are pre-existing unrelated AC stampAc sibling work (present at session start, not introduced by this recon), commit scoped to vdmos.ts + progress/ledger only."
+      ],
       "rationale": null,
       "escalation": null
     },

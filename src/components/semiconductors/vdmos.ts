@@ -479,7 +479,13 @@ function _createVdmosElementWithType(
       this._drainConductance = p.RD > 0 ? this._m / p.RD : 0.0;
       this._sourceConductance = p.RS > 0 ? this._m / p.RS : 0.0;
       this._gateConductance = p.RG > 0 ? this._m / p.RG : 0.0;
-      this._dsConductance = (p.RDS > 0) ? this._m / p.RDS : 1e-15;
+      // vdmosset.c:292-300 — dsConductance gated on rdsGiven: only when rds is
+      // user-given does rds>0 yield m/rds; ungiven (or rds<=0) defaults to 1e-15.
+      if (given.RDS) {
+        this._dsConductance = p.RDS > 0 ? this._m / p.RDS : 1e-15;
+      } else {
+        this._dsConductance = 1e-15;
+      }
       this._dioConductance = p.RB > 0 ? this._m / p.RB : 0.0;
 
       this._internalLabels.length = 0;
