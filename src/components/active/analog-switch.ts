@@ -45,6 +45,9 @@ import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
@@ -70,6 +73,15 @@ export const { paramDefs: ANALOG_SWITCH_PARAM_DEFS, defaults: ANALOG_SWITCH_DEFA
     rOff:         { default: 1e9,  unit: "Î",  description: "Off-state resistance (SWoffResistance, swdefs.h:69)" },
     vThreshold:   { default: 1.65, unit: "V",  description: "Switching threshold voltage (SWvThreshold, swdefs.h:70)" },
     vHysteresis:  { default: 0,    unit: "V",  description: "Switching hysteresis voltage (SWvHysteresis, swdefs.h:71)" },
+  },
+  instance: {
+    // Initial-condition keywords SW_IC_ON / SW_IC_OFF (swdefs.h:88-89), both
+    // writing the single instance flag SWzero_stateGiven (swdefs.h:46). A
+    // non-zero `on` sets SWzero_stateGiven=TRUE; a non-zero `off` sets it FALSE
+    // (swparam.c:21-28). Default false (switch starts OFF). Represented here as
+    // 0/1 flags since the property bag stores numeric model params.
+    on:  { default: 0, description: "Initial-condition flag SW_IC_ON: when set, SWzero_stateGiven=TRUE (swparam.c:21-24)" },
+    off: { default: 0, description: "Initial-condition flag SW_IC_OFF: when set, SWzero_stateGiven=FALSE (swparam.c:25-28)" },
   },
 });
 
@@ -257,6 +269,11 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
   private _vThreshold:  number;
   private _vHysteresis: number;
 
+  // Initial-condition flag (SWzero_stateGiven, swdefs.h:46). Set by the
+  // SW_IC_ON / SW_IC_OFF keywords (swparam.c:21-28); selects the MODEINITFIX /
+  // MODEINITJCT starting state in swLoadHandles. Default false (starts OFF).
+  private _zeroStateGiven: boolean;
+
   // Matrix handles allocated in setup() per swsetup.c:59-62 TSTALLOC sequence
   private _hPP = -1;
   private _hPN = -1;
@@ -272,6 +289,12 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
     this._rOff        = props.getModelParam<number>("rOff");
     this._vThreshold  = props.getModelParam<number>("vThreshold");
     this._vHysteresis = props.getModelParam<number>("vHysteresis");
+    // SWzero_stateGiven from the IC keywords (swparam.c:21-28). Default FALSE;
+    // SW_IC_ON sets it TRUE, SW_IC_OFF sets it FALSE. Applied on-then-off so a
+    // netlisted `off` wins over `on`, matching keyword parse order.
+    this._zeroStateGiven = false;
+    if (props.getModelParam<number>("on"))  this._zeroStateGiven = true;
+    if (props.getModelParam<number>("off")) this._zeroStateGiven = false;
   }
 
   setup(ctx: SetupContext): void {
@@ -295,10 +318,72 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
       1 / rOffNow,            // SWoffConduct = 1/Roff, swdefs.h:73
       this._vThreshold,       // SWvThreshold, swdefs.h:70
       this._vHysteresis,      // SWvHysteresis, swdefs.h:71
-      false,                  // SWzero_stateGiven = false (default: starts OFF), swdefs.h:44
+      this._zeroStateGiven,   // SWzero_stateGiven (swdefs.h:46), set by SW_IC_ON/SW_IC_OFF
       false,                  // invertCtrl = false (SPST: direct control)
       this._hPP, this._hPN, this._hNP, this._hNN,
     );
+  }
+
+  stampAc(solver: SparseSolverStamp, _omega: number, _ctx: LoadContext): void {
+    // swacload.c:26-33 (SWacLoad) — propagate the saved switch state and stamp
+    // the on/off conductance into the AC matrix. The conductance is purely
+    // resistive, so there is no imaginary-part contribution.
+    //
+    // swacload.c:26: current_state = (int) CKTstate0[SWswitchstate].
+    const current_state = (this._pool.states[0][this._stateBase + SLOT_STATE]) | 0;
+    const rOnNow  = Math.max(this._rOn, 1e-3);
+    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    // swacload.c:28: g_now = current_state ? SWonConduct : SWoffConduct.
+    // Any non-zero state selects the on conductance (truthiness, not the
+    // REALLY_ON/HYST_ON test the DC pin-current path uses).
+    const g_now = current_state ? 1 / rOnNow : 1 / rOffNow;
+
+    solver.stampElement(this._hPP, +g_now);   // swacload.c:30 SWposPosPtr
+    solver.stampElement(this._hPN, -g_now);   // swacload.c:31 SWposNegPtr
+    solver.stampElement(this._hNP, -g_now);   // swacload.c:32 SWnegPosPtr
+    solver.stampElement(this._hNN, +g_now);   // swacload.c:33 SWnegNegPtr
+  }
+
+  getLteTimestep(
+    _dt: number,
+    deltaOld: readonly number[],
+    _order: number,
+    _method: IntegrationMethod,
+    _lteParams: LteParams,
+  ): number {
+    // swtrunc.c:23-46 (SWtrunc) — shrink the proposed timestep when the control
+    // voltage is approaching the switching threshold. Method-presence is the
+    // reactivity gate (element.ts:106-116); the controller takes the min across
+    // elements, so Infinity = no constraint and a finite return clamps the step.
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const ctrl0 = s0[this._stateBase + SLOT_V_CTRL];
+    const ctrl1 = s1 !== undefined ? s1[this._stateBase + SLOT_V_CTRL] : ctrl0;
+    // swtrunc.c:23-25: lastChange = CKTstate0[SWctrlvalue] - CKTstate1[SWctrlvalue].
+    const lastChange = ctrl0 - ctrl1;
+    // swtrunc.c:32: CKTdeltaOld[0] (current trial delta).
+    const deltaOld0 = deltaOld[0];
+    let ref: number;
+    let maxChange: number;
+    let maxStep: number;
+
+    // swtrunc.c:26: if (CKTstate0[SWswitchstate] == 0) — off branch.
+    if (s0[this._stateBase + SLOT_STATE] === 0) {
+      ref = this._vThreshold + this._vHysteresis;                    // swtrunc.c:27
+      if (ctrl0 < ref && lastChange > 0) {                           // swtrunc.c:28
+        maxChange = (ref - ctrl0) * 0.75 + 0.05;                     // swtrunc.c:29-31
+        maxStep = maxChange / lastChange * deltaOld0;                // swtrunc.c:32
+        return maxStep;                                              // swtrunc.c:33-34
+      }
+    } else {
+      ref = this._vThreshold - this._vHysteresis;                    // swtrunc.c:37
+      if (ctrl0 > ref && lastChange < 0) {                           // swtrunc.c:38
+        maxChange = (ref - ctrl0) * 0.75 - 0.05;                     // swtrunc.c:39-41
+        maxStep = maxChange / lastChange * deltaOld0;                // swtrunc.c:42
+        return maxStep;                                              // swtrunc.c:43-44
+      }
+    }
+    return Infinity;
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -321,6 +406,10 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
     else if (key === "rOff")        this._rOff        = value;
     else if (key === "vThreshold")  this._vThreshold  = value;
     else if (key === "vHysteresis") this._vHysteresis = value;
+    // swparam.c:21-24 — SW_IC_ON: non-zero value ⇒ SWzero_stateGiven=TRUE.
+    else if (key === "on")  { if (value) this._zeroStateGiven = true; }
+    // swparam.c:25-28 — SW_IC_OFF: non-zero value ⇒ SWzero_stateGiven=FALSE.
+    else if (key === "off") { if (value) this._zeroStateGiven = false; }
   }
 }
 
@@ -359,6 +448,12 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
   private _vThreshold:  number;
   private _vHysteresis: number;
 
+  // Initial-condition flag (SWzero_stateGiven, swdefs.h:46) for the COM-NO
+  // path. Set by the SW_IC_ON / SW_IC_OFF keywords (swparam.c:21-28). The
+  // COM-NC path is the inverted-polarity digiTS extension and carries no IC
+  // flag (it starts REALLY_OFF), so only the NO path threads this.
+  private _zeroStateGiven: boolean;
+
   // Matrix handles for COM-NO path (swsetup.c:59-62, pos=nCom, neg=nNO)
   private _hNO_PP = -1;
   private _hNO_PN = -1;
@@ -381,6 +476,10 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
     this._rOff        = props.getModelParam<number>("rOff");
     this._vThreshold  = props.getModelParam<number>("vThreshold");
     this._vHysteresis = props.getModelParam<number>("vHysteresis");
+    // SWzero_stateGiven for the COM-NO path from the IC keywords (swparam.c:21-28).
+    this._zeroStateGiven = false;
+    if (props.getModelParam<number>("on"))  this._zeroStateGiven = true;
+    if (props.getModelParam<number>("off")) this._zeroStateGiven = false;
   }
 
   setup(ctx: SetupContext): void {
@@ -411,7 +510,7 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
       ctx, this._pool, this._stateBase,
       this._nCtrl, gOn, gOff,
       this._vThreshold, this._vHysteresis,
-      false,  // SWzero_stateGiven=false: NO path starts OFF (normally open)
+      this._zeroStateGiven,  // SWzero_stateGiven (swdefs.h:46), set by SW_IC_ON/SW_IC_OFF
       false,  // invertCtrl=false: normal polarity
       this._hNO_PP, this._hNO_PN, this._hNO_NP, this._hNO_NN,
     );
@@ -429,6 +528,85 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
       true,   // invertCtrl=true: complementary polarity
       this._hNC_PP, this._hNC_PN, this._hNC_NP, this._hNC_NN,
     );
+  }
+
+  stampAc(solver: SparseSolverStamp, _omega: number, _ctx: LoadContext): void {
+    // swacload.c:26-33 (SWacLoad) applied to both complementary SW paths. The
+    // SPDT element is a digiTS extension built from two SW instances, so each
+    // path runs the SWacLoad body independently. Purely resistive — no
+    // imaginary-part contribution.
+    const s0 = this._pool.states[0];
+    const rOnNow  = Math.max(this._rOn, 1e-3);
+    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+
+    // COM-NO path (slot base+0).
+    const stateNO = (s0[this._stateBase + 0]) | 0;       // swacload.c:26
+    const gNO = stateNO ? 1 / rOnNow : 1 / rOffNow;      // swacload.c:28
+    solver.stampElement(this._hNO_PP, +gNO);             // swacload.c:30
+    solver.stampElement(this._hNO_PN, -gNO);             // swacload.c:31
+    solver.stampElement(this._hNO_NP, -gNO);             // swacload.c:32
+    solver.stampElement(this._hNO_NN, +gNO);             // swacload.c:33
+
+    // COM-NC path (slot base+2).
+    const stateNC = (s0[this._stateBase + 2]) | 0;       // swacload.c:26
+    const gNC = stateNC ? 1 / rOnNow : 1 / rOffNow;      // swacload.c:28
+    solver.stampElement(this._hNC_PP, +gNC);             // swacload.c:30
+    solver.stampElement(this._hNC_PN, -gNC);             // swacload.c:31
+    solver.stampElement(this._hNC_NP, -gNC);             // swacload.c:32
+    solver.stampElement(this._hNC_NN, +gNC);             // swacload.c:33
+  }
+
+  getLteTimestep(
+    _dt: number,
+    deltaOld: readonly number[],
+    _order: number,
+    _method: IntegrationMethod,
+    _lteParams: LteParams,
+  ): number {
+    // swtrunc.c:23-46 (SWtrunc) applied to both complementary SW paths. The
+    // SPDT element is a digiTS extension built from two SW instances; ngspice's
+    // SWtrunc loops over every switch instance and folds each one into the same
+    // running *timeStep via MIN, so the SPDT returns the tighter of the two
+    // paths' proposed steps. Method-presence is the reactivity gate.
+    const noStep = this._truncPath(this._stateBase + 0, deltaOld);
+    const ncStep = this._truncPath(this._stateBase + 2, deltaOld);
+    return Math.min(noStep, ncStep);
+  }
+
+  /**
+   * SWtrunc body for one SW path (swtrunc.c:23-46), keyed off the path's state
+   * base. Returns the proposed timestep, or Infinity when the path imposes no
+   * constraint. Both complementary paths share vThreshold/vHysteresis.
+   */
+  private _truncPath(base: number, deltaOld: readonly number[]): number {
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const ctrl0 = s0[base + SLOT_V_CTRL];
+    const ctrl1 = s1 !== undefined ? s1[base + SLOT_V_CTRL] : ctrl0;
+    // swtrunc.c:23-25: lastChange = CKTstate0[SWctrlvalue] - CKTstate1[SWctrlvalue].
+    const lastChange = ctrl0 - ctrl1;
+    const deltaOld0 = deltaOld[0];  // swtrunc.c:32: CKTdeltaOld[0].
+    let ref: number;
+    let maxChange: number;
+    let maxStep: number;
+
+    // swtrunc.c:26: if (CKTstate0[SWswitchstate] == 0) — off branch.
+    if (s0[base + SLOT_STATE] === 0) {
+      ref = this._vThreshold + this._vHysteresis;                    // swtrunc.c:27
+      if (ctrl0 < ref && lastChange > 0) {                           // swtrunc.c:28
+        maxChange = (ref - ctrl0) * 0.75 + 0.05;                     // swtrunc.c:29-31
+        maxStep = maxChange / lastChange * deltaOld0;                // swtrunc.c:32
+        return maxStep;                                              // swtrunc.c:33-34
+      }
+    } else {
+      ref = this._vThreshold - this._vHysteresis;                    // swtrunc.c:37
+      if (ctrl0 > ref && lastChange < 0) {                           // swtrunc.c:38
+        maxChange = (ref - ctrl0) * 0.75 - 0.05;                     // swtrunc.c:39-41
+        maxStep = maxChange / lastChange * deltaOld0;                // swtrunc.c:42
+        return maxStep;                                              // swtrunc.c:43-44
+      }
+    }
+    return Infinity;
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -453,6 +631,10 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
     else if (key === "rOff")        this._rOff        = value;
     else if (key === "vThreshold")  this._vThreshold  = value;
     else if (key === "vHysteresis") this._vHysteresis = value;
+    // swparam.c:21-24 — SW_IC_ON: non-zero value ⇒ SWzero_stateGiven=TRUE (COM-NO path).
+    else if (key === "on")  { if (value) this._zeroStateGiven = true; }
+    // swparam.c:25-28 — SW_IC_OFF: non-zero value ⇒ SWzero_stateGiven=FALSE (COM-NO path).
+    else if (key === "off") { if (value) this._zeroStateGiven = false; }
   }
 }
 
@@ -655,6 +837,9 @@ const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "rOff",        propertyKey: "rOff",        convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "vThreshold",  propertyKey: "vThreshold",  convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "vHysteresis", propertyKey: "vHysteresis", convert: (v) => parseFloat(v), modelParam: true },
+  // SW_IC_ON / SW_IC_OFF instance keywords (swdefs.h:88-89) → SWzero_stateGiven.
+  { xmlName: "on",          propertyKey: "on",          convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "off",         propertyKey: "off",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",       propertyKey: "label",       convert: (v) => v },
 ];
 
