@@ -69,6 +69,45 @@ are sec4-allowed iteration plumbing and render as a zero-line TS delta.
 | `JFET_IC_VDS` / `here->JFETicVDS` | `ICVDS` / `p.ICVDS` |
 | `JFET_IC_VGS` / `here->JFETicVGS` | `ICVGS` / `p.ICVGS` |
 
+## AC small-signal load (jfetacld.c::JFETacLoad → NJFETElement.stampAc)
+
+The whole `JFETacLoad` function maps to `NJFETElement.stampAc(solver, omega,
+ctx, rhsRe, rhsIm)`. The C model/instance loop (`JFETnextModel` /
+`JFETinstances` / `JFETnextInstance`, hunk h001) is the per-element-invocation
+plumbing already documented above (zero-line TS delta). The body is the 22
+admittance stamps.
+
+| ngspice | digiTS |
+|---|---|
+| `model->JFETdrainConduct * here->JFETarea` | `(params.RD > 0 ? 1/params.RD : 0) * params.AREA` (gdpr) |
+| `model->JFETsourceConduct * here->JFETarea` | `(params.RS > 0 ? 1/params.RS : 0) * params.AREA` (gspr) |
+| `*(ckt->CKTstate0 + here->JFETgm)`  | `s0[base + SLOT_GM]`  (gm) |
+| `*(ckt->CKTstate0 + here->JFETgds)` | `s0[base + SLOT_GDS]` (gds) |
+| `*(ckt->CKTstate0 + here->JFETggs)` | `s0[base + SLOT_GGS]` (ggs) |
+| `*(ckt->CKTstate0 + here->JFETggd)` | `s0[base + SLOT_GGD]` (ggd) |
+| `*(ckt->CKTstate0 + here->JFETqgs) * ckt->CKTomega` | `s0[base + SLOT_QGS] * omega` (xgs) |
+| `*(ckt->CKTstate0 + here->JFETqgd) * ckt->CKTomega` | `s0[base + SLOT_QGD] * omega` (xgd) |
+| `here->JFETm` | `params.M` (m) |
+| `*(ptr) += val` | `solver.stampElement(handle, val)` |
+| `*(ptr +1) += val` | `solver.stampElementImag(handle, val)` |
+| `*(ptr) -= val` | `solver.stampElement(handle, -(val))` (additive primitive) |
+| `*(ptr +1) -= val` | `solver.stampElementImag(handle, -(val))` |
+| `JFETdrainDrainPtr` | `_hDD` |
+| `JFETgateGatePtr` | `_hGG` |
+| `JFETsourceSourcePtr` | `_hSS` |
+| `JFETdrainPrimeDrainPrimePtr` | `_hDPDP` |
+| `JFETsourcePrimeSourcePrimePtr` | `_hSPSP` |
+| `JFETdrainDrainPrimePtr` | `_hDDP` |
+| `JFETgateDrainPrimePtr` | `_hGDP` |
+| `JFETgateSourcePrimePtr` | `_hGSP` |
+| `JFETsourceSourcePrimePtr` | `_hSSP` |
+| `JFETdrainPrimeDrainPtr` | `_hDPD` |
+| `JFETdrainPrimeGatePtr` | `_hDPG` |
+| `JFETdrainPrimeSourcePrimePtr` | `_hDPSP` |
+| `JFETsourcePrimeGatePtr` | `_hSPG` |
+| `JFETsourcePrimeSourcePtr` | `_hSPS` |
+| `JFETsourcePrimeDrainPrimePtr` | `_hSPDP` |
+
 ## LTE truncation (jfettrun.c::JFETtrunc)
 
 | ngspice | digiTS |

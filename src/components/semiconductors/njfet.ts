@@ -33,6 +33,7 @@ import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -907,6 +908,71 @@ class NJFETElement extends PoolBackedAnalogElement {
     solver.stampElement(this._hSSP,  m * (-gspr));              // JFETsourceSourcePrimePtr
     solver.stampElement(this._hSPS,  m * (-gspr));              // JFETsourcePrimeSourcePtr
     solver.stampElement(this._hSS,   m * gspr);                 // JFETsourceSourcePtr
+  }
+
+  /**
+   * AC small-signal admittance stamp — jfetacld.c::JFETacLoad line-for-line.
+   *
+   * Reads the operating-point conductances (JFETgm/gds/ggs/ggd from CKTstate0)
+   * and the gate-junction charges (JFETqgs/JFETqgd from CKTstate0) persisted by
+   * the most recent load(), scaling the charges by CKTomega to form the
+   * junction susceptances xgs/xgd. The imaginary (susceptance) terms go to the
+   * `+1` half of each cell via stampElementImag; the real (conductance) terms
+   * via stampElement. The additive solver primitives have no subtract variant,
+   * so each ngspice `-=` is rendered as a stamp of the negated cell expression
+   * (jfetacld.c:55-61,63,66-68), preserving the operand order inside the
+   * parentheses.
+   */
+  stampAc(
+    solver: SparseSolverStamp,
+    omega: number,
+    _ctx: LoadContext,
+    _rhsRe: Float64Array,
+    _rhsIm: Float64Array,
+  ): void {
+    const s0 = this._pool.states[0];
+    const base = this._stateBase;
+    const params = this._params;
+
+    // jfetacld.c:36-43: dc conductances (area-scaled) + state0 reads, with the
+    // gate-junction charges scaled by CKTomega to form susceptances.
+    const gdpr = (params.RD > 0 ? 1 / params.RD : 0) * params.AREA;
+    const gspr = (params.RS > 0 ? 1 / params.RS : 0) * params.AREA;
+    const gm  = s0[base + SLOT_GM];
+    const gds = s0[base + SLOT_GDS];
+    const ggs = s0[base + SLOT_GGS];
+    const xgs = s0[base + SLOT_QGS] * omega;
+    const ggd = s0[base + SLOT_GGD];
+    const xgd = s0[base + SLOT_QGD] * omega;
+
+    // jfetacld.c:45: m = here->JFETm.
+    const m = params.M;
+
+    // jfetacld.c:47-68: Y-matrix stamps via cached TSTALLOC handles. Real
+    // (conductance) terms to the cell; imaginary (susceptance) terms to the
+    // `+1` half. ngspice `-=` rendered as a stamp of the negated expression.
+    solver.stampElement(this._hDD,    m * (gdpr));                  // *(JFETdrainDrainPtr)
+    solver.stampElement(this._hGG,    m * (ggd + ggs));             // *(JFETgateGatePtr)
+    solver.stampElementImag(this._hGG, m * (xgd + xgs));            // *(JFETgateGatePtr +1)
+    solver.stampElement(this._hSS,    m * (gspr));                  // *(JFETsourceSourcePtr)
+    solver.stampElement(this._hDPDP,  m * (gdpr + gds + ggd));      // *(JFETdrainPrimeDrainPrimePtr)
+    solver.stampElementImag(this._hDPDP, m * (xgd));               // *(JFETdrainPrimeDrainPrimePtr +1)
+    solver.stampElement(this._hSPSP,  m * (gspr + gds + gm + ggs)); // *(JFETsourcePrimeSourcePrimePtr)
+    solver.stampElementImag(this._hSPSP, m * (xgs));              // *(JFETsourcePrimeSourcePrimePtr +1)
+    solver.stampElement(this._hDDP,   -(m * (gdpr)));              // *(JFETdrainDrainPrimePtr) -=
+    solver.stampElement(this._hGDP,   -(m * (ggd)));              // *(JFETgateDrainPrimePtr) -=
+    solver.stampElementImag(this._hGDP, -(m * (xgd)));            // *(JFETgateDrainPrimePtr +1) -=
+    solver.stampElement(this._hGSP,   -(m * (ggs)));              // *(JFETgateSourcePrimePtr) -=
+    solver.stampElementImag(this._hGSP, -(m * (xgs)));            // *(JFETgateSourcePrimePtr +1) -=
+    solver.stampElement(this._hSSP,   -(m * (gspr)));             // *(JFETsourceSourcePrimePtr) -=
+    solver.stampElement(this._hDPD,   -(m * (gdpr)));             // *(JFETdrainPrimeDrainPtr) -=
+    solver.stampElement(this._hDPG,   m * (-ggd + gm));           // *(JFETdrainPrimeGatePtr)
+    solver.stampElementImag(this._hDPG, -(m * (xgd)));           // *(JFETdrainPrimeGatePtr +1) -=
+    solver.stampElement(this._hDPSP,  m * (-gds - gm));           // *(JFETdrainPrimeSourcePrimePtr)
+    solver.stampElement(this._hSPG,   m * (-ggs - gm));           // *(JFETsourcePrimeGatePtr)
+    solver.stampElementImag(this._hSPG, -(m * (xgs)));          // *(JFETsourcePrimeGatePtr +1) -=
+    solver.stampElement(this._hSPS,   -(m * (gspr)));            // *(JFETsourcePrimeSourcePtr) -=
+    solver.stampElement(this._hSPDP,  -(m * (gds)));             // *(JFETsourcePrimeDrainPrimePtr) -=
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
