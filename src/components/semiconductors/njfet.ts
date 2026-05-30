@@ -81,9 +81,13 @@ export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = d
     FC:   { default: 0.5,               description: "Forward-bias capacitance coefficient" },
     RD:   { default: 0,     unit: "Î",  description: "Drain ohmic resistance" },
     RS:   { default: 0,     unit: "Î",  description: "Source ohmic resistance" },
-    B:    { default: 1.0,               description: "Sydney University doping-tail parameter" },
-    TCV:  { default: 0.0,   unit: "V/K",description: "Threshold voltage temperature coefficient" },
-    BEX:  { default: 0.0,               description: "Mobility temperature exponent" },
+    B:      { default: 1.0,               description: "Sydney University doping-tail parameter" },
+    TCV:    { default: 0.0,   unit: "V/K", description: "Threshold voltage temperature coefficient" },
+    VTOTC:  { default: 0.0,   unit: "V/K", spiceName: "vtotc", description: "Threshold voltage temperature coefficient alternative (jfet.c:71 JFET_MOD_VTOTC)" },
+    BEX:    { default: 0.0,               description: "Mobility temperature exponent" },
+    BETATCE:{ default: 0.0,   unit: "%/K", spiceName: "betatce", description: "Mobility temperature exponent alternative (jfet.c:73 JFET_MOD_BETATCE)" },
+    XTI:    { default: 3.0,               spiceName: "xti", description: "Gate junction saturation current temperature exponent (jfet.c:74 JFET_MOD_XTI)" },
+    EG:     { default: 1.11,  unit: "eV",  spiceName: "eg", description: "Bandgap voltage (jfet.c:75 JFET_MOD_EG)" },
     KF:   { default: 0,                 description: "Flicker noise coefficient" },
     AF:   { default: 1,                 description: "Flicker noise exponent" },
     TNOM: { default: REFTEMP, unit: "K", description: "Nominal temperature for parameters", spiceConverter: kelvinToCelsius },
@@ -93,6 +97,8 @@ export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = d
     M:    { default: 1.0,               description: "Parallel multiplier" },
     TEMP: { default: 300.15,  unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     OFF:  { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
+    ICVDS:{ default: 0,    unit: "V",   emitGroup: { name: "IC", index: 0 }, spiceName: "icvds", description: "Initial condition for Vds (MODEUIC) (jfetpar.c:41-43 JFET_IC_VDS, vec[0])" },
+    ICVGS:{ default: 0,    unit: "V",   emitGroup: { name: "IC", index: 1 }, spiceName: "icvgs", description: "Initial condition for Vgs (MODEUIC) (jfetpar.c:45-47 JFET_IC_VGS, vec[1])" },
   },
 });
 
@@ -114,7 +120,11 @@ export interface JfetParams {
   RS: number;
   B: number;
   TCV: number;
+  VTOTC: number;
   BEX: number;
+  BETATCE: number;
+  XTI: number;
+  EG: number;
   AREA: number;
   M: number;
   KF: number;
@@ -122,6 +132,8 @@ export interface JfetParams {
   TNOM: number;
   TEMP: number;
   OFF: number;
+  ICVDS: number;
+  ICVGS: number;
   [key: string]: number;
 }
 
@@ -295,6 +307,20 @@ class NJFETElement extends PoolBackedAnalogElement {
   // cite: jfettemp.c:83-88 — JFETtempGiven mirrors PropertyBag givenness for TEMP.
   private _tempGiven: boolean;
 
+  // jfetdefs.h model-struct *Given bits: read whether the netlist supplied each
+  // temperature/bandgap parameter so the temperature pass can branch on
+  // givenness (jfettemp.c:92, :115, :120).
+  private _vtotcGiven: boolean;
+  private _betatceGiven: boolean;
+  private _xtiGiven: boolean;
+  private _egGiven: boolean;
+
+  // jfetdefs.h instance-struct JFETicVDSGiven / JFETicVGSGiven: track whether
+  // the netlist supplied the IC operating-point seeds, read by the UIC load
+  // branch (jfetload.c:109-114).
+  private _icVDSGiven: boolean;
+  private _icVGSGiven: boolean;
+
   // Internal nodes allocated during setup()- jfetset.c:115-158
   private _sourcePrimeNode = -1;
   private _drainPrimeNode  = -1;
@@ -316,6 +342,12 @@ class NJFETElement extends PoolBackedAnalogElement {
   ) {
     super(pinNodes);
     this._tempGiven = props.isModelParamGiven("TEMP");
+    this._vtotcGiven = props.isModelParamGiven("VTOTC");
+    this._betatceGiven = props.isModelParamGiven("BETATCE");
+    this._xtiGiven = props.isModelParamGiven("XTI");
+    this._egGiven = props.isModelParamGiven("EG");
+    this._icVDSGiven = props.isModelParamGiven("ICVDS");
+    this._icVGSGiven = props.isModelParamGiven("ICVGS");
     this._params = {
       VTO:    props.getModelParam<number>("VTO"),
       BETA:   props.getModelParam<number>("BETA"),
@@ -330,7 +362,11 @@ class NJFETElement extends PoolBackedAnalogElement {
       RS:     props.getModelParam<number>("RS"),
       B:      props.getModelParam<number>("B"),
       TCV:    props.getModelParam<number>("TCV"),
+      VTOTC:  props.getModelParam<number>("VTOTC"),
       BEX:    props.getModelParam<number>("BEX"),
+      BETATCE:props.getModelParam<number>("BETATCE"),
+      XTI:    props.getModelParam<number>("XTI"),
+      EG:     props.getModelParam<number>("EG"),
       AREA:   props.getModelParam<number>("AREA"),
       M:      props.getModelParam<number>("M"),
       KF:     props.getModelParam<number>("KF"),
@@ -338,6 +374,8 @@ class NJFETElement extends PoolBackedAnalogElement {
       TNOM:   props.getModelParam<number>("TNOM"),
       TEMP:   props.getModelParam<number>("TEMP"),
       OFF:    props.getModelParam<number>("OFF"),
+      ICVDS:  props.getModelParam<number>("ICVDS"),
+      ICVGS:  props.getModelParam<number>("ICVGS"),
     };
     this._tp = computeJfetTempParams(this._params);
   }
@@ -452,11 +490,13 @@ class NJFETElement extends PoolBackedAnalogElement {
       vgd = s1[base + SLOT_VGD];
       icheck = 0;
     } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-      // jfetload.c:109-114: UIC with IC params  digiTS has no ICVDS/ICVGS
-      // on JfetParams, so the IC values collapse to zero. With polarity=+1:
-      //   vds = polarity * 0 = 0;  vgs = polarity * 0 = 0;  vgd = vgs - vds.
-      vgs = 0;
-      vgd = 0;
+      // jfetload.c:109-114: UIC operating-point seed from the instance IC params.
+      //   vds = JFETtype * JFETicVDS;  vgs = JFETtype * JFETicVGS;  vgd = vgs - vds.
+      // With no netlisted ic, ICVDS/ICVGS default to 0 so the seed reduces to
+      // vgs = vgd = 0. N-channel polarity = +1.
+      const vds = polarity * params.ICVDS;
+      vgs = polarity * params.ICVGS;
+      vgd = vgs - vds;
       icheck = 0;
     } else if ((mode & MODEINITJCT) && params.OFF === 0) {
       // jfetload.c:115-118: initJct, device on  vgs=-1, vgd=-1.
@@ -878,7 +918,19 @@ class NJFETElement extends PoolBackedAnalogElement {
       this._tempGiven = true;
       // cite: jfettemp.c:83-88 — per-instance TEMP given overrides circuit temp.
       this._tp = computeJfetTempParams(this._params);
-    } else if (key in this._params) {
+      return;
+    }
+    // jfet.c:71-75 JFET_MOD_VTOTC/BETATCE/XTI/EG — a hot-loaded temperature/
+    // bandgap param sets its *Given bit so the temperature pass sees givenness.
+    if (key === "VTOTC") this._vtotcGiven = true;
+    else if (key === "BETATCE") this._betatceGiven = true;
+    else if (key === "XTI") this._xtiGiven = true;
+    else if (key === "EG") this._egGiven = true;
+    // jfetpar.c:41-47 JFET_IC_VDS / JFET_IC_VGS — a hot-loaded IC seed sets its
+    // *Given bit so JFETgetic does not overwrite it from the operating point.
+    else if (key === "ICVDS") this._icVDSGiven = true;
+    else if (key === "ICVGS") this._icVGSGiven = true;
+    if (key in this._params) {
       this._params[key] = value;
       this._tp = computeJfetTempParams(this._params);
     }
