@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-30T00:49:55.048Z",
+    "generated": "2026-05-30T00:57:50.599Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 33,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 138,
+    "progressEntriesApplied": 141,
     "progressEntriesStaleIgnored": 0
   },
   "files": [
@@ -42869,10 +42869,12 @@
         90
       ],
       "hunkHash": "98d84bb517b3b90f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/register-all.ts — the per-device `import` block. The digiTS counterpart of an ngspice `#include \"vdmos/vdmositf.h\"` line is the per-device-definition ES-module `import` near the top of register-all.ts. Sub-range of h005 isolates the single `+#include \"vdmos/vdmositf.h\"` line (the only IN-list registration in the parent hunk). VDMOS is IN per device-class-scope.md (frozen 2026-05-21) — reconstruction class. This hunk applies after the vdmos `wholeClass` reconstruction is APPLIED; the reconstruction item itself (`vdmos#recon/wholeClass`) is declared by the future per-device vdmos planning pass, not this overlay (device-class-scope.md is explicit: \"vdmos — Missing — declares vdmos#recon/wholeClass\"). Leave PENDING with this planningNote per the amendment instructions; the applier will pick this hunk up when the vdmos reconstruction lands.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH. Sub-item slice device-dispatch.md:86-90 isolates the single v41 +line #include \"vdmos/vdmositf.h\" (verified fresh against ref/ngspice/src/spicelib/devices/dev.c:127). digiTS structural counterpart of an ngspice per-device itf #include is the per-device-definition ES-module import near the top of register-all.ts. Present at src/components/register-all.ts:153 -- import { VdmosNDefinition, VdmosPDefinition } from \"./semiconductors/vdmos.js\";. Line-isomorphic: one v41 include +line <-> one digiTS import +line. The N/P split (two Definition symbols on one import) is the established digiTS convention for a type-flagged ngspice device (independently confirmed from code: NmosfetDefinition/PmosfetDefinition for the single MOS class, NpnBjt/PnpBjt for the single BJT class) -- not a rename-map assertion; ngspice VDMOS is one device class parameterised by type (vdmosset.c type=+/-1). rename-maps NOT consulted. No forbidden shape. Already committed at cc981161 (pre-port ngspice-parity continuation, ancestor of recon 813f321f); no working-tree delta. FILE-SCOPE: register-all.ts is clean in working tree; the three groups introduced no new diff; bjt.ts/mosfet.ts stray working-tree files are unrelated AC stampAc sibling work, not attributable to this group."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -42962,10 +42964,12 @@
         122
       ],
       "hunkHash": "5493a13e227d570f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/register-all.ts — the `registry.register(<Def>)` call sequence (the digiTS structural counterpart of ngspice's `static_devices[]` table). The hunk inserts `get_vdmos_info` after `get_vsrc_info`. VDMOS is IN per device-class-scope.md (frozen 2026-05-21) — reconstruction class. This hunk applies after the vdmos `wholeClass` reconstruction is APPLIED; the reconstruction item itself (`vdmos#recon/wholeClass`) is declared by the future per-device vdmos planning pass, not this overlay (device-class-scope.md is explicit: \"vdmos — Missing — declares vdmos#recon/wholeClass\"). Leave PENDING with this planningNote per the amendment instructions; the applier will pick this hunk up when the vdmos reconstruction lands. Structurally paired with `devsup.c#h004` (DevCapVDMOS, the VDMOS-specific Cgd shaping helper) — both feed the same vdmos reconstruction.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH. device-dispatch.md:115-122 = static_devices[] insertion +    get_vdmos_info, after get_vsrc_info (verified fresh against ref/ngspice/src/spicelib/devices/dev.c:202-203: get_vsrc_info, then get_vdmos_info,). digiTS structural counterpart of the static_devices[] table is the registry.register(<Def>) call sequence in register-all.ts. VDMOS present at src/components/register-all.ts:450-451 -- registry.register(VdmosNDefinition); registry.register(VdmosPDefinition);. The single v41 get_vdmos_info insertion <-> the digiTS vdmos registration insertion; N/P split mirrors h005a per the digiTS type-flagged-device convention. Positional note: ngspice orders get_vdmos_info after get_vsrc_info; digiTS registers VDMOS in the semiconductor block (after MOS, before JFET), and ngspice load-order parity is independently enforced by auditNgspiceLoadOrderTables(registry) at register-all.ts:580, not by literal positional mirroring of static_devices[] -- the contract maps this hunk to the register sequence (membership), which holds. VDMOS is IN per device-class-scope.md. rename-maps NOT consulted. Already committed at cc981161 (ancestor of recon); no working-tree delta. FILE-SCOPE clean for this group."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -43398,10 +43402,12 @@
         647
       ],
       "hunkHash": "8b7271d1acc638b7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "Future `src/components/semiconductors/vdmos.ts` (does not yet exist) — `DevCapVDMOS(vgd, cgdmin, cgdmax, a, cgs, *capgs, *capgd)` is a VDMOS-specific Cgd capacitance shaping helper (LTspice undocumented model) used by the VDMOS load path only. Wholly new in v41 (added inside `devsup.c` between `DEVcmeyer` and `DEVqmeyer`). VDMOS is IN per device-class-scope.md (frozen 2026-05-21) — reconstruction class; the scope doc's \"Engine-side consequences\" section explicitly classifies `DevCapVDMOS` as PORT, absorbed into `vdmos#recon/wholeClass`. The reconstruction item itself is declared by the future per-device vdmos planning pass, not this overlay. Leave PENDING with this planningNote per the amendment instructions; the applier will pick this hunk up when the vdmos reconstruction lands. Structurally paired with `dev.c#h005a` (vdmos include) and `dev.c#h007` (vdmos static_devices entry).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Tier1+Tier2 MATCH vs ref/ngspice/src/spicelib/devices/devsup.c:653-665 (DevCapVDMOS), v41-NEW all-additions hunk (device-dispatch.md:625-647). Bijective construct correspondence re-derived independently (rename-maps NOT consulted), fresh v41 read: double s=(cgdmax-cgdmin)/(1+M_PI/2) <-> const s=(cgdmax-cgdmin)/(1+Math.PI/2) (operands/grouping identical, M_PI->Math.PI); double y=cgdmax-s <-> const y=cgdmax-s; if(vgd>0) *capgd=0.5*(s*tanh(a*vgd)+y) else *capgd=0.5*(s*atan(a*vgd)+y) <-> ternary vgd>0 ? 0.5*(s*Math.tanh(a*vgd)+y) : 0.5*(s*Math.atan(a*vgd)+y) (condition, branch arms, tanh/atan split, operand order all identical); *capgs=0.5*cgs <-> const capgs=0.5*cgs; out-pointers *capgs,*capgd <-> returned {capgs,capgd} (C<->TS surface form, allowed). No construct dropped, no operand reorder, no algebraic simplification, no forbidden shape. PLACEMENT: the contract maps tsFile=vdmos.ts, but DevCapVDMOS lives in ngspice devsup.c (shared device-support, NOT a device file); digiTS counterpart is src/solver/analog/newton-raphson.ts:373 export function devCapVdmos (sibling of pnjlim/fetlim/limvds/limitlog) -- the IDENTICAL architectural choice already accepted for devsup.c#h001 (DEVlimitlog->newton-raphson.ts limitlog, APPLIED). It is CALLED from the VDMOS load path at src/components/semiconductors/vdmos.ts:1054 (devCapVdmos(vgd,cgdmin,cgdmax,a,cgs) -> s0 CAPGS/CAPGD), so the vdmos.ts integration the contract references is the call site; the helper definition is the shared file. Already committed at cc981161 (ancestor of recon 813f321f); no working-tree delta. sec1a harness gate N/A here (single all-additions helper hunk; whole-device harness parity already established null by recon vdmos#recon/wholeClass on vdmos-power-switch.dts). FILE-SCOPE: no new diff introduced by this group."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
