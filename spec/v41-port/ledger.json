@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-31T21:25:11.230Z",
+    "generated": "2026-05-31T21:29:32.277Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 142,
+    "progressEntriesApplied": 143,
     "progressEntriesStaleIgnored": 6
   },
   "files": [
@@ -44322,10 +44322,12 @@
         586
       ],
       "hunkHash": "51bc2cdfe2feb446",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ckt-context.ts (CKTepsmin: minimum argument floor for log() in junction saturation-current evaluation; default 1e-28 -> no default-behavior change per #58). DEVnameHash/MODnameHash are unchanged context (shell device/model symbol tables), not added lines.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH. functionGroup include-ngspice/cktdefs.h::struct CKTcircuit {; tsFile src/solver/analog/ckt-context.ts. Sub-item slice docLineRange[579-586] of split hunk h012 adds exactly `double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/` (diff line 583) + one blank line; the DEVnameHash/MODnameHash lines are unchanged context and the noise_input add is carved to sibling sub-item #h012b (NO-COUNTERPART, frozen). Verified against fresh ref/ngspice/src/include/ngspice/cktdefs.h:323 (CKTepsmin member) and cktinit.c:94 (sckt->CKTepsmin = 1e-28) by hand; rename-maps NOT consulted. TIER1 (zero-delta blocked-hunk): the construct `double CKTepsmin` <-> ckt-context.ts:346 `cktEpsmin: number = 1e-28` is PRESENT, placed by the blocked-by reconstruction item include-ngspice#recon/epsmin (APPLIED, hunkHash 909f8bd025236ffc, commit d082bac0). Per TASK.md sec6 blocked-hunk semantics the pre-image is case (a) once the recon is APPLIED; the field default 1e-28 matches cktinit.c:94 exactly, the cited cktdefs.h:323 declaration is verbatim. Allowed C<->TS differences only: `double`->`number`, identifier CKTepsmin->cktEpsmin, comment wording. The applier's incremental delta is zero because the field was landed by the recon, NOT because a real change was dropped -- the added construct is present and correct. PASS. TIER2 (bijective, struct-member add): the v41 struct member `double CKTepsmin` maps one-to-one to the class field cktEpsmin (same semantic = minimum log-argument floor for diode/VDMOS saturation current, same default 1e-28, correct type and citation); no unmapped v41 construct, no digiTS construct without a v41 counterpart. PASS. FILE-SCOPE: git diff src/solver/analog/ckt-context.ts empty (field committed via recon commit d082bac0); rename-maps/include-ngspice.md committed. The other working-tree-modified files (bjt.ts/mosfet.ts = pre-existing AC stampAc work per the gitStatus snapshot and the recon verifierNote; ledger/state files) are NOT edits of this group -- no over-application attributable to include-ngspice/#h012a. Source-only single-hunk per VERIFICATION.md sec1; the section1a harness gate was carried by the blocked-by reconstruction (null firstDivergence on resistive-divider.dts)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
