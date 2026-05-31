@@ -35,6 +35,21 @@ highest-order term first (`ag[order]*state[order]`) down to `ag[1]*state1` then
 | GEAR `default: return(E_ORDER)` (niinteg.c:66-67) | `if (order < 1 \|\| order > 6) throw new Error(...E_ORDER)` |
 | `return(E_METHOD)` (niinteg.c:75) | `else { throw new Error(...E_METHOD) }` (method neither trap nor gear) |
 
+## nicomcof.c::NIcomCof GEAR ag-zeroing (#h003)
+
+`#h003` is `bzero(ckt->CKTag,7*sizeof(double))` → `memset(ckt->CKTag, 0,
+7*sizeof(double))` (nicomcof.c:65). Both v26 and v41 clear the whole 7-wide
+`CKTag` array. digiTS clears `ag` in `solveGearVandermonde`
+(`src/solver/analog/integration.ts`) via `ag.fill(0, 0, 7)` — the byte-span
+isomorph of the v41 `memset` (CKTag is `double[7]`; digiTS `ag` is
+`Float64Array(7)`, ckt-context.ts:720).
+
+| ngspice | digiTS |
+|---|---|
+| `ckt->CKTag` | `ag` (Float64Array(7), ckt-context.ts:266,720) |
+| `memset(ckt->CKTag, 0, 7*sizeof(double))` (nicomcof.c:65) | `ag.fill(0, 0, 7)` (integration.ts solveGearVandermonde) |
+| `ckt->CKTag[1] = -1/ckt->CKTdelta` (nicomcof.c:66) | `ag[1] = -1 / dt` |
+
 ## Identifiers referenced in the escalated groups (for cross-hunk consistency)
 
 These groups are ESCALATED (see `ESCALATIONS.md` ESC-002…ESC-006); the mappings

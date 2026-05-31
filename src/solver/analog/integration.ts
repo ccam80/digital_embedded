@@ -165,8 +165,11 @@ function solveGearVandermonde(
     }
   }
 
-  // Initialize RHS (ag). ngspice: bzero then ag[1] = -1/delta.
-  for (let i = 0; i <= order; i++) ag[i] = 0;
+  // nicomcof.c:65 — memset(ckt->CKTag, 0, 7*sizeof(double)) then
+  // ckt->CKTag[1] = -1/ckt->CKTdelta. The clear spans the whole 7-wide CKTag
+  // array (CKTag is double[7], ckt-context.ts ag = Float64Array(7)), not just
+  // slots 0..order, so ag.fill(0, 0, 7) reproduces the memset byte-span exactly.
+  ag.fill(0, 0, 7);
   ag[1] = -1 / dt;
 
   // Set up matrix columns. ngspice nicomcof.c:70-86.
