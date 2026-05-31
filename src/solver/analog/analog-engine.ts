@@ -1486,6 +1486,10 @@ export class MNAEngine implements AnalogEngine {
       solver: this._solver,
       temp: params.temp ?? 300.15,
       nomTemp: params.nomTemp ?? 300.15,
+      // epsmin sourced from the live CKTCircuitContext (cktdefs.h:323 field),
+      // falling back to params.epsmin ?? 1e-28 (DEFAULT_SIMULATION_PARAMS) when
+      // the context is not yet constructed, mirroring the temp/nomTemp shape.
+      epsmin: this._ctx?.cktEpsmin ?? (params.epsmin ?? 1e-28),
       copyNodesets: params.copyNodesets ?? false,
       makeVolt(label, suffix) { return engine._makeNode(label, suffix, "voltage"); },
       makeCur (label, suffix) { return engine._makeNode(label, suffix, "current"); },

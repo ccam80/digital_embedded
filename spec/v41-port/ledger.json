@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-31T11:15:21.075Z",
+    "generated": "2026-05-31T21:25:11.230Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 141,
+    "progressEntriesApplied": 142,
     "progressEntriesStaleIgnored": 6
   },
   "files": [
@@ -59708,7 +59708,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "engine#recon/nodeAllocOrder"
+      "blockedBy": "parser#recon/nodeAllocOrder"
     },
     {
       "id": "parser/inppas2.c#h002",
@@ -59739,7 +59739,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "engine#recon/nodeAllocOrder"
+      "blockedBy": "parser#recon/nodeAllocOrder"
     },
     {
       "id": "parser/inppas2.c#h003",
@@ -59770,7 +59770,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "engine#recon/nodeAllocOrder"
+      "blockedBy": "parser#recon/nodeAllocOrder"
     },
     {
       "id": "parser/inppas3.c#h001",
@@ -61258,7 +61258,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "engine#recon/nodeAllocOrder"
+      "blockedBy": "parser#recon/nodeAllocOrder"
     },
     {
       "id": "parser/inptyplk.c#h001",
@@ -62051,9 +62051,11 @@
         "include-ngspice/cktdefs.h#h012a"
       ],
       "hunkHash": "909f8bd025236ffc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH (reconstruction). VERIFICATION.md sec1a both legs satisfied. SPEC-PRESENCE GATE: spec/v41-port/reconstruction/engine-epsmin.md present on disk, RATIFIED 2026-05-30. (a) Source isomorphism re-derived INDEPENDENTLY against fresh ref/ngspice (rename-maps NOT consulted). Citations verified by hand: cktdefs.h:323 declares \"double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/\"; cktinit.c:94 \"sckt->CKTepsmin = 1e-28;\"; diosetup.c:92-103 knee-current disable gated on model->DIOforwardKneeCurrentGiven / model->DIOreverseKneeCurrentGiven each testing \"< ckt->CKTepsmin\" and clearing the *Given flag; diosetup.c:189-191 \"if (model->DIOsatCur < ckt->CKTepsmin) model->DIOsatCur = ckt->CKTepsmin;\"; vdmosset.c:250-252 \"if (model->VDIOjctSatCur < ckt->CKTepsmin) model->VDIOjctSatCur = ckt->CKTepsmin;\". PART A (engine field): ckt-context.ts adds cktEpsmin:number=1e-28 adjacent to cktIndVerbosity, cited cktdefs.h:323 + cktinit.c:94; constructor + refreshTolerances override cktEpsmin from params.epsmin when defined (mirrors the cktIndVerbosity hot-reload pattern, cited cktdojob.c:110 CKTepsmin=task->TSKepsmin). analog-engine-interface.ts adds SimulationParams.epsmin?:number + DEFAULT_SIMULATION_PARAMS.epsmin=1e-28. PART B (SetupContext surface): setup-context.ts adds readonly epsmin:number after nomTemp; analog-engine.ts _buildSetupContext populates epsmin: this._ctx?.cktEpsmin ?? (params.epsmin ?? 1e-28), the same wiring shape as temp/nomTemp (the spec-sanctioned fallback when the context is not reachable). PART C (diode setup, diode.ts): setup() floors params.IS to ctx.epsmin when params.IS < ctx.epsmin and re-runs applyDioTempResult(dioTemp(...)) so tIS (DIOtSatCur) derives from the floored value, matching diosetup.c:190-191 applied before DIOtemp. Knee disable forces IKF/IKR to Infinity when isFinite(params.IK*) && params.IK* < ctx.epsmin. Verified the diode load() knee gates at diode.ts:772 / diode.ts:786 use isFinite(params.IKF) / isFinite(params.IKR), so forcing Infinity skips the high-injection Norton arm = the structural analogue of ngspice clearing DIOforwardKneeCurrentGiven / DIOreverseKneeCurrentGiven. The leading isFinite guard leaves an ungiven (default-Infinity) knee untouched, disables only a given finite sub-floor knee. PART D (vdmos setup, vdmos.ts): setup() floors p.IS to ctx.epsmin when p.IS < ctx.epsmin. Verified _tSatCur is computed in computeTemperature() at vdmos.ts:709 (reading p.IS) which runs AFTER setup(), so the floor precedes the temperature pass that consumes it = VDMOSsetup-before-VDMOStemp order; the spec re-run clause is not needed because computeTemperature runs post-setup. VDMOS has no IKF/IKR; only the body-diode saturation current is floored. The 1e-28 constant appears ONLY at the cktEpsmin field default + DEFAULT_SIMULATION_PARAMS; every device floor reads ctx.epsmin, no device site inlines 1e-28. Bijective over reconstructed scope. (b) HARNESS GATE: server_restart -> harness_start(dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll) on src/solver/analog/__tests__/ngspice-parity/fixtures/resistive-divider.dts (the contract gate fixture) -> harness_run -> harness_first_divergence: firstDivergence NULL across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape), earliest null; 107/107 tran steps both engines, 0 failed, avgIterations 2.028 both, maxIterations 5 both, stepCount delta 0. Bit-exact. FILE-SCOPE: git diff --name-only shows the 6 recon tsFiles (ckt-context.ts, setup-context.ts, analog-engine.ts, analog-engine-interface.ts, diode.ts, vdmos.ts) plus bjt.ts/mosfet.ts which carry pre-existing unrelated AC stampAc sibling work (present at session start per the gitStatus snapshot; verified zero epsmin/CKTepsmin content in those diffs) -- NOT over-application by this recon, which touched only its 6 tsFiles. Commit scoped to the 6 recon tsFiles + progress/ledger."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -62719,7 +62721,7 @@
       "escalation": null
     },
     {
-      "id": "engine#recon/nodeAllocOrder",
+      "id": "parser#recon/nodeAllocOrder",
       "kind": "reconstruction",
       "diffDoc": "spec/ngspice-v41-engine-diffs/parser.md",
       "ngspiceFile": null,
@@ -62751,7 +62753,7 @@
         "parser/inppas2.c#h003",
         "parser/inpsymt.c#h001"
       ],
-      "hunkHash": "ff1082a2166ef740",
+      "hunkHash": "ddd28193a655604e",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],

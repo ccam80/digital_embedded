@@ -21,6 +21,10 @@ export interface SetupContext {
   /** ckt->CKTnomTemp. */
   readonly nomTemp: number;
 
+  /** ckt->CKTepsmin (cktdefs.h:323) — minimum log-argument floor for the
+   *  diode/VDMOS saturation-current and knee-current setup clamps. */
+  readonly epsmin: number;
+
   /** ckt->CKTcopyNodesets. */
   readonly copyNodesets: boolean;
 

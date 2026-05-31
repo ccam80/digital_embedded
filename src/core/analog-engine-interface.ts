@@ -176,6 +176,14 @@ export interface SimulationParams {
    * Default: 2 (ngspice cktinit.c:65). Hot-loadable via configure().
    */
   indVerbosity?: number;
+  /**
+   * Minimum argument value for log-domain device quantities (ngspice CKTepsmin,
+   * cktdefs.h:323). The lower clamp the diode/VDMOS setup applies to the
+   * saturation current and the diode high-injection knee currents. Sourced from
+   * the user `option epsmin` (cktdojob.c:110 — CKTepsmin = task->TSKepsmin).
+   * Default: 1e-28 (ngspice cktinit.c:94). Hot-loadable via configure().
+   */
+  epsmin?: number;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
@@ -215,6 +223,7 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   nomTemp: 300.15,
   copyNodesets: false,
   indVerbosity: 2,
+  epsmin: 1e-28,
 };
 
 /**

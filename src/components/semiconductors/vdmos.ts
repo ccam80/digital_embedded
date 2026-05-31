@@ -464,6 +464,14 @@ function _createVdmosElementWithType(
     // Part C — setup()
     // -----------------------------------------------------------------------
     setup(ctx: SetupContext): void {
+      // cite: vdmosset.c:251-252 — set lower limit of the body-diode saturation
+      // current (VDIOjctSatCur). ngspice floors it in VDMOSsetup, before
+      // VDMOStemp (vdmostemp.c:99-107) derives tSatCur from it; flooring p.IS
+      // here precedes the post-setup computeTemperature() pass that consumes it.
+      if (p.IS < ctx.epsmin) {
+        p.IS = ctx.epsmin;
+      }
+
       const solver = ctx.solver;
       dNode = this.pinNodes.get("D")!;
       gNode = this.pinNodes.get("G")!;

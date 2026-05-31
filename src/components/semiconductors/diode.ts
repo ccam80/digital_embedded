@@ -552,6 +552,35 @@ export function createDiodeElement(
     }
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      // cite: diosetup.c:190-191 — set lower limit of saturation current. ngspice
+      // floors model->DIOsatCur before DIOtemp consumes it; floor the
+      // area-scaled IS (the DIOsatCur analogue) and re-run the temperature pass
+      // that produced tIS (DIOtSatCur) so tIS derives from the floored value.
+      if (params.IS < ctx.epsmin) {
+        params.IS = ctx.epsmin;
+        applyDioTempResult(dioTemp({
+          IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
+          BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
+          XTI: params.XTI, TNOM: params.TNOM,
+          ISW: params.ISW, NSW: params.NSW, FC: params.FC,
+        }, params.TEMP));
+      }
+      // cite: diosetup.c:92-103 — disable the high-injection knee effect when
+      // IKF/IKR is below the log-argument floor. ngspice clears
+      // DIOforwardKneeCurrentGiven / DIOreverseKneeCurrentGiven; the load() knee
+      // arms (dioload.c:290-314) gate on …Given. Forcing IKF/IKR to Infinity
+      // makes isFinite(params.IKF)===false at diode.ts load() (the IKF/IKR Norton
+      // gate), the structural analogue of …Given=FALSE. The leading isFinite
+      // guard is the analogue of `if (model->DIO*KneeCurrentGiven)`: an ungiven
+      // (default-Infinity) knee is left untouched, a given finite sub-floor knee
+      // is disabled.
+      if (isFinite(params.IKF) && params.IKF < ctx.epsmin) {
+        params.IKF = Infinity;
+      }
+      if (isFinite(params.IKR) && params.IKR < ctx.epsmin) {
+        params.IKR = Infinity;
+      }
+
       const solver = ctx.solver;
       const posNode = this.pinNodes.get("A")!;
       const negNode = this.pinNodes.get("K")!;

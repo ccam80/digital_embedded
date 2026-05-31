@@ -335,6 +335,16 @@ export class CKTCircuitContext {
    */
   cktIndVerbosity: number = 2;
 
+  /**
+   * ngspice CKTepsmin (cktdefs.h:323). Minimum argument value for log-domain
+   * device quantities — the lower clamp the diode/VDMOS setup applies to the
+   * saturation current and the diode high-injection knee currents so the
+   * subsequent log/exp evaluations stay in-domain.
+   * cite: cktdefs.h:323  — double CKTepsmin; minimum argument value for some log functions
+   * cite: cktinit.c:94    — sckt->CKTepsmin = 1e-28;
+   */
+  cktEpsmin: number = 1e-28;
+
   /** Cached TempContext instance. Null until first access of `tempCtx`. */
   private _tempCtx: TempContext | null = null;
 
@@ -801,6 +811,14 @@ export class CKTCircuitContext {
       this.cktIndVerbosity = params.indVerbosity;
     }
 
+    // cite: cktdojob.c:110 — ckt->CKTepsmin = task->TSKepsmin (user `option
+    // epsmin`). The field default 1e-28 (cktinit.c:94) stands when the param is
+    // omitted; the device floors read this.cktEpsmin so a future override is
+    // honored everywhere at once.
+    if (params.epsmin !== undefined) {
+      this.cktEpsmin = params.epsmin;
+    }
+
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;
     this.diagonalGmin = params.diagGmin ?? 0;
@@ -920,6 +938,11 @@ export class CKTCircuitContext {
     // TempContext below so the next verify pass observes the new value.
     if (params.indVerbosity !== undefined) {
       this.cktIndVerbosity = params.indVerbosity;
+    }
+    // cite: cktdojob.c:110 — CKTepsmin re-read on configure() so the device
+    // saturation/knee floors are hot-loadable, mirroring CKTindverbosity above.
+    if (params.epsmin !== undefined) {
+      this.cktEpsmin = params.epsmin;
     }
     this.resetTempCtx();
 
