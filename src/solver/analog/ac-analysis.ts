@@ -200,6 +200,20 @@ export class AcAnalysis {
   private readonly _compiled: AcCompiledCircuit;
   private readonly _deps: AcAnalysisDeps;
 
+  // niaciter.c — the six complex RHS buffers NIacIter operates on, held on the
+  // ckt (cktdefs.h CKTrhs/CKTrhsSpare/CKTrhsOld real triple + CKTirhs/
+  // CKTirhsSpare/CKTirhsOld imag triple). rhs/rhsOld ping-pong each frequency
+  // (niaciter.c:171,173); spare is NG_IGNORE'd scratch (spsmp.c:222-223).
+  // Allocated once per run() (cktsetup.c RHS-allocation block), reused per
+  // frequency. Length N+1: index 0 is the ground sentinel cleared post-solve
+  // (niaciter.c:164-169).
+  private _acRhsRe: Float64Array = new Float64Array(0);     // CKTrhs
+  private _acRhsIm: Float64Array = new Float64Array(0);     // CKTirhs
+  private _acRhsOldRe: Float64Array = new Float64Array(0);  // CKTrhsOld
+  private _acRhsOldIm: Float64Array = new Float64Array(0);  // CKTirhsOld
+  private _acRhsSpareRe: Float64Array = new Float64Array(0); // CKTrhsSpare
+  private _acRhsSpareIm: Float64Array = new Float64Array(0); // CKTirhsSpare
+
   /**
    * @param compiled - Adapted compiled-circuit view (matrixSize, elements, …).
    * @param _params  - Simulation params. Retained on the constructor signature
@@ -316,15 +330,18 @@ export class AcAnalysis {
     // is no synthetic branch- matrix dimension equals N, not N+1.
     const N = compiled.matrixSize;
 
-    // Caller-owned RHS / solution vectors (length N+1: indices 0..N, with
-    // slot 0 = ground sentinel matching ngspice's CKTrhs / CKTirhs layout),
-    // reused each frequency. SparseSolver.solve takes the real and imaginary
-    // halves as separate parallel arrays (ngspice RHS / iRHS, Solution /
-    // iSolution)- the halves are NOT adjacent.
-    const rhsRe = new Float64Array(N + 1);
-    const rhsIm = new Float64Array(N + 1);
-    const solRe = new Float64Array(N + 1);
-    const solIm = new Float64Array(N + 1);
+    // cktsetup.c RHS-allocation block — six AC RHS buffers (real+imag triples),
+    // length N+1 (index 0 = ground sentinel). Allocated once, reused per
+    // frequency; rhs/rhsOld ping-pong each point (niaciter.c:171,173), spare is
+    // NG_IGNORE'd scratch (spsmp.c:222-223). There is no dedicated solution
+    // buffer pair: the complex solve is in place (RHS aliased as Solution,
+    // spsmp.c:225), and the post-solve SWAP lands the solution in rhsOld/irhsOld.
+    this._acRhsRe      = new Float64Array(N + 1);
+    this._acRhsIm      = new Float64Array(N + 1);
+    this._acRhsOldRe   = new Float64Array(N + 1);
+    this._acRhsOldIm   = new Float64Array(N + 1);
+    this._acRhsSpareRe = new Float64Array(N + 1);
+    this._acRhsSpareIm = new Float64Array(N + 1);
 
     // Step 5: Frequency sweep- one unified SparseSolver in complex mode, the
     // same factor/solve code path as DC and transient (ngspice spSetComplex).
@@ -362,17 +379,23 @@ export class AcAnalysis {
       // the first AC frequency).
       solver._resetForAssembly();
 
-      // Zero the complex RHS before stamping. AC sources (V/I) accumulate
-      // their `AC <mag> [<phase>]` contributions via stampAc directly into
-      // these arrays per vsrcacld.c:179-180 and isrcacld.c:43-50.
-      rhsRe.fill(0);
-      rhsIm.fill(0);
+      // niaciter.c:114 + CKTacLoad — zero the loaded complex RHS before the
+      // per-type acLoad accumulates AC source contributions. Only the loaded
+      // pair (CKTrhs/CKTirhs) is zeroed; rhsOld/spare are scratch the solve and
+      // swap manage. AC sources (V/I) accumulate their `AC <mag> [<phase>]`
+      // contributions via stampAc directly into these arrays per
+      // vsrcacld.c:179-180 and isrcacld.c:43-50.
+      this._acRhsRe.fill(0);
+      this._acRhsIm.fill(0);
 
       // Stamp all elements' AC admittances and RHS contributions via the
       // family dispatcher. Elements lazily allocate their matrix cells on
-      // the first stamp.
+      // the first stamp. Stamps land in CKTrhs/CKTirhs (_acRhsRe/_acRhsIm).
       // cite: acan.c:409-414 -- per-type DEVacLoad loop.
-      const acHandlerCtx: AcHandlerCtx = { solver, omega, loadCtx: acLoadCtx, rhsRe, rhsIm };
+      const acHandlerCtx: AcHandlerCtx = {
+        solver, omega, loadCtx: acLoadCtx,
+        rhsRe: this._acRhsRe, rhsIm: this._acRhsIm,
+      };
       runByDeviceFamily(compiled.elementsByFamily, "stampAc", acHandlerCtx, defaultStampAcHandler);
 
       // Harness matrix capture (pre-factor)- mirrors ngspice's
@@ -406,23 +429,40 @@ export class AcAnalysis {
       const err = fi === 0 ? solver.orderAndFactor() : solver.factor();
 
       if (err === 0) {
-        // Harness RHS capture (pre-solve)- mirrors ni_ac_capture_loaded_rhs.
-        // solve() reads rhsRe/rhsIm and writes solRe/solIm (separate buffers),
-        // so capturing here is timing-equivalent to capturing after solve;
-        // doing it pre-solve matches the C-side fire-order exactly.
-        const snapshotRhsRe = this._deps.acSnapshotSink ? rhsRe.slice() : null;
-        const snapshotRhsIm = this._deps.acSnapshotSink ? rhsIm.slice() : null;
+        // niaciter.c:156 ni_ac_capture_loaded_rhs window — capture the LOADED
+        // complex RHS before the in-place solve overwrites CKTrhs/CKTirhs
+        // (_acRhsRe/_acRhsIm). Under the six-buffer model the solve destroys the
+        // loaded RHS, so this capture-before-overwrite timing is mandatory.
+        const snapshotRhsRe = this._deps.acSnapshotSink ? this._acRhsRe.slice() : null;
+        const snapshotRhsIm = this._deps.acSnapshotSink ? this._acRhsIm.slice() : null;
 
-        solRe.fill(0);
-        solIm.fill(0);
-        // ngspice spSolve(Matrix, RHS, Solution, iRHS, iSolution).
-        solver.solve(rhsRe, solRe, rhsIm, solIm);
+        // spsmp.c:225 — SMPcSolve does spSolve(M, RHS, RHS, iRHS, iRHS): the
+        // complex solve is IN PLACE, RHS aliased as Solution. solver.solve is
+        // the frozen spSolve port; pass _acRhsRe as both rhs and solution,
+        // _acRhsIm as both iRHS and iSolution. The Spare buffers SMPcSolve takes
+        // are NG_IGNORE'd (spsmp.c:222-223), so they are not passed here.
+        solver.solve(this._acRhsRe, this._acRhsRe, this._acRhsIm, this._acRhsIm);
 
+        // niaciter.c:164-169 — clear the ground sentinel [0] on all six RHS
+        // buffers, in ngspice order (rhs, rhsSpare, rhsOld, irhs, irhsSpare,
+        // irhsOld).
+        this._acRhsRe[0] = 0;
+        this._acRhsSpareRe[0] = 0;
+        this._acRhsOldRe[0] = 0;
+        this._acRhsIm[0] = 0;
+        this._acRhsSpareIm[0] = 0;
+        this._acRhsOldIm[0] = 0;
+
+        // niaciter.c:171,173 — SWAP imag then real; the in-place solution moves
+        // into rhsOld/irhsOld (_acRhsOldRe/_acRhsOldIm).
+        this._swapAcRhs();
+
+        // Solution now lives in _acRhsOld{Re,Im} (= CKTrhsOld/CKTirhsOld).
         // Extract transfer function at each output node (1-based index).
         for (const [label, nodeId] of outputNodeIds) {
           if (nodeId >= 1 && nodeId <= N) {
-            const re = solRe[nodeId];
-            const im = solIm[nodeId];
+            const re = this._acRhsOldRe[nodeId];
+            const im = this._acRhsOldIm[nodeId];
             const mag = Math.sqrt(re * re + im * im);
             const magDb = mag > 0 ? 20 * Math.log10(mag) : -300;
             const phaseDeg = (Math.atan2(im, re) * 180) / Math.PI;
@@ -447,8 +487,10 @@ export class AcAnalysis {
             matrix: snapshotMatrix,
             rhsRe: snapshotRhsRe!,
             rhsIm: snapshotRhsIm!,
-            solRe: solRe.slice(),
-            solIm: solIm.slice(),
+            // niaciter.c:175-177 — solution read from rhsOld/irhsOld after the
+            // swap (ni_ac_capture_solution_and_fire reads CKTrhsOld/CKTirhsOld).
+            solRe: this._acRhsOldRe.slice(),
+            solIm: this._acRhsOldIm.slice(),
           });
         }
       }
@@ -468,6 +510,20 @@ export class AcAnalysis {
       imag: imagMap,
       diagnostics: diagnostics.getDiagnostics(),
     };
+  }
+
+  /**
+   * niaciter.c:171,173 — SWAP(double*, CKTirhs, CKTirhsOld) then
+   * SWAP(double*, CKTrhs, CKTrhsOld). Reference swap of the Float64Array fields:
+   * the post-solve solution the in-place SMPcSolve left in _acRhs{Re,Im} moves
+   * to _acRhsOld{Re,Im}, and the stale buffers move back to _acRhs{Re,Im} for
+   * the next frequency's reload. Imaginary pair first, real pair second, matching
+   * the ngspice SWAP order; the order is immaterial to the result (independent
+   * pairs) but is reproduced for line-for-line structural parity.
+   */
+  private _swapAcRhs(): void {
+    const tmpIm = this._acRhsIm;  this._acRhsIm = this._acRhsOldIm;  this._acRhsOldIm = tmpIm;
+    const tmpRe = this._acRhsRe;  this._acRhsRe = this._acRhsOldRe;  this._acRhsOldRe = tmpRe;
   }
 
   private _setupAnalysis(): {
