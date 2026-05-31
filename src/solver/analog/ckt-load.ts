@@ -49,7 +49,12 @@ function makeTroubleTrackingHandler(
       for (const el of instances) {
         el.load(lctx);
         if (lctx.noncon.value > 0) {
+          // cktload.c:64-65 — clear the trouble node and element so a stale
+          // blame from a prior iteration does not leak. The device's own
+          // convTest (dioconv.c:61) sets CKTtroubleElt; the NR-layer niConvTest
+          // sets CKTtroubleNode.
           ctx.troubleNode = null;
+          ctx.troubleElt = null;
         }
       }
     },

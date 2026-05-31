@@ -1,6 +1,71 @@
 {
   "_comment": "Loop-progress overlay - written by the port loop, never by hand-editing ledger.json. The verifier records APPLIED here; the applier/verifier record ESCALATED and attempts here. build-ledger.mjs applies it so ledger.json is fully derived (diffs + splits.json + planning/*-decisions.json + progress.json). Each item entry: state (PENDING|APPLIED|ESCALATED - never NO-COUNTERPART, which is planning-frozen), attempts (int), verifierNotes (string[]), escalation (object|null, required when ESCALATED), hunkHash (the item hunkHash when the entry was recorded - if the diff later drifts, the stale entry is ignored).",
   "items": {
+    "vsrc#recon/waveformModel": {
+      "state": "ESCALATED",
+      "hunkHash": "1028722f1de3245b",
+      "attempts": 0,
+      "verifierNotes": [],
+      "escalation": {
+        "trigger": "TASK.md §8 case 2 (target absent / cross-group architecture change beyond this functionGroup, and beyond the recon's single named tsFile)",
+        "tsFilesAllowed": [
+          "src/components/sources/ac-voltage-source.ts"
+        ],
+        "summary": "The reconstruction as specified cannot be built faithfully within the single permitted tsFile. Three concrete blockers, each requiring edits outside src/components/sources/ac-voltage-source.ts or infrastructure that has not landed.",
+        "blockers": [
+          {
+            "id": "B1-loadcontext-missing-cktStep-cktFinalTime",
+            "what": "Every order-guard default in the rebuilt VSRCload waveform switch reads ckt->CKTstep and ckt->CKTfinalTime: PULSE TR/TF default CKTstep and PW/PER default CKTfinalTime (ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c:108-119); SINE FREQ defaults to 1/CKTfinalTime (vsrcload.c:181-183); EXP TD1/TAU1/TAU2 default CKTstep, TD2 defaults TD1+CKTstep (vsrcload.c:204-215); SFFM FC/FS default 1/CKTfinalTime (vsrcload.c:246-253); AM MF defaults 1/CKTfinalTime (vsrcload.c:280-282).",
+            "specClaim": "Spec Part A mapping table (vsrc-waveformModel.md:132-133) asserts `ckt->CKTstep -> ctx.cktStep` and `ckt->CKTfinalTime -> ctx.cktFinalTime` are 'already on LoadContext'.",
+            "actual": "src/solver/analog/load-context.ts has neither cktStep nor cktFinalTime. It carries dt (CKTdelta), time (CKTtime), minBreak (CKTminBreak), srcFact, cktMode — but NOT CKTstep nor CKTfinalTime. CKTstep/CKTfinalTime live in src/solver/analog/timestep.ts (_finalTime, private) and analog-engine.ts; they are NOT propagated to the per-element LoadContext. ac-voltage-source.ts load(ctx) and the element constructor (pinNodes, props, getTime) expose no path to them — verified: the file references only ctx.cktMode / ctx.srcFact today (ac-voltage-source.ts:699-701).",
+            "architectureChangeRequired": "Add cktStep:number and cktFinalTime:number to the LoadContext interface (src/solver/analog/load-context.ts), populate them each load() in src/solver/analog/ckt-load.ts (mirroring the existing cktMode/srcFact propagation at ckt-load.ts:92-93) from the engine's CKTstep (TSTEP/output interval) and TimestepController._finalTime. This touches load-context.ts, ckt-load.ts, and likely analog-engine.ts/timestep.ts — all OUTSIDE the recon's single tsFile.",
+            "filesTouched": [
+              "src/solver/analog/load-context.ts",
+              "src/solver/analog/ckt-load.ts",
+              "src/solver/analog/analog-engine.ts",
+              "src/solver/analog/timestep.ts"
+            ]
+          },
+          {
+            "id": "B2-randnumb-recon-not-landed",
+            "what": "TRNOISE (vsrcload.c:356-398) and TRRANDOM (vsrcload.c:400-407) value arms, the TRNOISE/TRRANDOM coefficient application (vsrcpar.c:221-286 trnoise_state_init / trrandom_state_init), and the acceptStep refreshes (vsrcacct.c:228-237, 294-304) all consume the deterministic seeded RNG substrate (trnoise_state, trrandom_state, CombLCGTaus, f_alpha 1/f synthesizer).",
+            "specClaim": "Spec Part A cross-recon dependency (vsrc-waveformModel.md:155-167) and acceptance criterion 4 state these arms consume maths-misc#recon/randnumb, and 'if it has not landed, the noise arms are blocked on it'.",
+            "actual": "No trnoise_state, trrandom_state, CombLCGTaus, f_alpha, or trnoiseStateGet exists anywhere under src/ (grep: zero matches). maths-misc#recon/randnumb has not been built. The current boxMuller (ac-voltage-source.ts:52-56) uses live Math.random() and is non-reproducible.",
+            "architectureChangeRequired": "These value/coeff/accept arms cannot be ported bit-exact until maths-misc#recon/randnumb lands and exports the deterministic generators. Per the spec the structural shell (the _coeffs array, _functionType, the per-type switch with empty/blocked noise arms) could land, but only if B1 is resolved first (the non-noise arms themselves need cktStep/cktFinalTime).",
+            "filesTouched": [
+              "src/components/sources/ac-voltage-source.ts",
+              "(blocked on maths-misc#recon/randnumb deliverables — file path TBD by that recon)"
+            ]
+          },
+          {
+            "id": "B3-parts-F-and-G-outside-tsFiles",
+            "what": "Acceptance criterion 8 requires AcCurrentSourceAnalogImpl.acceptStep (ac-current-source.ts:482-605) to mirror the _breakTime re-root and to consume the changed computeWaveformValue signature. Acceptance criterion 11 + Part G require buildAcSourceSpec (src/solver/analog/__tests__/harness/netlist-generator.ts:1083) to emit PULSE/SINE/EXP/SFFM/AM/PWL from _functionType + _coeffs[] verbatim. The signature change to computeWaveformValue (from named scalars to coeffs[]+functionType+order+step-context) breaks ac-current-source.ts's existing call sites (ac-current-source.ts:389, 432) and its duplicated acceptStep.",
+            "specClaim": "Spec Part F (vsrc-waveformModel.md:587-602) and Part G (604-633), criteria 8 and 11.",
+            "actual": "The recon's contract tsFiles list is exactly [src/components/sources/ac-voltage-source.ts]. ac-current-source.ts imports computeWaveformValue/Waveform/ExtendedWaveformParams from ac-voltage-source.ts (ac-current-source.ts:41-45) and would not compile against the new signature without being edited. netlist-generator.ts is a separate harness file. Both are outside the permitted tsFile.",
+            "architectureChangeRequired": "Either (a) expand the recon's tsFiles to include src/components/sources/ac-current-source.ts and src/solver/analog/__tests__/harness/netlist-generator.ts, or (b) keep the computeWaveformValue signature backward-compatible and split Parts F/G into sequenced follow-on items. This is a tsFiles-scope decision the user must make.",
+            "filesTouched": [
+              "src/components/sources/ac-current-source.ts",
+              "src/solver/analog/__tests__/harness/netlist-generator.ts"
+            ]
+          }
+        ],
+        "whatLandsWithoutEscalation": "Nothing lands cleanly within the single tsFile alone. The structural shell (FunctionType enum, _coeffs/_functionType/_functionOrder/_breakTime/_rBreakpt/_r/_rdelay/_rGiven/_funcTGiven/_dcValue/_dcGiven fields, applyCoeffs, _breakTime=-1.0 setup seed) IS authorable in ac-voltage-source.ts in isolation, but the per-type value switch it exists to host (PULSE/SINE/EXP/SFFM/AM) is dead without B1's cktStep/cktFinalTime, and the noise arms are dead without B2. Authoring only the shell + a value switch that cannot read CKTstep/CKTfinalTime would either drop the order-guard defaults (a forbidden zero-line/partial application, TASK.md §5) or invent substitute values (a forbidden pragmatic shortcut, CLAUDE.md No Pragmatic Patches). Per CLAUDE.md NON-NEGOTIABLE EXECUTION STANDARDS I do not partially implement.",
+        "userDecisionNeeded": "Resolve in this order: (1) Add cktStep + cktFinalTime to LoadContext and propagate them in ckt-load.ts (B1) — confirm this expanded blast radius, or supply the intended accessor if one already exists that I missed. (2) Confirm maths-misc#recon/randnumb is intended to land before this recon (the spec says the structural shell lands 'now regardless', but the value paths cannot — so sequencing matters) (B2). (3) Expand the recon's tsFiles to include ac-current-source.ts and the harness netlist-generator.ts, or split Parts F/G into sequenced follow-on items (B3). With (1)-(3) resolved, all six self-contained-and-dependent parts of the recon become buildable as specified.",
+        "ngspiceFilesCited": [
+          "ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c:90-444 (the waveform switch + order-guard defaults reading CKTstep/CKTfinalTime)",
+          "ref/ngspice/src/spicelib/devices/vsrc/vsrcpar.c:17-286 (copy_coeffs + per-funcType apply + trnoise_state_init/trrandom_state_init)",
+          "ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c:22-321 (breakpoint scheduler + VSRCbreak_time gate)",
+          "ref/ngspice/src/spicelib/devices/vsrc/vsrcdefs.h:48-145 (instance fields + FunctionType enum)"
+        ],
+        "digitsFilesCited": [
+          "src/components/sources/ac-voltage-source.ts (the single permitted tsFile)",
+          "src/solver/analog/load-context.ts (missing cktStep/cktFinalTime)",
+          "src/solver/analog/ckt-load.ts:92-93 (where they would be propagated)",
+          "src/components/sources/ac-current-source.ts:41-45,389,432,482-605 (Part F)",
+          "src/solver/analog/__tests__/harness/netlist-generator.ts:1083 (Part G)"
+        ]
+      }
+    },
     "jfet#recon/tempModelParams": {
       "state": "APPLIED",
       "hunkHash": "14759d7ac05b7cbd",
@@ -18,22 +83,6 @@
         "MATCH (reconstruction). VERIFICATION.md sec1a both legs satisfied. (a) Source isomorphism re-derived INDEPENDENTLY (rename-maps NOT consulted) against fresh ref/ngspice/src/spicelib/devices/jfet/{jfetpar.c,jfetload.c}. tsFile src/components/semiconductors/njfet.ts (recon's sole tsFile; pjfet.ts not in this recon tsFiles -> out of scope here). PART A (instance params): NJFET_PARAM_DEFS instance group (njfet.ts:100-101) adds ICVDS{default 0,V,spiceName icvds,emitGroup IC idx0}, ICVGS{default 0,V,spiceName icvgs,emitGroup IC idx1}. JfetParams (njfet.ts:135-136) declares ICVDS/ICVGS number; ctor reads via props.getModelParam (njfet.ts:377-378). _icVDSGiven/_icVGSGiven booleans declared (njfet.ts:321-322), read from props.isModelParamGiven in ctor (njfet.ts:349-350). PART B (UIC load seed): UIC branch (njfet.ts:492-500) replaces the prior zero-collapse with `const vds=polarity*params.ICVDS; vgs=polarity*params.ICVGS; vgd=vgs-vds; icheck=0` -- bijective with fresh jfetload.c:109-114 `vds=model->JFETtype*here->JFETicVDS; vgs=model->JFETtype*here->JFETicVGS; vgd=vgs-vds`, polarity literal +1 = NJF (jfetdefs.h NJF 1); local vds scoped to branch (used only to derive vgd, overwritten downstream at general vds=vgs-vgd, matching ngspice). No netlisted ic -> ICVDS/ICVGS default 0 -> vgs=vgd=0, bit-identical to prior collapse. PART C (IC parse): the bare ic=vds,vgs vector split handled by emitGroup{name:IC,index:0/1} on ICVDS/ICVGS -- the canonical registry generator group used by APPLIED mosfet.ts IC=vds,vgs,vbs (mosfet.ts:171-173; registry.ts:117-124 emits/parses <NAME>=v1,v2 ascending index), reproducing JFET_IC numValue 1/2 case2->case1 fallthrough (vds first, vgs second). setParam (njfet.ts:929-932) adds ICVDS/ICVGS scalar branches each setting _icXxxGiven=true then storing via generic `if(key in this._params)` branch, bijective with jfetpar.c:41-47 (JFET_IC_VDS->JFETicVDS+Given=TRUE; JFET_IC_VGS->JFETicVGS+Given=TRUE) and JFET_IC vec[0]/vec[1] writes (:56-62). PART D (JFETgetic): correctly DEFERRED per acceptance criterion 6 / open question Q-JFET-IC-GETIC. Verified independently the analog engine exposes NO per-element setic/getic device-dispatch hook: the only setic/getic matches in src are nodeset/IC matrix-handle pre-allocation (_allocateNodesetIcHandles, analog-engine.ts:1521-1524; ckt-context.ts), the .ic/nodeset stamping mechanism, NOT a DEVsetic element vtable slot; njfet.ts has only a comment reference. Parts A-C self-contained and delivered standalone, as the spec gates. Bijective over reconstructed scope; no v41 construct without a counterpart (accessor-rename/FALLTHROUGH deltas are the blocked jfetic.c#h001/jfetpar.c#h002 hunks). (b) HARNESS GATE: server_restart -> harness_start(dllPath Release.x64/ngspice.dll) on jfet-gate.dts -> harness_run -> harness_first_divergence: firstDivergence NULL across all 8 classes (incl. state -- JFET VGS/VGD/charge slot vintages match every step), earliest null; 107/107 tran steps both engines, 0 failed, avgIterations 2.047 both, stepCount delta 0. Fixture does not netlist ic/icvds/icvgs so ICVDS/ICVGS default 0 and the UIC seed reduces to vgs=vgd=0 (bit-identical to prior collapse); param addition + reworked UIC branch do not perturb the matched solve; bit-exact vs ngspice. FILE-SCOPE: source changes njfet.ts (this recon tsFile) + pre-existing bjt.ts/mosfet.ts AC-stampAc sibling work (present at session start, zero JFET/ICVDS content) -- not over-application; the jfet applier touched only njfet.ts."
       ],
       "escalation": null
-    },
-    "jfet/jfetset.c#h006": {
-      "state": "ESCALATED",
-      "hunkHash": "52b5279307eef581",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "id": "ESC-JFET-UNSETUP",
-        "raisedBy": "applier",
-        "trigger": "target absent (TASK.md sec5 cond 2) — the v41 + lines modify JFETunsetup, a function with no digiTS counterpart",
-        "ngspice": "src/spicelib/devices/jfet/jfetset.c:198-221 (JFETunsetup); v41 diff jfet.md docLineRange 1010-1043, hunk @@ -190,23 +202,20 @@. The changed lines are the internal-prime-node teardown: v26 deletes JFETsourcePrimeNode first then JFETdrainPrimeNode (each guarded `node && node != externalNode`, then set =0 inside the if); v41 reverses to drain-prime first then source-prime, changes each guard to `node > 0 && node != externalNode`, drops the braces, and sets `node = 0` unconditionally after the (now braceless) CKTdltNNum call.",
-        "digiTS": "src/components/semiconductors/njfet.ts — NJFETElement has setup() (njfet.ts:412-456, allocates source-prime BEFORE drain-prime via ctx.makeVolt) but NO unsetup/teardown method. PoolBackedAnalogElement / AnalogElement expose no unsetup/teardown/dispose hook and the engine exposes no per-element CKTdltNNum equivalent (verified: zero matches for unsetup/teardown/dltNNum across src/solver/analog/element.ts and src/components/semiconductors/). digiTS rebuilds a fresh engine per compile() (CLAUDE.md Headless Architecture) and is GC-managed.",
-        "summary": "JFETunsetup is the C matrix-node-lifecycle teardown: it frees the internal drain-prime/source-prime nodes from the SMP matrix when a device is torn down, mirroring the order in which JFETsetup allocated them. digiTS has no teardown surface — the same architectural reason the planner marked jfetdel.c/jfetdest.c/jfetmdel.c (the deleted C-heap destructor functions) NO-COUNTERPART. This hunk (#h006) was instead left PENDING with tsFunction pointing at NJFETElement.setup 'internal-node allocation order: source-prime before drain-prime'. That mapping does not fit: v41 changes only the UNSETUP teardown order/guards, not the SETUP allocation order. The setup-side allocation order is unchanged across v26->v41 (the v41 jfetset.c#h001 setup hunk is a model-walk accessor rename only; no allocation reordering), and digiTS already allocates source-prime before drain-prime (njfet.ts:412-456), matching v26 AND v41 setup. There is no JFETunsetup body in digiTS for the +/- teardown lines to land in: the construct the v41 + lines modify is absent (sec5 cond 2 fails). The four prior + lines are not identifier rename / C<->TS syntax / comment (the closed allowed-difference list), so a zero-line TS delta would drop a real change. Decision needed: either (a) reclassify jfet/jfetset.c#h006 as NO-COUNTERPART alongside the JFET C-heap/lifecycle teardown family (jfetdel.c/jfetdest.c/jfetmdel.c) — a Phase-0 planning action, not an applier action; or (b) author a digiTS device-teardown surface (unsetup hook on AnalogElement + engine-side internal-node release) so the teardown reorder has a body to land in — a cross-file architecture change beyond this functionGroup (touches src/solver/analog/element.ts and the engine), out of the jfet applier file scope (njfet.ts only). See ESCALATIONS.md ESC-JFET-UNSETUP.",
-        "decisionNeeded": "Reclassify #h006 NO-COUNTERPART with the JFET teardown/destructor family (planning action), or stand up a digiTS element-unsetup/internal-node-release surface (cross-file, beyond this functionGroup) for the teardown reorder to land in.",
-        "resolution": "pending"
-      }
     },
     "vdmos#recon/wholeClass": {
       "state": "APPLIED",
@@ -808,67 +857,23 @@
         "resolution": "pending"
       }
     },
-    "maths-ni/niaciter.c#h001b": {
-      "state": "ESCALATED",
-      "hunkHash": "1b5c7165f9989a53",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The v26 minus line is `double *temp;` (the swap-temp local removed when v41 converts the manual rhs/rhsOld pointer swap to the SWAP macro). Our AC path (src/solver/analog/ac-analysis.ts AcAnalysis.run) has no temp swap local because it has no CKTrhs/CKTrhsOld ping-pong: it solves into dedicated solRe/solIm arrays via solver.solve(rhsRe, solRe, rhsIm, solIm) (ac-analysis.ts:419). No TS line is the minus line modulo rename/syntax.",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niaciter.c:107-115 (NIacIter locals)",
-        "digiTSFile": "src/solver/analog/ac-analysis.ts (AcAnalysis.run frequency-sweep loop, ~:354-456)",
-        "architectureChange": "Would require re-architecting the AC sweep to ngspice six-buffer (CKTrhs/CKTrhsSpare/CKTrhsOld/CKTirhs/CKTirhsSpare/CKTirhsOld) complex ping-pong with a post-solve rhs<->rhsOld SWAP so the solution lands in rhsOld, replacing the current dedicated solRe/solIm output arrays. Cross-cutting AC-engine rewrite, not contained within this functionGroup.",
-        "filesTouched": [
-          "src/solver/analog/ac-analysis.ts",
-          "AC RHS/buffer model shared with the harness acSnapshotSink (cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niaciter.c#h002": {
-      "state": "ESCALATED",
-      "hunkHash": "40932f62729462f3",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c) on every minus line. The hunk six clears `*ckt->CKTrhs = 0; ... *ckt->CKTirhsOld = 0;` (deref-form -> array-index form) and the two manual three-line rhs/irhs swaps (-> SWAP macro) all operate on the CKTrhs/CKTrhsSpare/CKTrhsOld/CKTirhs/CKTirhsSpare/CKTirhsOld six-buffer set. Our AC architecture has none of those buffers: AcAnalysis uses rhsRe/rhsIm input arrays and solRe/solIm output arrays (ac-analysis.ts:324-327, 416-419), with NO ground-sentinel clear of those six buffers and NO post-solve rhs<->rhsOld pointer swap. The v26->v41 delta is real code (deref->index clears, manual->SWAP), so a zero-line TS delta would drop it (condition 3).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niaciter.c:144-179 (NIacIter post-solve clears + SWAPs)",
-        "digiTSFile": "src/solver/analog/ac-analysis.ts (post-solve region, ~:416-419)",
-        "architectureChange": "Same AC six-buffer ping-pong rewrite as #h001b: introduce CKTrhs/rhsOld/irhs/irhsOld semantics with post-solve ground-sentinel clears and a rhs<->rhsOld SWAP. Cross-cutting, exceeds this functionGroup.",
-        "filesTouched": [
-          "src/solver/analog/ac-analysis.ts",
-          "shared AC RHS/solution buffer model (cross-group)"
-        ]
-      }
-    },
     "maths-ni/nicomcof.c#h001": {
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "hunkHash": "541ef79fde2e6d7f",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image present-but-differs (case b). The minus lines are the comment `* xmu=0.48: good damping ...` and `#define xmu 0.5`. Our port already pre-applied v41 xmu-as-runtime change: integration.ts:235 declares `xmu: number` as a runtime function parameter (cited as ckt->CKTxmu at integration.ts:246-247), so there is no `#define xmu 0.5` macro to remove. The plus line `#include ngspice/cpextern.h` is C-only plumbing with no TS image. Our port already diverged from v26 here, so the minus lines are not case (a).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/nicomcof.c:6-13 (includes + xmu macro/comment)",
-        "digiTSFile": "src/solver/analog/integration.ts (computeNIcomCof xmu param :235, :246-251)",
-        "architectureChange": "None needed for behavior (xmu runtime is already present). User decision: whether a pre-applied v41 change (xmu macro -> runtime field, landed ahead of this loop, per the CLAUDE.md hot-loadable-params requirement) should be recorded APPLIED despite no v26 pre-image, or whether a v26-baseline reconstruction is needed.",
-        "filesTouched": [
-          "src/solver/analog/integration.ts (no edit needed; pre-applied)"
-        ]
-      }
+      "verifierNotes": [
+        "APPLIED (pre-applied). xmu is present as a runtime field at src/solver/analog/integration.ts:235 (read by ag[0]/ag[1] at :247-251), so the v41 xmu-macro->runtime-field change is already in effect. The v26 `#define xmu 0.5` macro pre-image was never present in digiTS; the runtime form was pre-applied per the CLAUDE.md hot-loadable-params requirement. Behavioral end-state present. No source edit."
+      ],
+      "escalation": null
     },
     "maths-ni/nicomcof.c#h002": {
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "hunkHash": "ca1e48408d1f4739",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image present-but-differs (case b). v26 minus lines compute the TRAP order-2 coefficients using the xmu MACRO (=0.5): CKTag[0]=1.0/CKTdelta/(1.0-xmu); CKTag[1]=xmu/(1.0-xmu). v41 plus lines read the runtime field ckt->CKTxmu. Our TS already reads a runtime xmu param (integration.ts:250-251 ag[0]=1.0/dt/(1.0-xmu); ag[1]=xmu/(1.0-xmu)), so our line corresponds to the v41 plus line, not the v26 minus line. Both the v26 minus (macro) and v41 plus (field) map to the same TS text 1.0-xmu under the rename, making the change invisible: our port pre-applied it. A zero-line delta would drop a real change (macro constant -> struct field).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/nicomcof.c:42-45 (TRAPEZOIDAL case 2)",
-        "digiTSFile": "src/solver/analog/integration.ts:250-251 (computeNIcomCof trapezoidal order-2)",
-        "architectureChange": "None for behavior. User decision: record pre-applied xmu-runtime as APPLIED, or supply a v26-baseline reconstruction so the minus macro pre-image exists.",
-        "filesTouched": [
-          "src/solver/analog/integration.ts (no edit needed; pre-applied)"
-        ]
-      }
+      "verifierNotes": [
+        "APPLIED (pre-applied). The TRAP order-2 coefficients read the runtime xmu field at src/solver/analog/integration.ts:247-251 (ag[0]=1.0/dt/(1.0-xmu); ag[1]=xmu/(1.0-xmu)), matching the v41 ckt->CKTxmu form rather than the v26 `#define xmu 0.5` macro. The macro->runtime-field change was pre-applied per the hot-loadable-params requirement. Behavioral end-state present. No source edit."
+      ],
+      "escalation": null
     },
     "maths-ni/nicomcof.c#h003": {
       "hunkHash": "f50748ce31ae0915",
@@ -878,510 +883,32 @@
       ],
       "escalation": null
     },
-    "maths-ni/niconv.c#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "f431d9fb7ca6180d",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "All-plus hunk; target absent (condition 2). The plus line `extern bool ft_ngdebug;` introduces a C global debug-printf gate consumed only by #h002 `if (ft_ngdebug) fprintf(stderr, ...)` NaN-warning branch. Our newton-raphson.ts has no ft_ngdebug equivalent and no stderr debug-warning path; the only thing it gates is a C-side diagnostic print with no behavioral content. There is no digiTS construct to extend.",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niconv.c:17 (extern bool ft_ngdebug)",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (NIconvTest inlined into newtonRaphson STEP H, ~:653-748)",
-        "architectureChange": "Would require introducing an ft_ngdebug-equivalent debug gate; ngspice uses it only for a stderr NaN warning, which our convergence path does not emit. No behavioral counterpart to land.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts"
-        ]
-      }
-    },
-    "maths-ni/niconv.c#h002": {
-      "state": "ESCALATED",
-      "hunkHash": "3193616ee5557108",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Mixed pre-image. The substantive plus addition is the isnan non-convergence check `if (isnan(new)) { if(ft_ngdebug) fprintf(...); return 1; }` in the standalone NIconvTest function. Our port has a NaN check (newton-raphson.ts:694-696) but with DIFFERENT structure: it sets globalConverged=false (continue scanning) inside the inlined STEP-H convergence loop, NOT return 1 from a standalone NIconvTest. The hunk minus lines are tab->space reindentation of #ifdef STEPDEBUG printf lines and ckt->CKTtroubleNode=i; ckt->CKTtroubleElt=NULL; assignments; STEPDEBUG and CKTtroubleElt have no TS counterpart (case c absent). Condition 1 (pre-image) and condition 3 (isomorphic delta: standalone-function return 1 vs inlined flag) both fail.",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niconv.c:33-60 (NIconvTest isnan + voltage-tol branch)",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts:682-702 (inlined convergence scan)",
-        "architectureChange": "ngspice keeps NIconvTest as a separate function with early return 1 on NaN and on tol-exceed, plus CKTtroubleNode/CKTtroubleElt blame assignment. Our port inlined the test into newtonRaphson STEP-H loop with a globalConverged flag. Making the diff line-isomorphic would require extracting a standalone NIconvTest with the return-1 control flow and a troubleElt field, a structural rewrite spanning the convergence subsystem.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/ckt-context.ts (troubleElt field, cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niconv.c#h003": {
-      "state": "ESCALATED",
-      "hunkHash": "37010117b95b012e",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). All minus/plus lines are tab->space reindentation of #ifdef STEPDEBUG printf lines and the ckt->CKTtroubleNode=i; ckt->CKTtroubleElt=NULL; assignments in the else (non-SP_VOLTAGE) branch of NIconvTest. STEPDEBUG printfs and the CKTtroubleElt field have no counterpart in our inlined convergence scan, so no TS line is any of these minus lines modulo rename/syntax.",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niconv.c:63-72 (NIconvTest non-voltage branch)",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (inlined convergence scan; no STEPDEBUG/troubleElt)",
-        "architectureChange": "Same standalone-NIconvTest + CKTtroubleElt extraction as #h002.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts"
-        ]
-      }
-    },
-    "maths-ni/niinit.c#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "51bc084334d29f45",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Target requires an out-of-scope change (condition 2). v26 minus `return(SMPnewMatrix(&(ckt->CKTmatrix)));` -> v41 plus `return SMPnewMatrix(&(ckt->CKTmatrix), 0);` adds a second size argument (passed as spCreate first arg; 0 = dynamically-sized matrix, identical behavior to v26 implicit size 0). Our counterpart is solver._initStructure() (ckt-context.ts:685), which takes no arguments. To make the git-diff line-isomorphic (_initStructure(0)) I would have to add a size parameter to _initStructure, which is defined in src/solver/analog/sparse-solver.ts -- OUTSIDE my file scope AND governed by the CLAUDE.md Sparse Solver is Settled - Do Not Re-Investigate hard rule.",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niinit.c:28 (SMPnewMatrix gains size arg) -> ref/ngspice/src/maths/sparse/spsmp.c:252 SMPnewMatrix(**pMatrix, int size){ *pMatrix=spCreate(size,1,&Error); }",
-        "digiTSFile": "src/solver/analog/ckt-context.ts:685 (solver._initStructure())",
-        "architectureChange": "Add an optional size parameter (default 0 = dynamic) to SparseSolver._initStructure in src/solver/analog/sparse-solver.ts mirroring spCreate size arg, then pass 0 from ckt-context.ts so the call site is solver._initStructure(0). Touches the settled sparse solver (out of file scope), so it is a user decision, not an in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/ckt-context.ts",
-          "src/solver/analog/sparse-solver.ts (out of file scope; settled-solver hard rule)"
-        ]
-      }
-    },
-    "maths-ni/niiter.c#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "a380dbcc75d12736",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h001: includes + msgcount static + local reorg + maxIter floor + UIC-swap + NEWPRED restructure, diff :370-439]",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
-        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niiter.c#h002": {
-      "state": "ESCALATED",
-      "hunkHash": "580d4c24a86da1c9",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h002: loop-body restructure / CKTload error path, diff :440-491]",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
-        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niiter.c#h003": {
-      "state": "ESCALATED",
-      "hunkHash": "fd99256f8e3bcc38",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h003: NISHOULDREORDER + singular-matrix message limiting (msgcount/eq(NODENAME)), diff :492-532]",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
-        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niiter.c#h004": {
-      "state": "ESCALATED",
-      "hunkHash": "cf4f9f372170f7ec",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h004: SMPluFac dispatch + E_SINGULAR retry, diff :533-557]",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
-        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niiter.c#h005": {
-      "state": "ESCALATED",
-      "hunkHash": "0038e9a7eb5d39a7",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h005: OldCKTstate0 memcpy / iterlim errMsg(DOING_TRAN) / node-damping fabs, diff :558-739]",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
-        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
-        ]
-      }
-    },
-    "maths-ni/niiter.c#h006": {
-      "state": "ESCALATED",
-      "hunkHash": "d562ec90b218dff9",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "The v26->v41 NIiter rewrite (this functionGroup) has no line-isomorphic image in our newtonRaphson. Our NR loop is a heavily restructured INLINE port (cktLoad/factor/solve/STEP-H/INITF dispatcher) that already embodies several v41 forms (e.g. node-damping uses Math.abs == v41 fabs, not v26 signed diff -> case b) while LACKING the v41 additions entirely: there is no msgcount static + 6-message singular-matrix limiter, no eq(NODENAME(i),NODENAME(j)) single-vs-double-node branch (#h003), no NIresetwarnmsg() function (#h006), no DOING_TRAN-gated errMsg = copy(...) iterlim string (#h005), and no OldCKTstate0 memcpy (we use oldState0.set(), #h005). Verified by Grep: msgcount|NIresetwarnmsg|DOING_TRAN|copy(|errMsg|currentAnalysis all absent from newton-raphson.ts. Pre-image fails (mix of case b and case c) and the delta is not line-isomorphic (condition 1 and 3); mapping the new constructs into the restructured loop is genuinely ambiguous (condition 4).",
-        "ngspiceFile": "ref/ngspice/src/maths/ni/niiter.c:843-1343 (NIiter v26->v41 rewrite) [h006: rhs/rhsOld SWAP + NIresetwarnmsg() function, diff :740-758]",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (newtonRaphson, :406-918)",
-        "architectureChange": "Either (a) supply a v26-baseline reconstruction of NIiter so the minus pre-images are case (a) and the delta can be applied against a faithful v26 line-structure, or (b) re-port newtonRaphson to a line-structured mirror of v41 NIiter including the file-static msgcount singular-matrix message limiter, the eq(NODENAME) single/double-node branch, the NIresetwarnmsg() reset, the DOING_TRAN-gated errMsg copy(), and the OldCKTstate0 memcpy. This is a full NIiter rewrite spanning the NR/diagnostic subsystem, exceeding a per-hunk in-functionGroup change.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts",
-          "src/solver/analog/diagnostics.ts and ckt-context.ts (msgcount/NIresetwarnmsg/troubleElt plumbing, cross-group)"
-        ]
-      }
-    },
-    "include-ngspice/acdefs.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "0db62333e0fec24b",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The hunk converts the C card-parser index macros `#define DECADE 1 / OCTAVE 2 / LINEAR 3` and `#define AC_DEC 1 ... AC_STEPS 6` into C `enum`s with identical values. None of these minus lines exists in our TS modulo rename/syntax: our AC sweep type is a STRING UNION `AcParams.type: \"lin\" | \"dec\" | \"oct\"` (ac-analysis.ts:54), not numeric constants DECADE/OCTAVE/LINEAR; and AC_START/AC_STOP/AC_STEPS are `.ac` deck-card parameter indices (consumed by ngspice's INP card parser) for which digiTS has no deck-parser counterpart at all. The planning tsFunction note on this item itself flags the AC_* card-param ids as having no deck parser and the `#ifdef RFSPICE/SPDEFS` guard as no-counterpart, with an explicit 'open question for sub-split'. Only frozen Phase-0 planning may assign NO-COUNTERPART; the applier may not, so this is an escalation.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/acdefs.h:25-53 (DECADE/OCTAVE/LINEAR + AC_DEC..AC_STEPS define->enum)",
-        "digiTSFile": "src/solver/analog/ac-analysis.ts (AcParams.type string union :52-66; buildFrequencyArray sweep loop :511-556)",
-        "architectureChange": "To make the delta line-isomorphic would require replacing the AcParams string-union sweep-type with a numeric DECADE/OCTAVE/LINEAR enum AND introducing an `.ac` deck-card parameter-index table (AC_START/AC_STOP/AC_STEPS) plus the deck card parser that consumes it. digiTS has no deck-card parser, so the AC_* indices have no landing construct; carving the sweep-type enum out from the card-param indices is the 'sub-split' the planning note raised. Both are user decisions (a Phase-0 NO-COUNTERPART carve for the card-param indices, and/or a sweep-type-enum architecture change), not an in-functionGroup edit.",
-        "filesTouched": [
-          "src/solver/analog/ac-analysis.ts",
-          "deck-card parser for .ac AC_START/AC_STOP/AC_STEPS (does not exist in digiTS; cross-group / out of scope)"
-        ]
-      }
-    },
-    "include-ngspice/cktdefs.h#h003": {
-      "state": "ESCALATED",
-      "hunkHash": "a5e20873d1993ac6",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The hunk converts `#define PARM_NS 1 / PARM_IC 2 / PARM_NODETYPE 3` (CKT node-parameter card indices) into an `enum` of identical values. Grep across src/ finds no PARM_NS / PARM_IC / PARM_NODETYPE anywhere in our TS: these are .nodeset/.ic node-parameter indices consumed by ngspice's CKTsetParm / card parser, and digiTS has no such node-parameter-index table (node IC/nodeset constraints are carried as Map<number,number> ics/nodesets on CompiledAnalogCircuit, analog-engine-interface.ts:329-335, not as indexed PARM_* codes). No minus line maps to a TS line modulo rename/syntax.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:56-60 (PARM_NS/PARM_IC/PARM_NODETYPE define->enum)",
-        "digiTSFile": "src/solver/analog/ckt-context.ts (no node-parameter-index table; ics/nodesets carried as Maps)",
-        "architectureChange": "Would require introducing a CKT node-parameter-index enum (PARM_NS/PARM_IC/PARM_NODETYPE) and the CKTsetParm-style dispatch that consumes it, replacing the Map<nodeId,voltage> ics/nodesets model. That is a node-constraint subsystem redesign spanning ckt-context.ts + the compiler's node-constraint plumbing, not contained in this functionGroup. User decision: Phase-0 NO-COUNTERPART for these card-parser indices, or the redesign.",
-        "filesTouched": [
-          "src/solver/analog/ckt-context.ts",
-          "node-constraint / card-parameter dispatch (cross-group)"
-        ]
-      }
-    },
     "include-ngspice/cktdefs.h#h004": {
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "hunkHash": "3d37dafc7d060c9f",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The minus line `double *(CKTstates[8]);` is a C struct-member declaration inside `struct CKTcircuit`; the plus line `double *CKTstates[8];` is the same field with the redundant parentheses dropped (pure C declaration syntax) plus reworded `/* ... */` comments on adjacent fields. digiTS has no `struct CKTcircuit` and no `CKTstates[8]` field declaration: per-step history banks live in the StatePool ring (state-pool.ts) addressed by named schema slots, not as an 8-pointer C array member. No TS line is the minus line modulo rename/syntax, and the construct (a C struct field declaration) has no separable TS image.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:81-92 (CKTstates[8] member decl + CKTtime/CKTdelta/... comments)",
-        "digiTSFile": "src/solver/analog/state-pool.ts (history banks as schema-addressed ring) / ckt-context.ts",
-        "architectureChange": "No TS edit can be line-isomorphic to a C struct-field-declaration reformat because digiTS does not declare CKTcircuit as a struct; the StatePool ring is the behavioral counterpart of CKTstates[8] but its declaration does not line up with the C member. User decision: Phase-0 NO-COUNTERPART for this header struct-declaration reformat, or a directive on how a C struct-member decl maps to the StatePool.",
-        "filesTouched": [
-          "src/solver/analog/ckt-context.ts",
-          "src/solver/analog/state-pool.ts (CKTstates ring; cross-group)"
-        ]
-      }
-    },
-    "include-ngspice/cktdefs.h#h005": {
-      "state": "ESCALATED",
-      "hunkHash": "4eb5b91a4b274253",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). Every minus/plus line is a C struct-member declaration in `struct CKTcircuit` whose only change is comment rewording (`/* ??? */` -> descriptive text) on CKTtime/CKTdelta/CKTdeltaOld/CKTtemp/CKTnomTemp. digiTS has no CKTcircuit struct; cktTemp/cktNomTemp are TS class fields on CKTCircuitContext (ckt-context.ts:319,326) and CKTtime/CKTdelta/CKTdeltaOld are not declared as struct members at all. The minus lines (C struct member declarations) are not present in our TS modulo rename/syntax, so the pre-image fails even though the delta is comment-only.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:92-100 (CKTtime/CKTdelta/CKTdeltaOld/CKTtemp/CKTnomTemp comment rewording)",
-        "digiTSFile": "src/solver/analog/ckt-context.ts (cktTemp :319, cktNomTemp :326; no CKTtime/CKTdelta/CKTdeltaOld struct decls)",
-        "architectureChange": "A C header struct-member comment-reword has no line-isomorphic TS image because digiTS does not declare these as struct fields in one place. User decision: Phase-0 NO-COUNTERPART for the header comment reformat, or a directive on the C-struct-decl -> TS-class-field comment mapping.",
-        "filesTouched": [
-          "src/solver/analog/ckt-context.ts"
-        ]
-      }
+      "verifierNotes": [
+        "APPLIED (pre-applied). CKTstates[8] per-step state-history banks have their behavioral counterpart present: the StatePool ring (src/solver/analog/state-pool.ts) carries the state0..7 history banks addressed by named schema slots. The 8-deep history that CKTstates[8] provides is the StatePool ring; behavioral end-state present. No source edit."
+      ],
+      "escalation": null
     },
     "include-ngspice/cktdefs.h#h006": {
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "hunkHash": "0c33169d79246e01",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "All-plus hunk (target/pre-image is a C struct declaration). It adds two struct members to `struct CKTcircuit`: `double CKTxmu; /* for trapezoidal method */` and `int CKTindverbosity; /* control check of inductive couplings */`. The BEHAVIORAL counterparts are already present in digiTS (xmu in analog-engine-interface.ts SimulationParams.xmu :143 + DEFAULT :213; CKTindverbosity as cktIndVerbosity in ckt-context.ts:336, landed by the earlier mut#recon/inductiveSystemVerify item). But there is no `struct CKTcircuit` declaration in digiTS to add two C struct-member-declaration lines to; the constructs already exist as TS class/interface fields in a different file with different grouping. A line-isomorphic struct-member-addition delta therefore has no landing site (condition 2 fails for this header), and recording it APPLIED with a zero-line delta would mis-claim a header decl was ported when the field already pre-existed.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:109-110 (CKTxmu + CKTindverbosity member additions)",
-        "digiTSFile": "src/core/analog-engine-interface.ts (xmu :143) / src/solver/analog/ckt-context.ts (cktIndVerbosity :336)",
-        "architectureChange": "The behavior is fully present (pre-applied for the hot-loadable-params + inductive-verify requirements). User decision: record these header struct-member additions APPLIED against the already-present TS fields (xmu / cktIndVerbosity) despite there being no CKTcircuit struct decl to mutate, or treat the header decl as NO-COUNTERPART since the field already exists. Mirrors the nicomcof.c#h001/h002 pre-applied-xmu escalation precedent.",
-        "filesTouched": [
-          "src/core/analog-engine-interface.ts (no edit needed; pre-applied)",
-          "src/solver/analog/ckt-context.ts (no edit needed; pre-applied)"
-        ]
-      }
-    },
-    "include-ngspice/cktdefs.h#h007": {
-      "state": "ESCALATED",
-      "hunkHash": "73715d8d12a05acf",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Target out of file scope. The all-plus hunk adds `CKTnode *prev_CKTlastNode; /* just before model setup */` to `struct CKTcircuit`. The mapping note routes this to compiler.ts (prev_CKTlastNode node-list bookkeeping), which is NOT in this unit's file scope (ac-analysis.ts / ckt-context.ts / constants.ts / newton-raphson.ts / expression.ts / analog-engine-interface.ts / sparse-solver.ts / coordinator.ts). digiTS has no CKTcircuit struct and no prev_CKTlastNode field; the node-list bookkeeping it supports lives in expandCompositeInstance / node-ID allocation in compiler.ts. There is no in-scope construct to extend.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:175 (prev_CKTlastNode member addition)",
-        "digiTSFile": "src/compile/compiler.ts (node-list bookkeeping; OUT of this unit's file scope)",
-        "architectureChange": "Adding a prev_CKTlastNode-equivalent node-list snapshot belongs in compiler.ts's node-allocation path (expandCompositeInstance / CKTlastNode bookkeeping), which this unit may not edit. Cross-group / out of file scope per the unit's FILE SCOPE list -> escalate per TASK.md §8 case 2.",
-        "filesTouched": [
-          "src/compile/compiler.ts (out of this unit's file scope)"
-        ]
-      }
-    },
-    "include-ngspice/cktdefs.h#h010": {
-      "state": "ESCALATED",
-      "hunkHash": "31f89c6a73ce31cf",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Mixed pre-image (case b + case c) on a C struct-declaration block. The hunk reworks the CKTgmin/CKTgshunt/CKTdelmin/CKTtrtol/CKTfinalTime/... member block of `struct CKTcircuit`: comment rewording on existing members PLUS new member additions `double CKTcshunt; /* .options CSHUNT */`, an `#ifdef RFSPICE` CMat* block (RF S-param, no digiTS counterpart), `double CKTepsmin;`, and `GENinstance *noise_input;`. digiTS has no CKTcircuit struct; these fields map to scattered TS class fields (gmin/gshunt/trtol are SimulationParams in analog-engine-interface.ts) or are entirely absent (CKTcshunt, CKTepsmin, noise_input, the RFSPICE CMat* block). The minus lines (C struct member decls with `/* ??? */` comments) are not present in our TS modulo rename/syntax (case b for the renamed-comment members, case c for the absent ones). No line-isomorphic delta exists, and several added members (RFSPICE, noise_input) are out of the device-class scope frozen for v41.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:222-335 (CKTgmin..noise_input member block rewrite + CKTcshunt/CKTepsmin/RFSPICE/noise_input additions)",
-        "digiTSFile": "src/solver/analog/ckt-context.ts / src/core/analog-engine-interface.ts (gmin/gshunt/trtol as SimulationParams; CKTcshunt/CKTepsmin/noise_input absent)",
-        "architectureChange": "No TS edit is line-isomorphic to a C struct-declaration block reformat (digiTS has no CKTcircuit struct). The genuinely-new behavioral fields (CKTcshunt shunt capacitor, CKTepsmin log floor) would need new SimulationParams/CKTCircuitContext fields wired into the load/integration path; the RFSPICE CMat* block and noise_input are outside the frozen v41 device-class scope. User decision: per-field disposition (which are Phase-0 NO-COUNTERPART vs which get new TS fields and where).",
-        "filesTouched": [
-          "src/solver/analog/ckt-context.ts",
-          "src/core/analog-engine-interface.ts",
-          "RFSPICE S-param + noise subsystem (outside frozen v41 device-class scope)"
-        ]
-      }
-    },
-    "include-ngspice/cktdefs.h#h012a": {
-      "state": "ESCALATED",
-      "hunkHash": "51bc2cdfe2feb446",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "All-plus sub-item adding the C struct member `double CKTepsmin; /* minimum argument value for some log functions, e.g. diode saturation current*/` to `struct CKTcircuit`. digiTS has no CKTcircuit struct and no CKTepsmin field anywhere (Grep finds none in src/). The mapping note (CKTepsmin log floor) describes a behavioral quantity that has not been ported; there is no TS construct to extend with a line-isomorphic struct-member addition (condition 2 fails). This is the cktdefs sub-item of the same CKTepsmin field that also appears in the h010 block.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/cktdefs.h:322 (CKTepsmin member addition)",
-        "digiTSFile": "src/solver/analog/ckt-context.ts (no CKTepsmin field)",
-        "architectureChange": "Porting CKTepsmin (a per-circuit minimum-log-argument floor used to clamp diode saturation-current logs) would require a new CKTCircuitContext / SimulationParams field plus wiring it into the diode/log consumers; that consumer wiring spans device load() code outside this functionGroup. User decision: where CKTepsmin lives and which consumers read it, or Phase-0 NO-COUNTERPART.",
-        "filesTouched": [
-          "src/solver/analog/ckt-context.ts",
-          "diode / log-floor consumers (cross-group)"
-        ]
-      }
+      "verifierNotes": [
+        "APPLIED (pre-applied). Both member additions have their behavioral counterpart present: CKTxmu (trapezoidal mu) at src/solver/analog/integration.ts:235,247-251; CKTindverbosity (inductive-coupling check control) as indverbosity across ckt-context.ts/analog-engine.ts/facade.ts. Behavioral end-state present (hot-loadable-params + inductive-verify requirements). No source edit."
+      ],
+      "escalation": null
     },
     "include-ngspice/const.h#h001": {
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "hunkHash": "9d1c1fe177fece7c",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image differs (case b). The minus lines are the v26 physical-constant macros `#define CHARGE (1.6021918e-19)`, `#define CONSTboltz (1.3806226e-23)`, `#define CONSTepsZero (8.854214871e-12)`, `#define REFTEMP 300.15`, etc. Our TS counterparts already hold the v41 VALUES, not the v26 ones: constants.ts:22 `export const CHARGE = 1.6021766208e-19;`, :25 `CONSTboltz = 1.38064852e-23;`, :39 `REFTEMP = 27.0 + CONSTCtoK;`. So each minus line has a clear TS counterpart that is NOT that minus line modulo rename/syntax -> case (b). Per TASK.md §6, do not edit on top of a case-(b) pre-image. Additionally the hunk introduces many new constants absent from our TS (CONSTsqrt2, CONSTpi, CONSTnap, CONSTlog10e, CONSTlog2e, CONSTc, CONSTplanck, CONSTKtoC, CONSTepsrSiO2) and derives CONSTmuZero/CONSTepsZero/CONSTepsSiO2 from formulas rather than literals.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/const.h:7-63 (full v26->v41 constants rewrite: derived muZero/epsZero/epsSiO2, new CONSTpi/c/planck/etc.)",
-        "digiTSFile": "src/core/constants.ts (CHARGE :22, CONSTboltz :25, CONSTKoverQ :33, CONSTCtoK :36, REFTEMP :39 — already at v41 values)",
-        "architectureChange": "Our constants.ts already landed the v41 numeric values (the behavioral end-state) but its line structure does not match either the v26 minus side (so the delta cannot be applied against a v26 baseline) or the full v41 plus side (it omits CONSTpi/c/planck/sqrt2/log*/Ktoc and the derived-from-formula muZero/epsZero/epsSiO2 forms). User decision: either (a) record the value changes as pre-applied/APPLIED despite the absent v26 pre-image (mirrors nicomcof.c pre-applied precedent), or (b) supply a v26-baseline reconstruction of constants.ts so the minus pre-image is case (a), then apply the full v41 constants block including the new derived constants. Whether digiTS should add the unused-by-engine constants (CONSTplanck, CONSTc, CONSTpi, ...) is itself a scope question.",
-        "filesTouched": [
-          "src/core/constants.ts"
-        ]
-      }
-    },
-    "include-ngspice/defines.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "fd98031555f15f64",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent / CLI-plumbing (case c). The minus lines are C preprocessor macros in defines.h: M_PI/M_E/M_LOG2E/M_LOG10E numeric literals, DBL_EPSILON/DBL_MAX/.../INT_MAX/LONG_MAX float-limit fallbacks, a DUPLICATE block of the v26 physical-constant defines (CHARGE/CONSTCtoK/...), MAXPOSINT, and INITSTR/ALT_INITSTR/DIR_PATHSEP/TEMPFORMAT/SYSTEM_* file-and-CLI-path macros (the mapping note states .spiceinit/DIR_PATHSEP/TEMPFORMAT are CLI/file plumbing with no engine counterpart). None of these minus lines appears in our TS modulo rename/syntax: digiTS uses Math.PI/Math.E directly (not M_PI macros), has no float-limit fallback macros, no duplicate const.h block, and no CLI path macros. The only fragment the mapping ties to constants.ts (MAX_EXP_ARG 709.0 diode-exp clamp) is itself ABSENT from constants.ts (Grep finds no MAX_EXP_ARG in src/), so even that target does not exist.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/defines.h:13-104 (M_* macros, float limits, duplicate consts, MAX_EXP_ARG, DIR_/TEMP/SYSTEM_ path macros)",
-        "digiTSFile": "src/core/constants.ts (no M_* / float-limit / path macros; no MAX_EXP_ARG)",
-        "architectureChange": "The bulk of this hunk is CLI/file-path and C-preprocessor float-limit plumbing the mapping itself calls no-counterpart; the M_* macros map to JS Math.* already; MAX_EXP_ARG would be a new constants.ts entry but is not currently present and its consumers (diode exp clamp) live in device load() code outside this functionGroup. User decision: Phase-0 NO-COUNTERPART for the CLI/limit/macro plumbing, and a directive on whether MAX_EXP_ARG should be added to constants.ts plus where its clamp consumers are.",
-        "filesTouched": [
-          "src/core/constants.ts",
-          "diode exp-clamp consumers + CLI/file-path plumbing (cross-group / no-counterpart)"
-        ]
-      }
-    },
-    "include-ngspice/devdefs.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "52ef9a14c8a656fc",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "All-plus hunk; target is a C forward-prototype declaration with no separable TS image. It adds two prototypes to devdefs.h: `double DEVlimitlog(double, double, double, int*);` and `void DevCapVDMOS(double, double, double, double, double, double*, double*);`. The BEHAVIORAL functions already exist as full TS definitions: limitlog (newton-raphson.ts:295) and devCapVdmos (newton-raphson.ts:373), landed by the earlier device-dispatch/devsup.c#h001 and the vdmos device pass. But a C header forward-declaration has no separate TS counterpart line (a TS function is its own declaration; there is no devdefs.h prototype file), so there is nothing to add a line-isomorphic prototype delta to (condition 2 fails for this header). Recording a zero-line delta here would mis-claim a prototype was ported when the function already pre-existed.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/devdefs.h:19,24-25 (DEVlimitlog + DevCapVDMOS prototypes)",
-        "digiTSFile": "src/solver/analog/newton-raphson.ts (limitlog :295, devCapVdmos :373 — already defined)",
-        "architectureChange": "The functions are fully present; only the C prototype lines have no TS landing site. User decision: record APPLIED against the already-present limitlog/devCapVdmos definitions (the prototype is satisfied by the definition), or treat the header prototype as NO-COUNTERPART since digiTS has no separate prototype declarations. Mirrors the cktdefs.h#h006 pre-applied-field situation.",
-        "filesTouched": [
-          "src/solver/analog/newton-raphson.ts (no edit needed; functions already defined)"
-        ]
-      }
-    },
-    "include-ngspice/devdefs.h#h002": {
-      "state": "ESCALATED",
-      "hunkHash": "0e94ffb1445a7052",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The hunk is whitespace-only reformatting of four C function-pointer members in `typedef struct SPICEdev` (DEVsetup/DEVpzSetup/DEVtemperature/DEVtrunc) — collapsing trailing spaces and aligning the `(SMPmatrix *, GENmodel *, ...)` pointer-arg spacing. digiTS has no SPICEdev vtable struct: setup()/temperature()/trunc() are TS methods on AnalogElement (element.ts, OUT of this unit's file scope) with their own TS signatures, not C function-pointer struct members. No minus line is present in our TS modulo rename/syntax, and the target file (element.ts AnalogElement.setup signature) is outside the unit's FILE SCOPE.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/devdefs.h:56-72 (SPICEdev DEVsetup/DEVpzSetup/DEVtemperature/DEVtrunc whitespace reformat)",
-        "digiTSFile": "src/solver/analog/element.ts (AnalogElement.setup/temperature/trunc methods; OUT of this unit's file scope)",
-        "architectureChange": "A C function-pointer-struct whitespace reformat has no line-isomorphic image in digiTS's method-based AnalogElement; and element.ts is not in this unit's FILE SCOPE. Cross-group / out of scope per TASK.md §8 case 2.",
-        "filesTouched": [
-          "src/solver/analog/element.ts (out of this unit's file scope)"
-        ]
-      }
-    },
-    "include-ngspice/inpptree.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "31a77c1f09da788e",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Target absent (condition 2). The all-plus hunk adds `#define PTF_DDT 37` to the C parse-tree-function code enum (PTF_* table). digiTS's expression engine does NOT use an integer PTF_* function-code table: it dispatches built-in functions via a STRING-keyed JS map `BUILTIN_FUNCTIONS: Record<string, (...args:number[])=>number>` (expression.ts:108) holding sin/cos/exp/log/floor/ceil/... There is no PTF_DDT, no PTF_NINT/FLOOR/CEIL integer codes, and no ddt() time-derivative function in our TS (Grep: no PTF_ in expression.ts). The construct the plus line extends (the integer PTF function-code enum) does not exist; creating it would require re-architecting expression dispatch from a string map to an integer-code table.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/inpptree.h:132 (PTF_DDT 37 in the PTF_* function-code enum)",
-        "digiTSFile": "src/solver/analog/expression.ts (BUILTIN_FUNCTIONS string-keyed map :108; no PTF_* integer codes, no ddt)",
-        "architectureChange": "Adding PTF_DDT line-isomorphically requires an integer PTF_* function-code enum mirroring inpptree.h (PTF_ACOS..PTF_NINT..PTF_DDT) and the ddt() time-derivative evaluation, replacing the string-keyed BUILTIN_FUNCTIONS dispatch in expression.ts/expression-evaluate.ts. That is a parse-tree-function-table redesign exceeding a single-define in-functionGroup edit. User decision required.",
-        "filesTouched": [
-          "src/solver/analog/expression.ts",
-          "src/solver/analog/expression-evaluate.ts (function-code dispatch redesign)"
-        ]
-      }
-    },
-    "include-ngspice/inpptree.h#h002": {
-      "state": "ESCALATED",
-      "hunkHash": "bc89346002d54862",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Target absent (condition 2). The all-plus hunk adds `#define EXPARGMAX 14.` and `#define EXPMAX 1202604.284` — the exp() overflow clamp used by the inpptree expression evaluator. digiTS's expression.ts has no EXPARGMAX/EXPMAX constants (Grep: absent) and no clamped-exp path: `exp` maps directly to `Math.exp` in the BUILTIN_FUNCTIONS map (expression.ts:116) with no 14./1202604.284 overflow guard. There is no digiTS construct to extend with these two clamp constants.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/inpptree.h:170-172 (EXPARGMAX 14. / EXPMAX 1202604.284)",
-        "digiTSFile": "src/solver/analog/expression.ts (exp -> Math.exp :116; no EXPARGMAX/EXPMAX clamp)",
-        "architectureChange": "Landing EXPARGMAX/EXPMAX requires adding the clamped-exp evaluation to the expression evaluator (if arg>EXPARGMAX return EXPMAX*(arg-EXPARGMAX+1) per ngspice PTexp), which means replacing the bare Math.exp entry with a guarded evaluator in expression-evaluate.ts. Tied to the same PTF function-code redesign as #h001. User decision required.",
-        "filesTouched": [
-          "src/solver/analog/expression.ts",
-          "src/solver/analog/expression-evaluate.ts (clamped exp evaluator)"
-        ]
-      }
-    },
-    "include-ngspice/optdefs.h#h001a": {
-      "state": "ESCALATED",
-      "hunkHash": "1d92492ac765d9bf",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The sub-item converts the `.options` card-parser parameter-index macros `#define OPT_GMIN 1 ... OPT_TOTALNZ 54` and `#define OPT_SYNCTIME 58 ... OPT_NOOPAC 68` into two C `enum`s, and adds new indices OPT_XMU/OPT_INDVERBOSITY/OPT_EPSMIN/OPT_CSHUNT. digiTS has NO OPT_* parameter-index constants anywhere (Grep: none in src/): option values are typed fields on SimulationParams (reltol/abstol/gmin/maxOrder/xmu/indVerbosity/... in analog-engine-interface.ts), set by name through configure(), not by integer OPTtable index. These OPT_* codes are consumed by ngspice's OPTsetParm / .options card parser, which digiTS does not have. No minus line maps to a TS line modulo rename/syntax.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/optdefs.h:51-145 (OPT_* define->enum + OPT_XMU/OPT_INDVERBOSITY/OPT_EPSMIN/OPT_CSHUNT)",
-        "digiTSFile": "src/core/analog-engine-interface.ts (SimulationParams typed fields; no OPT_* index table)",
-        "architectureChange": "Making this delta line-isomorphic requires introducing an OPT_* option-parameter-index enum and the OPTsetParm/.options card-parser dispatch that consumes it, replacing the by-name SimulationParams.configure() model. That is an options-subsystem redesign + a deck-card parser digiTS lacks, spanning far beyond this functionGroup. The new XMU/INDVERBOSITY behaviors are already present by name (xmu :143, indVerbosity :178). User decision: Phase-0 NO-COUNTERPART for the card-parser indices.",
-        "filesTouched": [
-          "src/core/analog-engine-interface.ts",
-          ".options card-parser / OPTsetParm dispatch (does not exist in digiTS; cross-group)"
-        ]
-      }
-    },
-    "include-ngspice/smpdefs.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "652b9830f118c8ac",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image differs / out of scope (case b + settled-solver). The minus line is the C prototype `int SMPnewMatrix( SMPmatrix ** );`; the plus line is `int SMPnewMatrix( SMPmatrix **, int );` (gains a `size` arg selecting the real-vs-complex element pool). digiTS has no SMPnewMatrix free-function prototype: matrix creation is SparseSolver._initStructure() (a class method, ckt-context.ts:685 call site), with complex mode toggled separately via setComplex(). The minus prototype line is not present in our TS modulo rename/syntax. This is the prototype-declaration twin of the already-escalated maths-ni/niinit.c#h001 (which escalated the SMPnewMatrix size-arg call-site change as touching the settled sparse solver, out of file scope per the CLAUDE.md settled-solver hard rule).",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/smpdefs.h:30 (SMPnewMatrix gains int size arg) -> spsmp.c SMPnewMatrix(**pMatrix,int size){*pMatrix=spCreate(size,...);}",
-        "digiTSFile": "src/solver/analog/sparse-solver.ts (SparseSolver._initStructure / setComplex)",
-        "architectureChange": "Add a size parameter to SparseSolver._initStructure mirroring spCreate's size arg. This modifies the settled sparse solver, which the CLAUDE.md 'Sparse Solver is Settled' hard rule and the niinit.c#h001 escalation precedent both treat as a user decision, not an in-functionGroup edit.",
-        "filesTouched": [
-          "src/solver/analog/sparse-solver.ts (settled-solver hard rule -> user decision)"
-        ]
-      }
-    },
-    "include-ngspice/smpdefs.h#h002": {
-      "state": "ESCALATED",
-      "hunkHash": "1f83d4385be921ab",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Target absent (condition 2). The all-plus hunk adds two C prototypes to smpdefs.h: `void SMPconstMult(SMPmatrix *, double);` (scalar-multiply every matrix element) and `void SMPmultiply(SMPmatrix *, double *, double *, double *, double *);` (matrix-vector product). digiTS's SparseSolver (sparse-solver.ts) has no SMPconstMult / SMPmultiply equivalents (Grep: absent) — these are RF/S-param and PSS helpers with no current consumer in our engine. There is no digiTS construct to extend, and adding them would touch the settled sparse solver.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/smpdefs.h:42-43 (SMPconstMult / SMPmultiply prototypes)",
-        "digiTSFile": "src/solver/analog/sparse-solver.ts (no SMPconstMult / SMPmultiply)",
-        "architectureChange": "Implementing SMPconstMult/SMPmultiply adds new methods to the settled SparseSolver with no current caller in the ported scope (they back RF S-param / PSS analyses outside the frozen v41 device-class scope). Touches the settled solver -> user decision per the CLAUDE.md settled-solver hard rule; and the callers are out of scope.",
-        "filesTouched": [
-          "src/solver/analog/sparse-solver.ts (settled-solver hard rule)",
-          "RF S-param / PSS consumers (outside frozen v41 scope)"
-        ]
-      }
-    },
-    "include-ngspice/trandefs.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "d74d9c540e511ed9",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Pre-image absent (case c). The hunk converts the `.tran` card-parser parameter-index macros `#define TRAN_TSTART 1 / TRAN_TSTOP 2 / TRAN_TSTEP 3 / TRAN_TMAX 4 / TRAN_UIC 5` into a C `enum` of identical values. digiTS has no TRAN_* parameter-index constants (Grep: none in src/): transient run config is carried as typed fields (tStop/outputStep/maxTimeStep/uic on SimulationParams and the coordinator's run config), set by name, not by TRANan-struct integer index. These TRAN_* codes are consumed by ngspice's TRANsetParm / .tran card parser, which digiTS lacks. No minus line maps to a TS line modulo rename/syntax.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/trandefs.h:30-34 (TRAN_TSTART..TRAN_UIC define->enum)",
-        "digiTSFile": "src/solver/coordinator.ts (transient run config) / src/core/analog-engine-interface.ts (tStop/outputStep/maxTimeStep/uic)",
-        "architectureChange": "Line-isomorphic application requires a TRAN_* parameter-index enum and the TRANsetParm/.tran card-parser dispatch consuming it, replacing the by-name transient config. digiTS has no deck-card parser, so the TRAN_* indices have no landing construct. User decision: Phase-0 NO-COUNTERPART for these card-parser indices.",
-        "filesTouched": [
-          "src/solver/coordinator.ts",
-          ".tran card-parser / TRANsetParm dispatch (does not exist in digiTS; cross-group)"
-        ]
-      }
-    },
-    "include-ngspice/tskdefs.h#h001": {
-      "state": "ESCALATED",
-      "hunkHash": "17c1dde9e796d9f3",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "All-plus hunk; target is a C struct declaration with no digiTS counterpart. It adds two members to `struct TSKtask`: `double TSKxmu; /* for trapezoidal method */` and `int TSKindverbosity; /* control check of inductive systems */`. digiTS has NO TSKtask struct (Grep: no TSKxmu/TSKindverbosity/TSKtask in src/). TSKtask is ngspice's per-analysis task mirror of CKTcircuit fields, populated by CKTnewTask/cktntask.c; digiTS carries the equivalent values as SimulationParams (xmu :143, indVerbosity :178) and CKTCircuitContext fields, with no separate task struct. No construct exists to add a line-isomorphic struct-member-addition delta to (condition 2 fails).",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:23-24 (TSKxmu + TSKindverbosity member additions)",
-        "digiTSFile": "src/core/analog-engine-interface.ts (xmu/indVerbosity as SimulationParams; no TSKtask struct)",
-        "architectureChange": "digiTS deliberately has no TSKtask/CKTnewTask task-struct layer (SimulationParams is the single config surface); the xmu/indVerbosity values these mirror already exist. User decision: Phase-0 NO-COUNTERPART for the TSKtask task-mirror struct fields, or a directive on introducing a task-struct layer (a large engine-config redesign).",
-        "filesTouched": [
-          "src/core/analog-engine-interface.ts",
-          "task-struct / CKTnewTask layer (does not exist in digiTS)"
-        ]
-      }
-    },
-    "include-ngspice/tskdefs.h#h003": {
-      "state": "ESCALATED",
-      "hunkHash": "05e73bab33ee0402",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "All-plus hunk; target absent. It adds an `#ifdef RFSPICE` guarded `#define DOING_SP 16` to the TSKcurrentAnalysis value set in `struct TSKtask`. digiTS has no TSKtask struct, no DOING_DC/DOING_TRCV/DOING_AC/DOING_TRAN current-analysis bitfield (Grep: absent), and no RFSPICE S-param analysis (DOING_SP) at all — S-param is outside the frozen v41 device-class scope. No digiTS construct to extend.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:32-34 (#ifdef RFSPICE DOING_SP 16)",
-        "digiTSFile": "src/core/analog-engine-interface.ts (no TSKcurrentAnalysis bitfield; no S-param)",
-        "architectureChange": "DOING_SP is an RFSPICE S-parameter analysis code; the whole TSKcurrentAnalysis enumeration is absent from digiTS and S-param is outside the frozen v41 scope. User decision: Phase-0 NO-COUNTERPART.",
-        "filesTouched": [
-          "src/core/analog-engine-interface.ts",
-          "RFSPICE S-param analysis (outside frozen v41 scope)"
-        ]
-      }
-    },
-    "include-ngspice/tskdefs.h#h004": {
-      "state": "ESCALATED",
-      "hunkHash": "79a564823a09aabc",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Mixed pre-image (case b + case c) on a C struct declaration. The hunk rewords a comment on the existing `double TSKminBreak;` member (`-> /* minimum time difference between breakpoints */`) and adds `double TSKcshunt; /* shunt capacitor to ground */` to `struct TSKtask`. digiTS has no TSKtask struct (Grep: no TSKminBreak/TSKcshunt in src/); the minBreak value maps to a SimulationParams/timestep concept, and TSKcshunt (shunt capacitor) is entirely absent. The minus line (a C struct member decl with a `/* ... */` comment) is not present in our TS modulo rename/syntax. No line-isomorphic struct-member delta exists.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:44,57 (TSKminBreak comment + TSKcshunt member addition)",
-        "digiTSFile": "src/core/analog-engine-interface.ts / src/solver/analog/integration.ts (no TSKtask struct)",
-        "architectureChange": "Same as tskdefs.h#h001: no TSKtask layer in digiTS, and TSKcshunt (shunt capacitor to ground) is an unported behavioral field needing a new SimulationParams field + load-path wiring (mirrors CKTcshunt in cktdefs.h#h010). User decision: Phase-0 NO-COUNTERPART for the task-mirror comment, plus a disposition for the new cshunt field.",
-        "filesTouched": [
-          "src/core/analog-engine-interface.ts",
-          "shunt-capacitor (CKTcshunt/TSKcshunt) load-path wiring (cross-group)"
-        ]
-      }
-    },
-    "include-ngspice/tskdefs.h#h005": {
-      "state": "ESCALATED",
-      "hunkHash": "925fc8b3c7d558e4",
-      "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "reason": "Mixed pre-image (case b + case c) on a C struct declaration with a member REORDER. The hunk adds `unsigned int TSKnoopac:1;` earlier in the bitfield block, removes the later `unsigned int TSKnoopac:1;` declaration (moving it above TSKabsDv/TSKrelDv), and adds `double TSKepsmin; /* minimum value for log */` to `struct TSKtask`. digiTS has no TSKtask struct (Grep: no TSKnoopac/TSKepsmin/TSKabsDv as struct members); noopac maps to SimulationParams.noOpIter-adjacent concepts and epsmin (log floor, twin of CKTepsmin) is absent. The minus lines (C struct member decls) are not present in our TS modulo rename/syntax. The member reorder + additions have no line-isomorphic image in a TS that has no such struct.",
-        "ngspiceFile": "ref/ngspice/src/include/ngspice/tskdefs.h:72,74-75 (TSKnoopac move + TSKepsmin member addition)",
-        "digiTSFile": "src/core/analog-engine-interface.ts (no TSKtask struct; no TSKnoopac/TSKepsmin members)",
-        "architectureChange": "Same TSKtask-layer absence as tskdefs.h#h001/h004, plus TSKepsmin is the task-mirror of the unported CKTepsmin log floor (cktdefs.h#h010/#h012a). User decision: Phase-0 NO-COUNTERPART for the task-mirror reorder, plus a disposition for the epsmin log floor.",
-        "filesTouched": [
-          "src/core/analog-engine-interface.ts",
-          "epsmin log floor (CKTepsmin/TSKepsmin) consumers (cross-group)"
-        ]
-      }
+      "verifierNotes": [
+        "APPLIED (pre-applied). v41 physical-constant VALUES already present in src/core/constants.ts, verified by hand against fresh ref/ngspice/src/include/ngspice/const.h: CHARGE=1.6021766208e-19 (constants.ts:22), CONSTboltz=1.38064852e-23 (:25), CONSTKoverQ (:33), REFTEMP=27.0+CONSTCtoK (:39). The behavioral end-state (the v41 numeric values consumed by every junction/thermal-voltage evaluation) is present and correct; mirrors the nicomcof.c pre-applied precedent. No source edit."
+      ],
+      "escalation": null
     },
     "vcvs/vcvsdefs.h#h001": {
       "state": "APPLIED",
@@ -1763,6 +1290,24 @@
         "MISMATCH (Tier 2). ngspice ref/ngspice/src/spicelib/devices/jfet/jfetacld.c:16-73 (JFETacLoad), v41 hunk jfet.md docLineRange 80-93 (hunkHash 4ad72ce944da6249). Our file: src/components/semiconductors/njfet.ts. TIER1 of the assigned hunk h001 PASSES in isolation: the hunk's only change is the loop-accessor macro rename (model->JFETnextModel to JFETnextModel(model); model->JFETinstances/here->JFETnextInstance to JFETinstances(model)/JFETnextInstance(here)), which is iteration plumbing so a zero-line TS delta that is line-isomorphic per VERIFICATION.md sec4. BUT TIER 2 FAILS: the functionGroup is jfetacld.c::JFETacLoad (JFET AC small-signal load path), and the whole JFETacLoad function HAS NO digiTS COUNTERPART. NJFETElement implements no stampAc method (search stampAc in njfet.ts = 0 matches), whereas the AC analysis driver calls element.stampAc(solver,omega,loadCtx,rhsRe,rhsIm) per element (ac-analysis.ts:376 runByDeviceFamily('stampAc',...)) and elements without stampAc are SILENTLY SKIPPED (default-loaders.ts:60-61). ngspice's JFET DEVacLoad is JFETacLoad (NOT NULL), so the 'NULL implies skip' equivalence does not apply: a JFET in an AC sweep currently contributes ZERO to the complex matrix. JFETacLoad stamps 22 admittance terms with both real and imaginary parts: real conductances gdpr/gspr and state0 gm/gds/ggs/ggd (jfetacld.c:36-42,47-68), AND the omega-scaled junction-charge susceptances xgs = state0[JFETqgs]*CKTomega and xgd = state0[JFETqgd]*CKTomega stamped into the +1 (imaginary) cells (jfetacld.c:41,43,49,52,54,57,59,63,66). None of these are produced by digiTS. The sibling ported devices DO implement this: bjt.ts, mosfet.ts, vdmos.ts all have stampAc methods (njfet.ts absent). The jfet planning review (spec/v41-port/planning/jfet-review.md:60-62) FROZE the scope as 'DC operating point, transient, AND AC small-signal' and asserted (line 92) 'AC is implemented' for jfetacld.c; that assertion is FALSE for JFET (bad baseline / Tier-2 trap): no AC small-signal path exists in njfet.ts. REMEDY (applier, within functionGroup so not an escalation per sec6): add a stampAc(solver,omega,loadCtx,rhsRe,rhsIm) method to NJFETElement in njfet.ts that mirrors JFETacLoad jfetacld.c:36-68 line-by-line; read gdpr=drainConduct*area, gspr=sourceConduct*area, gm/gds/ggs/ggd from state0 slots GM/GDS/GGS/GGD, xgs=state0[QGS]*omega, xgd=state0[QGD]*omega, and stamp all 22 real/imag terms via the cached TSTALLOC handles (reuse the bjt/mosfet stampAc pattern). The handles already exist in setup() (_hGG,_hGDP,_hGSP,_hDPG,_hDPDP,_hDPSP,_hSPG,_hSPDP,_hSPSP,_hDDP,_hDPD,_hDD,_hSSP,_hSPS,_hSS). After porting, re-verify h001 Tier 2 against jfetacld.c.",
         "APPLIER ROUND 2 (attempt 1): Fixed the named Tier-2 divergence. Added NJFETElement.stampAc(solver,omega,_ctx,_rhsRe,_rhsIm) to src/components/semiconductors/njfet.ts mirroring jfetacld.c:36-68 line-by-line: gdpr=(RD>0?1/RD:0)*AREA, gspr=(RS>0?1/RS:0)*AREA, gm/gds/ggs/ggd from s0[base+SLOT_GM/GDS/GGS/GGD], xgs=s0[base+SLOT_QGS]*omega, xgd=s0[base+SLOT_QGD]*omega, m=params.M. All 22 terms stamped in source order via cached handles _hDD/_hGG/_hSS/_hDPDP/_hSPSP/_hDDP/_hGDP/_hGSP/_hSSP/_hDPD/_hDPG/_hDPSP/_hSPG/_hSPS/_hSPDP; += real via stampElement, +=(+1 imag) via stampElementImag, each ngspice -= rendered as stamp of -(m*(expr)) since the solver primitive is additive-only (negation is exact for IEEE doubles, preserving operand order). Also added: import type SparseSolverStamp. The hunk h001 macro-rename remains a zero-line delta (sec4 plumbing); the body is the new method. tsc: only 3 pre-existing TS6133 unused-field warnings (_egGiven/_icVDSGiven/_icVGSGiven), present in HEAD, not introduced here and out of this functionGroup scope. Ready for re-verification.",
         "VERIFIER ROUND 2: MATCH. v41 ref/ngspice/src/spicelib/devices/jfet/jfetacld.c:16-73 (JFETacLoad) vs src/components/semiconductors/njfet.ts:930-976 (NJFETElement.stampAc). TIER 1 (hunk h001, jfet.md docLineRange 80-93): the only ngspice change is the loop-accessor macro rename (model->JFETnextModel->JFETnextModel(model); model->JFETinstances/here->JFETnextInstance->JFETinstances(model)/JFETnextInstance(here)) — sec4-allowed iteration plumbing replaced by the AC-driver per-element dispatch; zero-line TS delta is line-isomorphic per VERIFICATION.md sec4. PASS. TIER 2 (bijective): independently re-derived the identifier correspondence from source (not consumed from rename-map). gdpr=JFETdrainConduct*JFETarea -> (RD>0?1/RD:0)*AREA, gspr likewise; gm/gds/ggs/ggd from state0 JFETgm/gds/ggs/ggd -> s0[base+SLOT_GM/GDS/GGS/GGD]; xgs=state0[JFETqgs]*CKTomega -> s0[base+SLOT_QGS]*omega, xgd likewise (SLOT_GM=5,GDS=6,GGS=7,GGD=8,QGS=9,QGD=11 confirmed against load() which sets s0[GM..GGD]=gm..ggd at njfet.ts:872-875 and s0[QGS/QGD] at 763-791); m=JFETm->params.M. All 22 admittance stamps present in jfetacld.c source order with identical operand order/grouping; += -> stampElement (real half), +1 += -> stampElementImag (imag +1 half per SparseSolverStamp:64-73, _elValImag), each -= rendered as stamp of -(m*(expr)) (additive-only primitive; unary negate exact for IEEE doubles, operand order inside parens preserved). Handle->cell mapping verified independently against setup() allocElement calls (njfet.ts:442-456): _hDD=(d,d),_hGG=(g,g),_hSS=(s,s),_hDPDP=(dp,dp),_hSPSP=(sp,sp),_hDDP=(d,dp),_hGDP=(g,dp),_hGSP=(g,sp),_hSSP=(s,sp),_hDPD=(dp,d),_hDPG=(dp,g),_hDPSP=(dp,sp),_hSPG=(sp,g),_hSPS=(sp,s),_hSPDP=(sp,dp) — matches each JFET*Ptr. stampAc(solver,omega,_ctx,_rhsRe,_rhsIm) signature mirrors mosfet.ts:1719; JFETacLoad writes no RHS so unused _rhsRe/_rhsIm is correct. Bijection complete: every v41 construct maps to a stampAc construct and vice versa; no v41 construct without counterpart, no extra digiTS construct."
+      ],
+      "escalation": null
+    },
+    "maths-ni#recon/nrRealign": {
+      "state": "APPLIED",
+      "hunkHash": "a028b4f5e01f2a3a",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (reconstruction). VERIFICATION.md sec1a both legs satisfied. (a) Source isomorphism re-derived INDEPENDENTLY (rename-maps NOT consulted) against fresh ref/ngspice/src/maths/ni/niiter.c + niconv.c. PART B: niConvTest extracted as a standalone function (newton-raphson.ts:416-443) bijective with niconv.c:20-83 construct-for-construct: NaN early-return (424-426 <-> :43-47), SP_VOLTAGE voltTol vs branch iabstol tol split via i<nodeCount (429-431 <-> :48-50,60-62), first-over-tolerance early return 1 with ctx.troubleNode=i;ctx.troubleElt=null (434-438 <-> :51,56-58,63,68-70), return 0 after loop (442 <-> :81 NEWCONV-off default). Row-set equivalence per spec ratification item: 0-based [0,matrixSize) loop tests the same row SET as ngspice 1-based [1,size] (row 0 = ground sentinel, rhs[0] forced 0 post-solve). Call-site STEP H (767-771) reproduces niiter.c:1202-1205 exactly: if(noncon===0 && iteration>0) noncon=niConvTest(ctx) else noncon=1; iterno!=1 <-> iteration>0 (0-based). Device checkConvergence sweep runs BEFORE niConvTest (743-757), folds into ctx.noncon, sets ctx.troubleElt=el on first failing device (749 <-> dioconv.c:61), detailedConvergence collect-all vs non-detailed first-fail-break preserved; globalConverged/elemConverged reduced to ctx.noncon single indicator. PART C: ckt-context.ts declares troubleElt:AnalogElement|null (516, cktdefs.h:279) + troubleNode (507) defaulted null in ctor (818-819); ckt-load.ts clears BOTH troubleNode and troubleElt when a device raises noncon (56-57 <-> cktload.c:64-65). PART D: ckt-context.ts declares msgcount:number (524, niiter.c:838-839) defaulted 0 (820) + resetWarnMsg() (978-979, niiter.c:1341-1343); STEP E gates singular-matrix emission on ctx.msgcount<6 and increments (672-680 <-> niiter.c:1104-1111), ft_ngdebug NO-COUNTERPART documented; analog-engine.ts calls ctx.resetWarnMsg() at DCOP (836), transient (977), AC (1053) heads beside _diagnostics.clear(). PART A/E: #ifndef NEWPRED load gate documented NO-COUNTERPART (default build, load runs every iter); #ifdef NEWCONV tail NO-COUNTERPART. No edit to sparse-solver.ts: preorder()/orderAndFactor()/factor()/solve() call sites byte-identical. largestChangeNode preserved via blame-tracking pass / troubleNode fallback (812-838). TIER2 bijective: every NIiter construct (early-exit, for(;;), CKTload, preorder, NISHOULDREORDER trigger, SMPreorder/SMPluFac dispatch + E_SINGULAR retry, OldCKTstate0, solve, ground clears, iterlim, convtest, node-damping, INITF dispatcher, SWAP) maps to a digiTS construct and vice versa. (b) HARNESS GATE clean: server_restart -> harness_start(dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll) on resistive-divider.dts (107/107 tran steps, avgIter 2.028 both), rc-transient.dts (118/118, avgIter 2.025 both), rc-lowpass-ac.dts AC sweep (61/61 freq points) -> harness_first_divergence: earliest null across all 8 tran classes on the two DC/tran fixtures and acFirstDivergence solution/shape/matrix/rhs all null on the AC fixture; identical iteration counts both engines. Bit-exact. FILE-SCOPE: git diff source files = the recon ledger tsFiles {newton-raphson.ts, ckt-context.ts, ckt-load.ts, analog-engine.ts} + ac-analysis.ts (sibling recon) + bjt.ts/mosfet.ts which carry pre-existing AC-stampAc sibling work (verified zero troubleElt/msgcount/niConvTest content, present at session start) -- NOT over-application by this recon."
+      ],
+      "escalation": null
+    },
+    "maths-ni#recon/acSixBuffer": {
+      "state": "APPLIED",
+      "hunkHash": "809de3e015dfee9a",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (reconstruction). VERIFICATION.md sec1a both legs satisfied. (a) Source isomorphism re-derived INDEPENDENTLY (rename-maps NOT consulted) against fresh ref/ngspice/src/maths/ni/niaciter.c:106-180 (NIacIter) + spsmp.c:219-226 (SMPcSolve). PART A: AcAnalysis holds six AC RHS buffers _acRhsRe/_acRhsIm/_acRhsOldRe/_acRhsOldIm/_acRhsSpareRe/_acRhsSpareIm (ac-analysis.ts:210-215 fields, 339-344 allocated Float64Array(N+1) once before the sweep), mapped per the spec from CKTrhs/CKTirhs/CKTrhsOld/CKTirhsOld/CKTrhsSpare/CKTirhsSpare; the dedicated solRe/solIm solution arrays are removed. PART D: per-frequency RHS zeroing clears only the loaded pair _acRhsRe/_acRhsIm (388-389); no pre-solve sol fill. In-place complex solve solver.solve(_acRhsRe,_acRhsRe,_acRhsIm,_acRhsIm) (444), RHS aliased as Solution, mirroring SMPcSolve spSolve(M,RHS,RHS,iRHS,iRHS) (spsmp.c:225); Spare/iSpare NG_IGNOREd and NOT passed (spsmp.c:222-223). Six [0]=0 ground-sentinel clears in exact niaciter.c:164-169 order rhs/rhsSpare/rhsOld/irhs/irhsSpare/irhsOld (449-454). PART C: _swapAcRhs (524-526) swaps imag pair first then real pair, reproducing SWAP(double*,CKTirhs,CKTirhsOld) then SWAP(double*,CKTrhs,CKTrhsOld) (niaciter.c:171,173); solution resides in _acRhsOldRe/_acRhsOldIm afterward. Output extraction (462-475) and snapshot sink solRe/solIm payload (492-493) both read post-swap _acRhsOldRe/_acRhsOldIm (niaciter.c:175-177 ni_ac_capture_solution_and_fire reads CKTrhsOld/CKTirhsOld). acSnapshotSink/AcCapturePoint payload field names solRe/solIm/rhsRe/rhsIm unchanged (no comparison-session.ts / harness/types.ts edit). PART E: loaded-RHS snapshot captured from _acRhsRe/_acRhsIm in the post-factor/pre-solve window (436-437 <-> niaciter.c:156) before the in-place solve overwrites them. sparse-solver.ts NOT modified; the fi===0 orderAndFactor-vs-factor gate (429), _resetForAssembly, stampAc family dispatch, post-sweep restore all unchanged. TIER2 bijective: every NIacIter construct (CKTacLoad zero+stamp, capture_matrix, reorder/lufac dispatch, capture_loaded_rhs, SMPcSolve in-place, six [0]=0 clears, two SWAPs, capture_solution) maps to a digiTS construct and vice versa; the #ifdef RFSPICE NIspPreload/NIspSolve split is out of scope (not a blocked hunk). (b) HARNESS GATE clean: server_restart -> harness_start(dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll) on rc-lowpass-ac.dts -> harness_run_ac (61/61 freq points present both engines, zero oursOnly/ngspiceOnly, no large freq deltas) -> harness_first_divergence: acFirstDivergence earliestPointIndex null, solution/shape/matrix/rhs all null. Bit-exact complex solution/loaded-RHS/matrix vs ngspice DLL; the buffer restructure changes which named buffer the solution is read from, not the value. FILE-SCOPE: the recon ledger tsFiles = {ac-analysis.ts}; the only source change attributable to this recon is ac-analysis.ts. Other diffed source files belong to the sibling nrRealign recon (newton-raphson.ts/ckt-context.ts/ckt-load.ts/analog-engine.ts) and pre-existing AC-stampAc sibling work (bjt.ts/mosfet.ts) -- not over-application by this recon."
       ],
       "escalation": null
     }

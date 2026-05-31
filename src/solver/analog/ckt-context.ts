@@ -506,6 +506,23 @@ export class CKTCircuitContext {
    */
   troubleNode: number | null;
   /**
+   * ngspice CKTtroubleElt mirror (cktdefs.h:279 — GENinstance *CKTtroubleElt).
+   * The non-convergent device instance, set by a device convTest
+   * (dioconv.c:61 — CKTtroubleElt = here) and cleared by the node-level
+   * niConvTest (niconv.c:57,69 — CKTtroubleElt = NULL). Also cleared in the
+   * cktLoad device loop when a device raises noncon (cktload.c:64-65). Null when
+   * no element is blamed.
+   */
+  troubleElt: AnalogElement | null;
+  /**
+   * ngspice msgcount mirror (niiter.c:838-839 — `static int msgcount`). Caps the
+   * singular-matrix warning at six emissions per analysis. A field (not a module
+   * static) so independent circuits do not share the counter: digiTS creates a
+   * fresh CKTCircuitContext per compile(), and a module static would leak the
+   * count across circuits. Zeroed at the head of each analysis by resetWarnMsg().
+   */
+  msgcount: number;
+  /**
    * Post-iteration hook for harness instrumentation.
    * Called after each NR iteration's convergence check.
    */
@@ -799,6 +816,8 @@ export class CKTCircuitContext {
     this.limitingCollector = null;
     this.enableBlameTracking = false;
     this.troubleNode = null;
+    this.troubleElt = null;
+    this.msgcount = 0;
     this.postIterationHook = null;
     this.preFactorHook = null;
     this.detailedConvergence = false;
@@ -948,5 +967,15 @@ export class CKTCircuitContext {
     this.loadCtx.rhsOld = this.rhsOld;
     this.loadCtx.rhs = this.rhs;
     this.nrResult.voltages = this.rhs;
+  }
+
+  /**
+   * ngspice NIresetwarnmsg() (niiter.c:1341-1343 — `void NIresetwarnmsg(void) {
+   * msgcount = 0; }`). Zero the singular-matrix warning counter at the head of
+   * each analysis (DC-OP / transient / AC), so each analysis gets a fresh
+   * six-message budget. Called by the engine before the first NR solve.
+   */
+  resetWarnMsg(): void {
+    this.msgcount = 0;
   }
 }

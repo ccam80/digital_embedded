@@ -1,15 +1,15 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-05-30T01:37:06.173Z
+Generated: 2026-05-31T10:58:14.097Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
 - Diff docs: **34**
 - ngspice files touched: **698**
 - Parent hunks enumerated: **1756**
-- v26-baseline reconstruction items: **26**
-- Ledger items (hunks + sub-items + reconstruction): **1802** (37 sub-items, 26 reconstruction)
-- Planning decisions overlays applied: **33**
+- v26-baseline reconstruction items: **31**
+- Ledger items (hunks + sub-items + reconstruction): **1807** (37 sub-items, 31 reconstruction)
+- Planning decisions overlays applied: **34**
 - Lines: +23664 / -18407
 
 ledger.json is machine-derived: diffs + splits.json + planning/*-decisions.json,
@@ -19,10 +19,10 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 598 |
-| APPLIED        | 125 |
-| ESCALATED      | 39 |
-| NO-COUNTERPART | 1040 |
+| PENDING        | 581 |
+| APPLIED        | 128 |
+| ESCALATED      | 1 |
+| NO-COUNTERPART | 1097 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
 is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
@@ -45,7 +45,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | spec/ngspice-v41-model-diffs/mes.md | 20 | 29 |
 | spec/ngspice-v41-model-diffs/mos1.md | 26 | 77 |
 | spec/ngspice-v41-model-diffs/mos2.md | 25 | 64 |
-| spec/ngspice-v41-model-diffs/mos3.md | 26 | 43 |
+| spec/ngspice-v41-model-diffs/mos3.md | 27 | 44 |
 | spec/ngspice-v41-model-diffs/mos6.md | 14 | 27 |
 | spec/ngspice-v41-model-diffs/mos9.md | 26 | 43 |
 | spec/ngspice-v41-model-diffs/res.md | 23 | 45 |
@@ -55,15 +55,15 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | spec/ngspice-v41-model-diffs/vsrc.md | 19 | 61 |
 | spec/ngspice-v41-engine-diffs/analysis.md | 49 | 169 |
 | spec/ngspice-v41-engine-diffs/device-dispatch.md | 3 | 22 |
-| spec/ngspice-v41-engine-diffs/include-ngspice.md | 97 | 251 |
+| spec/ngspice-v41-engine-diffs/include-ngspice.md | 98 | 252 |
 | spec/ngspice-v41-engine-diffs/maths-cmaths.md | 11 | 98 |
 | spec/ngspice-v41-engine-diffs/maths-dense.md | 4 | 4 |
 | spec/ngspice-v41-engine-diffs/maths-fft.md | 2 | 8 |
 | spec/ngspice-v41-engine-diffs/maths-misc.md | 6 | 15 |
-| spec/ngspice-v41-engine-diffs/maths-ni.md | 10 | 25 |
+| spec/ngspice-v41-engine-diffs/maths-ni.md | 11 | 27 |
 | spec/ngspice-v41-engine-diffs/maths-poly.md | 2 | 2 |
 | spec/ngspice-v41-engine-diffs/maths-sparse.md | 5 | 12 |
-| spec/ngspice-v41-engine-diffs/parser.md | 56 | 172 |
+| spec/ngspice-v41-engine-diffs/parser.md | 57 | 173 |
 | null | 1 | 1 |
 
 ## Per-file item counts

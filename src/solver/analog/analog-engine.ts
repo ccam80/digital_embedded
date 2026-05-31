@@ -830,6 +830,10 @@ export class MNAEngine implements AnalogEngine {
 
     const { elements } = this._compiled;
     this._diagnostics.clear();
+    // niiter.c:1341-1343 — NIresetwarnmsg() zeroes the singular-matrix warning
+    // counter at the head of each analysis, so DC-OP gets a fresh six-message
+    // budget (niiter.c:1104-1111).
+    this._ctx!.resetWarnMsg();
 
     const cac = this._compiled as ConcreteCompiledAnalogCircuit;
 
@@ -968,6 +972,9 @@ export class MNAEngine implements AnalogEngine {
 
     const { elements } = this._compiled;
     this._diagnostics.clear();
+    // niiter.c:1341-1343 — NIresetwarnmsg() zeroes the singular-matrix warning
+    // counter at the head of the transient-boot DC-OP analysis.
+    this._ctx!.resetWarnMsg();
 
     const cac = this._compiled as ConcreteCompiledAnalogCircuit;
 
@@ -1039,6 +1046,11 @@ export class MNAEngine implements AnalogEngine {
     }
 
     this._setup();
+    // niiter.c:1341-1343 — NIresetwarnmsg() zeroes the singular-matrix warning
+    // counter at the head of the AC analysis (the DC-OP that precedes the sweep
+    // and any per-frequency singular-matrix warning share the six-message
+    // budget for this analysis).
+    this._ctx!.resetWarnMsg();
     // Adapt the compiled circuit to AcCompiledCircuit, supplying matrixSize
     // from the post-setup solver (mirrors ngspice CKTmaxEqNum + 1).
     const adapted = {

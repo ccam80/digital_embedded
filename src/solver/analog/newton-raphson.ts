@@ -383,6 +383,66 @@ export function devCapVdmos(
 }
 
 // ---------------------------------------------------------------------------
+// niConvTest- node-level convergence test (rebuild of ngspice NIconvTest)
+// ---------------------------------------------------------------------------
+
+/**
+ * Node-level convergence test, mirroring ngspice NIconvTest (niconv.c:20-83).
+ *
+ * Walks every solved row; the first NaN solution row (niconv.c:43-47) or the
+ * first row whose |new-old| exceeds reltol*max(|old|,|new|)+absTol
+ * (niconv.c:51,63) is non-convergence, recorded as the trouble node with the
+ * trouble element cleared (niconv.c:56-57,68-69). Returns 1 (non-converged) or
+ * 0 (converged).
+ *
+ * ngspice → digiTS map:
+ *   ckt                       → ctx
+ *   size = SMPmatSize(...)    → ctx.solver.matrixSize
+ *   node->type == SP_VOLTAGE  → i < ctx.nodeCount (voltage rows precede branch
+ *                               rows in the 1-based MNA layout)
+ *   CKTrhs[i] / CKTrhsOld[i]  → ctx.rhs[i] / ctx.rhsOld[i]
+ *   CKTreltol                 → ctx.reltol
+ *   CKTvoltTol                → ctx.voltTol
+ *   CKTabstol                 → ctx.iabstol
+ *   CKTtroubleNode = i        → ctx.troubleNode = i
+ *   CKTtroubleElt  = NULL     → ctx.troubleElt = null
+ *
+ * Row indexing: niconv.c iterates `for (i=1;i<=size;i++)` (1-based). digiTS
+ * iterates `[0, matrixSize)` so the row SET tested is byte-for-byte the set
+ * tested by the prior inline loop (newton-raphson.ts row loop) — row 0 is the
+ * ground sentinel (ctx.rhs[0] forced to 0 after solve), exactly as ngspice's
+ * row 0 is the same ground sentinel its loop starts past.
+ */
+function niConvTest(ctx: CKTCircuitContext): number {
+  const { rhs, rhsOld, reltol, voltTol, iabstol, nodeCount } = ctx;
+  const size = ctx.solver.matrixSize;
+  for (let i = 0; i < size; i++) {
+    const newV = rhs[i];
+    const oldV = rhsOld[i];
+    // niconv.c:43-47 — a NaN solution row is non-convergence; the tol test below
+    // cannot catch it (NaN > tol is false).
+    if (Number.isNaN(newV)) {
+      return 1;
+    }
+    // niconv.c:48-50,60-62 — SP_VOLTAGE rows use CKTvoltTol; branch rows use
+    // CKTabstol.
+    const tol = i < nodeCount
+      ? reltol * Math.max(Math.abs(oldV), Math.abs(newV)) + voltTol
+      : reltol * Math.max(Math.abs(oldV), Math.abs(newV)) + iabstol;
+    // niconv.c:51,56-57,63,68-69 — the first row over tolerance blames the node
+    // and clears the element.
+    if (Math.abs(newV - oldV) > tol) {
+      ctx.troubleNode = i;
+      ctx.troubleElt = null;
+      return 1;
+    }
+  }
+  // niconv.c:80-82 — NEWCONV is off in the default build; no extra CKTconvTest
+  // pass, so the function returns 0 (converged) after the row loop.
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Newton-Raphson iteration loop
 // ---------------------------------------------------------------------------
 
@@ -406,7 +466,6 @@ export function devCapVdmos(
 export function newtonRaphson(ctx: CKTCircuitContext): void {
   const {
     solver, elements, nodeCount,
-    reltol, abstol, iabstol,
   } = ctx;
 
   const diagnostics = ctx.diagnostics;
@@ -488,7 +547,12 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       ctx.limitingCollector.length = 0;
     }
 
-    // ---- STEP B: CKTload- single-pass device evaluation ----
+    // ---- STEP B: CKTload- single-pass device evaluation (niiter.c:891-896) ----
+    // niiter.c:891-896 wraps the load/factor/solve body in `#ifdef NEWPRED if
+    // (!(CKTmode & MODEINITPRED))`. The default ngspice build does NOT define
+    // NEWPRED, so the guard is compiled out and the body runs unconditionally
+    // every iteration. digiTS tracks the default (NEWPRED-off) build: the load
+    // runs every iteration with no MODEINITPRED predictor-skip guard.
     // ctx.rhsOld already holds iter K's input voltages: at iter 0 it is whatever
     // the caller seeded (predictor / DC-OP carryover); at iter K>0 the previous
     // ctx.swapRhsBuffers() rotated iter K-1's solve output into ctx.rhsOld.
@@ -599,12 +663,21 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         shouldReorder = true;
         continue;
       }
-      diagnostics.emit(
-        makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
-          explanation: `The MNA matrix became singular at iteration ${iteration + 1} (sparse error ${errorCode}).`,
-          suggestions: [],
-        }),
-      );
+      // niiter.c:1104-1111 — emit at most six singular-matrix warnings per
+      // analysis: `if (ft_ngdebug || msgcount < 6) { … msgcount += 1; }`.
+      // ft_ngdebug is the ngspice frontend verbose-debug global; digiTS has no
+      // `set ngdebug` control, so the `ft_ngdebug ||` short-circuit is NO-
+      // COUNTERPART and only the `msgcount < 6` half is mirrored. The counter is
+      // reset per analysis by ctx.resetWarnMsg() (niiter.c:1341-1343).
+      if (ctx.msgcount < 6) {
+        diagnostics.emit(
+          makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
+            explanation: `The MNA matrix became singular at iteration ${iteration + 1} (sparse error ${errorCode}).`,
+            suggestions: [],
+          }),
+        );
+        ctx.msgcount += 1;
+      }
       ctx.nrResult.converged = false;
       ctx.nrResult.iterations = iteration + 1;
       ctx.nrResult.largestChangeElement = -1;
@@ -650,102 +723,57 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       return;
     }
 
-    // ---- STEP H: Convergence check (ngspice NIconvTest) ----
+    // ---- STEP H: Convergence test (niiter.c:1202-1205) ----
     //
-    // Mirror niiter.c:957-961 in full:
+    // Device-level convergence (the DIOconvTest/BJTconvTest counterpart) runs
+    // FIRST. In ngspice each device's convTest runs inside CKTload and bumps
+    // CKTnoncon + sets CKTtroubleElt (dioconv.c:55-62), so by the time NIiter
+    // reads CKTnoncon at niiter.c:1202 the device-side flags are already folded
+    // in. digiTS runs el.checkConvergence here, before the node-level niConvTest,
+    // so the `ctx.noncon === 0` guard at the niConvTest call means "no device
+    // flagged itself", matching niiter.c:1202.
     //
-    //   if (CKTnoncon == 0 && iterno != 1) {
-    //       CKTnoncon = NIconvTest(ckt);   // 0 if converged, else 1
-    //   } else {
-    //       CKTnoncon = 1;                  // ASSIGNMENT, not increment
-    //   }
-    //
-    // The else branch fires for both first-iteration AND device-limited cases.
-    // The assignment normalizes any multi-junction limiter increments (BJT,
-    // MOSFET, multi-diode) so the INITF dispatcher and the harness only ever
-    // read 0 or 1. Devices use `ctx.noncon.value++`, so without this collapse
-    // we leak counts > 1 to the harness comparison.
-    if (iteration === 0 || ctx.noncon !== 0) {
-      // niiter.c:960- `CKTnoncon = 1` for the entire else branch
-      // `(CKTnoncon != 0 || iterno == 1)`. Assignment, not increment, so any
-      // multi-junction limiter increments collapse to 1.
-      ctx.noncon = 1;
-    }
-
-    let globalConverged = false;
-    let elemConverged = false;
-    let largestChangeNode = 0;
-    let largestChangeMag = 0;
+    // The convergenceFailedElements collector is reset every iteration; in
+    // detailedConvergence mode it collects every failing element label
+    // (harness blame surface), and in non-detailed mode it short-circuits on
+    // the first failing device.
     const convergenceFailedElements = ctx.convergenceFailures;
     convergenceFailedElements.length = 0;
-
-    if (ctx.noncon === 0 && iteration > 0) {
-      globalConverged = true;
-      for (let i = 0; i < solver.matrixSize; i++) {
-        const delta = Math.abs(ctx.rhs[i] - ctx.rhsOld[i]);
-        if (delta > largestChangeMag) {
-          largestChangeMag = delta;
-          largestChangeNode = i;
-        }
-        // ngspice niconv.c:43-46 - a NaN solution node is non-convergence.
-        // The tolerance test below cannot catch it on its own: `delta` is NaN
-        // and `NaN > tol` evaluates false, so a NaN node would otherwise pass
-        // the test and let the solve falsely report convergence.
-        if (Number.isNaN(ctx.rhs[i])) {
-          globalConverged = false;
-        }
-        const absTol = i < nodeCount ? abstol : iabstol;
-        const tol = reltol * Math.max(Math.abs(ctx.rhs[i]), Math.abs(ctx.rhsOld[i])) + absTol;
-        if (delta > tol) {
-          globalConverged = false;
-        }
-      }
-
-      if (ctx.detailedConvergence) {
-        const failedIndices: number[] = [];
-        for (let i = 0; i < ctx.elementsWithConvergence.length; i++) {
-          const el = ctx.elementsWithConvergence[i];
-          if (!el.checkConvergence!(ctx.loadCtx)) {
-            failedIndices.push(elements.indexOf(el));
-          }
-        }
-        elemConverged = failedIndices.length === 0;
-        convergenceFailedElements.length = 0;
-        for (const i of failedIndices) {
-          convergenceFailedElements.push(elements[i].label ?? `element_${i}`);
-        }
-      } else {
-        elemConverged = true;
-        for (const el of ctx.elementsWithConvergence) {
-          if (!el.checkConvergence!(ctx.loadCtx)) {
-            elemConverged = false;
-            break;
-          }
-        }
-      }
-
-      // niiter.c:957-961- write the NIconvTest result back into CKTnoncon so
-      // the INITF dispatcher (and MODEINITFLOAT return gate) sees a unified
-      // convergence indicator. Without this, INITFIXâ†’INITFLOAT transitions
-      // fire after a single iteration whenever no device limited, regardless
-      // of whether the global convergence test actually passed.
-      if (!globalConverged || !elemConverged) {
-        ctx.noncon = 1;
-      }
-    } else if (ctx.noncon > 0 && iteration > 0 && ctx.detailedConvergence) {
-      const failedIndices: number[] = [];
-      for (let i = 0; i < ctx.elementsWithConvergence.length; i++) {
-        const el = ctx.elementsWithConvergence[i];
+    let elemConverged = true;
+    if (iteration > 0) {
+      for (let k = 0; k < ctx.elementsWithConvergence.length; k++) {
+        const el = ctx.elementsWithConvergence[k];
         if (!el.checkConvergence!(ctx.loadCtx)) {
-          failedIndices.push(elements.indexOf(el));
+          ctx.noncon = 1;
+          elemConverged = false;
+          ctx.troubleElt = el;                         // dioconv.c:61 — CKTtroubleElt = here
+          if (ctx.detailedConvergence) {
+            convergenceFailedElements.push(el.label ?? `element_${elements.indexOf(el)}`);
+          } else {
+            break;                                     // first blamed device is enough
+          }
         }
-      }
-      elemConverged = false;
-      convergenceFailedElements.length = 0;
-      for (const i of failedIndices) {
-        convergenceFailedElements.push(elements[i].label ?? `element_${i}`);
       }
     }
+
+    // niiter.c:1202-1205 —
+    //   if ((CKTnoncon == 0) && (iterno != 1)) CKTnoncon = NIconvTest(ckt);
+    //   else CKTnoncon = 1;
+    // iterno is 1-based and pre-incremented in ngspice; our `iteration` is
+    // 0-based, so ngspice's `iterno != 1` is our `iteration > 0`. The else
+    // branch (CKTnoncon != 0 || first iteration) collapses any multi-junction
+    // limiter increments to a single 1, so the INITF dispatcher and the harness
+    // read only 0 or 1.
+    if (ctx.noncon === 0 && iteration > 0) {
+      ctx.noncon = niConvTest(ctx);
+    } else {
+      ctx.noncon = 1;
+    }
+    // globalConverged reported to the harness hook mirrors the node-level
+    // niConvTest verdict folded with the device sweep: ctx.noncon is now the
+    // single convergence indicator (= CKTnoncon), so a converged iteration has
+    // ctx.noncon === 0.
+    const globalConverged = ctx.noncon === 0;
 
     // ---- STEP I: Newton damping (ngspice niiter.c:1020-1046) ----
     if (ctx.nodeDamping && ctx.noncon !== 0 && isDcop(ctx.cktMode) && iteration > 0) {
@@ -774,10 +802,25 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
     }
 
-    // Blame tracking
+    // Blame tracking. niConvTest early-returns and so cannot compute a
+    // full-vector node argmax; the node argmax joins the element argmax here,
+    // gated on ctx.enableBlameTracking. When blame tracking is off,
+    // largestChangeNode falls back to the row niConvTest blamed
+    // (ctx.troubleNode, the CKTtroubleNode counterpart), which is strictly more
+    // faithful to ngspice than a full-vector argmax.
     let largestChangeElement = -1;
+    let largestChangeNode = ctx.troubleNode ?? -1;
     if (ctx.enableBlameTracking) {
       let largestElemDelta = -1;
+      let largestNodeMag = 0;
+      largestChangeNode = 0;
+      for (let i = 0; i < solver.matrixSize; i++) {
+        const d = Math.abs(ctx.rhs[i] - ctx.rhsOld[i]);
+        if (d > largestNodeMag) {
+          largestNodeMag = d;
+          largestChangeNode = i;
+        }
+      }
       for (let ei = 0; ei < elements.length; ei++) {
         const el = elements[ei];
         let elDelta = 0;
@@ -806,9 +849,9 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // niiter.c:1051-1057- DC + nodeset gate. ipass is only ever 0 or 1
       // (sole writer is the MODEINITFIX branch below). When ipass==1 we
       // raise noncon to defer the terminating return by one iteration; the
-      // unconditional `ipass = 0` matches ngspice exactly. The outer
-      // globalConverged/elemConverged checks are folded into ctx.noncon at
-      // the convergence step (lines 545-547), so reading noncon alone
+      // unconditional `ipass = 0` matches ngspice exactly. STEP H has already
+      // folded the device sweep and the node-level niConvTest into ctx.noncon
+      // (the single CKTnoncon indicator), so reading ctx.noncon alone here
       // mirrors niiter.c:1058 verbatim.
       if (isDcop(ctx.cktMode) && ctx.hadNodeset) {
         if (ipass) {
