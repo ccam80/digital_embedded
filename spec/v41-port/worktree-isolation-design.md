@@ -82,3 +82,32 @@ Two viable architectures:
   the warn-not-throw guard (done), it removes the crash class cheaply while A is built.
 
 Recommendation: ship B now (cheap, removes the crash class), build A deliberately as the real isolation.
+
+## IMPLEMENTED 2026-06-01 — Option A, src-only worktree (+ main bookkeeping)
+
+Three repo-structure facts ruled out a self-contained worktree checkout: `spec/v41-port/` is gitignored
+(only 6 force-tracked files), `build-ledger.mjs` resolves its inputs via `import.meta.url` (operates on the
+tree it physically lives in), and `ref/ngspice` is a submodule (a worktree does not populate it). So the
+chosen model isolates ONLY `src/` in the worktree; specs/diffDocs/`ref/ngspice`/DLL are read from MAIN, and
+ledger bookkeeping (`build-ledger` + `ledger.json`/`.md`) runs in MAIN after a successful merge.
+
+Foundation (committed `f3fc5d08`): `mcp-wrapper.mjs` reads `.mcp-active-tree` for the child cwd. Validated
+end-to-end (repoint round-trip main→worktree→main proven; junction lifecycle safe, node_modules intact).
+
+Driver (`workflows/v41-port-loop.workflow.mjs`, untracked tooling): per unit — `setupWorktreePrompt`
+(`git worktree add` from `${BRANCH}` + junction node_modules + write `.mcp-active-tree` + `server_restart`);
+the recon/applier/verifier/gate agents carry `wtPreamble` (edit `src/` ONLY under `${WT}`, read refs from
+`${MAIN}`, MCP gates `${WT}`, commit src+progress.json in the worktree, no build-ledger); `teardownWorktreePrompt`
+(compile-gate the worktree, ff-merge `wt/<unit>`→`${BRANCH}`, regenerate the ledger in MAIN, device-complete
+marker, junction-safe destroy). The per-unit body is wrapped in try/finally so teardown always runs.
+
+The four guards: (1) preflight CLEAN-MAIN gate — abort if main `src/` is dirty (merges need it); (2) verifier
+EMPTY-DIFF catch — `git -C WT diff` empty ⇒ the edit leaked to MAIN ⇒ MISMATCH+retry; (3) teardown
+MAIN-SRC-CLEAN check — a stray uncommitted `src/` change in MAIN ⇒ capture + HALT the run; (4) preflight
+junction-safe STALE-WORKTREE SWEEP. Residual hazard: soft isolation (overlapping `src/` + absolute-path tools)
+— detected, not hard-prevented; inherent to the workflow-agent model, same in any design.
+
+Status: A2 BUILT + parses (validated wrapped as the harness runs it). Orchestration not yet exercised on a
+live unit — needs a controlled first run. The 3 Phase-0 engine recons have their OWN gate blockers (nodeset-ic
++ tf are scout-deferred "no input surface"; randnumb's gate is circular) — those fixtures must be authored
+before they can run through the loop.
