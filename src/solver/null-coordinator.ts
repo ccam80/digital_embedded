@@ -18,7 +18,7 @@ import { EngineState } from '../core/engine-interface.js';
 import type { MeasurementObserver, SnapshotId } from '../core/engine-interface.js';
 import type { StepRecord } from './analog/convergence-log.js';
 import { FacadeError } from '../headless/types.js';
-import type { DcOpResult, SimulationParams } from '../core/analog-engine-interface.js';
+import type { DcOpResult, SimulationParams, TfParams, TfResult } from '../core/analog-engine-interface.js';
 import type { SignalAddress, SignalValue } from '../compile/types.js';
 import type { AcParams, AcResult } from './analog/ac-analysis.js';
 import type { Wire } from '../core/circuit.js';
@@ -95,6 +95,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   supportsRunToBreak(): boolean { return false; }
   supportsAcSweep(): boolean { return false; }
   supportsDcOp(): boolean { return false; }
+  supportsTf(): boolean { return false; }
 
   // -------------------------------------------------------------------------
   // Feature execution- no-ops / null
@@ -104,6 +105,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   runToBreak(): void { /* no-op */ }
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
+  transferFunction(_params: TfParams): TfResult | null { return null; }
 
   applyCaptureHook(_bundle: import('./coordinator-types.js').PhaseAwareCaptureHook | null): void {
     // null coordinator has no engine to apply the hook to

@@ -386,6 +386,16 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   /**
+   * Run a DC transfer-function analysis (ngspice `.tf`), or null if no analog
+   * backend. Delegates to the coordinator, mirroring `getDcOpResult()`.
+   */
+  transferFunction(
+    params: import('../core/analog-engine-interface.js').TfParams,
+  ): import('../core/analog-engine-interface.js').TfResult | null {
+    return this._coordinator.transferFunction(params);
+  }
+
+  /**
    * Set the circuit operating temperature in Kelvin.
    * Forwards to the underlying analog engine so temperature-dependent elements
    * recalculate their model parameters at the next solve.

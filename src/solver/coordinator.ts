@@ -13,7 +13,7 @@
 
 import type { SimulationEngine, MeasurementObserver, SnapshotId } from '../core/engine-interface.js';
 import { EngineState } from '../core/engine-interface.js';
-import type { AnalogEngine, DcOpResult, SimulationParams } from '../core/analog-engine-interface.js';
+import type { AnalogEngine, DcOpResult, SimulationParams, TfParams, TfResult } from '../core/analog-engine-interface.js';
 import { DigitalEngine } from './digital/digital-engine.js';
 import type { ConcreteCompiledCircuit } from './digital/digital-engine.js';
 import { ClockManager } from './digital/clock.js';
@@ -384,6 +384,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   supportsRunToBreak(): boolean { return this._digital !== null; }
   supportsAcSweep(): boolean { return this._analog !== null; }
   supportsDcOp(): boolean { return this._analog !== null; }
+  supportsTf(): boolean { return this._analog !== null; }
 
   microStep(): void {
     if (this._digital !== null) this._digital.microStep();
@@ -447,6 +448,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   acAnalysis(params: AcParams): AcResult | null {
     if (this._analog === null) return null;
     return this._analog.acAnalysis(params);
+  }
+
+  /**
+   * DC transfer-function analysis (ngspice `.tf` → tfanal.c TFanal). Forwards
+   * to the analog engine, which runs a fresh DC-OP to factor the Jacobian and
+   * then re-solves it with unit input/output excitations. Returns null when no
+   * analog backend is present.
+   */
+  transferFunction(params: TfParams): TfResult | null {
+    if (this._analog === null) return null;
+    this._analysisPhase = "dcop";
+    return this._analog.transferFunction(params);
   }
 
   // -------------------------------------------------------------------------

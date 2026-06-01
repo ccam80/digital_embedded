@@ -15,6 +15,8 @@ import type {
   DcOpResult,
   DiagnosticSuggestion,
   CompiledAnalogCircuit,
+  TfParams,
+  TfResult,
 } from "@/core/analog-engine-interface";
 import type { Diagnostic, DiagnosticCode } from "@/compile/types";
 import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
@@ -211,6 +213,17 @@ describe("AnalogEngineTypes", () => {
           phase: new Map(),
           real: new Map(),
           imag: new Map(),
+          diagnostics: [],
+        };
+      },
+      transferFunction(params: TfParams): TfResult {
+        return {
+          transferFunction: 0,
+          inputResistance: 0,
+          outputResistance: 0,
+          inputSource: params.inputSource,
+          output: params.output,
+          converged: true,
           diagnostics: [],
         };
       },

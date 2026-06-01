@@ -438,6 +438,57 @@ export function registerSimulationTools(
   );
 
   // ---------------------------------------------------------------------------
+  // circuit_tf
+  // ---------------------------------------------------------------------------
+
+  server.registerTool(
+    "circuit_tf",
+    {
+      title: "DC Transfer Function",
+      description:
+        "Compute the DC small-signal transfer function of the compiled analog " +
+        "or mixed-signal circuit (ngspice .tf). Returns the transfer ratio " +
+        "d(output)/d(inputSource), the input resistance at the source, and the " +
+        "output resistance at the output port. Errors if the circuit has no " +
+        "analog domain.",
+      inputSchema: {
+        handle: z.string().describe("Circuit handle"),
+        inputSource: z.string().describe("Label of the input independent source (e.g. V1)"),
+        output: z
+          .string()
+          .describe("Output port: node (Vout or Vout,Vref) or source current (I(V2))"),
+      },
+    },
+    wrapTool<{ handle: string; inputSource: string; output: string }>(
+      "circuit_tf error",
+      ({ handle, inputSource, output }) => {
+        const coordinator = ensureEngine(handle, facade, session);
+        if (!coordinator.supportsTf()) {
+          return "Transfer-function analysis not available (no analog domain)";
+        }
+        const r = coordinator.transferFunction({ inputSource, output });
+        if (!r) {
+          return "Transfer-function analysis not available (no analog domain)";
+        }
+        const lines: string[] = [
+          `Transfer Function (.tf):`,
+          `  Input source: ${r.inputSource}`,
+          `  Output: ${r.output}`,
+          `  Converged: ${r.converged}`,
+          `  Transfer ratio d(${r.output})/d(${r.inputSource}) = ${r.transferFunction}`,
+          `  Input resistance  = ${r.inputResistance} Ohm`,
+          `  Output resistance = ${r.outputResistance} Ohm`,
+        ];
+        // Surface DC-OP diagnostics like circuit_dc_op (simulation-tools.ts:331-341).
+        for (const d of r.diagnostics) {
+          lines.push(`    [${d.severity}] ${d.code}: ${d.message}`);
+        }
+        return lines.join("\n");
+      },
+    ),
+  );
+
+  // ---------------------------------------------------------------------------
   // circuit_convergence_log
   // ---------------------------------------------------------------------------
 

@@ -774,10 +774,13 @@
       "escalation": null
     },
     "analysis#recon/tf": {
-      "state": "PENDING",
+      "state": "APPLIED",
       "hunkHash": "adda0def5d673cee",
       "attempts": 0,
-      "verifierNotes": []
+      "verifierNotes": [
+        "APPLIED. runTransferFunction driver (dc-operating-point.ts) is line-isomorphic to ngspice tfanal.c:73-157 (re-derived independently from ref/ngspice/src/spicelib/analysis/tfanal.c): zero RHS over [0..size] (tfanal.c:74-76); input injection isource nodePos-=1/nodeNeg+=1 (tfanal.c:79-80) vs vsource branch+=1 (tfanal.c:83); re-solve + rhs[0]=0 (tfanal.c:87-88); transfer ratio node Pos-Neg / branch (tfanal.c:113-117); input R isource Neg-Pos / vsource -1/i with 1e-20|1e20 clamp (tfanal.c:122-129); same-source shortcut (tfanal.c:132-139); second zero+output injection (tfanal.c:140-149); second re-solve + rhs[0]=0 (tfanal.c:150-151); output R node Neg-Pos / branch 1/MAX(1e-20,...) (tfanal.c:153-156). R-1 reSolveFactored primitive (analog-engine.ts) maps SMPsolve(M,CKTrhs,CKTrhsSpare); rhs/rhsSpare length matrixSize+1 (ckt-context.ts:874-875) so inclusive i<=size indexing is safe. R-3 label->branch via _deviceMap (the findDevice backing map, analog-engine.ts:1646) + inEl.branchIndex (element.ts:65). Engine/coordinator/null-coordinator/facade/MCP surfaces (Parts D/E) declared+implemented per spec. File-scope extra src/core/__tests__/analog-engine-interface.test.ts is a compile-forced AnalogEngine-stub conformance edit (adds transferFunction to satisfy the new interface member), minimal, no logic. Harness regression gate after server_restart: firstDivergence null on ALL classes for resistive-divider.dts (DC/tran), rc-transient.dts (tran), inductor-rl-step.dts (tran), rc-lowpass-ac.dts (AC). Verified against tfanal.c:73-157."
+      ],
+      "escalation": null
     },
     "maths-ni/nicomcof.c#h001": {
       "state": "APPLIED",

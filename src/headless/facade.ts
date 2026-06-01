@@ -20,7 +20,7 @@ import type {
   PatchResult,
 } from './netlist-types.js';
 import type { Diagnostic } from '../compile/types.js';
-import type { SimulationParams } from '../core/analog-engine-interface.js';
+import type { SimulationParams, TfParams, TfResult } from '../core/analog-engine-interface.js';
 
 /**
  * The primary interface for programmatic circuit building and simulation
@@ -173,6 +173,17 @@ export interface SimulatorFacade {
    * @param params - Partial SimulationParams to merge
    */
   configure(params: Partial<SimulationParams>): void;
+
+  /**
+   * Run a DC small-signal transfer-function analysis (ngspice `.tf`). Computes
+   * the transfer ratio d(output)/d(inputSource), the input resistance at the
+   * source, and the output resistance at the output port. Returns null when the
+   * compiled circuit has no analog domain.
+   *
+   * @param params - Input source label and output-port spec
+   * @returns The transfer-function result, or null if no analog backend
+   */
+  transferFunction(params: TfParams): TfResult | null;
 
   // ============================================
   // Testing: Run automated test vectors

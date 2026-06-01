@@ -521,6 +521,144 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 }
 
 // ---------------------------------------------------------------------------
+// runTransferFunction- ngspice tfanal.c:17-165 TFanal
+// ---------------------------------------------------------------------------
+
+/**
+ * Port descriptor for a `.tf` analysis.
+ *
+ * The input is the independent source providing the unit excitation: a voltage
+ * source contributes its branch-current row (tfanal.c:82-83); a current source
+ * contributes its two terminal MNA node ids (tfanal.c:79-80). The output is
+ * either a node-pair voltage (tfanal.c:113-114) or a source branch current
+ * (tfanal.c:116-117).
+ */
+export interface TfPortSpec {
+  // Input source: its branch-current row (voltage source, tfanal.c:82-83) or
+  // its two node ids (current source, tfanal.c:79-80 — GENnode(ptr)[0]/[1]).
+  input:
+    | { kind: "vsource"; branch: number }
+    | { kind: "isource"; nodePos: number; nodeNeg: number };
+  // Output port: a node pair (voltage output, tfanal.c:113-114) or a source
+  // branch row (current output, tfanal.c:116-117). `sameSourceAsInput` mirrors
+  // the `TFoutSrc == TFinSrc` test at tfanal.c:132-134.
+  output:
+    | { kind: "node"; nodePos: number; nodeNeg: number }
+    | { kind: "branch"; branch: number; sameSourceAsInput: boolean };
+}
+
+/**
+ * Result of a `.tf` analysis. Mirrors the three-element `outputs[]` vector
+ * emitted by ngspice `TFanal` (tfanal.c:158-162).
+ */
+export interface TfResult {
+  /** outputs[0] (tfanal.c:113-117) — d(output)/d(input). */
+  transferFunction: number;
+  /** outputs[1] (tfanal.c:122-129) — input resistance at the source. */
+  inputResistance: number;
+  /** outputs[2] (tfanal.c:153-156) — output resistance at the output port. */
+  outputResistance: number;
+}
+
+/**
+ * DC small-signal transfer-function driver — ngspice `TFanal` (tfanal.c:73-157).
+ *
+ * Runs over the **already-factored** DC-OP Jacobian: it injects a unit RHS at
+ * the input port, runs one forward/back-substitution (no re-factor), reads the
+ * transfer ratio and input resistance, then injects a unit RHS at the output
+ * port for a second re-solve to read the output resistance. The DC operating
+ * point that left the matrix factored is the caller's responsibility (Part D
+ * runs `solveDcOperatingPoint` first), matching ngspice where `TFanal` calls
+ * `CKTop` itself before the two `SMPsolve` re-solves (tfanal.c:44, 87, 150).
+ *
+ * `reSolve` is the generic re-solve-against-the-factored-matrix primitive
+ * (R-1): it performs one `SMPsolve` (forward/back-substitution against the
+ * existing LU) writing the solution back into `rhs`. ngspice maps `SMPsolve(M,
+ * CKTrhs, CKTrhsSpare)` to this; the caller supplies the primitive so the same
+ * code path serves `.tf` and a future `.sens`.
+ *
+ * Variable map (ngspice tfanal.c → ours):
+ *   CKTrhs[]                         → rhs
+ *   SMPmatSize(matrix)               → size
+ *   SMPsolve(matrix, CKTrhs, spare)  → reSolve(rhs)
+ *   GENnode(ptr)[0]/[1]              → port.input.nodePos / nodeNeg
+ *   CKTfndBranch(TFinSrc)            → port.input.branch
+ *   TFoutPos/Neg->number             → port.output.nodePos / nodeNeg
+ *   CKTfndBranch(TFoutSrc)           → port.output.branch
+ *   outputs[0..2]                    → transferFunction / inputResistance / outputResistance
+ */
+export function runTransferFunction(
+  size: number,
+  rhs: Float64Array,
+  reSolve: (rhs: Float64Array) => void,
+  port: TfPortSpec,
+): TfResult {
+  // tfanal.c:73-76 — zero the RHS over [0..size].
+  for (let i = 0; i <= size; i++) rhs[i] = 0;
+
+  // tfanal.c:78-84 — inject the unit input excitation.
+  let insrcBranch = -1;
+  if (port.input.kind === "isource") {
+    rhs[port.input.nodePos] -= 1;   // tfanal.c:79
+    rhs[port.input.nodeNeg] += 1;   // tfanal.c:80
+  } else {
+    insrcBranch = port.input.branch;
+    rhs[insrcBranch] += 1;          // tfanal.c:83
+  }
+
+  // tfanal.c:87-88 — one re-solve against the factored DC Jacobian (no re-factor).
+  reSolve(rhs);
+  rhs[0] = 0;                       // tfanal.c:88 — ground row residual
+
+  // tfanal.c:111-118 — transfer ratio (outputs[0]).
+  let transferFunction: number;
+  if (port.output.kind === "node") {
+    transferFunction = rhs[port.output.nodePos] - rhs[port.output.nodeNeg]; // tfanal.c:113-114
+  } else {
+    transferFunction = rhs[port.output.branch];                            // tfanal.c:116-117
+  }
+
+  // tfanal.c:120-130 — input resistance (outputs[1]).
+  let inputResistance: number;
+  if (port.input.kind === "isource") {
+    inputResistance = rhs[port.input.nodeNeg] - rhs[port.input.nodePos];   // tfanal.c:122-123
+  } else {
+    const iin = rhs[insrcBranch];
+    inputResistance = Math.abs(iin) < 1e-20 ? 1e20 : -1 / iin;             // tfanal.c:125-129
+  }
+
+  // tfanal.c:132-139 — output == input-source-current shortcut.
+  if (port.output.kind === "branch" && port.output.sameSourceAsInput) {
+    return { transferFunction, inputResistance, outputResistance: inputResistance };
+  }
+
+  // tfanal.c:140-149 — second RHS zero + unit output excitation.
+  for (let i = 0; i <= size; i++) rhs[i] = 0;
+  if (port.output.kind === "node") {
+    rhs[port.output.nodePos] -= 1;  // tfanal.c:145
+    rhs[port.output.nodeNeg] += 1;  // tfanal.c:146
+  } else {
+    rhs[port.output.branch] += 1;   // tfanal.c:148
+  }
+
+  // tfanal.c:150-151 — second re-solve against the same factored matrix.
+  reSolve(rhs);
+  rhs[0] = 0;                       // tfanal.c:151
+
+  // tfanal.c:152-157 — output resistance (outputs[2]). The node case subtracts
+  // Neg − Pos (tfanal.c:153-154), the reverse of the transfer-ratio Pos − Neg
+  // (tfanal.c:113-114); both orders are sign conventions reproduced verbatim.
+  let outputResistance: number;
+  if (port.output.kind === "node") {
+    outputResistance = rhs[port.output.nodeNeg] - rhs[port.output.nodePos]; // tfanal.c:153-154
+  } else {
+    outputResistance = 1 / Math.max(1e-20, rhs[port.output.branch]);       // tfanal.c:156
+  }
+
+  return { transferFunction, inputResistance, outputResistance };
+}
+
+// ---------------------------------------------------------------------------
 // dynamicGmin- cktop.c:127-258
 // ---------------------------------------------------------------------------
 

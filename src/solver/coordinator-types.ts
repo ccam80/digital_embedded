@@ -11,7 +11,7 @@
 
 import type { MeasurementObserver, SnapshotId } from "../core/engine-interface.js";
 import { EngineState } from "../core/engine-interface.js";
-import type { DcOpResult, SimulationParams } from "../core/analog-engine-interface.js";
+import type { DcOpResult, SimulationParams, TfParams, TfResult } from "../core/analog-engine-interface.js";
 import type { StepRecord } from "./analog/convergence-log.js";
 import type { Diagnostic, SignalAddress, SignalValue } from "../compile/types.js";
 import type { LimitingEvent } from "./analog/newton-raphson.js";
@@ -188,6 +188,9 @@ export interface SimulationCoordinator {
   /** True when a DC operating point can be computed. */
   supportsDcOp(): boolean;
 
+  /** True when a DC transfer-function analysis can be computed (analog domain present). */
+  supportsTf(): boolean;
+
   // -------------------------------------------------------------------------
   // ss1.2 Unified feature execution (replace backend reach-through)
   // -------------------------------------------------------------------------
@@ -203,6 +206,9 @@ export interface SimulationCoordinator {
 
   /** AC sweep analysis. Returns null if not supported. */
   acAnalysis(params: AcParams): AcResult | null;
+
+  /** DC transfer-function analysis (ngspice .tf). Returns null if no analog domain. */
+  transferFunction(params: TfParams): TfResult | null;
 
   /** Apply a phase-aware capture hook (master switch). Pass null to clear. */
   applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void;

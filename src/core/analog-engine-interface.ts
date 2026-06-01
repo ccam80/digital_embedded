@@ -304,6 +304,46 @@ export interface DcOpResult {
 }
 
 // ---------------------------------------------------------------------------
+// Transfer-function analysis (ngspice .tf / tfanal.c TFanal)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parameters for a DC small-signal transfer-function analysis
+ * (`AnalogEngine.transferFunction`, ngspice `.tf` / tfanal.c TFanal).
+ */
+export interface TfParams {
+  /** Label of the independent source providing the input excitation (e.g. "V1"). */
+  inputSource: string;
+  /**
+   * Output port. Either a node-pair voltage ("Vout" or "Vout,Vref"; the second
+   * name defaults to ground when omitted) or a source-branch current ("I(V2)").
+   */
+  output: string;
+}
+
+/**
+ * Result returned by `AnalogEngine.transferFunction()`. Carries the three
+ * scalars ngspice `TFanal` emits (tfanal.c:113-156) plus the resolved port
+ * labels and the DC-OP convergence state.
+ */
+export interface TfResult {
+  /** outputs[0] (tfanal.c:113-117) — d(output)/d(inputSource). */
+  transferFunction: number;
+  /** outputs[1] (tfanal.c:122-129) — input resistance at the source (Ohm). */
+  inputResistance: number;
+  /** outputs[2] (tfanal.c:153-156) — output resistance at the output port (Ohm). */
+  outputResistance: number;
+  /** Resolved input source label echoed back for the caller. */
+  inputSource: string;
+  /** Resolved output-port spec echoed back for the caller. */
+  output: string;
+  /** False (with a diagnostic) when the underlying DC-OP did not converge. */
+  converged: boolean;
+  /** Diagnostics from the DC-OP solve and the port resolution. */
+  diagnostics: Diagnostic[];
+}
+
+// ---------------------------------------------------------------------------
 // CompiledAnalogCircuit- executable analog circuit representation
 // ---------------------------------------------------------------------------
 
@@ -389,6 +429,15 @@ export interface AnalogEngine extends Engine {
    * nodes. The engine must be initialised (`init()` called) before invoking this.
    */
   acAnalysis(params: AcParams): AcResult;
+
+  /**
+   * Run a DC small-signal transfer-function analysis (ngspice `.tf`, tfanal.c
+   * TFanal). Solves the DC operating point to factor the Jacobian, then injects
+   * a unit excitation at the input source and (unless shortcut) at the output
+   * port, re-solving the factored matrix to read the transfer ratio, input
+   * resistance, and output resistance.
+   */
+  transferFunction(params: TfParams): TfResult;
 
   // -------------------------------------------------------------------------
   // Simulation time

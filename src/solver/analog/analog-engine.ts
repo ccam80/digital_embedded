@@ -12,6 +12,8 @@ import type {
   AnalogEngine,
   DcOpResult,
   SimulationParams,
+  TfParams,
+  TfResult,
 } from "../../core/analog-engine-interface.js";
 import type { IntegrationMethod } from "./integration.js";
 import type { Diagnostic } from "../../compile/types.js";
@@ -27,8 +29,8 @@ import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
 import type { StepRecord, NRAttemptRecord } from "./convergence-log.js";
 
-import { solveDcOperatingPoint } from "./dc-operating-point.js";
-import type { DcOpNRPhase, DcOpNRAttemptOutcome } from "./dc-operating-point.js";
+import { solveDcOperatingPoint, runTransferFunction } from "./dc-operating-point.js";
+import type { DcOpNRPhase, DcOpNRAttemptOutcome, TfPortSpec } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 import { CKTCircuitContext } from "./ckt-context.js";
@@ -1078,6 +1080,148 @@ export class MNAEngine implements AnalogEngine {
       cktContext: deps?.cktContext ?? this._ctx!,
     });
     return ac.run(params);
+  }
+
+  /**
+   * Re-solve the post-DC-OP factored Jacobian with a caller-supplied RHS.
+   *
+   * Generic primitive (Ratification R-1): performs one forward/back-substitution
+   * against the existing LU with NO re-factor, writing the solution back into
+   * `rhs` in place. Maps to ngspice `SMPsolve(matrix, CKTrhs, CKTrhsSpare)`
+   * (tfanal.c:87, 150) — the spare buffer (`ctx.rhsSpare`) is the `SMPsolve`
+   * scratch `CKTrhsSpare` argument, and the solution is copied back so the
+   * caller reads it from the same `rhs` buffer it injected into. The DC-OP that
+   * left the matrix factored is the caller's responsibility (the sparse solver
+   * asserts IS_FACTORED, sparse-solver.ts:790-794). `.tf` consumes this; a
+   * future `.sens` shares it.
+   */
+  reSolveFactored(rhs: Float64Array): Float64Array {
+    const ctx = this._ctx!;
+    const spare = ctx.rhsSpare;
+    ctx.solver.solve(rhs, spare);
+    rhs.set(spare);
+    return rhs;
+  }
+
+  /**
+   * Run a DC small-signal transfer-function analysis (ngspice `.tf`, tfanal.c
+   * TFanal). Resolves the input source and output port from caller labels,
+   * solves the DC operating point (leaving the Jacobian factored, tfanal.c:44),
+   * then runs the two-re-solve driver (`runTransferFunction`) over that factored
+   * matrix.
+   */
+  transferFunction(params: TfParams): TfResult {
+    const fail = (message: string, converged: boolean, diags: Diagnostic[]): TfResult => ({
+      transferFunction: 0,
+      inputResistance: 0,
+      outputResistance: 0,
+      inputSource: params.inputSource,
+      output: params.output,
+      converged,
+      diagnostics: [
+        ...diags,
+        makeDiagnostic("dc-op-failed", "error", message, { explanation: message }),
+      ],
+    });
+
+    if (!this._compiled) {
+      return fail("Transfer-function analysis requires a compiled circuit.", false, []);
+    }
+
+    this._setup();
+
+    // tfanal.c:49-71 — resolve the input source and classify it as a voltage
+    // source (branch-current row, tfanal.c:82-83) or a current source (its two
+    // terminal nodes, tfanal.c:79-80). CKTfndDev maps to the engine device map;
+    // the source class is the element's deviceFamily.
+    const inEl = this._deviceMap.get(params.inputSource);
+    if (!inEl) {
+      return fail(`Transfer function source "${params.inputSource}" not in circuit.`, false, []);
+    }
+    let input: TfPortSpec["input"];
+    if (inEl.deviceFamily === "VSRC") {
+      // CKTfndBranch(TFinSrc) (tfanal.c:82) — the source branch-current row.
+      if (inEl.branchIndex < 0) {
+        return fail(`Transfer function source "${params.inputSource}" has no branch row.`, false, []);
+      }
+      input = { kind: "vsource", branch: inEl.branchIndex };
+    } else if (inEl.deviceFamily === "ISRC") {
+      // GENnode(ptr)[0]/[1] (tfanal.c:79-80) — the source pos/neg terminals.
+      const nodePos = inEl.pinNodes.get("pos");
+      const nodeNeg = inEl.pinNodes.get("neg");
+      if (nodePos === undefined || nodeNeg === undefined) {
+        return fail(`Transfer function source "${params.inputSource}" has no pos/neg terminals.`, false, []);
+      }
+      input = { kind: "isource", nodePos, nodeNeg };
+    } else {
+      return fail(`Transfer function source "${params.inputSource}" is not of proper type (must be a voltage or current source).`, false, []);
+    }
+
+    // Resolve the output port. A current output is written "I(<sourceLabel>)"
+    // (tfanal.c:97,116 — CKTfndBranch(TFoutSrc)); anything else is a node-pair
+    // voltage "Vnode" or "Vpos,Vneg" (tfanal.c:113-114, TFoutPos/Neg->number).
+    const out = params.output.trim();
+    const currentMatch = /^I\(\s*([^)]+?)\s*\)$/i.exec(out);
+    let output: TfPortSpec["output"];
+    if (currentMatch) {
+      const outSrcLabel = currentMatch[1]!;
+      const outEl = this._deviceMap.get(outSrcLabel);
+      if (!outEl) {
+        return fail(`Transfer function output source "${outSrcLabel}" not in circuit.`, false, []);
+      }
+      if (outEl.deviceFamily !== "VSRC") {
+        return fail(`Transfer function output source "${outSrcLabel}" must be a voltage source for a current output.`, false, []);
+      }
+      if (outEl.branchIndex < 0) {
+        return fail(`Transfer function output source "${outSrcLabel}" has no branch row.`, false, []);
+      }
+      // tfanal.c:132-134 — TFoutIsI && (TFoutSrc == TFinSrc) shortcut.
+      const sameSourceAsInput =
+        input.kind === "vsource" && outSrcLabel === params.inputSource;
+      output = { kind: "branch", branch: outEl.branchIndex, sameSourceAsInput };
+    } else {
+      const labelToNodeId = this._compiled.labelToNodeId;
+      const resolveNode = (name: string): number | undefined => {
+        const n = name.trim();
+        if (n === "" || n === "0" || n.toLowerCase() === "gnd" || n.toLowerCase() === "ground") {
+          return 0;
+        }
+        return labelToNodeId.get(n);
+      };
+      // "Vpos,Vneg" — the second name defaults to ground (node 0) when omitted.
+      const commaIdx = out.indexOf(",");
+      const posName = commaIdx >= 0 ? out.slice(0, commaIdx) : out;
+      const negName = commaIdx >= 0 ? out.slice(commaIdx + 1) : "0";
+      const nodePos = resolveNode(posName);
+      const nodeNeg = resolveNode(negName);
+      if (nodePos === undefined) {
+        return fail(`Transfer function output node "${posName.trim()}" not found.`, false, []);
+      }
+      if (nodeNeg === undefined) {
+        return fail(`Transfer function output node "${negName.trim()}" not found.`, false, []);
+      }
+      output = { kind: "node", nodePos, nodeNeg };
+    }
+
+    // tfanal.c:44 — operating point. Leaves the Jacobian factored on success.
+    const dcop = this.dcOperatingPoint();
+    if (!dcop.converged) {
+      return fail("Transfer-function analysis requires a converged DC operating point.", false, dcop.diagnostics);
+    }
+
+    const ctx = this._ctx!;
+    const size = ctx.solver.matrixSize;
+    const r = runTransferFunction(size, ctx.rhs, (rhs) => this.reSolveFactored(rhs), { input, output });
+
+    return {
+      transferFunction: r.transferFunction,
+      inputResistance: r.inputResistance,
+      outputResistance: r.outputResistance,
+      inputSource: params.inputSource,
+      output: params.output,
+      converged: true,
+      diagnostics: dcop.diagnostics,
+    };
   }
 
   // -------------------------------------------------------------------------
