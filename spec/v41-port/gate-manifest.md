@@ -114,7 +114,7 @@ circuits, each engine driver gated by the simplest fixture that exercises it:
 | include-ngspice (PENDING) | CKTepsmin + the engine-relevant `cktdefs`/`cktntask`/`cktsopt` bits | `vsrc-dc-only` + later gates | gated via device fixtures |
 | `maths-sparse#recon/nodesetIcRowZero` | ZeroNoncurRow nodeset/IC stamping | `nodeset-ic-gate.dts` | ＋AUTHOR |
 | `analysis#recon/tf` | `.tf` transfer-function driver | `tf-gate.dts` | ＋AUTHOR |
-| `maths-misc#recon/randnumb` | deterministic CombLCGTaus RNG | seeded-reproducibility check | ＋AUTHOR / N/A |
+| `maths-misc#recon/randnumb` | deterministic CombLCGTaus RNG | **self-compare** — gateKind=`self-compare`, gateFixtures=[`src/solver/analog/__tests__/monte-carlo.test.ts`] (seeded-reproducibility, NOT a harness divergence circuit). Bit-exact-via-TRNOISE (Acceptance #9) defers to vsrc. | RUNNABLE (self-compare) |
 
 > maths-cmaths / maths-poly / maths-fft / maths-dense and most `include-ngspice`
 > /`maths-sparse` hunks are NO-COUNTERPART (RFSPICE/noise/PZ/sensitivity or the
@@ -181,7 +181,7 @@ device gate above; these recons need dedicated stimulus:
 |---|---|---|
 | `maths-sparse#recon/nodesetIcRowZero` | `nodeset-ic-gate.dts` (a circuit with `.nodeset` + `.ic`, only verified devices) | ＋AUTHOR |
 | `analysis#recon/tf` | `tf-gate.dts` (`.tf` transfer-function on a verified resistive/controlled-source net) | ＋AUTHOR |
-| `maths-misc#recon/randnumb` | deterministic-seed RNG/noise check (no harness divergence circuit; validated by seeded reproducibility) | ＋AUTHOR (or N/A) |
+| `maths-misc#recon/randnumb` | **RUNNABLE** — gateKind=`self-compare`, gateFixtures=[`src/solver/analog/__tests__/monte-carlo.test.ts`] (seeded reproducibility; no harness divergence circuit). Bit-exact-via-TRNOISE (Acceptance #9) defers to vsrc's noise arm. | self-compare |
 | `parser#recon/nodeAllocOrder` | `resistive-divider` / `diode-resistor` / `vccs-gate` / `jfet-gate` (FLAT slot-index parity, VERIFIED-device fixtures only) | ✓ node-ordering bit-identical (topology/coords match every fixture; orderingDiffs none). NOTE: `bjt-common-emitter` / `mosfet-inverter` are NOT used here — their DUTs (bjt, mos1) are UNPORTED (recons PENDING), so `harness_first_divergence` flags their device-model numerics (Q1.VBE state, M1 convergence flag), which are the pending bjt/mos1 ports, NOT node-ordering. Per the composition rule a fixture gates an engine recon only when its devices are verified bit-exact. Composite/subcircuit node-ordering DEFERRED post-migration (see Deferred list). |
 
 ## Fixture work list (tier-ordered — "fixtures set up")
@@ -189,7 +189,7 @@ Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the devi
 1. **Tier 0/1:** ~~`vsrc-dc-only` (dropped — degenerate)~~ · ✅`vsrc-ac-square-rload` · ✅`vsrc-ac-sine-rload` · ✅`isrc-dc-rload` · ✅`isrc-ac-rload`.
 2. **Tier 2:** ✅`vccs-gate` · ✅`vcvs-gate` · ✅`cccs-gate` · ✅`ccvs-gate` · ✅`sw-gate` · ⛔`csw-gate` · ⛔`asrc-gate`.
 3. **Tier 3:** ✅`jfet-gate` · ⛔`jfet2-gate` · ⛔`mes-gate`.
-4. **Engine:** ⛔`nodeset-ic-gate` · ⛔`tf-gate` · ⛔ randnumb check.
+4. **Engine:** ⛔`nodeset-ic-gate` · ⛔`tf-gate` · ✅ randnumb (self-compare via `monte-carlo.test.ts` — no `.dts`).
 
 **Built (10) — all emit to ngspice; smoke-tested bit-exact pre-port (107/107, firstDivergence null):**
 `isrc-dc-rload`, `vccs-gate`, `vcvs-gate`, `cccs-gate`, `jfet-gate`, `sw-gate`. Also built+saved: `isrc-ac-rload`, `ccvs-gate` (canon-derived linear H), `vsrc-ac-square-rload`, `vsrc-ac-sine-rload` (waveform gates, run when the driver gates `vsrc`).
@@ -199,7 +199,7 @@ Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the devi
 - `asrc-gate` — `src/components/active/bsource.ts` does not exist yet; the B source is built by the asrc port (#19/#27), which also adds the generator's B-source emitter. Fixture authored then.
 - `jfet2-gate`, `mes-gate` — components built by their `wholeClass` recons; fixtures authored with the recon.
 - `nodeset-ic-gate`, `tf-gate` — no `.nodeset`/`.ic`/`.tf` surface in `src/headless` or `scripts/mcp`; built by `maths-sparse#recon/nodesetIcRowZero` / `analysis#recon/tf`. Fixtures authored then.
-- randnumb — validated by seeded reproducibility, not a divergence circuit.
+- randnumb — RUNNABLE NOW (not deferred): gateKind=`self-compare`, the loop runs `monte-carlo.test.ts` (seeded reproducibility) as the gate; no `.dts` divergence circuit. Only the bit-exact-via-TRNOISE check (Acceptance #9) defers to vsrc's noise arm.
 - `composite-mosfet-stage` / any **user-subcircuit analog gate** — **DEFERRED POST-MIGRATION** (niche; user 2026-06-01). ngspice returns 0 elements: an analog net loses its identity when it crosses a user-subcircuit `Port` boundary, so the MOSFET gate net collapses to gnd. Proven NOT node-ordering and NOT a general high-Z bug — the FLAT `mosfet-inverter` (same gate-bias topology) is 122/122 bit-exact. The real bug is the flatten Port-stitch / analog partition (`src/solver/digital/flatten.ts` + the analog partitioner); `nodeAllocOrder`'s `mintPort` Part E targeted the in-registry-composite path (`walkCompositeForNodeAllocation`), which never runs for a flattened user subcircuit. Fixed after the whole migration; `nodeAllocOrder` gates flat-only until then.
 
 Each authored fixture is built via the MCP circuit tools (`circuit_build`/`circuit_save`),
