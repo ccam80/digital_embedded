@@ -244,14 +244,16 @@ function computeSubcktParams(
  * `kind: "netlist"`) recurse via the same allocator so their internal nets
  * also land in flattened-deck position.
  *
- * Pin walk order: `connectivity[pi]` from `netlist.netlist[elIdx]` (pinLayout
- * order). Composite authors write `nodes:` in pinLayout order per the
- * `MnaSubcircuitNetlist` contract, so for every primitive sub-element that
- * has an entry in `TYPE_ID_TO_DECK_PIN_LABEL_ORDER`, pinLayout order matches
- * the deck card's node-list order. The MOSFET/JFET (D-G-S deck vs G-S-D
- * pinLayout) divergence does not currently affect any shipped composite —
- * none has a MOSFET or JFET sub-element. If one is added, extend this walk
- * to consult `TYPE_ID_TO_DECK_PIN_LABEL_ORDER[sub.typeId]`.
+ * Pin walk order: each sub-element's pins are visited in its deck node-token
+ * order (`TYPE_ID_TO_DECK_PIN_LABEL_ORDER[sub.typeId]`), exactly as the
+ * outer-device node-map walk does. ngspice flattens the subcircuit before
+ * `INPpas2`, so a sub-element's node tokens mint internal-net numbers in the
+ * same `INP2*` token order as a top-level device (`inppas2.c:76` over the
+ * flattened deck; per-device token order from each `INP2*` parser, e.g.
+ * `inp2m.c:80-104` for the M card's `D G S` tokens). A sub-element with no
+ * deck-pin row (a card-less nested composite) falls back to `connectivity`
+ * (pinLayout) order; the nested-composite recursion below then drives that
+ * sub-element's own internal numbering through this same allocator.
  */
 function walkCompositeForNodeAllocation(
   netlist: MnaSubcircuitNetlist,
@@ -269,32 +271,26 @@ function walkCompositeForNodeAllocation(
     const sub = netlist.elements[elIdx]!;
     const connectivity = netlist.netlist[elIdx]!;
 
-    for (let pi = 0; pi < connectivity.length; pi++) {
-      const netIdx = connectivity[pi];
-      if (netIdx === undefined || netIdx < portCount) continue;
-      const slot = netIdx - portCount;
-      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
-      const key = `${parentLabel}#${suffix}`;
-      if (!internalIds.has(key)) {
-        allocateInternal(parentLabel, suffix);
-      }
-    }
-
-    // Nested-composite recursion: if a sub-element is itself `kind: "netlist"`,
-    // its internal nets are also flattened-deck-visible and must land at this
-    // sub-element's deck position, not after the outer composite finishes.
+    // Resolve the sub-element's definition + props + pinLayout up front so the
+    // internal-net mint loop below can visit pins in this sub-element's deck
+    // node-token order, not raw pinLayout order. ngspice flattens the subckt
+    // before INPpas2, so each sub-element's node tokens mint internal numbers
+    // in its `INP2*` parser's token order (inppas2.c:76 over the flattened
+    // deck). A sub-element with no registry def is walked in connectivity order
+    // (it carries no SPICE card to dictate a different token order).
     const subDef = registry.get(sub.typeId);
-    if (!subDef) continue;
     const modelKey = sub.modelRef ?? (sub.params?.model as string | undefined);
-    if (modelKey === undefined) continue;
-    const subEntry = resolveModelEntry(subDef, modelKey, runtimeModelMap);
-    if (!subEntry || subEntry.kind !== "netlist") continue;
+    const subEntry =
+      subDef && modelKey !== undefined
+        ? resolveModelEntry(subDef, modelKey, runtimeModelMap)
+        : null;
 
-    // Build subProps for the nested netlist resolution. Mirrors the
-    // expandCompositeInstance subProps construction (literal numbers + string
-    // refs into subcktParams; sibling-refs aren't walk-relevant so skip them).
+    // Build subProps once for both pinLayout resolution and the nested-netlist
+    // resolution. Mirrors the expandCompositeInstance subProps construction
+    // (model-entry defaults + literal numbers + string refs into subcktParams;
+    // sibling-refs aren't walk-relevant so skip them).
     const subProps = new PropertyBag();
-    if (subEntry.params) {
+    if (subEntry?.params) {
       for (const [k, v] of Object.entries(subEntry.params)) {
         if (typeof v === "number") subProps.setModelParam(k, v);
       }
@@ -310,11 +306,42 @@ function walkCompositeForNodeAllocation(
       }
     }
 
+    const subPinLayout = subDef ? resolvePinLayout(subDef, subProps) : [];
+
+    // Deck node-token visit order: map each deck-token label to its pinLayout
+    // index (which is the `connectivity` index, since connectivity is stored in
+    // pinLayout order), preserving the INP2* token sequence. For a sub-element
+    // with no deck-pin row (a card-less nested composite) fall back to
+    // pinLayout/connectivity order.
+    const subDeck = TYPE_ID_TO_DECK_PIN_LABEL_ORDER[sub.typeId];
+    const internalVisitOrder: number[] =
+      subDeck !== undefined
+        ? subDeck
+            .map((lbl) => subPinLayout.findIndex((p) => p.label === lbl))
+            .filter((i) => i >= 0)
+        : connectivity.map((_, i) => i);
+
+    for (const pi of internalVisitOrder) {
+      const netIdx = connectivity[pi];
+      if (netIdx === undefined || netIdx < portCount) continue;
+      const slot = netIdx - portCount;
+      const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
+      const key = `${parentLabel}#${suffix}`;
+      if (!internalIds.has(key)) {
+        allocateInternal(parentLabel, suffix);
+      }
+    }
+
+    // Nested-composite recursion: if a sub-element is itself `kind: "netlist"`,
+    // its internal nets are also flattened-deck-visible and must land at this
+    // sub-element's deck position, not after the outer composite finishes.
+    if (!subDef) continue;
+    if (!subEntry || subEntry.kind !== "netlist") continue;
+
     const innerNetlist = resolveNetlistInstance(subEntry, subProps);
     const innerSubcktParams = computeSubcktParams(innerNetlist, subProps);
     const subName = sub.subElementName ?? `el${elIdx}`;
     const childLabel = `${parentLabel}:${subName}`;
-    const subPinLayout = resolvePinLayout(subDef, subProps);
 
     const innerOuterPortNodes = new Map<string, number>();
     for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
