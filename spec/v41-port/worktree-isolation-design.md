@@ -107,7 +107,31 @@ MAIN-SRC-CLEAN check — a stray uncommitted `src/` change in MAIN ⇒ capture +
 junction-safe STALE-WORKTREE SWEEP. Residual hazard: soft isolation (overlapping `src/` + absolute-path tools)
 — detected, not hard-prevented; inherent to the workflow-agent model, same in any design.
 
-Status: A2 BUILT + parses (validated wrapped as the harness runs it). Orchestration not yet exercised on a
-live unit — needs a controlled first run. The 3 Phase-0 engine recons have their OWN gate blockers (nodeset-ic
-+ tf are scout-deferred "no input surface"; randnumb's gate is circular) — those fixtures must be authored
-before they can run through the loop.
+Status: A2 VALIDATED end-to-end (2026-06-01). First live run (`maths-misc`/randnumb) exercised the full
+pipeline — worktree setup → repoint → recon build → isomorphism + self-compare gate → ff-merge → ledger
+refresh — and landed `maths-misc#recon/randnumb` APPLIED on `v41-port` (`e5ab98cc`). The orchestration works.
+
+## INCIDENT + FIX (2026-06-01) — `cmd /c` no-ops in the agent shell → node_modules deletion
+
+The first run's TEARDOWN destroyed the main `node_modules`. Root cause: the teardown removed the worktree's
+node_modules junction with `cmd /c rmdir "<path>\node_modules"`, but **`cmd /c <cmd>` SILENTLY NO-OPS in the
+workflow agent's bash shell** (it printed the interactive banner and returned without running the argument —
+unlike my PowerShell smoke test, which is why the smoke test gave false confidence). The junction therefore
+survived into `git -C MAIN worktree remove --force`, which traversed the LIVE junction and deleted real files
+out of `MAIN/node_modules` (246 → 110). Recovery: the MCP server held `koffi.node` open (ngspice FFI), so
+`npm ci` EPERM'd — `server_restart` took the MCP down (the respawn can't load the wiped `tsx`, so per
+`mcp-wrapper.mjs` the wrapper shuts down on exit ≠ 120), releasing `koffi.node`; then `npm ci` restored it.
+(`server_reset` would NOT have worked — it keeps the process alive, so the loaded koffi addon stays locked.)
+
+THE FIX (hazard class eliminated): **no junction is ever created.** The worktree lives at `.wt/<unit>` INSIDE
+the main checkout, so Node resolves `node_modules` by walking UP to `MAIN/node_modules` — the worktree needs
+none of its own. With no junction: setup just `git worktree add` + verifies upward resolution
+(`node -e "require.resolve('typescript')"`); teardown's `git worktree remove` has nothing to traverse; a
+positive guard asserts `<WT>/node_modules` is `absent` (and halts if a real one appears) before removal +
+re-checks the MAIN count is unchanged after. Every `cmd /c` is purged from the driver (banned — it no-ops
+here); the only sanctioned link-removal is Node `fs` (lstat-guarded, link-only), used solely by the stale
+sweep for legacy strays. Per-run recovery if it ever recurs: `server_restart` (NOT reset) → `npm ci` → `/mcp`
+reconnect.
+
+Next: re-run `maths-misc` is unnecessary (randnumb already landed); the next loop unit is `nodeset-ic` (its
+harness input surface + fixtures are committed at `865aeb96`), now safe to run under the no-junction driver.
