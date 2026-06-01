@@ -2,69 +2,10 @@
   "_comment": "Loop-progress overlay - written by the port loop, never by hand-editing ledger.json. The verifier records APPLIED here; the applier/verifier record ESCALATED and attempts here. build-ledger.mjs applies it so ledger.json is fully derived (diffs + splits.json + planning/*-decisions.json + progress.json). Each item entry: state (PENDING|APPLIED|ESCALATED - never NO-COUNTERPART, which is planning-frozen), attempts (int), verifierNotes (string[]), escalation (object|null, required when ESCALATED), hunkHash (the item hunkHash when the entry was recorded - if the diff later drifts, the stale entry is ignored).",
   "items": {
     "vsrc#recon/waveformModel": {
-      "state": "ESCALATED",
+      "state": "PENDING",
       "hunkHash": "1028722f1de3245b",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "trigger": "TASK.md §8 case 2 (target absent / cross-group architecture change beyond this functionGroup, and beyond the recon's single named tsFile)",
-        "tsFilesAllowed": [
-          "src/components/sources/ac-voltage-source.ts"
-        ],
-        "summary": "The reconstruction as specified cannot be built faithfully within the single permitted tsFile. Three concrete blockers, each requiring edits outside src/components/sources/ac-voltage-source.ts or infrastructure that has not landed.",
-        "blockers": [
-          {
-            "id": "B1-loadcontext-missing-cktStep-cktFinalTime",
-            "what": "Every order-guard default in the rebuilt VSRCload waveform switch reads ckt->CKTstep and ckt->CKTfinalTime: PULSE TR/TF default CKTstep and PW/PER default CKTfinalTime (ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c:108-119); SINE FREQ defaults to 1/CKTfinalTime (vsrcload.c:181-183); EXP TD1/TAU1/TAU2 default CKTstep, TD2 defaults TD1+CKTstep (vsrcload.c:204-215); SFFM FC/FS default 1/CKTfinalTime (vsrcload.c:246-253); AM MF defaults 1/CKTfinalTime (vsrcload.c:280-282).",
-            "specClaim": "Spec Part A mapping table (vsrc-waveformModel.md:132-133) asserts `ckt->CKTstep -> ctx.cktStep` and `ckt->CKTfinalTime -> ctx.cktFinalTime` are 'already on LoadContext'.",
-            "actual": "src/solver/analog/load-context.ts has neither cktStep nor cktFinalTime. It carries dt (CKTdelta), time (CKTtime), minBreak (CKTminBreak), srcFact, cktMode — but NOT CKTstep nor CKTfinalTime. CKTstep/CKTfinalTime live in src/solver/analog/timestep.ts (_finalTime, private) and analog-engine.ts; they are NOT propagated to the per-element LoadContext. ac-voltage-source.ts load(ctx) and the element constructor (pinNodes, props, getTime) expose no path to them — verified: the file references only ctx.cktMode / ctx.srcFact today (ac-voltage-source.ts:699-701).",
-            "architectureChangeRequired": "Add cktStep:number and cktFinalTime:number to the LoadContext interface (src/solver/analog/load-context.ts), populate them each load() in src/solver/analog/ckt-load.ts (mirroring the existing cktMode/srcFact propagation at ckt-load.ts:92-93) from the engine's CKTstep (TSTEP/output interval) and TimestepController._finalTime. This touches load-context.ts, ckt-load.ts, and likely analog-engine.ts/timestep.ts — all OUTSIDE the recon's single tsFile.",
-            "filesTouched": [
-              "src/solver/analog/load-context.ts",
-              "src/solver/analog/ckt-load.ts",
-              "src/solver/analog/analog-engine.ts",
-              "src/solver/analog/timestep.ts"
-            ]
-          },
-          {
-            "id": "B2-randnumb-recon-not-landed",
-            "what": "TRNOISE (vsrcload.c:356-398) and TRRANDOM (vsrcload.c:400-407) value arms, the TRNOISE/TRRANDOM coefficient application (vsrcpar.c:221-286 trnoise_state_init / trrandom_state_init), and the acceptStep refreshes (vsrcacct.c:228-237, 294-304) all consume the deterministic seeded RNG substrate (trnoise_state, trrandom_state, CombLCGTaus, f_alpha 1/f synthesizer).",
-            "specClaim": "Spec Part A cross-recon dependency (vsrc-waveformModel.md:155-167) and acceptance criterion 4 state these arms consume maths-misc#recon/randnumb, and 'if it has not landed, the noise arms are blocked on it'.",
-            "actual": "No trnoise_state, trrandom_state, CombLCGTaus, f_alpha, or trnoiseStateGet exists anywhere under src/ (grep: zero matches). maths-misc#recon/randnumb has not been built. The current boxMuller (ac-voltage-source.ts:52-56) uses live Math.random() and is non-reproducible.",
-            "architectureChangeRequired": "These value/coeff/accept arms cannot be ported bit-exact until maths-misc#recon/randnumb lands and exports the deterministic generators. Per the spec the structural shell (the _coeffs array, _functionType, the per-type switch with empty/blocked noise arms) could land, but only if B1 is resolved first (the non-noise arms themselves need cktStep/cktFinalTime).",
-            "filesTouched": [
-              "src/components/sources/ac-voltage-source.ts",
-              "(blocked on maths-misc#recon/randnumb deliverables — file path TBD by that recon)"
-            ]
-          },
-          {
-            "id": "B3-parts-F-and-G-outside-tsFiles",
-            "what": "Acceptance criterion 8 requires AcCurrentSourceAnalogImpl.acceptStep (ac-current-source.ts:482-605) to mirror the _breakTime re-root and to consume the changed computeWaveformValue signature. Acceptance criterion 11 + Part G require buildAcSourceSpec (src/solver/analog/__tests__/harness/netlist-generator.ts:1083) to emit PULSE/SINE/EXP/SFFM/AM/PWL from _functionType + _coeffs[] verbatim. The signature change to computeWaveformValue (from named scalars to coeffs[]+functionType+order+step-context) breaks ac-current-source.ts's existing call sites (ac-current-source.ts:389, 432) and its duplicated acceptStep.",
-            "specClaim": "Spec Part F (vsrc-waveformModel.md:587-602) and Part G (604-633), criteria 8 and 11.",
-            "actual": "The recon's contract tsFiles list is exactly [src/components/sources/ac-voltage-source.ts]. ac-current-source.ts imports computeWaveformValue/Waveform/ExtendedWaveformParams from ac-voltage-source.ts (ac-current-source.ts:41-45) and would not compile against the new signature without being edited. netlist-generator.ts is a separate harness file. Both are outside the permitted tsFile.",
-            "architectureChangeRequired": "Either (a) expand the recon's tsFiles to include src/components/sources/ac-current-source.ts and src/solver/analog/__tests__/harness/netlist-generator.ts, or (b) keep the computeWaveformValue signature backward-compatible and split Parts F/G into sequenced follow-on items. This is a tsFiles-scope decision the user must make.",
-            "filesTouched": [
-              "src/components/sources/ac-current-source.ts",
-              "src/solver/analog/__tests__/harness/netlist-generator.ts"
-            ]
-          }
-        ],
-        "whatLandsWithoutEscalation": "Nothing lands cleanly within the single tsFile alone. The structural shell (FunctionType enum, _coeffs/_functionType/_functionOrder/_breakTime/_rBreakpt/_r/_rdelay/_rGiven/_funcTGiven/_dcValue/_dcGiven fields, applyCoeffs, _breakTime=-1.0 setup seed) IS authorable in ac-voltage-source.ts in isolation, but the per-type value switch it exists to host (PULSE/SINE/EXP/SFFM/AM) is dead without B1's cktStep/cktFinalTime, and the noise arms are dead without B2. Authoring only the shell + a value switch that cannot read CKTstep/CKTfinalTime would either drop the order-guard defaults (a forbidden zero-line/partial application, TASK.md §5) or invent substitute values (a forbidden pragmatic shortcut, CLAUDE.md No Pragmatic Patches). Per CLAUDE.md NON-NEGOTIABLE EXECUTION STANDARDS I do not partially implement.",
-        "userDecisionNeeded": "Resolve in this order: (1) Add cktStep + cktFinalTime to LoadContext and propagate them in ckt-load.ts (B1) — confirm this expanded blast radius, or supply the intended accessor if one already exists that I missed. (2) Confirm maths-misc#recon/randnumb is intended to land before this recon (the spec says the structural shell lands 'now regardless', but the value paths cannot — so sequencing matters) (B2). (3) Expand the recon's tsFiles to include ac-current-source.ts and the harness netlist-generator.ts, or split Parts F/G into sequenced follow-on items (B3). With (1)-(3) resolved, all six self-contained-and-dependent parts of the recon become buildable as specified.",
-        "ngspiceFilesCited": [
-          "ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c:90-444 (the waveform switch + order-guard defaults reading CKTstep/CKTfinalTime)",
-          "ref/ngspice/src/spicelib/devices/vsrc/vsrcpar.c:17-286 (copy_coeffs + per-funcType apply + trnoise_state_init/trrandom_state_init)",
-          "ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c:22-321 (breakpoint scheduler + VSRCbreak_time gate)",
-          "ref/ngspice/src/spicelib/devices/vsrc/vsrcdefs.h:48-145 (instance fields + FunctionType enum)"
-        ],
-        "digitsFilesCited": [
-          "src/components/sources/ac-voltage-source.ts (the single permitted tsFile)",
-          "src/solver/analog/load-context.ts (missing cktStep/cktFinalTime)",
-          "src/solver/analog/ckt-load.ts:92-93 (where they would be propagated)",
-          "src/components/sources/ac-current-source.ts:41-45,389,432,482-605 (Part F)",
-          "src/solver/analog/__tests__/harness/netlist-generator.ts:1083 (Part G)"
-        ]
-      }
+      "verifierNotes": []
     },
     "jfet#recon/tempModelParams": {
       "state": "APPLIED",
@@ -220,18 +161,10 @@
       "escalation": null
     },
     "sw/swload.c#h002": {
-      "state": "ESCALATED",
+      "state": "PENDING",
       "hunkHash": "7de382dcef68836c",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "id": "ESC-012",
-        "raisedBy": "applier",
-        "trigger": "pre-image failure (case b, present-but-differs)",
-        "ngspice": "src/spicelib/devices/sw/swload.c:90 (MODEINITFLOAT negative-hysteresis bad-previous-state default: else internalerror(\"bad value for previous state in swload\")); v41 diff sw.md docLineRange 801-960, the -/+ pair at diff lines 828-829/854-855 (line changed whitespace-only v26->v41, so it is a - line of the hunk)",
-        "digiTS": "src/components/active/analog-switch.ts:200 - swLoadHandles MODEINITFLOAT branch final else { current_state = HYST_OFF; } (analog-switch.ts:193-201)",
-        "summary": "SWload MODEINITFLOAT bad-previous-state branch: pre-existing port substituted current_state = HYST_OFF for ngspice internalerror(...). Every other - line of #h002 is case (a) (paren/whitespace/CKTstates[0]+SWstate->CKTstate0[SWswitchstate]/ptr->Ptr/return(OK)->return OK), so the v26->v41 delta there is a zero-line TS delta; this single line is case (b). Per TASK.md sec6 a case-(b) - line escalates the whole sw/swload.c::SWload group (#h001+#h002). Divergence pre-dates v26 baseline (it is in the pre-existing SWload port, not in the acLoad/trunc/icParam recons, all APPLIED). Decision needed: directive to make the bad-previous-state default match ngspice internalerror(...) (restoring case-(a) pre-image so #h002 applies as a clean zero-line cosmetic delta), or a sequenced v26-baseline restore item ahead of #h002. See ESCALATIONS.md ESC-012."
-      }
+      "verifierNotes": []
     },
     "sw#recon/acLoad": {
       "state": "APPLIED",
@@ -841,21 +774,10 @@
       "escalation": null
     },
     "analysis#recon/tf": {
-      "state": "ESCALATED",
+      "state": "PENDING",
       "hunkHash": "adda0def5d673cee",
       "attempts": 0,
-      "verifierNotes": [],
-      "escalation": {
-        "raisedBy": "applier",
-        "trigger": "reconstruction spec absent",
-        "ngspice": "src/spicelib/analysis/tfanal.c:18-165 (TFanal, v41 tree ref/ngspice/src/spicelib/analysis/tfanal.c)",
-        "digiTS": "src/solver/analog/dc-operating-point.ts -- a new .tf driver (DC transfer ratio + input/output resistance over the factored DC Jacobian), plus facade method and circuit_tf MCP surface",
-        "whatIsBlocked": "The entire .tf analysis driver. ledger.json records this reconstruction item with specExists:false; the spec file spec/v41-port/reconstruction/analysis-tf.md does not exist on disk (confirmed via Glob -- the reconstruction/ directory holds cap-/mut-/ind-/vdmos-/vccs-/res-/jfet- specs but no analysis-tf.md). The two v41 hunks it blocks (analysis/tfanal.c#h001 docLineRange 8352-8362, #h002 8363-8373) are GENnode(ptr)[0]/[1] accessor renames inside TFanal that only become case-(a) applicable once the driver exists. No .tf driver exists in the target TS today (Grep for TFanal|transferFunction|TFinSrc|circuit_tf|computeTransfer in dc-operating-point.ts returns zero matches), and no rename-maps/*tf* stub exists.",
-        "architectureChangeRequired": "Build from scratch, in src/solver/analog/dc-operating-point.ts (+ facade + MCP), a faithful v26-baseline TFanal port: (1) run CKTop to the operating point; (2) resolve the input source (Vsource branch / Isource node pair) and output (Vsource branch / node pair); (3) zero CKTrhs, inject +/-1 at the input source's branch or node pair, SMPsolve against the already-factored DC Jacobian, read the transfer ratio and input resistance (-1/rhs[insrc] with the 1e-20 guard, or the node-difference for an Isource input); (4) for output resistance, re-zero rhs, inject at the output, re-solve, read 1/MAX(1e-20,rhs[outsrc]) or the node difference, with the TFoutIsI && TFoutSrc==TFinSrc short-circuit. Each of these decisions -- how digiTS exposes a re-solve against the retained factored Jacobian (the SMPsolve analog), how it addresses a source branch vs a node pair for RHS injection, the output-vector/plot shape, the facade method signature, and the circuit_tf MCP tool contract and serialization -- is a design the missing spec was to define. Authoring them by inference would be inventing the spec, which the reconstruction-from-spec contract and the project 'no pragmatic shortcuts / match ngspice exactly' rule forbid.",
-        "whyExceedsOneFunctionGroup": "This is not a single-functionGroup architecture change: it spans the AnalogEngine solve surface (re-solve against the factored DC Jacobian), the facade (src/headless/default-facade.ts / facade.ts), and the MCP server (a new circuit_tf tool). The reconstruction item's own tsFunction field names exactly this multi-surface scope ('a new .tf driver over the factored DC Jacobian (transfer ratio + Zin/Zout) on the AnalogEngine, plus the facade/MCP surface (circuit_tf)'). With no spec to fix the contract at each surface, the mapping is genuinely ambiguous.",
-        "decisionNeeded": "Author spec/v41-port/reconstruction/analysis-tf.md defining the .tf driver architecture (re-solve-against-factored-Jacobian surface on AnalogEngine, source-branch vs node-pair RHS injection, transfer-ratio/Zin/Zout output shape, facade method signature, circuit_tf MCP contract), then rebuild the ledger so specExists flips true and this item returns to PENDING for the builder.",
-        "resolution": "pending"
-      }
+      "verifierNotes": []
     },
     "maths-ni/nicomcof.c#h001": {
       "state": "APPLIED",

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-01T07:17:49.827Z",
+    "generated": "2026-06-01T12:30:14.398Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -34157,19 +34157,12 @@
         960
       ],
       "hunkHash": "7de382dcef68836c",
-      "state": "ESCALATED",
+      "state": "PENDING",
       "tsFunction": "src/components/active/analog-switch.ts — swLoadHandles (analog-switch.ts:116-237) called from AnalogSwitchSPSTElement.load (288-302) and AnalogSwitchSPDTElement.load (403-432). The v41 hunk applies as accessor renames (model->SWinstances → SWinstances(model)), SWstate→SWswitchstate/SWctrlvalue macro substitution, ptr→Ptr matrix-pointer renames, and brace/whitespace reflow over the already-ported mode-dispatched state machine + state write-back + four-cell conductance stamp.",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
-      "escalation": {
-        "id": "ESC-012",
-        "raisedBy": "applier",
-        "trigger": "pre-image failure (case b, present-but-differs)",
-        "ngspice": "src/spicelib/devices/sw/swload.c:90 (MODEINITFLOAT negative-hysteresis bad-previous-state default: else internalerror(\"bad value for previous state in swload\")); v41 diff sw.md docLineRange 801-960, the -/+ pair at diff lines 828-829/854-855 (line changed whitespace-only v26->v41, so it is a - line of the hunk)",
-        "digiTS": "src/components/active/analog-switch.ts:200 - swLoadHandles MODEINITFLOAT branch final else { current_state = HYST_OFF; } (analog-switch.ts:193-201)",
-        "summary": "SWload MODEINITFLOAT bad-previous-state branch: pre-existing port substituted current_state = HYST_OFF for ngspice internalerror(...). Every other - line of #h002 is case (a) (paren/whitespace/CKTstates[0]+SWstate->CKTstate0[SWswitchstate]/ptr->Ptr/return(OK)->return OK), so the v26->v41 delta there is a zero-line TS delta; this single line is case (b). Per TASK.md sec6 a case-(b) - line escalates the whole sw/swload.c::SWload group (#h001+#h002). Divergence pre-dates v26 baseline (it is in the pre-existing SWload port, not in the acLoad/trunc/icParam recons, all APPLIED). Decision needed: directive to make the bad-previous-state default match ngspice internalerror(...) (restoring case-(a) pre-image so #h002 applies as a clean zero-line cosmetic delta), or a sequenced v26-baseline restore item ahead of #h002. See ESCALATIONS.md ESC-012."
-      },
+      "escalation": null,
       "kind": "hunk",
       "blockedBy": null
     },
@@ -62559,7 +62552,7 @@
       "blocks": [
         "maths-sparse/spsmp.c#h002"
       ],
-      "hunkHash": "d47aa3b8972cfd42",
+      "hunkHash": "385ed606e9fa52c4",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [
@@ -63092,7 +63085,7 @@
         "vsrc/vsrcset.c#h001",
         "vsrc/vsrctemp.c#h002"
       ],
-      "hunkHash": "0a86798334e613e1",
+      "hunkHash": "98ebc2118c119c86",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
