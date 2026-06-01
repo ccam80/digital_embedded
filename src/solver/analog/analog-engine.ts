@@ -1003,6 +1003,12 @@ export class MNAEngine implements AnalogEngine {
     // loadCtx.dt (per-iter capture and device load() reads).
     this._timestep.currentDt = 0;
     ctx.loadCtx.dt = 0;
+    // ngspice CKTstep / CKTfinalTime — bind the circuit-global transient
+    // constants from the resolved params at transient boot. Independent-source
+    // waveform order-guard defaults read these (vsrcload.c PULSE/SINE/EXP/SFFM/AM
+    // fall back to CKTstep / CKTfinalTime when a coefficient is absent or zero).
+    ctx.loadCtx.cktStep = this._params.outputStep ?? 0;
+    ctx.loadCtx.cktFinalTime = this._params.tStop ?? 0;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);

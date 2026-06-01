@@ -52,6 +52,8 @@ export class LoadCtxImpl implements LoadContext {
   rhsOld!: Float64Array;
   time!: number;
   dt!: number;
+  cktStep!: number;
+  cktFinalTime!: number;
   method!: IntegrationMethod;
   order!: number;
   deltaOld!: readonly number[];
@@ -769,6 +771,14 @@ export class CKTCircuitContext {
       rhsOld: this.rhsOld,
       time: 0,
       dt: 0,
+      // ngspice CKTstep / CKTfinalTime — circuit-global transient constants
+      // read by the independent-source waveform order-guard defaults
+      // (vsrcload.c). CKTstep is the analysis TSTEP (params.outputStep);
+      // CKTfinalTime is the stop time (params.tStop). Both 0 when no transient
+      // analysis is configured; refreshed in updateParams() and at transient
+      // entry from the resolved params.
+      cktStep: params.outputStep ?? 0,
+      cktFinalTime: params.tStop ?? 0,
       method: "trapezoidal",
       order: 1,
       deltaOld: this.deltaOld,
@@ -956,6 +966,11 @@ export class CKTCircuitContext {
     this.loadCtx.reltol = params.reltol;
     this.loadCtx.iabstol = params.abstol;
     this.loadCtx.cktGmin = params.gmin ?? 1e-12;
+    // ngspice CKTstep / CKTfinalTime — re-read on configure() so the
+    // independent-source waveform order-guard defaults are hot-loadable when a
+    // transient analysis supplies tStop / outputStep after construction.
+    this.loadCtx.cktStep = params.outputStep ?? 0;
+    this.loadCtx.cktFinalTime = params.tStop ?? 0;
     // diagGmin is refreshed per-NR-iteration by ckt-load from diagonalGmin.
 
     // Keep the full params reference in sync so downstream readers

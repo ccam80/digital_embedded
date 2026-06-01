@@ -20,6 +20,11 @@ import type {
   SubcircuitElementParam,
 } from "../../../../core/mna-subcircuit-netlist.js";
 import { deckOrder } from "../../ngspice-load-order.js";
+import {
+  enumWaveformCoeffs,
+  FunctionType,
+  type Waveform,
+} from "../../../../components/sources/ac-voltage-source.js";
 
 // ---------------------------------------------------------------------------
 // SPICE prefix table (typeId -> SPICE prefix, model type for semiconductors)
@@ -1120,80 +1125,62 @@ function buildAcSourceSpec(
   modelKey: string,
   rawLabel: string,
 ): string {
-  const period = freq > 0 ? 1 / freq : 1;
+  // ngspice coefficient model (vsrcpar.c / vsrcload.c): when a SPICE function
+  // token + coefficient vector are given, emit the token straight from those
+  // coefficients so the ngspice deck carries the exact coefficients digiTS
+  // evaluates (the precondition for a bit-exact waveform gate, Part G). The
+  // order-guard defaults (TR/TF→CKTstep, PW/PER→CKTfinalTime) are resolved by
+  // ngspice itself from the emitted coefficient list, identically to our
+  // evaluateNgspiceWaveform — so the coefficients are passed verbatim.
+  const funcToken = (props.has("funcType") ? props.get<string>("funcType") : "").trim().toUpperCase();
+  if (funcToken !== "") {
+    const coeffsRaw = props.has("coeffs") ? props.get<number[] | string>("coeffs") : [];
+    const coeffs = Array.isArray(coeffsRaw)
+      ? coeffsRaw
+      : coeffsRaw.split(/[\s,]+/).filter((s) => s.length > 0).map((s) => parseFloat(s));
+    switch (funcToken) {
+      case "PULSE": case "SINE": case "EXP": case "SFFM": case "AM": case "PWL":
+        return `${funcToken}(${coeffs.join(" ")})`;
+      case "TRNOISE": case "TRRANDOM":
+        // TRNOISE/TRRANDOM deck emission rides with maths-misc#recon/randnumb:
+        // the deterministic generator must match bit-exact on both sides before
+        // a noise deck is comparable. Until that recon lands, refuse to emit a
+        // noise deck rather than produce an uncomparable one.
+        throw new Error(
+          `SPICE deck emission for ${funcToken} sources rides with `
+          + `maths-misc#recon/randnumb (deterministic RNG parity); not yet available.`,
+        );
+      default:
+        throw new Error(`Unrecognized SPICE function token '${funcToken}' on '${rawLabel}'.`);
+    }
+  }
 
   switch (waveform) {
-    case "sine": {
-      // Our engine: dc + amp * sin(2Ï€ * freq * t + phase)  [phase in radians]
-      // SPICE SIN:  SIN(VO VA FREQ TD THETA PHASE_DEG)
-      //   PHASE_DEG is phase in degrees (ngspice manual ss4.1.2).
-      const phaseDeg = phase * (180 / Math.PI);
-      return `SIN(${dc} ${amp} ${freq} 0 0 ${phaseDeg})`;
-    }
-
-    case "square": {
-      // Our engine (ngspice PULSE semantics, vsrcload.c):
-      //   V1 = dc - amp (LOW), V2 = dc + amp (HIGH)
-      //   Rising edge: [0, TR] within the period-local clock.
-      //   HIGH plateau: [TR, TR+PW] where PW = period/2 - TR.
-      //   Falling edge: [TR+PW, TR+PW+TF].
-      //   LOW: rest of period.
-      //
-      // SPICE PULSE(V1 V2 TD TR TF PW PER):
-      //   V1  = dc - amp
-      //   V2  = dc + amp
-      //   TD  = delay to first rising edge start in real time
-      //         = ((-phaseShift) % period + period) % period
-      //         (positive phase â†’ waveform shifted left â†’ rising edge earlier â†’ larger TD wrap)
-      //   TR  = riseTime
-      //   TF  = fallTime
-      //   PW  = period/2 - TR  (HIGH plateau, same as engine)
-      //   PER = period
+    case "sine":
+    case "square":
+    case "triangle":
+    case "sawtooth": {
+      // Criterion #11: the editor-facing waveform enum drives off the SAME
+      // ngspice coefficient vector digiTS evaluates — enumWaveformCoeffs builds
+      // the PULSE/SINE coefficients from the named params and the element
+      // evaluates the identical vector through evaluateNgspiceWaveform. Emitting
+      // those coefficients verbatim makes the ngspice deck carry digiTS's exact
+      // coefficient set (the precondition for a bit-exact waveform gate). The
+      // riseTime/fallTime resolution mirrors the element's named-param defaults
+      // (registry default 1e-12), so both sides build identical vectors.
       const riseTime = requireParam(props, def, modelKey, "riseTime", rawLabel);
       const fallTime = requireParam(props, def, modelKey, "fallTime", rawLabel);
-      const halfPeriod = period / 2;
-      const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
-      // Rising edge starts at t = -phaseShift in the engine's unwrapped clock.
-      // Wrap to [0, period) for SPICE PULSE TD.
-      const td = ((-phaseShift % period) + period) % period;
-      const pw = halfPeriod - riseTime;
-      const v1 = dc - amp;
-      const v2 = dc + amp;
-      return `PULSE(${v1} ${v2} ${td} ${riseTime} ${fallTime} ${pw} ${period})`;
-    }
-
-    case "triangle": {
-      // PULSE-aligned triangle (see ac-voltage-source.ts computeWaveformValue):
-      // rises V1 â†’ V2 over halfPeriod, then falls V2 â†’ V1 over halfPeriod.
-      // At t=0 (phase=0) the wave sits at V1 rising. Non-zero phase shifts the
-      // waveform left in time by phase/(2Ï€*freq); encode that as a positive TD
-      // wrapped into [0, period) just like the square case.
-      const halfP = period / 2;
-      const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
-      const td = ((-phaseShift % period) + period) % period;
-      const v1 = dc - amp;
-      const v2 = dc + amp;
-      return `PULSE(${v1} ${v2} ${td} ${halfP} ${halfP} 0 ${period})`;
-    }
-
-    case "sawtooth": {
-      // PULSE-aligned sawtooth (see ac-voltage-source.ts computeWaveformValue):
-      // rises V1 â†’ V2 over (period - fallTime), then falls V2 â†’ V1 over fallTime.
-      // At t=0 (phase=0) the wave sits at V1 rising. Default fallTime = 1 ps so
-      // the sharp fall is below typical transient timesteps while remaining
-      // losslessly encodable in PULSE.
-      const fallTime = requireParam(props, def, modelKey, "fallTime", rawLabel);
-      if (fallTime >= period) {
+      const built = enumWaveformCoeffs(
+        waveform as Waveform, amp, freq, phase, dc, riseTime, fallTime,
+      );
+      if (built === null) {
         throw new Error(
-          `sawtooth fallTime (${fallTime}s) must be strictly less than period (${period}s)`,
+          `netlist-generator: waveform '${waveform}' on '${rawLabel}' has no ` +
+          `ngspice coefficient counterpart.`,
         );
       }
-      const riseSpan = period - fallTime;
-      const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
-      const td = ((-phaseShift % period) + period) % period;
-      const v1 = dc - amp;
-      const v2 = dc + amp;
-      return `PULSE(${v1} ${v2} ${td} ${riseSpan} ${fallTime} 0 ${period})`;
+      const token = built.functionType === FunctionType.SINE ? "SIN" : "PULSE";
+      return `${token}(${built.coeffs.join(" ")})`;
     }
 
     case "sweep":

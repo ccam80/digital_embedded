@@ -84,6 +84,22 @@ export interface LoadContext {
   time: number;
   /** Current timestep in seconds (ngspice CKTdelta). 0 during DC-OP. */
   dt: number;
+  /**
+   * Requested output/print timestep in seconds (ngspice CKTstep). This is the
+   * analysis `TSTEP`, a circuit-global constant for the run — distinct from
+   * `dt` (CKTdelta, the live integration step). Independent-source waveform
+   * order-guard defaults read it: PULSE TR/TF and EXP TD1/TAU1 fall back to
+   * CKTstep when the coefficient is absent or zero (vsrcload.c:110-113,
+   * 206-215). 0 during pure DC-OP runs with no transient analysis configured.
+   */
+  cktStep: number;
+  /**
+   * Transient stop time in seconds (ngspice CKTfinalTime). Circuit-global run
+   * constant. Independent-source order-guard defaults read it: PULSE PW/PER
+   * default to CKTfinalTime and SINE/SFFM/AM FREQ default to 1/CKTfinalTime
+   * (vsrcload.c:116-119, 183, 248, 282). 0 during pure DC-OP runs.
+   */
+  cktFinalTime: number;
   /** Active numerical integration method (ngspice CKTintegrateMethod). */
   method: IntegrationMethod;
   /** Integration order (1 or 2). */

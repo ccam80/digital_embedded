@@ -34,7 +34,7 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
+import { MODEDC, MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -46,13 +46,80 @@ import { almostEqualUlps } from "../../solver/analog/timestep.js";
 
 export type Waveform = "sine" | "square" | "triangle" | "sawtooth" | "expression" | "sweep" | "am" | "fm" | "noise";
 
+// ---------------------------------------------------------------------------
+// ngspice independent-source function-type model (vsrcdefs.h / vsrcload.c)
+// ---------------------------------------------------------------------------
+
 /**
- * Box-Muller transform: produces a standard normal (mean=0, std=1) sample.
+ * Independent-source function-type codes (vsrcdefs.h:131-145), shared with the
+ * current source. The numeric values are load-bearing: applyCoeffs() stores
+ * them in `_functionType` and computeWaveformValue() dispatches on them. EXTERNAL
+ * (vsrcdefs.h:140) is the `#ifdef SHARED_MODULE` embedded-host callback; it is
+ * declared for header value-parity but has no load() body (digiTS has no
+ * shared-module host). The RFSPICE `PORT` code (vsrcdefs.h:141-144) is out of
+ * scope and absent.
  */
-function boxMuller(): number {
-  const u1 = Math.random();
-  const u2 = Math.random();
-  return Math.sqrt(-2 * Math.log(u1 === 0 ? Number.EPSILON : u1)) * Math.cos(2 * Math.PI * u2);
+export enum FunctionType {
+  PULSE = 1,
+  SINE = 2,
+  EXP = 3,
+  SFFM = 4,
+  PWL = 5,
+  AM = 6,
+  TRNOISE = 7,
+  TRRANDOM = 8,
+  EXTERNAL = 9,
+}
+
+/**
+ * Deterministic transient-noise generator state (ngspice `struct trnoise_state`,
+ * frontend 1-f-code.c). Constructed by `trnoise_state_init` and sampled by
+ * `trnoise_state_get` in the `maths-misc#recon/randnumb` reconstruction. The
+ * TRNOISE load() arm (vsrcload.c:356-398) interpolates two consecutive samples
+ * around floor(time/TS), adds the RTS step when RTSAM>0, and adds the DC value.
+ */
+export interface TrnoiseState {
+  /** Noise sample period TS (vsrcload.c:360). */
+  TS: number;
+  /** RTS noise amplitude (vsrcload.c:361). */
+  RTSAM: number;
+  /** RTS trap capture time (vsrcload.c:389). */
+  RTScapTime: number;
+  /** time==0 reset latch for repeated tran commands (vsrcload.c:365-371). */
+  timezero: boolean;
+  /** 1/f synthesizer running index, reset on the time=0→time>0 jump (vsrcload.c:369). */
+  top: number;
+}
+
+/**
+ * Deterministic transient-random generator state (ngspice `struct trrandom_state`).
+ * Constructed by `trrandom_state_init`; its `value` is refreshed each accepted
+ * step by `trrandom_state_get` in acceptStep (vsrcacct.c:303) and read by the
+ * TRRANDOM load() arm (vsrcload.c:402). Both live in the
+ * `maths-misc#recon/randnumb` reconstruction.
+ */
+export interface TrrandomState {
+  /** Time step TS (vsrcacct.c:283). */
+  TS: number;
+  /** Initial delay TD (vsrcacct.c:284). */
+  TD: number;
+  /** Most-recently scheduled random value (vsrcacct.c:303, vsrcload.c:402). */
+  value: number;
+}
+
+/**
+ * Parse a SPICE function-token coefficient vector from a property value. The
+ * vector arrives either as a `number[]` (programmatic build) or a
+ * whitespace/comma-separated string (`"1 2 3"` / `"1,2,3"`), mirroring how a
+ * `PULSE(...)` token's parenthesised list is captured at parse time. Returns a
+ * flat numeric array suitable for applyCoeffs / copy_coeffs (vsrcpar.c:17-29).
+ */
+export function parseCoeffVector(raw: number[] | string): number[] {
+  if (Array.isArray(raw)) return raw.slice();
+  return raw
+    .split(/[\s,]+/)
+    .filter((s) => s.length > 0)
+    .map((s) => parseFloat(s));
 }
 
 /**
@@ -87,8 +154,295 @@ export interface ExtendedWaveformParams {
   noiseSampleTime?: number;
 }
 
+// ---------------------------------------------------------------------------
+// ngspice coefficient-model waveform engine (rebuild of VSRCload's switch)
+// ---------------------------------------------------------------------------
+
 /**
- * Compute instantaneous waveform value at time t.
+ * Per-evaluation engine-step context for the ngspice coefficient model. Carries
+ * the circuit-global transient constants the order-guard defaults read
+ * (ckt->CKTstep, ckt->CKTfinalTime) plus the source's DC value/flag for the
+ * noise arms (vsrcload.c:394-405).
+ */
+export interface WaveformStepContext {
+  /** ckt->CKTstep — analysis TSTEP; PULSE TR/TF and EXP TD1/TAU1 default to it. */
+  cktStep: number;
+  /** ckt->CKTfinalTime — stop time; PULSE PW/PER and SINE/SFFM/AM FREQ default off it. */
+  cktFinalTime: number;
+  /** here->VSRCdcValue — added to TRNOISE/TRRANDOM output when dcGiven. */
+  dcValue: number;
+  /** here->VSRCdcGiven flag (vsrcload.c:395, 404). */
+  dcGiven: boolean;
+  /** here->VSRCtrnoise_state — deterministic noise generator (maths-misc#recon/randnumb). */
+  trnoiseState: TrnoiseState | null;
+  /** here->VSRCtrrandom_state — deterministic random generator (maths-misc#recon/randnumb). */
+  trrandomState: TrrandomState | null;
+  /** here->VSRCrdelay — pwl delay period `td=` (vsrcload.c:304). */
+  rdelay: number;
+  /** here->VSRCrGiven — pwl repeat flag (vsrcload.c:316). */
+  rGiven: boolean;
+  /** here->VSRCrBreakpt — pwl repeat start-coefficient index (vsrcload.c:320-323). */
+  rBreakpt: number;
+}
+
+/**
+ * Evaluate the ngspice independent-source waveform at `time` from the flat
+ * coefficient array, exactly mirroring the `switch(here->VSRCfunctionType)` of
+ * vsrcload.c:90-425. `time` is `ckt->CKTtime` in transient (0 under MODEDC).
+ * The arms read `coeffs[i]` by index with `order` (VSRCfunctionOrder) guards,
+ * bit-for-bit against the cited ngspice lines.
+ */
+export function evaluateNgspiceWaveform(
+  functionType: FunctionType,
+  coeffs: Float64Array,
+  order: number,
+  time: number,
+  ctx: WaveformStepContext,
+): number {
+  let value = 0.0;
+  switch (functionType) {
+    default:
+      // vsrcload.c:92-94 — no function type set: DC value.
+      value = ctx.dcValue;
+      break;
+
+    case FunctionType.PULSE: {
+      // vsrcload.c:104-119 — V1 V2 TD TR TF PW PER with order/zero guards.
+      const V1 = coeffs[0];
+      const V2 = coeffs[1];
+      const TD = order > 2 ? coeffs[2] : 0.0;
+      const TR = order > 3 && coeffs[3] !== 0.0 ? coeffs[3] : ctx.cktStep;
+      const TF = order > 4 && coeffs[4] !== 0.0 ? coeffs[4] : ctx.cktStep;
+      const PW = order > 5 && coeffs[5] !== 0.0 ? coeffs[5] : ctx.cktFinalTime;
+      const PER = order > 6 && coeffs[6] !== 0.0 ? coeffs[6] : ctx.cktFinalTime;
+      // vsrcload.c:122 — shift time by delay TD.
+      let tt = time - TD;
+      // vsrcload.c:124-139 — 8th coeff is the pulse-count cap (the newcompat.xs
+      // phase-normalization branch, vsrcload.c:127-136, is a blocked v41 hunk;
+      // the baseline takes the PHASE>0 ⇒ pulse-count path, vsrcload.c:137-139).
+      const PHASE = order > 7 ? coeffs[7] : 0.0;
+      let tmax = 1e99;
+      if (PHASE > 0.0) tmax = PHASE * PER;
+      if (tt > tmax) {
+        // vsrcload.c:141-143 — past the pulse-count cap: hold V1.
+        value = V1;
+      } else {
+        // vsrcload.c:145-150 — fold a repeating signal into one period.
+        if (tt > PER) tt -= PER * Math.floor(tt / PER);
+        // vsrcload.c:151-162 — piecewise V1 / rise / V2 / fall.
+        if (tt <= 0 || tt >= TR + PW + TF) value = V1;
+        else if (tt >= TR && tt <= TR + PW) value = V2;
+        else if (tt > 0 && tt < TR) value = V1 + (V2 - V1) * tt / TR;
+        else value = V2 + (V1 - V2) * (tt - (TR + PW)) / TF;
+      }
+      break;
+    }
+
+    case FunctionType.SINE: {
+      // vsrcload.c:173-187 — VO VA FREQ TD THETA PHASE; FREQ defaults to 1/finalTime.
+      const PHASE = order > 5 ? coeffs[5] : 0.0;
+      const phase = PHASE * Math.PI / 180.0;            // vsrcload.c:177
+      const VO = coeffs[0];
+      const VA = coeffs[1];
+      const FREQ = order > 2 && coeffs[2] !== 0.0 ? coeffs[2] : (1 / ctx.cktFinalTime);
+      const TD = order > 3 ? coeffs[3] : 0.0;
+      const THETA = order > 4 ? coeffs[4] : 0.0;
+      const tt = time - TD;                              // vsrcload.c:189
+      if (tt <= 0) {
+        value = VO + VA * Math.sin(phase);               // vsrcload.c:191
+      } else {
+        // vsrcload.c:193-194 — operand order FREQ*time*2π+phase is load-bearing
+        // (non-associative f64 multiply): 1 ULP here propagates through sin.
+        value = VO + VA * Math.sin(FREQ * tt * 2.0 * Math.PI + phase) * Math.exp(-tt * THETA);
+      }
+      break;
+    }
+
+    case FunctionType.EXP: {
+      // vsrcload.c:202-215 — V1 V2 TD1 TAU1 TD2 TAU2 with CKTstep defaults.
+      const V1 = coeffs[0];
+      const V2 = coeffs[1];
+      const TD1 = order > 2 && coeffs[2] !== 0.0 ? coeffs[2] : ctx.cktStep;
+      const TAU1 = order > 3 && coeffs[3] !== 0.0 ? coeffs[3] : ctx.cktStep;
+      const TD2 = order > 4 && coeffs[4] !== 0.0 ? coeffs[4] : TD1 + ctx.cktStep;
+      const TAU2 = order > 5 && coeffs[5] ? coeffs[5] : ctx.cktStep;
+      // vsrcload.c:217-224 — two-stage charge/discharge exponential.
+      if (time <= TD1) value = V1;
+      else if (time <= TD2) value = V1 + (V2 - V1) * (1 - Math.exp(-(time - TD1) / TAU1));
+      else value = V1 + (V2 - V1) * (1 - Math.exp(-(time - TD1) / TAU1))
+                      + (V1 - V2) * (1 - Math.exp(-(time - TD2) / TAU2));
+      break;
+    }
+
+    case FunctionType.SFFM: {
+      // vsrcload.c:235-253 — VO VA FC MDI FS PHASEC PHASES; FC/FS default 1/finalTime.
+      const PHASEC = order > 5 ? coeffs[5] : 0.0;
+      const PHASES = order > 6 ? coeffs[6] : 0.0;
+      const phasec = PHASEC * Math.PI / 180.0;
+      const phases = PHASES * Math.PI / 180.0;
+      const VO = coeffs[0];
+      const VA = coeffs[1];
+      const FC = order > 2 && coeffs[2] ? coeffs[2] : (1 / ctx.cktFinalTime);
+      const MDI = order > 3 ? coeffs[3] : 0.0;
+      const FS = order > 4 && coeffs[4] ? coeffs[4] : (1 / ctx.cktFinalTime);
+      // vsrcload.c:256-258 — carrier modulated by sin of the modulating tone.
+      value = VO + VA * Math.sin((2.0 * Math.PI * FC * time + phasec)
+                  + MDI * Math.sin(2.0 * Math.PI * FS * time + phases));
+      break;
+    }
+
+    case FunctionType.AM: {
+      // vsrcload.c:269-287 — VA VO MF FC TD PHASEC PHASES; MF defaults 1/finalTime.
+      const PHASES = order > 6 ? coeffs[6] : 0.0;
+      const phases = PHASES * Math.PI / 180.0;
+      const VA = coeffs[0];
+      const VO = coeffs[1];
+      const MF = order > 2 && coeffs[2] ? coeffs[2] : (1 / ctx.cktFinalTime);
+      const FC = order > 3 ? coeffs[3] : 0.0;
+      const TD = order > 4 && coeffs[4] ? coeffs[4] : 0.0;
+      const tt = time - TD;
+      if (tt <= 0) {
+        value = 0;
+      } else {
+        // vsrcload.c:294-295 — both factors read `phases` (ngspice uses it twice).
+        value = VA * (VO + Math.sin(2.0 * Math.PI * MF * tt + phases))
+                   * Math.sin(2.0 * Math.PI * FC * tt + phases);
+      }
+      break;
+    }
+
+    case FunctionType.PWL: {
+      // vsrcload.c:304-309 — delay, then clamp to the first value before the first knot.
+      let tt = time - ctx.rdelay;
+      if (tt < coeffs[0]) { value = coeffs[1]; break; }
+      // vsrcload.c:311-329 — past the last knot: repeat (rGiven) or hold final value.
+      const endTime = coeffs[order - 2];
+      if (tt > endTime) {
+        if (ctx.rGiven) {
+          // vsrcload.c:319-323 — fold into the repeat window [rBreakpt, end_time].
+          const period = endTime - coeffs[ctx.rBreakpt];
+          tt -= coeffs[ctx.rBreakpt];
+          tt -= period * Math.floor(tt / period);
+          tt += coeffs[ctx.rBreakpt];
+        } else {
+          // vsrcload.c:324-328 — hold the final value.
+          value = coeffs[order - 1];
+          break;
+        }
+      }
+      // vsrcload.c:331-343 — linear interpolation within the bracketing pair.
+      for (let i = 2; i < order; i += 2) {
+        const itime = coeffs[i];
+        if (itime >= tt) {
+          tt -= coeffs[i - 2];
+          tt /= coeffs[i] - coeffs[i - 2];
+          value = coeffs[i - 1];
+          value += tt * (coeffs[i + 1] - coeffs[i - 1]);
+          break;
+        }
+      }
+      break;
+    }
+
+    case FunctionType.TRNOISE:
+    case FunctionType.TRRANDOM:
+      // vsrcload.c:356-407 — the TRNOISE/TRRANDOM value arms consume the
+      // deterministic generators (trnoise_state_get / state->value) from
+      // maths-misc#recon/randnumb, which has not landed in this worktree. The
+      // structural state (TrnoiseState / TrrandomState, the _functionType, the
+      // switch shell) is in place; the value evaluation is blocked on that RNG
+      // reconstruction. See ESCALATIONS.md.
+      throw new Error(
+        "TRNOISE/TRRANDOM waveform evaluation requires the deterministic RNG "
+        + "substrate from maths-misc#recon/randnumb (trnoise_state_get / "
+        + "trrandom_state_get), which is not present in this worktree.",
+      );
+  }
+  return value;
+}
+
+/**
+ * Re-express a digiTS editor-facing waveform enum on the ngspice coefficient
+ * engine (criterion #11). `square` / `triangle` / `sawtooth` map onto a PULSE
+ * coefficient vector and `sine` onto a SINE vector, so the verified
+ * `evaluateNgspiceWaveform` switch is the SINGLE evaluation path for these
+ * waveforms — the legacy `computeWaveformValue` arms are removed. Returning
+ * `null` means the waveform has no ngspice VSRCfunctionType counterpart
+ * (`sweep` / `am` / `fm`) or is owned by another device path (`expression` →
+ * ASRC, `noise` → deterministic TRNOISE) and stays on the extension/throw path.
+ *
+ * The coefficient math mirrors ngspice PULSE / SIN semantics (vsrcload.c):
+ *   square   → PULSE(V1 V2 TD TR TF PW PER)   V1=dc−amp (LOW start), V2=dc+amp
+ *   triangle → PULSE(V1 V2 TD halfP halfP 0 PER)
+ *   sawtooth → PULSE(V1 V2 TD (PER−TF) TF 0 PER)
+ *   sine     → SINE(VO VA FREQ 0 0 PHASE_DEG)
+ * TD is the phase-derived delay `wrap(-phaseShift, PER)` so a positive phase
+ * shifts the waveform left in time, identical to the harness deck emitter.
+ *
+ * @returns the (functionType, coeffs) pair, or null when the enum has no
+ *   ngspice counterpart and must drive the legacy/extension path.
+ */
+export function enumWaveformCoeffs(
+  waveform: Waveform,
+  amplitude: number,
+  frequency: number,
+  phase: number,
+  dcOffset: number,
+  riseTime: number,
+  fallTime: number,
+): { functionType: FunctionType; coeffs: number[] } | null {
+  const period = frequency > 0 ? 1 / frequency : Infinity;
+  const halfPeriod = period / 2;
+  const phaseShift = frequency > 0 ? phase / (2 * Math.PI * frequency) : 0;
+  // Wrap the phase-derived delay into [0, PER) — vsrcload.c TD semantics.
+  const td = Number.isFinite(period) ? (((-phaseShift % period) + period) % period) : 0;
+  const V1 = dcOffset - amplitude; // PULSE LOW level (ngspice starts at V1).
+  const V2 = dcOffset + amplitude; // PULSE HIGH level.
+
+  switch (waveform) {
+    case "sine": {
+      // vsrcload.c:173-194 — VO VA FREQ TD THETA PHASE; phase in degrees.
+      const phaseDeg = phase * (180 / Math.PI);
+      return { functionType: FunctionType.SINE, coeffs: [dcOffset, amplitude, frequency, 0, 0, phaseDeg] };
+    }
+    case "square": {
+      // PULSE(V1 V2 TD TR TF PW PER): PW = halfPeriod − TR (HIGH plateau).
+      const pw = halfPeriod - riseTime;
+      return { functionType: FunctionType.PULSE, coeffs: [V1, V2, td, riseTime, fallTime, pw, period] };
+    }
+    case "triangle": {
+      // PULSE(V1 V2 TD halfP halfP 0 PER): symmetric rise/fall, zero plateau.
+      return { functionType: FunctionType.PULSE, coeffs: [V1, V2, td, halfPeriod, halfPeriod, 0, period] };
+    }
+    case "sawtooth": {
+      // PULSE(V1 V2 TD (PER−TF) TF 0 PER): linear rise then sharp fall.
+      if (fallTime >= period) {
+        throw new Error(
+          `sawtooth fallTime (${fallTime}s) must be strictly less than period (${period}s)`,
+        );
+      }
+      const riseSpan = period - fallTime;
+      return { functionType: FunctionType.PULSE, coeffs: [V1, V2, td, riseSpan, fallTime, 0, period] };
+    }
+    default:
+      // sweep / am / fm — digiTS-only extension; expression / noise — other paths.
+      return null;
+  }
+}
+
+/**
+ * Compute instantaneous extension-waveform value at time t.
+ *
+ * The ngspice coefficient model (PULSE / SINE / EXP / SFFM / AM / PWL /
+ * TRNOISE / TRRANDOM) is evaluated by `evaluateNgspiceWaveform`. This function
+ * carries the digiTS-only waveforms layered over that core (#16 §2,
+ * IN-class additive-behavior rule): `sweep` / `fm` have no ngspice
+ * VSRCfunctionType counterpart, and `am` is the legacy named-parameter
+ * abstraction retained for `.dig` files that predate the SPICE-token (AM)
+ * path. The `square` / `triangle` / `sawtooth` / `sine` enums are re-expressed
+ * onto the coefficient engine via `enumWaveformCoeffs` and evaluated by
+ * `evaluateNgspiceWaveform` — they no longer have a `computeWaveformValue` arm.
+ * `noise` is removed (replaced by the deterministic TRNOISE arm).
  *
  * @param waveform  - Waveform type
  * @param amplitude - Peak amplitude in volts
@@ -96,7 +450,7 @@ export interface ExtendedWaveformParams {
  * @param phase     - Phase offset in radians
  * @param dcOffset  - DC offset added to waveform output
  * @param t         - Simulation time in seconds
- * @param ext       - Extended parameters for sweep/AM/FM/noise modes
+ * @param ext       - Extended parameters for sweep/AM/FM modes
  */
 export function computeWaveformValue(
   waveform: Waveform,
@@ -110,116 +464,19 @@ export function computeWaveformValue(
   const arg = 2 * Math.PI * frequency * t + phase;
   switch (waveform) {
     case "sine":
-      // ngspice vsrcload.c:159- operand order is `FREQ*time * 2.0 * M_PI + phase`,
-      // not `2*PI*FREQ*time + phase`. Floating-point multiply is non-associative,
-      // so the difference is observable as 1 ULP in the argument and propagates
-      // through sin to a 1-ULP source voltage that drifts the entire MNA solve.
-      return dcOffset + amplitude * Math.sin(frequency * t * 2.0 * Math.PI + phase);
-
-    case "square": {
-      const riseTime = ext?.riseTime ?? 0;
-      const fallTime = ext?.fallTime ?? 0;
-      if (riseTime === 0 && fallTime === 0) {
-        return dcOffset + amplitude * Math.sign(Math.sin(arg));
-      }
-      // Trapezoidal square wave  ngspice PULSE semantics (vsrcload.c).
-      // V1 = dcOffset - amplitude (LOW), V2 = dcOffset + amplitude (HIGH)
-      // Rising edge: [0, TR]; HIGH plateau: [TR, TR+PW]; falling edge: [TR+PW, TR+PW+TF]; LOW: rest.
-      const period = frequency > 0 ? 1 / frequency : Infinity;
-      const halfPeriod = period / 2;
-      // Positive phase shifts waveform left (earlier) in time.
-      const phaseShift = phase / (2 * Math.PI * frequency);
-      const tShifted = t - phaseShift;
-      // Mirrors vsrcload.c:112-117 bit-exact: gate on `time > PER`, then
-      // reduce via `time -= PER * floor(time/PER)`. For tShifted <= PER the
-      // value is used as-is  preserves f64 precision for tShifted << PER
-      // (the failing rc-transient case where ((x%P)+P)%P loses ~2e7 ULPs).
-      // Negative tShifted (from positive phase shift) falls through unchanged
-      // and is handled by the `tMod <= 0` branch below, matching ngspice's
-      // `time <= 0` PULSE branch.
-      let tMod = tShifted;
-      if (tMod > period) {
-        tMod = tMod - period * Math.floor(tMod / period);
-      }
-
-      const TR = riseTime;
-      const TF = fallTime;
-      // HIGH plateau width: period/2 - TR. Clamp to 0 if rise time exceeds half period.
-      const PW = Math.max(0, halfPeriod - TR);
-      const V1 = dcOffset - amplitude;
-      const V2 = dcOffset + amplitude;
-
-      if (tMod <= 0 || tMod >= TR + PW + TF) {
-        return V1;
-      } else if (tMod >= TR && tMod <= TR + PW) {
-        return V2;
-      } else if (tMod > 0 && tMod < TR) {
-        return V1 + (V2 - V1) * tMod / TR;
-      } else {
-        // tMod in (TR+PW, TR+PW+TF)
-        return V2 + (V1 - V2) * (tMod - TR - PW) / TF;
-      }
-    }
-
-    case "triangle": {
-      // SPICE PULSE triangle semantics: at t=0, phase=0 the wave sits at
-      // V1 = dcOffset - amplitude and rises linearly to V2 = dcOffset + amplitude
-      // at t = period/2, then falls linearly back to V1 at t = period. The
-      // piecewise-linear form is bit-exact against a SPICE PULSE(V1 V2 TD halfP
-      // halfP 0 period) emission  indispensable for .tran parity against
-      // ngspice (computing via asin(sin(...)) instead drifts by ~1 ulp per
-      // sample due to the irrational-Ï€ rounding chain).
-      if (frequency <= 0) return dcOffset - amplitude;
-      const period = 1 / frequency;
-      const halfPeriod = period / 2;
-      const phaseShift = phase / (2 * Math.PI * frequency);
-      const tShifted = t - phaseShift;
-      // ngspice vsrcload.c:112-117 bit-exact reduction.
-      let tMod = tShifted;
-      if (tMod > period) {
-        tMod = tMod - period * Math.floor(tMod / period);
-      }
-      const V1 = dcOffset - amplitude;
-      const V2 = dcOffset + amplitude;
-      // Mirrors PULSE branch `time <= 0 || time >= TR + PW + TF` (= period for
-      // triangle): handles negative tShifted from phase shift.
-      if (tMod <= 0 || tMod >= period) return V1;
-      if (tMod < halfPeriod) {
-        return V1 + (V2 - V1) * tMod / halfPeriod;
-      }
-      return V2 - (V2 - V1) * (tMod - halfPeriod) / halfPeriod;
-    }
-
-    case "sawtooth": {
-      // SPICE PULSE sawtooth semantics: linear rise from V1 to V2 over
-      // (period - fallTime), then linear fall from V2 back to V1 over
-      // fallTime. At t=0, phase=0 the wave is at V1 rising.
-      if (frequency <= 0) return dcOffset - amplitude;
-      const period = 1 / frequency;
-      const fallTime = ext?.fallTime ?? 1e-12;
-      if (fallTime >= period) {
-        throw new Error(
-          `sawtooth fallTime (${fallTime}s) must be strictly less than period (${period}s)`,
-        );
-      }
-      const riseSpan = period - fallTime;
-      const phaseShift = phase / (2 * Math.PI * frequency);
-      const tShifted = t - phaseShift;
-      // ngspice vsrcload.c:112-117 bit-exact reduction.
-      let tMod = tShifted;
-      if (tMod > period) {
-        tMod = tMod - period * Math.floor(tMod / period);
-      }
-      const V1 = dcOffset - amplitude;
-      const V2 = dcOffset + amplitude;
-      // Mirrors PULSE branch `time <= 0 || time >= TR + PW + TF` (= period for
-      // sawtooth): handles negative tShifted from phase shift.
-      if (tMod <= 0 || tMod >= period) return V1;
-      if (tMod < riseSpan) {
-        return V1 + (V2 - V1) * tMod / riseSpan;
-      }
-      return V2 - (V2 - V1) * (tMod - riseSpan) / fallTime;
-    }
+    case "square":
+    case "triangle":
+    case "sawtooth":
+      // Re-expressed onto the ngspice coefficient engine (criterion #11): the
+      // element builds a PULSE/SINE coefficient vector via enumWaveformCoeffs
+      // and evaluates it through evaluateNgspiceWaveform. computeWaveformValue
+      // has no arm for these — reaching here means the element failed to route
+      // the enum onto the coefficient path.
+      throw new Error(
+        `Waveform '${waveform}' is evaluated through the ngspice coefficient `
+        + `engine (enumWaveformCoeffs + evaluateNgspiceWaveform), not the `
+        + `extension engine.`,
+      );
 
     case "sweep": {
       const fStart = ext?.freqStart ?? frequency;
@@ -248,7 +505,15 @@ export function computeWaveformValue(
     }
 
     case "noise":
-      return dcOffset + amplitude * boxMuller();
+      // The live-Math.random() Box-Muller `noise` arm is removed (#16 §3): noise
+      // is the deterministic ngspice TRNOISE function type, evaluated by
+      // evaluateNgspiceWaveform from the seeded generator (maths-misc#recon/randnumb).
+      // The element routes a `noise` waveform onto _functionType = TRNOISE, so the
+      // extension engine never sees it.
+      throw new Error(
+        "noise waveform is evaluated through the deterministic TRNOISE function "
+        + "type (evaluateNgspiceWaveform), not the extension engine.",
+      );
 
     case "expression":
       return dcOffset;
@@ -514,6 +779,40 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     visibleWhen: { key: "waveform", values: ["fm"] },
   },
   {
+    // SPICE function token (vsrcpar.c:79-286): PULSE / SINE / EXP / SFFM / AM /
+    // PWL / TRNOISE / TRRANDOM. When set, the coefficient model drives the
+    // waveform from `coeffs`; when empty, the legacy named-param / digiTS-only
+    // waveform above drives evaluation.
+    key: "funcType",
+    type: PropertyType.STRING,
+    label: "SPICE Function",
+    defaultValue: "",
+    description: "ngspice independent-source function token (PULSE/SINE/EXP/SFFM/AM/PWL/TRNOISE/TRRANDOM)",
+  },
+  {
+    // Flat coefficient vector for the SPICE function token (vsrcdefs.h:54,
+    // copy_coeffs vsrcpar.c:17-29). Whitespace/comma-separated list.
+    key: "coeffs",
+    type: PropertyType.STRING,
+    label: "SPICE Coefficients",
+    defaultValue: "",
+    description: "Coefficient vector for the SPICE function token (e.g. \"0 5 1u 1n 1n 5u 10u\")",
+  },
+  {
+    key: "td",
+    type: PropertyType.STRING,
+    label: "PWL Delay",
+    defaultValue: "",
+    description: "PWL delay period td= (vsrcpar.c:120-122)",
+  },
+  {
+    key: "r",
+    type: PropertyType.STRING,
+    label: "PWL Repeat",
+    defaultValue: "",
+    description: "PWL repeat start time r= (vsrcpar.c:124-161); -1 disables, 0 repeats from 0",
+  },
+  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -532,6 +831,11 @@ const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
   { xmlName: "Phase",     propertyKey: "phase",     convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "DCOffset",  propertyKey: "dcOffset",  convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Waveform",  propertyKey: "waveform",  convert: (v) => v },
+  // SPICE function token + coefficient model (vsrcpar.c:79-286).
+  { xmlName: "FuncType",  propertyKey: "funcType",  convert: (v) => v },
+  { xmlName: "Coeffs",    propertyKey: "coeffs",    convert: (v) => v },
+  { xmlName: "TD",        propertyKey: "td",        convert: (v) => v },
+  { xmlName: "R",         propertyKey: "r",         convert: (v) => v },
   { xmlName: "Label",     propertyKey: "label",     convert: (v) => v },
 ];
 
@@ -582,6 +886,41 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   private readonly _ext: ExtendedWaveformParams;
   private readonly _getTime: () => number;
 
+  // ngspice independent-source waveform model (sVSRCinstance, vsrcdefs.h:50-93).
+  // _functionType is null when no SPICE function token is given (the legacy
+  // named-param / digiTS-only extension path drives the waveform instead).
+  private _functionType: FunctionType | null = null;   // VSRCfunctionType (vsrcdefs.h:50)
+  private _functionOrder = 0;                            // VSRCfunctionOrder (vsrcdefs.h:51)
+  private _coeffs: Float64Array = new Float64Array(0);   // VSRCcoeffs (vsrcdefs.h:54)
+  private _funcTGiven = false;                           // VSRCfuncTGiven (vsrcdefs.h:88)
+  private _rdelay = 0;                                   // VSRCrdelay (vsrcdefs.h:73)
+  private _r = 0;                                        // VSRCr (vsrcdefs.h:72)
+  private _rGiven = false;                               // VSRCrGiven (vsrcdefs.h:93)
+  private _rBreakpt = 0;                                 // VSRCrBreakpt (vsrcdefs.h:52)
+  private _dcValue = 0;                                  // VSRCdcValue (vsrcdefs.h:56)
+  private _dcGiven = false;                              // VSRCdcGiven (vsrcdefs.h:84)
+  private _trnoiseState: TrnoiseState | null = null;     // VSRCtrnoise_state (vsrcdefs.h:69)
+  private _trrandomState: TrrandomState | null = null;   // VSRCtrrandom_state (vsrcdefs.h:70)
+  // VSRCbreak_time (vsrcdefs.h:53) — time of the most-recent scheduled
+  // breakpoint. Seeded to -1.0 in setup() (vsrcset.c:34).
+  private _breakTime = -1.0;
+
+  // Circuit-global transient constants captured from LoadContext during load()
+  // (ckt->CKTstep / ckt->CKTfinalTime / ckt->CKTminBreak). acceptStep() and
+  // getPinCurrents() receive no LoadContext, so the most-recent load() values
+  // are reused there (the constants are run-invariant; only minBreak is read by
+  // acceptStep's back-off, sourced from the same TimestepController.minBreak
+  // that syncs ctx.minBreak per load-context.ts).
+  private _cktStep = 0;
+  private _cktFinalTime = 0;
+  private _minBreak = 0;
+
+  // True when the coefficient model was derived from the editor-facing waveform
+  // enum (square/triangle/sawtooth/sine) rather than an explicit SPICE funcType
+  // token. Enum-derived coefficients are re-built from named params on every
+  // hot-loadable setParam (criterion #11); explicit-token coefficients are not.
+  private _enumDerivedCoeffs = false;
+
   _parsedExpr: ExprNode | null;
   _parseError: string | null;
 
@@ -624,6 +963,19 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       noiseSampleTime: this._noiseSampleTime,
     };
 
+    // vsrcpar.c:42-45 — VSRC_DC: the source DC value / flag. digiTS folds the
+    // DC value into dcOffset; mark it given whenever a non-default offset is
+    // present so the TRNOISE/TRRANDOM arms add it (vsrcload.c:395, 404).
+    this._dcValue = this._dcOffset;
+    this._dcGiven = props.hasModelParam("dcOffset");
+
+    // vsrcpar.c:79-286 — a SPICE-style function token (PULSE/SINE/EXP/SFFM/AM/
+    // PWL/TRNOISE/TRRANDOM) populates the coefficient model via applyCoeffs.
+    // The token + coefficient vector arrive through the property bag (`funcType`
+    // + `coeffs`); when absent, _functionType stays null and the legacy named /
+    // digiTS-only waveform drives evaluation through the extension engine.
+    this._initCoeffModel(props);
+
     // Parse expression once at creation for expression waveform mode.
     this._parsedExpr = null;
     this._parseError = null;
@@ -637,7 +989,179 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     }
   }
 
+  /**
+   * Read a SPICE function token + coefficient vector from the property bag and
+   * route it into the ngspice coefficient model (rebuild of VSRCparam,
+   * vsrcpar.c:79-286). The function token (`funcType`) names the
+   * VSRCfunctionType; `coeffs` is its flat coefficient vector; `td`/`r` carry
+   * the PWL delay (vsrcpar.c:120-122) and repeat (vsrcpar.c:124-161). When no
+   * `funcType` is present the coefficient model stays unset.
+   */
+  private _initCoeffModel(props: PropertyBag): void {
+    const tokenRaw = props.getOrDefault<string>("funcType", "");
+    const token = tokenRaw.trim().toUpperCase();
+    if (token === "") {
+      // Criterion #11: no SPICE function token, but the editor-facing waveform
+      // enum (square/triangle/sawtooth/sine) drives off the ngspice coefficient
+      // engine — build its PULSE/SINE coefficient vector so the single
+      // evaluateNgspiceWaveform path serves these waveforms. sweep/am/fm/
+      // expression/noise return null and stay on the extension/other paths.
+      this._deriveEnumCoeffs();
+      return;
+    }
+
+    const coeffs = props.has("coeffs")
+      ? parseCoeffVector(props.get<number[] | string>("coeffs"))
+      : [];
+
+    switch (token) {
+      case "PULSE": this.applyCoeffs(FunctionType.PULSE, coeffs); break;
+      case "SINE":  this.applyCoeffs(FunctionType.SINE, coeffs); break;
+      case "EXP":   this.applyCoeffs(FunctionType.EXP, coeffs); break;
+      case "PWL":
+        this.applyCoeffs(FunctionType.PWL, coeffs);
+        // vsrcpar.c:110-116 — non-increasing PWL time-point diagnostic.
+        for (let i = 0; i < (this._functionOrder / 2) - 1; i++) {
+          if (this._coeffs[2 * (i + 1)] <= this._coeffs[2 * i]) {
+            // eslint-disable-next-line no-console
+            console.warn(`Warning : voltage source ${this.label} has non-increasing PWL time points.`);
+          }
+        }
+        break;
+      case "SFFM":  this.applyCoeffs(FunctionType.SFFM, coeffs); break;
+      case "AM":    this.applyCoeffs(FunctionType.AM, coeffs); break;
+      case "TRNOISE":
+      case "TRRANDOM":
+        // vsrcpar.c:221-286 — the TRNOISE/TRRANDOM cases construct the
+        // deterministic generator state via trnoise_state_init /
+        // trrandom_state_init, which live in maths-misc#recon/randnumb (not
+        // present in this worktree). The coefficient array + function type are
+        // applied here; the generator construction is blocked on that recon.
+        this.applyCoeffs(token === "TRNOISE" ? FunctionType.TRNOISE : FunctionType.TRRANDOM, coeffs);
+        throw new Error(
+          `${token} voltage source requires the deterministic RNG substrate from `
+          + `maths-misc#recon/randnumb (trnoise_state_init / trrandom_state_init), `
+          + `which is not present in this worktree.`,
+        );
+      default:
+        throw new Error(`Unrecognized VSRC function token '${tokenRaw}'.`);
+    }
+
+    // vsrcpar.c:120-122 — VSRC_TD: pwl delay period.
+    const tdRaw = props.getOrDefault<string>("td", "").trim();
+    if (tdRaw !== "") this._rdelay = parseFloat(tdRaw);
+    // vsrcpar.c:124-161 — VSRC_R: pwl repeat coefficient + breakpoint scan.
+    const rRaw = props.getOrDefault<string>("r", "").trim();
+    if (rRaw !== "") this._applyRepeat(parseFloat(rRaw));
+  }
+
+  /**
+   * Rebuild of copy_coeffs (vsrcpar.c:17-29): store the coefficient vector, set
+   * the function type + order, and mark the function-type-given flag. The
+   * coefficient array is a Float64Array (ngspice's flat `double *VSRCcoeffs`),
+   * so reading _coeffs[i] reproduces VSRCcoeffs[i] bit-for-bit. Hot-loadable:
+   * the next load() reads the rewritten array (MEMORY.md hot-loadable-params).
+   */
+  applyCoeffs(fnType: FunctionType, vec: readonly number[]): void {
+    this._functionType = fnType;
+    this._funcTGiven = true;
+    this._coeffs = Float64Array.from(vec);
+    this._functionOrder = vec.length;
+  }
+
+  /**
+   * Re-express the editor-facing waveform enum (square/triangle/sawtooth/sine)
+   * onto the ngspice coefficient engine (criterion #11). Called when no SPICE
+   * `funcType` token is given: builds the PULSE/SINE coefficient vector from the
+   * current named params via enumWaveformCoeffs and applies it, so the verified
+   * evaluateNgspiceWaveform switch is the single evaluation path for these
+   * waveforms. The digiTS-only extension waveforms (sweep/am/fm) and the
+   * other-path waveforms (expression/noise) return null and leave the
+   * coefficient model unset (the extension engine / throw arms handle them).
+   * Re-derived on every hot-loadable setParam so the coefficient array tracks
+   * live amplitude/frequency/phase/rise/fall mutations (MEMORY.md
+   * hot-loadable-params).
+   */
+  private _deriveEnumCoeffs(): void {
+    this._enumDerivedCoeffs = true;
+    const built = enumWaveformCoeffs(
+      this._waveform,
+      this._amplitude,
+      this._frequency,
+      this._phase,
+      this._dcOffset,
+      this._riseTime,
+      this._fallTime,
+    );
+    if (built === null) {
+      // No ngspice counterpart: clear any previously-derived coefficient model
+      // so the extension / throw path drives evaluation.
+      this._functionType = null;
+      this._funcTGiven = false;
+      this._coeffs = new Float64Array(0);
+      this._functionOrder = 0;
+      return;
+    }
+    this.applyCoeffs(built.functionType, built.coeffs);
+  }
+
+  /**
+   * Rebuild of VSRC_R (vsrcpar.c:124-161): apply the pwl repeat coefficient.
+   * r < -0.5 disables repeat; otherwise scan for the matching breakpoint index
+   * and validate against the final time point.
+   */
+  private _applyRepeat(r: number): void {
+    // vsrcpar.c:130-133 — r < -0.5: no repetition.
+    if (r < -0.5) { this._rGiven = false; return; }
+    // vsrcpar.c:136-139 — buggy input guard: r is not a repetition coefficient.
+    if (this._coeffs.length === 0 || this._functionOrder < 2) { this._rGiven = false; return; }
+
+    this._r = r;
+    this._rGiven = true;
+
+    // vsrcpar.c:144-147 — find the breakpoint index whose time equals r.
+    for (let i = 0; i < this._functionOrder; i += 2) {
+      this._rBreakpt = i;
+      if (this._r === this._coeffs[i]) break;
+    }
+
+    // vsrcpar.c:149-153 — r must be smaller than the final time point.
+    const endTime = this._coeffs[this._functionOrder - 2];
+    if (this._r >= endTime) {
+      throw new Error(
+        `ERROR: repeat start time value ${this._r} for pwl voltage source must be `
+        + `smaller than final time point given!`,
+      );
+    }
+    // vsrcpar.c:155-158 — r must match one of the given time points.
+    if (this._r !== this._coeffs[this._rBreakpt]) {
+      throw new Error(
+        `ERROR: repeat start time value ${this._r} for pwl voltage source does not `
+        + `match any time point given!`,
+      );
+    }
+  }
+
+  /** Build the per-evaluation engine-step context for evaluateNgspiceWaveform. */
+  private _stepContext(): WaveformStepContext {
+    return {
+      cktStep: this._cktStep,
+      cktFinalTime: this._cktFinalTime,
+      dcValue: this._dcValue,
+      dcGiven: this._dcGiven,
+      trnoiseState: this._trnoiseState,
+      trrandomState: this._trrandomState,
+      rdelay: this._rdelay,
+      rGiven: this._rGiven,
+      rBreakpt: this._rBreakpt,
+    };
+  }
+
   setup(ctx: SetupContext): void {
+    // vsrcset.c:34 — seed the most-recent-breakpoint time so the first accepted
+    // step schedules from t=0 (the gate `CKTtime >= VSRCbreak_time` passes at t=0).
+    this._breakTime = -1.0;
+
     const posNode    = this.pinNodes.get("pos")!;
     const negNode    = this.pinNodes.get("neg")!;
 
@@ -679,12 +1203,28 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       this._ext.riseTime = this._riseTime;
       this._ext.fallTime = this._fallTime;
       this._ext.noiseSampleTime = this._noiseSampleTime;
+      // vsrcpar.c:42-44 — keep VSRCdcValue in sync (hot-loadable DC value).
+      this._dcValue = this._dcOffset;
+      this._dcGiven = true;
+      // Criterion #11 hot-loadability: when the waveform enum drives the
+      // coefficient engine, re-build the PULSE/SINE coefficients from the
+      // mutated named params so the next load() reads coefficients consistent
+      // with the new amplitude/frequency/phase/rise/fall.
+      if (this._enumDerivedCoeffs) this._deriveEnumCoeffs();
     }
   }
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     const t = this._getTime();
+
+    // Capture the circuit-global transient constants for acceptStep() /
+    // getPinCurrents(), which receive no LoadContext. CKTstep / CKTfinalTime are
+    // run-invariant; minBreak comes from the same TimestepController.minBreak
+    // that syncs ctx.minBreak (load-context.ts:128-134).
+    this._cktStep = ctx.cktStep;
+    this._cktFinalTime = ctx.cktFinalTime;
+    this._minBreak = ctx.minBreak;
 
     // ngspice srcFact gating mirrors vsrcload.c. The waveform-evaluation path
     // (vsrcload.c:56-401) is followed by `if (CKTmode & MODETRANOP) value *= srcFact`
@@ -700,16 +1240,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       ? ctx.srcFact
       : 1.0;
 
-    let v: number;
-    if (this._waveform === "expression") {
-      if (this._parsedExpr !== null) {
-        v = evaluateExpression(this._parsedExpr, { t }) * ramp;
-      } else {
-        v = 0;
-      }
-    } else {
-      v = computeWaveformValue(this._waveform, this._amplitude, this._frequency, this._phase, this._dcOffset, t, this._ext) * ramp;
-    }
+    const v = this._evaluate(ctx.cktMode, t) * ramp;
 
     // vsrcload.c:43-46
     solver.stampElement(this._hPosBr, +1.0);
@@ -718,6 +1249,34 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     solver.stampElement(this._hBrNeg, -1.0);
     // vsrcload.c:416- RHS
     ctx.rhs[this.branchIndex] += v;
+  }
+
+  /**
+   * Source value at the current time, before the srcFact ramp. Mirrors the
+   * vsrcload.c branch structure: the DC-value short-circuit (vsrcload.c:74-82)
+   * under MODEDCOP|MODEDCTRANCURVE with dcGiven, the MODEDC time=0 gate
+   * (vsrcload.c:84-88), then either the ngspice coefficient switch
+   * (evaluateNgspiceWaveform) when a SPICE function token is given, or the
+   * legacy named / digiTS-only extension engine (computeWaveformValue).
+   */
+  private _evaluate(cktMode: number, t: number): number {
+    // vsrcload.c:74-82 — DC-value branch: short-circuit when in a DC-op /
+    // DC-transfer-curve solve with a DC value present.
+    if ((cktMode & (MODEDCOP | MODEDCTRANCURVE)) && this._dcGiven && this._funcTGiven) {
+      return this._dcValue;
+    }
+    // vsrcload.c:84-88 — under MODEDC the waveform is sampled at time 0.
+    const time = (cktMode & MODEDC) ? 0 : t;
+
+    if (this._funcTGiven && this._functionType !== null) {
+      // ngspice coefficient model (PULSE/SINE/EXP/SFFM/AM/PWL/TRNOISE/TRRANDOM).
+      return evaluateNgspiceWaveform(this._functionType, this._coeffs, this._functionOrder, time, this._stepContext());
+    }
+    // Legacy named-param / digiTS-only extension path.
+    if (this._waveform === "expression") {
+      return this._parsedExpr !== null ? evaluateExpression(this._parsedExpr, { t: time }) : 0;
+    }
+    return computeWaveformValue(this._waveform, this._amplitude, this._frequency, this._phase, this._dcOffset, time, this._ext);
   }
 
   stampAc(
@@ -815,18 +1374,127 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   }
 
   /**
-   * Mirrors ngspice VSRCaccept (vsrcacct.c:24-310). Registers at most one
-   * breakpoint per call, gated on:
-   *   - CKTbreak (atBreakpoint flag)  non-boundary acceptances do nothing
-   *   - SAMETIME(time, phase-boundary)  current CKTtime must sit on a
-   *     phase boundary; the registration target is the NEXT phase boundary
+   * ngspice VSRCaccept for the coefficient model (vsrcacct.c:42-306), re-rooted
+   * on _breakTime + _coeffs[]. The newcompat.xs phase-normalization branch
+   * (vsrcacct.c:79-87) and the TRNOISE RTS capture/emission breaks
+   * (vsrcacct.c:239-277) are deferred v41 hunks and are not part of this
+   * baseline. addBreakpoint(t) is the CKTsetBreak surrogate; minBreak is the
+   * captured CKTminBreak back-off (vsrcacct.c:136).
+   */
+  private _acceptNgspice(simTime: number, addBreakpoint: (t: number) => void): void {
+    const coeffs = this._coeffs;
+    const order = this._functionOrder;
+    switch (this._functionType) {
+      default:
+        // vsrcacct.c:44-46 — DC: no breakpoints.
+        break;
+
+      case FunctionType.PULSE: {
+        // vsrcacct.c:59-74 — TD/TR/TF/PW/PER/PHASE with CKTstep/CKTfinalTime defaults.
+        const TD = order > 2 ? coeffs[2] : 0.0;
+        const TR = order > 3 && coeffs[3] !== 0.0 ? coeffs[3] : this._cktStep;
+        const TF = order > 4 && coeffs[4] !== 0.0 ? coeffs[4] : this._cktStep;
+        const PW = order > 5 && coeffs[5] !== 0.0 ? coeffs[5] : this._cktFinalTime;
+        const PER = order > 6 && coeffs[6] !== 0.0 ? coeffs[6] : this._cktFinalTime;
+        const PHASE = order > 7 ? coeffs[7] : 0.0;
+
+        // vsrcacct.c:77 — offset time by delay.
+        let time = simTime - TD;
+
+        // vsrcacct.c:88-92 — PHASE>0 pulse-count cap (newcompat.xs branch deferred).
+        if (PHASE > 0.0) {
+          const tmax = PHASE * PER;
+          if (time > tmax) break;
+        }
+
+        // vsrcacct.c:94 — gate on the most-recent scheduled break time.
+        if (simTime >= this._breakTime) {
+          // vsrcacct.c:97-102 — repeating signal: where in the period are we?
+          if (time >= PER) {
+            const basetime = PER * Math.floor(time / PER);
+            time -= basetime;
+          }
+
+          // vsrcacct.c:104-125 — compute the wait to the next phase boundary.
+          let wait: number;
+          if (time < 0.0) wait = -time;
+          else if (time < TR) wait = TR - time;
+          else if (time < TR + PW) wait = TR + PW - time;
+          else if (time < TR + PW + TF) wait = TR + PW + TF - time;
+          else wait = PER - time;
+
+          // vsrcacct.c:126-129 — schedule and store the next break.
+          this._breakTime = simTime + wait;
+          addBreakpoint(this._breakTime);
+          // vsrcacct.c:131-136 — back off by CKTminBreak so a step ending just
+          // before the target still triggers the following schedule.
+          this._breakTime -= this._minBreak;
+        }
+        break;
+      }
+
+      case FunctionType.SINE:
+      case FunctionType.EXP:
+      case FunctionType.SFFM:
+      case FunctionType.AM:
+        // vsrcacct.c:141-159 — no breakpoints.
+        break;
+
+      case FunctionType.PWL:
+        // vsrcacct.c:162-201 — gated on _breakTime; schedule the next knot.
+        if (simTime >= this._breakTime) {
+          let time = simTime - this._rdelay;
+          const end = coeffs[order - 2];
+          if (time > end) {
+            if (this._rGiven) {
+              // vsrcacct.c:173-179 — fold into the repeat window.
+              const period = end - coeffs[this._rBreakpt];
+              time -= coeffs[this._rBreakpt];
+              time -= period * Math.floor(time / period);
+              time += coeffs[this._rBreakpt];
+            } else {
+              // vsrcacct.c:181-182 — hold until final time.
+              this._breakTime = this._cktFinalTime;
+              break;
+            }
+          }
+          // vsrcacct.c:186-200 — schedule the next knot strictly after `time`.
+          for (let i = 0; i < order; i += 2) {
+            if (coeffs[i] > time) {
+              this._breakTime = simTime + coeffs[i] - time;
+              addBreakpoint(this._breakTime);
+              this._breakTime -= this._minBreak;
+              break;
+            }
+          }
+        }
+        break;
+
+      case FunctionType.TRNOISE:
+      case FunctionType.TRRANDOM:
+        // vsrcacct.c:210-306 — TRNOISE/TRRANDOM scheduling reads state->TS /
+        // state->TD and (TRRANDOM) refreshes state->value via trrandom_state_get,
+        // all from maths-misc#recon/randnumb (not present). The break_time gate
+        // shell is structurally in place; the generator-backed scheduling is
+        // blocked on that recon. See ESCALATIONS.md.
+        throw new Error(
+          "TRNOISE/TRRANDOM breakpoint scheduling requires the deterministic RNG "
+          + "substrate from maths-misc#recon/randnumb, which is not present in this worktree.",
+        );
+    }
+  }
+
+  /**
+   * Mirrors ngspice VSRCaccept (vsrcacct.c:22-321). When a SPICE function token
+   * is given (_funcTGiven) the breakpoint schedule is re-rooted on the stored
+   * _breakTime + _coeffs[] (the ngspice VSRCbreak_time gate, vsrcacct.c:94/162).
+   * Otherwise the legacy named / digiTS-only waveforms (square / triangle /
+   * sawtooth / noise) keep the SAMETIME phase-boundary scheme below.
    *
-   * SAMETIME(a,b) := |a-b| <= 1e-7 * PW (vsrcacct.c:21). PW maps to
-   * `halfPeriod - riseTime` for our square wave (matches load() math). For
-   * triangle/sawtooth (digiTS-only waveforms with no ngspice analogue) we
-   * apply the same SAMETIME pattern using each waveform's natural phase
-   * boundaries; PW is taken as halfPeriod (triangle) or riseSpan (sawtooth)
-   * so the tolerance scales with the local phase width.
+   * SAMETIME(a,b) := |a-b| <= 1e-7 * PW. PW maps to `halfPeriod - riseTime`
+   * for the square wave (matches load() math). For triangle / sawtooth (no
+   * ngspice analogue) the same pattern applies with PW = halfPeriod (triangle)
+   * or riseSpan (sawtooth) so the tolerance scales with the local phase width.
    */
   acceptStep(
     simTime: number,
@@ -835,6 +1503,12 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   ): void {
     // ngspice gates every CKTsetBreak inside VSRCaccept on CKTbreak.
     if (!atBreakpoint) return;
+
+    // ngspice coefficient model: re-rooted on _breakTime + _coeffs[].
+    if (this._funcTGiven && this._functionType !== null) {
+      this._acceptNgspice(simTime, addBreakpoint);
+      return;
+    }
 
     // SINE / EXP / SFFM / AM-equivalent / expression: ngspice empty cases
     // (vsrcacct.c:147-165). No breakpoints to register.

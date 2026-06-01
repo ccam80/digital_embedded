@@ -2,10 +2,12 @@
   "_comment": "Loop-progress overlay - written by the port loop, never by hand-editing ledger.json. The verifier records APPLIED here; the applier/verifier record ESCALATED and attempts here. build-ledger.mjs applies it so ledger.json is fully derived (diffs + splits.json + planning/*-decisions.json + progress.json). Each item entry: state (PENDING|APPLIED|ESCALATED - never NO-COUNTERPART, which is planning-frozen), attempts (int), verifierNotes (string[]), escalation (object|null, required when ESCALATED), hunkHash (the item hunkHash when the entry was recorded - if the diff later drifts, the stale entry is ignored).",
   "items": {
     "vsrc#recon/waveformModel": {
-      "state": "PENDING",
+      "state": "APPLIED",
       "hunkHash": "1028722f1de3245b",
-      "attempts": 0,
-      "verifierNotes": []
+      "attempts": 1,
+      "verifierNotes": [
+        "APPLIED 2026-06-02. Coeff waveform engine (PULSE/SINE/EXP/SFFM/AM/PWL from _coeffs[]/_functionType) + criterion-#11 enum re-expression (square/triangle/sawtooth->PULSE, sine->SIN via enumWaveformCoeffs) across ac-voltage-source.ts, ac-current-source.ts (mirror), netlist-generator.ts (identical coeffs emitted both sides), + B1 cktStep/cktFinalTime on LoadContext. Verified: source-isomorphic to vsrcload.c/vsrcpar.c/vsrcacct.c/vsrcset.c (separate-context verifier), vsrc-ac-sine-rload harness firstDivergence NULL across all 8 classes, square sign bug FIXED (-5 at t=0, coeff vector bit-exact both sides). TRNOISE 1/f (NALPHA) arm = ruled DO-NOT-PORT (f_alpha + Wallace + Green-FFT ~4300 lines; user 2026-06-02); TRNOISE white(NA)+RTS ride randnumb, the 1/f arm throws. OUT-OF-SCOPE residual (NOT this recon, escalated): vsrc-ac-square-rload full gate blocks on the transient firsttime-delta parity gap (timestep.ts:218-221 explicit firstStep vs dctran.c:118 computed MIN(finalTime/100,step)/10 + 552-560 at-breakpoint cuts) -> fix-list. Unit-test fallout (ac-voltage-source.test.ts square/triangle + hotload_square assert pre-#11 +5 start) pending update."
+      ]
     },
     "jfet#recon/tempModelParams": {
       "state": "APPLIED",

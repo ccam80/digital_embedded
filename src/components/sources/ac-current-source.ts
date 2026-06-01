@@ -32,7 +32,7 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
+import { MODEDC, MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -41,7 +41,14 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   type Waveform,
   type ExtendedWaveformParams,
+  type WaveformStepContext,
+  type TrnoiseState,
+  type TrrandomState,
+  FunctionType,
   computeWaveformValue,
+  evaluateNgspiceWaveform,
+  enumWaveformCoeffs,
+  parseCoeffVector,
 } from "./ac-voltage-source.js";
 
 // ---------------------------------------------------------------------------
@@ -295,6 +302,33 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   // Captures srcFact from load() for getPinCurrents consistency between iterations.
   private _lastSrcFact = 1;
 
+  // ngspice independent-source waveform model (shared with VSRC; isrcdefs.h
+  // mirrors vsrcdefs.h:50-93). null _functionType => legacy named / digiTS-only
+  // extension path drives the waveform.
+  private _functionType: FunctionType | null = null;
+  private _functionOrder = 0;
+  private _coeffs: Float64Array = new Float64Array(0);
+  private _funcTGiven = false;
+  private _rdelay = 0;
+  private _r = 0;
+  private _rGiven = false;
+  private _rBreakpt = 0;
+  private _dcValue = 0;
+  private _dcGiven = false;
+  private _trnoiseState: TrnoiseState | null = null;
+  private _trrandomState: TrrandomState | null = null;
+  // ISRCbreak_time — most-recent scheduled breakpoint; seeded -1.0 in setup().
+  private _breakTime = -1.0;
+  // Circuit-global transient constants captured from LoadContext during load()
+  // (see AcVoltageSourceAnalogImpl for the rationale).
+  private _cktStep = 0;
+  private _cktFinalTime = 0;
+  private _minBreak = 0;
+  // True when the coefficient model was derived from the editor-facing waveform
+  // enum (square/triangle/sawtooth/sine) rather than an explicit SPICE funcType
+  // token (mirrors AcVoltageSourceAnalogImpl; criterion #11).
+  private _enumDerivedCoeffs = false;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) {
     super(pinNodes);
     this._getTime = getTime;
@@ -343,11 +377,142 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
         this._parseError = err instanceof ExprParseError ? err.message : String(err);
       }
     }
+
+    // ngspice ISRC DC value / flag (mirrors vsrcpar.c:42-45).
+    this._dcValue = this._dcOffset;
+    this._dcGiven = props.hasModelParam("dcOffset");
+    // SPICE function token + coefficient model (mirrors vsrcpar.c:79-286).
+    this._initCoeffModel(props);
+  }
+
+  /** Mirror of AcVoltageSourceAnalogImpl._initCoeffModel (vsrcpar.c:79-286). */
+  private _initCoeffModel(props: PropertyBag): void {
+    const tokenRaw = props.getOrDefault<string>("funcType", "");
+    const token = tokenRaw.trim().toUpperCase();
+    if (token === "") {
+      // Criterion #11: no SPICE function token — re-express the waveform enum
+      // (square/triangle/sawtooth/sine) onto the ngspice coefficient engine.
+      this._deriveEnumCoeffs();
+      return;
+    }
+
+    const coeffs = props.has("coeffs")
+      ? parseCoeffVector(props.get<number[] | string>("coeffs"))
+      : [];
+
+    switch (token) {
+      case "PULSE": this.applyCoeffs(FunctionType.PULSE, coeffs); break;
+      case "SINE":  this.applyCoeffs(FunctionType.SINE, coeffs); break;
+      case "EXP":   this.applyCoeffs(FunctionType.EXP, coeffs); break;
+      case "PWL":
+        this.applyCoeffs(FunctionType.PWL, coeffs);
+        for (let i = 0; i < (this._functionOrder / 2) - 1; i++) {
+          if (this._coeffs[2 * (i + 1)] <= this._coeffs[2 * i]) {
+            // eslint-disable-next-line no-console
+            console.warn(`Warning : current source ${this.label} has non-increasing PWL time points.`);
+          }
+        }
+        break;
+      case "SFFM":  this.applyCoeffs(FunctionType.SFFM, coeffs); break;
+      case "AM":    this.applyCoeffs(FunctionType.AM, coeffs); break;
+      case "TRNOISE":
+      case "TRRANDOM":
+        this.applyCoeffs(token === "TRNOISE" ? FunctionType.TRNOISE : FunctionType.TRRANDOM, coeffs);
+        throw new Error(
+          `${token} current source requires the deterministic RNG substrate from `
+          + `maths-misc#recon/randnumb (trnoise_state_init / trrandom_state_init), `
+          + `which is not present in this worktree.`,
+        );
+      default:
+        throw new Error(`Unrecognized ISRC function token '${tokenRaw}'.`);
+    }
+
+    const tdRaw = props.getOrDefault<string>("td", "").trim();
+    if (tdRaw !== "") this._rdelay = parseFloat(tdRaw);
+    const rRaw = props.getOrDefault<string>("r", "").trim();
+    if (rRaw !== "") this._applyRepeat(parseFloat(rRaw));
+  }
+
+  /** Mirror of copy_coeffs (vsrcpar.c:17-29). */
+  applyCoeffs(fnType: FunctionType, vec: readonly number[]): void {
+    this._functionType = fnType;
+    this._funcTGiven = true;
+    this._coeffs = Float64Array.from(vec);
+    this._functionOrder = vec.length;
+  }
+
+  /**
+   * Mirror of AcVoltageSourceAnalogImpl._deriveEnumCoeffs (criterion #11):
+   * re-express the editor-facing waveform enum onto the ngspice coefficient
+   * engine. Re-derived on every hot-loadable setParam when enum-driven.
+   */
+  private _deriveEnumCoeffs(): void {
+    this._enumDerivedCoeffs = true;
+    const built = enumWaveformCoeffs(
+      this._waveform,
+      this._amplitude,
+      this._frequency,
+      this._phase,
+      this._dcOffset,
+      this._riseTime,
+      this._fallTime,
+    );
+    if (built === null) {
+      this._functionType = null;
+      this._funcTGiven = false;
+      this._coeffs = new Float64Array(0);
+      this._functionOrder = 0;
+      return;
+    }
+    this.applyCoeffs(built.functionType, built.coeffs);
+  }
+
+  /** Mirror of VSRC_R (vsrcpar.c:124-161). */
+  private _applyRepeat(r: number): void {
+    if (r < -0.5) { this._rGiven = false; return; }
+    if (this._coeffs.length === 0 || this._functionOrder < 2) { this._rGiven = false; return; }
+    this._r = r;
+    this._rGiven = true;
+    for (let i = 0; i < this._functionOrder; i += 2) {
+      this._rBreakpt = i;
+      if (this._r === this._coeffs[i]) break;
+    }
+    const endTime = this._coeffs[this._functionOrder - 2];
+    if (this._r >= endTime) {
+      throw new Error(
+        `ERROR: repeat start time value ${this._r} for pwl current source must be `
+        + `smaller than final time point given!`,
+      );
+    }
+    if (this._r !== this._coeffs[this._rBreakpt]) {
+      throw new Error(
+        `ERROR: repeat start time value ${this._r} for pwl current source does not `
+        + `match any time point given!`,
+      );
+    }
+  }
+
+  /** Build the per-evaluation engine-step context for evaluateNgspiceWaveform. */
+  private _stepContext(): WaveformStepContext {
+    return {
+      cktStep: this._cktStep,
+      cktFinalTime: this._cktFinalTime,
+      dcValue: this._dcValue,
+      dcGiven: this._dcGiven,
+      trnoiseState: this._trnoiseState,
+      trrandomState: this._trrandomState,
+      rdelay: this._rdelay,
+      rGiven: this._rGiven,
+      rBreakpt: this._rBreakpt,
+    };
   }
 
   setup(_ctx: SetupContext): void {
     // ISRC has no *set.c in ngspice. No TSTALLOC, no internal nodes,
-    // no branch row, no state slots. Body is intentionally empty.
+    // no branch row, no state slots. The only setup work mirrors vsrcset.c:34:
+    // seed the most-recent-breakpoint time so the first accepted step schedules
+    // from t=0.
+    this._breakTime = -1.0;
   }
 
   setParam(key: string, value: number): void {
@@ -365,11 +530,41 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       this._ext.riseTime = this._riseTime;
       this._ext.fallTime = this._fallTime;
       this._ext.noiseSampleTime = this._noiseSampleTime;
+      // Keep the DC value in sync (hot-loadable; mirrors vsrcpar.c:42-44).
+      this._dcValue = this._dcOffset;
+      this._dcGiven = true;
+      // Criterion #11 hot-loadability: re-build PULSE/SINE coefficients from the
+      // mutated named params when the waveform enum drives the coefficient engine.
+      if (this._enumDerivedCoeffs) this._deriveEnumCoeffs();
     }
+  }
+
+  /**
+   * Source current at the current time, before the srcFact ramp. Mirrors
+   * AcVoltageSourceAnalogImpl._evaluate (the vsrcload.c branch structure).
+   */
+  private _evaluate(cktMode: number, t: number): number {
+    if ((cktMode & (MODEDCOP | MODEDCTRANCURVE)) && this._dcGiven && this._funcTGiven) {
+      return this._dcValue;
+    }
+    const time = (cktMode & MODEDC) ? 0 : t;
+    if (this._funcTGiven && this._functionType !== null) {
+      return evaluateNgspiceWaveform(this._functionType, this._coeffs, this._functionOrder, time, this._stepContext());
+    }
+    if (this._waveform === "expression") {
+      return this._parsedExpr !== null ? evaluateExpression(this._parsedExpr, { t: time }) : 0;
+    }
+    return computeWaveformValue(this._waveform, this._amplitude, this._frequency, this._phase, this._dcOffset, time, this._ext);
   }
 
   load(ctx: LoadContext): void {
     const t = this._getTime();
+
+    // Capture the circuit-global transient constants for acceptStep() /
+    // getPinCurrents() (mirrors AcVoltageSourceAnalogImpl).
+    this._cktStep = ctx.cktStep;
+    this._cktFinalTime = ctx.cktFinalTime;
+    this._minBreak = ctx.minBreak;
 
     // srcFact gating mirrors isrcload.c. The same three-mode pattern as
     // AcVoltageSource: apply srcFact for MODEDCOP | MODEDCTRANCURVE | MODETRANOP.
@@ -378,16 +573,7 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       : 1.0;
     this._lastSrcFact = ramp;
 
-    let I: number;
-    if (this._waveform === "expression") {
-      if (this._parsedExpr !== null) {
-        I = evaluateExpression(this._parsedExpr, { t }) * ramp;
-      } else {
-        I = 0;
-      }
-    } else {
-      I = computeWaveformValue(this._waveform, this._amplitude, this._frequency, this._phase, this._dcOffset, t, this._ext) * ramp;
-    }
+    const I = this._evaluate(ctx.cktMode, t) * ramp;
 
     const nodePos = this.pinNodes.get("pos")!;
     const nodeNeg = this.pinNodes.get("neg")!;
@@ -428,12 +614,10 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
 
   getPinCurrents(_rhs: Float64Array): number[] {
     // No branch row. Pin layout: [neg, pos].
-    // Conventional current flows neg→pos through the source.
-    const I = computeWaveformValue(
-      this._waveform,
-      this._amplitude, this._frequency, this._phase, this._dcOffset,
-      this._getTime(), this._ext,
-    ) * this._lastSrcFact;
+    // Conventional current flows neg→pos through the source. Sample the same
+    // engine load() uses (transient time, cktMode=0 so the DC short-circuit is
+    // bypassed) and reuse the srcFact captured by the last load().
+    const I = this._evaluate(0, this._getTime()) * this._lastSrcFact;
     return [I, -I];
   }
 
@@ -479,12 +663,95 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
     return null;
   }
 
+  /** Mirror of AcVoltageSourceAnalogImpl._acceptNgspice (vsrcacct.c:42-306). */
+  private _acceptNgspice(simTime: number, addBreakpoint: (t: number) => void): void {
+    const coeffs = this._coeffs;
+    const order = this._functionOrder;
+    switch (this._functionType) {
+      default:
+        break;
+
+      case FunctionType.PULSE: {
+        const TD = order > 2 ? coeffs[2] : 0.0;
+        const TR = order > 3 && coeffs[3] !== 0.0 ? coeffs[3] : this._cktStep;
+        const TF = order > 4 && coeffs[4] !== 0.0 ? coeffs[4] : this._cktStep;
+        const PW = order > 5 && coeffs[5] !== 0.0 ? coeffs[5] : this._cktFinalTime;
+        const PER = order > 6 && coeffs[6] !== 0.0 ? coeffs[6] : this._cktFinalTime;
+        const PHASE = order > 7 ? coeffs[7] : 0.0;
+        let time = simTime - TD;
+        if (PHASE > 0.0) {
+          const tmax = PHASE * PER;
+          if (time > tmax) break;
+        }
+        if (simTime >= this._breakTime) {
+          if (time >= PER) {
+            const basetime = PER * Math.floor(time / PER);
+            time -= basetime;
+          }
+          let wait: number;
+          if (time < 0.0) wait = -time;
+          else if (time < TR) wait = TR - time;
+          else if (time < TR + PW) wait = TR + PW - time;
+          else if (time < TR + PW + TF) wait = TR + PW + TF - time;
+          else wait = PER - time;
+          this._breakTime = simTime + wait;
+          addBreakpoint(this._breakTime);
+          this._breakTime -= this._minBreak;
+        }
+        break;
+      }
+
+      case FunctionType.SINE:
+      case FunctionType.EXP:
+      case FunctionType.SFFM:
+      case FunctionType.AM:
+        break;
+
+      case FunctionType.PWL:
+        if (simTime >= this._breakTime) {
+          let time = simTime - this._rdelay;
+          const end = coeffs[order - 2];
+          if (time > end) {
+            if (this._rGiven) {
+              const period = end - coeffs[this._rBreakpt];
+              time -= coeffs[this._rBreakpt];
+              time -= period * Math.floor(time / period);
+              time += coeffs[this._rBreakpt];
+            } else {
+              this._breakTime = this._cktFinalTime;
+              break;
+            }
+          }
+          for (let i = 0; i < order; i += 2) {
+            if (coeffs[i] > time) {
+              this._breakTime = simTime + coeffs[i] - time;
+              addBreakpoint(this._breakTime);
+              this._breakTime -= this._minBreak;
+              break;
+            }
+          }
+        }
+        break;
+
+      case FunctionType.TRNOISE:
+      case FunctionType.TRRANDOM:
+        throw new Error(
+          "TRNOISE/TRRANDOM breakpoint scheduling requires the deterministic RNG "
+          + "substrate from maths-misc#recon/randnumb, which is not present in this worktree.",
+        );
+    }
+  }
+
   acceptStep(
     simTime: number,
     addBreakpoint: (t: number) => void,
     atBreakpoint: boolean,
   ): void {
     if (!atBreakpoint) return;
+    if (this._funcTGiven && this._functionType !== null) {
+      this._acceptNgspice(simTime, addBreakpoint);
+      return;
+    }
     if (this._waveform === "sine" || this._waveform === "expression"
         || this._waveform === "am" || this._waveform === "fm" || this._waveform === "sweep") {
       return;
