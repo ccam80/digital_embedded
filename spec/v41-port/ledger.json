@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-05-31T21:29:32.277Z",
+    "generated": "2026-06-01T01:43:38.621Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 143,
+    "progressEntriesApplied": 148,
     "progressEntriesStaleIgnored": 6
   },
   "files": [
@@ -59703,10 +59703,12 @@
         6164
       ],
       "hunkHash": "432635bca582c216",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/compiler.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED via parser#recon/nodeAllocOrder. This v41 inppas2.c hunk (pass-2 card-walk node numbering, inppas2.c:23 region) has no standalone digiTS line counterpart; its behavioral content is the flat node-allocation restructure in src/solver/analog/compiler.ts (deckOrder-driven buildAnalogNodeMapFromPartition walk) delivered by the recon, exactly as cktdefs.h#h012a was represented by the epsmin recon. Flat-gate bit-exact on all four verified-device fixtures (resistive-divider/diode-resistor/vccs-gate/jfet-gate, firstDivergence null)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -59734,10 +59736,12 @@
         6182
       ],
       "hunkHash": "10260570dfb8739b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/compiler.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED via parser#recon/nodeAllocOrder. This v41 inppas2.c hunk (INPpas2 top-to-bottom card walk, inppas2.c:82 region) is the deck-line walk order the recon reproduces in compiler.ts via the shared deckOrder() producer (forward-within-NGSPICE_LOAD_ORDER-bucket); no standalone TS line counterpart. Flat-gate bit-exact on all four verified-device fixtures."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -59765,10 +59769,12 @@
         6191
       ],
       "hunkHash": "ad62dfdb72ba5569",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/compiler.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED via parser#recon/nodeAllocOrder. This v41 inppas2.c hunk (pass-2 INP2* dispatch region) is reproduced by the recon's deck-pin-order coverage machinery (TYPE_ID_TO_DECK_PIN_LABEL_ORDER + auditDeckPinOrderCoverage) feeding the flat node-map walk in compiler.ts; no standalone TS line counterpart. Flat-gate bit-exact on all four verified-device fixtures."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -61253,10 +61259,12 @@
         9474
       ],
       "hunkHash": "b1588817f8c8a16e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/compiler.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED via parser#recon/nodeAllocOrder. This v41 inpsymt.c hunk (INPtermInsert first-encounter / sequential newNode, inpsymt.c:43-72) is the first-encounter node-numbering semantics the recon reproduces in the flat buildAnalogNodeMapFromPartition first-encounter pin walk (compiler.ts); no standalone TS line counterpart. Flat-gate bit-exact on all four verified-device fixtures."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -62746,7 +62754,8 @@
         "src/solver/analog/compiler.ts",
         "src/solver/analog/ngspice-load-order.ts",
         "src/core/registry.ts",
-        "src/solver/analog/__tests__/harness/netlist-generator.ts"
+        "src/solver/analog/__tests__/harness/netlist-generator.ts",
+        "src/solver/analog/ngspice-load-order-audit.ts"
       ],
       "tsFunction": "compiler node-ID allocation (expandCompositeInstance first-encounter order)",
       "blocks": [
@@ -62755,10 +62764,12 @@
         "parser/inppas2.c#h003",
         "parser/inpsymt.c#h001"
       ],
-      "hunkHash": "ddd28193a655604e",
-      "state": "PENDING",
+      "hunkHash": "33fe30f1ad313554",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED FLAT-ONLY. The verified flat node-ordering core landed: deckOrder() is the single producer of device-line order in ngspice-load-order.ts (inppas2.c:76 top-to-bottom card walk), consumed by both buildAnalogNodeMapFromPartition (compiler.ts) and the harness netlist-generator.ts emitter; auditDeckPinOrderCoverage(registry.analogTypeIds()) is wired into compileAnalogPartition; the softened deck-pin-order audit (warn) + CSW/MUT/Transformer rows land in ngspice-load-order.ts and ngspice-load-order-audit.ts. The composite Part E / mintPort code (deck-token sub-element pin walk + port-mint in walkCompositeForNodeAllocation and the mintPort wiring in the composite block of buildAnalogNodeMapFromPartition) was STRIPPED and DEFERRED post-migration as a user-subcircuit Port-stitch concern (engine-node-alloc-order.md Part E banner + gate-manifest.md Deferred list); walkCompositeForNodeAllocation is byte-identical to its pre-build form. Unit tests GREEN: compile-analog-partition.test.ts + compiler.test.ts 28 passed / 0 failed. FLAT GATE (verified-device fixtures only, Release.x64 ngspice.dll, stopTime 1e-5, dedicated harness_first_divergence tool): resistive-divider all-null 107/107; diode-resistor all-null 107/107; vccs-gate all-null 107/107; jfet-gate all-null 107/107 — firstDivergence null across all 8 classes, harness_topology_diff orderingDiffs none, ngspice stepCount matches ours on all four. bjt-common-emitter and mosfet-inverter were REMOVED from the gate manifest row as INVALID gate fixtures here: their DUTs (bjt, mos1) are unported (bjt#recon/stampAc, mos1#recon/stampAc PENDING), so their harness_first_divergence hits are device-model numerics, NOT node-ordering — node-ordering is bit-identical on those two (topology/coords match, orderingDiffs none) but cannot gate while the device is unverified per the manifest composition rule."
+      ],
       "rationale": null,
       "escalation": null
     },

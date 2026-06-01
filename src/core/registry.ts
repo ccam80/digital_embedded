@@ -715,6 +715,23 @@ export class ComponentRegistry {
     return def.factory(createSeededBag(def));
   }
 
+  /**
+   * Return the names (typeIds) of every analog component type- one with a
+   * non-empty `modelRegistry`. These are the device classes whose deck lines
+   * ngspice's pass-2 switch dispatches (inppas2.c:94-263), so they are the set
+   * `auditDeckPinOrderCoverage` checks for a deck-pin-order row. Includes both
+   * user-facing and internal-only definitions, in registration order.
+   */
+  analogTypeIds(): string[] {
+    const out: string[] = [];
+    for (const def of this._byName.values()) {
+      if (def.modelRegistry !== undefined && Object.keys(def.modelRegistry).length > 0) {
+        out.push(def.name);
+      }
+    }
+    return out;
+  }
+
   /** Total number of registered component types. */
   get size(): number {
     return this._byName.size;

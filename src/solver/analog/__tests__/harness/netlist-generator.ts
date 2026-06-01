@@ -19,6 +19,7 @@ import type {
   SubcircuitElement,
   SubcircuitElementParam,
 } from "../../../../core/mna-subcircuit-netlist.js";
+import { deckOrder } from "../../ngspice-load-order.js";
 
 // ---------------------------------------------------------------------------
 // SPICE prefix table (typeId -> SPICE prefix, model type for semiconductors)
@@ -261,23 +262,28 @@ export function generateSpiceNetlist(
   // Collect model cards: modelName -> ".model <name> <type> (<params>)"
   const modelCards = new Map<string, string>();
 
-  // One element line per compiled element. compiled.elements is sorted by
-  // (ngspiceLoadOrder ASC, originalIndex DESC)- i.e. reverse-within-bucket
-  // (see compiler.ts). Emit the deck in forward-within-bucket order so that
-  // ngspice's `cktcrte.c:63-65` prepend reverses it back into the order our
-  // engine actually walks. Concretely: walk each bucket of consecutive
-  // same-loadOrder elements from end to start.
-  const emitOrder: number[] = [];
-  let bucketStart = 0;
-  for (let i = 0; i <= compiled.elements.length; i++) {
-    const atEnd = i === compiled.elements.length;
-    const orderChanged = !atEnd
-      && compiled.elements[i]!.ngspiceLoadOrder !== compiled.elements[bucketStart]!.ngspiceLoadOrder;
-    if (atEnd || orderChanged) {
-      for (let j = i - 1; j >= bucketStart; j--) emitOrder.push(j);
-      bucketStart = i;
-    }
+  // One element line per compiled element. The MNA node-map walk and this deck
+  // emitter MUST iterate device lines in the identical order (inppas2.c:76
+  // top-to-bottom card walk), or parse-time node integers desync from the
+  // emitted deck. Both consume the single shared `deckOrder` producer
+  // (ngspice-load-order.ts).
+  //
+  // `compiled.elements` is stored (ngspiceLoadOrder ASC, build-order DESC)-
+  // reverse-within-bucket, because cktcrte.c:62-64's LIFO instance prepend
+  // reverses the per-iteration load walk back. Node numbering, by contrast,
+  // is the forward parse order. To recover each element's forward build order,
+  // enumerate the array in reverse (ascending originalIndex tracks the original
+  // build order within each bucket), then `deckOrder` re-buckets into
+  // forward-within-bucket emission order. Sub-elements (no parent
+  // CircuitElement) are emitted via their parent's subcircuit recursion, so
+  // they are excluded from the top-level deck order here.
+  const emittable: { typeId: string; arrayIndex: number }[] = [];
+  for (let i = compiled.elements.length - 1; i >= 0; i--) {
+    const circuitEl = compiled.elementToCircuitElement.get(i);
+    if (!circuitEl) continue;
+    emittable.push({ typeId: circuitEl.typeId, arrayIndex: i });
   }
+  const emitOrder = deckOrder(emittable).map(({ item }) => item.arrayIndex);
   // Emit-context: subcircuit recursion reuses compiler-assigned IDs for
   // composite-internal nets when present (so the deck names match digiTS
   // node IDs and the harness's nodeMap correlates them by stringified id).

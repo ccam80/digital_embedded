@@ -3,6 +3,7 @@ import {
   TYPE_ID_TO_NGSPICE_LOAD_ORDER,
   TYPE_ID_TO_DEVICE_FAMILY,
   TYPE_ID_TO_DECK_PIN_LABEL_ORDER,
+  MULTI_LINE_COMPOSITES,
   type DeviceFamily,
 } from "./ngspice-load-order.js";
 
@@ -24,12 +25,16 @@ const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>(
   "CCVS",
   "VCCS",
   "VCVS",
+  // Single-card switch / coupling: CSW emits `W out+ out- VSENSE model` (two output
+  // node tokens); MUT emits `K L1 L2 k`, referencing inductors by name and minting
+  // no nodes (its deck-pin row is the empty []). Both are genuine single-card
+  // deck-emitting devices, so they carry a row.
+  "CSW",
+  "MUT",
 ]);
 
-const MULTI_LINE_COMPOSITES: ReadonlySet<string> = new Set<string>([
-  "Transformer",
-  "TappedTransformer",
-]);
+// MULTI_LINE_COMPOSITES now lives in ngspice-load-order.ts (single source of truth,
+// shared with auditDeckPinOrderCoverage) and is imported above.
 
 export function auditNgspiceLoadOrderTables(registry: ComponentRegistry): void {
   const inLoadOrder = new Set(Object.keys(TYPE_ID_TO_NGSPICE_LOAD_ORDER));

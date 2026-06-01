@@ -41,7 +41,7 @@ import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, Componen
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
 import { AnalogElement } from "./element.js";
-import { getNgspiceLoadOrderByTypeId, getDeviceFamilyByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
+import { getNgspiceLoadOrderByTypeId, getDeviceFamilyByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER, deckOrder, auditDeckPinOrderCoverage } from "./ngspice-load-order.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
 import {
   buildTopologyInfo,
@@ -402,6 +402,11 @@ function expandCompositeInstance(
   // is not seen by the flattened-deck walk; the current contract requires
   // every declared internal net to have an ID, so fill stragglers via the
   // partition-level allocator (these IDs land past the deck-walk range).
+  //
+  // A declared internal net referenced by no sub-element pin never appears on
+  // ngspice's flattened deck (no INPtermInsert ever names it, inpsymt.c:43-72),
+  // so ngspice mints no number for it. Appending past the deck-walk range here
+  // is the faithful counterpart; such a net is a degenerate declaration.
   for (let slot = 0; slot < netlist.internalNetCount; slot++) {
     if (internalNetIds[slot] === undefined) {
       const suffix = netlist.internalNetLabels?.[slot] ?? `int${slot}`;
@@ -850,17 +855,17 @@ function buildAnalogNodeMapFromPartition(
       positionToGroupId.set(`${gp.worldPosition.x},${gp.worldPosition.y}`, g.groupId);
     }
   }
-  // Sort partition.components in deck-emission order and walk pins for
-  // first-encounter numbering. Ground components are walked too- their pins
-  // resolve to groupId 0, which is already mapped, so they're no-ops.
-  const componentsInDeckOrder = partition.components
-    .map((pc, originalIndex) => ({ pc, originalIndex }))
-    .sort((a, b) => {
-      const lhs = getNgspiceLoadOrderByTypeId(a.pc.element.typeId);
-      const rhs = getNgspiceLoadOrderByTypeId(b.pc.element.typeId);
-      if (lhs !== rhs) return lhs - rhs;
-      return a.originalIndex - b.originalIndex;
-    });
+  // Walk partition.components in deck-line order and number pins on
+  // first-encounter. Ground components are walked too- their pins resolve to
+  // groupId 0, which is already mapped, so they're no-ops. `deckOrder`
+  // (ngspice-load-order.ts) is the single producer of device-line order shared
+  // with the harness deck emitter (inppas2.c:76 top-to-bottom card walk); both
+  // consumers iterate this identical sequence so parse-time node integers stay
+  // bound to the emitted deck. `deckOrder` keys on `typeId`, so project each
+  // PartitionedComponent's `element.typeId` onto the sortable item.
+  const componentsInDeckOrder = deckOrder(
+    partition.components.map((pc) => ({ typeId: pc.element.typeId, pc })),
+  ).map(({ item }) => ({ pc: item.pc }));
   // Composite-internal node IDs land in the deck-walk range, interleaved with
   // external IDs at the position the parent composite occupies in the
   // emission. The compositeInternalIds map and preAllocatedNodes entries are
@@ -1036,6 +1041,13 @@ export function compileAnalogPartition(
   perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
   const diagnostics: Diagnostic[] = [];
+
+  // Assert the deck-pin-order table is total over every analog device class the
+  // generator can emit (inppas2.c:94-263). A missing row would silently fall
+  // back to pinLayout order in the node-map walk- the deck order only by
+  // coincidence- so a gap is a loud error here, not a parity drift discovered
+  // three layers down.
+  auditDeckPinOrderCoverage(registry.analogTypeIds());
 
   // Extract typed inline runtime models for use in route resolution.
   const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =

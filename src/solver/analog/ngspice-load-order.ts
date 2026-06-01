@@ -252,4 +252,96 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   // Deck: `E/Gname out+ out- ctrl+ ctrl- gain`.
   VCCS:            ["out+", "out-", "ctrl+", "ctrl-"],
   VCVS:            ["out+", "out-", "ctrl+", "ctrl-"],
+  // Transformer / TappedTransformer are MULTI-LINE composites (see
+  // MULTI_LINE_COMPOSITES below): they decompose into per-winding `L` cards plus a
+  // `K` coupling, so there is NO single deck card with a fixed node-token order.
+  // Node numbering comes from the winding sub-element lines (each an Inductor
+  // ["pos","neg"]) via the composite node-alloc walk- they carry no row here.
+  // K-card mutual coupling (`Kname Lname1 Lname2 k`, inp2k.c) references the two
+  // inductors by device name and reads NO node tokens, so it mints no node IDs.
+  MutualInductor:    [],
+  // W-card current-controlled switch (`Wname out+ out- VSENSE model`, inp2w.c):
+  // the sense element is referenced by device name, so only the two output
+  // node tokens appear on the card.
+  CurrentControlledSwitch: ["out+", "out-"],
 };
+
+/**
+ * Multi-line composite typeIds: devices that decompose into MULTIPLE deck cards
+ * (a Transformer -> per-winding `L` lines + a `K`), so they have no single
+ * deck-pin-order row- their node numbering comes from their sub-element lines via
+ * the composite node-alloc walk. Both the registry self-check
+ * (ngspice-load-order-audit.ts) and `auditDeckPinOrderCoverage` below exempt these
+ * from the "must have a deck-pin row" rule. Single source of truth for the set.
+ */
+export const MULTI_LINE_COMPOSITES: ReadonlySet<string> = new Set<string>([
+  "Transformer",
+  "TappedTransformer",
+]);
+
+/**
+ * Deck-line ordering producer- single source of truth for the order ngspice's
+ * pass-2 parser walks device lines, shared by the MNA node-map walk and the
+ * harness deck emitter.
+ *
+ * inppas2.c:76 numbers MNA nodes by walking the parsed card list top-to-bottom
+ * (`for (current = data; current != NULL; current = current->nextcard)`),
+ * dispatching each leading character to its `INP2*` parser via the pass-2
+ * `switch` (inppas2.c:94-263). Within an NGSPICE_LOAD_ORDER bucket (a device
+ * type's position in dev.c's `DEVices[]`), the emitted line order is the order
+ * this function returns- forward within bucket (`originalIndex` ascending).
+ * cktcrte.c:62-64's LIFO instance prepend reverses only the per-iteration load
+ * walk (CKTsetup head→tail over `GENinstances`), never the parse-time numbering,
+ * so node numbering is strictly the forward deck order produced here.
+ *
+ * The MNA node-map walk (`buildAnalogNodeMapFromPartition`) and the harness deck
+ * emitter (`__tests__/harness/netlist-generator.ts`) MUST iterate device lines
+ * in this identical order, or parse-time node integers desync from the emitted
+ * deck. The dependency direction is strictly harness → production: production
+ * imports `deckOrder` from here; this module never imports the harness.
+ */
+export function deckOrder<T extends { typeId: string }>(
+  components: readonly T[],
+): { item: T; originalIndex: number }[] {
+  return components
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => {
+      const lhs = getNgspiceLoadOrderByTypeId(a.item.typeId);
+      const rhs = getNgspiceLoadOrderByTypeId(b.item.typeId);
+      if (lhs !== rhs) return lhs - rhs;
+      return a.originalIndex - b.originalIndex; // forward-within-bucket
+    });
+}
+
+/**
+ * Startup audit asserting every analog typeId the deck generator can emit has a
+ * `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` row.
+ *
+ * inppas2.c:94-263- every device class ngspice's pass-2 switch dispatches has a
+ * fixed node-token order in its `INP2*` parser. The MNA node-map walk reproduces
+ * that order from this table; a missing row would silently fall back to pinLayout
+ * order, which is the deck order only by coincidence. Auditing at startup makes a
+ * gap a loud error rather than a parity drift discovered three layers down.
+ *
+ * Only typeIds that carry a SPICE card (an `NGSPICE_LOAD_ORDER` / family entry)
+ * are checked; genuinely card-less composite outer typeIds legitimately have no
+ * row- their sub-element lines drive numbering, so they take the pinLayout
+ * fallback by design.
+ */
+export function auditDeckPinOrderCoverage(analogTypeIds: readonly string[]): void {
+  for (const typeId of analogTypeIds) {
+    if (!(typeId in TYPE_ID_TO_NGSPICE_LOAD_ORDER)) continue; // card-less composite
+    if (MULTI_LINE_COMPOSITES.has(typeId)) continue; // sub-element cards supply node order
+    if (!(typeId in TYPE_ID_TO_DECK_PIN_LABEL_ORDER)) {
+      // Warn, never throw: a missing row is a developer-facing coverage gap, not a
+      // reason to break every compile (and take the MCP/simulator down with it). The
+      // node-walk falls back to pinLayout order; if that differs from deck order it
+      // surfaces as a harness parity divergence on that device's own gate- the right
+      // place to catch it, not a hard crash three layers up.
+      console.warn(
+        `[ngspice-load-order] TYPE_ID_TO_DECK_PIN_LABEL_ORDER missing "${typeId}"; ` +
+          `node numbering falls back to pinLayout order (inppas2.c:94-263).`,
+      );
+    }
+  }
+}
