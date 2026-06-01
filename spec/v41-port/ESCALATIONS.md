@@ -540,3 +540,126 @@ Expand the recon's tsFiles to include `src/solver/analog/ngspice-load-order-audi
 
 - **source:** `maths-misc/maths-misc/randnumb.c::int poisson(double lambda)`  •  **verdict:** 3-ROUNDS-EXHAUSTED
   - **note (verbatim):** hunk maths-misc/randnumb.c#h008 (hash 6780580bcd30da31), CONTRACT tsFile src/components/sources/ac-voltage-source.ts (mapping: ::boxMuller / exprand+com_sseed). EMPTY-DIFF CATCH fires: `git -C ...maths-misc diff --name-only` = {.vitest-failures.json, spec/v41-port/ESCALATIONS.md, spec/v41-port/progress.json} only — ac-voltage-source.ts carries NO edit in the worktree (git status --porcelain on that path is empty). The contract's named tsFile is untouched. ac-voltage-source.ts contains ONLY boxMuller() (Math.random()-based cosine-form Gaussian, lines 52-56); no poisson / exprand / com_sseed counterpart exists there (mapping note itself: 'no current behavioral counterpart - see Q2'). The applier instead landed poisson on src/solver/analog/monte-carlo.ts::SeededRng.poisson (monte-carlo.ts:413-427), which I independently confirm is bijective with poisson (ref/ngspice/src/maths/misc/randnumb.c:260-274): max_k=1000, p=CombLCGTaus(), P=exp(-lambda), sum=P, if sum>=p return 0, for k=1..max_k P*=lambda/k, sum+=P, if sum>=p break, return k. So the function is numerically correct, but it landed under the separate maths-misc#recon/randnumb reconstruction item (APPLIED) on a DIFFERENT file than the contract's named tsFile — the contract's functionGroup is NOT applied at its mapping target. h008 is also state=ESCALATED under ESC-014 in progress.json (applier trigger: 'pre-image failure case c, absent — reconstruction delivered v41 post-image directly; exprand checkseed() removal already done by recon; com_sseed/setseedinfo are frontend NO-COUNTERPART'). Per the EMPTY-DIFF CATCH this is a MISMATCH for the named tsFile: the ac-voltage-source.ts mapping (boxMuller/exprand+com_sseed) did not land; re-apply rooted at the contract's tsFile or correct the contract mapping. Left PENDING/ESCALATED; nothing committed. No file-scope violation: the only worktree changes are progress.json, ESCALATIONS.md, and the test-runner artifact .vitest-failures.json. A prior verifier recorded the identical MISMATCH verdict at ESCALATIONS.md:518-519; this independent re-derivation confirms it.
+
+---
+
+### ESC-015 — `analysis/acan.c#h001`–`#h011`, `acsetp.c#h001`/`#h002` — `ACan`/`CKTacLoad`/`ACsetParm` are reimplemented as `AcAnalysis.run`; no line-isomorphic image
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case b/c) across all 13 hunks
+- **ngspice:** `src/spicelib/analysis/acan.c` (ACan + CKTacLoad), `acsetp.c` (ACsetParm), v41 tree `ref/ngspice/src/spicelib/analysis/`
+- **digiTS:** `src/solver/analog/ac-analysis.ts` — `AcAnalysis.run` + `buildFrequencyArray`
+- **What is blocked:** the literal application of any acan/acsetp hunk. `ACan` is a monolithic C driver (restart/resume, `ACAN*job`, `switch(ACstepType)` freqDelta setup, XSPICE EVTop/IPC, CKTop/CKTncDump, front-end `OUTpBeginPlot`/`CKTnames`/`runDesc`, `while(freq<=ACstopFreq+freqTol)` sweep with `goto endsweep`, `INIT_STATS`/`UPDATE_STATS`). digiTS reimplements AC as `AcAnalysis.run`: a precomputed `frequencies[]` array (built by the SEPARATE `buildFrequencyArray`, ac-analysis.ts:567), an `fi` index loop, per-element `stampAc` via `runByDeviceFamily`, and a six-buffer complex solve. The one behavioral counterpart — the DEC `freqDelta`/`num_steps` math — already sits at the **v41** form in `buildFrequencyArray` (`numSteps=floor(abs(log10(fStop/fStart))*numPoints)`; `freqDelta=exp(log(fStop/fStart)/numSteps)`, ac-analysis.ts:589-590), so the v26 `-` line `exp(log(10.0)/numberSteps)` is **absent** (case b/c). The new `ACstartFreq<=0` `E_PARMVAL` guard (h004) and the `ACsetParm` `rValue<=0.0 -> <0.0` validation (acsetp h001/h002) have **no** counterpart in `run()`/`buildFrequencyArray`/`AcParams` (no ACsetParm, no rValue check, no "invalid for AC" error). Everything else (h001/h003/h005-h011) is XSPICE/IPC/`OUTpBeginPlot`/`CKTacLoad`/`STATloadTime` C surface over constructs that do not exist in digiTS.
+- **Architecture change required:** either (a) re-port `AcAnalysis.run` as a line-structured mirror of `ACan` (restart/resume path, in-function `switch(ACstepType)` freqDelta setup INCLUDING the new startfreq guards, the `while(freq<=stopFreq+freqTol)` increment loop), folding `buildFrequencyArray` back in; and add an `ACsetParm`-equivalent start/stop validation surface — or (b) record the DEC freqDelta v41 form APPLIED against the already-present `buildFrequencyArray` (kind-1 ledger-sync) and split the front-end/XSPICE/validation pieces into sequenced items / frozen-Phase-0 NO-COUNTERPART. Touches `src/solver/analog/ac-analysis.ts` and the AC validation surface (facade/netlist layer).
+- **Why it exceeds one functionGroup / why it is ambiguous:** the AC driver was reimplemented with a different decomposition (`run` + `buildFrequencyArray`) and is already at v41 for the only numeric counterpart; producing a line-isomorphic git diff is impossible without rewriting the driver. The kind-1 (record-APPLIED) vs kind-2 (reconstruct/NO-COUNTERPART) split is a user/planning action the applier may not self-assign (§6).
+- **Decision needed from user:** convert back to `PENDING` with a directive — re-port `AcAnalysis.run`/`AcParams` to mirror `ACan`/`ACsetParm` (incl. startfreq guards), or record the present v41 freqDelta APPLIED + split the front-end/validation pieces.
+- **Resolution:** _pending_
+
+---
+
+### ESC-016 — `analysis/cktdojob.c#h003`–`#h005`, `cktntask.c#h001`–`#h006`, `cktsopt.c#h002`–`#h008` — `CKTdoJob`/`CKTnewTask`/`CKTsetOpt`/`OPTtbl[]` task+option machinery has no digiTS counterpart
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case c, absent) across all 16 hunks
+- **ngspice:** `src/spicelib/analysis/cktdojob.c` (CKTdoJob task->ckt copy), `cktntask.c` (CKTnewTask TSKtask defaults/copy), `cktsopt.c` (CKTsetOpt switch + OPTtbl IFparm table), v41 tree `ref/ngspice/src/spicelib/analysis/`
+- **digiTS:** `src/solver/analog/ckt-context.ts` — `CKTCircuitContext` (fields + `configure()`)
+- **What is blocked:** the v41 additions of four option/task parameters — `indverbosity` (default 2), `xmu` (default 0.5), `cshunt` (default -1), `epsmin` (default 1e-28) — threaded through the C `TSKtask` struct (`CKTnewTask` copy/defaults), the `CKTdoJob` task->ckt copy block, and the `CKTsetOpt` switch + `OPTtbl[]` IFparm option-index table. digiTS has **no** `TSKtask` struct, no `CKTnewTask`, no `CKTdoJob` copy loop, no `CKTsetOpt`, and no `OPTtbl` integer-index table: `CKTCircuitContext` carries options as typed fields read from a params object via `configure()`. `cktIndVerbosity` (=2) and `cktEpsmin` (=1e-28) already exist as v41-default field initialisers (ckt-context.ts:336/346); `xmu` already exists as a param (`integrationXmu`, analog-engine.ts:753); `cshunt` is absent. The C copy-block / default-branch / IFparm-row / switch-case pre-images are all absent (case c).
+- **Architecture change required:** decide per parameter — (1) record the already-present fields (indverbosity, epsmin, xmu) APPLIED against the present TS construct despite the absent C pre-image (kind-1, the ESC-003/ESC-007 precedent); (2) for `cshunt` (shunt capacitor to ground), add a `SimulationParams.cshunt` field + load-path wiring (a new behavioral addition spanning load-context/element load, beyond this functionGroup); (3) the `OPTtbl` desc-string edits and the C struct-copy mechanics are the classic "ngspice declaration with no behavioral counterpart" shape that only frozen Phase-0 may mark NO-COUNTERPART. Touches `src/solver/analog/ckt-context.ts` and (for cshunt) the load path.
+- **Why it exceeds one functionGroup / why it is ambiguous:** every hunk is a C task-struct/option-table declaration; digiTS has no struct/option-table layer mirroring them, so no per-statement TS edit renders a line-isomorphic image. The kind-1/kind-2/new-behavior split is a user/planning action (§3/§6).
+- **Decision needed from user:** convert back to `PENDING` with per-parameter directives (record-APPLIED for present fields; sequenced item for `cshunt`; frozen NO-COUNTERPART for the option-table/struct-copy declarations).
+- **Resolution:** _pending_
+
+---
+
+### ESC-017 — `analysis/cktic.c#h001`/`#h002` — `CKTic` direct-RHS nodeset/IC seeding (`CKTrhsOld=CKTrhs=v`) has no digiTS counterpart
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case c, absent)
+- **ngspice:** `src/spicelib/analysis/cktic.c` lines `28-36` (CKTic: `CKTrhs[number]=nodeset|ic` -> `CKTrhsOld[number]=CKTrhs[number]=nodeset|ic`), v41 tree `ref/ngspice/src/spicelib/analysis/cktic.c`
+- **digiTS:** `src/solver/analog/ckt-load.ts` — `cktLoad`
+- **What is blocked:** the v41 dual-write of the nodeset/IC value into both `CKTrhsOld` and `CKTrhs`. digiTS has **no** `CKTic` function: `cktLoad` ports `cktload.c`, enforcing nodesets/ICs by stamping a 1e10 conductance + RHS (`stampElement`/`stampRHS`, ckt-load.ts:135-155), not by `CKTic`'s direct `CKTrhs[number]=...` with `SMPmakeElt`. There is no `CKTrhsOld[number]=CKTrhs[number]=value` construct anywhere. Same architectural gap as the AC six-buffer model (ESC-002).
+- **Architecture change required:** stand up a `CKTic` analogue (direct-RHS nodeset/IC seed with a `CKTrhs`/`CKTrhsOld` dual-write), which requires the six-buffer RHS/RHSold model the digiTS load path does not have. Touches `src/solver/analog/ckt-load.ts` and the RHS buffer model (cross-group, shared with ESC-002).
+- **Why it exceeds one functionGroup / why it is ambiguous:** the pre-image construct (`CKTic`) is absent; the dual-write target depends on a buffer model digiTS does not implement on the DC/load path.
+- **Decision needed from user:** convert back to `PENDING` with a directive to build a `CKTic`-equivalent over a CKTrhs/CKTrhsOld dual-write, or sequence it behind the RHS-buffer reconstruction (ESC-002).
+- **Resolution:** _pending_
+
+---
+
+### ESC-018 — `analysis/cktncdump.c#h001`, `dcop.c#h001` — `CKTncDump`/`DCop` front-end debug dumps reimplemented numerically; name-string filter / commented blocks absent
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case c, absent)
+- **ngspice:** `src/spicelib/analysis/cktncdump.c` line `24` (`!strstr(node->name,"#")` -> `!strchr(node->name,'#')`), `dcop.c` lines `82-96` (DCop: delete commented-out CKTncDump-by-name block + restructure the `converged!=0` failure branch), v41 tree `ref/ngspice/src/spicelib/analysis/`
+- **digiTS:** `src/solver/analog/dc-operating-point.ts` — `cktncDump` (numeric) and `solveDcOperatingPoint`
+- **What is blocked:** (cktncdump h001) the node-name C-string filter `strstr(name,"#branch")||!strstr(name,"#")` -> `!strchr(name,'#')`. digiTS `cktncDump` operates purely on numeric matrix indices (`i<matrixSize`, delta/tol), with **no** `node->name` inspection — the strstr/strchr filter has no counterpart. (dcop h001) `DCop` is reimplemented as the phase-ladder `solveDcOperatingPoint` (onPhaseBegin/onPhaseEnd, dcopResult); the failure path emits a `dc-op-failed` diagnostic, not the C `fprintf(stdout,"DC solution failed")`/`CKTncDump`-by-name; the v26 commented-block + indented `converged!=0` pre-image is not line-isomorphic. Case (c).
+- **Architecture change required:** none behaviorally required (these are front-end stdout debug dumps with no digiTS surface); the disposition is a frozen-Phase-0 NO-COUNTERPART call for the name-string filter / fprintf dump, which the applier may not self-assign (§3).
+- **Decision needed from user:** convert back to `PENDING` with a directive, or frozen-Phase-0 NO-COUNTERPART for the front-end debug-print hunks.
+- **Resolution:** _pending_
+
+---
+
+### ESC-019 — `analysis/cktop.c#h001`–`#h010` — `CKTop`/`dynamic_gmin`/`spice3_gmin`/`gillespie_src`/`spice3_src` are reimplemented and already at v41
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case b, present-but-differs / already-v41)
+- **ngspice:** `src/spicelib/analysis/cktop.c` (CKTop dispatch + new_gmin + OPtran; CKTconvTest; dynamic_gmin; spice3_gmin; gillespie_src; spice3_src), v41 tree `ref/ngspice/src/spicelib/analysis/cktop.c`
+- **digiTS:** `src/solver/analog/dc-operating-point.ts` — `solveDcOperatingPoint` + `dynamicGmin`/`newGmin`/`spice3Gmin`/`gillespieSrc`/`spice3Src`
+- **What is blocked:** the literal application of the cktop hunks, because digiTS `dc-operating-point.ts` is **already at the v41 post-image**: the `new_gmin` fallback is already present and wired (dc-operating-point.ts:391-405, dyngmin gate, with explicit v41-vs-v26 annotations); `dynamicGmin` already uses `factor = Math.max(Math.sqrt(factor), 1.00005)` (line 727, the cktop#h004/#h005 v41 change) and `while(true)`+break with `saveSnapshot`/`restoreSnapshot`; `newGmin` (line 810+) is a full port of the v41 `new_gmin` (cktop#h006). `OPtran` is a no-op on the default `nooptran` path per analysis-scope.md, with no driver. `CKTconvTest` has no standalone counterpart (convergence is `niConvTest` in newton-raphson.ts). The v26 `-` pre-images (bare `factor=sqrt(factor)`, the success/failed-flag while-loop, the no-new_gmin dispatch) are **absent** (case b). Per §5 "post-change behaviour already present" is NOT an APPLY condition; per §6 a case-(b) pre-image forbids editing on top.
+- **Architecture change required:** none inside this functionGroup — the v41 behavior is already realized. The conflict is phase-ordering: a prior device/engine pass delivered `dc-operating-point.ts` at v41 rather than at v26 for this loop to apply the delta. Identical in shape to ESC-003 and ESC-014.
+- **Decision needed from user:** convert back to `PENDING` with a directive — record h001-h010 APPLIED against the already-present v41 `solveDcOperatingPoint`/gmin/src code, or split a "restore v26 baseline of cktop" item so the `-` pre-images exist.
+- **Resolution:** _pending_
+
+---
+
+### ESC-020 — `analysis/cktsetbk.c#h001`/`#h002` — `CKTsetBreak` reimplemented as a binary-search splice; guard already present, end-scan branch absent
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case b/c)
+- **ngspice:** `src/spicelib/analysis/cktsetbk.c` lines `27-36` (all-`+` AlmostEqualUlps(time,CKTtime,3) ignore-guard) and `82` (`if(time-CKTbreaks[CKTbreakSize-1]<=CKTminBreak)` -> `if(CKTbreaks && ...)`), v41 tree `ref/ngspice/src/spicelib/analysis/cktsetbk.c`
+- **digiTS:** `src/solver/analog/timestep.ts` — `TimestepController.addBreakpoint`
+- **What is blocked:** (h001) the AlmostEqualUlps(time,CKTtime,3) ignore-guard is **already present** (`almostEqualUlps(time,_lastAcceptedSimTime,3) return;`, timestep.ts:779) but by reimplementation — there is no STEPDEBUG printf, no breakpoint-in-the-past panic, no `CKTbreakSize` linear scan to insert it between; `addBreakpoint` uses a binary-search splice. (h002) the `CKTbreaks` null-guard is on the beyond-end-of-time linear-scan branch, which digiTS does not have (binary-search splice with `eps=maxTimeStep*5e-5`). Case b (guard present by other means, §5 not an APPLY cond) + case c (end-scan branch absent).
+- **Architecture change required:** none behaviorally required for h001 (guard present); h002's null-guard targets a linear-scan branch that does not exist. Either record h001 APPLIED against the present guard (kind-1) and frozen-NO-COUNTERPART h002 (no linear-scan branch), or re-port `addBreakpoint` to a line-structured `CKTsetBreak` mirror.
+- **Why it exceeds one functionGroup / why it is ambiguous:** the breakpoint structure was reimplemented (binary-search vs linear `CKTbreaks[]`/`CKTbreakSize` scan), so no line-isomorphic insertion exists.
+- **Decision needed from user:** convert back to `PENDING` — record h001 APPLIED against the present ULP guard + disposition h002 (no end-scan branch), or re-port addBreakpoint to mirror CKTsetBreak.
+- **Resolution:** _pending_
+
+---
+
+### ESC-021 — `analysis/cktsetup.c#h002`–`#h006` — `CKTsetup`/`CKTunsetup` (DEVsetup driver + matrix-node teardown) have no body in `compiler.ts`
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case c, absent) + target absent
+- **ngspice:** `src/spicelib/analysis/cktsetup.c` (CKTsetup: No-model/No-device E_PANIC guards, NIinit, prev_CKTlastNode, DEVsetup loop; CKTunsetup: node->ptr=NULL, prev_CKTlastNode internal-error guard), v41 tree `ref/ngspice/src/spicelib/analysis/cktsetup.c`
+- **digiTS:** `src/solver/analog/compiler.ts` — `expandCompositeInstance` (composite-subcircuit expansion)
+- **What is blocked:** the new `No model list found`/`No device list found` E_PANIC guards, the `prev_CKTlastNode` incomplete-unsetup tracking (setup + unsetup), the `NIinit` error-return reformat, and `node->ptr=0`->`NULL`. `compiler.ts` has **no** `CKTsetup`/`CKTunsetup` function (only comment references); `expandCompositeInstance` is composite-subcircuit flatten, not the DEVsetup driver — no `NIinit`, no `DEVsetup` loop, no `prev_CKTlastNode`, no `No model list` panic, no `node->ptr`/`icGiven`/`nsGiven` reset. `CKTunsetup` is matrix-node teardown; digiTS rebuilds a fresh engine per `compile()` and has no unsetup/teardown surface (same architectural reason as ESC-JFET-UNSETUP). Case (c).
+- **Architecture change required:** the setup-guard hunks would land in the digiTS setup driver (`MNAEngine._setup`, not `expandCompositeInstance`); the teardown hunks (CKTunsetup) need a device-teardown surface digiTS does not have. Both are outside this functionGroup / the named tsFile, and the teardown is the frozen NO-COUNTERPART family (per-device del/dest).
+- **Why it exceeds one functionGroup / why it is ambiguous:** the planner's mapping (`expandCompositeInstance`) is not the CKTsetup driver; the constructs are absent and the teardown half has no digiTS surface.
+- **Decision needed from user:** convert back to `PENDING` with a directive — map the CKTsetup guards to the real digiTS setup driver, or frozen-NO-COUNTERPART the teardown half alongside the device del/dest family.
+- **Resolution:** _pending_
+
+---
+
+### ESC-022 — `analysis/ckttrunc.c#h001` — `CKTtrunc` reimplemented numerically; STEPDEBUG `#endif` comment edit absent
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case c, absent)
+- **ngspice:** `src/spicelib/analysis/ckttrunc.c` line `73` (`#endif STEPDEBUG` -> `#endif`), v41 tree `ref/ngspice/src/spicelib/analysis/ckttrunc.c`
+- **digiTS:** `src/solver/analog/ckt-terr.ts` — LTE timestep estimation (`cktTerr`/`cktTerrVoltage`)
+- **What is blocked:** the preprocessor/comment edit on the `STEPDEBUG printf(at time %g, delta %g, CKTdeltaOld[0])` block. `ckt-terr.ts` is a numerical LTE reimplementation with **no** STEPDEBUG block, no `#endif`, no `CKTdeltaOld[0]` printf. Case (c).
+- **Architecture change required:** none — STEPDEBUG is a C debug-print preprocessor block with no digiTS counterpart; disposition is a frozen-Phase-0 NO-COUNTERPART call the applier may not self-assign.
+- **Decision needed from user:** convert back to `PENDING` or frozen-NO-COUNTERPART for the STEPDEBUG preprocessor edit.
+- **Resolution:** _pending_
+
+---
+
+### ESC-023 — `analysis/dctran.c#h001`–`#h014`, `traninit.c#h001`/`#h002`, `transetp.c#h001` — `DCtran`/`TRANinit`/`TRANsetParm` reimplemented as `MNAEngine.stepToTime`/`init`; already-v41 / no-counterpart
+
+- **Raised by:** applier (unit "analysis")
+- **Trigger:** pre-image failure (case b/c) across all 17 hunks
+- **ngspice:** `src/spicelib/analysis/dctran.c` (DCtran + resume:), `traninit.c` (TRANinit), `transetp.c` (TRANsetParm), v41 tree `ref/ngspice/src/spicelib/analysis/`
+- **digiTS:** `src/solver/analog/analog-engine.ts` — `MNAEngine.stepToTime` / `MNAEngine.init`
+- **What is blocked:** the literal application of the transient-driver hunks. `DCtran` is reimplemented as `MNAEngine.stepToTime` with breakpoint handling factored into `timestep.ts`, state rotation via getters/`.set()`, and no IPC/CKTdump/stdout-print/`del_before`/`CKTsizeIncr`/LTRA surface. Several v41 changes are **already present**: the autostop termination `finalTime-time<minBreak` (analog-engine.ts:737, dctran#h008), and the breakpoint-pop `while(...)` + at-breakpoint clamp (timestep.ts:556-578, dctran#h010/#h011) — case b. The rest are absent (case c): `#include enh.h`/`-static double del_before` (h001/h002), `CKTsizeIncr=10->100`+LTRA (h003), commented CKTncDump block + `Using transient initial conditions` print + strstr->strchr (h004), `OUTendPlot` (h005), `bcopy->memcpy CKTstate1` (h006, digiTS rotates via getters; the bcopy site at analog-engine.ts:1698/1744 are comment citations, not statements), IPC `wantevtdata` (h007), `MODEUIC`/initTime CKTdump gate (h009), the `resume:` goto-label block (h011-h014), the NDEV `ft_norefprint` stdout progress indicator (h014). `TRANinit` is reimplemented as `MNAEngine.init` reading typed params (no JOB/TSKtask, no `CKTmaxStep==0` clamp with `nostepsizelimit` cp_getvar override). `TRANsetParm` `TST0P->TSTOP` typo fix has no counterpart — digiTS has no `TRANsetParm`/`TRAN_TSTOP`/`TST0P`-or-`TSTOP` error string anywhere (repo search: 0 hits).
+- **Architecture change required:** either re-port `MNAEngine.stepToTime`/`init` as line-structured mirrors of `DCtran`/`TRANinit` (folding the timestep/breakpoint logic back in), or record the already-present v41 pieces (autostop, breakpoint pop) APPLIED (kind-1) and disposition the IPC/stdout/LTRA/`del_before`/typo C surface as frozen-NO-COUNTERPART or sequenced items. Touches `src/solver/analog/analog-engine.ts`, `timestep.ts`, and the transient validation surface (facade).
+- **Why it exceeds one functionGroup / why it is ambiguous:** the transient driver was reimplemented across `analog-engine.ts` + `timestep.ts` + `ckt-terr.ts` and is already at v41 for the numeric counterparts; no line-isomorphic git diff is producible. The kind-1/kind-2 split is a user/planning action (§3/§6).
+- **Decision needed from user:** convert back to `PENDING` with a directive — record the present v41 transient pieces APPLIED + disposition the C-surface hunks (NO-COUNTERPART / sequenced), or re-port stepToTime/init as line-structured DCtran/TRANinit mirrors.
+- **Resolution:** _pending_
