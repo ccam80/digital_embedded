@@ -1,6 +1,6 @@
 // harness-tools.ts- MCP tool registration for ngspice comparison harness
 
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -18,6 +18,62 @@ import { isPoolBacked } from "../../src/solver/analog/element.js";
 // ---------------------------------------------------------------------------
 // JSON serialization helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Read the OPTIONAL `circuit.nodesets` / `circuit.ics` objects from a `.dts`
+ * JSON file and convert each to a `ReadonlyMap<string, number>` keyed by
+ * net/pin NAME (e.g. `{"Q1:C":5}` -> Map([["Q1:C",5]])). Absent or empty
+ * fields read as undefined, so `harness_start({dtsPath})` alone self-contains
+ * any `.nodeset` / `.ic` stimulus the loop's gate prompt needs without extra
+ * args. A malformed (non-object / non-numeric-value) field is rejected rather
+ * than silently dropped, so a typo can never quietly defeat the gate.
+ */
+function readDtsConstraints(dtsPath: string): {
+  nodesets?: ReadonlyMap<string, number>;
+  ics?: ReadonlyMap<string, number>;
+} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(dtsPath, "utf-8"));
+  } catch (err) {
+    throw new Error(
+      `harness_start: failed to parse .dts JSON at ${dtsPath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const circuit = (parsed as { circuit?: unknown }).circuit;
+  const toMap = (
+    field: unknown,
+    fieldName: string,
+  ): ReadonlyMap<string, number> | undefined => {
+    if (field === undefined || field === null) return undefined;
+    if (typeof field !== "object" || Array.isArray(field)) {
+      throw new Error(
+        `harness_start: circuit.${fieldName} must be a JSON object mapping ` +
+          `net/pin NAME -> volts (e.g. {"Q1:C":5}).`,
+      );
+    }
+    const entries = Object.entries(field as Record<string, unknown>);
+    if (entries.length === 0) return undefined;
+    const map = new Map<string, number>();
+    for (const [name, value] of entries) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(
+          `harness_start: circuit.${fieldName}["${name}"] must be a finite number (volts).`,
+        );
+      }
+      map.set(name, value);
+    }
+    return map;
+  };
+  if (typeof circuit !== "object" || circuit === null) {
+    return {};
+  }
+  const c = circuit as { nodesets?: unknown; ics?: unknown };
+  return {
+    nodesets: toMap(c.nodesets, "nodesets"),
+    ics: toMap(c.ics, "ics"),
+  };
+}
 
 function serializeSummary(summary: SessionSummary) {
   return {
@@ -172,11 +228,19 @@ export function registerHarnessTools(
         );
       }
 
+      // Self-contain any `.nodeset` / `.ic` stimulus carried in the .dts itself
+      // (optional `circuit.nodesets` / `circuit.ics` objects). Absent fields →
+      // undefined → unchanged behaviour. This keeps the loop's gate prompt
+      // uniform: harness_start({dtsPath}) alone drives the constrained run.
+      const { nodesets, ics } = readDtsConstraints(dtsPath);
+
       const session = new ComparisonSession({
         dtsPath: args.dtsPath,
         dllPath,
         tolerance: args.tolerance,
         maxOurSteps: args.maxOurSteps,
+        nodesets,
+        ics,
         // Structural-parity asserts throw inside runDcOp/runTransient, which
         // makes coord-set / matrix-size divergences fatal at the MCP layer
         // — exactly the bugs the investigation tools below need to surface.

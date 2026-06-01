@@ -289,6 +289,18 @@ export interface ComparisonSessionOptions {
    * owns the deck) or when `selfCompare` is true (no ngspice side).
    */
   nodesets?: ReadonlyMap<string, number>;
+  /**
+   * Initial-condition constraints, keyed by net/pin NAME (e.g. "C1:pos")
+   * mapped to volts. Resolved to digiTS node IDs at init time and emitted as a
+   * `.ic` card on the auto-generated deck (cktload.c:131-158: icGiven nodes get
+   * CKTrhs[number] = 1e10 * ic * CKTsrcFact and *(node->ptr) += 1e10 during the
+   * MODETRANOP transient-boot DCOP, no MODEUIC). Unlike nodesets, the resolved
+   * ICs are ALSO seeded into the digiTS compiled circuit's `ics` Map so both
+   * engines receive the same transient-boot IC stimulus. Ignored when `cirPath`
+   * is supplied (the author owns the deck) or when `selfCompare` is true (no
+   * ngspice side).
+   */
+  ics?: ReadonlyMap<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -615,6 +627,22 @@ export class ComparisonSession {
       this._engine.getNodeTable(),
     );
 
+    // Seed the digiTS compiled circuit with the author-supplied ICs so the
+    // transient-boot DCOP (MODETRANOP) honours them on the digiTS side too.
+    // _ourTopology.nodeLabels was captured above, so the NAME->id resolution
+    // can run here. Nodesets stay ngspice-only (the digiTS nodeset apply is the
+    // recon's target), but ICs are seeded into BOTH engines so the harness
+    // drives the same transient-boot stimulus on each side. The compiled
+    // circuit's `ics` field is declared readonly but is a mutable Map written
+    // via cast in its constructor; ckt-load reads it through ctx.ics at setup.
+    const resolvedIcsForOurs = this._resolveIcNames();
+    if (resolvedIcsForOurs && resolvedIcsForOurs.size > 0) {
+      const icMap =
+        compiled.ics ??
+        ((compiled as { ics?: Map<number, number> }).ics = new Map<number, number>());
+      for (const [nodeId, value] of resolvedIcsForOurs) icMap.set(nodeId, value);
+    }
+
     // elementIndex → canonical device type, used by captureElementStates to
     // project per-pin terminal currents from the slot data via DEVICE_MAPPINGS.
     // Type IDs do not change between init and post-setup, so building this
@@ -677,8 +705,13 @@ export class ComparisonSession {
       // captured above, so its nodeLabels map carries the same name->id pairing
       // the deck emits.
       const resolvedNodesets = this._resolveNodesetNames();
+      // Resolve author-supplied IC NAMES to digiTS node IDs and emit them as a
+      // `.ic` card on the deck, parallel to the `.nodeset` path above. The
+      // digiTS side was already seeded with the same resolved IDs above, so
+      // both engines receive the transient-boot IC stimulus.
+      const resolvedIcs = this._resolveIcNames();
       this._cirClean = generateSpiceNetlist(
-        compiled, this._registry, this._elementLabels, undefined, resolvedNodesets,
+        compiled, this._registry, this._elementLabels, undefined, resolvedNodesets, resolvedIcs,
       );
     }
 
@@ -3932,6 +3965,32 @@ export class ComparisonSession {
         const known = [...this._ourTopology.nodeLabels.values()].join(", ");
         throw new Error(
           `ComparisonSession: nodeset name '${name}' did not resolve to any ` +
+          `compiled node. Known node labels: [${known}].`
+        );
+      }
+      resolved.set(nodeId, value);
+    }
+    return resolved;
+  }
+
+  /**
+   * Resolve the author-supplied `ics` map (net/pin NAME -> volts) into the
+   * id-keyed map `generateSpiceNetlist` consumes (digiTS node id -> volts).
+   * Returns undefined when no ICs were supplied. Throws naming any unresolved
+   * name rather than silently dropping it — an IC that targets no node would
+   * constrain nothing and quietly defeat the test's purpose. Mirrors
+   * `_resolveNodesetNames`.
+   */
+  private _resolveIcNames(): ReadonlyMap<number, number> | undefined {
+    const authored = this._opts.ics;
+    if (!authored || authored.size === 0) return undefined;
+    const resolved = new Map<number, number>();
+    for (const [name, value] of authored) {
+      const nodeId = this._findNodeIdByLabel(name, this._ourTopology.nodeLabels);
+      if (nodeId === null) {
+        const known = [...this._ourTopology.nodeLabels.values()].join(", ");
+        throw new Error(
+          `ComparisonSession: ic name '${name}' did not resolve to any ` +
           `compiled node. Known node labels: [${known}].`
         );
       }

@@ -253,6 +253,7 @@ export function generateSpiceNetlist(
   elementLabels: Map<number, string>,
   title?: string,
   nodesets?: ReadonlyMap<number, number>,
+  ics?: ReadonlyMap<number, number>,
 ): string {
   const lines: string[] = [];
 
@@ -354,6 +355,28 @@ export function generateSpiceNetlist(
       parts.push(`V(${nodeId})=${value}`);
     }
     lines.push(`.nodeset ${parts.join(" ")}`);
+  }
+
+  // Emit the .ic card (transient-boot INITIAL CONDITION). Each listed node is
+  // constrained to its value during the MODETRANOP transient-boot DCOP when
+  // MODEUIC is not set (cktload.c:131-158: icGiven nodes get
+  // CKTrhs[number] = 1e10 * ic * CKTsrcFact and *(node->ptr) += 1e10). Unlike a
+  // .nodeset GUESS, an .ic is enforced through the transient-boot operating
+  // point. The deck emits stringified digiTS node IDs as node names, so V(<id>)
+  // targets the same node digiTS allocated. Node 0 is ground; an IC on ground
+  // is meaningless and rejected.
+  if (ics && ics.size > 0) {
+    const parts: string[] = [];
+    for (const [nodeId, value] of ics) {
+      if (nodeId === 0) {
+        throw new Error(
+          `netlist-generator: .ic on node 0 (ground) is meaningless; ` +
+          `ground is fixed at 0 V. Remove the ground entry from the ics map.`
+        );
+      }
+      parts.push(`V(${nodeId})=${value}`);
+    }
+    lines.push(`.ic ${parts.join(" ")}`);
   }
 
   lines.push(".end");
