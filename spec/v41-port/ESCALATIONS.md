@@ -419,3 +419,92 @@ Expand the recon's tsFiles to include `src/solver/analog/ngspice-load-order-audi
 
 - **source:** `vsrc#recon/waveformModel`  •  **verdict:** MISMATCH (teardown-side durable record; builder ESCALATED rather than building — recon left PENDING/ESCALATED)
   - **note (verbatim):** EMPTY-DIFF CATCH fired. `git -C C:/local_working_projects/digital_in_browser/.wt/vsrc diff --name-only` is EMPTY (also empty for --cached); worktree `git status --porcelain` is clean; latest commit is 8b7c6a02 'v41-port(vsrc): record 1 escalation(s)' (not an APPLIED recon). None of the recon's tsFiles [src/components/sources/ac-voltage-source.ts, src/solver/analog/load-context.ts, src/solver/analog/analog-engine.ts, src/components/sources/ac-current-source.ts, src/solver/analog/__tests__/harness/netlist-generator.ts] carry any edit in the worktree. The MAIN checkout (C:/local_working_projects/digital_in_browser) `git status --porcelain` for those same files is also clean, so the edit did NOT land in the wrong tree by mistake — it was never applied at all. The builder ESCALATED instead of building: progress.json has "vsrc#recon/waveformModel": state=ESCALATED, attempts=0, with three recorded blockers — B1: spec Part A claims ckt->CKTstep/CKTfinalTime are 'already on LoadContext' but LoadContext has neither (only ctx.dt=CKTdelta), so cktStep/cktFinalTime must be ADDED to load-context.ts + populated in the engine builder (the non-noise PULSE/EXP/SINE default guards depend on these); B2: maths-misc#recon/randnumb deterministic RNG (trnoise_state/trrandom_state/CombLCGTaus/f_alpha) is required for the TRNOISE/TRRANDOM arms and the noise arms are blocked until it lands; B3: ac-current-source.ts + netlist-generator.ts were outside the originally-recorded single-tsFile scope. SPEC-PRESENCE gate PASSES — the spec exists at spec/v41-port/reconstruction/vsrc-waveformModel.md (RATIFIED 2026-05-30; REVISED 2026-05-31 'precondition fix, pending re-review' which expands tsFiles to the full five-file set, superseding B3's scope concern, and corrects Part A to ADD cktStep/cktFinalTime rather than claim they pre-exist, confirming B1's substance). I did NOT run the harness GATE (no source change exists to gate) and did NOT flip progress.json to APPLIED. Recon left PENDING/ESCALATED. Builder must re-apply, rooted at C:/local_working_projects/digital_in_browser/.wt/vsrc, against the REVISED spec (which already resolves B1's precondition framing and B3's tsFiles scope); the TRNOISE/TRRANDOM value+coeff+accept arms remain genuinely blocked on maths-misc#recon/randnumb per the spec's own cross-recon dependency (note: a prior commit e98ab61/ae98ad61 shows maths-misc#recon/randnumb APPLIED on this branch, so B2 may now be unblockable — builder should re-check before re-escalating).
+
+## analysis (2026-06-02)
+
+- **source:** `analysis/analysis/acan.c::Modified 2001: AlansFixes`  •  **verdict:** ESCALATE
+  - **note (verbatim):** acan.c#h001 (analysis.md:103-113; ref/ngspice/.../acan.c) adds XSPICE event includes (+#include evt.h/enh.h inside #ifdef XSPICE) plus a comment reindent. digiTS has no XSPICE/event subsystem and no C include layer; ACan is reimplemented as AcAnalysis.run, not transcribed. Pre-image case (c) absent. Legitimate Trigger-1 escalation; confirmed. Not APPLIED, nothing committed.
+
+- **source:** `analysis/analysis/acan.c::do { \`  •  **verdict:** ESCALATE
+  - **note (verbatim):** acan.c#h002 (analysis.md:114-125) is pure C pointer-style cosmetics (ACan(CKTcircuit *ckt) -> CKTcircuit* ckt; ACAN *job=(ACAN *) -> ACAN* job=(ACAN*)) on a function digiTS reimplements as AcAnalysis.run rather than transcribing. No transcription counterpart for the *-spacing delta. Legitimate reimplemented-driver-layer escalation; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/acan.c::CKTacLoad(CKTcircuit *ckt)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** acan.c#h011 (analysis.md:678-686), CKTacLoad. digiTS reimplements AC load via per-element stampAc, not a transcribed CKTacLoad. No case-(a) pre-image (case b/c). Target file ac-analysis.ts shows no change for this hunk. Legitimate reimplemented-driver-layer escalation; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktdojob.c::CKTdoJob(CKTcircuit *ckt, int reset, TSKtask *task)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktdojob.c#h003/#h004/#h005 -> ckt-context.ts::CKTCircuitContext. digiTS has no CKTdoJob method and no TSKtask struct; the task-config (CKTindverbosity/CKTepsmin) is reimplemented as fields on CKTCircuitContext read from ResolvedSimulationParams. Target file ckt-context.ts shows no change. Pre-image case (b)/(c) -- either already-v41 (ledger-sync, kind 1) or no-counterpart (kind 2). Legitimate; user decision per the unit-wide note. Confirmed; not APPLIED.
+
+- **source:** `analysis/analysis/cktic.c::CKTic(CKTcircuit *ckt)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktic.c#h001/#h002 (analysis.md:1596-1612; ref/ngspice/cktic.c:28-36) change CKTrhs[n]=v to CKTrhsOld[n]=CKTrhs[n]=v (six-buffer dual-write). digiTS cktLoad seeds nodeset/IC via a large-conductance stamp, not a CKTrhs/CKTrhsOld ping-pong -- the same buffer-model architecture gap already open as ESC-002. Case-(b)/(c) pre-image; the dual-write target structure is absent. ckt-load.ts shows no change. Legitimate Trigger-1/cross-group escalation; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktncdump.c::CKTncDump(`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktncdump.c#h001 (analysis.md:1669-1677; ref/ngspice/cktncdump.c:24) swaps the node-name filter !strstr(name,"#") -> !strchr(name,'#') on an fprintf-based DC-OP non-convergence debug dump. C-string-API swap on a front-end debug print (the no-counterpart family). dc-operating-point.ts::cktncDump shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktntask.c::CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktntask.c#h001-#h006 -> ckt-context.ts::CKTCircuitContext. digiTS has no CKTnewTask/TSKtask; task allocation+defaults are reimplemented in the CKTCircuitContext constructor reading ResolvedSimulationParams. The new TSKxmu/TSKindverbosity/TSKepsmin/TSKcshunt fields are either pre-applied as TS fields (kind 1) or absent (kind 2). ckt-context.ts shows no change. Legitimate; user decision. Confirmed; not APPLIED.
+
+- **source:** `analysis/analysis/cktop.c::Modified: 2005 Paolo Nenzi - Restructured`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktop.c#h001 -> dc-operating-point.ts::solveDcOperatingPoint. Includes OPtran integration in CKTop, which digiTS has no counterpart for. CKTop is reimplemented as solveDcOperatingPoint; no case-(a) pre-image. dc-operating-point.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktop.c::CKTop (CKTcircuit * ckt, long int firstmode, long int continuemode,`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktop.c#h002 -> solveDcOperatingPoint. Reimplemented driver; the substantive gmin/src control-flow content is already-v41 in dc-operating-point.ts (escalation note kind 1: ledger-sync) so re-applying would double-apply. Case-(b) pre-image. No change in dc-operating-point.ts. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktop.c::CKTconvTest (CKTcircuit * ckt)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktop.c#h003 -> solveDcOperatingPoint. CKTconvTest reimplemented inline in the digiTS NR/DC-OP path; no standalone transcribed function, no case-(a) pre-image. No change in dc-operating-point.ts. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktop.c::dynamic_gmin (CKTcircuit * ckt, long int firstmode,`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktop.c#h004/#h005/#h006 -> solveDcOperatingPoint. dynamic_gmin reimplemented as dynamicGmin; substantive content (MAX(sqrt(factor),1.00005) etc.) already-v41 (kind 1 ledger-sync). Case-(b) pre-image; re-applying double-applies. No change in dc-operating-point.ts. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktop.c::spice3_gmin (CKTcircuit * ckt, long int firstmode,`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktop.c#h007 -> solveDcOperatingPoint. spice3_gmin reimplemented; no case-(a) pre-image (kind 1/2). No change in dc-operating-point.ts. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktop.c::gillespie_src (CKTcircuit * ckt, long int firstmode,`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktop.c#h008/#h009/#h010 -> solveDcOperatingPoint. gillespie_src reimplemented; gminstart capture/restore already-v41 (kind 1 ledger-sync). Case-(b) pre-image. No change in dc-operating-point.ts. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktsetbk.c::CKTsetBreak(CKTcircuit *ckt, double time)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktsetbk.c#h001/#h002 -> timestep.ts::TimestepController. CKTsetBreak reimplemented as TimestepController.addBreakpoint; the AlmostEqualUlps(time,CKTtime,3) guard is already-v41 in timestep.ts (kind 1 ledger-sync). Case-(b) pre-image; re-applying double-applies. timestep.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktsetup.c::CKTsetup(CKTcircuit *ckt)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktsetup.c#h002/#h003/#h004 -> compiler.ts::expandCompositeInstance. CKTsetup reimplemented as MNAEngine._setup/expandCompositeInstance; the prev_CKTlastNode/!CKThead/!DEVices guards and CKTsizeIncr have no digiTS counterpart (case c). compiler.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktsetup.c::CKTunsetup(CKTcircuit *ckt)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktsetup.c#h005/#h006 -> compiler.ts. CKTunsetup is matrix-node teardown; digiTS rebuilds a fresh engine per compile() and has no unsetup/teardown surface (same architectural reason JFETunsetup escalated, ESC-JFET-UNSETUP). Target absent (case c). compiler.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktsopt.c::CKTsetOpt(CKTcircuit *ckt, JOB *anal, int opt, IFvalue *val)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktsopt.c#h002/#h003 -> ckt-context.ts::CKTCircuitContext. digiTS has no CKTsetOpt method nor an integer-indexed option setter; options are typed fields read from ResolvedSimulationParams. No case-(a) pre-image. ckt-context.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/cktsopt.c::static IFparm OPTtbl[] = {`  •  **verdict:** ESCALATE
+  - **note (verbatim):** cktsopt.c#h004-#h008 -> ckt-context.ts. OPTtbl[] is the C option-index IFparm table (OPT_GMIN..OPT_CSHUNT); digiTS has no option-index table (it uses named typed config). The added cshunt/epsmin rows are either pre-applied fields (kind 1) or absent (kind 2). ckt-context.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/ckttrunc.c::CKTtrunc(CKTcircuit *ckt, double *timeStep)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** ckttrunc.c#h001 -> ckt-terr.ts. CKTtrunc reimplemented as cktTerr/cktTerrVoltage; no transcribed CKTtrunc loop, no case-(a) pre-image. ckt-terr.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/dcop.c::DCop(CKTcircuit *ckt, int notused)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** dcop.c#h001 -> dc-operating-point.ts::solveDcOperatingPoint. DCop reimplemented; firstmode=(CKTmode&MODEUIC)|MODEDCOP|MODEINITJCT logic present but not a transcribed DCop function (case b). dc-operating-point.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/dctran.c::extern struct dbcomm *dbs;`  •  **verdict:** ESCALATE
+  - **note (verbatim):** dctran.c#h001/#h002 -> analog-engine.ts::MNAEngine.stepToTime. File-level C externs/debugger globals (dbcomm *dbs) with no digiTS counterpart (case c). analog-engine.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/dctran.c::DCtran(CKTcircuit *ckt,`  •  **verdict:** ESCALATE
+  - **note (verbatim):** dctran.c#h003-#h010 -> analog-engine.ts::MNAEngine.stepToTime. DCtran reimplemented as MNAEngine.stepToTime; the breakpoint-pop while-loop + autostop predicate are already-v41 in timestep.ts:556-578 (kind 1 ledger-sync), the CKTmaxStep/(finalTime-initTime)/50 + nostepsizelimit derivation has no counterpart (digiTS takes params.maxTimeStep, kind 2). Case-(b)/(c). analog-engine.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/dctran.c::resume:`  •  **verdict:** ESCALATE
+  - **note (verbatim):** dctran.c#h011-#h014 -> analog-engine.ts::MNAEngine.stepToTime. The C 'resume:' goto-label transient-resume block is reimplemented as MNAEngine.stepToTime control flow; no goto/label counterpart (case c). analog-engine.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/tfanal.c::TFanal(CKTcircuit *ckt, int restart)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** tfanal.c#h001/#h002 -> dc-operating-point.ts .tf driver. Sequencing-blocked on reconstruction item analysis#recon/tf (PENDING, specExists:false) per ESC-001: no .tf driver exists in digiTS, and the 2 GENnode accessor-rename hunks are only applicable once the driver exists. Legitimate blocked/sequencing escalation; confirmed. Not APPLIED, left untouched.
+
+- **source:** `analysis/analysis/traninit.c::Modified: 2000 AlansFixes`  •  **verdict:** ESCALATE
+  - **note (verbatim):** traninit.c#h001 -> analog-engine.ts::MNAEngine.init. File-header/include-region hunk on TRANinit, which digiTS reimplements as MNAEngine.init; no transcribed counterpart, no case-(a) pre-image. analog-engine.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/traninit.c::int TRANinit(CKTcircuit	*ckt, JOB *anal)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** traninit.c#h002 -> analog-engine.ts::MNAEngine.init. TRANinit reimplemented as MNAEngine.init reading typed params (not a JOB/TSKtask); no case-(a) pre-image. analog-engine.ts shows no change. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/transetp.c::TRANsetParm(CKTcircuit *ckt, JOB *anal, int which, IFvalue *value)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** transetp.c#h001 -> analog-engine.ts::MNAEngine.init. digiTS has no TRANsetParm method; transient params are typed and validated at the facade (escalation kind 2). NOTE: this is the TRAN twin of acsetp.c (group 5) -- but unlike group 5, the applier did NOT write a counterpart edit into analog-engine.ts (analog-engine.ts shows no change), so the no-counterpart claim holds here. Legitimate; confirmed. Not APPLIED.
+
+- **source:** `analysis/analysis/acan.c::ACan(CKTcircuit *ckt, int restart)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** tsFile src/solver/analog/ac-analysis.ts carries NO edit in the worktree (git diff --name-only = {spec/v41-port/ESCALATIONS.md, progress.json} only; not staged either). The applier deliberately ESCALATED (progress.json: all of h003-h010 state=ESCALATED, attempts=0, reason=pre-image-absent) rather than misrouting an edit — internally consistent, not the EMPTY-DIFF-CATCH misapply case. The earlier stray uncommitted fStart/fStop<0.0 throws (which a prior verifier review bounced groups 3/5 over) have been WITHDRAWN: run() (ac-analysis.ts:245-348) has no such throw and buildFrequencyArray (567-612) has no startfreq guard. Independent pre-image check vs ref/ngspice/src/spicelib/analysis/acan.c:44-395: ACan is the AC driver (INIT/UPDATE_STATS, XSPICE evt.h/enh.h/IPC, CKTop/CKTncDump/OUTpBeginPlot/fprintf/runDesc, freqDelta switch 84-112, sweep loop), reimplemented as AcAnalysis.run + buildFrequencyArray. Only behavioral counterpart is the DEC freqDelta, and buildFrequencyArray:589-590 already carries the v41 form numSteps=floor(|log10(stop/start)|*n); freqDelta=exp(log(stop/start)/numSteps) (= acan.c:89-90), NOT the v26 exp(log(10.0)/numberSteps) — so the v26 - line is absent (case c / already-v41). startfreq<=0 E_PARMVAL guards (acan.c:85-88,94-97) + fprintf(stderr,'ERROR: AC startfreq <= 0') have no TS image. h003,h005-h010 are XSPICE/IPC/OUTpBeginPlot/fprintf/runDesc + C star-spacing/brace/comment cosmetics over absent constructs. No case-(a) pre-image in any of h003-h010. Escalation reason sound; surfaced kind1-ledger-sync vs kind2-NO-COUNTERPART/sequenced-port decision is a user/planning action the applier cannot self-assign. Left PENDING/ESCALATED; nothing committed. Appended scoped verifier confirmation to spec/v41-port/ESCALATIONS.md.
+
+- **source:** `analysis/analysis/acsetp.c::ACsetParm(CKTcircuit *ckt, JOB *anal, int which, IFvalue *value)`  •  **verdict:** ESCALATE
+  - **note (verbatim):** tsFile src/solver/analog/ac-analysis.ts carries NO edit in the worktree; applier ESCALATED both hunks (progress.json: acsetp.c#h001 hash b0ef899ebf4d7700, #h002 hash 510d9e50acfb748a, both state=ESCALATED attempts=0 reason=pre-image-absent) — consistent escalation, not a misrouted edit. Independent pre-image check vs ref/ngspice/src/spicelib/analysis/acsetp.c:16-82: ACsetParm is a switch(which) IFparm setter on the ACAN job struct (AC_START/AC_STOP validate value->rValue<0.0, set errMsg=copy(...), return E_PARMVAL). digiTS AcAnalysis.run takes a typed AcParams object: there is no ACsetParm method, no ACAN struct, no switch(which) dispatch, no errMsg/E_PARMVAL — the param validation lives at the facade/netlist layer. The v26 - lines (if value->rValue <= 0.0 { errMsg=copy('Frequency of 0 is invalid for AC start/stop') }) have no case-(a) pre-image in this file -> case (c). The earlier stray fStart/fStop<0.0 throws a prior verifier flagged here have been withdrawn (run() lines 245-348 contain none). Escalation substantively correct: digiTS reimplements the ACsetParm driver rather than transcribing it; the kind1/kind2 classification decision is a user/planning action. Left PENDING/ESCALATED; nothing committed. Scoped verifier confirmation appended to spec/v41-port/ESCALATIONS.md.
