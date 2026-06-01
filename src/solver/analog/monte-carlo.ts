@@ -209,38 +209,226 @@ export type CircuitFactory = (
 ) => ConcreteCompiledAnalogCircuit;
 
 // ---------------------------------------------------------------------------
-// SeededRng  multiplicative LCG for reproducible random sampling
+// SeededRng  combined Tausworthe/LCG generator (ngspice randnumb.c)
 // ---------------------------------------------------------------------------
 
 /**
- * A seeded pseudo-random number generator using the Park-Miller LCG.
+ * Seeded pseudo-random number generator: the combined three-component
+ * Tausworthe / LCG generator from ngspice's `randnumb.c`.
  *
- * Produces uniformly distributed values in (0, 1) and Gaussian samples via
- * the Box-Muller transform.
+ * Two independent state quartets drive two generators that share the same
+ * `TauS`/`LGCS` recurrences (`randnumb.c:54-59`):
+ *   - `_s1.._s4` feed `combLCGTaus()` (the `[0,1)` double, `randnumb.c:140-148`)
+ *     and `drand()` (the `[-1,+1)` uniform, `randnumb.c:95-98`);
+ *   - `_s5.._s8` feed `combLCGTausInt()` (the 32-bit unsigned integer variate,
+ *     `randnumb.c:154-162`).
+ *
+ * Gaussian samples use the polar (Marsaglia) Box-Muller form
+ * (`gauss0`/`gauss1`/`rgauss`, `randnumb.c:195-254`). `poisson` and `exprand`
+ * (`randnumb.c:260-283`) supply the Poisson and exponential variates.
+ *
+ * The eight state words are 32-bit unsigned quantities in C; every shift, xor,
+ * mask, and multiply is forced back to uint32 with `>>> 0` (and the LCG product
+ * formed with `Math.imul`) so the advance is bit-identical to C's `unsigned`
+ * arithmetic.
  */
 export class SeededRng {
-  private _state: number;
+  /** Double-generator Tausworthe words (randnumb.c:54). */
+  private _s1: number;
+  private _s2: number;
+  private _s3: number;
+  /** Double-generator LCG word (randnumb.c:55). */
+  private _s4: number;
+  /** Integer-generator Tausworthe words (randnumb.c:58). */
+  private _s5: number;
+  private _s6: number;
+  private _s7: number;
+  /** Integer-generator LCG word (randnumb.c:59). */
+  private _s8: number;
+
+  /** Polar Box-Muller cached-second-value latch (randnumb.c:197-198). */
+  private _gliset = true;
+  private _glgset = 0.0;
 
   constructor(seed: number) {
-    this._state = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
+    // randnumb.c:101-115 — seed eight generator words into [129, 32767].
+    // ngspice draws each from libc rand()/RAND_MAX; digiTS drives a
+    // deterministic per-seed expander (a splitmix step) so the same `seed`
+    // yields the same eight words, preserving TausSeed's [129, 32767]
+    // placement and the >128 floor (randnumb.c:103-104).
+    let x = (Math.abs(Math.floor(seed)) >>> 0) || 1;
+    const draw = (): number => {
+      x = (x + 0x9e3779b9) >>> 0;
+      let z = x;
+      z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
+      z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
+      z = (z ^ (z >>> 16)) >>> 0;
+      return z / 4294967296;
+    };
+    // randnumb.c:108-115 — (rand()/RAND_MAX * 32638) + 129, eight words.
+    this._s1 = Math.floor(draw() * 32638) + 129;
+    this._s2 = Math.floor(draw() * 32638) + 129;
+    this._s3 = Math.floor(draw() * 32638) + 129;
+    this._s4 = Math.floor(draw() * 32638) + 129;
+    this._s5 = Math.floor(draw() * 32638) + 129;
+    this._s6 = Math.floor(draw() * 32638) + 129;
+    this._s7 = Math.floor(draw() * 32638) + 129;
+    this._s8 = Math.floor(draw() * 32638) + 129;
   }
 
-  /** Return the next value in (0, 1). */
+  /**
+   * Inject the eight `CombState1..8` words directly, bypassing the per-seed
+   * expander. The harness uses this to seed digiTS with ngspice's
+   * post-`TausSeed` state so both engines run the identical bit stream
+   * (RNG-1 = SEED-INJECTION). Each word is forced to uint32.
+   */
+  setState(
+    s1: number,
+    s2: number,
+    s3: number,
+    s4: number,
+    s5: number,
+    s6: number,
+    s7: number,
+    s8: number,
+  ): void {
+    this._s1 = s1 >>> 0;
+    this._s2 = s2 >>> 0;
+    this._s3 = s3 >>> 0;
+    this._s4 = s4 >>> 0;
+    this._s5 = s5 >>> 0;
+    this._s6 = s6 >>> 0;
+    this._s7 = s7 >>> 0;
+    this._s8 = s8 >>> 0;
+  }
+
+  // randnumb.c:125-129 — one Tausworthe component: shift-xor-shift mixing word
+  // b, then update the state by masking, left-shifting C3, and xoring b. All
+  // ops are 32-bit unsigned; >>> 0 forces JS back to uint32 after each step.
+  private tauS(state: number, c1: number, c2: number, c3: number, m: number): number {
+    const b = (((state << c1) ^ state) >>> c2) >>> 0;
+    return (((((state & m) >>> 0) << c3) >>> 0) ^ b) >>> 0;
+  }
+
+  // randnumb.c:131-134 — linear-congruential step state = A1*state + A2,
+  // wrapped to uint32. Math.imul gives the low-32-bit product C's unsigned
+  // multiply yields.
+  private lgcs(state: number, a1: number, a2: number): number {
+    return (Math.imul(a1, state) + a2) >>> 0;
+  }
+
+  // randnumb.c:140-148 — combine three Tausworthe components and one LCG by
+  // xor, scale by 1/2^32 to land in [0,1). The xor operands advance their state
+  // words in place, left-to-right.
+  combLCGTaus(): number {
+    this._s1 = this.tauS(this._s1, 13, 19, 12, 0xfffffffe);
+    this._s2 = this.tauS(this._s2, 2, 25, 4, 0xfffffff8);
+    this._s3 = this.tauS(this._s3, 3, 11, 17, 0xfffffff0);
+    this._s4 = this.lgcs(this._s4, 1664525, 1013904223);
+    const combined = (this._s1 ^ this._s2 ^ this._s3 ^ this._s4) >>> 0;
+    return 2.3283064365387e-10 * combined;
+  }
+
+  // randnumb.c:154-162 — 32-bit unsigned variate from the second state quartet;
+  // same TauS/LGCS recurrences as combLCGTaus, no [0,1) scaling.
+  combLCGTausInt(): number {
+    this._s5 = this.tauS(this._s5, 13, 19, 12, 0xfffffffe);
+    this._s6 = this.tauS(this._s6, 2, 25, 4, 0xfffffff8);
+    this._s7 = this.tauS(this._s7, 3, 11, 17, 0xfffffff0);
+    this._s8 = this.lgcs(this._s8, 1664525, 1013904223);
+    return (this._s5 ^ this._s6 ^ this._s7 ^ this._s8) >>> 0;
+  }
+
+  // randnumb.c:95-98 — map combLCGTaus()'s [0,1) onto [-1,+1).
+  drand(): number {
+    return 2.0 * this.combLCGTaus() - 1.0;
+  }
+
+  /** Return the next value in [0, 1). Re-rooted onto combLCGTaus(). */
   next(): number {
-    this._state = (this._state * 16807) % 2147483647;
-    return this._state / 2147483647;
+    return this.combLCGTaus();
   }
 
-  /** Sample from N(0, 1) using Box-Muller transform. */
+  // randnumb.c:195-215 — polar (Marsaglia) Box-Muller, two normals per uniform
+  // pair. On the cached call return the stored partner value; the
+  // gliset/glgset latch is instance state so the consumption pattern matches
+  // per stream.
+  gauss0(): number {
+    if (this._gliset) {
+      let v1: number, v2: number, r: number;
+      do {
+        v1 = 2.0 * this.combLCGTaus() - 1.0; // randnumb.c:202
+        v2 = 2.0 * this.combLCGTaus() - 1.0; // randnumb.c:203
+        r = v1 * v1 + v2 * v2; // randnumb.c:204
+      } while (r >= 1.0); // randnumb.c:205
+      const fac = Math.sqrt((-2.0 * Math.log(r)) / r); // randnumb.c:207
+      this._glgset = v1 * fac; // randnumb.c:208
+      this._gliset = false; // randnumb.c:209
+      return v2 * fac; // randnumb.c:210
+    } else {
+      this._gliset = true; // randnumb.c:212
+      return this._glgset; // randnumb.c:213
+    }
+  }
+
+  // randnumb.c:220-231 — same polar draw as gauss0 but with no caching latch:
+  // two uniforms per call, returns v2*fac every call (the reproducible gauss).
+  gauss1(): number {
+    let v1: number, v2: number, r: number;
+    do {
+      v1 = 2.0 * this.combLCGTaus() - 1.0;
+      v2 = 2.0 * this.combLCGTaus() - 1.0;
+      r = v1 * v1 + v2 * v2;
+    } while (r >= 1.0);
+    const fac = Math.sqrt((-2.0 * Math.log(r)) / r);
+    return v2 * fac;
+  }
+
+  // randnumb.c:240-254 — polar Box-Muller delivering BOTH normals per call.
+  // w = sqrt(-2*log(w)/w); py1 = x1*w, py2 = x2*w.
+  rgauss(): [number, number] {
+    let x1: number, x2: number, w: number;
+    do {
+      x1 = 2.0 * this.combLCGTaus() - 1.0;
+      x2 = 2.0 * this.combLCGTaus() - 1.0;
+      w = x1 * x1 + x2 * x2;
+    } while (w >= 1.0);
+    w = Math.sqrt((-2.0 * Math.log(w)) / w);
+    return [x1 * w, x2 * w];
+  }
+
+  /** Sample from N(0, 1). Re-rooted onto the polar gauss0(). */
   gaussian(): number {
-    const u1 = this.next();
-    const u2 = this.next();
-    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return this.gauss0();
   }
 
-  /** Sample from Uniform(-1, 1). */
+  /** Sample from Uniform(-1, 1). Re-rooted onto drand(). */
   uniform(): number {
-    return this.next() * 2 - 1;
+    return this.drand();
+  }
+
+  // randnumb.c:260-274 — Knuth-style Poisson via one uniform: accumulate the
+  // Poisson CDF P*=lambda/k until it meets the uniform draw p; cap at
+  // max_k=1000.
+  poisson(lambda: number): number {
+    const maxK = 1000; // randnumb.c:263
+    const p = this.combLCGTaus(); // randnumb.c:264
+    let P = Math.exp(-lambda); // randnumb.c:265
+    let sum = P; // randnumb.c:266
+    if (sum >= p) return 0; // randnumb.c:267
+    let k = 1;
+    for (; k < maxK; ++k) {
+      // randnumb.c:268
+      P *= lambda / k; // randnumb.c:269
+      sum += P; // randnumb.c:270
+      if (sum >= p) break; // randnumb.c:271
+    }
+    return k; // randnumb.c:273
+  }
+
+  // randnumb.c:278-283 — exponential variate -log(u)*mean from one uniform.
+  exprand(mean: number): number {
+    return -Math.log(this.combLCGTaus()) * mean; // randnumb.c:281
   }
 }
 

@@ -495,11 +495,13 @@ describe("Sweep", () => {
 // ===========================================================================
 
 describe("SeededRng", () => {
-  it("produces values in (0, 1)", () => {
+  it("produces values in [0, 1)", () => {
+    // combLCGTaus() lands in [0,1): 1/2^32 * (uint32 combine) — 0 is reachable,
+    // 1 is not (randnumb.c:140-148).
     const rng = new SeededRng(42);
     for (let i = 0; i < 1000; i++) {
       const v = rng.next();
-      expect(v).toBeGreaterThan(0);
+      expect(v).toBeGreaterThanOrEqual(0);
       expect(v).toBeLessThan(1);
     }
   });
@@ -525,8 +527,104 @@ describe("SeededRng", () => {
     const mean = sum / n;
     let sumSq = 0;
     for (const v of values) sumSq += (v - mean) ** 2;
-    Math.sqrt(sumSq / n);
+    const std = Math.sqrt(sumSq / n);
+    // Polar Box-Muller (randnumb.c:195-215) → standard normal.
+    expect(Math.abs(mean)).toBeLessThan(0.1);
+    expect(std).toBeGreaterThan(0.9);
+    expect(std).toBeLessThan(1.1);
+  });
 
+  it("drand produces values in [-1, +1)", () => {
+    // randnumb.c:95-98 — 2*CombLCGTaus()-1.
+    const rng = new SeededRng(42);
+    for (let i = 0; i < 1000; i++) {
+      const v = rng.drand();
+      expect(v).toBeGreaterThanOrEqual(-1);
+      expect(v).toBeLessThan(1);
+    }
+  });
+
+  it("setState injection makes two streams bit-identical", () => {
+    // RNG-1 = SEED-INJECTION: both engines seeded from the same CombState1..8
+    // produce the identical bit stream (Acceptance #6, #9).
+    const a = new SeededRng(1);
+    const b = new SeededRng(999999);
+    a.setState(129, 130, 131, 132, 133, 135, 137, 138);
+    b.setState(129, 130, 131, 132, 133, 135, 137, 138);
+    for (let i = 0; i < 200; i++) {
+      expect(a.combLCGTaus()).toBe(b.combLCGTaus());
+    }
+    for (let i = 0; i < 200; i++) {
+      expect(a.combLCGTausInt()).toBe(b.combLCGTausInt());
+    }
+  });
+
+  it("combLCGTausInt returns a uint32", () => {
+    // randnumb.c:154-162 — raw 32-bit unsigned combine, no scaling.
+    const rng = new SeededRng(5);
+    for (let i = 0; i < 1000; i++) {
+      const v = rng.combLCGTausInt();
+      expect(Number.isInteger(v)).toBe(true);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(0xffffffff);
+    }
+  });
+
+  it("gauss0 caching latch returns the stored partner on the off-call", () => {
+    // randnumb.c:195-215 — on the cached call gauss0 consumes no uniforms and
+    // returns glgset = v1*fac. Reproduce the latch directly from two streams
+    // seeded identically: stream A calls gauss0 twice; stream B reconstructs
+    // the polar pair from raw uniforms.
+    const a = new SeededRng(0);
+    const b = new SeededRng(0);
+    a.setState(11, 22, 33, 44, 55, 66, 77, 88);
+    b.setState(11, 22, 33, 44, 55, 66, 77, 88);
+
+    const first = a.gauss0();
+    const second = a.gauss0(); // off-call: returns the cached glgset
+
+    let v1: number, v2: number, r: number;
+    do {
+      v1 = 2.0 * b.combLCGTaus() - 1.0;
+      v2 = 2.0 * b.combLCGTaus() - 1.0;
+      r = v1 * v1 + v2 * v2;
+    } while (r >= 1.0);
+    const fac = Math.sqrt((-2.0 * Math.log(r)) / r);
+    expect(first).toBe(v2 * fac);
+    expect(second).toBe(v1 * fac);
+  });
+
+  it("gauss1 and rgauss draw two uniforms per call", () => {
+    // randnumb.c:220-231 (gauss1) and :240-254 (rgauss) share the polar loop.
+    const rng = new SeededRng(3);
+    const g = rng.gauss1();
+    expect(Number.isFinite(g)).toBe(true);
+    const [y1, y2] = rng.rgauss();
+    expect(Number.isFinite(y1)).toBe(true);
+    expect(Number.isFinite(y2)).toBe(true);
+  });
+
+  it("exprand is non-negative and reproducible per seed", () => {
+    // randnumb.c:278-283 — -log(u)*mean, u in [0,1) so the variate is >= 0.
+    const a = new SeededRng(17);
+    const b = new SeededRng(17);
+    for (let i = 0; i < 100; i++) {
+      const ea = a.exprand(2.0);
+      const eb = b.exprand(2.0);
+      expect(ea).toBe(eb);
+      expect(ea).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("poisson returns a non-negative integer within [0, 1000]", () => {
+    // randnumb.c:260-274 — Knuth CDF accumulation capped at max_k=1000.
+    const rng = new SeededRng(8);
+    for (let i = 0; i < 500; i++) {
+      const k = rng.poisson(4.0);
+      expect(Number.isInteger(k)).toBe(true);
+      expect(k).toBeGreaterThanOrEqual(0);
+      expect(k).toBeLessThanOrEqual(1000);
+    }
   });
 });
 
