@@ -1,0 +1,850 @@
+{
+  "circuit": {
+    "description": "Top circuit instantiating the cs_stage common-source NMOS subcircuit once via domain-agnostic Ports. VGS DC source drives gate input (IN), VDD DC source drives the VDD rail port, RLOAD on OUT to ground. Gate fixture for engine#recon/nodeAllocOrder criterion 10: composite-internal node allocation order for a 3-terminal active (NMOS) sub-element.",
+    "elements": [
+      {
+        "id": "115405c6-3118-4a99-b508-0f410570a0d6",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 3
+          },
+          "label": "VGS",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 3
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "e674ff7f-ec2e-42f8-afec-6146decbd044",
+        "position": {
+          "x": 0,
+          "y": 5
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "VDD",
+          "position": [
+            0,
+            8
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "ca63515a-93b9-47b8-8203-11cc76be1d00",
+        "position": {
+          "x": 0,
+          "y": 10
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100000
+          },
+          "label": "RLOAD",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 100000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "5b5fd3fc-3388-49e3-8248-d660907d7c58",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "label": "GND_VGS",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "6a7ac90e-d5d4-416f-9cab-06e100d95443",
+        "position": {
+          "x": 12,
+          "y": 5
+        },
+        "properties": {
+          "label": "GND_VDD",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "64f69d6c-bd14-46d8-9d5f-1d0a294b8c78",
+        "position": {
+          "x": 12,
+          "y": 9
+        },
+        "properties": {
+          "label": "GND_LOAD",
+          "position": [
+            0,
+            40
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "a41ed7a1-a634-49ae-83e8-a3ba76d8df0c",
+        "position": {
+          "x": 52,
+          "y": 98
+        },
+        "properties": {
+          "label": "STAGE1",
+          "position": [
+            52,
+            98
+          ]
+        },
+        "rotation": 0,
+        "type": "cs_stage"
+      }
+    ],
+    "name": "composite-mosfet-stage",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 12,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 0
+          },
+          {
+            "x": 12,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 5
+          },
+          {
+            "x": -1,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 5
+          },
+          {
+            "x": 6,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 5
+          },
+          {
+            "x": 6,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 10
+          },
+          {
+            "x": 5,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 10
+          },
+          {
+            "x": 9,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 10
+          },
+          {
+            "x": 9,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 0
+          },
+          {
+            "x": 52,
+            "y": 98
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 5
+          },
+          {
+            "x": 52,
+            "y": 99
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 52,
+            "y": 100
+          },
+          {
+            "x": 0,
+            "y": 10
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "subcircuitDefinitions": {
+    "cs_stage": {
+      "description": "Common-source NMOS stage subcircuit using domain-agnostic Port interfaces. Gate=IN port, drain to internal net DRN through load resistor from VDD port, DRN to OUT port via series resistor, source to ground. Exercises composite-internal node allocation for a 3-terminal active sub-element (NMOS D/G/S).",
+      "elements": [
+        {
+          "id": "1cdca1fb-0adf-48ad-820d-5db4a511c2dd",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "properties": {
+            "label": "IN",
+            "position": [
+              0,
+              0
+            ]
+          },
+          "rotation": 0,
+          "type": "Port"
+        },
+        {
+          "id": "8080522f-fad3-47a7-8bd5-e9f80a2af68b",
+          "position": {
+            "x": 0,
+            "y": 4
+          },
+          "properties": {
+            "label": "VDD",
+            "position": [
+              0,
+              8
+            ]
+          },
+          "rotation": 0,
+          "type": "Port"
+        },
+        {
+          "id": "a7fb5aaa-2ce2-494a-a741-dd507a4e9f42",
+          "position": {
+            "x": 46,
+            "y": 0
+          },
+          "properties": {
+            "label": "OUT",
+            "position": [
+              0,
+              16
+            ]
+          },
+          "rotation": 0,
+          "type": "Port"
+        },
+        {
+          "id": "10fd92f6-52c1-4620-8dbb-21661b736c92",
+          "position": {
+            "x": 22,
+            "y": 1
+          },
+          "properties": {
+            "_modelParams": {
+              "KP": 0.00005,
+              "L": 0.000001,
+              "LAMBDA": 0.02,
+              "VTO": 1,
+              "W": 0.00001
+            },
+            "label": "M1",
+            "model": "spice-l1",
+            "position": [
+              0,
+              24
+            ]
+          },
+          "rotation": 0,
+          "type": "NMOS"
+        },
+        {
+          "id": "f6450c75-d030-4522-82cb-3110c4031745",
+          "position": {
+            "x": 10,
+            "y": 4
+          },
+          "properties": {
+            "_modelParams": {
+              "resistance": 10000
+            },
+            "label": "RD",
+            "position": [
+              0,
+              32
+            ],
+            "resistance": 10000
+          },
+          "rotation": 0,
+          "type": "Resistor"
+        },
+        {
+          "id": "c14599dd-1808-4253-b6b6-ce25ee06513b",
+          "position": {
+            "x": 34,
+            "y": 1
+          },
+          "properties": {
+            "_modelParams": {
+              "resistance": 1000
+            },
+            "label": "ROUT",
+            "position": [
+              0,
+              40
+            ],
+            "resistance": 1000
+          },
+          "rotation": 0,
+          "type": "Resistor"
+        },
+        {
+          "id": "1314ea47-242b-4951-9dc1-4f2ed8f061eb",
+          "position": {
+            "x": 46,
+            "y": 4
+          },
+          "properties": {
+            "label": "GND_S",
+            "position": [
+              0,
+              48
+            ]
+          },
+          "rotation": 0,
+          "type": "Ground"
+        }
+      ],
+      "name": "cs_stage",
+      "wires": [
+        {
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": -1,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 22,
+              "y": 1
+            },
+            {
+              "x": 21,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": -1,
+              "y": 0
+            },
+            {
+              "x": 10,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 10,
+              "y": 0
+            },
+            {
+              "x": 16,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 16,
+              "y": 0
+            },
+            {
+              "x": 16,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 16,
+              "y": 1
+            },
+            {
+              "x": 21,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 0,
+              "y": 4
+            },
+            {
+              "x": -1,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 10,
+              "y": 4
+            },
+            {
+              "x": 9,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": -1,
+              "y": 4
+            },
+            {
+              "x": 9,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 14,
+              "y": 4
+            },
+            {
+              "x": 15,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 26,
+              "y": 0
+            },
+            {
+              "x": 27,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 15,
+              "y": 4
+            },
+            {
+              "x": 28,
+              "y": 4
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 28,
+              "y": 4
+            },
+            {
+              "x": 28,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 28,
+              "y": 0
+            },
+            {
+              "x": 27,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 26,
+              "y": 0
+            },
+            {
+              "x": 29,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 34,
+              "y": 1
+            },
+            {
+              "x": 33,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 29,
+              "y": 0
+            },
+            {
+              "x": 31,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 31,
+              "y": 0
+            },
+            {
+              "x": 31,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 31,
+              "y": 1
+            },
+            {
+              "x": 33,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 38,
+              "y": 1
+            },
+            {
+              "x": 39,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 46,
+              "y": 0
+            },
+            {
+              "x": 45,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 39,
+              "y": 1
+            },
+            {
+              "x": 42,
+              "y": 1
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 42,
+              "y": 1
+            },
+            {
+              "x": 42,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 42,
+              "y": 0
+            },
+            {
+              "x": 45,
+              "y": 0
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 26,
+              "y": 2
+            },
+            {
+              "x": 27,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 46,
+              "y": 4
+            },
+            {
+              "x": 46,
+              "y": 3
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 27,
+              "y": 2
+            },
+            {
+              "x": 31,
+              "y": 2
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 31,
+              "y": 2
+            },
+            {
+              "x": 31,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 31,
+              "y": 5
+            },
+            {
+              "x": 34,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 34,
+              "y": 5
+            },
+            {
+              "x": 40,
+              "y": 5
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 40,
+              "y": 5
+            },
+            {
+              "x": 40,
+              "y": 3
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "x": 40,
+              "y": 3
+            },
+            {
+              "x": 46,
+              "y": 3
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "version": 1
+}
