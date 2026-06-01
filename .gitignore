@@ -12,3 +12,7 @@ test-results/
 dist/
 spec/
 .tmp_*
+# port-loop worktree isolation (runtime)
+.mcp-active-tree
+.wt/
+.wt-failed/

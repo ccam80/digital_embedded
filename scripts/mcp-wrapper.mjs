@@ -15,6 +15,8 @@
 
 import { spawn } from "child_process";
 import { createInterface } from "readline";
+import { readFileSync, existsSync, statSync } from "fs";
+import { join } from "path";
 
 // -- Config ------------------------------------------------------------------
 
@@ -35,10 +37,37 @@ const suppressedIds = new Set();
 
 // -- Child lifecycle ---------------------------------------------------------
 
+/**
+ * Resolve the child server's working directory.
+ *
+ * Worktree isolation: the port-loop driver can point the harness MCP at a
+ * throwaway per-unit git worktree by writing that worktree's absolute path to
+ * `.mcp-active-tree` (in the wrapper's launch dir). On each (re)spawn we read it;
+ * absent/empty/invalid -> the wrapper's own cwd (the main checkout). ANY error
+ * falls back to cwd, so a missing or stale control file can never wedge the
+ * server. The driver writes the base path back (or removes the file) when a unit
+ * finishes, so the live MCP returns to the main tree.
+ */
+function resolveChildCwd() {
+  try {
+    const f = join(process.cwd(), ".mcp-active-tree");
+    if (existsSync(f)) {
+      const p = readFileSync(f, "utf8").trim();
+      if (p && existsSync(p) && statSync(p).isDirectory()) {
+        process.stderr.write(`[mcp-wrapper] active tree: ${p}\n`);
+        return p;
+      }
+    }
+  } catch (err) {
+    process.stderr.write(`[mcp-wrapper] .mcp-active-tree unreadable (${err.message}); using cwd\n`);
+  }
+  return process.cwd();
+}
+
 function spawnChild() {
   child = spawn(CHILD_CMD, CHILD_ARGS, {
     stdio: ["pipe", "pipe", "inherit"], // inherit stderr for diagnostics
-    cwd: process.cwd(),
+    cwd: resolveChildCwd(),
   });
 
   // Child stdout → client stdout (proxy responses back)

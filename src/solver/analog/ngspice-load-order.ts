@@ -325,8 +325,8 @@ export function deckOrder<T extends { typeId: string }>(
  *
  * Only typeIds that carry a SPICE card (an `NGSPICE_LOAD_ORDER` / family entry)
  * are checked; genuinely card-less composite outer typeIds legitimately have no
- * row- their sub-element lines drive numbering, so they take the pinLayout
- * fallback by design.
+ * row- their sub-element lines drive node numbering, so the pinLayout order
+ * applies to them and is correct.
  */
 export function auditDeckPinOrderCoverage(analogTypeIds: readonly string[]): void {
   for (const typeId of analogTypeIds) {
