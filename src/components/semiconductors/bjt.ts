@@ -27,6 +27,7 @@ import {
 } from "../../core/registry.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import {
   MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
@@ -2089,6 +2090,90 @@ export function createSpiceL1BjtElement(
       // cite: bjtload.c:841-842  BJTbaseColPrimePtr / BJTcolPrimeBasePtr += -geqbx/+(-geqbx).
       solver.stampElement(this._hBCP,  m * -geqbx);
       solver.stampElement(this._hCPB,  m * -geqbx);
+    }
+
+    /**
+     * AC small-signal stamp mirroring bjtacld.c::BJTacLoad. Reuses the matrix
+     * handles allocated once in setup() (the BJTsetup TSTALLOC / BJTacLoad
+     * pure-stamp function boundary — no allocation here). The real conductances
+     * (gpi/gmu/gm/go/gx/gcpr/gepr) and the capacitive charge state slots
+     * (cqbe/cqbc/cqbx/cqsub/cexbc) are the small-signal parameters saved by
+     * load() during the preceding DC operating point.
+     *
+     * Under the unified SparseSolver each handle addresses both the real half
+     * (stampElement) and the imaginary half (stampElementImag, the `+1` offset
+     * in ngspice's `*(ptr+1)` complex-cell slot) of one matrix cell.
+     */
+    stampAc(solver: SparseSolverStamp, omega: number): void {
+      const base = this._stateBase;
+      const s0 = this._pool.states[0];
+
+      // bjtacld.c:45 — m = here->BJTm.
+      const m = params.M;
+
+      // bjtacld.c:47-52 — gcpr/gepr terminal conductances (area-scaled per v26
+      // gcpr = BJTtcollectorConduct * BJTarea) and the saved gpi/gmu/gm/go.
+      const gcpr = tp.tcollectorConduct * params.AREA;
+      const gepr = tp.temitterConduct * params.AREA;
+      const gpi = s0[base + SLOT_GPI];
+      const gmu = s0[base + SLOT_GMU];
+      let gm = s0[base + SLOT_GM];
+      const go = s0[base + SLOT_GO];
+
+      // bjtacld.c:56-63 — excess-phase rotation of gm.
+      let xgm = 0;
+      const td = tp.excessPhaseFactor;
+      if (td !== 0) {
+        const arg = td * omega;
+        gm = gm + go;
+        xgm = -gm * Math.sin(arg);
+        gm = gm * Math.cos(arg) - go;
+      }
+      // bjtacld.c:64 — gx (base-resistance conductance).
+      const gx = s0[base + SLOT_GX];
+      // bjtacld.c:65-69 — capacitive susceptances ωC for each junction charge.
+      const xcpi = s0[base + SLOT_CQBE] * omega;
+      const xcmu = s0[base + SLOT_CQBC] * omega;
+      const xcbx = s0[base + SLOT_CQBX] * omega;
+      const xcsub = s0[base + SLOT_CQSUB] * omega;
+      const xcmcb = s0[base + SLOT_CEXBC] * omega;
+
+      // bjtacld.c:71-106 — complex matrix stamps (real half via stampElement,
+      // imaginary half `*(ptr+1)` via stampElementImag), line-for-line.
+      solver.stampElement(this._hCC,   m * (gcpr));                  // BJTcolColPtr
+      solver.stampElement(this._hBB,   m * (gx));                    // BJTbaseBasePtr
+      solver.stampElementImag(this._hBB,   m * (xcbx));              // BJTbaseBasePtr + 1
+      solver.stampElement(this._hEE,   m * (gepr));                  // BJTemitEmitPtr
+      solver.stampElement(this._hCPCP, m * (gmu + go + gcpr));       // BJTcolPrimeColPrimePtr
+      solver.stampElementImag(this._hCPCP, m * (xcmu + xcbx));       // BJTcolPrimeColPrimePtr + 1
+      solver.stampElementImag(this._hSubstConSubstCon, m * (xcsub)); // BJTsubstConSubstConPtr + 1
+      solver.stampElement(this._hBPBP, m * (gx + gpi + gmu));        // BJTbasePrimeBasePrimePtr
+      solver.stampElementImag(this._hBPBP, m * (xcpi + xcmu + xcmcb)); // BJTbasePrimeBasePrimePtr + 1
+      solver.stampElement(this._hEPEP, m * (gpi + gepr + gm + go));  // BJTemitPrimeEmitPrimePtr
+      solver.stampElementImag(this._hEPEP, m * (xcpi + xgm));        // BJTemitPrimeEmitPrimePtr + 1
+      solver.stampElement(this._hCCP,  m * (-gcpr));                 // BJTcolColPrimePtr
+      solver.stampElement(this._hBBP,  m * (-gx));                   // BJTbaseBasePrimePtr
+      solver.stampElement(this._hEEP,  m * (-gepr));                 // BJTemitEmitPrimePtr
+      solver.stampElement(this._hCPC,  m * (-gcpr));                 // BJTcolPrimeColPtr
+      solver.stampElement(this._hCPBP, m * (-gmu + gm));             // BJTcolPrimeBasePrimePtr
+      solver.stampElementImag(this._hCPBP, m * (-xcmu + xgm));       // BJTcolPrimeBasePrimePtr + 1
+      solver.stampElement(this._hCPEP, m * (-gm - go));              // BJTcolPrimeEmitPrimePtr
+      solver.stampElementImag(this._hCPEP, m * (-xgm));              // BJTcolPrimeEmitPrimePtr + 1
+      solver.stampElement(this._hBPB,  m * (-gx));                   // BJTbasePrimeBasePtr
+      solver.stampElement(this._hBPCP, m * (-gmu));                  // BJTbasePrimeColPrimePtr
+      solver.stampElementImag(this._hBPCP, m * (-xcmu - xcmcb));     // BJTbasePrimeColPrimePtr + 1
+      solver.stampElement(this._hBPEP, m * (-gpi));                  // BJTbasePrimeEmitPrimePtr
+      solver.stampElementImag(this._hBPEP, m * (-xcpi));             // BJTbasePrimeEmitPrimePtr + 1
+      solver.stampElement(this._hEPE,  m * (-gepr));                 // BJTemitPrimeEmitPtr
+      solver.stampElement(this._hEPCP, m * (-go));                   // BJTemitPrimeColPrimePtr
+      solver.stampElementImag(this._hEPCP, m * (xcmcb));            // BJTemitPrimeColPrimePtr + 1
+      solver.stampElement(this._hEPBP, m * (-gpi - gm));             // BJTemitPrimeBasePrimePtr
+      solver.stampElementImag(this._hEPBP, m * (-xcpi - xgm - xcmcb)); // BJTemitPrimeBasePrimePtr + 1
+      solver.stampElementImag(this._hSS,   m * (xcsub));            // BJTsubstSubstPtr + 1
+      solver.stampElementImag(this._hSCS,  m * (-xcsub));           // BJTsubstConSubstPtr + 1
+      solver.stampElementImag(this._hSSC,  m * (-xcsub));           // BJTsubstSubstConPtr + 1
+      solver.stampElementImag(this._hBCP,  m * (-xcbx));            // BJTbaseColPrimePtr + 1
+      solver.stampElementImag(this._hCPB,  m * (-xcbx));            // BJTcolPrimeBasePtr + 1
     }
 
     checkConvergence(ctx: LoadContext): boolean {

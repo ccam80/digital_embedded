@@ -38,6 +38,7 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -842,6 +843,17 @@ function _createMosfetElementWithPolarity(
     private _mode = 0;
     private _von  = 0;
 
+    // ngspice MOS1instance fields read by MOS1acLoad (mos1acld.c:71-72,91-92).
+    // MOS1capbd/MOS1capbs are the bulk-drain/bulk-source depletion capacitances
+    // computed in MOS1load (mos1load.c:586-694); MOS1drainConductance/
+    // MOS1sourceConductance are the terminal-resistance conductances computed
+    // in MOS1temp (mos1temp.c:292-328). load() persists them so stampAc reads
+    // the same instance values, exactly as MOS1acLoad dereferences here->MOS1*.
+    private _capbd = 0;
+    private _capbs = 0;
+    private _drainConductance  = 0;
+    private _sourceConductance = 0;
+
     // cite: mos1temp.c:129-133 — MOS1tempGiven mirrors PropertyBag givenness
     // for TEMP. When false, instance temp = ckt->CKTtemp.
     private _tempGiven = props.isModelParamGiven("TEMP");
@@ -949,6 +961,29 @@ function _createMosfetElementWithPolarity(
       this._hDPB  = solver.allocElement(dp,    bNode); // (20)
       this._hSPB  = solver.allocElement(sp,    bNode); // (21)
       this._hSPDP = solver.allocElement(sp,    dp);    // (22)
+
+      // mos1temp.c:292-328: terminal-resistance conductances. ngspice keys on
+      // model-param givenness: drainResistanceGiven -> m/RD; else
+      // sheetResistanceGiven -> m/(RSH*drainSquares); else 0 (likewise source).
+      // Persisted as here->MOS1drainConductance / here->MOS1sourceConductance,
+      // read by MOS1acLoad (mos1acld.c:91-92) for the real terminal stamps.
+      const m = params.M;
+      if (props.isModelParamGiven("RD")) {
+        this._drainConductance = params.RD !== 0 ? m / params.RD : 0;
+      } else if (props.isModelParamGiven("RSH")) {
+        this._drainConductance = params.RSH !== 0
+          ? m / (params.RSH * params.drainSquares) : 0;
+      } else {
+        this._drainConductance = 0;
+      }
+      if (props.isModelParamGiven("RS")) {
+        this._sourceConductance = params.RS !== 0 ? m / params.RS : 0;
+      } else if (props.isModelParamGiven("RSH")) {
+        this._sourceConductance = (params.RSH !== 0 && params.sourceSquares !== 0)
+          ? m / (params.RSH * params.sourceSquares) : 0;
+      } else {
+        this._sourceConductance = 0;
+      }
     }
 
     /**
@@ -1416,6 +1451,11 @@ function _createMosfetElementWithPolarity(
           capbd = 0;
         }
 
+        // mos1load.c:639,696: here->MOS1capbs / here->MOS1capbd. Persisted for
+        // MOS1acLoad (mos1acld.c:71-72: xbd/xbs = MOS1capbd/capbs * CKTomega).
+        this._capbs = capbs;
+        this._capbd = capbd;
+
         // mos1load.c:701-725: NIintegrate bulk junctions into gbd/gbs
         // (direct lumping  no invented CAP_GEQ_DB/SB slots).
         const runBulkNIintegrate = (mode & MODETRAN) !== 0
@@ -1662,6 +1702,105 @@ function _createMosfetElementWithPolarity(
       if (icheckLimited && (params.OFF === 0 || !(mode & (MODEINITFIX | MODEINITSMSIG)))) {
         ctx.noncon.value++;
       }
+    }
+
+    /**
+     * AC small-signal admittance stamp- mos1acld.c::MOS1acLoad line-for-line.
+     *
+     * Reads the operating-point conductances (MOS1gm/gds/gmbs/gbd/gbs,
+     * MOS1drainConductance/MOS1sourceConductance, mode) and capacitances
+     * (the Meyer half-caps in CKTstate0[capgs/capgd/capgb], the bulk junction
+     * caps MOS1capbd/MOS1capbs) persisted by the most recent load(), and the
+     * gate-overlap caps recomputed here exactly as MOS1acLoad does. The
+     * imaginary (susceptance) terms go to the `+1` half of each cell via
+     * stampElementImag; the real (conductance) terms via stampElement.
+     * Mirrors the 22-handle TSTALLOC cells allocated in setup().
+     */
+    stampAc(
+      solver: SparseSolverStamp,
+      omega: number,
+      _ctx: LoadContext,
+      _rhsRe: Float64Array,
+      _rhsIm: Float64Array,
+    ): void {
+      const s0 = this._pool.states[0];
+      const base = this._stateBase;
+
+      // mos1acld.c:40-46: xnrm/xrev from MOS1mode sign.
+      let xnrm: number, xrev: number;
+      if (this._mode < 0) {
+        xnrm = 0;
+        xrev = 1;
+      } else {
+        xnrm = 1;
+        xrev = 0;
+      }
+
+      // mos1acld.c:50-57: Meyer overlap caps (here->MOS1m == params.M).
+      const m = params.M;
+      const EffectiveLength = params.L - 2 * params.LD;
+      const GateSourceOverlapCap = params.CGSO * m * params.W;
+      const GateDrainOverlapCap = params.CGDO * m * params.W;
+      const GateBulkOverlapCap = params.CGBO * m * EffectiveLength;
+
+      // mos1acld.c:59-67: capgs/capgd/capgb = 2*state0[cap] + overlap. ngspice
+      // literally adds the same state slot twice (CKTstate0[capgs] + CKTstate0[capgs]).
+      const capgs = (s0[base + SLOT_CAPGS] + s0[base + SLOT_CAPGS] + GateSourceOverlapCap);
+      const capgd = (s0[base + SLOT_CAPGD] + s0[base + SLOT_CAPGD] + GateDrainOverlapCap);
+      const capgb = (s0[base + SLOT_CAPGB] + s0[base + SLOT_CAPGB] + GateBulkOverlapCap);
+      const xgs = capgs * omega;
+      const xgd = capgd * omega;
+      const xgb = capgb * omega;
+      const xbd = this._capbd * omega;
+      const xbs = this._capbs * omega;
+
+      // mos1acld.c:77-90: imaginary (susceptance) half-cell stamps.
+      solver.stampElementImag(this._hGG,   xgd + xgs + xgb);   // *(MOS1GgPtr +1)
+      solver.stampElementImag(this._hBB,   xgb + xbd + xbs);   // *(MOS1BbPtr +1)
+      solver.stampElementImag(this._hDPDP, xgd + xbd);         // *(MOS1DPdpPtr +1)
+      solver.stampElementImag(this._hSPSP, xgs + xbs);         // *(MOS1SPspPtr +1)
+      solver.stampElementImag(this._hGB,   -xgb);              // *(MOS1GbPtr +1)
+      solver.stampElementImag(this._hGDP,  -xgd);              // *(MOS1GdpPtr +1)
+      solver.stampElementImag(this._hGSP,  -xgs);              // *(MOS1GspPtr +1)
+      solver.stampElementImag(this._hBG,   -xgb);              // *(MOS1BgPtr +1)
+      solver.stampElementImag(this._hBDP,  -xbd);              // *(MOS1BdpPtr +1)
+      solver.stampElementImag(this._hBSP,  -xbs);              // *(MOS1BspPtr +1)
+      solver.stampElementImag(this._hDPG,  -xgd);              // *(MOS1DPgPtr +1)
+      solver.stampElementImag(this._hDPB,  -xbd);              // *(MOS1DPbPtr +1)
+      solver.stampElementImag(this._hSPG,  -xgs);              // *(MOS1SPgPtr +1)
+      solver.stampElementImag(this._hSPB,  -xbs);              // *(MOS1SPbPtr +1)
+
+      // mos1acld.c:91-113: real (conductance) cell stamps.
+      const gbd = this._gbd;
+      const gbs = this._gbs;
+      const gm = this._gm;
+      const gds = this._gds;
+      const gmbs = this._gmbs;
+      const drainConductance = this._drainConductance;
+      const sourceConductance = this._sourceConductance;
+      solver.stampElement(this._hDD,   drainConductance);                          // *(MOS1DdPtr)
+      solver.stampElement(this._hSS,   sourceConductance);                         // *(MOS1SsPtr)
+      solver.stampElement(this._hBB,   gbd + gbs);                                 // *(MOS1BbPtr)
+      solver.stampElement(this._hDPDP, drainConductance +
+              gds + gbd +
+              xrev * (gm + gmbs));                                                  // *(MOS1DPdpPtr)
+      solver.stampElement(this._hSPSP, sourceConductance +
+              gds + gbs +
+              xnrm * (gm + gmbs));                                                  // *(MOS1SPspPtr)
+      solver.stampElement(this._hDDP,  -drainConductance);                         // *(MOS1DdpPtr)
+      solver.stampElement(this._hSSP,  -sourceConductance);                        // *(MOS1SspPtr)
+      solver.stampElement(this._hBDP,  -gbd);                                      // *(MOS1BdpPtr)
+      solver.stampElement(this._hBSP,  -gbs);                                      // *(MOS1BspPtr)
+      solver.stampElement(this._hDPD,  -drainConductance);                         // *(MOS1DPdPtr)
+      solver.stampElement(this._hDPG,  (xnrm - xrev) * gm);                        // *(MOS1DPgPtr)
+      solver.stampElement(this._hDPB,  -gbd + (xnrm - xrev) * gmbs);               // *(MOS1DPbPtr)
+      solver.stampElement(this._hDPSP, -gds -
+              xnrm * (gm + gmbs));                                                  // *(MOS1DPspPtr)
+      solver.stampElement(this._hSPG,  -(xnrm - xrev) * gm);                       // *(MOS1SPgPtr)
+      solver.stampElement(this._hSPS,  -sourceConductance);                        // *(MOS1SPsPtr)
+      solver.stampElement(this._hSPB,  -gbs - (xnrm - xrev) * gmbs);               // *(MOS1SPbPtr)
+      solver.stampElement(this._hSPDP, -gds -
+              xrev * (gm + gmbs));                                                  // *(MOS1SPdpPtr)
     }
 
     checkConvergence(ctx: LoadContext): boolean {
