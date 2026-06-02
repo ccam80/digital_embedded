@@ -1,6 +1,268 @@
 {
   "_comment": "Loop-progress overlay - written by the port loop, never by hand-editing ledger.json. The verifier records APPLIED here; the applier/verifier record ESCALATED and attempts here. build-ledger.mjs applies it so ledger.json is fully derived (diffs + splits.json + planning/*-decisions.json + progress.json). Each item entry: state (PENDING|APPLIED|ESCALATED - never NO-COUNTERPART, which is planning-frozen), attempts (int), verifierNotes (string[]), escalation (object|null, required when ESCALATED), hunkHash (the item hunkHash when the entry was recorded - if the diff later drifts, the stale entry is ignored).",
   "items": {
+    "vsrc/vsrcdefs.h#h001": {
+      "state": "APPLIED",
+      "hunkHash": "d291fe862037281f",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcdefs.h struct sSVSRCinstance (diff vsrc.md docLineRange 754-797). functionGroup vsrc/vsrcdefs.h::sVSRCinstance, tsFile src/components/sources/ac-voltage-source.ts. Correspondence re-derived independently (rename-maps NOT consulted): the sole portable behavioral addition in this hunk is the new field `double VSRCbreak_time; /* time of most-recent breakpoint */` (vsrcdefs.h:794) <-> `private _breakTime = -1.0;` (ac-voltage-source.ts:906, comment cites vsrcdefs.h). ZERO-DELTA RULE (VERIFICATION.md sec2.4): every other +/- line of h001 is an allowed difference -- (a) the GENinstance struct-embedding refactor (`struct sVSRCmodel *VSRCmodPtr`/`*VSRCnextInstance`/`IFuid VSRCname`/`int VSRCstate` -> `struct GENinstance gen;` + the VSRCmodPtr/VSRCnextInstance/VSRCname/VSRCstate accessor macros) = C linked-list plumbing with no digiTS counterpart (per-element dispatch); (b) `int VSRCposNode/VSRCnegNode` -> `const int ...` = const-qualifier only; (c) the RFSPICE block (VSRCresNode + VSRCposPosPtr/VSRCnegNegPtr/VSRCposNegPtr/VSRCnegPosPtr) = #ifdef RFSPICE S-parameter NO-COUNTERPART; (d) VSRCposIbrptr->VSRCposIbrPtr etc. = ptr->Ptr capitalisation rename (allowed). The _breakTime field is present, seeded -1.0 in setup() (ac:1163, vsrcset.c:34) and consumed by _acceptNgspice (ac:1419,1453). Bijective over the portable field. The _breakTime initial value -1.0 matches the VSRCbreak_time=-1.0 seed semantics."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcfbr.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "abb38a20337fdba9",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcfbr.c VSRCfindBr (diff vsrc.md docLineRange 1083-1095; fresh fn vsrcfbr.c:16-37). functionGroup vsrc/vsrcfbr.c::VSRCfindBr, tsFile src/components/sources/dc-voltage-source.ts (also mirrored ac-voltage-source.ts:1189-1197). Correspondence re-derived independently: VSRCfindBr looks up the instance by name, allocates its branch via CKTmkCur if VSRCbranch==0, returns VSRCbranch <-> findBranchFor (dc-voltage-source.ts:205-213): ctx.findDevice(name) (the VSRCname==name lookup), `if(dev.branchIndex===-1) dev.branchIndex=ctx.makeCur(name,'branch')` (the VSRCbranch==0 CKTmkCur allocation; -1 is digiTS's unallocated sentinel == ngspice's 0), `return dev.branchIndex`. ZERO-DELTA RULE (sec2.4): the only +/- lines in h001 are the model/instance walk accessor renames (`model->VSRCnextModel`->`VSRCnextModel(model)`, `model->VSRCinstances`/`here->VSRCnextInstance`->`VSRCinstances(model)`/`VSRCnextInstance(here)`) = C linked-list plumbing with no digiTS counterpart (the engine device registry replaces the per-model instance list). Arithmetic and control flow unchanged. Bijective."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcpar.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "423f2e15e7cdde10",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcpar.c VSRC_R case (diff vsrc.md docLineRange 1684-1705; fresh fn vsrcpar.c:446-483). functionGroup vsrc/vsrcpar.c::VSRCparam, tsFile src/components/sources/ac-voltage-source.ts. h003 adds the VSRC_R param-validation guards. Correspondence re-derived independently: (1) `if(value->rValue < -0.5){ VSRCrGiven=FALSE; break; }` (vsrcpar.c:452-455) <-> `if (r < -0.5) { this._rGiven = false; return; }` (ac:1115); (2) `if(!VSRCcoeffs || VSRCfunctionOrder<2){ VSRCrGiven=FALSE; break; }` (vsrcpar.c:458-461) <-> `if (this._coeffs.length === 0 || this._functionOrder < 2) { this._rGiven = false; return; }` (ac:1117); (3) `VSRCr=value->rValue; VSRCrGiven=TRUE;` (vsrcpar.c:463-464) <-> `this._r = r; this._rGiven = true;` (ac:1119-1120). The breakpoint-scan loop `for(i=0;i<VSRCfunctionOrder;i+=2){ VSRCrBreakpt=i; if(VSRCr==VSRCcoeffs[i]) break; }` (vsrcpar.c:466-469) <-> ac:1123-1126. blocked-by vsrc#recon/waveformModel = APPLIED in this worktree, so the _coeffs[]/_rBreakpt/_rGiven substrate is present. Bijective over the guard logic; operands/comparators identical."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcpar.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "81eb76d8ae4d570e",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcpar.c (diff vsrc.md docLineRange 1706-1714; fresh vsrcpar.c:471-475). functionGroup vsrc/vsrcpar.c::VSRCparam, tsFile src/components/sources/ac-voltage-source.ts. The sole behavioral change of h004 is the end_time comparison `if(VSRCr > end_time)` -> `if(VSRCr >= end_time)` (vsrcpar.c diff line 1710->1711). digiTS: `if (this._r >= endTime)` (ac:1130) uses the v41 `>=` form, where `endTime = this._coeffs[this._functionOrder - 2]` (ac:1129) <-> `end_time = *(VSRCcoeffs + VSRCfunctionOrder-2)` (vsrcpar.c:471). The subsequent E_PARMVAL error (vsrcpar.c:472-474) <-> the thrown Error 'repeat start time ... must be smaller than final time point given' (ac:1131-1134). Bijective; comparator is the v41 `>=`."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcset.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f2d5d01b52e498bf",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcset.c VSRCsetup head (diff vsrc.md docLineRange 1893-1909; fresh vsrcset.c:27-39). functionGroup vsrc/vsrcset.c::VSRCsetup, tsFiles ac-voltage-source.ts + dc-voltage-source.ts. h001 portable content: (1) `here->VSRCbreak_time = -1.0;` initial-breakpoint seed (vsrcset.c:34) <-> `this._breakTime = -1.0;` (ac:1163) -- AC only; DC source carries no breakpoint schedule (constant-value source), correct no-counterpart for DC; (2) the shorted-source guard `if(VSRCposNode == VSRCnegNode){ IFerrorf(ERR_FATAL,\"instance %s is a shorted VSRC\",VSRCname); return(E_UNSUPP); }` (vsrcset.c:35-38) <-> the `if (posNode === negNode) throw new Error(...is a shorted VSRC)` guard in BOTH ac:1172-1173 and dc:188-189 (this is the live working-tree delta in `git diff`). The ERR_FATAL+return(E_UNSUPP) maps to a thrown Error (digiTS fatal stop); message text is the v41 wording. The model/instance walk accessor renames (`model->VSRCnextModel`->`VSRCnextModel(model)` etc.) are C plumbing with no digiTS counterpart. Bijective over the portable guard+seed; the shorted-VSRC fatal is line-isomorphic to vsrcset.c:35-38 (C IFerrorf+return -> TS throw, allowed C<->TS difference)."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcset.c#h002b": {
+      "state": "APPLIED",
+      "hunkHash": "e1c8410af2814cc1",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcset.c #else TSTALLOC branch (diff vsrc.md docLineRange 1952-1961; fresh vsrcset.c:88-91). functionGroup vsrc/vsrcset.c::VSRCsetup. The four non-RFSPICE TSTALLOC calls TSTALLOC(VSRCposIbrPtr,VSRCposNode,VSRCbranch)/TSTALLOC(VSRCnegIbrPtr,VSRCnegNode,VSRCbranch)/TSTALLOC(VSRCibrNegPtr,VSRCbranch,VSRCnegNode)/TSTALLOC(VSRCibrPosPtr,VSRCbranch,VSRCposNode) <-> ctx.solver.allocElement(posNode,branchNode)/allocElement(negNode,branchNode)/allocElement(branchNode,negNode)/allocElement(branchNode,posNode) in BOTH ac:1183-1186 and dc:199-202 -- same coordinate pairs, same order (CLAUDE.md TSTALLOC-sequence parity: element-pool order preserved). The h002b +/- lines are solely the ptr->Ptr (VSRCposIbrptr->VSRCposIbrPtr) rename on the macro's first arg = allowed difference; the idempotent makeCur branch allocation (vsrcset.c:41-44) precedes both (ac:1177-1180, dc:193-195). The #ifdef RFSPICE port branch (h002a) is correctly NO-COUNTERPART/frozen. Bijective."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcacct.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "4fd0221397d27757",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c:27-39 (diff vsrc.md docLineRange 102-116). functionGroup vsrc/vsrcacct.c::VSRCaccept. h003 is the model/instance walk accessor rename (`model->VSRCnextModel`->`VSRCnextModel(model)`, `model->VSRCinstances`/`here->VSRCnextInstance`->`VSRCinstances(model)`/`VSRCnextInstance(here)`) + the non-transient early-return `if(!(CKTmode & (MODETRAN|MODETRANOP))) return(OK)`. The walk has no digiTS counterpart (acceptStep is invoked per-element during transient stepping). The MODETRAN|MODETRANOP gate maps to acceptStep's `if(!atBreakpoint) return` (ac-voltage-source.ts:1513): ngspice gates every CKTsetBreak on CKTbreak/transient-mode; digiTS only invokes acceptStep at accepted transient steps and gates on atBreakpoint. ZERO-DELTA RULE (sec2.4): every +/- line is an accessor rename = allowed difference. Bijective over the dispatch."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcacct.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "7d76bf35f201d0f3",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c (PULSE local decls; diff vsrc.md docLineRange 117-135). functionGroup vsrc/vsrcacct.c::VSRCaccept. h004 reshapes the PULSE-case local declarations: removes `double tshift;`, adds `double tmax = 1e99;`, and unwraps the `#ifdef XSPICE` around `PHASE/phase/deltat`. digiTS _acceptNgspice PULSE (ac-voltage-source.ts:1400-1407): locals TD/TR/TF/PW/PER/PHASE declared, tmax used inline (1414); no tshift (digiTS uses simTime directly, the TD-shift folded into `time = simTime - TD` at 1410). The XSPICE-unwrap exposes PHASE unconditionally <-> PHASE read at 1407. Allowed C<->TS differences (decl reshape, no arithmetic). Bijective over the decl set."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcacct.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "aea8e1e2ffdac0e1",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c PULSE break_time arm (diff vsrc.md docLineRange 136-263). functionGroup vsrc/vsrcacct.c::VSRCaccept. The v41 PULSE arm replaced the v26 SAMETIME edge-detection with a break_time-gated wait-to-next-boundary scheme. digiTS _acceptNgspice PULSE (ac-voltage-source.ts:1409-1441) is bijective with the v41 NON-compat path: `time = simTime - TD` (1410) <-> vsrcacct.c time=CKTtime-TD; PHASE>0 tmax cap with break (1413-1416) <-> the `else if(PHASE>0.0){tmax=PHASE*PER; if(time>tmax) break;}` v41 branch; `if(simTime >= _breakTime)` gate (1419) <-> `if(CKTtime >= VSRCbreak_time)`; repeating basetime (1421-1424) <-> the in-gate `if(time>=PER){basetime=PER*floor(time/PER); time-=basetime;}`; the wait-ladder (1427-1432): time<0->-time, <TR->TR-time, <TR+PW->TR+PW-time, <TR+PW+TF->TR+PW+TF-time, else PER-time -- operand-for-operand identical to v41 lines 230-249; `_breakTime=simTime+wait; addBreakpoint(_breakTime); _breakTime-=_minBreak` (1435-1439) <-> VSRCbreak_time=CKTtime+wait; CKTsetBreak; VSRCbreak_time-=CKTminBreak. The newcompat.xs phase-normalization sub-branch (v41: `if(newcompat.xs){phase=PHASE/360; fmod; deltat...; time+=deltat;}`) has NO digiTS counterpart (newcompat is an ngspice process-global, cross-subsystem); it is the compat-mode-only path, distinct from the non-compat PULSE schedule which is fully ported. The PULSE break-schedule is bijective over the non-compat path; the newcompat.xs gap is the same frozen compat-mode global escalated for vsrcload.c#h004 (NO-COUNTERPART) and does not affect the default (non-compat) breakpoint schedule. addBreakpoint dedup at CKTminBreak per FIX-003 (cktsetbk.c). PASS on the portable non-compat arm."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcacct.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "b09302fd83b9e644",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c PWL break_time arm (diff vsrc.md docLineRange 264-328). functionGroup vsrc/vsrcacct.c::VSRCaccept. The v41 PWL arm replaced the v26 AlmostEqualUlps knot-detection + goto bkptset with a break_time-gated next-knot schedule. digiTS _acceptNgspice PWL (ac-voltage-source.ts:1451-1479) is bijective: `if(simTime >= _breakTime)` gate (1453) <-> `if(CKTtime >= VSRCbreak_time)`; `time = simTime - _rdelay` (1454) <-> time=CKTtime-VSRCrdelay; `end = coeffs[order-2]` (1455) <-> end=VSRCcoeffs[VSRCfunctionOrder-2]; `if(time > end)` with repeat fold `if(_rGiven){ period=end-coeffs[_rBreakpt]; time-=coeffs[_rBreakpt]; time-=period*floor(time/period); time+=coeffs[_rBreakpt]; } else { _breakTime=_cktFinalTime; break; }` (1456-1467) <-> v41 lines 282-297 operand-for-operand; the next-knot loop `for(i=0;i<order;i+=2){ if(coeffs[i]>time){ _breakTime=simTime+coeffs[i]-time; addBreakpoint(_breakTime); _breakTime-=_minBreak; break; } }` (1470-1477) <-> v41 lines 305-318. Bijective; SINE/EXP/SFFM/AM empty cases (vsrcacct.c:147-165) <-> ac:1444-1449 no-breakpoint cases. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h002a": {
+      "state": "APPLIED",
+      "hunkHash": "dbbda3f58519d427",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c (4 incidence stamps; diff vsrc.md docLineRange 1243-1260). functionGroup vsrc/vsrcload.c::VSRCload, tsFiles dc-voltage-source.ts + ac-voltage-source.ts + variable-rail.ts. The four #ifndef-RFSPICE stamps `*(VSRCposIbrPtr)+=1.0; *(VSRCnegIbrPtr)-=1.0; *(VSRCibrPosPtr)+=1.0; *(VSRCibrNegPtr)-=1.0` <-> solver.stampElement(_hPosBr,+1.0)/(_hNegBr,-1.0)/(_hBrPos,+1.0)/(_hBrNeg,-1.0) in dc:222-225 and ac:1254-1257, same sign pattern same handle quad (the setup TSTALLOC order). h002a +/- lines are solely ptr->Ptr renames (allowed). The #ifdef RFSPICE g0-admittance branch (h002b) is correctly NO-COUNTERPART. Bijective."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h002c": {
+      "state": "APPLIED",
+      "hunkHash": "5c0a52d399a5eeab",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c (DC-value gate head; diff vsrc.md docLineRange 1285-1292). functionGroup vsrc/vsrcload.c::VSRCload. The `if((CKTmode & (MODEDCOP|MODEDCTRANCURVE)) && VSRCdcGiven){ value = VSRCdcValue * CKTsrcFact; }` DC-value branch (vsrcload.c:47-55 non-XSPICE) <-> dc-voltage-source.ts:226-232 (the ramp = (cktMode & (MODEDCOP|MODEDCTRANCURVE|MODETRANOP)) ? srcFact : 1.0 gate + rhs += voltage*ramp) and ac _evaluate DC short-circuit (ac:1273-1275). Bijective over the DC gate; the srcFact application matches the vsrcload.c:47-55 + 410-412 gating. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "8566f703071d6b04",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c PULSE value arm (diff vsrc.md docLineRange 1293-1306). functionGroup vsrc/vsrcload.c::VSRCload. PULSE coeff reads (V1=coeffs[0], V2=coeffs[1], TD/TR/TF/PW/PER order-guarded defaults from CKTstep/CKTfinalTime) <-> evaluateNgspiceWaveform PULSE arm (ac-voltage-source.ts coeff engine). The v41 reshape removes the #ifdef XSPICE wrapper on PHASE/phase/deltat. Non-compat value computation (the V1/V2/ramp ladder) is present and bijective. The newcompat.xs branch (load h004) is the frozen NO-COUNTERPART, not in this hunk. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "b680605fac0abb34",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c SINE value arm (diff vsrc.md docLineRange 1377-1385). functionGroup vsrc/vsrcload.c::VSRCload. The v41 SINE arm unwraps #ifdef XSPICE making the PHASE-aware form unconditional: VO=coeffs[0], VA=coeffs[1], FREQ order-guarded (default 1/CKTfinalTime), TD, THETA, PHASE; time-=TD; if(time<=0) value=VO+VA*sin(phase) else value=VO+VA*sin(FREQ*time*2*PI+phase)*exp(-time*THETA). evaluateNgspiceWaveform SINE arm matches operand-for-operand (phase in radians, the *2*M_PI, the exp(-time*THETA) damping). Bijective. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "9cd56afd4719c231",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c EXP value arm (diff vsrc.md docLineRange 1386-1394). functionGroup vsrc/vsrcload.c::VSRCload. EXP: V1=coeffs[0], V2=coeffs[1], TD1/TAU1/TD2/TAU2 order-guarded (CKTstep defaults; TD2 default TD1+CKTstep), the three-region value (time<=TD1->V1; time<=TD2->V1+(V2-V1)*(1-exp(-(time-TD1)/TAU1)); else +(V1-V2)*(1-exp(-(time-TD2)/TAU2))). evaluateNgspiceWaveform EXP arm matches operand-for-operand. Bijective. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "5754e976aff33c4b",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c PULSE value-tail (diff vsrc.md docLineRange 1395-1413). functionGroup vsrc/vsrcload.c::VSRCload. The post-newcompat PULSE value ladder `if(time<=0 || time>=TR+PW+TF) value=V1; else if(time>=TR && time<=TR+PW) value=V2; else if(time>0 && time<TR) value=V1+(V2-V1)*time/TR; else value=V2+(V1-V2)*(time-(TR+PW))/TF` <-> evaluateNgspiceWaveform PULSE value ladder, operand-for-operand. Note this slice (diff lines 1395-1413, fresh vsrcload.c:188+ SINE head + PULSE tail) is AFTER the newcompat.xs block (frozen h004); the non-compat ladder is fully ported. Bijective. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "4cfa4a0a129d75e8",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c SFFM value arm (diff vsrc.md docLineRange 1414-1422). functionGroup vsrc/vsrcload.c::VSRCload. SFFM unwraps #ifdef XSPICE making the phasec/phases form unconditional: VO=coeffs[0], VA=coeffs[1], FC/MDI/FS order-guarded, value=VO+VA*sin((2*PI*FC*time+phasec)+MDI*sin(2*PI*FS*time+phases)). evaluateNgspiceWaveform SFFM matches operand-for-operand incl. nested sin and the +phasec/+phases. Bijective. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "8eaa4009b0a9b4c1",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c AM value arm head (diff vsrc.md docLineRange 1423-1430). functionGroup vsrc/vsrcload.c::VSRCload. AM decls + phasec/phases radians (unwrapped from #ifdef XSPICE) + coeff reads (VA=coeffs[0], VO=coeffs[1], MF/FC/TD order-guarded). evaluateNgspiceWaveform AM arm matches. Bijective over the AM head. PASS (value body in h010)."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "ff19cf01138f0455",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c AM value body + PWL head (diff vsrc.md docLineRange 1431-1457). functionGroup vsrc/vsrcload.c::VSRCload. AM: time-=TD; if(time<=0) value=0 else value=VA*(VO+sin(2*PI*MF*time+phases))*sin(2*PI*FC*time+phases) -- note ngspice uses `phases` in BOTH factors (the documented AM quirk where phasec is computed but the value uses phases twice); evaluateNgspiceWaveform AM reproduces the phases-used-twice form. PWL head: time-=VSRCrdelay; if(time<VSRCcoeffs[0]) value=VSRCcoeffs[1] <-> ac PWL arm. Bijective incl. the AM phases quirk. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "ec8e847956d16a04",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c PWL repeat/end-time (diff vsrc.md docLineRange 1458-1465). functionGroup vsrc/vsrcload.c::VSRCload. PWL end_time=coeffs[functionOrder-2]; if(time>end_time){ if(VSRCrGiven){ period=end_time-coeffs[VSRCrBreakpt]; time-=coeffs[VSRCrBreakpt]; time-=period*floor(time/period); time+=coeffs[VSRCrBreakpt]; } else { value=coeffs[functionOrder-1]; break; } } <-> evaluateNgspiceWaveform PWL repeat fold (ac:319-332 region), operand-for-operand. Bijective. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h012": {
+      "state": "APPLIED",
+      "hunkHash": "1a7ae61fa4b249d1",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c PWL interpolation + TRNOISE/TRRANDOM/EXTERNAL switch shell (diff vsrc.md docLineRange 1466-1562). functionGroup vsrc/vsrcload.c::VSRCload. PWL bracket interpolation `for(i=2;i<functionOrder;i+=2){ if(coeffs[i]>=time){ time-=coeffs[i-2]; time/=coeffs[i]-coeffs[i-2]; value=coeffs[i-1]; value+=time*(coeffs[i+1]-coeffs[i-1]); break; } }` <-> ac-voltage-source.ts:334-343 operand-for-operand (linear interp within the bracketing pair). The TRNOISE/TRRANDOM/EXTERNAL switch-shell dispatch is structurally present (case labels). The TRNOISE/TRRANDOM VALUE arms (vsrcload.c:356-407) are the separately-escalated h013 (throw, blocked on trnoise_state subsystem); EXTERNAL is NO-COUNTERPART (SHARED_MODULE). The PWL interpolation + switch shell are bijective. PASS (the value-arm throw is isolated to h013)."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcload.c#h014": {
+      "state": "APPLIED",
+      "hunkHash": "2ef157a3c05b1552",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh vsrcload.c switch-tail + srcFact gate + RHS (diff vsrc.md docLineRange 1587-1604). functionGroup vsrc/vsrcload.c::VSRCload. The `if(CKTmode & MODETRANOP) value *= CKTsrcFact` srcFact gate (vsrcload.c:410-412 non-XSPICE) <-> the ramp gate `(cktMode & (MODEDCOP|MODEDCTRANCURVE|MODETRANOP)) ? srcFact : 1.0` applied to v (ac:1247-1251, dc:229-232); the RHS write `*(CKTrhs + VSRCbranch) += value` (vsrcload.c:416) <-> `ctx.rhs[this.branchIndex] += v` (ac:1259) / `ctx.rhs[this.branchIndex] += this._voltage*ramp` (dc:232). The #ifdef RFSPICE PORT case is correctly NO-COUNTERPART. Bijective over the srcFact gate + RHS. PASS."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrcacct.c#h008": {
+      "state": "ESCALATED",
+      "hunkHash": "f995b08762bc7ffd",
+      "attempts": 0,
+      "verifierNotes": [
+        "ESCALATE (group vsrc/vsrcacct.c::VSRCaccept). h008 (vsrc.md docLineRange 337-443; fresh vsrcacct.c TRNOISE accept arm) is the break_time-gated TRNOISE breakpoint schedule + RTS shot-noise capture/emission state machine (state->TS, state->RTSAM, state->RTScapTime/RTSemTime, exprand(state->RTSCAPT)). digiTS _acceptNgspice (ac-voltage-source.ts:1481-1492) does NOT port this arm: it THROWS 'TRNOISE/TRRANDOM breakpoint scheduling requires the deterministic RNG substrate from maths-misc#recon/randnumb (trnoise_state_get/trrandom_state_get), which is not present in this worktree.' The v41 RTS state-machine constructs (exprand, state->RTScapTime/RTSemTime advance) have NO digiTS counterpart -- the vsrc-specific trnoise_state lifecycle (trnoise_state_init/_get, the f_alpha 1/f synthesizer, the RTS trap state) was NOT delivered by maths-misc#recon/randnumb (which delivered only the bare SeededRng primitives CombLCGTaus/gauss/poisson on monte-carlo.ts). The faithful port requires building the trnoise_state subsystem (ngspice frontend 1-f-code.c) which lives OUTSIDE this functionGroup's tsFile (ac-voltage-source.ts) -- a cross-subsystem dependency per VERIFICATION.md sec6. NOT closeable as pre-existing/partial. Blocks the VSRCaccept group; see ESCALATIONS.md."
+      ],
+      "escalation": {
+        "trigger": "cross-subsystem dependency (VERIFICATION.md sec6): faithful port requires a subsystem outside the functionGroup tsFile",
+        "ngspiceFile": "ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c (TRNOISE accept arm, diff vsrc.md 337-443)",
+        "digitsFile": "src/components/sources/ac-voltage-source.ts:1481-1492 (_acceptNgspice TRNOISE/TRRANDOM case throws)",
+        "blockedBy": "the vsrc trnoise_state/trrandom_state lifecycle (trnoise_state_init/_get, f_alpha 1/f synthesizer, RTS trap state machine) is unbuilt; maths-misc#recon/randnumb delivered only SeededRng primitives, not the trnoise_state subsystem",
+        "filesTouched": ["new trnoise_state/trrandom_state subsystem (ngspice frontend 1-f-code.c equivalent), beyond ac-voltage-source.ts"],
+        "userDecision": "frozen NO-COUNTERPART (TRNOISE/TRRANDOM accept) vs authorize the trnoise_state subsystem recon"
+      }
+    },
+    "vsrc/vsrcacct.c#h009": {
+      "state": "ESCALATED",
+      "hunkHash": "5d5af570f78394bc",
+      "attempts": 0,
+      "verifierNotes": [
+        "ESCALATE (group vsrc/vsrcacct.c::VSRCaccept). h009 (vsrc.md docLineRange 444-487; fresh vsrcacct.c TRRANDOM accept arm) is the break_time-gated TRRANDOM breakpoint schedule with state->value refresh via trrandom_state_get(state) (vsrcacct.c:303) and the TD initial-delay seed. digiTS _acceptNgspice THROWS for FunctionType.TRRANDOM (ac-voltage-source.ts:1481-1492) -- same block as h008. The trrandom_state_get refresh has NO digiTS counterpart (the trrandom_state lifecycle is unbuilt). Cross-subsystem dependency outside ac-voltage-source.ts per VERIFICATION.md sec6. NOT closeable as pre-existing/partial. See ESCALATIONS.md. (PULSE arm h005 + PWL arm h006 of this same group ARE faithfully ported in _acceptNgspice and are bijective; the group cannot reach MATCH while h008/h009 throw.)"
+      ],
+      "escalation": {
+        "trigger": "cross-subsystem dependency (VERIFICATION.md sec6)",
+        "ngspiceFile": "ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c (TRRANDOM accept arm, diff vsrc.md 444-487)",
+        "digitsFile": "src/components/sources/ac-voltage-source.ts:1481-1492 (_acceptNgspice throws)",
+        "blockedBy": "trrandom_state lifecycle (trrandom_state_init/_get) unbuilt; maths-misc#recon/randnumb delivered SeededRng primitives only",
+        "filesTouched": ["new trrandom_state subsystem, beyond ac-voltage-source.ts"],
+        "userDecision": "frozen NO-COUNTERPART vs authorize the trrandom_state subsystem recon"
+      }
+    },
+    "vsrc/vsrcload.c#h013": {
+      "state": "ESCALATED",
+      "hunkHash": "28cb66ffffe75810",
+      "attempts": 0,
+      "verifierNotes": [
+        "ESCALATE (group vsrc/vsrcload.c::VSRCload). h013 (vsrc.md docLineRange 1563-1586; fresh vsrcload.c:356-407 TRNOISE+TRRANDOM value arms). The switch-shell dispatch (case TRNOISE/TRRANDOM) is structurally present in evaluateNgspiceWaveform (ac-voltage-source.ts:347-359), but the VALUE COMPUTATION THROWS: 'TRNOISE/TRRANDOM waveform evaluation requires the deterministic RNG substrate from maths-misc#recon/randnumb (trnoise_state_get/trrandom_state_get), which is not present in this worktree.' The v41 value arm (TRNOISE: floor(time/TS) two-sample interpolation V1+(V2-V1)*(time/TS-n1) + RTS step + DC; TRRANDOM: state->value + DC) consumes trnoise_state_get/state->value which have NO digiTS counterpart -- the trnoise_state/trrandom_state lifecycle is unbuilt (randnumb delivered SeededRng primitives only). A throw is NOT a faithful port of the value computation (VERIFICATION.md sec2.4: a dropped v41 construct is not waved through because the shell is bijective). Cross-subsystem dependency outside ac-voltage-source.ts per sec6. NOT closeable as pre-existing/partial. Blocks the VSRCload group; the OTHER 12 hunks (h002a/h002c stamps+DC/srcFact gate, h003 PULSE, h005 SINE, h006 EXP, h007 PULSE-value-tail, h008/h009 SFFM, h010/h011 AM, h012 PWL, h014 switch-tail+MODETRANOP srcFact+RHS) are individually Tier1+Tier2 bijective vs fresh vsrcload.c and are recorded APPLIED separately. h013 is the sole blocker. See ESCALATIONS.md. (h004 newcompat.xs is NO-COUNTERPART/frozen, not in this group's hunk set.)"
+      ],
+      "escalation": {
+        "trigger": "cross-subsystem dependency (VERIFICATION.md sec6)",
+        "ngspiceFile": "ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c:356-407 (TRNOISE/TRRANDOM value arms, diff vsrc.md 1563-1586)",
+        "digitsFile": "src/components/sources/ac-voltage-source.ts:347-359 (evaluateNgspiceWaveform TRNOISE/TRRANDOM case throws)",
+        "blockedBy": "trnoise_state/trrandom_state lifecycle unbuilt; maths-misc#recon/randnumb delivered SeededRng primitives only, not the vsrc noise-state subsystem",
+        "filesTouched": ["new trnoise_state/trrandom_state subsystem, beyond ac-voltage-source.ts"],
+        "userDecision": "frozen NO-COUNTERPART (TRNOISE/TRRANDOM value) vs authorize the trnoise_state subsystem recon (tracked as task #24: TRNOISE noise-value arm unimplemented)"
+      }
+    },
+    "vsrc/vsrctemp.c#h002": {
+      "state": "ESCALATED",
+      "hunkHash": "4a3bd4ba18d49c6c",
+      "attempts": 0,
+      "verifierNotes": [
+        "ESCALATE (group vsrc/vsrctemp.c::VSRCtemp). h002 (vsrc.md docLineRange 2015-2163; fresh vsrctemp.c:39-180). The portable CORE is faithfully present: acMag default 1 / acPhase default 0 (vsrctemp.c:40-43 `if(VSRCacGiven && !VSRCacMGiven) VSRCacMag=1` / `if(VSRCacGiven && !VSRCacPGiven) VSRCacPhase=0`) <-> ac-voltage-source.ts:940-941 default-fill (cites vsrctemp.c:39,42); and radians=VSRCacPhase*M_PI/180; VSRCacReal=VSRCacMag*cos(radians); VSRCacImag=VSRCacMag*sin(radians) (vsrctemp.c:53-55) <-> ac-voltage-source.ts:1310-1312 stampAc (acMagnitude*cos/sin(acPhase*PI/180)). The #ifdef RFSPICE port machinery (vsrctemp.c:56-161: VSRCisPort/portZ0/portFreq/VAmplitude/portY0 + the CKTrfPorts reorder/dup-check sweep) is correctly NO-COUNTERPART (S-parameter). BUT the v41 transient-time-0 value-warning REWRITE (vsrctemp.c diff lines 2019-2052: the v26 `if(!VSRCdcGiven){...}` ERR_WARNING block was REPLACED with `if(!VSRCdcGiven && !VSRCfuncTGiven){ERR_INFO 'DC 0 assumed'} else if(VSRCdcGiven && VSRCfuncTGiven && !TRNOISE && !TRRANDOM && !EXTERNAL){ time0value = (AM||PWL)?VSRCcoeffs[1]:VSRCcoeffs[0]; if(!AlmostEqualUlps(time0value,VSRCdcValue,3)) ERR_INFO 'dc value used for op instead of transient time=0 value' }`) is a REAL v41 control-flow construct with NO digiTS counterpart: Grep over ac-voltage-source.ts = ZERO matches for IFerrorf/ERR_INFO/'DC 0 assumed'/'time=0 value'. digiTS has no SPfrontEnd warning channel (front-end diagnostic emission), so this front-end ERR_INFO rewrite cannot be ported within ac-voltage-source.ts. Per VERIFICATION.md sec2.4/sec5 a dropped v41 construct is not waved through (banned: pre-existing/partial); per sec6 the faithful fix needs a front-end warning subsystem outside the functionGroup tsFile. The warning is diagnostic-only (no matrix/RHS effect), so it does not perturb numerical parity, but it is still an unported v41 construct requiring user disposition (frozen NO-COUNTERPART vs a front-end warning channel). See ESCALATIONS.md."
+      ],
+      "escalation": {
+        "trigger": "cross-subsystem dependency (VERIFICATION.md sec6): front-end ERR_INFO warning channel outside the functionGroup tsFile",
+        "ngspiceFile": "ref/ngspice/src/spicelib/devices/vsrc/vsrctemp.c:43-52 (transient-time-0 value-warning rewrite; diff vsrc.md 2019-2052)",
+        "digitsFile": "src/components/sources/ac-voltage-source.ts (no IFerrorf/ERR_INFO counterpart; portable acMag/acPhase+acReal/acImag core IS present at 940-941, 1310-1312)",
+        "blockedBy": "digiTS has no SPfrontEnd warning-emission channel; the time0value-vs-dcValue ERR_INFO compare reads VSRCcoeffs[0/1] and emits a front-end console warning with no matrix/RHS effect",
+        "filesTouched": ["new front-end warning/diagnostic channel, beyond ac-voltage-source.ts"],
+        "userDecision": "frozen NO-COUNTERPART (front-end ERR_INFO diagnostic, no numerical effect) vs authorize a device-warning channel"
+      }
+    },
     "vsrc#recon/waveformModel": {
       "state": "APPLIED",
       "hunkHash": "1028722f1de3245b",

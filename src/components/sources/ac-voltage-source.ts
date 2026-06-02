@@ -1165,7 +1165,15 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     const posNode    = this.pinNodes.get("pos")!;
     const negNode    = this.pinNodes.get("neg")!;
 
-    // Port of vsrcset.c:40-43- idempotent branch allocation
+    // vsrcset.c:35-39 — VSRCposNode == VSRCnegNode → ERR_FATAL "instance %s is a
+    // shorted VSRC", then return(E_UNSUPP) so the degenerate instance never
+    // reaches branch allocation / TSTALLOC. The ERR_FATAL + early-return maps to
+    // a thrown Error (the digiTS fatal stop); the message text is the v41 wording.
+    if (posNode === negNode) {
+      throw new Error(`instance ${this.label ?? "vsrc"} is a shorted VSRC`);
+    }
+
+    // Port of vsrcset.c:41-44- idempotent branch allocation
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }

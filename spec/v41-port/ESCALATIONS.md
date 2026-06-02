@@ -743,3 +743,29 @@ matrix-cell / step-iter bug, so both are recorded here rather than in
 - **Default-off safety:** OPtran is `nooptran=TRUE` by default (acceptance `#3`), so deferring it changes **nothing** for current circuits — purely a missing last-resort fallback plus its verification infra.
 - **Decision needed from user:** when prioritized, authorize the optran infra mini-project (plumbing + fixture) above. Until then the recon is genuinely deferred, **not** closed.
 - **Resolution:** _DEFERRED 2026-06-02 per user ("defer OPtran honestly; build the rest"). The recon remains PENDING open work; this entry is the build-handoff. Not marked APPLIED/NO-COUNTERPART, so a future run re-surfaces it as real work._
+
+## vsrc per-hunk verification (2026-06-02, .wt/vsrc verifier pass)
+
+Verifier pass over the 7 vsrc functionGroups in worktree `.wt/vsrc`. 22 hunks recorded **APPLIED** (VSRCdefs::VSRCbreak_time field, VSRCfindBr, VSRCparam VSRC_R guards h003/h004, VSRCsetup h001/h002b, VSRCaccept PULSE/PWL h003-h006, VSRCload 12 hunks h002a/h002c/h003/h005-h012/h014). 4 hunks **ESCALATED** below — each a v41 construct whose faithful port provably requires a subsystem outside the functionGroup's tsFile (`ac-voltage-source.ts`), per VERIFICATION.md §6.
+
+### ESC-vsrc-trnoise-accept — `vsrc/vsrcacct.c#h008`, `#h009` (VSRCaccept TRNOISE/TRRANDOM arms)
+- **Trigger:** cross-subsystem dependency (§6). Faithful port needs the `trnoise_state`/`trrandom_state` lifecycle, outside `ac-voltage-source.ts`.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/vsrc/vsrcacct.c` TRNOISE accept arm (diff `spec/ngspice-v41-model-diffs/vsrc.md` 337-443) and TRRANDOM accept arm (444-487): break_time-gated schedule + RTS shot-noise capture/emission state machine (`state->RTScapTime/RTSemTime`, `exprand(state->RTSCAPT/RTSEMT)`) and `trrandom_state_get(state)` value refresh.
+- **digiTS:** `src/components/sources/ac-voltage-source.ts:1481-1492` — `_acceptNgspice` THROWS for `FunctionType.TRNOISE`/`TRRANDOM`. The PULSE (h005) and PWL (h006) arms of the same group ARE faithfully ported and bijective.
+- **Blocked by:** `maths-misc#recon/randnumb` delivered only the bare `SeededRng` primitives (`CombLCGTaus`/`gauss`/`poisson` on `monte-carlo.ts`); it did NOT deliver the vsrc-specific `trnoise_state_init`/`trnoise_state_get` (the f_alpha 1/f synthesizer + RTS trap state machine) or `trrandom_state_get`. The TS comments confirm "not present in this worktree".
+- **Architecture change required:** build the `trnoise_state`/`trrandom_state` subsystem (ngspice frontend `1-f-code.c` equivalent) — beyond the functionGroup tsFile. Tracked as task #24 (TRNOISE noise-value arm unimplemented).
+- **Decision needed from user:** frozen NO-COUNTERPART (TRNOISE/TRRANDOM accept) vs authorize the `trnoise_state` subsystem recon.
+
+### ESC-vsrc-trnoise-value — `vsrc/vsrcload.c#h013` (VSRCload TRNOISE/TRRANDOM value arms)
+- **Trigger:** cross-subsystem dependency (§6). Same `trnoise_state` block as above.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/vsrc/vsrcload.c:356-407` (diff `vsrc.md` 1563-1586): TRNOISE two-sample interpolation `V1+(V2-V1)*(time/TS-n1)` + RTS step + DC; TRRANDOM `state->value` + DC.
+- **digiTS:** `src/components/sources/ac-voltage-source.ts:347-359` — `evaluateNgspiceWaveform` TRNOISE/TRRANDOM case THROWS. The switch-shell dispatch is bijectively present (case labels), but the value computation is dropped (a throw is not a faithful port; §2.4 forbids waving a dropped construct because the shell is bijective). The OTHER 12 VSRCload hunks are APPLIED.
+- **Blocked by:** same unbuilt `trnoise_state`/`trrandom_state` subsystem.
+- **Decision needed from user:** frozen NO-COUNTERPART vs authorize the subsystem recon (task #24).
+
+### ESC-vsrc-temp-warning — `vsrc/vsrctemp.c#h002` (VSRCtemp transient-time-0 value warning)
+- **Trigger:** cross-subsystem dependency (§6). Faithful port needs a front-end warning-emission channel, absent in digiTS.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/vsrc/vsrctemp.c:43-52` (diff `vsrc.md` 2019-2052): the v26 `if(!VSRCdcGiven){ ERR_WARNING ... }` block was REWRITTEN to `if(!VSRCdcGiven && !VSRCfuncTGiven){ ERR_INFO "DC 0 assumed" } else if(VSRCdcGiven && VSRCfuncTGiven && !TRNOISE && !TRRANDOM && !EXTERNAL){ time0value = (AM||PWL)?VSRCcoeffs[1]:VSRCcoeffs[0]; if(!AlmostEqualUlps(time0value, VSRCdcValue, 3)) ERR_INFO "dc value used for op instead of transient time=0 value" }`.
+- **digiTS:** `src/components/sources/ac-voltage-source.ts` — the PORTABLE CORE of h002 IS present and bijective (acMag default 1 / acPhase default 0 at 940-941; `acReal=acMag*cos(acPhase*π/180)`, `acImag=acMag*sin(...)` at stampAc 1310-1312). The RFSPICE port machinery is correctly NO-COUNTERPART. But the `ERR_INFO` value-warning rewrite has NO counterpart: Grep = zero matches for `IFerrorf`/`ERR_INFO`/`DC 0 assumed`/`time=0 value`. digiTS has no `SPfrontEnd` device-warning channel. The warning is diagnostic-only (no matrix/RHS effect, no numerical-parity impact), but it is an unported v41 construct.
+- **Architecture change required:** a front-end/device warning-emission channel — beyond `ac-voltage-source.ts`.
+- **Decision needed from user:** frozen NO-COUNTERPART (front-end ERR_INFO diagnostic, no numerical effect) vs authorize a device-warning channel.
