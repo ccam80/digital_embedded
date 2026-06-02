@@ -64,6 +64,24 @@
       ],
       "escalation": null
     },
+    "vsrc/vsrctemp.c#h002a": {
+      "state": "APPLIED",
+      "hunkHash": "b4f0c4c115dfe1c2",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrctemp.c (diff vsrc.md docLineRange 2015-2018; fresh fn vsrctemp.c:38-43). functionGroup vsrc/vsrctemp.c::VSRCtemp, tsFile src/components/sources/ac-voltage-source.ts. h002a is the acMag/acPhase default-fill sub-item of the vsrctemp.c#h002 split (addedLines:0/removedLines:0). ZERO-DELTA RULE (VERIFICATION.md sec1.4): the docLineRange 2015-2018 slice is context-only -- the `if(here->VSRCacGiven && !here->VSRCacPGiven){ here->VSRCacPhase = 0; }` block is unchanged v26->v41 (the h002 parent's real +/- lines are the diagnostic rewrite [h002b NO-COUNTERPART] and the RFSPICE blocks [h002d NO-COUNTERPART]); no +/- line falls in this slice, so the empty worktree delta is line-isomorphic. Tier-2 construct correspondence re-derived independently: v41 vsrctemp.c:41-43 `if(VSRCacGiven && !VSRCacPGiven) VSRCacPhase=0` <-> ac-voltage-source.ts:941 `acPhase: props.hasModelParam('acPhase') ? props.getModelParam('acPhase') : 0` (the present->value / absent->0 default-fill, allowed C<->TS ternary form of the guard); the paired acMag default v41 vsrctemp.c:38-40 `if(VSRCacGiven && !VSRCacMGiven) VSRCacMag=1` <-> ac-voltage-source.ts:940 `acMagnitude: ... : 1`; reload mirror at ac:1209-1210. blockedBy vsrc#recon/waveformModel = APPLIED in this worktree (the _acMagnitude/_acPhase substrate is present, ac:883-884/950-951). Bijective over the default-fill; comparators/defaults identical."
+      ],
+      "escalation": null
+    },
+    "vsrc/vsrctemp.c#h002c": {
+      "state": "APPLIED",
+      "hunkHash": "412200890a2c0871",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrctemp.c (diff vsrc.md docLineRange 2053-2055; fresh fn vsrctemp.c:68-70). functionGroup vsrc/vsrctemp.c::VSRCtemp, tsFile src/components/sources/ac-voltage-source.ts. h002c is the bijective acMag/acPhase->acReal/acImag derivation sub-item of the vsrctemp.c#h002 split (addedLines:0/removedLines:0). ZERO-DELTA RULE (VERIFICATION.md sec1.4): the docLineRange 2053-2055 slice is context-only -- `radians = VSRCacPhase * M_PI / 180.0; VSRCacReal = VSRCacMag*cos(radians); VSRCacImag = VSRCacMag*sin(radians)` is unchanged v26->v41; no +/- line in this slice, so the empty worktree delta is line-isomorphic. Tier-2 construct correspondence re-derived independently: v41 vsrctemp.c:68 `radians = VSRCacPhase * M_PI / 180.0` <-> ac-voltage-source.ts:1310 `const radians = this._acPhase * Math.PI / 180.0` (same operands/operator/order/grouping); v41:69 `VSRCacReal = VSRCacMag * cos(radians)` <-> ac:1311 `rhsRe[branchIndex] += this._acMagnitude * Math.cos(radians)`; v41:70 `VSRCacImag = VSRCacMag * sin(radians)` <-> ac:1312 `rhsIm[branchIndex] += this._acMagnitude * Math.sin(radians)`. The VSRCacReal/VSRCacImag intermediates are inlined directly into the stampAc RHS accumulation -- this is the vsrctemp(compute)/vsrcacld(consume to RHS) boundary; digiTS computes per-instance at stampAc time. The arithmetic expressions VSRCacMag*cos/sin(radians) are operand/operator/order-identical, NOT an algebraic simplification. blockedBy vsrc#recon/waveformModel = APPLIED in this worktree. Bijective over the derivation."
+      ],
+      "escalation": null
+    },
     "vsrc/vsrcpar.c#h003": {
       "state": "APPLIED",
       "hunkHash": "423f2e15e7cdde10",
