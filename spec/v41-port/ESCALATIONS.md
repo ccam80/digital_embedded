@@ -941,3 +941,43 @@ before any numerical comparison can occur), so it routes here per §6 rather tha
 - **Not numerical:** the TRNOISE path throws before any matrix/RHS/state value is produced, so there is no firstDivergence/matrix-cell/step-iter signature — this is a cross-group source-isomorphism gap, routed here per §6, not a `fix-list-phase-2-audit.md` bug. Not closed as "pre-existing"/"intentional divergence"/"close enough" (banned verdicts).
 - **Decision needed from user:** either (a) split `isrcload.c:317-331` (h013) to a Phase-0 frozen NO-COUNTERPART, sibling to the ratified h014 (verifier may not perform the split, §7); or (b) sequence the cross-unit `trnoise_state` lifecycle (`maths-misc#recon/randnumb`) ahead of isrc so the TRNOISE path is implemented rather than throwing, then re-assign h013.
 - **Resolution:** _pending_
+
+---
+
+## dio (2026-06-03) — WORKTREE GATE+MERGE+TEARDOWN (serial pass)
+
+Teardown of isolated worktree `.wt/dio`. REBASE onto the advancing `v41-port` **conflicted**
+(`rebaseClean=false`) — the conflict was confined to the escalation log
+`spec/v41-port/ESCALATIONS.md` (two units appended escalations to the same file); the 8
+substantive DIO code commits (the `diode.ts` v41 port) rebased cleanly through 8/9 steps,
+and only the worktree's pre-rebase escalation-log artifact commit collided. Per the
+parallel-phase contract the rebase was aborted (substantive work preserved on `wt/dio`,
+kept patch written to `.wt-failed/dio.diff` = 2194 lines of `src/` work for resume-from-patch),
+no merge this pass (`merged=false`, `gatePass=null`, gate skipped — no isomorphic committed
+work to gate per the serial-stage contract). MAIN `src/` confirmed clean (`mainSrcClean=true`).
+Neither escalation below is a numerical gate-fail / firstDivergence / matrix-cell / step-iter
+bug — both are NO-COUNTERPART device-subsystem absences (per-device sensitivity store,
+device-teardown surface) — so they route here per §6 rather than to
+`spec/fix-list-phase-2-audit.md`. The rebase-conflict record is a sequencing issue, not
+numerical, so it is recorded here as the teardown note (above).
+
+### ESC-DIO-h016 — `dio/dioload.c::DIOload` (h016) device-level SENSITIVITY store has no digiTS counterpart
+
+- **source=dio/dio/dioload.c::DIOload | hunks=[dio/dioload.c#h016] | verdict=ESCALATE.** Single functionGroup, 20 hunks (h001-h020), tsFile `src/components/semiconductors/diode.ts`. 19/20 hunks verified Tier-1 line-isomorphic + Tier-2 bijective vs fresh `ref/ngspice/src/spicelib/devices/dio/dioload.c` read and recorded APPLIED in progress.json (committed `c4336d2f`; staged ONLY `diode.ts` + `progress.json`, no `git add -A`). The substantive body (self-heating, recombination, level-3 parasitic caps, temperature derivatives) was landed by the already-APPLIED reconstructions `dio#recon/v41NewFeatures` + `dio#recon/diotempUpdate`; the applier re-derived the full `load()`/`stampAc`/`checkConvergence` bijection independently (`diode.ts:870-1239, 1273-1333`) without consulting rename-maps.
+- **The applier's only code edit this pass** is the MODEDCTRANCURVE capGate widening (`diode.ts:1108` + import at `diode.ts:43`), line-isomorphic to `dioload.c:419` — this is the +/- line of hunk h014 by docLineRange [dio.md 1382-1390]; a prior verifier had recorded the MISMATCH under the h019 label (a hunk-numbering conflation), but the fix satisfies both h014 and h019, so both flip to APPLIED. `tsc` clean on `diode.ts` (only pre-existing `njfet.ts` TS6133 unused-var lint, unrelated device). File-scope clean: worktree diff touches only `diode.ts`, ESCALATIONS.md, and `.vitest-failures.json` — no over-application.
+- **The un-ported v41 construct (h016).** `[dio.md 1411-1418]` = the `if(SenCond){...; *(CKTstate0+DIOdIdio_dT)=dIdio_dT; ...}` device-level SENSITIVITY store remains a genuine NO-COUNTERPART: digiTS implements no per-device sensitivity (`CKTsenInfo`/`SenCond`), consistent with the entire frozen DIO sensitivity family (`diosload.c`/`diosacl.c`/`diodset.c`/`diosset.c`/`diosupd.c`/`diosprt.c`/`diomask.c`/`diomdel.c` all NO-COUNTERPART). h016 carries no `blockedBy` = planning miss; it must be marked NO-COUNTERPART (Phase-0 frozen, user action) or the device-sensitivity subsystem authorized. The escalation (ESC-DIO-h016) was already raised by the applier and UPHELD by a prior verifier per VERIFICATION.md §6a; this teardown concurs and leaves h016 ESCALATED.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/dio/dioload.c` SenCond store (diff `dio.md` 1411-1418).
+- **digiTS:** `src/components/semiconductors/diode.ts:870-1239` (`load()` body) — no `SenCond`/`CKTsenInfo`/`DIOdIdio_dT` device-sensitivity store.
+- **Per §8 an open escalation blocks group completion,** so the group verdict is ESCALATE even though 19/20 hunks are APPLIED. No harness gate run this pass per the parallel-phase contract.
+- **Decision needed from user:** rule `dio/dioload.c#h016` NO-COUNTERPART (rationale: device-level sensitivity `SenCond` store; no per-device sensitivity in digiTS, consistent with the DIO sensitivity family) OR authorize a device-sensitivity reconstruction.
+- **Resolution:** _pending_
+
+### ESC-DIO-unsetup — `dio/diosetup.c::DIOunsetup` (h009) per-device node teardown has no digiTS surface
+
+- **source=dio/dio/diosetup.c::DIOunsetup | hunks=[diosetup.c#h009] | verdict=ESCALATE.** ESC-026, UPHELD. `diosetup.c#h009` `DIOunsetup` (`diosetup.c:356-378`) is per-device node teardown: `CKTdltNNum(posPrimeNode)` + the v41 unconditional `DIOposPrimeNode=0` reset behind a `posPrimeNode>0` guard. digiTS has NO device-teardown surface — `AbstractAnalogElement` exposes only `setup()` (no `unsetup()` vtable slot), engine rebuilt fresh per `compile()` so the internal prime node is re-derived in `setup()` each compile and never freed.
+- **Architecture change required:** landing it requires an `unsetup()` method on the analog element interface (`element.ts`) + every implementer + an engine teardown call — a cross-subsystem change beyond the `DIOunsetup` functionGroup. Same NO-COUNTERPART device-del/dest/unsetup family as ESC-021 / ESC-JFET-UNSETUP.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/dio/diosetup.c:356-378` (`DIOunsetup`).
+- **digiTS:** `src/components/semiconductors/diode.ts` / `src/core/element.ts` — no `unsetup()` device-teardown vtable slot; prime node re-derived in `setup()` per compile.
+- **Genuine §6a-valid escalation** (not bogus/in-scope); reaches the user. State left ESCALATED in progress.json.
+- **Decision needed from user:** confirm NO-COUNTERPART for the C device-teardown family (`DIOunsetup`), OR authorize an `unsetup()` device-teardown surface on the analog element interface + engine teardown call.
+- **Resolution:** _pending_
