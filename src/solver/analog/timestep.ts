@@ -769,23 +769,51 @@ export class TimestepController {
    * @param time - Breakpoint time in seconds
    */
   addBreakpoint(time: number): void {
-    // ngspice cktsetbk.c CKTsetBreak (v41 addition): a breakpoint requested at
-    // (within 3 ULPs of) the current circuit time is silently ignored -
-    // `if (AlmostEqualUlps(time, ckt->CKTtime, 3)) return (OK);`. v26 had no
-    // such guard and would insert a breakpoint coincident with "now", which the
-    // top-of-step pop loop then discards on the very next step. _lastAcceptedSimTime
-    // is the controller's CKTtime (the time of the last accepted step, which is
-    // the circuit time in effect when devices dispatch acceptStep -> addBreakpoint).
+    // ngspice cktsetbk.c CKTsetBreak. A breakpoint requested at (within 3 ULPs
+    // of) the current circuit time is silently ignored- cktsetbk.c:32-37
+    // `if (AlmostEqualUlps(time, ckt->CKTtime, 3)) return (OK);`.
+    // _lastAcceptedSimTime is the controller's CKTtime (the time of the last
+    // accepted step, the circuit time in effect when devices dispatch
+    // acceptStep -> addBreakpoint).
     if (almostEqualUlps(time, this._lastAcceptedSimTime, 3)) return;
 
+    // cktsetbk.c:45-61 deduplication threshold is CKTminBreak, not maxStep*5e-5.
+    // Under the XSPICE lane digiTS targets, CKTminBreak = 10 * CKTdelmin
+    // (dctran.c:154), held in _minBreak. The `maxStep*5e-5` form is the
+    // non-XSPICE branch (dctran.c:157) and is ~5 orders of magnitude larger,
+    // which swallows sub-nanosecond source-edge breakpoints (e.g. a 1ps PULSE
+    // riseTime) that drive the first-timepoint delta cut at getClampedDt-
+    // dctran.c:552 reads `breaks[1] - breaks[0]` as the proximity window.
+    const minBreak = this._minBreak;
+
+    // cktsetbk.c:43-82 scans CKTbreaks ascending for the first entry strictly
+    // greater than `time`. The binary search yields `lo` = first index whose
+    // value is >= time; an exact-equal entry collapses into the
+    // `breaks[lo] - time (== 0) <= minBreak` replace branch below, matching
+    // cktsetbk.c:45 (`<=` predicate, take-earlier).
     let lo = 0, hi = this._breakpoints.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
       if (this._breakpoints[mid]! < time) lo = mid + 1; else hi = mid;
     }
-    const eps = this._params.maxTimeStep * 5e-5;
-    if (lo < this._breakpoints.length && this._breakpoints[lo]! - time < eps) return;
-    if (lo > 0 && time - this._breakpoints[lo - 1]! < eps) return;
+
+    if (lo < this._breakpoints.length) {
+      // cktsetbk.c:45-54- existing later breakpoint within minBreak: replace it
+      // with the earlier requested time (take earlier point).
+      if (this._breakpoints[lo]! - time <= minBreak) {
+        this._breakpoints[lo] = time;
+        return;
+      }
+      // cktsetbk.c:55-62- predecessor within minBreak: skip (keep predecessor).
+      if (lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;
+      // cktsetbk.c:63-81- fits in the middle: insert.
+      this._breakpoints.splice(lo, 0, time);
+      return;
+    }
+
+    // cktsetbk.c:84-101- beyond the end of the table. Skip when within minBreak
+    // of the last breakpoint; otherwise append.
+    if (lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;
     this._breakpoints.splice(lo, 0, time);
   }
 
