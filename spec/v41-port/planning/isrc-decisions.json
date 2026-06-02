@@ -274,10 +274,10 @@
       "rationale": null
     },
     "isrc/isrcload.c#h013": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load TRNOISE timezero-reset + no-noise-at-t0 rework (reconstructed by isrc#recon/coeffWaveforms)",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "isrc/isrcload.c::ISRCload",
-      "rationale": null
+      "rationale": "TRNOISE timezero-reset + no-noise-at-t0 state machine (isrcload.c:317-331). Requires the trnoise_state lifecycle (frozen construct trnoise-trrandom-state); TRNOISE/TRRANDOM ruled do-not-port (user 2026-06-03 — needs ngspice FFT f_alpha synthesizer). Sibling of the already-NC isrcload.c#h014 / isrcpar.c#h003/#h004."
     },
     "isrc/isrcload.c#h014": {
       "state": "NO-COUNTERPART",

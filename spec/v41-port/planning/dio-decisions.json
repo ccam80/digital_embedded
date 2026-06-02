@@ -1,0 +1,739 @@
+{
+  "device": "dio",
+  "diffDoc": "spec/ngspice-v41-model-diffs/dio.md",
+  "_help": "Planning overlay applied by build-ledger.mjs. Per file: classification (PORT|NO-COUNTERPART|REVIEW-CLASS), tsFile, planningNote. Per item: state (PENDING|NO-COUNTERPART only - planning never sets APPLIED/ESCALATED), tsFunction, functionGroup (optional override), rationale (required iff state=NO-COUNTERPART). The optional `reconstruction` section declares v26-baseline reconstruction items (id must contain \"#recon/\"); each needs spec, blocks (>=1 hunk id), tsFile, tsFunction. Edit THIS file, never ledger.json; then re-run build-ledger.mjs.",
+  "files": {
+    "src/spicelib/devices/dio/Makefile.am": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Automake source-list fragment. C build-system artifact (PLANNING.md §5 case (a)); digiTS has no autotools build, components register via src/core/registry.ts. Both hunks only delete the diodel.c/diodest.c/diomdel.c entries from libdio_la_SOURCES, all themselves NO-COUNTERPART C-heap-free files."
+    },
+    "src/spicelib/devices/dio/dio.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "IFparm DIOpTable/DIOmPTable parameter-name tables + DIOnames terminal-name list. digiTS keys params by name string (defineModelParams in diode.ts), no integer-id IFparm table. Six hunks resolved per hunk: alias-flag/redirect edits (tref/cj0/cj/qd, duplicate-ctp removal) are NO-COUNTERPART C parser-table plumbing; the new model params (lm/lp/wm/wp/thermal, isr/nr, rth0/cth0, id_max/te_max/pd_max, level-3 geometry) are PENDING (blocked by their reconstruction items); the new 'Tj' terminal in DIOnames is PENDING (blocked by dio#recon/selfHeating)."
+    },
+    "src/spicelib/devices/dio/dioacld.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "AC small-signal load (DIOacLoad). AC is implemented engine-wide (analysis-scope.md). digiTS diode has no dedicated stampAc method — its AC companion is the conductance/cap stamp inside load() under MODEAC; the ngspice DIOacLoad imaginary-half stamp is the AC counterpart. h001 is the accessor rename + the `gspr = DIOtConductance` area-relocation (PORT); h002 adds the entire self-heating AC thermal-node stamp block (blocked by dio#recon/selfHeating)."
+    },
+    "src/spicelib/devices/dio/dioask.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "IFparm value getter (DIOask). digiTS has no integer-id ask API; params/outputs are read by name via the property bag / getPinCurrents. h001 adds the DIO_THERMAL flag getter (blocked by dio#recon/selfHeating); h002 changes the DIO_POWER computation to add the series-resistance dissipation term (id²/gspr) — a real numerical change to the power output, but digiTS has no DIO_POWER ask output, so it is NO-COUNTERPART (no behavioral existence)."
+    },
+    "src/spicelib/devices/dio/dioconv.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Convergence test (DIOconvTest). Maps to DiodeAnalogElement.checkConvergence (diode.ts:880-901), which implements the cdhat current-prediction test. h001/h003 are accessor renames + whitespace (PORT); h002 adds the self-heating delTemp/deldelTemp prediction term to cdhat (blocked by dio#recon/selfHeating)."
+    },
+    "src/spicelib/devices/dio/diodefs.h": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Instance/model structs + param-id constants + state-slot macros + noise-source enum. DIODE_SCHEMA / DiodeAnalogElement instance fields + DIODE_PARAM_DEFS are the counterpart. Nine hunks: GENinstance/GENmodel struct-embedding and ptr→Ptr matrix-pointer renames are NO-COUNTERPART C plumbing; the noise-source enum is NO-COUNTERPART (noise not implemented); the self-heating instance fields + _dT derivative fields + new state-slot macros (DIOqth/DIOcqth/DIOdeltemp/DIOdIdio_dT, DIOnumStates 9) are PENDING blocked by dio#recon/selfHeating; the recombination tRecSatCur fields blocked by dio#recon/recombination; the level-3 cmetal/cpoly + geometry Given-flags + model params blocked by dio#recon/level3GeoCap; the SOA id_max/te_max/pd_max model params blocked by dio#recon/selfHeating (SOA derating is gated on the thermal subsystem)."
+    },
+    "src/spicelib/devices/dio/diodel.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C-heap free (FREE(here)) unlinking one instance from a linked list. PLANNING.md §5 case (a): digiTS is GC-managed; no allocator/destructor/linked list. Whole file deleted in v41."
+    },
+    "src/spicelib/devices/dio/diodest.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C-heap free loop releasing every model and instance. PLANNING.md §5 case (a): digiTS is GC-managed; no explicit destructor. Whole file deleted in v41."
+    },
+    "src/spicelib/devices/dio/diodisto.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Distortion analysis load (DIOdisto). PLANNING.md §5 case (b): analysis-scope.md ratifies distortion as not implemented in digiTS (no distortion engine file, no distortion AnalogEngine method, no distortion MCP tool). The single hunk is the linked-list-walk accessor rename inside the distortion-mode-gated loop."
+    },
+    "src/spicelib/devices/dio/diodset.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Distortion setup (DIOdSetup). PLANNING.md §5 case (b): distortion not implemented (analysis-scope.md). h001 is the accessor rename; h002 is a distortion-only breakdown gd reordering (gd computed once via vt instead of vte then recomputed). Whole file belongs to distortion analysis."
+    },
+    "src/spicelib/devices/dio/dioext.h": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C extern-prototype header. PLANNING.md §5 case (a): digiTS has no prototype headers — signatures are TS class members. The single hunk only removes the extern decls of the deleted DIOdelete/DIOdestroy/DIOmDelete heap functions. No surviving declaration changes."
+    },
+    "src/spicelib/devices/dio/diogetic.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Initial-condition retrieval (DIOgetic). digiTS implements DC-OP/transient (analysis-scope.md); IC handling lives in DiodeAnalogElement.load (the MODEUIC vd=params.IC branch, diode.ts:618-619). The single hunk is the linked-list-walk accessor rename inside the IC-retrieval loop."
+    },
+    "src/spicelib/devices/dio/dioinit.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "SPICEdev DIOinfo registration dispatch struct, converted to C99 designated initialisers. PLANNING.md §4 registration-glue note: digiTS registration is DiodeDefinition; method binding is the DiodeAnalogElement class. Reviewed per the glue note — single hunk; every surviving function-pointer assignment is unchanged v26→v41, the only non-cosmetic change is DEVdestroy/DEVmodDelete/DEVdelete set to NULL (deleted heap functions). No new parameter slot or default. NO-COUNTERPART."
+    },
+    "src/spicelib/devices/dio/dioload.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Transient/DC companion-model load (DIOload). Maps to DiodeAnalogElement.load, which already cites dioload.c throughout. 20 hunks: accessor renames + the `gspr = DIOtConductance` area-relocation + `diffcharge = TT*cd` (merged sidewall into bottom diffusion charge) are PORT; the self-heating delTemp/Temp/Ith/dIth_* blocks, NIintegrate(qth), thermal RHS/matrix stamps, and the *KneeCurrentGiven flag gating are blocked by dio#recon/selfHeating; the recombination cdb_rec/gen_fac block by dio#recon/recombination; the cmetal/cpoly cap addition by dio#recon/level3GeoCap; the _dT derivative accumulation by dio#recon/diotempUpdate. The MODEDCTRANCURVE addition to the cap gate is PORT (MODEDCTRANCURVE exists in ckt-mode.ts)."
+    },
+    "src/spicelib/devices/dio/diomask.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Model-param ask getter (DIOmAsk). digiTS has no integer-id model-ask API. h001 adds the DIO_MOD_IS epsmin floor to the IS getter (the floor itself is a real behavioral clamp — blocked by dio#recon/diotempUpdate which introduces the model->DIOsatCur epsmin floor in setup; but as an ask-getter it has no digiTS counterpart → NO-COUNTERPART); h002 adds getters for the new isr/nr/rth0/cth0/id_max/pd_max/te_max + level-3 geometry model params — all NO-COUNTERPART (no ask API; the params themselves are added by their reconstructions, but the integer-id getter mechanism has no digiTS counterpart)."
+    },
+    "src/spicelib/devices/dio/diomdel.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C-heap free unlinking a model and freeing its instances. PLANNING.md §5 case (a): digiTS is GC-managed; no model destructor/linked list. Whole file deleted in v41."
+    },
+    "src/spicelib/devices/dio/diompar.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Model parameter application (DIOmParam). Maps to model-param defaulting in createDiodeElement / setParam. The single hunk adds the setter cases for the new model params (id_max/pd_max/te_max, isr/nr, rth0/cth0, lm/lp/wm/wp/xom/xoi/xm/xp). Each setter case is PENDING, blocked by the reconstruction item that introduces its parameter (recombination / selfHeating / level3GeoCap)."
+    },
+    "src/spicelib/devices/dio/dionoise.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Noise analysis (DIOnoise). PLANNING.md §5 case (b): analysis-scope.md ratifies noise as not implemented in digiTS (no noise method on AnalogElement, no noise engine file, no noise MCP tool). All three hunks are inside DIOnoise: accessor renames + the NOISE_ADD_OUTVAR macro refactor of the plot-name registration. Whole file belongs to noise analysis."
+    },
+    "src/spicelib/devices/dio/dioparam.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Instance parameter application (DIOparam). Maps to createDiodeElement param reads / setParam. h001 removes the cp_getvar(\"scale\") read + scale local (the scale fold moves to diosetup.c level-3 path) — NO-COUNTERPART (digiTS has no cp_getvar global; scale is handled in the level-3 reconstruction); h002 drops the `* scale` from DIO_W/DIO_L instance setters and adds the DIO_THERMAL instance flag setter (thermal blocked by dio#recon/selfHeating; the W/L de-scale blocked by dio#recon/level3GeoCap); h003 adds the level-3 instance geometry setters (lm/lp/wm/wp) blocked by dio#recon/level3GeoCap."
+    },
+    "src/spicelib/devices/dio/diopzld.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Pole-zero load (DIOpzLoad). PLANNING.md §5 case (b): analysis-scope.md ratifies PZ as not implemented (no PZ method on AnalogEngine, no PZ engine file, no PZ MCP tool). The single hunk is the accessor rename + the `gspr = DIOtConductance` rename inside the PZ-load stamps. Whole file belongs to PZ."
+    },
+    "src/spicelib/devices/dio/diosacl.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Sensitivity AC-load (DIOsAcLoad). PLANNING.md §5 case (b): analysis-scope.md ratifies sensitivity as not implemented (no SENstruct/SENparms/senParmNo, no sensitivity engine/tool). Both hunks are accessor renames + the gspr rename inside the CKTsenInfo-gated sensitivity loop. Whole file belongs to sensitivity."
+    },
+    "src/spicelib/devices/dio/diosetup.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Matrix-pointer alloc + model-default-processing + state sizing (DIOsetup/DIOunsetup). Maps to DiodeAnalogElement.setup + the model-param defaulting in createDiodeElement. Nine hunks: model-walk/instance-walk renames are PORT-cosmetic; the *KneeCurrent epsmin-disable defaulting, DIOsatCur epsmin floor, DIOnomTemp/DIOconductance defaults are PORT (blocked by dio#recon/diotempUpdate where these defaults live); the recombination defaults (DIOrecEmissionCoeff/DIOrecSatCur) blocked by dio#recon/recombination; the rth0/cth0 + id_max/pd_max/te_max defaults blocked by dio#recon/selfHeating; the level-3 geometry defaults + cmetal/cpoly derivation + scale read blocked by dio#recon/level3GeoCap; the `*states += DIOnumStates` and selfheat TSTALLOC block blocked by dio#recon/selfHeating."
+    },
+    "src/spicelib/devices/dio/diosload.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Sensitivity load (DIOsLoad). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md). The single hunk is the linked-list-walk accessor rename inside the sensitivity loop. Whole file belongs to sensitivity."
+    },
+    "src/spicelib/devices/dio/diosoachk.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Safe-operating-area check (DIOsoaCheck). PLANNING.md §5 case (b): analysis-scope.md ratifies SOA as not implemented (no soaCheck method on AnalogElement, no CKTsoaMaxWarns analogue, no SOA engine pass, no SOA MCP tool). Both hunks (the vd source-node change + the new id/pd/te derated-power checks) are inside DIOsoaCheck. Whole file belongs to SOA."
+    },
+    "src/spicelib/devices/dio/diosprt.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Sensitivity debug printout (DIOsPrint). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md); also pure stdout. The single hunk is the accessor rename inside DIOsPrint."
+    },
+    "src/spicelib/devices/dio/diosset.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Sensitivity setup (DIOsSetup). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md) — the function assigns DIOsenParmNo into a SENstruct (info->SENparms) with no digiTS analogue. The single hunk is the accessor rename."
+    },
+    "src/spicelib/devices/dio/diosupd.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Sensitivity update (DIOsUpdate). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md) — recomputes charge sensitivities into the absent SENstruct. The single hunk is the accessor rename."
+    },
+    "src/spicelib/devices/dio/diotemp.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "Temperature parameter scaling (DIOtemp, refactored in v41 into DIOtempUpdate(Temp) + a thin DIOtemp driver). Maps to dioTemp()/DiodeAnalogElement.computeTemperature. The full v26 DIOtemp body (tlev/tlevc branch selection, TM1/TM2 grading temp coeffs, TTT1/TTT2 transit temp, TRS/TRS2 resistance temp adjust, tunneling sat currents, brkdEmissionCoeff breakdown matching, full sidewall cap tF2SW/tF3SW/tDepSWCap) is a v26-baseline gap — digiTS's dioTemp implements only a subset. Both hunks (h001 comment dedent; h002 the whole DIOtemp→DIOtempUpdate rewrite incl. the _dT derivatives, DIOgradingCoeffMax cp_getvar, area-scaled DIOtConductance) are blocked by dio#recon/diotempUpdate, with the _dT derivatives further consumed by dio#recon/selfHeating."
+    },
+    "src/spicelib/devices/dio/diotrunc.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "planningNote": "LTE / timestep-truncation contribution (DIOtrunc). digiTS implements transient LTE (analysis-scope.md); maps to DiodeAnalogElement.getLteTimestep (delegates to cktTerr on the cap charge slot). The single hunk is the linked-list-walk accessor rename inside the CKTterr call site."
+    }
+  },
+  "items": {
+    "dio/Makefile.am#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/Makefile.am::libdio_la_SOURCES",
+      "rationale": "Automake source-list fragment — a C build-system artifact (PLANNING.md §5 case (a)). digiTS has no autotools build; components register via src/core/registry.ts. The hunk only deletes the diodel.c/diodest.c entries from libdio_la_SOURCES; both are themselves NO-COUNTERPART C-heap-free files. No behavioral content."
+    },
+    "dio/Makefile.am#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/Makefile.am::libdio_la_SOURCES",
+      "rationale": "Automake source-list fragment — a C build-system artifact (PLANNING.md §5 case (a)). The hunk only deletes the diomdel.c entry from libdio_la_SOURCES; diomdel.c is itself a NO-COUNTERPART C-heap-free file. No behavioral content."
+    },
+    "dio/dio.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DIODE_PARAM_DEFS.instance (the lm/lp/wm/wp level-3 instance geometry params) and a new THERMAL instance flag param. The IFparm DIOpTable rows map to instance-param entries in defineModelParams.",
+      "functionGroup": "dio/dio.c::DIOpTable",
+      "rationale": null
+    },
+    "dio/dio.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dio.c::DIOpTable",
+      "rationale": "Adds an OPUR(\"qd\", DIO_CHARGE, ...) output-redirect alias for the existing 'charge' output. PLANNING.md §5 case (a): digiTS keys params/outputs by name string with no integer-id IFparm table and no IF_REDIRECT alias mechanism. The aliased quantity (DIO_CHARGE) is unchanged; the hunk is purely a parser-table alias-flag row. No behavioral content."
+    },
+    "dio/dio.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dio.c::DIOmPTable",
+      "rationale": "Changes the 'tref' DIOmPTable row from IOPR to IOPUR — adds the unit + redirect flags on the tref→DIO_MOD_TNOM alias. PLANNING.md §5 case (a): digiTS keys params by name string (TNOM in DIODE_PARAM_DEFS) with no integer-id IFparm table and no IF_REDIRECT alias mechanism. The aliased canonical param (TNOM) is present and unchanged; the hunk is purely a parser-table flag edit. No parameter added/removed, no default changed."
+    },
+    "dio/dio.c#h004": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dio.c::DIOmPTable",
+      "rationale": "Changes the 'cj0'/'cj' DIOmPTable rows from IOPR to IOPAR — adds the area + redirect flags on the cj0/cj→DIO_MOD_CJO aliases. PLANNING.md §5 case (a): digiTS keys params by name string (CJO in DIODE_PARAM_DEFS) with no integer-id IFparm table and no IF_REDIRECT alias mechanism. The aliased canonical param (CJO) is present and unchanged; the hunk is purely a parser-table flag edit. No parameter added/removed, no default changed."
+    },
+    "dio/dio.c#h005": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dio.c::DIOmPTable",
+      "rationale": "Removes a duplicate IOP(\"ctp\", DIO_MOD_CTP, ...) row that was accidentally listed twice in the v26 DIOmPTable. PLANNING.md §5 case (a): a C parser-table de-duplication; digiTS has no IFparm table and never had a duplicate. The single surviving ctp row (the canonical CTP perimeter-cap temp coeff) is unaffected. No behavioral content."
+    },
+    "dio/dio.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DIODE_PARAM_DEFS (the new model params: isr/nr recombination; rth0/cth0 self-heating; id_max/te_max/pd_max SOA; lm/lp/wm/wp/xom/xoi/xm/xp level-3 geometry) plus the new 'Tj' thermal terminal in the diode pin layout (buildDiodePinDeclarations / pinNodes). The DIOmPTable rows + DIOnames Tj entry map to model-param entries and the pin declaration.",
+      "functionGroup": "dio/dio.c::DIOmPTable",
+      "rationale": null
+    },
+    "dio/dioacld.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEAC capacitance/conductance companion-stamp block (capGate path, diode.ts:804-877). digiTS folds the AC small-signal stamp into load() under MODEAC rather than a separate stampAc method; the ngspice DIOacLoad gspr/geq/xceq imaginary-half stamps are that path. h001 is the accessor rename plus the `gspr = DIOtConductance` area-relocation (area folded into DIOtConductance in diotemp now).",
+      "functionGroup": "dio/dioacld.c::DIOacLoad",
+      "rationale": null
+    },
+    "dio/dioacld.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, MODEAC path, new self-heating thermal-node AC stamp block (DIOtempPos/PosPrime/Neg/Temp + posTemp/posPrimeTemp/negTemp ptrs, xgcTt). Requires the thermal node and the dIth_*/gcTt instance state introduced by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioacld.c::DIOacLoad",
+      "rationale": null
+    },
+    "dio/dioask.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — the DIOthermal flag accessor (a getThermal-equivalent on DiodeAnalogElement, read of the THERMAL param). Introduced together with the self-heating subsystem; blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioask.c::DIOask",
+      "rationale": null
+    },
+    "dio/dioask.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dioask.c::DIOask",
+      "rationale": "Changes the DIO_POWER ask output to add the series-resistance dissipation term (Id·Vd + Id²/gspr). PLANNING.md §5 case (a): digiTS has no integer-id ask API and no DIO_POWER output — power is not an exposed diode output in DiodeAnalogElement (getPinCurrents returns terminal currents only). The hunk modifies an output-getter that has no behavioral existence in digiTS. The dissipated-power quantity is recomputed internally by the self-heating Ith term (dioload.c h-block), which is the porting target for power; this ask-getter is not."
+    },
+    "dio/dioconv.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence (diode.ts:880-901). h001 is the local-var declaration (delTemp/deldelTemp) + accessor rename; in digiTS this maps to the function-local additions in checkConvergence.",
+      "functionGroup": "dio/dioconv.c::DIOconvTest",
+      "rationale": null
+    },
+    "dio/dioconv.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence, the cdhat prediction. h002 adds the self-heating delTemp/deldelTemp term to cdhat (cdhat += dIdio_dT·deldelTemp). Requires the thermal node + DIOdeltemp/DIOdIdio_dT state from dio#recon/selfHeating.",
+      "functionGroup": "dio/dioconv.c::DIOconvTest",
+      "rationale": null
+    },
+    "dio/dioconv.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence, the CKTtroubleElt store site. h003 is the whitespace normalization of the troubleElt assignment (tab→spaces). The CKTtroubleElt/CKTnoncon bump maps to checkConvergence returning false; no behavioral change in this hunk.",
+      "functionGroup": "dio/dioconv.c::DIOconvTest",
+      "rationale": null
+    },
+    "dio/diodefs.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodefs.h::noise-source-enum",
+      "rationale": "Adds the diode noise-source index enum (DIORSNOIZ/DIOIDNOIZ/DIOFLNOIZ/DIOTOTNOIZ/DIONSRCS). PLANNING.md §5 case (b): analysis-scope.md ratifies noise as not implemented in digiTS (no noise method on AnalogElement, no noise engine file, no noise MCP tool). These indices address the DIOnVar noise-density array consumed only by DIOnoise. No behavioral content for any implemented analysis."
+    },
+    "dio/diodefs.h#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement instance fields / pinNodes. The new `const int DIOtempNode` is the self-heating thermal node; in digiTS this is the new 'Tj' pin in pinNodes. The GENinstance struct embedding, const node-id qualifiers, and ptr→Ptr matrix-pointer renames have no digiTS counterpart (pinNodes is a ReadonlyMap; stamps use opaque handles), but the hunk as a whole introduces the thermal node, so it is PENDING blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/diodefs.h::sDIOinstance",
+      "rationale": null
+    },
+    "dio/diodefs.h#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement instance fields + DIODE_PARAM_DEFS. Adds the level-3 instance Given-flags (DIOlengthMetalGiven etc.) and instance fields (DIOlengthMetal/Poly, DIOwidthMetal/Poly) plus the `int DIOthermal` self-heating flag. The level-3 geometry fields are blocked by dio#recon/level3GeoCap; the DIOthermal flag by dio#recon/selfHeating. functionGroup-split tracked in §5 of the review (the hunk mixes two reconstructions).",
+      "functionGroup": "dio/diodefs.h::sDIOinstance",
+      "rationale": null
+    },
+    "dio/diodefs.h#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — the temperature-derivative working fields mirroring DioTempParams (DIOtConductance_dT, DIOtSatCur_dT, DIOtSatSWCur_dT, DIOtTunSatCur_dT, DIOtTunSatSWCur_dT). These _dT derivatives feed the self-heating Jacobian; they are introduced by the diotemp.c rewrite. Blocked by dio#recon/diotempUpdate (which rebuilds the v26 temp body the derivatives extend) and consumed by dio#recon/selfHeating.",
+      "functionGroup": "dio/diodefs.h::sDIOinstance",
+      "rationale": null
+    },
+    "dio/diodefs.h#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement instance fields. Adds DIOtRecSatCur/DIOtRecSatCur_dT (recombination, blocked by dio#recon/recombination), the dIth_dVrs/dIth_dVdio/dIth_dT/gcTt/dIrs_dT/dIdio_dT self-heating Jacobian-cache fields (blocked by dio#recon/selfHeating), and DIOcmetal/DIOcpoly level-3 parasitic caps (blocked by dio#recon/level3GeoCap). Mixed; whole hunk PENDING (the dominant introduction is the self-heating Jacobian cache).",
+      "functionGroup": "dio/diodefs.h::sDIOinstance",
+      "rationale": null
+    },
+    "dio/diodefs.h#h006": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodefs.h::noise-source-macros",
+      "rationale": "Removes the old `#define DIORSNOIZ 0 .. #define DIONSRCS 4` macro block (replaced by the enum in h001) and leaves the DIOnVar[NSTATVARS][DIONSRCS] noise-density array declaration. PLANNING.md §5 case (b): noise is not implemented (analysis-scope.md). The DIOnVar array and its index macros are noise-only; no behavioral content for any implemented analysis."
+    },
+    "dio/diodefs.h#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DIODE_SCHEMA (defineStateSchema) + SLOT_* constants + stateSize. Adds the new state-slot macros DIOqth (thermal cap charge), DIOcqth (thermal cap current), DIOdeltemp (thermal voltage), DIOdIdio_dT, and bumps DIOnumStates from 5 to 9. The DIOdphidp/DIOsensxp/DIOnumSenStates macros it also touches are sensitivity (NO-COUNTERPART per analysis-scope.md), but the new self-heating state slots dominate and require the schema expansion; whole hunk PENDING blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/diodefs.h::DIOstate-macros",
+      "rationale": null
+    },
+    "dio/diodefs.h#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — model-param Given-flag equivalents (the props.isModelParamGiven checks) and DIODE_PARAM_DEFS. Adds the new model Given-flags: DIOid_maxGiven/DIOpd_maxGiven/DIOte_maxGiven (SOA), DIOrecSatCurGiven/DIOrecEmissionCoeffGiven (recombination), DIOrth0Given/DIOcth0Given (self-heating), and the eight level-3 geometry Given-flags. Also embeds `struct GENmodel gen` + accessor macros (no digiTS counterpart). Blocked across recombination/selfHeating/level3GeoCap; whole hunk PENDING.",
+      "functionGroup": "dio/diodefs.h::sDIOmodel",
+      "rationale": null
+    },
+    "dio/diodefs.h#h009": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DIODE_PARAM_DEFS (new model param fields: DIOid_max/pd_max/te_max, DIOrecSatCur/recEmissionCoeff, DIOrth0/cth0, the eight level-3 geometry doubles) and the DIOtempUpdate forward-declaration (maps to the dioTemp(Temp) signature). The DIO_*/DIO_MOD_* `#define`→`enum` reformat is byte-identical-value C reformatting with no digiTS integer-id counterpart, but the hunk also adds the new param-id constants (DIO_LM..DIO_XP, DIO_MOD_ISR..DIO_MOD_XP, DIO_THERMAL); whole hunk PENDING, blocked across recombination/selfHeating/level3GeoCap.",
+      "functionGroup": "dio/diodefs.h::sDIOmodel",
+      "rationale": null
+    },
+    "dio/diodel.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodel.c::DIOdelete",
+      "rationale": "Whole-file deletion of DIOdelete — a C-heap free (FREE(here)) unlinking one instance from a linked list. PLANNING.md §5 case (a): digiTS is GC-managed; no allocator, no destructor, no model-instance linked list. The file is deleted in v41."
+    },
+    "dio/diodest.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodest.c::DIOdestroy",
+      "rationale": "Whole-file deletion of DIOdestroy — a C-heap free loop releasing every model and instance. PLANNING.md §5 case (a): digiTS is GC-managed; no explicit destructor. The file is deleted in v41."
+    },
+    "dio/diodisto.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodisto.c::DIOdisto",
+      "rationale": "Distortion analysis load (DIOdisto). PLANNING.md §5 case (b): analysis-scope.md ratifies distortion as not implemented in digiTS (no distortion engine file, no distortion AnalogEngine method, no distortion MCP tool). The single hunk is the linked-list-walk accessor rename inside the D_TWOF1/D_THRF1-mode-gated distortion loop. Whole file belongs to distortion."
+    },
+    "dio/diodset.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodset.c::DIOdSetup",
+      "rationale": "Distortion setup (DIOdSetup). PLANNING.md §5 case (b): distortion not implemented (analysis-scope.md). The hunk is the linked-list-walk accessor rename. Whole file belongs to distortion."
+    },
+    "dio/diodset.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diodset.c::DIOdSetup",
+      "rationale": "Distortion setup (DIOdSetup), breakdown-region branch. PLANNING.md §5 case (b): distortion not implemented (analysis-scope.md). The hunk reorders the breakdown gd computation (gd = csat*evrev/vt computed once, removing the dead vte-based assignment) inside the distortion-only DIOdSetup. Whole file belongs to distortion."
+    },
+    "dio/dioext.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dioext.h::extern-prototypes",
+      "rationale": "C extern-prototype header. PLANNING.md §5 case (a): digiTS has no prototype headers — signatures are TS class members. The single hunk only removes the extern declarations of DIOdelete/DIOdestroy/DIOmDelete (the three deleted C-heap-free functions). No surviving declaration is changed — no new parameter slot, no changed default, no new capability."
+    },
+    "dio/diogetic.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEUIC initial-condition branch (vd = params.IC, diode.ts:618-619). ngspice DIOgetic seeds DIOinitCond from the external node voltages when IC is not given; digiTS reads params.IC under the MODEINITJCT+MODETRANOP+MODEUIC gate. The single hunk is the linked-list-walk accessor rename inside the IC-retrieval loop.",
+      "functionGroup": "dio/diogetic.c::DIOgetic",
+      "rationale": null
+    },
+    "dio/dioinit.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dioinit.c::DIOinfo",
+      "rationale": "SPICEdev DIOinfo registration dispatch struct, converted to C99 designated initialisers. PLANNING.md §4 registration-glue note + §5 case (a): digiTS has no SPICEdev table — registration is the DiodeDefinition object and method binding is the DiodeAnalogElement class. Reviewed hunk-by-hunk per the glue note: every surviving function-pointer assignment (DEVload/DEVsetup/DEVtemperature/DEVtrunc/DEVacLoad/DEVconvTest/DEVsetic/DEVask/DEVmodAsk + the disto/noise/soaCheck/sen* pointers) is unchanged v26→v41; the only non-cosmetic change is DEVdestroy/DEVmodDelete/DEVdelete set to NULL (the deleted heap functions). No new parameter slot, no changed default, no new device capability."
+    },
+    "dio/dioload.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, function-local declarations. Adds cdb_dT/cdsw_dT temperature derivatives of the bottom/sidewall currents; in digiTS these are load()-local values feeding the self-heating Jacobian. Blocked by dio#recon/diotempUpdate (the derivatives) and consumed by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, function-local declarations for the recombination current path (gen_fac, gen_fac_vd, t1, evd_rec, cdb_rec, gdb_rec, cdb_rec_dT). Blocked by dio#recon/recombination.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, function-local declarations for self-heating (deldelTemp, delTemp, Temp, ceqqth, Ith, gcTt, vrs, dIdio_dT, dIth_dVdio, dIrs_dT, dIth_dVrs, dIth_dT, csat_dT, csatsw_dT, argsw_dT) and the Check_dio/Check_th split. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the per-instance init block. Sets Check_th from the selfheat predicate, reorders the cd/cdb/gd/gdb/cdsw init, and relocates `gspr = DIOtConductance` (area now folded into DIOtConductance by diotemp). The gspr area-relocation is blocked by dio#recon/diotempUpdate; the Check_th/selfheat predicate by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the sensitivity-seed branch (CKTsenInfo). digiTS has no sensitivity (analysis-scope.md), so the CKTsenInfo wrapper has no counterpart; the behavioral content this hunk adds is the delTemp seeding from CKTstate0/1 inside that path, which lands in the MODEINIT* vd/delTemp dispatch in load(). Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEINITSMSIG/MODEINITTRAN/MODEINITJCT/MODEINITFIX vd-selection chain (diode.ts:610-645). Adds delTemp seeding alongside each vd seed (delTemp from CKTstate0/1, or 0.0 in the off/JCT cases). Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEINITPRED branch (diode.ts:628-639). Adds the state1→state0 copies for DIOdeltemp/DIOdIdio_dT/DIOqth, the DEVpred(delTemp) prediction, the qth init (cth0·delTemp), and the MODEINITTRAN qth history copy. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load / checkConvergence bypass path. Adds the deldelTemp tolerance test to the bypass condition (skip recompute only if both current and temperature predictions are within tol), storing delTemp/dIdio_dT on bypass. digiTS has no NOBYPASS path in load() today; the thermal-prediction term is part of the self-heating subsystem. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h009": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the pnjlim block (diode.ts:649-674). Renames Check→Check_dio and adds the DEVlimitlog(delTemp, ...) thermal-step limiter call (digiTS limitlog already exists in newton-raphson.ts:295). The thermal limiting is part of self-heating. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h010": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the `next1:` block opening. Adds the selfheat Temp = DIOtemp + delTemp re-evaluation via DIOtempUpdate(Temp) and the csat_dT/csatsw_dT assignment from the temperature-derivative fields, plus gspr. The DIOtempUpdate re-eval at perturbed Temp requires the parameterized temp function (dio#recon/diotempUpdate); the selfheat gating by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h011": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the sidewall current block (diode.ts:697-726). Adds cdsw_dT temperature-derivative terms to each sidewall region (forward/reverse/breakdown) and the merged csat_dT += csatsw_dT. Blocked by dio#recon/diotempUpdate (the _dT derivatives extend the temp body).",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h012": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load / computeDiodeIV, the bottom-current forward region. Adds cdb_dT and the entire recombination-current sub-block (vterec, evd_rec, cdb_rec, gen_fac via tJctPot/tGradingCoeff, gdb_rec, cdb_rec_dT) gated on DIOrecSatCurGiven. Blocked by dio#recon/recombination (the recombination block) and dio#recon/diotempUpdate (cdb_dT).",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h013": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, sidewall tunneling current. Adds cdsw_dT tunneling-derivative term. Tunneling (DIOtTunSatSWCur) is a v26 feature digiTS never ported, and the _dT derivative extends it. Blocked by dio#recon/diotempUpdate.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h014": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, bottom tunneling current. Adds cdb_dT tunneling-derivative term. Tunneling (DIOtTunSatCur) is a v26 feature digiTS never ported, and the _dT derivative extends it. Blocked by dio#recon/diotempUpdate.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h015": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the cd/gd assembly + IKF/IKR knee limiting (diode.ts:737-769). Adds dIdio_dT = cdb_dT + cdsw_dT (self-heating Jacobian) and changes the knee-current gates from `model->DIOforwardKneeCurrent > 0.0` to `model->DIOforwardKneeCurrentGiven` (same for reverse). The Given-flag gate change is blocked by dio#recon/diotempUpdate (where the *KneeCurrentGiven epsmin-disable defaulting lives, diosetup.c h-block); dIdio_dT by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h016": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": "Adds `*(CKTstate0 + DIOdIdio_dT) = dIdio_dT;` inside the `if(SenCond){}` block (dio.md 1411-1418) — a per-device SENSITIVITY store. digiTS implements no per-device sensitivity (no CKTsenInfo/SenCond), consistent with the frozen DIO sensitivity family (diosload/diosacl/diosset/diosupd/diosprt/diomask). User ruling 2026-06-03: device sensitivities NO-COUNTERPART. (Prior planningNote misidentified this as the MODEDCTRANCURVE capGate widening — that is a different hunk, already PORTed.)"
+    },
+    "dio/dioload.c#h017": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the charge-storage block (diode.ts:811-821) + computeJunctionCharge. Two changes: (1) `diffcharge = TT*cd` (the v41 merge of bottom + sidewall diffusion charge into the total current cd, replacing separate diffcharge/diffchargeSW; diffcap = TT*gd likewise) — a genuine arithmetic relocation, PORT; (2) `capd += DIOcmetal + DIOcpoly` adds the level-3 parasitic caps, blocked by dio#recon/level3GeoCap.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h018": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the small-signal/transient charge store-back. Adds the SenCond store of dIdio_dT (sensitivity wrapper, no digiTS counterpart) and the selfheat NIintegrate(cth0, qth) → gcTt/ceqqth thermal-capacitor companion with its MODEINITTRAN cqth history copy. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h019": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load / checkConvergence, the non-convergence bump. Changes `if (Check == 1)` to `if ((Check_th == 1) || (Check_dio == 1))` so a thermal-limiting event also flags non-convergence. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/dioload.c#h020": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the `next2:` state store-back + stamp block (diode.ts:775-800). Adds the DIOdeltemp/DIOdIdio_dT state writes, the entire self-heating power/Jacobian computation (vrs, Ith = vd·cd + vrs²·gspr, dIrs_dT, dIth_dVrs/dVdio/dT, gcTt cache), the thermal RHS contributions to posNode/posPrimeNode/negNode/tempNode, and the 7 thermal-node matrix stamps (tempPos/tempPosPrime/tempNeg/tempTemp/posTemp/posPrimeTemp/negTemp). Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "rationale": null
+    },
+    "dio/diomask.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diomask.c::DIOmAsk",
+      "rationale": "Model-param ask getter (DIOmAsk), DIO_MOD_IS case. Adds a CKTepsmin floor to the returned IS value. PLANNING.md §5 case (a): digiTS has no integer-id model-ask API — model params are read by name from the property bag. This is an output-getter clamp with no behavioral existence in digiTS. The IS epsmin floor that affects the simulation lives in diosetup.c (model->DIOsatCur clamp) which is a separate PORT site under dio#recon/diotempUpdate; this ask-getter clamp is not that site."
+    },
+    "dio/diomask.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diomask.c::DIOmAsk",
+      "rationale": "Model-param ask getter (DIOmAsk). Adds getter cases for the new model params (id_max/pd_max/te_max, isr/nr, rth0/cth0, lm/lp/wm/wp/xom/xoi/xm/xp). PLANNING.md §5 case (a): digiTS has no integer-id model-ask API — params are read by name from the property bag, not via a which-id switch returning IFvalue. The underlying params are introduced by their reconstruction items (recombination/selfHeating/level3GeoCap), but the integer-id getter mechanism this hunk extends has no digiTS counterpart. No behavioral content."
+    },
+    "dio/diomdel.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diomdel.c::DIOmDelete",
+      "rationale": "Whole-file deletion of DIOmDelete — a C-heap free unlinking a model from the model list and freeing its instances. PLANNING.md §5 case (a): digiTS is GC-managed; no model destructor, no model linked list. The file is deleted in v41."
+    },
+    "dio/diompar.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — model-param application in createDiodeElement (params object reads) and DiodeAnalogElement.setParam. The new DIOmParam setter cases map to new entries in DIODE_PARAM_DEFS + their setParam handling: id_max/pd_max/te_max (SOA, blocked by dio#recon/selfHeating), isr/nr (blocked by dio#recon/recombination), rth0/cth0 (blocked by dio#recon/selfHeating), lm/lp/wm/wp/xom/xoi/xm/xp with the xom/xoi ×1e-10 unit scaling (blocked by dio#recon/level3GeoCap). Whole hunk PENDING.",
+      "functionGroup": "dio/diompar.c::DIOmParam",
+      "rationale": null
+    },
+    "dio/dionoise.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dionoise.c::DIOnoise",
+      "rationale": "Noise analysis (DIOnoise). PLANNING.md §5 case (b): analysis-scope.md ratifies noise as not implemented (no noise method on AnalogElement, no noise engine file, no noise MCP tool). The hunk removes the local `char name[N_MXVLNTH]` (subsumed by the NOISE_ADD_OUTVAR macro). Whole file belongs to noise."
+    },
+    "dio/dionoise.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dionoise.c::DIOnoise",
+      "rationale": "Noise analysis (DIOnoise). PLANNING.md §5 case (b): noise not implemented (analysis-scope.md). The hunk is the linked-list-walk accessor rename inside the noise model/instance loop. Whole file belongs to noise."
+    },
+    "dio/dionoise.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dionoise.c::DIOnoise",
+      "rationale": "Noise analysis (DIOnoise). PLANNING.md §5 case (b): noise not implemented (analysis-scope.md). The hunk refactors the N_DENS/INT_NOIZ plot-name registration into the NOISE_ADD_OUTVAR macro. Whole file belongs to noise."
+    },
+    "dio/dioparam.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/dioparam.c::DIOparam",
+      "rationale": "Instance-param application (DIOparam) preamble. Removes the `double scale;` local and the `cp_getvar(\"scale\", CP_REAL, &scale)` global-variable read (the scale fold relocates to diosetup.c's level-3 path). PLANNING.md §5 case (a): digiTS has no cp_getvar and no ngspice global `scale` variable; the level-3 scale handling is reconstructed in setup() under dio#recon/level3GeoCap. This preamble removal of a C global lookup has no behavioral content of its own."
+    },
+    "dio/dioparam.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — instance-param reads in createDiodeElement / setParam. Drops the `* scale` factor from the DIO_W/DIO_L instance setters (scale now applied in the level-3 setup path) and adds the DIO_THERMAL instance-flag setter (here->DIOthermal = value->iValue != 0). The W/L de-scale is blocked by dio#recon/level3GeoCap; the THERMAL flag by dio#recon/selfHeating.",
+      "functionGroup": "dio/dioparam.c::DIOparam",
+      "rationale": null
+    },
+    "dio/dioparam.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — instance-param reads in createDiodeElement / setParam. Adds the level-3 instance geometry setters (DIO_LM/DIO_LP/DIO_WM/DIO_WP → DIOlengthMetal/lengthPoly/widthMetal/widthPoly with their Given-flags). Blocked by dio#recon/level3GeoCap.",
+      "functionGroup": "dio/dioparam.c::DIOparam",
+      "rationale": null
+    },
+    "dio/diopzld.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diopzld.c::DIOpzLoad",
+      "rationale": "Pole-zero load (DIOpzLoad). PLANNING.md §5 case (b): analysis-scope.md ratifies PZ as not implemented (no PZ method on the AnalogEngine interface, no PZ engine file under src/solver/analog/, no PZ MCP tool). The hunk is the linked-list-walk accessor rename plus the `gspr = DIOtConductance` rename inside the SPcomplex pole-zero stamps. Whole file belongs to PZ."
+    },
+    "dio/diosacl.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosacl.c::DIOsAcLoad",
+      "rationale": "Sensitivity AC-load (DIOsAcLoad). PLANNING.md §5 case (b): analysis-scope.md ratifies sensitivity as not implemented (no SENstruct/SENparms type anywhere in src/, no senParmNo field, no sensitivity engine method/tool). The hunk is the linked-list-walk accessor rename inside the CKTsenInfo/PERTURBATION-gated loop. Whole file belongs to sensitivity."
+    },
+    "dio/diosacl.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosacl.c::DIOsAcLoad",
+      "rationale": "Sensitivity AC-load (DIOsAcLoad). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md). The hunk is the `gspr0 = DIOtConductance` rename (area now folded into DIOtConductance) inside the sensitivity perturbation stamps. Whole file belongs to sensitivity."
+    },
+    "dio/diosetup.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup / createDiodeElement model defaulting. Adds the `#include fteext.h` (C plumbing, no counterpart) and the `cp_getvar(\"scale\", CP_REAL, &scale)` read that feeds the level-3 area/perimeter and cmetal/cpoly scaling. The scale read is part of the level-3 geometric-cap path. Blocked by dio#recon/level3GeoCap.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — model-param defaulting in createDiodeElement. Changes the IKF/IKR (forward/reverse knee) defaulting: instead of `if(!given) set 0`, v41 keeps the Given-flag and, if given but < CKTepsmin, clears the Given-flag with a warning. Pairs with the dioload.c h015 `*KneeCurrentGiven` gate change. The IKF/IKR knee path exists in digiTS (diode.ts:742-768) but the epsmin-disable defaulting is part of the v26-baseline temp/setup defaulting digiTS never fully ported. Blocked by dio#recon/diotempUpdate.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — model-param defaulting in createDiodeElement / DiodeAnalogElement.setup. Adds the model defaults: id_max/pd_max/te_max=1e99 (SOA), recEmissionCoeff=2 / recSatCur=1e-14 (recombination), the DIOsatCur CKTepsmin floor, DIOnomTemp=CKTnomTemp, DIOconductance from DIOresist, rth0=0/cth0=1e-5 (self-heating), and the eight level-3 geometry defaults (lengthMetal/Poly, widthMetal/Poly =0; metalOxideThick/polyOxideThick =1e-6; metalMaskOffset/polyMaskOffset =0). Spans recombination/selfHeating/level3GeoCap/diotempUpdate; whole hunk PENDING. The dominant introduction (satCur floor, nomTemp, conductance) is the v26 setup-defaulting under dio#recon/diotempUpdate; the rest are reconstruction-specific defaults.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the instance-loop area/perimeter + level-3 geometry derivation. Adds the model/instance-walk rename, the DIOcmetal/DIOcpoly init, and the level=3 block: area/pj scaled by scale², the wm/lm/wp/lp instance-or-model selection, and the CONSTepsSiO2-based parasitic metal/poly overlap-capacitance computation. Blocked by dio#recon/level3GeoCap (requires CONSTepsSiO2, the geometry params, and the level=3 model branch).",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup + DIODE_SCHEMA. Changes `*states += 5` to `*states += DIOnumStates` (the 5→9 state-slot expansion for the self-heating thermal-cap and delTemp/dIdio_dT slots) and the sensitivity `2 * SENparms` to `DIOnumSenStates * SENparms` (sensitivity, NO-COUNTERPART per analysis-scope.md). The state-count expansion is the self-heating subsystem. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the selfheat predicate computation (int selfheat = DIOtempNode>0 && DIOthermal && DIOrth0Given) inserted before the TSTALLOC macro. This gates the thermal-node matrix allocations in h007. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the TSTALLOC sequence (diode.ts:580-587). Adds the seven self-heating thermal-node TSTALLOC allocations (DIOtempPos/tempPosPrime/tempNeg/tempTemp/posTemp/posPrimeTemp/negTemp) gated on the selfheat predicate, mirroring the existing allocElement handle pattern. Blocked by dio#recon/selfHeating.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the DIOunsetup posPrime-node teardown. Changes the unsetup guard to `DIOposPrimeNode > 0` and always resets DIOposPrimeNode = 0. digiTS allocates the prime node in setup() via ctx.makeVolt (diode.ts:573-578); unsetup/node-release has a partial counterpart (the internalLabels / engine node lifecycle). The guard-and-reset change is a structural refinement of node teardown — PORT.",
+      "functionGroup": "dio/diosetup.c::DIOsetup",
+      "rationale": null
+    },
+    "dio/diosetup.c#h009": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosetup.c::DIOunsetup",
+      "rationale": "DIOunsetup device teardown (dio.md 2071-2094): CKTdltNNum(posPrimeNode) + DIOposPrimeNode=0 reset behind a >0 guard. digiTS has no device-teardown/unsetup surface (no unsetup() vtable; engine rebuilt fresh per compile, the prime node re-derived each setup). User ruling 2026-06-03: device deletes/teardown NO-COUNTERPART. Sibling of the frozen diodel/diomdel family."
+    },
+    "dio/diosload.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosload.c::DIOsLoad",
+      "rationale": "Sensitivity load (DIOsLoad). PLANNING.md §5 case (b): analysis-scope.md ratifies sensitivity as not implemented (no SENstruct/SENparms/senParmNo, no sensitivity engine pass/tool). The hunk is the linked-list-walk accessor rename inside the sensitivity loop. Whole file belongs to sensitivity."
+    },
+    "dio/diosoachk.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosoachk.c::DIOsoaCheck",
+      "rationale": "Safe-operating-area check (DIOsoaCheck). PLANNING.md §5 case (b): analysis-scope.md ratifies SOA as not implemented (no soaCheck method on AnalogElement, no CKTsoaMaxWarns analogue, no SOA engine pass, no SOA MCP tool). The hunk adds the id/pd/te local declarations + warn-counters and the accessor rename, and changes the vd source node from DIOposPrimeNode to DIOposNode + the Vd/Fv_max/Bv_max message-text reformat. Whole file belongs to SOA."
+    },
+    "dio/diosoachk.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosoachk.c::DIOsoaCheck",
+      "rationale": "Safe-operating-area check (DIOsoaCheck). PLANNING.md §5 case (b): SOA not implemented (analysis-scope.md). The hunk adds the new id_max / pd_max (with self-heating and external-temp derating branches) / te_max checks with soa_printf warnings. The derating uses rth0/nomTemp/te. Whole file belongs to SOA — even with the self-heating subsystem reconstructed, digiTS has no SOA check pass to host these warnings."
+    },
+    "dio/diosprt.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosprt.c::DIOsPrint",
+      "rationale": "Sensitivity debug printout (DIOsPrint). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md); also pure stdout printing with no digiTS analogue. The hunk is the linked-list-walk accessor rename inside DIOsPrint."
+    },
+    "dio/diosset.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosset.c::DIOsSetup",
+      "rationale": "Sensitivity setup (DIOsSetup). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md) — the function assigns DIOsenParmNo into a SENstruct (info->SENparms) that has no digiTS analogue. The hunk is the linked-list-walk accessor rename."
+    },
+    "dio/diosupd.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "dio/diosupd.c::DIOsUpdate",
+      "rationale": "Sensitivity update (DIOsUpdate). PLANNING.md §5 case (b): sensitivity not implemented (analysis-scope.md) — recomputes charge sensitivities into the absent SENstruct. The hunk is the linked-list-walk accessor rename."
+    },
+    "dio/diotemp.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — dioTemp() / DiodeAnalogElement.computeTemperature (the doc comment heading). The hunk is the top-of-function comment dedent (4-space indent removed). Maps to the dioTemp() docstring; no behavioral content, but it sits in the diotemp.c rewrite. Blocked by dio#recon/diotempUpdate.",
+      "functionGroup": "dio/diotemp.c::DIOtempUpdate",
+      "rationale": null
+    },
+    "dio/diotemp.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — dioTemp() and DiodeAnalogElement.computeTemperature. The whole DIOtemp→DIOtempUpdate(model, here, Temp, ckt) rewrite: the temperature body is extracted into a function taking an explicit Temp (so self-heating can re-evaluate at Temp+delTemp), the DIOgradingCoeffMax cp_getvar grading-coeff limit, ALL _dT temperature derivatives (tSatCur_dT, tSatSWCur_dT, tTunSatCur_dT, tTunSatSWCur_dT, tRecSatCur_dT, tConductance_dT), the recombination tRecSatCur scaling, the tlev/tlevc branch selection, TM1/TM2 grading-temp, the breakdown-matching iteration, area-scaled DIOtConductance, and the sidewall tF2SW/tF3SW/tDepSWCap. digiTS's dioTemp implements only a subset of the v26 body (no tlev/tlevc, TM1/TM2, TTT1/TTT2, TRS/TRS2, tunneling, brkdEmissionCoeff, full sidewall cap), so the v26 baseline must be reconstructed before this rewrite applies. Blocked by dio#recon/diotempUpdate; the _dT derivatives are further consumed by dio#recon/selfHeating and tRecSatCur by dio#recon/recombination.",
+      "functionGroup": "dio/diotemp.c::DIOtempUpdate",
+      "rationale": null
+    },
+    "dio/diotrunc.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.getLteTimestep (diode.ts:910-931, delegates to cktTerr on the cap charge slot). The single hunk is the linked-list-walk accessor rename inside the CKTterr(DIOcapCharge) call site. PORT-cosmetic; not blocked.",
+      "functionGroup": "dio/diotrunc.c::DIOtrunc",
+      "rationale": null
+    }
+  },
+  "reconstruction": {
+    "dio#recon/diotempUpdate": {
+      "title": "Rebuild the complete v26 DIOtemp temperature-scaling body (tlev/tlevc branch selection, TM1/TM2 junction-grading temp coeffs, TTT1/TTT2 transit-time temp coeffs, TRS/TRS2 series-resistance temp adjust, tunneling saturation currents DIOtTunSatCur/DIOtTunSatSWCur, the brkdEmissionCoeff breakdown-current matching iteration, and the full sidewall depletion-cap path tF2SW/tF3SW/tDepSWCap) as the v26 baseline of diotemp.c, refactored into a DIOtempUpdate(Temp) helper that takes an explicit temperature; plus the IS/IKF/IKR/satCur CKTepsmin floors and DIOnomTemp/DIOconductance defaulting that v26 diosetup applies. digiTS's current dioTemp() implements only a subset (no tlev/tlevc, no TM1/TM2/TTT1/TTT2/TRS/TRS2, no tunneling, no brkdEmissionCoeff, partial sidewall cap).",
+      "spec": "spec/v41-port/reconstruction/dio-diotempupdate.md",
+      "ngspiceBaseline": [
+        "src/spicelib/devices/dio/diotemp.c",
+        "src/spicelib/devices/dio/diosetup.c"
+      ],
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "tsFiles": [
+        "src/components/semiconductors/diode.ts",
+        "src/solver/analog/temp-context.ts",
+        "src/solver/analog/ckt-context.ts"
+      ],
+      "tsFunction": "src/components/semiconductors/diode.ts — dioTemp() (extend to the full v26 body + the _dT derivative outputs in DioTempParams) and DiodeAnalogElement.computeTemperature (call with explicit Temp); also createDiodeElement/DiodeAnalogElement.setup for the satCur/knee epsmin floors and nomTemp/conductance defaults",
+      "functionGroup": "dio/diotemp.c::DIOtempUpdate",
+      "blocks": [
+        "dio/diodefs.h#h004",
+        "dio/dioload.c#h001",
+        "dio/dioload.c#h004",
+        "dio/dioload.c#h010",
+        "dio/dioload.c#h011",
+        "dio/dioload.c#h013",
+        "dio/dioload.c#h014",
+        "dio/dioload.c#h015",
+        "dio/diosetup.c#h002",
+        "dio/diosetup.c#h003",
+        "dio/diotemp.c#h001",
+        "dio/diotemp.c#h002"
+      ],
+      "state": "PENDING"
+    },
+    "dio#recon/v41NewFeatures": {
+      "title": "Build the three v41-new diode subsystems as one coherent reconstruction (they all weave into the same DIOload/DIOsetup bodies, so a single applier rebuilds them together): (1) ELECTRO-THERMAL SELF-HEATING — an ALWAYS-PRESENT third 'Tj' thermal terminal (#38: the diode is always 3-terminal, Tj is not conditional), DIOthermal flag + rth0/cth0 model params, thermal-cap NIintegrate (DIOqth/DIOcqth) + DIOdeltemp/DIOdIdio_dT state slots (DIOnumStates 5->9), the DEVlimitlog thermal-step limit (digiTS limitlog exists), DIOtempUpdate re-eval at Temp+delTemp, dissipated power Ith=vd*cd+vrs^2*gspr and its Jacobian (dIth_dVrs/dIth_dVdio/dIth_dT/dIrs_dT/gcTt), the seven thermal-node TSTALLOC stamps + RHS in load(), and the AC (dioacld) + convergence (dioconv) thermal branches. (2) RECOMBINATION CURRENT — isr (DIOrecSatCur)/nr (DIOrecEmissionCoeff) params, DIOtRecSatCur/_dT temp scaling, cdb_rec=tRecSatCur*(exp(vd/(nr*vt))-1)*gen_fac with gen_fac=((1-vd/tJctPot)^2+0.005)^(tGradingCoeff/2) and its V/T derivatives, gated on DIOrecSatCurGiven. (3) LEVEL=3 PARASITIC GEOMETRY CAPS — lm/lp/wm/wp/xom/xoi/xm/xp params, CONSTepsSiO2, the area/perimeter-from-w/l-and-scale derivation, DIOcmetal=epsSiO2/xom*m*(wm*scale+xm)*(lm*scale+xm) + DIOcpoly folded into capd, plus the cp_getvar('scale') fold and DIO_W/DIO_L de-scaling. All v41-new (no v26 baseline); reconstruction targets the v41 state directly. Merged per #20 (hybrid: dio#recon/diotempUpdate kept separate as a v26-baseline gap).",
+      "spec": "spec/v41-port/reconstruction/dio-v41newfeatures.md",
+      "ngspiceBaseline": [
+        "src/spicelib/devices/dio/dioload.c",
+        "src/spicelib/devices/dio/diosetup.c",
+        "src/spicelib/devices/dio/dioacld.c",
+        "src/spicelib/devices/dio/dioconv.c",
+        "src/spicelib/devices/dio/diodefs.h",
+        "src/spicelib/devices/dio/diotemp.c",
+        "src/spicelib/devices/dio/dioparam.c"
+      ],
+      "tsFile": "src/components/semiconductors/diode.ts",
+      "tsFiles": [
+        "src/components/semiconductors/diode.ts",
+        "src/core/constants.ts"
+      ],
+      "tsFunction": "src/components/semiconductors/diode.ts — DIODE_SCHEMA (4 new thermal slots), buildDiodePinDeclarations (always-present 'Tj' pin per #38), DIODE_PARAM_DEFS (rth0/cth0/thermal + isr/nr + lm/lp/wm/wp/xom/xoi/xm/xp + level), dioTemp() (tRecSatCur scaling), src/core/constants.ts (CONSTepsSiO2), DiodeAnalogElement.setup (thermal TSTALLOC + level=3 geometry derivation + cmetal/cpoly), DiodeAnalogElement.load (thermal stamps + Ith Jacobian + NIintegrate(qth), recombination current block, capd += cmetal+cpoly), checkConvergence (delTemp prediction), stampAc (thermal AC branch); engine-side TempContext re-eval at perturbed Temp",
+      "functionGroup": "dio/dioload.c::DIOload",
+      "blocks": [
+        "dio/dioload.c#h002",
+        "dio/dioload.c#h012",
+        "dio/dio.c#h001",
+        "dio/diodefs.h#h003",
+        "dio/dioparam.c#h002",
+        "dio/dioparam.c#h003",
+        "dio/dioload.c#h017",
+        "dio/diosetup.c#h001",
+        "dio/diosetup.c#h004",
+        "dio/dio.c#h006",
+        "dio/dioacld.c#h002",
+        "dio/dioask.c#h001",
+        "dio/dioconv.c#h002",
+        "dio/diodefs.h#h002",
+        "dio/diodefs.h#h005",
+        "dio/diodefs.h#h007",
+        "dio/diodefs.h#h008",
+        "dio/diodefs.h#h009",
+        "dio/diompar.c#h001",
+        "dio/dioload.c#h003",
+        "dio/dioload.c#h005",
+        "dio/dioload.c#h006",
+        "dio/dioload.c#h007",
+        "dio/dioload.c#h008",
+        "dio/dioload.c#h009",
+        "dio/dioload.c#h018",
+        "dio/dioload.c#h019",
+        "dio/dioload.c#h020",
+        "dio/diosetup.c#h005",
+        "dio/diosetup.c#h006",
+        "dio/diosetup.c#h007"
+      ],
+      "state": "PENDING"
+    }
+  }
+}

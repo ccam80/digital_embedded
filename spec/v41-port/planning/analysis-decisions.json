@@ -774,34 +774,34 @@
       "rationale": "Adds fteext.h + XSPICE enh.h includes. C preprocessor plumbing; the XSPICE enh symbol (rshunt) is XSPICE-only. PLANNING.md 5(a)."
     },
     "analysis/cktsetup.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsetup.c::CKTsetup(CKTcircuit *ckt)",
-      "rationale": null
+      "rationale": "!CKThead / !DEVices E_PANIC guards (CKTsetup): digiTS has no per-type model linked-list nor a global device-type registry — a C data-structure guard with no counterpart."
     },
     "analysis/cktsetup.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsetup.c::CKTsetup(CKTcircuit *ckt)",
-      "rationale": null
+      "rationale": "prev_CKTlastNode = CKTlastNode save before DEVsetup: digiTS has no node-ID high-water mark and no setup->unsetup->re-setup re-entry cycle (matrix rebuilt fresh per compile()). C re-entry architecture, no counterpart."
     },
     "analysis/cktsetup.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsetup.c::CKTsetup(CKTcircuit *ckt)",
-      "rationale": null
+      "rationale": "CKTlastNode save/reflow around DEVsetup (re-entry bookkeeping): same missing high-water-mark / setup-unsetup re-entry architecture as #h003. No counterpart."
     },
     "analysis/cktsetup.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsetup.c::CKTunsetup(CKTcircuit *ckt)",
-      "rationale": null
+      "rationale": "CKTunsetup node->ptr = NULL on icGiven||nsGiven nodes: digiTS has no node->ptr matrix-element-pointer cache nor a CKTunsetup teardown (nodeset/IC live in ctx.nodesets/ctx.ics maps, rebuilt fresh). Teardown, no counterpart."
     },
     "analysis/cktsetup.c#h006": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsetup.c::CKTunsetup(CKTcircuit *ckt)",
-      "rationale": null
+      "rationale": "CKTunsetup prev_CKTlastNode != CKTlastNode consistency assert + reset: same missing CKTlastNode high-water-mark / setup-unsetup re-entry architecture. No counterpart."
     },
     "analysis/cktsgen.c#h001": {
       "state": "NO-COUNTERPART",
@@ -984,10 +984,10 @@
       "rationale": null
     },
     "analysis/dctran.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "CKTsizeIncr=100 + LTRA CKTtimePoints TMALLOC: the LTRA lossy-transmission-line device is out of the frozen v41 device-class scope (frozen construct ltra-lossy-transmission-line) and CKTsizeIncr is a C array-growth detail. No counterpart."
     },
     "analysis/dctran.c#h004": {
       "state": "PENDING",
@@ -1248,10 +1248,10 @@
       "rationale": null
     },
     "analysis/transetp.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.init",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/transetp.c::TRANsetParm(CKTcircuit *ckt, JOB *anal, int which, IFvalue *value)",
-      "rationale": null
+      "rationale": "TST0P->TSTOP user-facing error-string typo fix inside the C IFparm TRANsetParm(which, IFvalue*) dispatcher. digiTS has no IFparm param dispatcher; transient param validation (TSTOP/TSTEP/TSTART/TMAX/UIC) lives in resolveSimulationParams + facade. Cosmetic C error-string in absent machinery, no counterpart."
     }
   },
   "reconstruction": {

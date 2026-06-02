@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T14:39:23.171Z",
+    "generated": "2026-06-02T19:16:37.888Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -16635,11 +16635,11 @@
         1418
       ],
       "hunkHash": "0155d08add828648",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the capacitance gate (diode.ts:804-806). Adds MODEDCTRANCURVE to the charge-storage gate mask. MODEDCTRANCURVE exists in ckt-mode.ts; this is a genuine PORT (gate-mask widening), not blocked by any reconstruction.",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Adds `*(CKTstate0 + DIOdIdio_dT) = dIdio_dT;` inside the `if(SenCond){}` block (dio.md 1411-1418) — a per-device SENSITIVITY store. digiTS implements no per-device sensitivity (no CKTsenInfo/SenCond), consistent with the frozen DIO sensitivity family (diosload/diosacl/diosset/diosupd/diosprt/diomask). User ruling 2026-06-03: device sensitivities NO-COUNTERPART. (Prior planningNote misidentified this as the MODEDCTRANCURVE capGate widening — that is a different hunk, already PORTed.)",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -17441,11 +17441,11 @@
         2094
       ],
       "hunkHash": "35ac1cd1c3b5e8f4",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup (DIOunsetup region). The model/instance-walk accessor rename inside DIOunsetup. digiTS's engine manages node lifecycle; the rename maps to the existing setup/teardown of the prime node. PORT-cosmetic.",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "DIOunsetup device teardown (dio.md 2071-2094): CKTdltNNum(posPrimeNode) + DIOposPrimeNode=0 reset behind a >0 guard. digiTS has no device-teardown/unsetup surface (no unsetup() vtable; engine rebuilt fresh per compile, the prime node re-derived each setup). User ruling 2026-06-03: device deletes/teardown NO-COUNTERPART. Sibling of the frozen diodel/diomdel family.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -21029,11 +21029,11 @@
         971
       ],
       "hunkHash": "bbf89c31082e5374",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load TRNOISE timezero-reset + no-noise-at-t0 rework (reconstructed by isrc#recon/coeffWaveforms)",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "TRNOISE timezero-reset + no-noise-at-t0 state machine (isrcload.c:317-331). Requires the trnoise_state lifecycle (frozen construct trnoise-trrandom-state); TRNOISE/TRRANDOM ruled do-not-port (user 2026-06-03 — needs ngspice FFT f_alpha synthesizer). Sibling of the already-NC isrcload.c#h014 / isrcpar.c#h003/#h004.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "isrc#recon/coeffWaveforms"
@@ -40641,11 +40641,11 @@
         3028
       ],
       "hunkHash": "f6124cd04915d85a",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "!CKThead / !DEVices E_PANIC guards (CKTsetup): digiTS has no per-type model linked-list nor a global device-type registry — a C data-structure guard with no counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40672,11 +40672,11 @@
         3046
       ],
       "hunkHash": "6bd08f21e2d2d2c5",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "prev_CKTlastNode = CKTlastNode save before DEVsetup: digiTS has no node-ID high-water mark and no setup->unsetup->re-setup re-entry cycle (matrix rebuilt fresh per compile()). C re-entry architecture, no counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40703,11 +40703,11 @@
         3067
       ],
       "hunkHash": "eb873815f2b2e7c0",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTlastNode save/reflow around DEVsetup (re-entry bookkeeping): same missing high-water-mark / setup-unsetup re-entry architecture as #h003. No counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40734,11 +40734,11 @@
         3076
       ],
       "hunkHash": "40e6a85ce133c5ee",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTunsetup node->ptr = NULL on icGiven||nsGiven nodes: digiTS has no node->ptr matrix-element-pointer cache nor a CKTunsetup teardown (nodeset/IC live in ctx.nodesets/ctx.ics maps, rebuilt fresh). Teardown, no counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40765,11 +40765,11 @@
         3090
       ],
       "hunkHash": "b17a3fc404fce59f",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/compiler.ts::expandCompositeInstance",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTunsetup prev_CKTlastNode != CKTlastNode consistency assert + reset: same missing CKTlastNode high-water-mark / setup-unsetup re-entry architecture. No counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -41728,11 +41728,11 @@
         3922
       ],
       "hunkHash": "41214164141bdcb0",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTsizeIncr=100 + LTRA CKTtimePoints TMALLOC: the LTRA lossy-transmission-line device is out of the frozen v41 device-class scope (frozen construct ltra-lossy-transmission-line) and CKTsizeIncr is a C array-growth detail. No counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -43092,11 +43092,11 @@
         8413
       ],
       "hunkHash": "6b3a020413fa81e2",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.init",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "TST0P->TSTOP user-facing error-string typo fix inside the C IFparm TRANsetParm(which, IFvalue*) dispatcher. digiTS has no IFparm param dispatcher; transient param validation (TSTOP/TSTEP/TSTART/TMAX/UIC) lives in resolveSimulationParams + facade. Cosmetic C error-string in absent machinery, no counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
