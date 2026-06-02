@@ -1020,3 +1020,37 @@ code behaviour) — so it routes here per §6 rather than to `spec/fix-list-phas
 - **Not numerical:** the stamps are bit-exact; only the three comment citations contradict the emitted code. No firstDivergence / matrix-cell / step-iter / gate-fail signature exists. Routed here per §6, not to `fix-list-phase-2-audit.md`. Not closed as "citation divergence"/"documentation hygiene" (banned verdicts) — this is a real contract violation the recon must fix before it can be recorded APPLIED.
 - **Decision needed from user:** direct the recon applier to change the `bjt.ts:2152/2159/2162` comments to the v26 PRE-IMAGE citations the spec prescribes (`bjt.md:244/253/257 pre-image`) and reframe the parenthetical collCX (v41 successor) notes — which this recon DEFERS to hunk `#h002` — to the v26 mechanism; code stamp VALUES stay as-is. Then re-run the recon so progress.json flips PENDING → APPLIED.
 - **Resolution:** _pending_
+
+---
+
+## mos1 (2026-06-03) — WORKTREE GATE+MERGE+TEARDOWN (serial pass)
+
+Teardown of isolated worktree `.wt/mos1`. REBASE onto the advancing `v41-port` ran cleanly
+(`rebaseClean=true`; the worktree fast-forwarded over the units merged since it branched, with no
+two-units-touched-the-same-file conflict). No merge this pass (`merged=false`, `gatePass=null`,
+gate skipped — no isomorphic committed work to gate per the serial-stage contract; the passed
+escalation below documents that the recon's edit never landed in the worktree). MAIN `src/`
+confirmed clean (`mainSrcClean=true`). The preserved kept-work diff
+(`git diff v41-port -- src/`) is **empty (0 bytes)**, consistent with the EMPTY-DIFF CATCH in the
+escalation below — there is no APPLIED edit to resume from. This escalation is NOT a numerical
+gate-fail / firstDivergence / matrix-cell / step-iter bug — by the verifier's own independent
+re-derivation the `stampAc` method already present at the base commit is bit-exact source-isomorphic
+to `mos1acld.c`. The blocking item is a recon-disposition / worktree-state defect (the edit did not
+land in `.wt/mos1`, so the APPLIED commit could not stage `mosfet.ts`) — so it routes here per §6
+rather than to `spec/fix-list-phase-2-audit.md`.
+
+### ESC-MOS1-stampAc-EMPTY-DIFF — `mos1#recon/stampAc` edit did not land in the worktree (empty diff for the recon's tsFile)
+
+- **source=mos1#recon/stampAc | verdict=MISMATCH.** The transcribed note (verbatim):
+
+  > EMPTY-DIFF CATCH triggered. `git -C C:/local_working_projects/digital_in_browser/.wt/mos1 diff --name-only` (and `diff --name-only HEAD`) is EMPTY for the recon's tsFile src/components/semiconductors/mosfet.ts; `git status --short` is clean; HEAD=161ca39e with no resumed prior-work patch. Per the contract's EMPTY-DIFF CATCH, an empty diff for a recon's tsFiles is MISMATCH 'edit did not land in C:/local_working_projects/digital_in_browser/.wt/mos1' — the worktree carries no APPLIED edit to commit. The commit instruction (`git add` ONLY the recon's tsFiles + progress.json) cannot be satisfied because mosfet.ts has nothing staged.
+  >
+  > Isomorphism note (informational, does NOT lift the empty-diff catch): the stampAc method already present at the base commit (mosfet.ts:1719-1804) IS source-isomorphic to ref/ngspice/src/spicelib/devices/mos1/mos1acld.c:40-113, independently re-derived: (1) xnrm/xrev from sign(this._mode) — mos1acld.c:40-46; (2) EffectiveLength=L-2*LD and the three overlap caps from params.{CGSO,CGDO,CGBO,M,W,L,LD} — mos1acld.c:50-57; (3) capgs/capgd/capgb formed as state0[slot]+state0[slot]+overlap (same slot added to itself, NOT 2*x), SLOT_CAPGS/CAPGD/CAPGB=4/7/10 (mosfet.ts:719/722/725), susceptances cap*omega and _capbd/_capbs*omega — mos1acld.c:59-72; (4) the 14 stampElementImag calls match cell/sign/operand-sum order verbatim (xgd+xgs+xgb, xgb+xbd+xbs, xgd+xbd, xgs+xbs, and the -x singles) — mos1acld.c:77-90; (5) the 18 stampElement real stamps match cell/sign and the (xnrm-xrev)*gm, xrev*(gm+gmbs), xnrm*(gm+gmbs) placements term-for-term — mos1acld.c:91-113; (6) no allocElement / no _hAc* fields, RHS untouched; the 22 handles allocated in setup() (mosfet.ts:942-963) match TSTALLOC order mos1set.c:186-207; (7) load() persists _capbs/_capbd (1456-57), _gbd/_gbs/_gm/_gds/_gmbs/_mode (1647-52).
+  >
+  > Resolution required from orchestrator: this recon needs the edit to actually land in the .wt/mos1 worktree branch (wt/mos1) so an APPLIED commit can stage mosfet.ts. If the intent is that the implementation already exists at base and the recon is verify-only, the setup that resumes prior kept-work into the worktree did not run for this unit — leaving PENDING per contract until a non-empty diff (or an explicit verify-only-with-zero-diff disposition) is provided.
+
+- **ngspice:** `ref/ngspice/src/spicelib/devices/mos1/mos1acld.c:40-113`; TSTALLOC order `mos1set.c:186-207`.
+- **digiTS:** `src/components/semiconductors/mosfet.ts` — `stampAc` (base `mosfet.ts:1719-1804`), `setup()` handle alloc `942-963`, `load()` state persist `1456-57`/`1647-52`, SLOT_CAPGS/CAPGD/CAPGB at `719`/`722`/`725`.
+- **Not numerical:** no firstDivergence / matrix-cell / absDelta / step-iter / gate-fail signature. The base-commit `stampAc` is bit-exact source-isomorphic to `mos1acld.c` per the verifier's re-derivation. The blocking item is a worktree-state / recon-disposition defect (empty diff for the recon's tsFile → no APPLIED edit to commit), routed here per §6, not to `fix-list-phase-2-audit.md`.
+- **Decision needed from user:** either (a) re-run the `mos1#recon/stampAc` applier so the edit actually lands in `.wt/mos1` (`wt/mos1`) and an APPLIED commit can stage `mosfet.ts`, or (b) if the implementation already exists at base and the recon is verify-only, issue an explicit verify-only-with-zero-diff disposition so progress.json can flip PENDING → APPLIED without a non-empty diff. The prior-work resume into the worktree did not run for this unit.
+- **Resolution:** _pending_
