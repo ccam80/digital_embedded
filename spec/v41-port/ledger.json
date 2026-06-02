@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-01T23:04:27.331Z",
+    "generated": "2026-06-02T01:52:11.084Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -36150,11 +36150,11 @@
         689
       ],
       "hunkHash": "d0670340d248e8aa",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-voltage-source.ts — AcVoltageSourceAnalogImpl.stampAc (ac-voltage-source.ts:723-746) and src/components/sources/dc-voltage-source.ts — DcVoltageSourceAnalogElement.stampAc (dc-voltage-source.ts:227-248). The portable content (the #else, non-RFSPICE path) is the MODEACNOISE noise-input gate (acReal/acImag = 1/0 when this instance is ckt->noise_input, else the VSRCacReal/VSRCacImag values) plus the four ±1 incidence stamps (renamed ptr→Ptr) and the two RHS writes (CKTrhs += acReal, CKTirhs += acImag). digiTS already stamps the four ±1 cells and writes acMag·cos / acMag·sin into rhsRe/rhsIm in stampAc; the MODEACNOISE noise-input gate is the new behavioral content to port. The split removes the RFSPICE block (VSRCspinit/VSRCspupdate/VSRCgetActivePorts + the #ifdef RFSPICE acLoad branch), which is NO-COUNTERPART (S-parameter analysis).",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "The only digiTS-absent content of this #else AC-load hunk is the MODEACNOISE noise-input gate (acReal/acImag = 1/0 when this instance is ckt->noise_input). digiTS has no small-signal .noise analysis — zero MODEACNOISE bit in ckt-mode.ts (bits stop at MODEUIC 0x10000), no ckt->noise_input designation, no noise driver — so the gate has no counterpart (user ruling 2026-06-02: NO-COUNTERPART; .noise out of analysis-scope). The hunk's other content (the four ±1 incidence stamps + the CKTrhs/CKTirhs writes of acMag·cos/acMag·sin) is ALREADY present and isomorphic in AcVoltageSourceAnalogImpl.stampAc / DcVoltageSourceAnalogElement.stampAc (verified by the parallel-run verifier); the noise gate is the sole delta and it is out of scope.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -36646,14 +36646,14 @@
         1376
       ],
       "hunkHash": "adf488aa1f2c4626",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-voltage-source.ts — computeWaveformValue square/PULSE case (ac-voltage-source.ts:119-162). The v41 hunk replaces the XSPICE #ifdef phase shift with the `newcompat.xs` runtime branch (phase-as-degrees vs phase-as-pulse-count via tmax = PHASE·PER) and restructures the period-reduction + four-region value selection accordingly. digiTS's square case uses a phase-derived phaseShift and the v26 four-region selection without newcompat/tmax. Blocked by vsrc#recon/waveformModel — the newcompat.xs phase semantics and VSRCcoeffs model are absent from the v26 baseline digiTS lacks (Q-VSRC-WAVEFORM).",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "The hunk's sole v41-new content is the `newcompat.xs` compatibility-mode branch — ngspice's emulation of foreign SPICE dialects (PSPICE/LTspice/HSPICE/Spice2-3, ngspice/compatmode.h), gated by `set ngbehavior`/`.option`; it only changes the PULSE phase convention WHEN a compat flag is set. digiTS has no compat-mode system (no ngbehavior/.option parser, no newcompat global; grep across src/ = zero hits) and foreign-dialect emulation is out of scope for a browser logic-sim (user ruling 2026-06-02: NO-COUNTERPART). The non-compat baseline PULSE phase path is the portable one and lands via the coeff engine; the newcompat.xs branch has no counterpart.",
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "vsrc#recon/waveformModel"
+      "blockedBy": null
     },
     {
       "id": "vsrc/vsrcload.c#h005",
@@ -63069,7 +63069,6 @@
         "vsrc/vsrcacct.c#h009",
         "vsrc/vsrcdefs.h#h001",
         "vsrc/vsrcload.c#h003",
-        "vsrc/vsrcload.c#h004",
         "vsrc/vsrcload.c#h005",
         "vsrc/vsrcload.c#h006",
         "vsrc/vsrcload.c#h007",
