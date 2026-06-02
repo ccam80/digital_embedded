@@ -1,6 +1,6 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-02T10:52:05.218Z
+Generated: 2026-06-02T11:57:09.705Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
@@ -19,13 +19,17 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 496 |
+| PENDING        | 489 |
 | APPLIED        | 190 |
 | ESCALATED      | 6 |
+| STALE          | 7 |
 | NO-COUNTERPART | 1124 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
-is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
+is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED, no STALE). A STALE item
+was APPLIED/ESCALATED but its diff hunk or recon spec drifted; it needs a cheap
+re-verify (re-confirm vs current v41 → re-record APPLIED with the fresh hash),
+never a full re-port.
 
 ## Per-doc item counts
 

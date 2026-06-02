@@ -162,6 +162,10 @@ function parseDoc(docRelPath) {
         //  NO-COUNTERPART set by a decisions overlay (planning); frozen
         //  APPLIED        set by the verifier; carried by content-hash merge
         //  ESCALATED      blocks the job; carried by content-hash merge
+        //  STALE          was APPLIED/ESCALATED but the hunk/spec hash drifted;
+        //                 build-derived in applyProgress (never set by an
+        //                 overlay/progress entry); needs re-verify, not re-port;
+        //                 blocks the job like ESCALATED
         state: 'PENDING',
         tsFunction: null,           // from the decisions overlay
         attempts: 0,
@@ -416,11 +420,25 @@ function loadProgress() {
 
 /* Apply loop progress onto items. The loop's verifier records APPLIED here;
  * the applier/verifier record ESCALATED and attempts here. ledger.json is
- * never hand-edited. An entry carries the `hunkHash` it was recorded against
- * - if the diff has since drifted, the stale entry is ignored. */
+ * never hand-edited. An entry carries the `hunkHash` it was recorded against.
+ *
+ * STALE HANDLING. If the recorded hunkHash no longer matches the item's
+ * current hash, the underlying diff hunk or reconstruction spec has drifted
+ * since the entry was recorded. A recorded APPLIED/ESCALATED entry is NOT
+ * silently reverted to raw PENDING (the old behavior — it made a re-verified
+ * item indistinguishable from a never-started one, so the loop re-PORTED it
+ * from scratch; this is the hole that re-ran vsrc 4x). Instead the item is set
+ * to STALE: previously decided, basis drifted, needs a CHEAP RE-VERIFY — confirm
+ * the current code still matches current v41 and re-record APPLIED with the
+ * fresh hash, or, if it no longer matches, let it fall to a real port. STALE
+ * carries the prior verifierNotes/escalation and the state it drifted from, and
+ * is reported BY NAME (never a silent count). A drifted bare entry (no
+ * APPLIED/ESCALATED — only attempts/notes on a still-PENDING item) has nothing
+ * worth preserving and is dropped as before. */
 function applyProgress(items, progress) {
   const byId = new Map(items.map((i) => [i.id, i]));
-  let applied = 0, stale = 0;
+  let applied = 0;
+  const staleItems = [];
   for (const [id, p] of progress) {
     const it = byId.get(id);
     if (!it) throw new Error(`progress.json: item id "${id}" matches no ledger item`);
@@ -431,7 +449,19 @@ function applyProgress(items, progress) {
         && !['PENDING', 'APPLIED', 'ESCALATED'].includes(p.state)) {
       throw new Error(`progress.json: item "${id}" state "${p.state}" invalid (PENDING|APPLIED|ESCALATED)`);
     }
-    if (p.hunkHash && p.hunkHash !== it.hunkHash) { stale++; continue; }
+    if (p.hunkHash && p.hunkHash !== it.hunkHash) {
+      // Drift. A recorded decision (APPLIED/ESCALATED) becomes STALE so it is
+      // re-verified, not silently re-ported. A bare PENDING entry is dropped.
+      if (p.state === 'APPLIED' || p.state === 'ESCALATED') {
+        it.state = 'STALE';
+        it.staleFrom = p.state;
+        it.staleHash = p.hunkHash;
+        if (p.verifierNotes !== undefined) it.verifierNotes = p.verifierNotes;
+        if (p.escalation !== undefined) it.escalation = p.escalation;
+        staleItems.push({ id, from: p.state });
+      }
+      continue;
+    }
     if (p.state) it.state = p.state;
     if (p.attempts !== undefined) it.attempts = p.attempts;
     if (p.verifierNotes !== undefined) it.verifierNotes = p.verifierNotes;
@@ -441,7 +471,7 @@ function applyProgress(items, progress) {
     }
     applied++;
   }
-  return { applied, stale };
+  return { applied, staleItems };
 }
 
 function build() {
@@ -487,7 +517,8 @@ function build() {
       totalAdded: allItems.reduce((n, i) => n + i.addedLines, 0),
       totalRemoved: allItems.reduce((n, i) => n + i.removedLines, 0),
       progressEntriesApplied: progress.applied,
-      progressEntriesStaleIgnored: progress.stale,
+      progressEntriesStale: progress.staleItems.length,
+      staleItems: progress.staleItems,
     },
     files,
     items: allItems,
@@ -525,10 +556,14 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 | PENDING        | ${tally((i) => i.state === 'PENDING')} |
 | APPLIED        | ${tally((i) => i.state === 'APPLIED')} |
 | ESCALATED      | ${tally((i) => i.state === 'ESCALATED')} |
+| STALE          | ${tally((i) => i.state === 'STALE')} |
 | NO-COUNTERPART | ${tally((i) => i.state === 'NO-COUNTERPART')} |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
-is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
+is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED, no STALE). A STALE item
+was APPLIED/ESCALATED but its diff hunk or recon spec drifted; it needs a cheap
+re-verify (re-confirm vs current v41 → re-record APPLIED with the fresh hash),
+never a full re-port.
 
 ## Per-doc item counts
 
@@ -798,5 +833,9 @@ if (args[0] === '--skeleton') {
   writeFileSync(LEDGER_MD, renderMd(ledger));
   console.log('Wrote ledger.json + ledger.md');
   console.log(`  ${ledger.meta.parentHunks} parent hunks -> ${ledger.meta.totalItems} items (${ledger.meta.subItems} sub-items) across ${ledger.meta.ngspiceFiles} files`);
-  console.log(`  decisions overlays: ${ledger.meta.decisionsOverlays}; progress entries: ${ledger.meta.progressEntriesApplied} applied, ${ledger.meta.progressEntriesStaleIgnored} stale-ignored`);
+  console.log(`  decisions overlays: ${ledger.meta.decisionsOverlays}; progress entries: ${ledger.meta.progressEntriesApplied} applied, ${ledger.meta.progressEntriesStale} STALE (need re-verify, not re-port)`);
+  if (ledger.meta.staleItems.length) {
+    console.log('  STALE items (was-verified, basis drifted — re-verify these, do NOT re-port):');
+    for (const s of ledger.meta.staleItems) console.log(`    - ${s.id} (was ${s.from})`);
+  }
 }
