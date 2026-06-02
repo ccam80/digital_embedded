@@ -623,10 +623,13 @@ function emitPrimitive(
     const freq     = requireParam(props, def, modelKey, "frequency", rawLabel);
     const phase    = requireParam(props, def, modelKey, "phase", rawLabel);
     const waveform = props.has("waveform") ? props.get<string>("waveform") : "sine";
-    const posNode = nodeAt(nodes, 1, rawLabel, "pos");
-    const negNode = nodeAt(nodes, 0, rawLabel, "neg");
+    // Current-source deck order: n+ = pin 0, n- = pin 1 (the DcCurrentSource
+    // order at line 618). AcCurrentSourceAnalogImpl stamps + at the "pos" pin in
+    // both load() and stampAc, and isrcacld.c stamps `CKTrhs[posNode] += acReal`,
+    // so the AC deck uses the same pin->node order as the DC deck.
+    const posNode = nodeAt(nodes, 0, rawLabel, "pos");
+    const negNode = nodeAt(nodes, 1, rawLabel, "neg");
     // ngspice I-source AC token: `AC <mag> [<phase>]` (isrcacld.c:36-50).
-    // Symmetric with AcVoltageSource above.
     const acMag   = requireParam(props, def, modelKey, "acMagnitude", rawLabel);
     const acPhase = requireParam(props, def, modelKey, "acPhase",     rawLabel);
     return [`${label} ${posNode} ${negNode} AC ${acMag} ${acPhase} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
