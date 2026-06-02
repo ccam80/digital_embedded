@@ -1,6 +1,6 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-02T07:32:22.777Z
+Generated: 2026-06-02T08:09:51.883Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
@@ -8,7 +8,7 @@ Target: ngspice-41 tag (2275fb85d)
 - ngspice files touched: **698**
 - Parent hunks enumerated: **1756**
 - v26-baseline reconstruction items: **33**
-- Ledger items (hunks + sub-items + reconstruction): **1809** (37 sub-items, 33 reconstruction)
+- Ledger items (hunks + sub-items + reconstruction): **1816** (47 sub-items, 33 reconstruction)
 - Planning decisions overlays applied: **34**
 - Lines: +23664 / -18407
 
@@ -19,10 +19,10 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 495 |
+| PENDING        | 501 |
 | APPLIED        | 187 |
-| ESCALATED      | 13 |
-| NO-COUNTERPART | 1114 |
+| ESCALATED      | 4 |
+| NO-COUNTERPART | 1124 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
 is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
@@ -39,7 +39,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | spec/ngspice-v41-model-diffs/csw.md | 19 | 31 |
 | spec/ngspice-v41-model-diffs/dio.md | 30 | 85 |
 | spec/ngspice-v41-model-diffs/ind.md | 34 | 70 |
-| spec/ngspice-v41-model-diffs/isrc.md | 15 | 44 |
+| spec/ngspice-v41-model-diffs/isrc.md | 15 | 48 |
 | spec/ngspice-v41-model-diffs/jfet.md | 22 | 45 |
 | spec/ngspice-v41-model-diffs/jfet2.md | 18 | 33 |
 | spec/ngspice-v41-model-diffs/mes.md | 20 | 29 |
@@ -52,7 +52,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | spec/ngspice-v41-model-diffs/sw.md | 20 | 34 |
 | spec/ngspice-v41-model-diffs/vccs.md | 15 | 17 |
 | spec/ngspice-v41-model-diffs/vcvs.md | 15 | 18 |
-| spec/ngspice-v41-model-diffs/vsrc.md | 19 | 61 |
+| spec/ngspice-v41-model-diffs/vsrc.md | 19 | 64 |
 | spec/ngspice-v41-engine-diffs/analysis.md | 49 | 171 |
 | spec/ngspice-v41-engine-diffs/device-dispatch.md | 3 | 22 |
 | spec/ngspice-v41-engine-diffs/include-ngspice.md | 98 | 252 |
@@ -253,7 +253,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | src/spicelib/devices/ind/muttemp.c | modified | 2 | REVIEW-CLASS | src/components/passives/mutual-inductor.ts |
 | src/spicelib/devices/isrc/Makefile.am | modified | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/isrc/isrc.c | modified | 3 | REVIEW-CLASS | src/components/sources/ac-current-source.ts |
-| src/spicelib/devices/isrc/isrcacct.c | modified | 5 | PORT | src/components/sources/ac-current-source.ts |
+| src/spicelib/devices/isrc/isrcacct.c | modified | 7 | PORT | src/components/sources/ac-current-source.ts |
 | src/spicelib/devices/isrc/isrcacld.c | modified | 3 | PORT | src/components/sources/ac-current-source.ts |
 | src/spicelib/devices/isrc/isrcask.c | modified | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/isrc/isrcdefs.h | modified | 3 | REVIEW-CLASS | src/components/sources/ac-current-source.ts |
@@ -261,7 +261,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | src/spicelib/devices/isrc/isrcdest.c | deleted | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/isrc/isrcext.h | modified | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/isrc/isrcinit.c | modified | 1 | REVIEW-CLASS | src/components/sources/ac-current-source.ts |
-| src/spicelib/devices/isrc/isrcload.c | modified | 15 | PORT | src/components/sources/ac-current-source.ts |
+| src/spicelib/devices/isrc/isrcload.c | modified | 17 | PORT | src/components/sources/ac-current-source.ts |
 | src/spicelib/devices/isrc/isrcmdel.c | deleted | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/isrc/isrcpar.c | modified | 4 | REVIEW-CLASS | src/components/sources/ac-current-source.ts |
 | src/spicelib/devices/isrc/isrctemp.c | modified | 2 | PORT | src/components/sources/ac-current-source.ts |
@@ -525,7 +525,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | src/spicelib/devices/vsrc/vsrcpzld.c | modified | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/vsrc/vsrcpzs.c | modified | 2 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/vsrc/vsrcset.c | modified | 4 | REVIEW-CLASS | src/components/sources/dc-voltage-source.ts |
-| src/spicelib/devices/vsrc/vsrctemp.c | modified | 2 | REVIEW-CLASS | src/components/sources/ac-voltage-source.ts |
+| src/spicelib/devices/vsrc/vsrctemp.c | modified | 5 | REVIEW-CLASS | src/components/sources/ac-voltage-source.ts |
 | src/spicelib/analysis/Makefile.am | modified | 3 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/analysis/acan.c | modified | 11 | PORT | src/solver/analog/ac-analysis.ts |
 | src/spicelib/analysis/acsetp.c | modified | 2 | PORT | src/solver/analog/ac-analysis.ts |

@@ -156,16 +156,16 @@
       "rationale": "Fixes a spelling typo in a C source comment (`tansient` → `transient`) above the TRNOISE case and adds one blank line inside the TRNOISE case. Pure source-comment / whitespace change per PLANNING.md §5 case (a) C-language artifact. No code, no preprocessor directive, no behavioral content."
     },
     "vsrc/vsrcacct.c#h008": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-voltage-source.ts — AcVoltageSourceAnalogImpl.acceptStep, the TRNOISE/noise breakpoint case (ac-voltage-source.ts:959-969). The v41 hunk replaces the v26 AlmostEqualUlps(nearest, CKTtime) sample-detection with the VSRCbreak_time-gated `break_time += TS` scheme and rewrites the RTS (random-telegraph-signal) shot-noise capture/emission scheduling reading state->RTScapTime/RTSemTime/RTSCAPT/RTSEMT. digiTS's noise acceptStep still uses the v26 AlmostEqualUlps scheme (ac-voltage-source.ts:963-966) and has no RTS state. Blocked by vsrc#recon/waveformModel — the VSRCbreak_time field and the RTS trnoise_state model are part of the ngspice waveform model digiTS does not carry (Q-VSRC-WAVEFORM).",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "vsrc/vsrcacct.c::VSRCaccept",
-      "rationale": null
+      "rationale": "TRNOISE source-waveform breakpoint arm of VSRCaccept: the VSRCbreak_time-gated `break_time += TS` sample scheduling and the RTS (random-telegraph-signal) shot-noise capture/emission scheduling reading state->RTScapTime/RTSemTime/RTSCAPT/RTSEMT. This is the trnoise_state noise subsystem, which is out of scope for a browser digital-logic simulator (user ruling 2026-06-02, ruled 3x). The trnoise_state lifecycle (trnoise_state_init/_get/_free, f_alpha 1/f synthesizer, RTS trap state machine) is tracked separately as the noise subsystem task (ESC-24-noise); maths-misc#recon/randnumb delivered only SeededRng primitives, not trnoise_state. NO-COUNTERPART: the TRNOISE/TRRANDOM source-waveform arms have no digiTS counterpart and are not reconstructed under vsrc#recon/waveformModel."
     },
     "vsrc/vsrcacct.c#h009": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-voltage-source.ts — AcVoltageSourceAnalogImpl.acceptStep, the TRRANDOM breakpoint case. The v41 hunk rewrites the TRRANDOM scheduling to the VSRCbreak_time-gated scheme with the TD initial-delay handling, reading state->TS/TD and calling trrandom_state_get(state). digiTS has no TRRANDOM waveform (no `trrandom` enum value; the closest `noise` case uses boxMuller and has no TS/TD random-source state). Blocked by vsrc#recon/waveformModel — TRRANDOM is an absent ngspice waveform sub-feature (IN-class reconstruction per device-class-scope.md; Q-VSRC-WAVEFORM).",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "vsrc/vsrcacct.c::VSRCaccept",
-      "rationale": null
+      "rationale": "TRRANDOM source-waveform breakpoint arm of VSRCaccept: the VSRCbreak_time-gated scheduling with TD initial-delay, reading state->TS/TD and calling trrandom_state_get(state). This is the trrandom_state noise subsystem, out of scope for a browser digital-logic simulator (user ruling 2026-06-02, ruled 3x). The trrandom_state lifecycle (trrandom_state_init/_get) is tracked separately as the noise subsystem task (ESC-24-noise); maths-misc#recon/randnumb delivered only SeededRng primitives. NO-COUNTERPART: the TRNOISE/TRRANDOM source-waveform arms have no digiTS counterpart and are not reconstructed under vsrc#recon/waveformModel."
     },
     "vsrc/vsrcacct.c#h010": {
       "state": "NO-COUNTERPART",
@@ -300,10 +300,10 @@
       "rationale": null
     },
     "vsrc/vsrcload.c#h013": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-voltage-source.ts — computeWaveformValue noise case (ac-voltage-source.ts:250-251) as the TRNOISE value counterpart. The v41 hunk adds the `state->timezero` reset-on-jump-from-0 handling and the `TS == 0.0 || time == 0.0 → value = 0` guard for the TRNOISE waveform value, reading state->TS/RTSAM. digiTS's noise case returns dcOffset + amplitude·boxMuller() with no trnoise_state, no TS, no timezero. Blocked by vsrc#recon/waveformModel — the ngspice TRNOISE state model is absent from the v26 baseline digiTS lacks (Q-VSRC-WAVEFORM).",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "vsrc/vsrcload.c::VSRCload",
-      "rationale": null
+      "rationale": "TRNOISE source-waveform value arm of VSRCload: the `state->timezero` reset-on-jump-from-0 handling, the `TS == 0.0 || time == 0.0 → value = 0` guard, and the trnoise_state_get interpolation reading state->TS/RTSAM. This is the trnoise_state noise subsystem, out of scope for a browser digital-logic simulator (user ruling 2026-06-02, ruled 3x). The trnoise_state lifecycle is tracked separately as the noise subsystem task (ESC-24-noise); maths-misc#recon/randnumb delivered only SeededRng primitives, not trnoise_state. NO-COUNTERPART: the TRNOISE/TRRANDOM source-waveform arms have no digiTS counterpart and are not reconstructed under vsrc#recon/waveformModel."
     },
     "vsrc/vsrcload.c#h014": {
       "state": "PENDING",
@@ -407,11 +407,29 @@
       "functionGroup": "vsrc/vsrctemp.c::VSRCtemp",
       "rationale": "VSRCtemp top-of-function: adds the #ifdef RFSPICE `ckt->CKTportCount = 0; int* portIDs; int prevPort;` port-bookkeeping locals plus the model/instance accessor rename. The RFSPICE port-count bookkeeping belongs to S-parameter / RF analysis (not in analysis-scope.md). The accessor rename is C linked-list-walk plumbing with no per-element digiTS counterpart (digiTS computes per instance). The portable acMag/acPhase derivation in VSRCtemp is unchanged by this hunk and lives in h002's surrounding context. PLANNING.md §5 cases (a)/(b). No behavioral content for an implemented analysis in this hunk."
     },
-    "vsrc/vsrctemp.c#h002": {
+    "vsrc/vsrctemp.c#h002a": {
       "state": "PENDING",
-      "tsFunction": "src/components/sources/ac-voltage-source.ts — the AC magnitude/phase derivation used in AcVoltageSourceAnalogImpl.stampAc (VSRCacReal/VSRCacImag = VSRCacMag·cos/sin(VSRCacPhase·π/180), ac-voltage-source.ts:743-745) and the VSRCacGiven default guards (acMag default 1, acPhase default 0; ac-voltage-source.ts:599-602). The portable content of this hunk is the unchanged `radians = VSRCacPhase·π/180; VSRCacReal = VSRCacMag·cos(radians); VSRCacImag = VSRCacMag·sin(radians)` block and the acMag/acPhase default-fill (VSRCacGiven && !VSRCacMGiven → acMag=1; && !VSRCacPGiven → acPhase=0). The DC/transient value-presence warnings (downgraded to ERR_INFO; the `dc value used for op instead of transient time=0 value` comparison reading VSRCcoeffs[0]/[1] by VSRCfunctionType) and the large #ifdef RFSPICE port-processing block read the absent VSRCcoeffs model / belong to S-parameter analysis. Blocked by vsrc#recon/waveformModel for the VSRCcoeffs-reading warning logic (Q-VSRC-WAVEFORM); the acMag/acPhase derivation itself is the portable core (applies onto the existing stampAc derivation as a confirm/no-op).",
+      "tsFunction": "src/components/sources/ac-voltage-source.ts — the VSRCacGiven default guards in AcVoltageSourceAnalogImpl (acMag default 1, acPhase default 0; ac-voltage-source.ts:599-602 / :940-941). Portable sub-item of the vsrctemp.c#h002 split: the acMag/acPhase default-fill block (VSRCacGiven && !VSRCacPGiven → acPhase=0). Blocked by vsrc#recon/waveformModel (the VSRCcoeffs-backed AC-coeff layer; Q-VSRC-WAVEFORM); the default-fill itself maps onto the existing derivation as a confirm/no-op.",
       "functionGroup": "vsrc/vsrctemp.c::VSRCtemp",
       "rationale": null
+    },
+    "vsrc/vsrctemp.c#h002b": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "vsrc/vsrctemp.c::VSRCtemp",
+      "rationale": "Frozen sub-item of the vsrctemp.c#h002 split: the v41 transient-time-0 DC value-warning rewrite. The v26 `if(!VSRCdcGiven){...}` ERR_WARNING block is replaced with `if(!VSRCdcGiven && !VSRCfuncTGiven){ ERR_INFO 'DC 0 assumed' } else if(VSRCdcGiven && VSRCfuncTGiven && !TRNOISE && !TRRANDOM && !EXTERNAL){ time0value=(AM||PWL)?VSRCcoeffs[1]:VSRCcoeffs[0]; if(!AlmostEqualUlps(time0value,VSRCdcValue,3)) ERR_INFO 'dc value used for op instead of transient time=0 value' }`. This is diagnostic-only with zero numerical effect (no matrix/RHS perturbation), it reads the VSRCcoeffs model, and it emits through the SPfrontEnd IFerrorf/ERR_INFO warning channel — which digiTS does not have (grep over ac-voltage-source.ts = zero IFerrorf/ERR_INFO/'DC 0 assumed'/'time=0 value'). NO-COUNTERPART (user ruling 2026-06-02): the ERR_INFO 'DC 0 assumed' rewrite is a diagnostic-only front-end warning with no SPfrontEnd channel in digiTS and no numerical effect."
+    },
+    "vsrc/vsrctemp.c#h002c": {
+      "state": "PENDING",
+      "tsFunction": "src/components/sources/ac-voltage-source.ts — the AC magnitude/phase derivation used in AcVoltageSourceAnalogImpl.stampAc (VSRCacReal/VSRCacImag = VSRCacMag·cos/sin(VSRCacPhase·π/180), ac-voltage-source.ts:743-745 / :1310-1312). Portable sub-item of the vsrctemp.c#h002 split: the bijective `radians = VSRCacPhase·π/180; VSRCacReal = VSRCacMag·cos(radians); VSRCacImag = VSRCacMag·sin(radians)` block. Blocked by vsrc#recon/waveformModel (the VSRCcoeffs-backed AC-coeff layer; Q-VSRC-WAVEFORM); the derivation itself is the portable core (applies onto the existing stampAc derivation as a confirm/no-op).",
+      "functionGroup": "vsrc/vsrctemp.c::VSRCtemp",
+      "rationale": null
+    },
+    "vsrc/vsrctemp.c#h002d": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "vsrc/vsrctemp.c::VSRCtemp",
+      "rationale": "Frozen sub-item of the vsrctemp.c#h002 split: the #ifdef RFSPICE port-processing block (VSRCisPort/portZ0/portFreq/VAmplitude/portY0 derivation, the CKTportCount/CKTrfPorts bookkeeping, the port-reorder bubble sweep, and the second model/instance sweep checking port indexing) plus the trailing `return(OK)`. RFSPICE port processing belongs to S-parameter / RF analysis, which is not in analysis-scope.md (only DC-OP, transient, AC are implemented). PLANNING.md §5 case (b) non-implemented analysis. No counterpart in any digiTS voltage-source element."
     },
     "vsrc/vsrcacld.c#h001a": {
       "state": "NO-COUNTERPART",
@@ -482,8 +500,6 @@
         "vsrc/vsrcacct.c#h004",
         "vsrc/vsrcacct.c#h005",
         "vsrc/vsrcacct.c#h006",
-        "vsrc/vsrcacct.c#h008",
-        "vsrc/vsrcacct.c#h009",
         "vsrc/vsrcdefs.h#h001",
         "vsrc/vsrcload.c#h003",
         "vsrc/vsrcload.c#h005",
@@ -494,12 +510,12 @@
         "vsrc/vsrcload.c#h010",
         "vsrc/vsrcload.c#h011",
         "vsrc/vsrcload.c#h012",
-        "vsrc/vsrcload.c#h013",
         "vsrc/vsrcload.c#h014",
         "vsrc/vsrcpar.c#h003",
         "vsrc/vsrcpar.c#h004",
         "vsrc/vsrcset.c#h001",
-        "vsrc/vsrctemp.c#h002"
+        "vsrc/vsrctemp.c#h002a",
+        "vsrc/vsrctemp.c#h002c"
       ],
       "state": "PENDING"
     }
