@@ -12,6 +12,7 @@ import { DLL_PATH, describeIfDll } from "../../../solver/analog/__tests__/ngspic
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import type { AcVoltageSourceAnalogElement } from "../ac-voltage-source.js";
 
 // ---------------------------------------------------------------------------
 // .dts fixtures used by the T3 harness sessions. Per-waveform-mode coverage
@@ -44,15 +45,14 @@ const DTS_TRIANGLE_RC = path.resolve(
 const DTS_SAWTOOTH_RC = path.resolve(
   "src/components/sources/__tests__/fixtures/acvsource-canon-sawtooth-rc.dts",
 );
-// 1kHz square 0V↔3.3V → 1kΩ load (no cap). Migrated from clock-canon-1khz-loaded.dts
-// because Clock-as-PULSE cannot achieve bit-exact ngspice parity (vsrcload.c:81-86
-// substitutes CKTstep for TR=0). AcVoltageSource carries explicit non-zero
-// riseTime/fallTime in the deck, so ngspice uses them directly.
+// 1kHz square 0V↔3.3V → 1kΩ load (no cap). The deck carries explicit non-zero
+// riseTime/fallTime, so ngspice reads TR/TF directly from the PULSE coefficients
+// (vsrcload.c:81-86 substitutes CKTstep only when TR=0, which this deck avoids),
+// giving a bit-exact PULSE edge schedule on both sides.
 const DTS_SQUARE_1KHZ_LOADED = path.resolve(
   "src/components/sources/__tests__/fixtures/acvsource-canon-square-1khz-loaded.dts",
 );
 // 2kHz square 0V↔3.3V → 10kΩ → 1µF RC low-pass (tau=10ms ≫ 0.25ms half-period).
-// Migrated from clock-canon-2khz-rc.dts.
 const DTS_SQUARE_2KHZ_RC = path.resolve(
   "src/components/sources/__tests__/fixtures/acvsource-canon-square-2khz-rc.dts",
 );
@@ -72,6 +72,7 @@ interface AcSourceProps {
   waveform?: string;
   riseTime?: number;
   fallTime?: number;
+  noiseSampleTime?: number;
 }
 
 function buildAcSourceCircuit(facade: DefaultSimulatorFacade, props: AcSourceProps): Circuit {
@@ -111,6 +112,20 @@ function getAcsrcCircuitElement(fix: ReturnType<typeof buildFixture>) {
     if (label === "acsrc") return ce;
   }
   throw new Error("AcVoltageSource circuit element 'acsrc' not found");
+}
+
+function getAcsrcAnalogElement(
+  fix: ReturnType<typeof buildFixture>,
+): AcVoltageSourceAnalogElement {
+  for (let i = 0; i < fix.circuit.elements.length; i++) {
+    const ce = fix.circuit.elementToCircuitElement.get(i);
+    if (ce === undefined) continue;
+    const label = ce.getProperties().getOrDefault<string>("label", "");
+    if (label === "acsrc") {
+      return fix.circuit.elements[i] as AcVoltageSourceAnalogElement;
+    }
+  }
+  throw new Error("AcVoltageSource analog element 'acsrc' not found");
 }
 
 // ===========================================================================
@@ -298,64 +313,97 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
   });
 
   it("hotload_fallTime_changes_square_pos_node", () => {
-    // Square mode: fallTime stretches the trailing-edge ramp. Changing it
-    // shifts the per-step value once the engine has advanced into the fall
-    // region of the cycle.
+    // Square mode (LOW-start PULSE): V1=dcOffset-amplitude=-5, V2=+5, PER=1ms,
+    // PW=halfPeriod-riseTime≈0.5ms. The falling edge begins at the half-period
+    // breakpoint t=0.5ms and spans [0.5ms, 0.5ms+fallTime]. With a default 1ps
+    // fallTime that window is invisible (the source snaps to LOW), so fallTime's
+    // effect is only observable when the sample time lands INSIDE the fall ramp.
+    //
+    // Build with a slow fallTime (0.2ms) so the engine, pulled to t=0.5ms by the
+    // half-period breakpoint, then ramps linearly through the fall window at the
+    // 1e-5 maxTimeStep. Stepping to t≈0.555ms parks the source mid-fall at
+    // V2+(V1-V2)*(t-(TR+PW))/TF ≈ +2.25V (the `before` sample).
+    //
+    // Hot-loading a STEEPER fallTime (0.05ms) shrinks the fall window to
+    // [0.5ms, 0.55ms]. The next step at t≈0.565ms is now PAST the (shorter) fall,
+    // so the source has reached the LOW rail (-5V). Had fallTime stayed 0.2ms the
+    // same next time would still sit mid-ramp (~+1.75V), so the move from +2.25V
+    // to the LOW rail is attributable to the fallTime change, not to time advance.
     const fix = buildFixture({
       build: (_r, facade) => buildAcSourceCircuit(facade, {
         waveform: "square", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
-        riseTime: 1e-12, fallTime: 1e-12,
-      }),
-    });
-    const ce = getAcsrcCircuitElement(fix);
-    const node = getAcsrcPosNode(fix);
-    // Step a few times into the cycle so we're past the rising-edge region.
-    for (let i = 0; i < 20; i++) fix.coordinator.step();
-    const before = fix.engine.getNodeVoltage(node);
-    fix.coordinator.setComponentProperty(ce, "fallTime", 2e-4);
-    fix.coordinator.step();
-    const after = fix.engine.getNodeVoltage(node);
-    expect(after).not.toBe(before);
-  });
-
-  it("hotload_noiseSampleTime_changes_noise_breakpoint_schedule", () => {
-    // Cat 4 derived-state-recompute pattern: noiseSampleTime gates the
-    // breakpoint registration schedule in noise mode. Hot-loading a new
-    // sample period changes the schedule, which changes both the count of
-    // step-end records that land on breakpoint boundaries AND the per-step
-    // observable on the source's pos node (because fresh Gaussian draws are
-    // taken at different simTimes).
-    //
-    // Directional / not-equal pattern per Cat 4 contract:
-    //   1) after !== before: the hot-load took effect at the simulator
-    //      surface (no-op silent-ignore of the param fails this).
-    //   2) Stepping under the new sample period yields >= 1 step record in
-    //      the convergence log (the schedule actually advanced the engine
-    //      under the new schedule, not just at the old breakpoint cadence).
-    const fix = buildFixture({
-      build: (_r, facade) => buildAcSourceCircuit(facade, {
-        waveform: "noise", amplitude: 1, frequency: 1000, phase: 0, dcOffset: 0,
+        riseTime: 1e-12, fallTime: 2e-4,
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-5 },
     });
-    fix.coordinator.setConvergenceLogEnabled(true);
     const ce = getAcsrcCircuitElement(fix);
     const node = getAcsrcPosNode(fix);
-
+    // Advance into the fall ramp (t in the (0.5ms, 0.6ms) fall window).
+    while (fix.coordinator.simTime !== null && fix.coordinator.simTime < 5.5e-4) {
+      fix.coordinator.step();
+    }
     const before = fix.engine.getNodeVoltage(node);
-    fix.coordinator.setComponentProperty(ce, "noiseSampleTime", 1e-5);
-    // Run enough steps under the new schedule to accumulate breakpoint
-    // landings (at least several sample-period boundaries).
-    for (let i = 0; i < 20; i++) fix.coordinator.step();
+    // Mid-fall sample sits strictly between the LOW and HIGH rails.
+    expect(before).toBeGreaterThan(-5);
+    expect(before).toBeLessThan(5);
+    // Steepen the fall so it completes before the next step time.
+    fix.coordinator.setComponentProperty(ce, "fallTime", 5e-5);
+    fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(node);
-
-    // (1) Directional: hot-load propagated to the simulator observable.
     expect(after).not.toBe(before);
-    // (2) Schedule observable: under the new noiseSampleTime, the engine
-    // recorded step-end records — the hot-loaded schedule actually drove
-    // the timestep controller forward.
-    const log = fix.coordinator.getConvergenceLog()!;
-    expect(log.length).toBeGreaterThan(0);
+    // The steeper fall has already bottomed out at the LOW rail (V1 = dc-amp).
+    expect(after).toBeCloseTo(-5, 6);
+    // The unchanged slope would still be mid-ramp here, so `before` was higher
+    // than the post-steepening LOW rail — the drop is the fallTime effect.
+    expect(before).toBeGreaterThan(after);
+  });
+
+  it("hotload_noiseSampleTime_changes_noise_breakpoint_schedule", () => {
+    // Cat 4 derived-state-recompute pattern on the TRNOISE noise cadence. The
+    // `noise` waveform schedules breakpoints at integer multiples of the noise
+    // sample period TS (ngspice TRNOISE, vsrcacct.c:209-224): the next sample
+    // strictly after t is (floor(t/TS)+1)*TS. noiseSampleTime carries TS, so the
+    // breakpoint schedule is the directly observable TRNOISE state surface.
+    //
+    // The schedule is read off the analog element's getBreakpoints — the same
+    // Category-8 breakpoint surface used for the square/triangle waves — rather
+    // than by stepping the engine: the TRNOISE per-step VALUE draw consumes the
+    // deterministic randnumb generator, so the per-step pos-node voltage is not
+    // the cadence observable. The cadence is.
+    //
+    // Build with TS = 2e-5: breakpoints fall on {2e-5, 4e-5, 6e-5, 8e-5} across
+    // (0, 1e-4). Hot-load TS to 1e-5 (half the period) and the schedule doubles
+    // to {1e-5, 2e-5, ..., 9e-5}. Asserting the post-hot-load cadence matches the
+    // new TS proves the param re-derived the TRNOISE schedule, not just that the
+    // breakpoint set changed.
+    const fix = buildFixture({
+      build: (_r, facade) => buildAcSourceCircuit(facade, {
+        waveform: "noise", amplitude: 1, frequency: 1000, phase: 0, dcOffset: 0,
+        // noiseSampleTime (TS) is read off the secondary model params.
+        noiseSampleTime: 2e-5,
+      }),
+      params: { tStop: 1e-3, maxTimeStep: 1e-5 },
+    });
+    const el = getAcsrcAnalogElement(fix);
+
+    // TS = 2e-5 cadence: one breakpoint every 2e-5 over (0, 1e-4).
+    const before = el.getBreakpoints(0, 1e-4);
+    expect(before.length).toBe(4);
+    expect(before[0]).toBeCloseTo(2e-5, 12);
+    expect(el.nextBreakpoint(2e-5)).toBeCloseTo(4e-5, 12);
+
+    // Hot-load TS to half the period; the cadence must halve (twice as many
+    // breakpoints, the first at the new 1e-5 period).
+    fix.coordinator.setComponentProperty(getAcsrcCircuitElement(fix), "noiseSampleTime", 1e-5);
+    const after = el.getBreakpoints(0, 1e-4);
+
+    // (1) Directional: the hot-load changed the TRNOISE schedule.
+    expect(after).not.toEqual(before);
+    // (2) Cadence observable: the new schedule is the TS=1e-5 cadence exactly —
+    // 9 breakpoints at integer multiples of 1e-5 across (0, 1e-4).
+    expect(after.length).toBe(9);
+    expect(after[0]).toBeCloseTo(1e-5, 12);
+    expect(el.nextBreakpoint(1e-5)).toBeCloseTo(2e-5, 12);
   });
 });
 
@@ -568,10 +616,14 @@ describeIfDll("AcVoltageSource sawtooth-RC paired vs ngspice (T3)", () => {
 });
 
 // ===========================================================================
-// 1kHz square 0V↔3.3V driving a 1kΩ load — migrated from analog-clock.test.ts
-// (clock-canon-1khz-loaded.dts). Same physical scenario as the original Clock
-// fixture but using AcVoltageSource so ngspice's PULSE deck has explicit
-// non-zero TR/TF (no CKTstep substitution).
+// 1kHz square 0V↔3.3V driving a 1kΩ load. The AcVoltageSource deck emits a PULSE
+// with explicit non-zero TR/TF, so ngspice reads the edge times directly from
+// the coefficients rather than substituting CKTstep.
+//
+// The transient_step_end_paired and full_iteration_paired tests below track the
+// FIX-005 timestep-control precision gap: ours and ngspice select different
+// accepted dt around the edge breakpoints, so the per-step / per-iteration
+// values diverge mid-run. These assertions stay strict and bit-exact.
 // ===========================================================================
 
 describeIfDll("AcVoltageSource square-1kHz-loaded paired vs ngspice (T3)", () => {
@@ -609,11 +661,14 @@ describeIfDll("AcVoltageSource square-1kHz-loaded paired vs ngspice (T3)", () =>
 });
 
 // ===========================================================================
-// 2kHz square 0V↔3.3V driving R=10kΩ + C=1µF RC low-pass — migrated from
-// analog-clock.test.ts (clock-canon-2khz-rc.dts). RC time constant 10ms is
-// much longer than the 0.25ms half-period, so the cap voltage ramps
-// continuously while the source toggles. Distinct integration regime from
+// 2kHz square 0V↔3.3V driving R=10kΩ + C=1µF RC low-pass. The RC time constant
+// 10ms is much longer than the 0.25ms half-period, so the cap voltage ramps
+// continuously while the source toggles — a distinct integration regime from
 // the 1kHz-loaded fixture.
+//
+// As with the 1kHz-loaded fixture, the transient_step_end_paired and
+// full_iteration_paired tests track the FIX-005 timestep-control precision gap
+// (divergent accepted dt near the edge breakpoints). The assertions stay strict.
 // ===========================================================================
 
 describeIfDll("AcVoltageSource square-2kHz-RC paired vs ngspice (T3)", () => {
