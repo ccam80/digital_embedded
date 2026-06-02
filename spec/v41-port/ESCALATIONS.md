@@ -912,3 +912,32 @@ firstDivergence / matrix-cell / step-iter bug, so all route here rather than to
 
 - **source=maths-sparse#recon/nodesetIcRowZero | verdict=MISMATCH.** EMPTY-DIFF CATCH triggered: edit did not land in C:/local_working_projects/digital_in_browser/.wt/maths-sparse. `git -C .wt/maths-sparse status --porcelain` is entirely empty (no staged/unstaged/untracked changes), and `git diff --name-only -- src/solver/analog/ckt-load.ts src/solver/analog/sparse-solver.ts src/solver/analog/stamp-helpers.ts` returns nothing. The three named tsFiles exist on disk but are unmodified. Latest commit on branch wt/maths-sparse is 161ca39e (infra STALE-state), not a maths-sparse nodesetIcRowZero implementation. The spec is PRESENT and well-formed (spec/v41-port/reconstruction/maths-sparse-nodeset-ic-rowzero.md, RATIFIED 2026-05-30 / REVISED 2026-06-01) and requires substantive new code across Parts A-F (findElement/zeroElement/size on SparseSolver, nodeType resolver on CKTCircuitContext, zeroNoncurRow helper + Step 4a/4b rebuild in ckt-load.ts, setRHS in stamp-helpers.ts), none of which is present. Note also the spec declared full file scope (ckt-context.ts + CKTCircuitContext builder) exceeds the orchestrator-supplied tsFiles list, but that is moot until an edit lands. Builder must implement before isomorphism can be verified; left PENDING (no APPLIED commit, no progress.json edit).
 - **Resolution:** _pending_
+
+---
+
+## isrc (2026-06-03) — WORKTREE GATE+MERGE+TEARDOWN (serial pass, post-rebase onto advancing v41-port)
+
+Teardown of isolated worktree `.wt/isrc`. REBASE onto the advancing `v41-port` clean
+(`rebaseClean=true`; other units merged since this worktree branched, no conflicts).
+EMPTY-DIFF context: the working-tree `git diff` was empty and the full ISRC v41 port is
+already committed on the branch lineage (commit `e4f5fd7e`, `isrc#recon/coeffWaveforms`),
+so this is iso-only re-verification of the FINAL committed result per the PRIOR-KEPT-WORK
+clause, not an absent edit. No isomorphic committed work to merge in this pass
+(`merged=false`, gate skipped). MAIN `src/` confirmed clean (`mainSrcClean=true`).
+The h013 blocker below is a cross-subsystem source-isomorphism gap, NOT a numerical
+gate-fail / firstDivergence / matrix-cell / step-iter bug (the digiTS TRNOISE path THROWS
+before any numerical comparison can occur), so it routes here per §6 rather than to
+`spec/fix-list-phase-2-audit.md`.
+
+### ESC-isrc-load-trnoise-timezero — `isrc/isrcload.c::ISRCload` TRNOISE timezero state machine + TS==0 gate change has no reachable digiTS counterpart
+
+- **source=isrc/isrc/isrcload.c::ISRCload | hunks=[h013] | verdict=ESCALATE.** Recorded ESCALATED in `progress.json` (hunkHash `bbf89c31082e5374`), committed `e73a07d93ae918311a05484bb22261b11b06f27c`.
+- **What is clean (13 of 14 assigned hunks).** h002, h003, h004a, h004c, h005, h006, h007, h008, h009, h010, h011, h012, h015 are Tier-1/Tier-2 clean: accessor renames + the PULSE/SINE/EXP/SFFM/AM/PWL value arms are bijective with the shared `evaluateNgspiceWaveform` engine (`ac-voltage-source.ts:209-345`; SINE operand order `FREQ*time*2*pi+phase` pinned, AM phases-twice quirk preserved, EXP TD2 default `TD1+step`, PWL paren-removal cosmetic), and h015 (`ISRCcurrent=m*value`) matches `getPinCurrents` m-scaling (`ac-current-source.ts:642`). The `newcompat` arm is the frozen NO-COUNTERPART h004b (excluded from this assignment). The 13 clean hunks remain PENDING under this group escalation; the group is NOT committed as APPLIED.
+- **The un-ported v41 construct (h013).** diff `isrc.md:972-1007`: the TRNOISE timezero state machine (`isrcload.c:317-325`) plus the `TS==0||time==0` gate change (`isrcload.c:327-331`) are real v41 `+`/`-` lines — a new branch plus a changed condition, forbidden differences per VERIFICATION.md §4. The digiTS TRNOISE path THROWS (`ac-voltage-source.ts:355-359` via `_evaluate` `ac-voltage-source.ts:572-573`), so the change is dropped. A zero-delta drop is NOT line-isomorphic to a real control-flow change (§2.4 Tier-2 automatic fail).
+- **Why the faithful fix crosses the functionGroup.** A faithful port provably requires the `trnoise_state` lifecycle from `maths-misc#recon/randnumb` (cross-unit, NOT present in this worktree). The recon spec Part A cross-dependency (`isrc-coeffWaveforms.md:181-191`, acceptance #4/#11) names this gap explicitly. The task's claim that h013 is blocked only by the isrc recons is factually wrong. This is the identical cross-subsystem gap and resolution as the already-ratified `isrc/isrcload.c#h014`, `isrc/isrcpar.c#h003`/`#h004`, and `vsrc/vsrcload.c#h013`.
+- **Proper disposition.** NO-COUNTERPART (sibling of the ratified h014), which the verifier may NOT set (§7 — verifier may not perform a hunk split / Phase-0 freeze).
+- **ngspice:** `ref/ngspice/src/spicelib/devices/isrc/isrcload.c:317-325` (TRNOISE timezero state machine), `:327-331` (`TS==0||time==0` gate change).
+- **digiTS:** `src/components/sources/ac-voltage-source.ts:355-359` (TRNOISE throw), `:572-573` (`_evaluate` dispatch); shared waveform engine `:209-345`.
+- **Not numerical:** the TRNOISE path throws before any matrix/RHS/state value is produced, so there is no firstDivergence/matrix-cell/step-iter signature — this is a cross-group source-isomorphism gap, routed here per §6, not a `fix-list-phase-2-audit.md` bug. Not closed as "pre-existing"/"intentional divergence"/"close enough" (banned verdicts).
+- **Decision needed from user:** either (a) split `isrcload.c:317-331` (h013) to a Phase-0 frozen NO-COUNTERPART, sibling to the ratified h014 (verifier may not perform the split, §7); or (b) sequence the cross-unit `trnoise_state` lifecycle (`maths-misc#recon/randnumb`) ahead of isrc so the TRNOISE path is implemented rather than throwing, then re-assign h013.
+- **Resolution:** _pending_
