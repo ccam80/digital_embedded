@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T08:55:40.215Z",
+    "generated": "2026-06-02T10:52:05.218Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 193,
+    "progressEntriesApplied": 198,
     "progressEntriesStaleIgnored": 7
   },
   "files": [
@@ -39025,10 +39025,12 @@
         1604
       ],
       "hunkHash": "f70395da96d27af9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ckt-load.ts::cktLoad",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED via analysis#recon/cktIcRhsOldSeed (commit df50b69f). cktic.c:28-32 nodeset branch CKTrhsOld[n]=CKTrhs[n]=node->nodeset realized as rhsOld[node]=rhs[node]=value over ctx.nodesets in analog-engine.ts IC/nodeset setup. ic-gate harness firstDivergence full-null per the recon gate."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39056,10 +39058,12 @@
         1613
       ],
       "hunkHash": "9f6b22a47e87b179",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ckt-load.ts::cktLoad",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED via analysis#recon/cktIcRhsOldSeed (commit df50b69f). cktic.c:36-40 ic branch CKTrhsOld[n]=CKTrhs[n]=node->ic realized as rhsOld[node]=rhs[node]=value over ctx.ics in analog-engine.ts IC/nodeset setup. ic-gate harness firstDivergence full-null per the recon gate."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39587,12 +39591,14 @@
         1938
       ],
       "hunkHash": "128339290dc58863",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "The cktop.c#h001 CKTop OPtran-integration hunk (post-source-step OPtran fall-through, cktop.c:101-108) is built in src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint (commit 248f5c75). Blocked-by analysis#recon/opTran, which is ESCALATED on FIX-006: gate #4 parity is unverifiable until then."
+      ],
       "rationale": null,
-      "escalation": null,
+      "escalation": "FIX-006 / ESC-025: verification gate (recon analysis#recon/opTran acceptance #4) blocked on FIX-006 - digiTS dynamic_gmin accepts a nonphysical gmin^-1-scale branch current so OPtran is never reached on the digiTS side. See the analysis#recon/opTran escalation and ESCALATIONS.md ESC-025.",
       "kind": "hunk",
       "blockedBy": "analysis#recon/opTran"
     },
@@ -62014,9 +62020,11 @@
         "analysis/cktic.c#h002"
       ],
       "hunkHash": "97be2fc0d2ab6e2a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, recorded from cktic implementer commit df50b69f and its separate-context verifier gate). The CKTic rhsOld dual-write seed is built in src/solver/analog/analog-engine.ts: at IC/nodeset setup, before the first NR solve, rhsOld[node]=rhs[node]=value is written for each (node,value) in ctx.nodesets and ctx.ics (direct assignment mirroring cktic.c:31,39 '='), gated as ngspice gates the nodeset/IC branches. The commit's ic-gate harness gate reports firstDivergence full-null, confirming iteration-0 of a .ic/.nodeset circuit starts from the constrained voltage bit-exact vs the ngspice DLL. Complements FIX-002 / maths-sparse#recon/nodesetIcRowZero (the per-iteration cktLoad stamp). No-IC circuits byte-identical (empty seed loop)."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -62052,12 +62060,14 @@
       "blocks": [
         "analysis/cktop.c#h001"
       ],
-      "hunkHash": "f77295bd18eed114",
-      "state": "PENDING",
+      "hunkHash": "4a01c0b744f8728c",
+      "state": "ESCALATED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Port COMPLETE (commit 248f5c75): OPtran pseudo-transient driver + opstepsize/opfinaltime/opramptime option plumbing (default-off) + cktop.c:101-108 post-source-step fall-through + harness optran NgspiceJobAnalysis variant. Acceptance #1-#3 PASS (default-off byte-identical; surfaces 1+2 green). Recorded ESCALATED not APPLIED because acceptance #4 is RED - see escalation."
+      ],
       "rationale": null,
-      "escalation": null
+      "escalation": "FIX-006 / ESC-025: acceptance #4 (bit-exact OPtran convergence parity on the inductor-singular fixture v1 1 0 dc 3 / v2 2 0 dc 5 / l1 1 2 1m) is BLOCKED. digiTS dynamic_gmin spuriously converges the l1 branch-current singularity to a nonphysical ~2e12 A (gmin^-1 scale) solution that passes the voltage-based NIconvTest, so solveDcOperatingPoint reports the static ladder succeeded and never reaches the OPtran fallback - whereas the ngspice DLL fails gmin+source on the branch-current singularity and falls to OPtran (physical ~2mA). Same root as the standing elemConverged ours=true/ngspice=false divergence. Gate #4 cannot pass until FIX-006 (digiTS convergence test must reject gmin-leakage-scale branch currents). The OPtran port itself is correct and simply unreachable on this fixture until then. See ESCALATIONS.md ESC-025 and FIX-006."
     },
     {
       "id": "asrc#recon/wholeClass",
