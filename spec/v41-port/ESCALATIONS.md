@@ -39,6 +39,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
   or decide mos3 needs a dedicated model file. Until then mos3 stays deferred.
 - **Resolution:** _pending_
 
+**SUPERSEDED-BY-SPEC 2026-06-02:** `spec/v41-port/reconstruction/mos3-wholeClass.md` exists with Status: RATIFIED 2026-05-31. The spec resolves the mapping gap cited here: mos3 gets a NEW dedicated file `src/components/semiconductors/mosfet3.ts` (peer of `vdmos.ts`), so the question of "mos3 → mosfet.ts per-hunk mappings" is answered — it maps to a new file, not mosfet.ts. The per-hunk tsFunction gap (tsFunction:null) is resolved by the reconstruction spec which names the target file explicitly. This defer is superseded by the ratified spec; the ledger rebuild is tracked as part of the mos3 reconstruction loop work.
+
 ### DEFER-parser — frozen engine-phase re-plan (#8 / #61)
 
 - **Surfaced:** 2026-05-30, confirmed against ledger; matches frozen Phase-0 decision.
@@ -137,6 +139,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Decision needed from user:** author `spec/v41-port/reconstruction/analysis-tf.md` defining the `.tf` driver architecture (re-solve-against-factored-Jacobian surface on AnalogEngine, source-branch vs node-pair RHS injection, transfer-ratio/Zin/Zout output shape, facade method signature, `circuit_tf` MCP contract), then rebuild the ledger so `specExists` flips true and this item returns to `PENDING` for the builder.
 - **Resolution:** _pending_
 
+**RESOLVED 2026-06-02:** `analysis#recon/tf` state=APPLIED in `progress.json`; `spec/v41-port/reconstruction/analysis-tf.md` exists with Status: RATIFIED 2026-05-30. The spec-absent blocker that triggered this escalation is cleared; the recon has landed.
+
 ---
 
 ### ESC-002 — `maths-ni/niaciter.c#h001b`, `#h002` — AC path has no CKTrhs/CKTrhsOld six-buffer ping-pong + SWAP
@@ -150,6 +154,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Why it exceeds one functionGroup / why it is ambiguous:** the change is not a per-statement edit; it replaces the AC solve's entire RHS/solution data model, which the harness capture path also consumes.
 - **Decision needed from user:** convert back to `PENDING` with a directive to adopt the ngspice six-buffer AC ping-pong (and update the harness AC capture timing accordingly), or split into a sequenced AC-engine reconstruction item.
 - **Resolution:** _pending_
+
+**RESOLVED 2026-06-02:** `maths-ni#recon/acSixBuffer` state=APPLIED in `progress.json`; `spec/v41-port/reconstruction/engine-ac-sixbuffer.md` exists with Status: RATIFIED 2026-05-30. The cross-group architecture blocker that triggered this escalation was resolved by the reconstruction; the recon has landed.
 
 ---
 
@@ -165,6 +171,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Decision needed from user:** convert back to `PENDING` with a directive (record pre-applied as APPLIED / supply v26 baseline for `#h001`/`#h002`; for `#h003`, "make ag-zeroing clear all 7 slots to match ngspice memset").
 - **Resolution:** _pending_
 
+**RESOLVED 2026-06-02:** `maths-ni#recon/nrRealign` state=APPLIED in `progress.json`; `spec/v41-port/reconstruction/engine-nr-realign.md` exists with Status: RATIFIED 2026-05-30, REVISED 2026-05-31. The nrRealign reconstruction (which covers the full NIiter/nicomcof realignment including pre-applied xmu and ag-zeroing disposition) has landed. The pre-image conflict that triggered this escalation is resolved within the reconstruction.
+
 ---
 
 ### ESC-004 — `maths-ni/niconv.c#h001`, `#h002`, `#h003` — NIconvTest is inlined (no standalone fn / ft_ngdebug / CKTtroubleElt / STEPDEBUG)
@@ -178,6 +186,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Why it exceeds one functionGroup / why it is ambiguous:** ngspice keeps `NIconvTest` separate with early `return 1`; our port inlined it with a `globalConverged` flag. A line-isomorphic image requires a convergence-subsystem rewrite, not a per-hunk edit.
 - **Decision needed from user:** convert back to `PENDING` with a directive to extract a standalone `NIconvTest` matching v41 (early-return control flow + troubleNode/troubleElt), or accept the inlined structure as an architectural divergence via a sequenced reconstruction item.
 - **Resolution:** _pending_
+
+**RESOLVED 2026-06-02:** Covered by `maths-ni#recon/nrRealign` APPLIED (progress.json state=APPLIED; `engine-nr-realign.md` RATIFIED 2026-05-30, REVISED 2026-05-31). The nrRealign reconstruction encompasses the NIconvTest/NIiter control-flow realignment including the NaN-check and convergence-scan structure that triggered this escalation.
 
 ---
 
@@ -206,6 +216,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Why it exceeds one functionGroup / why it is ambiguous:** the pre-image is case (b)/(c) across all six hunks; the inlined NR loop is not line-isomorphic to C `NIiter`; and mapping the new singular-matrix-message and reset constructs into the restructured loop is genuinely ambiguous. This is a full NIiter rewrite spanning the NR/diagnostic subsystem.
 - **Decision needed from user:** convert back to `PENDING` with a directive to either author a v26-baseline NIiter reconstruction or re-port `newtonRaphson` as a line-structured v41 mirror (including the message-limiter / reset / errMsg additions).
 - **Resolution:** _pending_
+
+**RESOLVED 2026-06-02:** Covered by `maths-ni#recon/nrRealign` APPLIED (progress.json state=APPLIED; `engine-nr-realign.md` RATIFIED 2026-05-30, REVISED 2026-05-31). The nrRealign reconstruction is the sequenced NIiter re-port (line-structured mirror including msgcount/NIresetwarnmsg/OldCKTstate0/DOING_TRAN errMsg) that this escalation requested. It has landed.
 
 ---
 
@@ -237,6 +249,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Decision needed from user:** resolve the three §7 Phase-0 questions (Q-ISRC-DECOMP, Q-ISRC-ACLD-SPLIT, Q-ISRC-WAVEFORM-FIDELITY), then author `spec/v41-port/reconstruction/isrc-coeffWaveforms.md` defining the coeff-array waveform engine end state (function-type dispatch, `ISRCcoeffs[]`/order parameterisation, the `waveform`-enum → ngspice-function-type re-expression, breakpoint scheduling), and rebuild the ledger so this item returns to `PENDING` for the builder.
 - **Resolution:** _pending_
 
+**RESOLVED 2026-06-02:** `spec/v41-port/reconstruction/isrc-coeffWaveforms.md` exists with Status: RATIFIED 2026-05-30. The spec-absent blocker that triggered this escalation (the three Phase-0 questions gate the spec authoring) is cleared — the spec has been authored and ratified. Implementation is tracked separately (the isrc teardown record at line 675 above notes the recon not yet built, but that is a subsequent loop task, not this escalation's scope).
+
 ---
 
 ### ESC-009 — `isrc#recon/parallelMultiplier` — reconstruction spec missing; cannot rebuild the `m` parallel-multiplier parameter
@@ -250,6 +264,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Why it exceeds one functionGroup / why it is ambiguous:** two blockers. (1) The spec is absent and, per `isrc-review.md` §6, reconstruction specs are "a separate deliverable, authored after the user approves this review" — not authored by the loop. (2) The planning doc's stated target for this recon spans **two** element files (`ac-current-source.ts` **and** `dc-current-source.ts`), but my contracted FILE SCOPE is `ac-current-source.ts` alone; building only the AC half would leave the DC source's `m` baseline unbuilt and the recon's stated scope half-met — a file-scope conflict the contract directs me to escalate rather than narrow silently. Coupled with Q-ISRC-DECOMP (§7, unresolved), which determines whether `dc-current-source.ts` participates at all, the correct target file set is genuinely undetermined.
 - **Decision needed from user:** author `spec/v41-port/reconstruction/isrc-parallelMultiplier.md` defining the `m`/`ISRCmValue`/`ISRCmGiven` parameter and its application points, **and** reconcile the file scope: either expand this builder's `tsFiles` to include `src/components/sources/dc-current-source.ts` (resolving Q-ISRC-DECOMP) or declare a separate recon item for the DC source. Then rebuild the ledger so this item returns to `PENDING`.
 - **Resolution:** _pending_
+
+**RESOLVED 2026-06-02:** `spec/v41-port/reconstruction/isrc-parallelMultiplier.md` exists with Status: RATIFIED 2026-05-30. The spec-absent and file-scope blockers that triggered this escalation are cleared. Additionally, FIX-004 (the AC RHS stamp sign/orientation issue surfaced during gating) is CLOSED per `spec/fix-list-phase-2-audit.md` — the bug was in the netlist-generator deck emitter (swapped n+/n- for AcCurrentSource), not the recon source, and is fixed; the recon's parallelMultiplier is isomorphic and DC-clean, merges once built.
 
 ---
 
@@ -265,6 +281,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Decision needed from user:** author `spec/v41-port/reconstruction/dio-diotempupdate.md` defining the full v26 `DIOtemp` body + `DIOtempUpdate(Temp)` refactor (tlev/tlevc, TM1/TM2/TTT1/TTT2/TRS/TRS2, tunneling, brkdEmissionCoeff, sidewall cap, `_dT` outputs, epsmin floors/defaults) against verified `ref/ngspice/src/spicelib/devices/dio/diotemp.c` + `diosetup.c` citations, then rebuild the ledger so `specExists` flips true and this item returns to `PENDING` for the builder.
 - **Resolution:** _pending_
 
+**RESOLVED 2026-06-02:** `spec/v41-port/reconstruction/dio-diotempupdate.md` exists with Status: RATIFIED 2026-05-30, REVISED 2026-05-31. The spec-absent blocker that triggered this escalation is cleared — the spec has been authored and ratified.
+
 ---
 
 ### ESC-011 — `dio#recon/v41NewFeatures` — reconstruction spec missing; cannot build self-heating + recombination + level-3 geometry-cap subsystems
@@ -278,6 +296,8 @@ gap is durable. Each needs a spec-author action, not a loop retry.
 - **Why it exceeds one functionGroup / why it is ambiguous:** two compounding blockers. (1) The spec is absent and, per `planning/dio-review.md` §6, reconstruction specs are "a separate deliverable, authored after the user approves this review" — not authored by the loop; the end state of three woven v41-new subsystems (state-slot layout, `Tj`-terminal topology and its three-surface test impact, the Ith Jacobian cache fields, the recombination generation-factor derivatives, the level-3 geometry derivation, the engine-side `TempContext` re-eval at perturbed `Temp`) is genuinely undetermined without it. (2) The recon's own ledger `tsFunction` names `src/core/constants.ts` as a required edit target, which is outside my contracted file scope. Authoring the spec by inference would be inventing it — forbidden by the reconstruction-from-spec contract and the "no pragmatic shortcuts / match ngspice exactly" rule. (Related historical planning open questions Q-DIO-ONE-RECON, Q-DIO-TJ-TERMINAL appear resolved in the ledger — the four planning reconstructions were merged to the hybrid `diotempUpdate` + `v41NewFeatures` pair and `Tj` is always-present per the ledger title's "#38" / "#20" notes — but the spec document realising those decisions was never written.)
 - **Decision needed from user:** author `spec/v41-port/reconstruction/dio-v41newfeatures.md` defining the three v41-new diode subsystems (self-heating thermal node + state expansion + Ith Jacobian + thermal stamps + AC/conv branches; recombination current + temp scaling + derivatives; level-3 geometry parasitic caps + scale fold), **and** reconcile the file scope by expanding this builder's `tsFiles` to include `src/core/constants.ts` (for `CONSTepsSiO2`). Then rebuild the ledger so `specExists` flips true and this item returns to `PENDING`.
 - **Resolution:** _pending_
+
+**RESOLVED 2026-06-02:** `spec/v41-port/reconstruction/dio-v41newfeatures.md` exists with Status: RATIFIED 2026-05-30, REVISED 2026-05-31. Both the spec-absent blocker and the file-scope conflict (constants.ts) that triggered this escalation are cleared — the spec has been authored and ratified with the expanded tsFiles.
 
 ---
 
@@ -393,6 +413,8 @@ The structural shell (the `FunctionType` enum, the `_coeffs`/`_functionType`/`_f
 With (1)–(3) resolved, all parts of the recon become buildable as specified. No "accepted divergence" outcome (TASK.md §8).
 - **Resolution:** _pending_
 
+**RESOLVED 2026-06-02:** `vsrc#recon/waveformModel` state=APPLIED in `progress.json`; `spec/v41-port/reconstruction/vsrc-waveformModel.md` Status: RATIFIED 2026-05-30, REVISED 2026-05-31. The three blockers (B1: `cktStep`/`cktFinalTime` on `LoadContext`, B2: `maths-misc#recon/randnumb` RNG, B3: tsFiles scope expansion) are all resolved in the REVISED spec and the recon has landed. The residual timestep-cadence divergence is reclassified as standalone FIX-003 (which itself no longer blocks the waveformModel recon per the fix-list note: "This no longer blocks `vsrc#recon/waveformModel` (APPLIED) — it is a standalone timestep-controller parity item"). The h001b (`MODEACNOISE`) and h004 (`newcompat.xs`) per-hunk escalations from the vsrc (2026-06-02) teardown are live and tracked in separate entries below.
+
 ---
 
 ## parser#recon/nodeAllocOrder — Part B totality gate forbidden by a pre-existing out-of-scope audit
@@ -431,6 +453,8 @@ Expand the recon's tsFiles to include `src/solver/analog/ngspice-load-order-audi
 
 - **Resolution:** _pending_
 
+**RESOLVED 2026-06-02:** `parser#recon/nodeAllocOrder` state=APPLIED in `progress.json`; `spec/v41-port/reconstruction/engine-node-alloc-order.md` Status: RATIFIED 2026-05-30, RE-RATIFIED 2026-05-31 (folded in FIND-composite-path Part E + criterion 11; all citation-review GOOD). The tsFiles expansion (to include `ngspice-load-order-audit.ts`) and the Part B totality rows that triggered this escalation have been resolved within the ratified spec and the recon has landed. Part B2 (harness gate not re-verified live due to MCP disconnect) remains an open verifier task, not a blocker to marking this escalation resolved.
+
 ---
 
 ## vsrc (2026-06-01)
@@ -440,6 +464,8 @@ Expand the recon's tsFiles to include `src/solver/analog/ngspice-load-order-audi
 
 - **source:** `vsrc#recon/waveformModel`  •  **verdict:** MISMATCH (teardown-side durable record; builder ESCALATED rather than building — recon left PENDING/ESCALATED)
   - **note (verbatim):** EMPTY-DIFF CATCH fired. `git -C C:/local_working_projects/digital_in_browser/.wt/vsrc diff --name-only` is EMPTY (also empty for --cached); worktree `git status --porcelain` is clean; latest commit is 8b7c6a02 'v41-port(vsrc): record 1 escalation(s)' (not an APPLIED recon). None of the recon's tsFiles [src/components/sources/ac-voltage-source.ts, src/solver/analog/load-context.ts, src/solver/analog/analog-engine.ts, src/components/sources/ac-current-source.ts, src/solver/analog/__tests__/harness/netlist-generator.ts] carry any edit in the worktree. The MAIN checkout (C:/local_working_projects/digital_in_browser) `git status --porcelain` for those same files is also clean, so the edit did NOT land in the wrong tree by mistake — it was never applied at all. The builder ESCALATED instead of building: progress.json has "vsrc#recon/waveformModel": state=ESCALATED, attempts=0, with three recorded blockers — B1: spec Part A claims ckt->CKTstep/CKTfinalTime are 'already on LoadContext' but LoadContext has neither (only ctx.dt=CKTdelta), so cktStep/cktFinalTime must be ADDED to load-context.ts + populated in the engine builder (the non-noise PULSE/EXP/SINE default guards depend on these); B2: maths-misc#recon/randnumb deterministic RNG (trnoise_state/trrandom_state/CombLCGTaus/f_alpha) is required for the TRNOISE/TRRANDOM arms and the noise arms are blocked until it lands; B3: ac-current-source.ts + netlist-generator.ts were outside the originally-recorded single-tsFile scope. SPEC-PRESENCE gate PASSES — the spec exists at spec/v41-port/reconstruction/vsrc-waveformModel.md (RATIFIED 2026-05-30; REVISED 2026-05-31 'precondition fix, pending re-review' which expands tsFiles to the full five-file set, superseding B3's scope concern, and corrects Part A to ADD cktStep/cktFinalTime rather than claim they pre-exist, confirming B1's substance). I did NOT run the harness GATE (no source change exists to gate) and did NOT flip progress.json to APPLIED. Recon left PENDING/ESCALATED. Builder must re-apply, rooted at C:/local_working_projects/digital_in_browser/.wt/vsrc, against the REVISED spec (which already resolves B1's precondition framing and B3's tsFiles scope); the TRNOISE/TRRANDOM value+coeff+accept arms remain genuinely blocked on maths-misc#recon/randnumb per the spec's own cross-recon dependency (note: a prior commit e98ab61/ae98ad61 shows maths-misc#recon/randnumb APPLIED on this branch, so B2 may now be unblockable — builder should re-check before re-escalating).
+
+**RESOLVED 2026-06-02:** Both 2026-06-01 teardown records are superseded. `vsrc#recon/waveformModel` state=APPLIED in `progress.json` — the recon has since landed (all three blockers B1/B2/B3 resolved by the REVISED spec). The residual timestep-cadence divergence is reclassified as standalone FIX-003 per `spec/fix-list-phase-2-audit.md`, which explicitly notes it "no longer blocks `vsrc#recon/waveformModel` (APPLIED)". The h001b (`MODEACNOISE`) and h004 (`newcompat.xs`) per-hunk escalations from the vsrc (2026-06-02) teardown are live separate entries.
 
 ## analysis (2026-06-02)
 
