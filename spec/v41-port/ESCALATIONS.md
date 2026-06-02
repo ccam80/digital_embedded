@@ -1160,3 +1160,32 @@ The v41 Kull quasi-saturation subsystem these 12 groups implement requires a new
 
 **Decision needed from user:** authorize a `bjt#recon/quasiSaturation` reconstruction item with cross-group sequencing (`bjt.ts` schema/setup/load/stampAc/convergence + `compiler.ts` collCX node-allocation + `computeBjtTempParams` QS-temperature block), OR rule the QS sub-feature out via an explicit device-class-scope.md amendment.
 - **Resolution:** _pending_ (consolidated under ESC-BJT-QS-collCXnode)
+
+---
+
+## mes (2026-06-03)
+
+Teardown of isolated worktree `.wt/mes` (SERIAL gate+merge+teardown stage). Rebase onto
+the advancing `v41-port` was clean (`rebaseClean=true`, 1 commit replayed). The unit did
+**NOT** merge: it failed the COMPILE GATE before the harness/self-compare gate could run
+(`merged=false`, `gatePass=null` — the harness never started). The blocking failure is an
+internal cross-table consistency defect in the unit's own from-scratch MES device-class
+work, surfaced by the `auditNgspiceLoadOrderTables` build-time invariant at registry
+creation. This is a **build/structural-consistency** failure, NOT a numerical divergence
+(no firstDivergence / matrix cell / absDelta / step-iter / harness gate-fail on fixtures),
+so it is recorded here rather than in `spec/fix-list-phase-2-audit.md`. The maximal kept
+work (53,644-byte diff vs `v41-port`, `src/` only) is preserved at
+`C:/local_working_projects/digital_in_browser/.wt-failed/mes.diff` for resume-from-patch on
+the next run. The mes worktree never touched MAIN's `src/` (`mainSrcClean=true`).
+
+- **source=mes#recon/wholeClass (from-scratch MESFET device class) | verdict=COMPILE-GATE FAIL (build invariant).** `node_modules/vitest run src/solver/analog/__tests__/compile-analog-partition.test.ts src/solver/analog/__tests__/compiler.test.ts` => 27 passed / **1 failed**. The single failing case is `compileAnalogPartition > setup() assigns _stateBase >= 0 to pool-backed elements after engine warm-start` (`compile-analog-partition.test.ts:569`), which throws from `auditNgspiceLoadOrderTables` (`src/solver/analog/ngspice-load-order-audit.ts:83`) during `createDefaultRegistry` (`src/components/register-all.ts:584`) via `buildFixture` (`fixtures/build-fixture.ts:73`). Exact audit error text:
+  ```
+  ngspice-load-order audit failed:
+    - typeId "NMESFET" is in TYPE_ID_TO_DECK_PIN_LABEL_ORDER but family "MES" is not deck-emitting
+    - typeId "PMESFET" is in TYPE_ID_TO_DECK_PIN_LABEL_ORDER but family "MES" is not deck-emitting
+  Fix the affected keys in src/solver/analog/ngspice-load-order.ts.
+  ```
+  Root cause: the mes implementer added the new MES family + NMESFET/PMESFET rows to three tables in `src/solver/analog/ngspice-load-order.ts` — `NGSPICE_LOAD_ORDER.MES = 31` (mes.c:184-189 dev info, between jfet/jfet2 and mos1) at :47, the `"MES"` arm of the family union at :90, `TYPE_ID_TO_LOAD_ORDER` NMESFET/PMESFET => `NGSPICE_LOAD_ORDER.MES` at :139-140, `TYPE_ID_TO_DECK_FAMILY` NMESFET/PMESFET => `"MES"` at :188-189, and `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` NMESFET/PMESFET => `["D","G","S"]` (mes.c:66-70 MESnames Drain/Gate/Source) at :251-252 — but did NOT register `MES` in the **deck-emitting families** set that the audit cross-checks. The audit requires: any typeId present in `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` must belong to a family flagged deck-emitting. NMESFET/PMESFET were added to the pin-label-order table without MES being marked deck-emitting, so the two tables disagree and the invariant trips for every consumer of `createDefaultRegistry` (hence the whole compile gate is RED). Per the gate contract this is escalated, never edited-to-pass; the fix belongs in the mes implementer's tsFile (`ngspice-load-order.ts` — add MES to the deck-emitting families set so it is consistent with the pin-label-order rows the same unit added).
+- **What is blocked:** the entire mes unit merge. No harness/self-compare run was possible (`circuit_build`/`harness_*` on `mes-gate.dts` were never reached — the registry the harness depends on cannot be constructed while the audit throws). The gate fixture `src/solver/analog/__tests__/ngspice-parity/fixtures/mes-gate.dts` was therefore neither authored nor exercised this pass.
+- **Decision needed from user:** re-run the mes unit after the implementer makes the MES family deck-emitting in `src/solver/analog/ngspice-load-order.ts` (so the deck-emitting-families set and `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` agree on MES), restoring a green compile gate; then the harness/self-compare gate on `mes-gate.dts` can run. Resume from `.wt-failed/mes.diff`.
+- **Resolution:** _pending_
