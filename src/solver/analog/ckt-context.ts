@@ -432,6 +432,18 @@ export class CKTCircuitContext {
   elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]>;
   /** Number of non-ground MNA node rows. */
   nodeCount: number;
+
+  /**
+   * Per-slot node type- the digiTS counterpart of CKTnode->type
+   * (cktdefs.h:45-48: SP_VOLTAGE=3, SP_CURRENT=4). cktload.c:178 reads
+   * n->type to classify a column as SP_CURRENT (branch) vs SP_VOLTAGE.
+   * Index by external slot (1 .. size); slot 0 is the ground sentinel.
+   * Populated by buildNodeTypes() from engine.getNodeTable(). NOT a
+   * slot-range test, because makeVolt device-internal voltage nodes share
+   * the > nodeCount range with branch (current) rows
+   * (analog-engine.ts:178,1652-1655).
+   */
+  private _slotType: Array<"voltage" | "current"> = [];
   /** Shared state pool for per-element state. Null until allocateStateBuffers() is called. */
   statePool: StatePool | null;
   /** Subset of elements that are pool-backed. Populated at construction. */
@@ -976,6 +988,44 @@ export class CKTCircuitContext {
     // Keep the full params reference in sync so downstream readers
     // (e.g. solveDcOperatingPoint) see the new values.
     this.params = params;
+  }
+
+  /**
+   * Per-slot node type- the authoritative counterpart of CKTnode->type
+   * (cktdefs.h:45-48) that ZeroNoncurRow consumes (cktload.c:178). Returns
+   * "current" for branch rows, "voltage" otherwise. Slots never recorded in
+   * the node table (the external user nodes 1 .. externalNodeCount) are
+   * voltage- a branch current is never an external node.
+   */
+  nodeType(slot: number): "voltage" | "current" {
+    return this._slotType[slot] ?? "voltage";
+  }
+
+  /**
+   * Build the per-slot node-type table from the engine's node table- the
+   * digiTS counterpart of walking ckt->CKTnodes and reading each n->type
+   * (cktload.c:175-178). Default every slot 1 .. size to "voltage", then
+   * overlay each recorded node's type. Slots absent from the table (the
+   * external user nodes) keep the "voltage" default- exactly the verdict
+   * ngspice's CKTnodes walk gives, since makeCur is the only allocator that
+   * tags a node "current" (analog-engine.ts:1639,1652-1655).
+   *
+   * Called once at setup() after the per-element setup loop has run (so
+   * makeCur branch entries are present) and the matrix order is final.
+   *
+   * cite: cktdefs.h:45-48 — SP_VOLTAGE / SP_CURRENT node-type tags.
+   * cite: cktnewn.c:23-43 — CKTnewNode records the type on each CKTnode.
+   */
+  buildNodeTypes(
+    size: number,
+    nodeTable: readonly { number: number; type: "voltage" | "current" }[],
+  ): void {
+    this._slotType = new Array<"voltage" | "current">(size + 1).fill("voltage");
+    for (const entry of nodeTable) {
+      if (entry.number >= 0 && entry.number <= size) {
+        this._slotType[entry.number] = entry.type;
+      }
+    }
   }
 
   /**

@@ -32,6 +32,16 @@ export function stampRHS(rhs: Float64Array, row: number, val: number): void {
 }
 
 /**
+ * Absolute RHS write- `CKTrhs[node->number] = value` (assignment), not
+ * accumulate. cktload.c:113,117,139,145 overwrite the device load()
+ * contribution at a pinned nodeset/IC row, discarding whatever the device
+ * loop accumulated there. Distinct from the additive stampRHS.
+ */
+export function setRHS(rhs: Float64Array, node: number, value: number): void {
+  rhs[node] = value;
+}
+
+/**
  * Allocate the 4 conductance matrix handles for a 2-terminal Norton port
  * at (posNode, negNode). Returns the tuple [hPP, hNN, hPN, hNP] (source
  * spec §6.8; call sites behavioral-output-driver.ts:166-212 and

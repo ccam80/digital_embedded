@@ -257,6 +257,24 @@ export class Circuit {
   metadata: CircuitMetadata;
 
   /**
+   * Per-node `.ic` initial conditions, keyed by net/pin NAME (e.g. "C1:pos")
+   * mapped to volts. The unified compiler resolves each NAME to its MNA node id
+   * and writes it into the compiled circuit's `ics` map, the counterpart of
+   * ngspice `node->icGiven`/`node->ic` (cktsetnp.c:34-36). Undefined when the
+   * source document carries no `.ic` cards.
+   */
+  ics?: ReadonlyMap<string, number>;
+
+  /**
+   * Per-node `.nodeset` DC operating-point guesses, keyed by net/pin NAME
+   * mapped to volts. The unified compiler resolves each NAME to its MNA node id
+   * and writes it into the compiled circuit's `nodesets` map, the counterpart
+   * of ngspice `node->nsGiven`/`node->nodeset` (cktsetnp.c:29-31). Undefined
+   * when the source document carries no `.nodeset` cards.
+   */
+  nodesets?: ReadonlyMap<string, number>;
+
+  /**
    * Source of pin-pair equivalence for this circuit.
    *
    * Defaults to `{ mode: 'wires' }` so circuits loaded from `.dig`/`.dts`

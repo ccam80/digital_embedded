@@ -86,6 +86,19 @@ export interface DtsCircuit {
     panelIndex: number;
     group: string;
   }>;
+  /**
+   * Per-node `.ic` initial conditions, keyed by net/pin NAME (e.g. "C1:pos")
+   * mapped to volts. The compiler resolves each NAME to its MNA node id and
+   * sets `node->icGiven`/`node->ic` (cktsetnp.c:34-36, PARM_IC), so the
+   * transient-boot DCOP (MODETRANOP) honours them.
+   */
+  ics?: Record<string, number>;
+  /**
+   * Per-node `.nodeset` DC operating-point guesses, keyed by net/pin NAME
+   * mapped to volts. The compiler resolves each NAME to its MNA node id and
+   * sets `node->nsGiven`/`node->nodeset` (cktsetnp.c:29-31, PARM_NS).
+   */
+  nodesets?: Record<string, number>;
 }
 
 /**
@@ -392,6 +405,30 @@ function validateDtsCircuit(value: unknown, path: string): void {
           `Invalid .dts document: "${path}.attributes["${k}"]" must be a string`,
         );
       }
+    }
+  }
+
+  validateNameVoltsRecord(circuit['ics'], `${path}.ics`);
+  validateNameVoltsRecord(circuit['nodesets'], `${path}.nodesets`);
+}
+
+/**
+ * Validate an optional NAME -> volts record (used for `circuit.ics` and
+ * `circuit.nodesets`). Each value must be a finite number; a typo can never be
+ * silently dropped. Absent / undefined fields pass.
+ */
+function validateNameVoltsRecord(value: unknown, path: string): void {
+  if (value === undefined) return;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(
+      `Invalid .dts document: "${path}" must be an object mapping net/pin NAME -> volts when present`,
+    );
+  }
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      throw new Error(
+        `Invalid .dts document: "${path}["${k}"]" must be a finite number (volts)`,
+      );
     }
   }
 }

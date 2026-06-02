@@ -1589,8 +1589,25 @@ export class MNAEngine implements AnalogEngine {
     this._ctx!.allocateStateBuffers(this._numStates, cac.statePool ?? null);
     cac.statePool = this._ctx!.statePool!;
     this._ctx!.allocateRowBuffers(this._solver.matrixSize);
+    // Seed ctx.ics / ctx.nodesets from the compiled circuit BEFORE the handle
+    // pre-allocation below reads them. ngspice CKTic runs after the node table
+    // is populated and before CKTop, allocating node->ptr = SMPmakeElt(n,n)
+    // for every nsGiven / icGiven node (cktic.c:28,35). Here the compiled maps
+    // are the node->icGiven/node->ic counterpart (set by the unified compiler,
+    // the CKTsetNodPm analogue at cktsetnp.c:29-36). dcOperatingPoint() /
+    // _transientDcop() re-point ctx.ics/ctx.nodesets at these same maps before
+    // each analysis; seeding here guarantees the handles are allocated against
+    // the populated maps rather than against an empty default.
+    this._ctx!.ics = cac.ics ?? new Map();
+    this._ctx!.nodesets = cac.nodesets ?? new Map();
     // Nodeset / IC handle pre-allocation (per A8).
     this._allocateNodesetIcHandles();
+
+    // Build the per-slot node-type table the nodeset/IC ZeroNoncurRow walk
+    // (cktload.c:167-186) consumes- the CKTnode->type counterpart. Runs after
+    // the per-element setup loop (so makeCur branch entries are present in
+    // _nodeTable) and after the matrix order is final (solver.matrixSize).
+    this._ctx!.buildNodeTypes(this._solver.matrixSize, this._nodeTable);
 
     // Post-setup topology diagnostics: branchIndex is now populated.
     // Voltage-source loops, inductor loops, and competing voltage constraints

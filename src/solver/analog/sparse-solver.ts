@@ -681,6 +681,57 @@ export class SparseSolver {
     this._elValImag[handle] += value;
   }
 
+  /**
+   * Current matrix order (ngspice Matrix->Size, spdefs.h:763). The highest
+   * internal slot assigned so far; loops over the live MNA system run
+   * `for (col = 1; col <= size; col++)`. Exposed for the nodeset/IC row-zero
+   * walk in ckt-load.ts, which iterates every candidate column the way
+   * cktload.c:175 walks ckt->CKTnodes.
+   */
+  get size(): number {
+    return this._size;
+  }
+
+  /**
+   * Read-only element lookup. Returns the pool handle for the cell at
+   * (row, col), or -1 when the cell does not exist. Does NOT create the
+   * cell and does NOT touch _insertionOrder (the read path must not perturb
+   * the element-pool allocation order the settled solver parity depends on).
+   *
+   * spsmp.c:454-471 (SMPfindElt with CreateIfMissing=0):
+   *   Row = ExtToIntRowMap[Row]; Col = ExtToIntColMap[Col];
+   *   if (Col == -1) return NULL;                  // spsmp.c:464-466 absent-col
+   *   Element = FirstInCol[Col];
+   *   spcFindElementInCol(&Element, Row, Col, NO); // spsmp.c:468-469
+   */
+  findElement(row: number, col: number): number {
+    // spsmp.c:461-462- translate through the live permutation maps. An ext
+    // index Translate never assigned an internal slot reads as -1
+    // (spalloc.c:255-259 lazy assignment), and is NOT created here.
+    const intRow = this._extToIntRow[row];
+    const intCol = this._extToIntCol[col];
+    // spsmp.c:464-466- an absent column has no element. The symmetric unseen-
+    // row case (an ext row never assigned an internal slot cannot match any
+    // stored Element->Row) yields the same absent verdict.
+    if (intCol === -1 || intRow === -1) return -1;
+    // spsmp.c:468-469- walk the column chain read-only; createIfMissing=false
+    // never reaches _spcCreateElement, so the element pool is untouched.
+    return this._spcFindElementInCol(intCol, intRow, /*createIfMissing=*/ false);
+  }
+
+  /**
+   * Absolute write of an element value (NOT accumulate). cktload.c:181
+   * (`*x = 0.0` via the SMPfindElt pointer) is an in-place zero of a single
+   * cell, distinct from the additive stampElement path. ZeroNoncurRow uses it
+   * to clear the non-current entries of a constrained row. Writes only the
+   * real half- the nodeset/IC apply runs in the real-only MODEDC family
+   * (cktload.c:105). Order-independent: writes through the handle, so it does
+   * not call _translate and does not touch _insertionOrder.
+   */
+  zeroElement(handle: number): void {
+    this._elVal[handle] = 0.0;
+  }
+
   // =========================================================================
   // Public API
   // =========================================================================

@@ -217,6 +217,17 @@ function deserializeDtsCircuit(
     circuit.addWire(wire);
   }
 
+  // Carry `.ic` / `.nodeset` cards (NAME -> volts) onto the Circuit so the
+  // unified compiler can resolve each NAME to its MNA node id and populate
+  // `compiled.ics`/`.nodesets`. Without this the constraint is silently dropped
+  // on the production / headless / MCP path.
+  if (dtsCircuit.ics !== undefined && Object.keys(dtsCircuit.ics).length > 0) {
+    circuit.ics = new Map(Object.entries(dtsCircuit.ics));
+  }
+  if (dtsCircuit.nodesets !== undefined && Object.keys(dtsCircuit.nodesets).length > 0) {
+    circuit.nodesets = new Map(Object.entries(dtsCircuit.nodesets));
+  }
+
   return circuit;
 }
 

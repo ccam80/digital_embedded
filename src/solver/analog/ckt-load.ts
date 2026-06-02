@@ -7,7 +7,7 @@
  */
 
 import type { CKTCircuitContext } from "./ckt-context.js";
-import { stampRHS } from "./stamp-helpers.js";
+import { setRHS } from "./stamp-helpers.js";
 import {
   MODEDC,
   MODEINITJCT,
@@ -21,11 +21,14 @@ import type { AnalogElement } from "./element.js";
 import type { LoadContext } from "./load-context.js";
 
 /**
- * Large conductance used to enforce nodeset and IC node voltages.
- * Matches ngspice cktload.c:96-136: 1e10 siemens pin to a voltage source.
+ * Large conductance soft-pin used only in the currents=1 branch of the
+ * nodeset/IC apply- when a current-type (branch) column shares the
+ * constrained node's row, ZeroNoncurRow returns 1 and the row keeps a 1e10
+ * diagonal large-conductance pin rather than the exact 1·v=value constraint.
  *
  * Variable mapping (ngspice → ours):
- *   cktload.c:113 (1e10 conductance) → CKTNS_PIN
+ *   cktload.c:113-115 (nodeset currents=1: *(node->ptr) = 1e10) → CKTNS_PIN
+ *   cktload.c:139-141 (IC currents=1:      *(node->ptr) += 1e10) → CKTNS_PIN
  */
 const CKTNS_PIN = 1e10;
 
@@ -123,36 +126,120 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // the per-element CKTtroubleNode tracking per cktload.c:64-65.
   runByDeviceFamily(ctx.elementsByFamily, "load", ctx.loadCtx, makeTroubleTrackingHandler(ctx));
 
-  // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.
+  // Step 4a: nodeset enforcement. ngspice cktload.c:108-129.
   // Gate: (CKTmode & MODEDC) && (CKTmode & (MODEINITJCT | MODEINITFIX))
   //- any DC-family analysis (DCOP, TRANOP, DCTRANCURVE) during JCT or FIX.
   //
+  // Zero the constrained node's non-current row (zeroNoncurRow); a pure-
+  // voltage row gets an exact 1·v=value constraint, a row sharing a branch
+  // (current) column keeps the 1e10 soft-pin.
+  //
   // Variable mapping (ngspice cktload.c → ours):
-  //   ckt->CKTnodeset    → ctx.nodesets
-  //   1e10 (conductance) → CKTNS_PIN
-  //   *ckt->CKTrhs       → ctx.rhs
-  //   CKTsrcFact         → ctx.srcFact
+  //   ckt->CKTnodes (node->nsGiven) → ctx.nodesets
+  //   node->ptr (diagonal)          → ctx.nodesetHandles.get(node)
+  //   ZeroNoncurRow(...)            → zeroNoncurRow(ctx, node)
+  //   *(node->ptr) = 1e10 / = 1     → zeroElement(diag); stampElement(diag, K)
+  //   CKTrhs[node->number] = …      → setRHS(ctx.rhs, node, …)  (assignment)
+  //   CKTsrcFact                    → ctx.srcFact
   if ((ctx.cktMode & MODEDC) && (ctx.cktMode & (MODEINITJCT | MODEINITFIX))) {
     for (const [node, value] of ctx.nodesets) {
-      ctx.solver.stampElement(ctx.nodesetHandles.get(node)!, CKTNS_PIN);
-      stampRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
+      const diag = ctx.nodesetHandles.get(node)!;
+      if (zeroNoncurRow(ctx, node)) {
+        // cktload.c:113-115- currents=1 branch: 1e10·value RHS + diagonal
+        // large-conductance soft-pin. *(node->ptr) = 1e10 is an assignment;
+        // zeroElement(diag) (already zeroed by zeroNoncurRow, made explicit
+        // for order-independence) + stampElement(diag, 1e10) reproduces it.
+        ctx.solver.zeroElement(diag);
+        ctx.solver.stampElement(diag, CKTNS_PIN);
+        setRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
+      } else {
+        // cktload.c:117-119- pure-voltage branch: exact 1·v = value.
+        // *(node->ptr) = 1 (assignment) + CKTrhs[node] = value·srcFact.
+        ctx.solver.zeroElement(diag);
+        ctx.solver.stampElement(diag, 1.0);
+        setRHS(ctx.rhs, node, value * ctx.srcFact);
+      }
     }
   }
 
-  // Step 4b: IC enforcement. ngspice cktload.c:130-157.
+  // Step 4b: IC enforcement. ngspice cktload.c:131-158.
   // Gate: (CKTmode & MODETRANOP) && !(CKTmode & MODEUIC)
   //- transient-boot DCOP only, and only when UIC was NOT requested.
   //
+  // Same row-zero mechanism as nodeset. One deliberate asymmetry vs. nodeset,
+  // mirrored literally: the IC currents=1 branch does *(node->ptr) += 1e10
+  // (cktload.c:141, accumulate onto the just-zeroed diagonal) where nodeset
+  // does = 1e10. After zeroNoncurRow the diagonal is 0, so += 1e10 and = 1e10
+  // produce the identical value; zeroElement(diag) + stampElement(diag, 1e10)
+  // reproduces both bit-exact.
+  //
   // Variable mapping (ngspice cktload.c → ours):
-  //   ckt->CKTnodeValues → ctx.ics
-  //   1e10 (conductance) → CKTNS_PIN
-  //   CKTsrcFact         → ctx.srcFact
+  //   ckt->CKTnodes (node->icGiven) → ctx.ics
+  //   node->ptr (diagonal)          → ctx.icHandles.get(node)
+  //   ZeroNoncurRow(...)            → zeroNoncurRow(ctx, node)
+  //   *(node->ptr) += 1e10 / = 1    → zeroElement(diag); stampElement(diag, K)
+  //   CKTrhs[node->number] = …      → setRHS(ctx.rhs, node, …)  (assignment)
+  //   CKTsrcFact                    → ctx.srcFact
   if ((ctx.cktMode & MODETRANOP) && !(ctx.cktMode & MODEUIC)) {
     for (const [node, value] of ctx.ics) {
-      ctx.solver.stampElement(ctx.icHandles.get(node)!, CKTNS_PIN);
-      stampRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
+      const diag = ctx.icHandles.get(node)!;
+      if (zeroNoncurRow(ctx, node)) {
+        // cktload.c:139-141- currents=1: 1e10·ic RHS + (zeroed diag) += 1e10.
+        ctx.solver.zeroElement(diag);
+        ctx.solver.stampElement(diag, CKTNS_PIN);
+        setRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
+      } else {
+        // cktload.c:145-147- pure-voltage: exact 1·v = ic.
+        ctx.solver.zeroElement(diag);
+        ctx.solver.stampElement(diag, 1.0);
+        setRHS(ctx.rhs, node, value * ctx.srcFact);
+      }
     }
   }
 
   // Step 5: finalize matrix
+}
+
+/**
+ * cktload.c:167-186 (ZeroNoncurRow) — zero the non-current entries of row
+ * `row` and report whether any current-type (branch) column shares the row.
+ * A pure-voltage row (returns false) is then driven by an exact 1·v=value
+ * constraint; a row touched by a branch column (returns true) keeps the 1e10
+ * soft-pin. File-private, mirroring the `static` linkage in cktload.c.
+ *
+ * Mechanism: walk every candidate column; look up the cell (row, col)
+ * read-only. If the cell exists, then either the column is a current-type
+ * (branch) row- record currents=true, leave the cell- or it is a voltage
+ * column- zero that off-diagonal/diagonal cell.
+ *
+ * Variable mapping (ngspice cktload.c → ours):
+ *   matrix                → ctx.solver
+ *   nodes (CKTnode list)  → candidate column indices 1 … size
+ *   rownum                → row (the constrained node's slot)
+ *   n->number             → col (a candidate column slot)
+ *   n->type == SP_CURRENT (cktdefs.h:46) → ctx.nodeType(col) === "current"
+ *   SMPfindElt(...,0)      → ctx.solver.findElement(row, col)
+ *   if (x)                 → handle >= 0
+ *   *x = 0.0               → ctx.solver.zeroElement(handle)
+ *   return currents        → return currents
+ */
+function zeroNoncurRow(ctx: CKTCircuitContext, row: number): boolean {
+  let currents = false;
+  // ngspice walks ckt->CKTnodes keyed by n->number = the external matrix
+  // index; digiTS's external indices are the contiguous slots 1 … size, so
+  // this visits exactly the same column set (cktload.c:175).
+  const size = ctx.solver.size;
+  for (let col = 1; col <= size; col++) {
+    // cktload.c:176- read-only lookup of cell (rownum, n->number).
+    const handle = ctx.solver.findElement(row, col);
+    if (handle < 0) continue; // cktload.c:177- !x: cell does not exist, skip.
+    if (ctx.nodeType(col) === "current") {
+      // cktload.c:178-179- a current-type column shares the row.
+      currents = true;
+    } else {
+      // cktload.c:181- zero the voltage-column entry of this row.
+      ctx.solver.zeroElement(handle);
+    }
+  }
+  return currents; // cktload.c:185.
 }

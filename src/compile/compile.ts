@@ -399,6 +399,52 @@ export function compileUnified(
   }
 
   // -------------------------------------------------------------------------
+  // Step 9b: Resolve `.ic` / `.nodeset` NAMEs to MNA node ids
+  //
+  // The source document carries `circuit.ics` / `circuit.nodesets` keyed by
+  // net/pin NAME (e.g. "C1:pos"). Resolve each NAME to its analog MNA node id
+  // via labelSignalMap (the same `label:pinLabel` -> nodeId mapping callers use
+  // to address a node) and populate compiled.ics / compiled.nodesets. This is
+  // the counterpart of ngspice CKTsetNodPm setting node->icGiven/node->ic
+  // (cktsetnp.c:34-36) and node->nsGiven/node->nodeset (cktsetnp.c:29-31).
+  // A NAME that resolves to no analog node throws rather than being silently
+  // dropped, so a typo can never quietly defeat the constraint.
+  // -------------------------------------------------------------------------
+
+  if (compiledAnalog !== null) {
+    const concreteAnalog = compiledAnalog as import("../solver/analog/compiled-analog-circuit.js").ConcreteCompiledAnalogCircuit;
+    const resolveConstraintNode = (name: string, kind: string): number => {
+      const addr = labelSignalMap.get(name);
+      if (addr === undefined || addr.domain !== "analog") {
+        const knownAnalog = [...labelSignalMap.entries()]
+          .filter(([, a]) => a.domain === "analog")
+          .map(([k]) => k)
+          .join(", ");
+        throw new Error(
+          `compileUnified: ${kind} name "${name}" did not resolve to any ` +
+          `analog MNA node. Known analog labels: [${knownAnalog}].`,
+        );
+      }
+      return addr.nodeId;
+    };
+
+    if (inputCircuit.ics !== undefined && inputCircuit.ics.size > 0) {
+      const icMap = new Map<number, number>();
+      for (const [name, value] of inputCircuit.ics) {
+        icMap.set(resolveConstraintNode(name, "ic"), value);
+      }
+      (concreteAnalog as { ics?: Map<number, number> }).ics = icMap;
+    }
+    if (inputCircuit.nodesets !== undefined && inputCircuit.nodesets.size > 0) {
+      const nsMap = new Map<number, number>();
+      for (const [name, value] of inputCircuit.nodesets) {
+        nsMap.set(resolveConstraintNode(name, "nodeset"), value);
+      }
+      (concreteAnalog as { nodesets?: Map<number, number> }).nodesets = nsMap;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Step 10: Assemble bridge adapters
   // -------------------------------------------------------------------------
 
