@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T12:35:51.502Z",
+    "generated": "2026-06-02T14:39:23.171Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 198,
+    "progressEntriesApplied": 201,
     "progressEntriesStale": 7,
     "staleItems": [
       {
@@ -37751,10 +37751,12 @@
         2018
       ],
       "hunkHash": "b4f0c4c115dfe1c2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-voltage-source.ts — the VSRCacGiven default guards in AcVoltageSourceAnalogImpl (acMag default 1, acPhase default 0; ac-voltage-source.ts:599-602 / :940-941). Portable sub-item of the vsrctemp.c#h002 split: the acMag/acPhase default-fill block (VSRCacGiven && !VSRCacPGiven → acPhase=0). Blocked by vsrc#recon/waveformModel (the VSRCcoeffs-backed AC-coeff layer; Q-VSRC-WAVEFORM); the default-fill itself maps onto the existing derivation as a confirm/no-op.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrctemp.c (diff vsrc.md docLineRange 2015-2018; fresh fn vsrctemp.c:38-43). functionGroup vsrc/vsrctemp.c::VSRCtemp, tsFile src/components/sources/ac-voltage-source.ts. h002a is the acMag/acPhase default-fill sub-item of the vsrctemp.c#h002 split (addedLines:0/removedLines:0). ZERO-DELTA RULE (VERIFICATION.md sec1.4): the docLineRange 2015-2018 slice is context-only -- the `if(here->VSRCacGiven && !here->VSRCacPGiven){ here->VSRCacPhase = 0; }` block is unchanged v26->v41 (the h002 parent's real +/- lines are the diagnostic rewrite [h002b NO-COUNTERPART] and the RFSPICE blocks [h002d NO-COUNTERPART]); no +/- line falls in this slice, so the empty worktree delta is line-isomorphic. Tier-2 construct correspondence re-derived independently: v41 vsrctemp.c:41-43 `if(VSRCacGiven && !VSRCacPGiven) VSRCacPhase=0` <-> ac-voltage-source.ts:941 `acPhase: props.hasModelParam('acPhase') ? props.getModelParam('acPhase') : 0` (the present->value / absent->0 default-fill, allowed C<->TS ternary form of the guard); the paired acMag default v41 vsrctemp.c:38-40 `if(VSRCacGiven && !VSRCacMGiven) VSRCacMag=1` <-> ac-voltage-source.ts:940 `acMagnitude: ... : 1`; reload mirror at ac:1209-1210. blockedBy vsrc#recon/waveformModel = APPLIED in this worktree (the _acMagnitude/_acPhase substrate is present, ac:883-884/950-951). Bijective over the default-fill; comparators/defaults identical."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -37813,10 +37815,12 @@
         2055
       ],
       "hunkHash": "412200890a2c0871",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-voltage-source.ts — the AC magnitude/phase derivation used in AcVoltageSourceAnalogImpl.stampAc (VSRCacReal/VSRCacImag = VSRCacMag·cos/sin(VSRCacPhase·π/180), ac-voltage-source.ts:743-745 / :1310-1312). Portable sub-item of the vsrctemp.c#h002 split: the bijective `radians = VSRCacPhase·π/180; VSRCacReal = VSRCacMag·cos(radians); VSRCacImag = VSRCacMag·sin(radians)` block. Blocked by vsrc#recon/waveformModel (the VSRCcoeffs-backed AC-coeff layer; Q-VSRC-WAVEFORM); the derivation itself is the portable core (applies onto the existing stampAc derivation as a confirm/no-op).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/vsrc/vsrctemp.c (diff vsrc.md docLineRange 2053-2055; fresh fn vsrctemp.c:68-70). functionGroup vsrc/vsrctemp.c::VSRCtemp, tsFile src/components/sources/ac-voltage-source.ts. h002c is the bijective acMag/acPhase->acReal/acImag derivation sub-item of the vsrctemp.c#h002 split (addedLines:0/removedLines:0). ZERO-DELTA RULE (VERIFICATION.md sec1.4): the docLineRange 2053-2055 slice is context-only -- `radians = VSRCacPhase * M_PI / 180.0; VSRCacReal = VSRCacMag*cos(radians); VSRCacImag = VSRCacMag*sin(radians)` is unchanged v26->v41; no +/- line in this slice, so the empty worktree delta is line-isomorphic. Tier-2 construct correspondence re-derived independently: v41 vsrctemp.c:68 `radians = VSRCacPhase * M_PI / 180.0` <-> ac-voltage-source.ts:1310 `const radians = this._acPhase * Math.PI / 180.0` (same operands/operator/order/grouping); v41:69 `VSRCacReal = VSRCacMag * cos(radians)` <-> ac:1311 `rhsRe[branchIndex] += this._acMagnitude * Math.cos(radians)`; v41:70 `VSRCacImag = VSRCacMag * sin(radians)` <-> ac:1312 `rhsIm[branchIndex] += this._acMagnitude * Math.sin(radians)`. The VSRCacReal/VSRCacImag intermediates are inlined directly into the stampAc RHS accumulation -- this is the vsrctemp(compute)/vsrcacld(consume to RHS) boundary; digiTS computes per-instance at stampAc time. The arithmetic expressions VSRCacMag*cos/sin(radians) are operand/operator/order-identical, NOT an algebraic simplification. blockedBy vsrc#recon/waveformModel = APPLIED in this worktree. Bijective over the derivation."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -40576,7 +40580,9 @@
       "state": "PENDING",
       "tsFunction": "src/solver/analog/timestep.ts::TimestepController",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "MISMATCH (Tier 2 bijection). v41 cktsetbk.c:85 beyond-end-of-table guard is `if(ckt->CKTbreaks && time-ckt->CKTbreaks[ckt->CKTbreakSize-1]<=ckt->CKTminBreak)` — a single non-null-array guard `ckt->CKTbreaks &&` prepended to the proximity test. The applier ported this at src/solver/analog/timestep.ts:818 as `if (this._breakpoints.length > 0 && lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`. The `this._breakpoints.length > 0` conjunct correctly mirrors `ckt->CKTbreaks &&` (non-empty array <-> non-null pointer) and the proximity test `time - _breakpoints[lo-1] <= minBreak` mirrors `time-CKTbreaks[size-1]<=minBreak` (at this branch lo===_breakpoints.length, so _breakpoints[lo-1] is CKTbreaks[size-1]). However the extra `lo > 0` conjunct has NO v41 counterpart at the beyond-end branch: v41's end-of-table guard (cktsetbk.c:85) carries no `i>0` term (the `i>0` guard is only in the middle-of-table branch, cktsetbk.c:55, which digiTS already mirrors at timestep.ts:808). At timestep.ts:818 control only arrives when lo===_breakpoints.length, so `lo > 0` is logically identical to `length > 0` (a restated guard, behaviorally bit-identical) but breaks strict construct bijection. REMEDIATION: drop the redundant `lo > 0 && ` so line 818 reads `if (this._breakpoints.length > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`, bijective with v41's single `ckt->CKTbreaks &&` guard."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
