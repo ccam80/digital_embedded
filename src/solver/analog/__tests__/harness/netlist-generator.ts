@@ -615,7 +615,11 @@ function emitPrimitive(
   }
   if (typeId === "DcCurrentSource") {
     const I = requireParam(props, def, modelKey, "current", rawLabel);
-    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} DC ${I}`];
+    // ngspice I-source parallel multiplier (isrc.c:15 ISRC_M IOP). Emitted only
+    // when the user set `m` (ngspice's !ISRCmGiven ⇒ 1 default, isrctemp.c:62-63),
+    // so an unset multiplier carries no `m=` token and ngspice defaults it to 1 —
+    // matching the digiTS paramDefs default of 1.
+    return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} DC ${I}${isrcMSuffix(props)}`];
   }
   if (typeId === "AcCurrentSource") {
     const amp      = requireParam(props, def, modelKey, "amplitude", rawLabel);
@@ -632,7 +636,10 @@ function emitPrimitive(
     // ngspice I-source AC token: `AC <mag> [<phase>]` (isrcacld.c:36-50).
     const acMag   = requireParam(props, def, modelKey, "acMagnitude", rawLabel);
     const acPhase = requireParam(props, def, modelKey, "acPhase",     rawLabel);
-    return [`${label} ${posNode} ${negNode} AC ${acMag} ${acPhase} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}`];
+    // The `m=` parallel-multiplier token (isrc.c:15 ISRC_M) trails the waveform
+    // token; ngspice scales every RHS/AC stamp by it (isrcload.c:387-388,
+    // isrcacld.c:43-50), matching AcCurrentSourceAnalogImpl's m-scaled stamps.
+    return [`${label} ${posNode} ${negNode} AC ${acMag} ${acPhase} ${buildAcSourceSpec(waveform, amp, dc, freq, phase, props, def, modelKey, rawLabel)}${isrcMSuffix(props)}`];
   }
   if (spec.prefix === "D") {
     const modelName = `${label}_${spec.modelType}`;
@@ -950,6 +957,22 @@ function emitPrimitive(
 // ---------------------------------------------------------------------------
 // Instance-param suffix (element line)
 // ---------------------------------------------------------------------------
+
+/**
+ * Emit the ngspice independent-current-source parallel-multiplier token `m=<v>`
+ * (isrc.c:15 ISRC_M IOP). The multiplier scales every RHS / AC stamp on the
+ * ngspice side (isrcload.c:387-388, isrcacld.c:43-50), matching the m-scaled
+ * stamps in AcCurrentSourceAnalogImpl / DcCurrentSourceAnalogImpl. ngspice
+ * defaults `m` to 1 when absent (isrctemp.c:62-63 !ISRCmGiven ⇒ 1), so the token
+ * is emitted only for a user-set override — an unset `m` carries no token and
+ * both sides default to 1.
+ */
+function isrcMSuffix(props: PropertyBag): string {
+  if (!props.isModelParamGiven("m")) return "";
+  const m = props.getModelParam<number>("m");
+  if (typeof m !== "number" || !Number.isFinite(m)) return "";
+  return ` m=${m}`;
+}
 
 function instanceParamSuffix(
   paramDefs: readonly ParamDef[],
