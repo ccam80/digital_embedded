@@ -38,6 +38,10 @@ export const { paramDefs: DC_CURRENT_SOURCE_PARAM_DEFS, defaults: DC_CURRENT_SOU
   primary: {
     current: { default: 0.01, unit: "A", description: "Source current in amperes" },
   },
+  secondary: {
+    // isrc.c:15 / isrctemp.c:62-63 — ISRCmValue parallel multiplier, default 1.
+    m: { default: 1, unit: "", description: "Parallel multiplier (ngspice ISRCmValue)" },
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -156,6 +160,7 @@ const DC_CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const DC_CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
   { xmlName: "Current", propertyKey: "current", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "M",       propertyKey: "m",       convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",   propertyKey: "label",   convert: (v) => v },
 ];
 
@@ -175,7 +180,12 @@ class DcCurrentSourceAnalogImpl extends AnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._p = { current: props.getModelParam<number>("current") };
+    // isrc.c:15 / isrctemp.c:62-63 — parallel multiplier, default 1 (the
+    // paramDefs default supplies the !ISRCmGiven ⇒ 1 rule).
+    this._p = {
+      current: props.getModelParam<number>("current"),
+      m: props.hasModelParam("m") ? props.getModelParam<number>("m") : 1,
+    };
   }
 
   setup(_ctx: SetupContext): void {
@@ -192,10 +202,10 @@ class DcCurrentSourceAnalogImpl extends AnalogElement {
     const nodePos = this.pinNodes.get("pos")!;
     const nodeNeg = this.pinNodes.get("neg")!;
     const I = this._p.current * ctx.srcFact;
-    // Unconditional RHS stamp (isrcload.c:33-34); ground rows land in
-    // rhs[0] which the post-SMPsolve clear in newton-raphson zeroes.
-    stampRHS(ctx.rhs, nodePos,  I);
-    stampRHS(ctx.rhs, nodeNeg, -I);
+    // isrcload.c:387-388 — the parallel multiplier scales the RHS stamp; the
+    // ramped current is multiplied by m (isrcload.c:45, m = ISRCmValue).
+    stampRHS(ctx.rhs, nodePos,  this._p.m * I);
+    stampRHS(ctx.rhs, nodeNeg, -this._p.m * I);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
@@ -204,7 +214,8 @@ class DcCurrentSourceAnalogImpl extends AnalogElement {
     // Conventional current flows from neg through source to pos (arrow direction).
     // Current into neg = +I (current enters element at neg from the circuit).
     // Current into pos = -I (current exits element at pos into the circuit).
-    const I = this._p.current * this._lastSrcFact;
+    // isrcload.c:392 — the recorded current is m-scaled (ISRCcurrent = m * value).
+    const I = this._p.current * this._lastSrcFact * this._p.m;
     return [I, -I];
   }
 }
