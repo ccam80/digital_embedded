@@ -890,6 +890,10 @@ export class MNAEngine implements AnalogEngine {
     // engine to ERROR.
     ctx.loadCtx.dt = 0;
     this._setup();
+    // CKTic (cktdojob.c:217-218): seed nodeset/IC into rhs + rhsOld after
+    // CKTsetup and before the CKTop NR solve, so iteration 0 starts from the
+    // constrained voltage (cktic.c:31,39 dual-write).
+    this._seedNodesetIcRhs();
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -1009,6 +1013,10 @@ export class MNAEngine implements AnalogEngine {
     // fall back to CKTstep / CKTfinalTime when a coefficient is absent or zero).
     ctx.loadCtx.cktStep = this._params.outputStep ?? 0;
     ctx.loadCtx.cktFinalTime = this._params.tStop ?? 0;
+    // CKTic (cktdojob.c:217-218): seed nodeset/IC into rhs + rhsOld after
+    // CKTsetup and before the transient-boot CKTop NR solve, so iteration 0
+    // starts from the constrained voltage (cktic.c:31,39 dual-write).
+    this._seedNodesetIcRhs();
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -1708,6 +1716,44 @@ export class MNAEngine implements AnalogEngine {
     }
     for (const [node] of this._ctx!.ics) {
       this._ctx!.icHandles.set(node, this._solver.allocElement(node, node));
+    }
+  }
+
+  /**
+   * Port of CKTic (cktic.c:13-53). Runs once per analysis, after CKTsetup and
+   * before the first NR solve (cktdojob.c:217-218 calls CKTic between an_init
+   * and an_func). For every node carrying a .nodeset or .ic, it writes the
+   * constrained value into BOTH the current RHS (CKTrhs) and the
+   * previous-solution buffer (CKTrhsOld) via the dual-write at cktic.c:31,39:
+   *
+   *     ckt->CKTrhsOld[node->number] = ckt->CKTrhs[node->number] = node->nodeset; // :31
+   *     ckt->CKTrhsOld[node->number] = ckt->CKTrhs[node->number] = node->ic;      // :39
+   *
+   * CKTrhsOld is the starting voltage vector the direct-NR level of CKTop reads
+   * (cktop.c:46, carried into NIiter untouched), so seeding it makes NR
+   * iteration 0 of a .nodeset/.ic circuit start from the constrained voltage.
+   *
+   * cktic.c:21-24 zeroes CKTrhs[0..size] first; here the analysis-entry buffer
+   * state is the freshly zeroed allocateRowBuffers() result, so the seed is a
+   * direct assignment with no prior zero pass. ctx.nodesets holds exactly the
+   * nsGiven nodes and ctx.ics exactly the icGiven nodes (CKTsetNodPm analogue),
+   * so iterating each map IS cktic.c's nsGiven / icGiven gate. The nodeset loop
+   * runs before the IC loop to match cktic.c:27-40, so a node carrying both
+   * lands on its IC value (cktic.c:39 overwrites cktic.c:31).
+   *
+   * cktic.c:43-50 (MODEUIC -> per-device DEVsetic) has no digiTS DEVsetic
+   * counterpart and is escalated as a separate item per the recon spec; it is
+   * not faked here.
+   */
+  private _seedNodesetIcRhs(): void {
+    const ctx = this._ctx!;
+    const rhs = ctx.rhs;
+    const rhsOld = ctx.rhsOld;
+    for (const [node, value] of ctx.nodesets) {
+      rhsOld[node] = rhs[node] = value;
+    }
+    for (const [node, value] of ctx.ics) {
+      rhsOld[node] = rhs[node] = value;
     }
   }
 
