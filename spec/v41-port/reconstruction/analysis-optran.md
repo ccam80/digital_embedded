@@ -1,6 +1,10 @@
 # Reconstruction spec — `analysis#recon/opTran`
 
-Status: DRAFT 2026-06-02 (user ruling: "port OPtran"), **pending re-review**.
+Status: DEFERRED 2026-06-02 (user ruling: "port OPtran", then "defer OPtran honestly").
+The recon stays **PENDING** (genuine open work, not closed); building + `#4`-gating it is
+blocked on the optran infra (harness/.dts/MCP plumbing + a real stiff fixture) — see
+**ESC-025**. OPtran is default-off, so the deferral changes nothing for current circuits.
+Build the rest of the foundation (cktic / vsrc / isrc) first.
 
 Port ngspice's `OPtran` (`optran.c`) — the operating-point-via-pseudo-transient
 **last-resort convergence fallback** — and its call site in `CKTop`
