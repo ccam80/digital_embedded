@@ -1,10 +1,16 @@
 # Reconstruction spec — `analysis#recon/opTran`
 
-Status: DEFERRED 2026-06-02 (user ruling: "port OPtran", then "defer OPtran honestly").
-The recon stays **PENDING** (genuine open work, not closed); building + `#4`-gating it is
-blocked on the optran infra (harness/.dts/MCP plumbing + a real stiff fixture) — see
-**ESC-025**. OPtran is default-off, so the deferral changes nothing for current circuits.
-Build the rest of the foundation (cktic / vsrc / isrc) first.
+Status: BUILDABLE 2026-06-02 — the stiff-fixture blocker is RESOLVED. The fixture is an
+**inductor-induced DC branch-current singularity** (two source-pinned nodes bridged by an
+ideal inductor): `v1 1 0 dc 3 / v2 2 0 dc 5 / l1 1 2 1m`. Confirmed against the v41 DLL —
+the static ladder fails as singular on `l1#branch` (gmin/source-resistant, since gmin is a
+node-to-ground conductance and cannot constrain a branch current), OPtran settles to a
+unique 3V/5V OP with zero drift over a 1000× `opfinaltime` sweep, and adding any series R
+makes it converge statically (proving the inductor short is the cause). It is trivially
+`.dts`-expressible (2 vsources + 1 inductor). Remaining to build: the optran option
+plumbing (`ResolvedSimulationParams` + a harness `optran` `NgspiceJobAnalysis` variant +
+MCP knob), the OPtran driver, and the `.dts` fixture. Recon PENDING, ready to build. See
+**ESC-025**.
 
 Port ngspice's `OPtran` (`optran.c`) — the operating-point-via-pseudo-transient
 **last-resort convergence fallback** — and its call site in `CKTop`
@@ -100,9 +106,11 @@ the port is mostly **wiring**, not new numerics:
    byte-for-byte identical to today (the fallback never runs).
 4. With `optran` enabled, a circuit that exhausts direct + gmin + source stepping
    converges via OPtran to an OP **bit-exact** to the ngspice DLL's OPtran run
-   (`harness_first_divergence` null across classes). Verified via the harness on an
-   optran-enabled stiff fixture (to be authored — flag: needs a fixture that
-   fails the static methods but settles via pseudo-transient).
+   (`harness_first_divergence` null across classes). Verified via the harness on the
+   inductor-singular fixture `v1 1 0 dc 3 / v2 2 0 dc 5 / l1 1 2 1m` (singular on
+   `l1#branch`, gmin/source-resistant, OPtran settles to a unique 3V/5V OP, zero drift over
+   a 1000× `opfinaltime` sweep; series R makes it converge statically — confirmed against
+   the v41 DLL). Authored as a `.dts` (2 vsources + 1 inductor).
 5. No `v26`/`v41`/era tags; present-tense citations to `optran.c`/`cktop.c`.
 
 ## tsFiles (implementer-confirmed)
