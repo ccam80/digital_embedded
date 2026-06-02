@@ -1788,6 +1788,15 @@
       ],
       "escalation": null
     },
+    "analysis/cktsetbk.c#h002": {
+      "state": "PENDING",
+      "hunkHash": "",
+      "attempts": 0,
+      "verifierNotes": [
+        "MISMATCH (Tier 2 bijection). v41 cktsetbk.c:85 beyond-end-of-table guard is `if(ckt->CKTbreaks && time-ckt->CKTbreaks[ckt->CKTbreakSize-1]<=ckt->CKTminBreak)` — a single non-null-array guard `ckt->CKTbreaks &&` prepended to the proximity test. The applier ported this at src/solver/analog/timestep.ts:818 as `if (this._breakpoints.length > 0 && lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`. The `this._breakpoints.length > 0` conjunct correctly mirrors `ckt->CKTbreaks &&` (non-empty array <-> non-null pointer) and the proximity test `time - _breakpoints[lo-1] <= minBreak` mirrors `time-CKTbreaks[size-1]<=minBreak` (at this branch lo===_breakpoints.length, so _breakpoints[lo-1] is CKTbreaks[size-1]). However the extra `lo > 0` conjunct has NO v41 counterpart at the beyond-end branch: v41's end-of-table guard (cktsetbk.c:85) carries no `i>0` term (the `i>0` guard is only in the middle-of-table branch, cktsetbk.c:55, which digiTS already mirrors at timestep.ts:808). At timestep.ts:818 control only arrives when lo===_breakpoints.length, so `lo > 0` is logically identical to `length > 0` (a restated guard, behaviorally bit-identical) but breaks strict construct bijection. REMEDIATION: drop the redundant `lo > 0 && ` so line 818 reads `if (this._breakpoints.length > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`, bijective with v41's single `ckt->CKTbreaks &&` guard."
+      ],
+      "escalation": null
+    },
     "maths-misc/randnumb.c#h005": {
       "state": "APPLIED",
       "hunkHash": "cb2f7535be54a450",
