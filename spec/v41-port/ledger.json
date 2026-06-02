@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T05:01:19.171Z",
+    "generated": "2026-06-02T05:41:53.023Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 161,
+    "progressEntriesApplied": 165,
     "progressEntriesStaleIgnored": 7
   },
   "files": [
@@ -38568,12 +38568,14 @@
         1283
       ],
       "hunkHash": "be5a0c75eb046e1c",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTdoJob task->ckt copy block (cktdojob.c:40-63). This hunk's new behavioral assignments are `ckt->CKTindverbosity = task->TSKindverbosity` (present: indVerbosity), `ckt->CKTxmu = task->TSKxmu` (present: xmu), AND `ckt->CKTcshunt = task->TSKcshunt` (cktdojob.c, the shunt-capacitor-to-ground param). cshunt is a GENUINELY UNPORTED behavioral param with no ResolvedSimulationParams field and no load-path (Grep cshunt/cShunt/CShunt over src/ = 0 matches). It must NOT be buried under the struct-copy NO-COUNTERPART that covers the present params; escalated as its own gap per ESC-016/ESC-024. Set aside (not workable-PENDING for the scout) pending the cshunt per-param user disposition."
+      ],
       "rationale": null,
-      "escalation": null,
+      "escalation": "ESC-024: cktdojob.c#h003 carries `ckt->CKTcshunt = task->TSKcshunt` (shunt capacitor to ground). cshunt is unported in digiTS (no SimulationParams field, no load-path). The hunk also copies indverbosity/xmu (both present/APPLIED), but the cshunt assignment forbids a clean NO-COUNTERPART of the whole hunk (would bury a real feature gap, PLANNING.md §5 / CLAUDE.md no-pragmatic-patches). Blocked pending the cshunt feature decision (new ResolvedSimulationParams.cshunt field + a load-path adding the per-node shunt conductance). See ESCALATIONS.md ESC-024 and ESC-016.",
       "kind": "hunk",
       "blockedBy": null
     },
@@ -38599,11 +38601,11 @@
         1416
       ],
       "hunkHash": "c02e5b2b9a17fe2d",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTdoJob TSKtask->CKTcircuit struct-copy block (cktdojob.c:104-110). The single new behavioral assignment is `ckt->CKTepsmin = task->TSKepsmin` (cktdojob.c:110); digiTS has no CKTdoJob method and no TSKtask struct — options arrive as typed fields on ResolvedSimulationParams (src/core/analog-engine-interface.ts:186 `epsmin?: number`, default 1e-28 at :226) read into CKTCircuitContext.cktEpsmin via configure() (ckt-context.ts:840-841, hot-loadable per CLAUDE.md). The behavioral param is APPLIED; this hunk is the C struct-copy MECHANISM (the TSKtask->ckt field-by-field transfer + CKTtroubleNode/troubleElt reset + inp_evaluate_temper + WANT_SENSE2/XSPICE plumbing) with no data content of its own and no line-isomorphic TS counterpart — the classic struct-layout/dispatch-plumbing shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016 (epsmin recorded present, struct-copy mechanism frozen).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -38630,11 +38632,11 @@
         1493
       ],
       "hunkHash": "452a85ad3cb24e67",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.init",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTdoJob analInfo[] job-dispatch loop (cktdojob.c:204-249): `for (i<ANALmaxnum) for(job=task->jobs) if(job->JOBtype==i) analInfo[i]->an_init/do_ic(CKTic)/an_func` plus WANT_SENSE2 skip and XSPICE EVTsetup, all-C brace/star/whitespace cosmetics. digiTS dispatches analyses through the AnalogEngine interface + coordinator (an analysis is invoked directly via MNAEngine.init/stepToTime/AcAnalysis.run / solveDcOperatingPoint), not a C `analInfo[]` JOB-struct table walked by JOBtype. No TSKtask, no JOB linked list, no analInfo[] dispatch table — the C job-table iteration has no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a) (C dispatch-table plumbing). ESC-016.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -39126,11 +39128,11 @@
         1742
       ],
       "hunkHash": "16b60b3a3de93363",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTnewTask def->tsk TSKtask copy block (cktntask.c:42-43). New rows `tsk->TSKindverbosity = def->TSKindverbosity` and `tsk->TSKxmu = def->TSKxmu`. digiTS has no CKTnewTask and no TSKtask struct — task allocation/default-copy is replaced by typed fields on ResolvedSimulationParams populated into CKTCircuitContext. Both params are present and APPLIED: indVerbosity (analog-engine-interface.ts:178, default 2 at :225 -> ckt-context.ts cktIndVerbosity, configure() :961-963) and xmu (analog-engine-interface.ts:143, default 0.5 at :221 -> analog-engine.ts integrationXmu :753-754, integration.ts:238/253-254). This hunk is the C TSKtask-struct field-copy MECHANISM with no behavioral content of its own and no line-isomorphic TS counterpart — struct-layout/dispatch plumbing. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016 (params recorded present; struct-copy mechanism frozen).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -39157,12 +39159,14 @@
         1750
       ],
       "hunkHash": "e089c575cbc1cdd4",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTnewTask def->tsk copy row `tsk->TSKcshunt = def->TSKcshunt` (cktntask.c:57). cshunt is a GENUINELY UNPORTED behavioral param (no ResolvedSimulationParams field, no load-path; Grep cshunt over src/ = 0). Cannot be buried under the struct-copy NO-COUNTERPART (the sibling rows h001/h003/h005/h006 carrying the present indverbosity/xmu/epsmin ARE NO-COUNTERPART). Set aside pending the cshunt per-param user disposition. ESC-024/ESC-016."
+      ],
       "rationale": null,
-      "escalation": null,
+      "escalation": "ESC-024: cktntask.c#h002 is the TSKtask def-copy of `TSKcshunt`. cshunt unported (no field, no load-path). Escalated rather than NO-COUNTERPART to avoid burying the feature gap. Blocked pending the cshunt feature decision. See ESCALATIONS.md ESC-024 and ESC-016.",
       "kind": "hunk",
       "blockedBy": null
     },
@@ -39188,11 +39192,11 @@
         1758
       ],
       "hunkHash": "b23eea801780c5da",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTnewTask def->tsk TSKtask copy block (cktntask.c:78). New row `tsk->TSKepsmin = def->TSKepsmin`. digiTS has no CKTnewTask/TSKtask; the param is present and APPLIED as ResolvedSimulationParams.epsmin (analog-engine-interface.ts:186, default 1e-28 at :226 -> ckt-context.ts cktEpsmin, configure() :966-967, hot-loadable per CLAUDE.md). This hunk is the C TSKtask struct field-copy MECHANISM with no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -39219,12 +39223,14 @@
         1766
       ],
       "hunkHash": "22ef6e8a0a17926e",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTnewTask application-default `tsk->TSKcshunt = -1` (cktntask.c:87). The cshunt default of -1 (disabled). cshunt is a GENUINELY UNPORTED behavioral param (no ResolvedSimulationParams field, no load-path; Grep cshunt over src/ = 0). Cannot be buried under the struct-default-init NO-COUNTERPART (the sibling app-default rows h005/h006 carrying present indverbosity=2/xmu=0.5/epsmin=1e-28 ARE NO-COUNTERPART). Set aside pending the cshunt per-param user disposition. ESC-024/ESC-016."
+      ],
       "rationale": null,
-      "escalation": null,
+      "escalation": "ESC-024: cktntask.c#h004 is the TSKtask app-default `TSKcshunt = -1`. cshunt unported (no field, no load-path). Escalated rather than NO-COUNTERPART. Blocked pending the cshunt feature decision (the default-disabled value -1 is part of the missing surface). See ESCALATIONS.md ESC-024 and ESC-016.",
       "kind": "hunk",
       "blockedBy": null
     },
@@ -39250,11 +39256,11 @@
         1782
       ],
       "hunkHash": "8b90308a9f72671b",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTnewTask application-default block (cktntask.c:103-112). New defaults `tsk->TSKindverbosity = 2` and `tsk->TSKxmu = 0.5` (plus the xmu BE/trap/0.49-damping comment). digiTS has no CKTnewTask/TSKtask; these defaults are present and APPLIED as the ResolvedSimulationParams field initialisers indVerbosity:2 (analog-engine-interface.ts:225) and xmu:0.5 (:221) — the same constants this block sets, established at the typed-config layer rather than a TSKtask app-default branch. C struct-default-init MECHANISM, no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -39281,11 +39287,11 @@
         1790
       ],
       "hunkHash": "a0ca40d6d6b943a1",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTnewTask application-default block (cktntask.c:132). New default `tsk->TSKepsmin = 1e-28`. digiTS has no CKTnewTask/TSKtask; the default is present and APPLIED as the ResolvedSimulationParams field initialiser epsmin:1e-28 (analog-engine-interface.ts:226) — the same constant this block sets. C struct-default-init MECHANISM, no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40541,11 +40547,11 @@
         3129
       ],
       "hunkHash": "a4670d536a1407f8",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTsetOpt switch(opt) setter cases (cktsopt.c:114-126): `case OPT_INDVERBOSITY: task->TSKindverbosity = val->iValue` and `case OPT_XMU: task->TSKxmu = val->rValue`. CKTsetOpt is the .options-card -> TSKtask integer-indexed option setter; digiTS has no CKTsetOpt dispatcher, no OPT_* index, no IFvalue union, and no .options card parser — options arrive as typed fields on ResolvedSimulationParams. Both params this hunk sets are present and APPLIED: indVerbosity (analog-engine-interface.ts:178/225 -> ckt-context.ts cktIndVerbosity configure() :961-963) and xmu (analog-engine-interface.ts:143/221 -> analog-engine.ts integrationXmu :753-754). This hunk is the SETTER MECHANISM (a switch-case dispatch on an integer option index) with no line-isomorphic TS counterpart, twin of the already-frozen OPTtbl[] rows h004-h008. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016 (params recorded present; setter-switch mechanism frozen). Does NOT carry cshunt (cshunt's OPT_CSHUNT setter case is in #h003, which is escalated, not buried here).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40572,12 +40578,14 @@
         3142
       ],
       "hunkHash": "12cdf8a01623f9b5",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTsetOpt switch cases (cktsopt.c:169-180): `case OPT_EPSMIN: task->TSKepsmin = val->rValue` (present: epsmin) AND `case OPT_CSHUNT: task->TSKcshunt = val->rValue` (cshunt setter). cshunt is a GENUINELY UNPORTED behavioral param (no ResolvedSimulationParams field, no load-path; Grep cshunt over src/ = 0). The OPT_CSHUNT setter case forbids a clean NO-COUNTERPART of the whole hunk; the OPT_INDVERBOSITY/OPT_XMU setter cases (present params) live in the sibling h002 which IS NO-COUNTERPART. Set aside pending the cshunt per-param user disposition. ESC-024/ESC-016."
+      ],
       "rationale": null,
-      "escalation": null,
+      "escalation": "ESC-024: cktsopt.c#h003 carries `case OPT_CSHUNT: task->TSKcshunt = val->rValue` (the .options `cshunt` setter case) alongside OPT_EPSMIN (present). cshunt unported (no field, no load-path). Escalated rather than NO-COUNTERPART to avoid burying the feature gap. Blocked pending the cshunt feature decision (new SimulationParams.cshunt field + load-path). See ESCALATIONS.md ESC-024 and ESC-016.",
       "kind": "hunk",
       "blockedBy": null
     },

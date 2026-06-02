@@ -444,16 +444,16 @@
       "rationale": null
     },
     "analysis/cktdojob.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktdojob.c::CKTdoJob(CKTcircuit *ckt, int reset, TSKtask *task)",
-      "rationale": null
+      "rationale": "CKTdoJob TSKtask->CKTcircuit struct-copy block (cktdojob.c:104-110). The single new behavioral assignment is `ckt->CKTepsmin = task->TSKepsmin` (cktdojob.c:110); digiTS has no CKTdoJob method and no TSKtask struct — options arrive as typed fields on ResolvedSimulationParams (src/core/analog-engine-interface.ts:186 `epsmin?: number`, default 1e-28 at :226) read into CKTCircuitContext.cktEpsmin via configure() (ckt-context.ts:840-841, hot-loadable per CLAUDE.md). The behavioral param is APPLIED; this hunk is the C struct-copy MECHANISM (the TSKtask->ckt field-by-field transfer + CKTtroubleNode/troubleElt reset + inp_evaluate_temper + WANT_SENSE2/XSPICE plumbing) with no data content of its own and no line-isomorphic TS counterpart — the classic struct-layout/dispatch-plumbing shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016 (epsmin recorded present, struct-copy mechanism frozen)."
     },
     "analysis/cktdojob.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.init",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktdojob.c::CKTdoJob(CKTcircuit *ckt, int reset, TSKtask *task)",
-      "rationale": null
+      "rationale": "CKTdoJob analInfo[] job-dispatch loop (cktdojob.c:204-249): `for (i<ANALmaxnum) for(job=task->jobs) if(job->JOBtype==i) analInfo[i]->an_init/do_ic(CKTic)/an_func` plus WANT_SENSE2 skip and XSPICE EVTsetup, all-C brace/star/whitespace cosmetics. digiTS dispatches analyses through the AnalogEngine interface + coordinator (an analysis is invoked directly via MNAEngine.init/stepToTime/AcAnalysis.run / solveDcOperatingPoint), not a C `analInfo[]` JOB-struct table walked by JOBtype. No TSKtask, no JOB linked list, no analInfo[] dispatch table — the C job-table iteration has no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a) (C dispatch-table plumbing). ESC-016."
     },
     "analysis/cktfndm.c#h001": {
       "state": "NO-COUNTERPART",
@@ -546,10 +546,10 @@
       "rationale": "CKTnoise noise-source naming/evaluation driver. Noise not implemented (analysis-scope.md). Hunks add sqrnoise squared_value handling."
     },
     "analysis/cktntask.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktntask.c::CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)",
-      "rationale": null
+      "rationale": "CKTnewTask def->tsk TSKtask copy block (cktntask.c:42-43). New rows `tsk->TSKindverbosity = def->TSKindverbosity` and `tsk->TSKxmu = def->TSKxmu`. digiTS has no CKTnewTask and no TSKtask struct — task allocation/default-copy is replaced by typed fields on ResolvedSimulationParams populated into CKTCircuitContext. Both params are present and APPLIED: indVerbosity (analog-engine-interface.ts:178, default 2 at :225 -> ckt-context.ts cktIndVerbosity, configure() :961-963) and xmu (analog-engine-interface.ts:143, default 0.5 at :221 -> analog-engine.ts integrationXmu :753-754, integration.ts:238/253-254). This hunk is the C TSKtask-struct field-copy MECHANISM with no behavioral content of its own and no line-isomorphic TS counterpart — struct-layout/dispatch plumbing. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016 (params recorded present; struct-copy mechanism frozen)."
     },
     "analysis/cktntask.c#h002": {
       "state": "PENDING",
@@ -558,10 +558,10 @@
       "rationale": null
     },
     "analysis/cktntask.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktntask.c::CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)",
-      "rationale": null
+      "rationale": "CKTnewTask def->tsk TSKtask copy block (cktntask.c:78). New row `tsk->TSKepsmin = def->TSKepsmin`. digiTS has no CKTnewTask/TSKtask; the param is present and APPLIED as ResolvedSimulationParams.epsmin (analog-engine-interface.ts:186, default 1e-28 at :226 -> ckt-context.ts cktEpsmin, configure() :966-967, hot-loadable per CLAUDE.md). This hunk is the C TSKtask struct field-copy MECHANISM with no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016."
     },
     "analysis/cktntask.c#h004": {
       "state": "PENDING",
@@ -570,16 +570,16 @@
       "rationale": null
     },
     "analysis/cktntask.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktntask.c::CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)",
-      "rationale": null
+      "rationale": "CKTnewTask application-default block (cktntask.c:103-112). New defaults `tsk->TSKindverbosity = 2` and `tsk->TSKxmu = 0.5` (plus the xmu BE/trap/0.49-damping comment). digiTS has no CKTnewTask/TSKtask; these defaults are present and APPLIED as the ResolvedSimulationParams field initialisers indVerbosity:2 (analog-engine-interface.ts:225) and xmu:0.5 (:221) — the same constants this block sets, established at the typed-config layer rather than a TSKtask app-default branch. C struct-default-init MECHANISM, no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016."
     },
     "analysis/cktntask.c#h006": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktntask.c::CKTnewTask(CKTcircuit *ckt, TSKtask **taskPtr, IFuid taskName, TSKtask **defPtr)",
-      "rationale": null
+      "rationale": "CKTnewTask application-default block (cktntask.c:132). New default `tsk->TSKepsmin = 1e-28`. digiTS has no CKTnewTask/TSKtask; the default is present and APPLIED as the ResolvedSimulationParams field initialiser epsmin:1e-28 (analog-engine-interface.ts:226) — the same constant this block sets. C struct-default-init MECHANISM, no line-isomorphic TS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016."
     },
     "analysis/cktop.c#h001": {
       "state": "PENDING",
@@ -816,10 +816,10 @@
       "rationale": "Adds XSPICE evt.h/enh.h includes for the XSPICE event engine, absent from digiTS. PLANNING.md 5(a)."
     },
     "analysis/cktsopt.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsopt.c::CKTsetOpt(CKTcircuit *ckt, JOB *anal, int opt, IFvalue *val)",
-      "rationale": null
+      "rationale": "CKTsetOpt switch(opt) setter cases (cktsopt.c:114-126): `case OPT_INDVERBOSITY: task->TSKindverbosity = val->iValue` and `case OPT_XMU: task->TSKxmu = val->rValue`. CKTsetOpt is the .options-card -> TSKtask integer-indexed option setter; digiTS has no CKTsetOpt dispatcher, no OPT_* index, no IFvalue union, and no .options card parser — options arrive as typed fields on ResolvedSimulationParams. Both params this hunk sets are present and APPLIED: indVerbosity (analog-engine-interface.ts:178/225 -> ckt-context.ts cktIndVerbosity configure() :961-963) and xmu (analog-engine-interface.ts:143/221 -> analog-engine.ts integrationXmu :753-754). This hunk is the SETTER MECHANISM (a switch-case dispatch on an integer option index) with no line-isomorphic TS counterpart, twin of the already-frozen OPTtbl[] rows h004-h008. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5(a). ESC-016 (params recorded present; setter-switch mechanism frozen). Does NOT carry cshunt (cshunt's OPT_CSHUNT setter case is in #h003, which is escalated, not buried here)."
     },
     "analysis/cktsopt.c#h003": {
       "state": "PENDING",
