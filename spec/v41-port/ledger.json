@@ -1,14 +1,14 @@
 {
   "meta": {
-    "generated": "2026-06-02T01:52:11.084Z",
+    "generated": "2026-06-02T04:34:43.658Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
     "ngspiceFiles": 698,
     "parentHunks": 1756,
-    "totalItems": 1807,
+    "totalItems": 1809,
     "subItems": 37,
-    "reconstructionItems": 31,
+    "reconstructionItems": 33,
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
@@ -38761,7 +38761,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/cktIcRhsOldSeed"
     },
     {
       "id": "analysis/cktic.c#h002",
@@ -38792,7 +38792,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/cktIcRhsOldSeed"
     },
     {
       "id": "analysis/cktload.c#h001",
@@ -39319,7 +39319,7 @@
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/opTran"
     },
     {
       "id": "analysis/cktop.c#h002",
@@ -61674,6 +61674,82 @@
         "analysis/tfanal.c#h002"
       ],
       "hunkHash": "6538c481da26c9e6",
+      "state": "PENDING",
+      "attempts": 0,
+      "verifierNotes": [],
+      "rationale": null,
+      "escalation": null
+    },
+    {
+      "id": "analysis#recon/cktIcRhsOldSeed",
+      "kind": "reconstruction",
+      "diffDoc": "spec/ngspice-v41-engine-diffs/analysis.md",
+      "ngspiceFile": null,
+      "ngspiceBaseline": [
+        "src/spicelib/analysis/cktic.c (CKTic: CKTrhsOld[n]=CKTrhs[n]=node->nodeset/ic dual-write, :31,39)"
+      ],
+      "fileStatus": null,
+      "hunkIndex": 0,
+      "hunkHeader": null,
+      "functionGroup": "analysis/cktic.c::CKTic(CKTcircuit *ckt)",
+      "isSubItem": false,
+      "parentHunk": null,
+      "blockedBy": null,
+      "addedLines": 0,
+      "removedLines": 0,
+      "docLineRange": null,
+      "title": "Seed the previous-solution buffer at IC/nodeset setup: port CKTic's CKTrhsOld[n]=CKTrhs[n]=value dual-write (cktic.c:31,39) so iteration 0 of a .ic/.nodeset circuit starts from the constrained voltage. Complementary to the per-iteration maths-sparse#recon/nodesetIcRowZero matrix stamp; FIX-002 (compiler propagation + ctx.ics/nodesets seeded before _allocateNodesetIcHandles) is the shared precondition that is already landed. digiTS today reaches the matrix (matrix axis null) but never seeds rhsOld, so iter-0 voltage/rhs/state diverge.",
+      "spec": "spec/v41-port/reconstruction/analysis-cktic-rhsold-seed.md",
+      "specExists": true,
+      "tsFile": "src/solver/analog/analog-engine.ts",
+      "tsFiles": [
+        "src/solver/analog/analog-engine.ts"
+      ],
+      "tsFunction": "the CKTic-counterpart IC/nodeset setup in MNAEngine: after the RHS buffers are zeroed and before the first NR solve, write each ctx.nodesets / ctx.ics value into BOTH rhs[node] and rhsOld[node] via a direct rhsOld[node]=rhs[node]=value assignment (not stampRHS's +=)",
+      "blocks": [
+        "analysis/cktic.c#h001",
+        "analysis/cktic.c#h002"
+      ],
+      "hunkHash": "97be2fc0d2ab6e2a",
+      "state": "PENDING",
+      "attempts": 0,
+      "verifierNotes": [],
+      "rationale": null,
+      "escalation": null
+    },
+    {
+      "id": "analysis#recon/opTran",
+      "kind": "reconstruction",
+      "diffDoc": "spec/ngspice-v41-engine-diffs/analysis.md",
+      "ngspiceFile": null,
+      "ngspiceBaseline": [
+        "src/spicelib/analysis/optran.c (OPtran: pseudo-transient 0..opfinaltime reusing the transient kernel, no output capture)",
+        "src/spicelib/analysis/cktop.c (CKTop OPtran call site + outcome mapping, :101-108)"
+      ],
+      "fileStatus": null,
+      "hunkIndex": 0,
+      "hunkHeader": null,
+      "functionGroup": "analysis/cktop.c::Modified: 2005 Paolo Nenzi - Restructured",
+      "isSubItem": false,
+      "parentHunk": null,
+      "blockedBy": null,
+      "addedLines": 0,
+      "removedLines": 0,
+      "docLineRange": null,
+      "title": "Port ngspice OPtran, the operating-point pseudo-transient last-resort convergence fallback (optran.c), plus its CKTop call site (cktop.c:101-108): an opt-in (nooptran default true) fallback invoked after direct + gmin + source stepping that reuses the existing transient kernel. Default-off => DC-OP byte-identical to today. The cosmetic/gmin-restructure portions of cktop.c#h001 are Decision-1 OUT; only the behavioral OPtran integration is reconstructed here.",
+      "spec": "spec/v41-port/reconstruction/analysis-optran.md",
+      "specExists": true,
+      "tsFile": "src/solver/analog/dc-operating-point.ts",
+      "tsFiles": [
+        "src/solver/analog/dc-operating-point.ts",
+        "src/solver/analog/analog-engine.ts",
+        "src/core/analog-engine-interface.ts"
+      ],
+      "tsFunction": "an OPtran fallback in solveDcOperatingPoint after source stepping (gated on the optran option) reusing MNAEngine's transient stepping; plus the optran/opstepsize/opfinaltime/opramptime option surface",
+      "blocks": [
+        "analysis/cktop.c#h001"
+      ],
+      "hunkHash": "490d2cf0a7ef4a2a",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],

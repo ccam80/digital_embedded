@@ -1,14 +1,14 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-02T01:52:11.084Z
+Generated: 2026-06-02T04:34:43.658Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
 - Diff docs: **34**
 - ngspice files touched: **698**
 - Parent hunks enumerated: **1756**
-- v26-baseline reconstruction items: **31**
-- Ledger items (hunks + sub-items + reconstruction): **1807** (37 sub-items, 31 reconstruction)
+- v26-baseline reconstruction items: **33**
+- Ledger items (hunks + sub-items + reconstruction): **1809** (37 sub-items, 33 reconstruction)
 - Planning decisions overlays applied: **34**
 - Lines: +23664 / -18407
 
@@ -19,7 +19,7 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 562 |
+| PENDING        | 564 |
 | APPLIED        | 146 |
 | ESCALATED      | 0 |
 | NO-COUNTERPART | 1099 |
@@ -53,7 +53,7 @@ is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED).
 | spec/ngspice-v41-model-diffs/vccs.md | 15 | 17 |
 | spec/ngspice-v41-model-diffs/vcvs.md | 15 | 18 |
 | spec/ngspice-v41-model-diffs/vsrc.md | 19 | 61 |
-| spec/ngspice-v41-engine-diffs/analysis.md | 49 | 169 |
+| spec/ngspice-v41-engine-diffs/analysis.md | 49 | 171 |
 | spec/ngspice-v41-engine-diffs/device-dispatch.md | 3 | 22 |
 | spec/ngspice-v41-engine-diffs/include-ngspice.md | 98 | 252 |
 | spec/ngspice-v41-engine-diffs/maths-cmaths.md | 11 | 98 |
