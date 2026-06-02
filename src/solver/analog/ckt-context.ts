@@ -156,7 +156,7 @@ export class DcOpResult {
   /** Whether the DC operating point converged. */
   converged: boolean = false;
   /** Which convergence method was used. */
-  method: "direct" | "dynamic-gmin" | "new-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src" = "direct";
+  method: "direct" | "dynamic-gmin" | "new-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src" | "optran" = "direct";
   /** Total NR iterations across all convergence levels. */
   iterations: number = 0;
   /**
@@ -648,6 +648,22 @@ export class CKTCircuitContext {
    */
   _onPhaseEnd: ((outcome: string, converged: boolean) => void) | null;
 
+  /**
+   * OPtran fallback hook (ngspice CKTop's `OPtran(ckt, converged)` call at
+   * cktop.c:104). `solveDcOperatingPoint` invokes this at the post-source-step
+   * fall-through, but ONLY when `params.optran` is set — mirroring optran.c:51
+   * `nooptran = TRUE` default, where OPtran returns `oldconverged` immediately
+   * unless the option is enabled. The engine wires this to its pseudo-transient
+   * driver (`MNAEngine._opTran`), which reuses the transient stepping kernel
+   * (NIiter / CKTtrunc / state rotation / NIcomCof) per optran.c:284-845 and
+   * leaves the settled matrix as the operating point. Returns the OPtran
+   * outcome: `converged` true on success, false on timestep-too-small / failure.
+   * Null in production runs with optran disabled and during the OPtran pass
+   * itself (set to null inside `_opTran` so the nested transient DC-OP cannot
+   * recurse into a second OPtran).
+   */
+  opTranFallback: (() => boolean) | null;
+
   // -------------------------------------------------------------------------
   // Full simulation params reference (read by solveDcOperatingPoint)
   // -------------------------------------------------------------------------
@@ -875,6 +891,7 @@ export class CKTCircuitContext {
     // DC-OP phase callbacks (set by engine before solveDcOperatingPoint call)
     this._onPhaseBegin = null;
     this._onPhaseEnd = null;
+    this.opTranFallback = null;
 
     // Full params reference
     this.params = params;

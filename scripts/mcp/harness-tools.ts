@@ -383,6 +383,74 @@ export function registerHarnessTools(
   );
 
   // -------------------------------------------------------------------------
+  // harness_run_dcop
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_run_dcop",
+    {
+      title: "Run DC Operating Point Analysis",
+      description:
+        "Run a standalone DC operating-point comparison on both engines (ours + " +
+        "ngspice). A session runs one analysis kind- call this OR harness_run " +
+        "(transient) OR harness_run_ac, not more than one, on the same handle; start " +
+        "a fresh session to switch. After this, harness_first_divergence reports the " +
+        "DC-OP voltage/matrix/state/shape divergence. " +
+        "Pass `optran` to enable the OPtran pseudo-transient operating-point fallback " +
+        "(ngspice optran.c / cktop.c:101-108): the digiTS engine is configured with " +
+        "optran/opstepsize/opfinaltime/opramptime and the ngspice side issues " +
+        "`optran 1 1 1 <step> <final> <ramp>` before `op`, so a circuit that exhausts " +
+        "direct NR + gmin stepping + source stepping (e.g. an inductor-induced DC " +
+        "branch-current singularity) settles via the pseudo-transient on both sides.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle from harness_start"),
+        optran: z
+          .object({
+            opstepsize: z
+              .number()
+              .positive()
+              .describe("OPtran pseudo-transient step size in seconds (ngspice opstepsize)."),
+            opfinaltime: z
+              .number()
+              .positive()
+              .describe("OPtran pseudo-transient final time in seconds (ngspice opfinaltime)."),
+            opramptime: z
+              .number()
+              .min(0)
+              .optional()
+              .describe(
+                "OPtran supply-ramp time in seconds (ngspice opramptime). 0 (default) " +
+                  "runs sources at full value; >0 eases supplies in via a raised cosine.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Enable the OPtran operating-point pseudo-transient fallback. Omit for the " +
+              "default DC-OP path (direct NR + gmin + source stepping only).",
+          ),
+      }),
+    },
+    wrapTool("harness_run_dcop", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_run_dcop");
+      const { session } = entry;
+
+      await session.runDcOp(args.optran);
+
+      entry.lastRunAt = new Date();
+      entry.analysis = "dcop";
+
+      const summary = session.getSummary();
+
+      return JSON.stringify({
+        handle: args.handle,
+        analysis: "dcop",
+        summary: serializeSummary(summary),
+        errors: session.errors,
+      });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
   // harness_run_ac
   // -------------------------------------------------------------------------
 

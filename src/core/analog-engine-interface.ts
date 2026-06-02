@@ -184,6 +184,42 @@ export interface SimulationParams {
    * Default: 1e-28 (ngspice cktinit.c:94). Hot-loadable via configure().
    */
   epsmin?: number;
+  /**
+   * Enable the OPtran operating-point pseudo-transient fallback (ngspice
+   * `optran` command; the `nooptran` static-flag counterpart at optran.c:51).
+   * When false (default) `solveDcOperatingPoint` never runs the OPtran pass —
+   * `OPtran(ckt, oldconverged)` returns `oldconverged` immediately at
+   * optran.c:314-315, so the DC-OP path is byte-identical to the gmin/source
+   * stepping stack alone. When true, a circuit that exhausts direct NR + gmin
+   * stepping + source stepping runs a pseudo-transient from 0 to `opfinaltime`
+   * (cktop.c:101-108 call site) and leaves the settled point as the OP.
+   * Hot-loadable via configure(). Default: false (nooptran=true).
+   */
+  optran?: boolean;
+  /**
+   * OPtran pseudo-transient step size in seconds (ngspice `opstepsize`,
+   * optran.c:49,357 — `CKTmaxStep = CKTstep = opstepsize`). Sets both the
+   * timestep ceiling and the seed step for the OPtran run. Only consulted when
+   * `optran` is true. Default: 1e-8 (optran.c:49). Hot-loadable via configure().
+   */
+  opstepsize?: number;
+  /**
+   * OPtran pseudo-transient final time in seconds (ngspice `opfinaltime`,
+   * optran.c:48). The OPtran run integrates from 0 to this time and returns the
+   * matrix at that point as the OP (optran.c:476-482). The initial delta seed is
+   * `MIN(opfinaltime/100, opstepsize)/10` (optran.c:359). Only consulted when
+   * `optran` is true. Default: 1e-6 (optran.c:48). Hot-loadable via configure().
+   */
+  opfinaltime?: number;
+  /**
+   * OPtran supply-ramp time in seconds (ngspice `opramptime`, optran.c:50).
+   * When > 0 the source scale factor follows the raised-cosine ramp
+   * `CKTsrcFact = 0.5*(1 - cos(pi*optime/opramptime))` (optran.c:662-664) so the
+   * supplies ease in from zero; when 0 (default) sources run at full value for
+   * the entire OPtran pass. Only consulted when `optran` is true. Default: 0
+   * (optran.c:50). Hot-loadable via configure().
+   */
+  opramptime?: number;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
@@ -224,6 +260,15 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   copyNodesets: false,
   indVerbosity: 2,
   epsmin: 1e-28,
+  // OPtran operating-point pseudo-transient fallback. Off by default — the
+  // `nooptran = TRUE` static flag at optran.c:51 makes OPtran return
+  // immediately, so the default DC-OP path never runs it. opstepsize /
+  // opfinaltime / opramptime carry the optran.c:48-50 static defaults and are
+  // only consulted once `optran` is enabled.
+  optran: false,
+  opstepsize: 1e-8,
+  opfinaltime: 1e-6,
+  opramptime: 0,
 };
 
 /**
@@ -294,7 +339,7 @@ export interface DcOpResult {
   /** Whether the DC operating point converged. */
   converged: boolean;
   /** Which convergence method was used. */
-  method: "direct" | "dynamic-gmin" | "new-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src";
+  method: "direct" | "dynamic-gmin" | "new-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src" | "optran";
   /** Total Newton-Raphson iterations performed across all attempts. */
   iterations: number;
   /** Node voltages at the operating point (indexed by MNA node ID). */

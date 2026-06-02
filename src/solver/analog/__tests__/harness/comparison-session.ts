@@ -801,13 +801,32 @@ export class ComparisonSession {
    * the result as _ourSession before running the ngspice side (or deep-cloning
    * for self-compare mode).
    */
-  async runDcOp(): Promise<void> {
+  async runDcOp(opTran?: {
+    opstepsize: number;
+    opfinaltime: number;
+    opramptime?: number;
+  }): Promise<void> {
     this._ensureInited();
     if (this._hasRun) return;
 
     this._analysis = "dcop";
     this._comparisons = null;
     this._structuralFindings = [];
+
+    // OPtran fall-through enable (ngspice optran.c / cktop.c:101-108). When the
+    // caller requests it, configure the digiTS engine so solveDcOperatingPoint
+    // runs the OPtran pseudo-transient after the static ladder fails, and the
+    // ngspice side issues `optran <step> <final> <ramp>` before `op` (see the
+    // analysis spec below). Both sides take their default DC-OP path when
+    // opTran is omitted.
+    if (opTran && this._engine) {
+      this._engine.configure({
+        optran: true,
+        opstepsize: opTran.opstepsize,
+        opfinaltime: opTran.opfinaltime,
+        opramptime: opTran.opramptime ?? 0,
+      });
+    }
 
     // Run standalone .op on our engine. Capture hook accumulates iterations
     // into the pending step buffer; endStep() closes them as step 0.
@@ -839,10 +858,18 @@ export class ComparisonSession {
 
     if (!this._opts.selfCompare && this._cirClean) {
       try {
+        const analysis: NgspiceJobSpec["analysis"] = opTran
+          ? {
+              kind: "optran",
+              opstepsize: this._formatSpiceTime(opTran.opstepsize),
+              opfinaltime: this._formatSpiceTime(opTran.opfinaltime),
+              opramptime: this._formatSpiceTime(opTran.opramptime ?? 0),
+            }
+          : { kind: "dcop" };
         const spec: NgspiceJobSpec = {
           dllPath: this._dllPath,
           netlist: this._materializeCir(),
-          analysis: { kind: "dcop" },
+          analysis,
         };
         const runResult = await runNgspiceGuarded(spec);
         this._ngSession = runResult.session ?? { source: "ngspice", topology: emptyTopology(), steps: [] };

@@ -1,0 +1,376 @@
+{
+  "circuit": {
+    "description": "Inductor-induced DC branch-current singularity: V1=3V (node 1) and V2=5V (node 2) are bridged by ideal L1=1mH. The static DC ladder is singular on l1#branch (gmin is a node-to-ground conductance and cannot constrain a branch current), so direct NR + gmin + source stepping all fail. OPtran pseudo-transient settles to the unique OP v(1)=3, v(2)=5. Adding any series R makes it converge statically, proving the inductor short is the cause.",
+    "elements": [
+      {
+        "id": "91ea65cb-58a0-4bdd-842a-83ed1d15644b",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 3
+          },
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 3
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "26f12c1d-ce55-4042-bf72-476cc8d4cf23",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "V2",
+          "position": [
+            0,
+            8
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "af24c1ca-9ed4-4c24-8e36-1cfdab6b531e",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "inductance": 0.001
+          },
+          "inductance": 0.001,
+          "label": "L1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Inductor"
+      },
+      {
+        "id": "1355d332-29ed-45b7-9fce-5d177a68154f",
+        "position": {
+          "x": 36,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "OPtran inductor singularity",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 23,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 1
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 24,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 5
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 22,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 22,
+            "y": -2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": -2
+          },
+          {
+            "x": 36,
+            "y": -2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": -2
+          },
+          {
+            "x": 36,
+            "y": 0
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

@@ -479,6 +479,54 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   }
 
   // -------------------------------------------------------------------------
+  // OPtran fallback (cktop.c:101-108)
+  //
+  // ngspice CKTop, after source stepping fails, runs
+  //   converged = OPtran(ckt, converged);
+  // at cktop.c:104. OPtran is a last-resort pseudo-transient: a transient
+  // simulation from 0 to opfinaltime that leaves the settled matrix as the OP
+  // (optran.c:284-845). It is opt-in: optran.c:51 `nooptran = TRUE` makes
+  // OPtran return `oldconverged` immediately (optran.c:314-315) unless the
+  // `optran` option set opstepsize/opfinaltime. We mirror that default-off
+  // guard with the `params.optran` gate here, so a circuit with optran
+  // disabled takes the exact same path as before this hook existed.
+  //
+  // The numerics are NOT re-ported: ctx.opTranFallback is wired by the engine
+  // to a driver that reuses the transient stepping kernel (NIiter / CKTtrunc /
+  // state rotation / NIcomCof). It runs the pseudo-transient in place over the
+  // same ctx/solver and returns whether the OP settled.
+  if (ctx.params.optran && ctx.opTranFallback) {
+    const opTranConverged = ctx.opTranFallback();
+    if (opTranConverged) {
+      ctx.dcopVoltages.set(ctx.rhs);
+      // smsig load is .OP-only- skip on transient-boot DCOP (dctran.c:230-346).
+      if (!isTranOp(ctx.cktMode)) {
+        dcopFinalize(ctx);
+      }
+      diagnostics.emit(
+        makeDiagnostic(
+          "dc-op-source-step",
+          "warning",
+          "DC operating point converged via OPtran pseudo-transient fallback.",
+          {
+            explanation:
+              "Direct NR, gmin stepping, and source stepping all failed. The OPtran " +
+              "fallback (ngspice optran.c) ran a pseudo-transient simulation from 0 to " +
+              "opfinaltime; the settled point is the operating point. Common for circuits " +
+              "with a DC branch-current singularity (e.g. ideal inductor bridging two " +
+              "source-pinned nodes) that gmin (a node-to-ground conductance) cannot resolve.",
+          },
+        ),
+      );
+      ctx.dcopResult.converged = true;
+      ctx.dcopResult.method = "optran";
+      ctx.dcopResult.iterations = totalIterations;
+      ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
+      return;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Level 5- Failure with blame attribution (cktncdump.c)
   //
   // ngspice CKTncDump compares the iter-K output (CKTrhs) against the

@@ -1093,6 +1093,27 @@ export class NgspiceBridge {
   }
 
   /**
+   * Issue the ngspice `optran` command, then run `op`.
+   *
+   * `optran <noopiter> <ngminsteps> <nsrcsteps> <opstepsize> <opfinaltime>
+   * <opramptime>` (com_optran.c:53-69). The first three integers override
+   * noopiter / gminsteps / srcsteps for this run; the trailing three floats set
+   * opstepsize / opfinaltime / opramptime, clearing the `nooptran` default flag
+   * (com_optran.c:110) so CKTop's `OPtran(ckt, converged)` fall-through
+   * (cktop.c:104) actually runs. We pass `1 1 1` so direct NR + gmin stepping +
+   * source stepping all run first (matching digiTS's static ladder), and OPtran
+   * engages only after they exhaust- exactly the cktop.c:101-108 ordering the
+   * #4 gate exercises. Issuing `optran` from the control lane is the
+   * `.control`/`.spiceinit` route com_optran.c documents (optran.c:66-69).
+   */
+  runOpTran(opstepsize: string, opfinaltime: string, opramptime: string): void {
+    this._iterations = [];
+    this._outerEvents = [];
+    this._cmd(`optran 1 1 1 ${opstepsize} ${opfinaltime} ${opramptime}`);
+    this._cmd("op");
+  }
+
+  /**
    * Issue ngspice `.tran TSTEP TSTOP <TSTART <TMAX>>`.
    *
    * Parameter naming matches the .tran spec exactly so callers can't conflate
@@ -1176,6 +1197,7 @@ export class NgspiceBridge {
 /** The analysis to run, plus its parameters, in a serialization-friendly shape. */
 export type NgspiceJobAnalysis =
   | { kind: "dcop" }
+  | { kind: "optran"; opstepsize: string; opfinaltime: string; opramptime: string }
   | { kind: "tran"; tStop: string; tStep: string; tMax?: string }
   | { kind: "ac"; type: "dec" | "oct" | "lin"; n: number; fStart: number; fStop: number };
 
@@ -1232,6 +1254,22 @@ export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<Ngspice
     bridge.loadNetlist(spec.netlist);
     if (spec.analysis.kind === "dcop") {
       bridge.runDcOp();
+      return {
+        analysis: "dcop",
+        session: bridge.getCaptureSession(),
+        acPoints: null,
+        ngspiceTopology: bridge.getTopology(),
+        rawNgspiceTopology: bridge.getRawTopology(),
+      };
+    } else if (spec.analysis.kind === "optran") {
+      bridge.runOpTran(
+        spec.analysis.opstepsize,
+        spec.analysis.opfinaltime,
+        spec.analysis.opramptime,
+      );
+      // The OPtran run is still an operating-point analysis on the ngspice
+      // side- it captures the same iteration/topology session shape as `op`,
+      // tagged "dcop" so downstream pairing (runDcOp on our side) lines up.
       return {
         analysis: "dcop",
         session: bridge.getCaptureSession(),

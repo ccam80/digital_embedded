@@ -18,12 +18,12 @@ import type {
 import type { IntegrationMethod } from "./integration.js";
 import type { Diagnostic } from "../../compile/types.js";
 import type { SetupContext } from "./setup-context.js";
-import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
+import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams, computeFirstStep } from "../../core/analog-engine-interface.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult, AcAnalysisDeps } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
-import { TimestepController } from "./timestep.js";
+import { TimestepController, almostEqualUlps } from "./timestep.js";
 import { HistoryStore, computeNIcomCof } from "./integration.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
@@ -896,6 +896,11 @@ export class MNAEngine implements AnalogEngine {
     this._seedNodesetIcRhs();
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
+    // cktop.c:104- wire the OPtran pseudo-transient fall-through.
+    // solveDcOperatingPoint calls this only when params.optran is set AND
+    // direct NR + gmin + source stepping all failed (the optran.c:51
+    // nooptran-default guard lives inside solveDcOperatingPoint).
+    ctx.opTranFallback = () => this._opTran();
     solveDcOperatingPoint(ctx);
     const result = ctx.dcopResult;
 
@@ -1019,6 +1024,10 @@ export class MNAEngine implements AnalogEngine {
     this._seedNodesetIcRhs();
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
+    // cktop.c:104- OPtran fall-through, also reachable from the transient-boot
+    // DC-OP (CKTop runs the same fallback stack regardless of MODEDCOP vs
+    // MODETRANOP). Gated on params.optran inside solveDcOperatingPoint.
+    ctx.opTranFallback = () => this._opTran();
     solveDcOperatingPoint(ctx);
     const result = ctx.dcopResult;
 
@@ -1035,6 +1044,192 @@ export class MNAEngine implements AnalogEngine {
     }
 
     return result;
+  }
+
+  /**
+   * OPtran operating-point pseudo-transient fallback (ngspice optran.c:284-845).
+   *
+   * Invoked from solveDcOperatingPoint via ctx.opTranFallback ONLY after direct
+   * NR + gmin stepping + source stepping all fail AND params.optran is set
+   * (cktop.c:101-108). Runs a transient simulation from time 0 to opfinaltime
+   * with no output capture; the settled matrix is the operating point
+   * (optran.c:286-287). It REUSES the transient stepping kernel- this method
+   * configures the pseudo-transient window then drives the existing step()
+   * loop, exactly as optran.c reuses dctran.c's NIiter / CKTtrunc / state
+   * rotation / NIcomCof / breakpoint handling rather than re-porting numerics.
+   *
+   * Mapping (optran.c -> here):
+   *   nooptran (optran.c:51,314-315)             -> caller's params.optran gate
+   *   CKTmaxStep = CKTstep = opstepsize (:357)    -> opParams maxTimeStep/outputStep
+   *   delta = MIN(opfinaltime/100, step)/10 (:359)-> computeFirstStep -> firstStep seed
+   *   opbreaks = [0, opfinaltime] (:378-382)      -> controller seed queue
+   *   CKTorder = 1 (:399)                         -> controller currentOrder
+   *   CKTdeltaOld[i] = CKTmaxStep (:400-402)      -> controller deltaOld reseed
+   *   CKTmode = (mode&MODEUIC)|MODETRAN|MODEINITTRAN (:409) -> ctx.cktMode seed
+   *   ag[0]=ag[1]=0 (:411)                        -> ctx.ag reset
+   *   state1 = state0 (:412-413)                  -> statePool.states[1] copy
+   *   supply ramp 0.5*(1-cos(pi*t/opramptime)) (:662-664) -> step()'s srcFact (below)
+   *   MODEINITTRAN re-arm on firsttime nrFail (:731) -> step() :554-556 already does this
+   *   firsttime LTE-skip (:754-759)               -> step() _stepCount===0 branch
+   *   CKTdelta<=CKTdelmin -> E_TIMESTEP (:807-814) -> step()'s two-strike delmin -> ERROR
+   *   finish at AlmostEqualUlps(optime,opfinaltime) (:476-482) -> loop terminate test
+   *
+   * Returns true when the pseudo-transient reaches opfinaltime (OP settled),
+   * false on timestep-too-small (E_TIMESTEP) or any step() ERROR.
+   */
+  private _opTran(): boolean {
+    if (!this._compiled) return false;
+    const ctx = this._ctx!;
+    const statePool = (this._compiled as ConcreteCompiledAnalogCircuit).statePool ?? null;
+
+    // optran.c:326-338- opramptime>0 init: zero CKTrhsOld + CKTstate0 and solve
+    // with all sources at zero (CKTsrcFact=0) before the ramp begins. For the
+    // common opramptime==0 path this block is skipped and sources run at full
+    // value, so the OPtran integrates the actual circuit toward its OP.
+    const opStep = this._params.opstepsize ?? 1e-8;
+    const opFinal = this._params.opfinaltime ?? 1e-6;
+    const opRamp = this._params.opramptime ?? 0;
+    if (opRamp > 0) {
+      ctx.rhsOld.fill(0);
+      if (statePool) statePool.states[0].fill(0);
+      ctx.srcFact = 0;
+      // optran.c:337 NIiter(ckt, CKTdcTrcvMaxIter) with sources at zero. Reuse
+      // the existing NR primitive- diagonalGmin/srcFact already set above.
+      ctx.maxIterations = this._params.dcTrcvMaxIter;
+      ctx.exactMaxIterations = false;
+      ctx.noncon = 1;
+      newtonRaphson(ctx);
+    }
+
+    // optran.c:355-359- CKTmaxStep = CKTstep = opstepsize; delta = MIN(
+    // opfinaltime/100, CKTstep)/10. Build a resolved param set for the
+    // pseudo-transient window: maxTimeStep=opstepsize (drives CKTdelmin =
+    // 1e-11*opstepsize and minTimeStep), outputStep=opstepsize (CKTstep),
+    // tStop=opfinaltime (CKTfinalTime), firstStep=delta (the :359 seed).
+    const savedParams = this._params;
+    const savedTimestep = this._timestep;
+    const savedSimTime = this._simTime;
+    const savedFirstStep = this._firstStep;
+    const savedStepCount = this._stepCount;
+    const savedCktMode = ctx.cktMode;
+
+    const delta = computeFirstStep(opFinal, opStep);
+    const opParams: ResolvedSimulationParams = resolveSimulationParams({
+      ...savedParams,
+      maxTimeStep: opStep,
+      outputStep: opStep,
+      tStop: opFinal,
+      initTime: 0,
+      firstStep: delta,
+      // Hold optran disabled inside the pseudo-transient so the warm-start
+      // DC-OP that step()'s body never re-enters cannot recurse OPtran. The
+      // gate below (ctx.opTranFallback = null) is the real guard; this keeps
+      // the resolved params self-consistent.
+      optran: false,
+    });
+    this._params = opParams;
+
+    // optran.c:378-382,399-403- breakpoints [0, opfinaltime], CKTorder=1,
+    // CKTdeltaOld[i]=CKTmaxStep, CKTdelta=delta. A fresh controller sharing
+    // ctx.deltaOld reseeds all of these (constructor: queue=[0,finalTime],
+    // currentOrder=1, deltaOld[i]=maxTimeStep, currentDt=firstStep).
+    this._timestep = new TimestepController(opParams, ctx.deltaOld);
+    ctx.refreshTolerances(opParams);
+
+    // optran.c:409,411- CKTmode = (mode & MODEUIC) | MODETRAN | MODEINITTRAN;
+    // CKTag[0]=CKTag[1]=0. The OPtran pass starts in transient mode with the
+    // first-NR-call init bit set. Source loads see MODETRAN (not MODETRANOP),
+    // so vsrcload.c's srcFact scaling is gated the same way a normal .tran
+    // step is- full value unless opramptime drives the ramp below.
+    const uic = savedCktMode & MODEUIC;
+    ctx.cktMode = uic | MODETRAN | MODEINITTRAN;
+    ctx.loadCtx.cktMode = ctx.cktMode;
+    ctx.ag[0] = 0;
+    ctx.ag[1] = 0;
+
+    // optran.c:412-413- memcpy(CKTstate1, CKTstate0): the OPtran pass treats
+    // the failed-static-solve state0 as the "last accepted" state1 so the
+    // first integration step has a consistent history slot.
+    if (statePool) {
+      statePool.states[1].set(statePool.states[0]);
+    }
+
+    // Run the pseudo-transient from optime=0. _firstStep=true skips step()'s
+    // warm-start DCOP (we are the OP solver); _stepCount=0 makes step()'s
+    // firsttime branch fire (LTE-skip + MODEINITTRAN re-arm), matching
+    // optran.c's firsttime semantics.
+    this._simTime = 0;
+    this._firstStep = true;
+    this._stepCount = 0;
+    if (this._compiled?.timeRef) this._compiled.timeRef.value = 0;
+
+    // optran.c:662-664- supply ramp. step() advances simTime then runs NR; we
+    // need CKTsrcFact set BEFORE each NR call to optime (= post-advance time).
+    // step() has no ramp hook, so drive the ramp via the per-step srcFact
+    // refresh below: opramptime>0 sets srcFact each iteration from simTime.
+    // When opramptime==0, srcFact stays 1 (sources at full value).
+    if (opRamp <= 0) {
+      ctx.srcFact = 1;
+    }
+
+    // Disarm the fallback so the warm-start DC-OP that nothing re-runs here
+    // cannot recurse into OPtran (defence-in-depth alongside optran:false).
+    const savedFallback = ctx.opTranFallback;
+    ctx.opTranFallback = null;
+
+    let converged = false;
+    // optran.c:424-843- the nextTime:/resume: timestep loop. step() is one
+    // iteration of dctran's for(;;); call it until optime reaches opfinaltime
+    // (optran.c:476 AlmostEqualUlps(optime, opfinaltime, 100)) or step() drops
+    // to ERROR (optran.c:807-814 timestep-too-small -> E_TIMESTEP).
+    const maxOpSteps = 100000;
+    for (let i = 0; i < maxOpSteps; i++) {
+      if (opRamp > 0) {
+        // optran.c:660-664- optime advances by CKTdelta inside the inner solve
+        // loop; srcFact is recomputed from that advanced optime. step()
+        // advances simTime at its top, so the value step() will integrate at
+        // is simTime + dt. Set srcFact from the projected post-advance time.
+        const projected = this._simTime + this._timestep.currentDt;
+        const ot = projected >= opFinal ? opFinal : projected;
+        ctx.srcFact = 0.5 * (1 - Math.cos(Math.PI * ot / opRamp));
+      }
+      this.step();
+      if (this._engineState === EngineState.ERROR) {
+        converged = false;
+        break;
+      }
+      // optran.c:476-482- finished when optime ~= opfinaltime (100-ULP window).
+      if (almostEqualUlps(this._simTime, opFinal, 100) || this._simTime >= opFinal) {
+        converged = true;
+        break;
+      }
+    }
+
+    // optran.c:479-481- restore CKTmaxStep/CKTstep to their pre-OPtran values.
+    // We restore the entire transient config the OPtran window overrode, and
+    // leave the settled solution in ctx.rhs (the OP). srcFact returns to 1
+    // (optran.c leaves CKTsrcFact at the ramp endpoint = 1 when ramptime>0).
+    ctx.srcFact = 1;
+    this._params = savedParams;
+    this._timestep = savedTimestep;
+    ctx.refreshTolerances(savedParams);
+    this._simTime = savedSimTime;
+    this._firstStep = savedFirstStep;
+    this._stepCount = savedStepCount;
+    ctx.opTranFallback = savedFallback;
+    if (this._compiled?.timeRef) this._compiled.timeRef.value = savedSimTime;
+    // The OPtran pass left the matrix at the OP; the caller's cktMode for the
+    // post-CKTop finalize is restored to the DC-OP analysis bits it owned.
+    ctx.cktMode = savedCktMode;
+    ctx.loadCtx.cktMode = ctx.cktMode;
+
+    // step() drops to ERROR on timestep-too-small; clear it so the engine is
+    // usable again (the caller decides converged/failed from our return).
+    if (this._engineState === EngineState.ERROR) {
+      this._transitionState(EngineState.STOPPED);
+    }
+
+    return converged;
   }
 
   /**
