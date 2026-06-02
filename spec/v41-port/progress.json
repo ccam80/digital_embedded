@@ -1896,6 +1896,177 @@
         "MATCH (Tier1+Tier2) vs fresh ref/ngspice/src/spicelib/devices/isrc/isrctemp.c:38-61 (diff isrc.md docLineRange 1138-1176). functionGroup isrc/isrctemp.c::ISRCtemp, tsFile src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl._checkTime0DcConsistency (ac:408-431). Correspondence re-derived independently. v41 restructures the value-presence notice into two branches: (1) if(!ISRCdcGiven && !ISRCfuncTGiven) ERR_INFO 'has no value, DC 0 assumed' (isrctemp.c:38-43) <-> if(!this._dcGiven && !this._funcTGiven) console.warn(`${label}: has no value, DC 0 assumed`) (ac:409-414); (2) else if(ISRCdcGiven && ISRCfuncTGiven && type!=TRNOISE && type!=TRRANDOM && type!=EXTERNAL){ time0value = (type==AM||type==PWL)?coeffs[1]:coeffs[0]; if(!AlmostEqualUlps(time0value,ISRCdcValue,3)) ERR_INFO 'dc value used for op...' } (isrctemp.c:44-61) <-> the identical guard, the identical AM/PWL->coeffs[1] else coeffs[0] selection, almostEqualUlps(time0value,this._dcValue,3) and console.warn (ac:415-430). Bijective: same two conditions, same exclusion set, same coeff selection, same 3-ULP compare. ERR_INFO vs console.warn = diagnostic-only emission (allowed, no numeric value changes, sec4). The v26 single if(!ISRCdcGiven){funcTGiven?warn:warn} form is fully superseded by the v41 two-branch form, which is what digiTS implements. No v41 construct without a counterpart."
       ],
       "escalation": null
+    },
+    "isrc/isrcacct.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "a2a3d5e982f37d8e",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:31-43."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcacct.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "fdc945e081014d5b",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:53-60."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcacct.c#h004a": {
+      "state": "APPLIED",
+      "hunkHash": "74c0feb633edc337",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:73-81."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcacct.c#h004c": {
+      "state": "APPLIED",
+      "hunkHash": "9c6c6e75379e2a44",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:94-156."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcacct.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "428c50be046e0e61",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:215."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "4fed09db51ce179e",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:39-45."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "4edbdd0a8a3db06d",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:72-79."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h004a": {
+      "state": "APPLIED",
+      "hunkHash": "e16e4c57cee67a95",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:97-102."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h004c": {
+      "state": "APPLIED",
+      "hunkHash": "bbc649e3f029b22e",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:114-139."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "3440ef560d517846",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:133-138."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "69f5809ff58a8c30",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:143-152."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "d282ea131ea348a9",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:156-173."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "1209dd3dac102522",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:204-211."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "cb0c8f71d7bb19a3",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:218-236."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "dac38d7833cd5a8d",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:231-256."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "f5adefda0ad43f08",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:263-273."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h012": {
+      "state": "APPLIED",
+      "hunkHash": "62a19b617715fc38",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:280-297."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcload.c#h015": {
+      "state": "APPLIED",
+      "hunkHash": "8b8ff64301b150ce",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:387-392."
+      ],
+      "escalation": null
+    },
+    "isrc/isrcpar.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "db03e78e733f8b83",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcpar.c:63-79."
+      ],
+      "escalation": null
     }
   }
 }

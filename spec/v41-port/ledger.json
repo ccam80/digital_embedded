@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T22:23:29.657Z",
+    "generated": "2026-06-02T22:34:16.960Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 204,
+    "progressEntriesApplied": 223,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -20060,10 +20060,12 @@
         113
       ],
       "hunkHash": "a2a3d5e982f37d8e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.acceptStep (PULSE breakpoint scheduling, reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:31-43."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20091,10 +20093,12 @@
         129
       ],
       "hunkHash": "fdc945e081014d5b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.acceptStep (PULSE PHASE/newcompat.xs rework, reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:53-60."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20122,10 +20126,12 @@
         142
       ],
       "hunkHash": "74c0feb633edc337",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.acceptStep PULSE head (PER/PHASE coeff reads, time = CKTtime - TD, tshift = TD; reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:73-81."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20184,10 +20190,12 @@
         269
       ],
       "hunkHash": "9c6c6e75379e2a44",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.acceptStep PULSE breakpoint body (period-fold + the four-region SAMETIME CKTsetBreak chain; reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:94-156."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20215,10 +20223,12 @@
         278
       ],
       "hunkHash": "428c50be046e0e61",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.acceptStep (ISRC fftFree debug-string fix at end of ISRCaccept; lands with the reconstructed coeff-array accept path, isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcacct.c:215."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20622,10 +20632,12 @@
         769
       ],
       "hunkHash": "4fed09db51ce179e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load / src/components/sources/dc-current-source.ts DcCurrentSourceAnalogImpl.load (model/instance linked-list-walk accessor-macro renames; the surrounding RHS-only srcFact stamp is the existing digiTS load body)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:39-45."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20653,10 +20665,12 @@
         783
       ],
       "hunkHash": "4edbdd0a8a3db06d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load PULSE waveform evaluation (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:72-79."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20684,10 +20698,12 @@
         792
       ],
       "hunkHash": "e16e4c57cee67a95",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load PULSE head (time -= TD; the PHASE coeff read context; reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:97-102."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20746,10 +20762,12 @@
         853
       ],
       "hunkHash": "bbc649e3f029b22e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load PULSE value piecewise (period-fold + V1/rise/V2/fall by time region; reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:114-139."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20777,10 +20795,12 @@
         862
       ],
       "hunkHash": "3440ef560d517846",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load PULSE value piecewise (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:133-138."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20808,10 +20828,12 @@
         871
       ],
       "hunkHash": "69f5809ff58a8c30",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load SINE waveform PHASE unification (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:143-152."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20839,10 +20861,12 @@
         891
       ],
       "hunkHash": "d282ea131ea348a9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load SINE value with phase (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:156-173."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20870,10 +20894,12 @@
         900
       ],
       "hunkHash": "1209dd3dac102522",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load SFFM waveform PHASE decls (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:204-211."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20901,10 +20927,12 @@
         908
       ],
       "hunkHash": "cb0c8f71d7bb19a3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load SFFM value with phasec/phases (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:218-236."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20932,10 +20960,12 @@
         935
       ],
       "hunkHash": "dac38d7833cd5a8d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load AM waveform PHASE decls (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:231-256."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20963,10 +20993,12 @@
         943
       ],
       "hunkHash": "f5adefda0ad43f08",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load AM value with phases (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:263-273."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -20994,10 +21026,12 @@
         962
       ],
       "hunkHash": "62a19b617715fc38",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load PWL equality-test paren cleanup (reconstructed by isrc#recon/coeffWaveforms)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:280-297."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21087,10 +21121,12 @@
         1019
       ],
       "hunkHash": "8b8ff64301b150ce",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl.load (the `ISRCcurrent = m * value` readout record at loadDone; the m multiplier is reconstructed by isrc#recon/parallelMultiplier, the recorded current is exposed via getPinCurrents)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcload.c:387-392."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -21180,10 +21216,12 @@
         1097
       ],
       "hunkHash": "db03e78e733f8b83",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-current-source.ts AcCurrentSourceAnalogImpl constructor / setParam (ISRC_AC vector parse: acMag/acPhase + given flags; digiTS acMagnitude/acPhase defaults at ac-current-source.ts:309-312). The hunk's content is the /* FALLTHROUGH */ compiler-hint comments on the existing case-cascade",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcpar.c:63-79."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
