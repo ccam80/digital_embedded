@@ -981,3 +981,42 @@ numerical, so it is recorded here as the teardown note (above).
 - **Genuine §6a-valid escalation** (not bogus/in-scope); reaches the user. State left ESCALATED in progress.json.
 - **Decision needed from user:** confirm NO-COUNTERPART for the C device-teardown family (`DIOunsetup`), OR authorize an `unsetup()` device-teardown surface on the analog element interface + engine teardown call.
 - **Resolution:** _pending_
+
+---
+
+## bjt (2026-06-03) — WORKTREE GATE+MERGE+TEARDOWN (serial pass)
+
+Teardown of isolated worktree `.wt/bjt`. REBASE onto the advancing `v41-port` **could not run**
+(`rebaseClean=false`): the worktree carried an uncommitted edit to
+`src/components/semiconductors/bjt.ts` (the `bjt#recon/stampAc` recon was deliberately left
+PENDING with no commit, per the passed escalation note below), and `git rebase` refused with
+"cannot rebase: You have unstaged changes." This is NOT a two-units-touched-the-same-file
+rebase conflict and NOT a precondition I may resolve by stashing/checkout/reset (blocked by
+the parallel-agent safety policy) or by committing on the unit's behalf (I am the serial
+gate/merge/teardown stage, not the recon author; the AC#3 citation defect below is unresolved).
+The substantive recon work was preserved for resume-from-patch: the worktree's working-tree diff
+vs `v41-port` (`git diff v41-port -- src/`, which includes the uncommitted change) was written to
+`.wt-failed/bjt.diff` (99 lines of `bjt.ts` `stampAc` work). No merge this pass
+(`merged=false`, `gatePass=null`, gate skipped — no isomorphic committed work to gate per the
+serial-stage contract). MAIN `src/` confirmed clean (`mainSrcClean=true`). The escalation below
+is NOT a numerical gate-fail / firstDivergence / matrix-cell / step-iter bug — the executable
+stamps are bit-exact isomorphic to the ratified v26 `BJTacLoad` baseline; the defect is a
+CLAUDE.md comment-citation contract violation (cited `ref/ngspice` line differs from the emitted
+code behaviour) — so it routes here per §6 rather than to `spec/fix-list-phase-2-audit.md`.
+
+### ESC-BJT-stampAc-AC3-citation — `bjt#recon/stampAc` three collCX-divergent cells carry current-tree comment citations that CONTRADICT the emitted stamps
+
+- **source=bjt#recon/stampAc | verdict=MISMATCH.** progress.json left PENDING; no commit. The transcribed verifier/applier note (verbatim):
+
+  > EXECUTABLE STAMPS: bit-exact isomorphic to the spec's ratified v26 BJTacLoad baseline. Verified independently against ref/ngspice (bjtacld.c) + the v26 pre-image (spec/ngspice-v41-model-diffs/bjt.md:240-265):
+  >  - Part A (gcpr/gepr area-scaled, bjt.ts:2118-2119 `tp.tcollectorConduct*params.AREA`/`tp.temitterConduct*params.AREA`) = v26 pre-image bjt.md:220-221 ✓; gpi/gmu/gm/go/gx + xc* susceptances read from named SLOT_* with omega as the method arg (never recomputed) ✓.
+  >  - Part B excess-phase (bjt.ts:2126-2133): exact operand order gm=gm+go; xgm=-gm*sin(arg); gm=gm*cos(arg)-go; xgm=0 default — matches bjtacld.c:56-63 ✓.
+  >  - Part C: all 33 stamps match the v26 baseline values incl. the THREE collCX-divergent cells held at the v26 form — _hCPCP=m*(gmu+go+gcpr) (bjt.md:244 pre-image), _hCCP=m*(-gcpr) (bjt.md:253), _hCPC=m*(-gcpr) (bjt.md:257); accumulation order _hCPCP-imag (2153) BEFORE _hSubstConSubstCon-imag (2154) preserved (AC#4) ✓; collCX block bjtacld.c:107-124 correctly EXCLUDED (AC#5) ✓; substrate triple + base-colPrime pair imaginary-only ✓. File-scope clean: only bjt.ts touched, only within stampAc.
+  >
+  > DEFECT (AC#3 comment-citation contract, fixable inside the named tsFile): the three collCX-divergent cells are commented with current-tree citations that CONTRADICT the emitted code. bjt.ts:2152 cites `bjtacld.c:76` — but bjtacld.c:76 reads `m*(gmu+go)` (NO +gcpr) while the code stamps `m*(gmu+go+gcpr)`. bjt.ts:2159 cites `bjtacld.c:84` (`BJTcollCollCXPtr`) for code stamping `_hCCP` (=v26 `BJTcolColPrimePtr`). bjt.ts:2162 cites `bjtacld.c:87` (`BJTcollCXCollPtr`) for code stamping `_hCPC` (=v26 `BJTcolPrimeColPtr`). Spec lines 220-221/230/237/240 and AC#3 explicitly mandate citing the v26 PRE-IMAGE (`bjt.md:244 pre-image`, `bjt.md:253 pre-image`, `bjt.md:257 pre-image`) for exactly these three cells precisely BECAUSE the current-tree lines emit different stamps. This is a CLAUDE.md citation-divergence (cited ref line differs from code behavior), not a doc-cleanup. FIX: change the bjt.ts:2152/2159/2162 comments to the v26 pre-image citations the spec prescribes (the parenthetical collCX notes describe the v41 successor, which this recon DEFERS to hunk #h002, and should be removed/reframed to the v26 mechanism). Code values stay as-is. progress.json left PENDING; no commit.
+
+- **ngspice:** `ref/ngspice/src/spicelib/devices/bjt/bjtacld.c:76` (`m*(gmu+go)` — no `+gcpr`), `:84` (`BJTcollCollCXPtr`), `:87` (`BJTcollCXCollPtr`); v26 pre-image `spec/ngspice-v41-model-diffs/bjt.md:244/253/257`.
+- **digiTS:** `src/components/semiconductors/bjt.ts:2152` / `:2159` / `:2162` (the three collCX-divergent stamp comments) within `stampAc`.
+- **Not numerical:** the stamps are bit-exact; only the three comment citations contradict the emitted code. No firstDivergence / matrix-cell / step-iter / gate-fail signature exists. Routed here per §6, not to `fix-list-phase-2-audit.md`. Not closed as "citation divergence"/"documentation hygiene" (banned verdicts) — this is a real contract violation the recon must fix before it can be recorded APPLIED.
+- **Decision needed from user:** direct the recon applier to change the `bjt.ts:2152/2159/2162` comments to the v26 PRE-IMAGE citations the spec prescribes (`bjt.md:244/253/257 pre-image`) and reframe the parenthetical collCX (v41 successor) notes — which this recon DEFERS to hunk `#h002` — to the v26 mechanism; code stamp VALUES stay as-is. Then re-run the recon so progress.json flips PENDING → APPLIED.
+- **Resolution:** _pending_
