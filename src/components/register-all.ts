@@ -574,7 +574,8 @@ export function createDefaultRegistry(
   // Mutual inductor sub-element (internalOnly — used by Transformer composites)
   registry.register(MutualInductorDefinition);
 
-  // Current-controlled switch (internalOnly — used by Relay composite)
+  // Current-controlled switch (ngspice CSW / W element). Placeable standalone
+  // and also referenced by the Relay composite as a sub-element.
   registry.register(CurrentControlledSwitchDefinition);
 
   auditNgspiceLoadOrderTables(registry);

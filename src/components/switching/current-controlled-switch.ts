@@ -13,7 +13,12 @@
  * Load is a line-for-line port of `cswload.c:107-136`.
  */
 
-import { PropertyBag } from "../../core/properties.js";
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
+import { drawColoredLead } from "../draw-helpers.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
+import type { PropertyDefinition } from "../../core/properties.js";
 import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -23,8 +28,12 @@ import {
   defineStateSchema,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
-import { PinDirection, type PinDeclaration } from "../../core/pin.js";
-import type { ComponentDefinition } from "../../core/registry.js";
+import { PinDirection, type PinDeclaration, type Pin, type Rotation } from "../../core/pin.js";
+import {
+  ComponentCategory,
+  type AttributeMapping,
+  type StandaloneComponentDefinition,
+} from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout (matches Switch contact pins A1, B1)
@@ -247,14 +256,134 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
 }
 
 // ---------------------------------------------------------------------------
-// CurrentControlledSwitchDefinition (internal-only)
+// CurrentControlledSwitchElement — CircuitElement
+//
+// Two-terminal switch (A1, B1). The controlling current is the branch current
+// of an independent V-source named by the `ctrlBranch` property, resolved at
+// setup() via ctx.findBranch — exactly the ngspice W-card `<vcontrol>` field
+// (csw.c:14 CSW_CONTROL "Name of controlling source"; cswsetup.c:47
+// CKTfndBranch). This mirrors CCVS/CCVS's senseSourceLabel wiring.
 // ---------------------------------------------------------------------------
 
-export const CurrentControlledSwitchDefinition: ComponentDefinition = {
+export class CurrentControlledSwitchElement extends AbstractCircuitElement {
+  constructor(
+    instanceId: string,
+    position: { x: number; y: number },
+    rotation: Rotation,
+    mirror: boolean,
+    props: PropertyBag,
+  ) {
+    super("CurrentControlledSwitch", instanceId, position, rotation, mirror, props);
+  }
+
+  getPins(): readonly Pin[] {
+    return this.derivePins(CSW_PIN_LAYOUT, []);
+  }
+
+  getBoundingBox(): Rect {
+    return { x: this.position.x, y: this.position.y, width: 2, height: 1 };
+  }
+
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
+    const vA = signals?.getPinVoltage("A1");
+    const vB = signals?.getPinVoltage("B1");
+
+    ctx.save();
+    ctx.setLineWidth(1);
+
+    // Blade body, stays COMPONENT.
+    ctx.setColor("COMPONENT");
+    ctx.drawLine(0.5, 0, 1.5, 0);
+
+    // A1 / B1 leads.
+    drawColoredLead(ctx, signals, vA, 0, 0, 0.5, 0);
+    drawColoredLead(ctx, signals, vB, 1.5, 0, 2, 0);
+
+    const label = this._visibleLabel();
+    if (label.length > 0) {
+      ctx.setColor("TEXT");
+      ctx.setFont({ family: "sans-serif", size: 0.8 });
+      ctx.drawText(label, 1, 1, { horizontal: "center", vertical: "top" });
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Property definitions
+// ---------------------------------------------------------------------------
+
+const CSW_PROPERTY_DEFS: PropertyDefinition[] = [
+  {
+    key: "ctrlBranch",
+    type: PropertyType.STRING,
+    label: "Controlling source",
+    defaultValue: "",
+    description:
+      "Label of the independent V-source whose branch current controls the " +
+      "switch (ngspice W-card <vcontrol>, csw.c:14). Required — the element " +
+      "throws if empty.",
+  },
+  {
+    key: "normallyClosed",
+    type: PropertyType.BOOLEAN,
+    label: "Normally Closed",
+    defaultValue: false,
+    description: "When true, the contact is closed at rest and opens as control current rises.",
+  },
+  {
+    key: "label",
+    type: PropertyType.STRING,
+    label: "Label",
+    defaultValue: "",
+    description: "Optional display label.",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Attribute mappings
+// ---------------------------------------------------------------------------
+
+const CSW_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
+  { xmlName: "ctrlBranch",     propertyKey: "ctrlBranch",     convert: (v) => v },
+  { xmlName: "normallyClosed", propertyKey: "normallyClosed", convert: (v) => v === "true" },
+  { xmlName: "pullInI",        propertyKey: "pullInI",        convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "dropOutI",       propertyKey: "dropOutI",       convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "Ron",            propertyKey: "Ron",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "Roff",           propertyKey: "Roff",           convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "Label",          propertyKey: "label",          convert: (v) => v },
+];
+
+// ---------------------------------------------------------------------------
+// CurrentControlledSwitchDefinition
+//
+// Placeable standalone device. The active MNA model is `default` (the CSW W
+// element). The controlling V-source is named via the `ctrlBranch` property,
+// read by CurrentControlledSwitchAnalogElement's constructor and resolved at
+// setup() via ctx.findBranch.
+// ---------------------------------------------------------------------------
+
+export const CurrentControlledSwitchDefinition: StandaloneComponentDefinition = {
   name: "CurrentControlledSwitch",
   typeId: -1,
-  internalOnly: true,
+  category: ComponentCategory.SWITCHING,
+
   pinLayout: CSW_PIN_LAYOUT,
+  propertyDefs: CSW_PROPERTY_DEFS,
+  attributeMap: CSW_ATTRIBUTE_MAPPINGS,
+
+  helpText:
+    "Current-Controlled Switch (ngspice CSW / W element) — two-terminal " +
+    "(A1, B1). Closes when the branch current of the named controlling " +
+    "V-source (ctrlBranch) exceeds the pull-in threshold, with pull-in / " +
+    "drop-out hysteresis.",
+
+  factory(props: PropertyBag): CurrentControlledSwitchElement {
+    return new CurrentControlledSwitchElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  },
+
+  models: {},
   modelRegistry: {
     default: {
       kind: "inline",

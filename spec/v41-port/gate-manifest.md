@@ -161,7 +161,7 @@ pass here first.
 | cccs | `CCCS` | `cccs-gate.dts` (DcVsrc + sense branch + CCCS + R load) | ＋AUTHOR |
 | ccvs | `CCVS` | `ccvs-gate.dts` (DcVsrc + sense branch + CCVS + R load) | ＋AUTHOR |
 | sw | (voltage-controlled switch — confirm type) | `sw-gate.dts` (DcVsrc + R + Switch + control vsrc) | ＋AUTHOR |
-| csw | `CurrentControlledSwitchAnalogElement` | `csw-gate.dts` (DcVsrc + R + CSW + controlling branch) | ＋AUTHOR |
+| csw | `CurrentControlledSwitchAnalogElement` (made placeable 2026-06-03) | `src/solver/analog/__tests__/ngspice-parity/fixtures/csw-gate.dts` (DcVsrc + R + CSW + controlling branch) | RUNNABLE — gateKind=`harness`; component made placeable (real typeId, `internalOnly` dropped) + `W`-card emit added to the netlist generator; fixture authored with the change |
 | asrc | (behavioral/arbitrary source — confirm type) | `asrc-gate.dts` (ASRC expression + R) | ＋AUTHOR |
 
 ### Tier 3 — on Tier 2
@@ -185,6 +185,11 @@ device gate above; these recons need dedicated stimulus:
 | `maths-misc#recon/randnumb` | **RUNNABLE** — gateKind=`self-compare`, gateFixtures=[`src/solver/analog/__tests__/monte-carlo.test.ts -t SeededRng`] (the `SeededRng` block only; the MonteCarlo/Sweep integration tests are a different feature with a separate pre-existing 0V-solve failure — out of scope). Bit-exact-via-TRNOISE (Acceptance #9) defers to vsrc's noise arm. | self-compare (scoped) |
 | `parser#recon/nodeAllocOrder` | `resistive-divider` / `diode-resistor` / `vccs-gate` / `jfet-gate` (FLAT slot-index parity, VERIFIED-device fixtures only) | ✓ node-ordering bit-identical (topology/coords match every fixture; orderingDiffs none). NOTE: `bjt-common-emitter` / `mosfet-inverter` are NOT used here — their DUTs (bjt, mos1) are UNPORTED (recons PENDING), so `harness_first_divergence` flags their device-model numerics (Q1.VBE state, M1 convergence flag), which are the pending bjt/mos1 ports, NOT node-ordering. Per the composition rule a fixture gates an engine recon only when its devices are verified bit-exact. Composite/subcircuit node-ordering DEFERRED post-migration (see Deferred list). |
 
+### Expression-engine (un-frozen 2026-06-03)
+| Unit | Gate fixture(s) | Status |
+|---|---|---|
+| `expr-engine` (parser `inpptree.c`/`inpeval.c`/`ptfuncs.c`/`ifeval.c` → `expression.ts` / `expression-evaluate.ts` / `model-parser.ts`) | gateKind=`self-compare`, gateFixtures=[`src/solver/analog/__tests__/expression.test.ts`, `src/solver/analog/__tests__/expression-evaluate.test.ts`, `src/solver/analog/__tests__/expression-differentiate.test.ts`] | RUNNABLE — 53 mapped PENDING hunks (the ngspice B-source parse-tree evaluator + function table ported onto digiTS's existing expression engine). Gated by the existing expression suite (no-regression); bit-exact-via-B-source harness follows with asrc. Parser card-reader + model groups stay frozen. |
+
 ## Fixture work list (tier-ordered — "fixtures set up")
 Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the device's own port/recon — reason given).
 1. **Tier 0/1:** ~~`vsrc-dc-only` (dropped — degenerate)~~ · ✅`vsrc-ac-square-rload` · ✅`vsrc-ac-sine-rload` · ✅`isrc-dc-rload` · ✅`isrc-ac-rload`.
@@ -196,7 +201,7 @@ Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the devi
 `isrc-dc-rload`, `vccs-gate`, `vcvs-gate`, `cccs-gate`, `jfet-gate`, `sw-gate`. Also built+saved: `isrc-ac-rload`, `ccvs-gate` (canon-derived linear H), `vsrc-ac-square-rload`, `vsrc-ac-sine-rload` (waveform gates, run when the driver gates `vsrc`).
 
 **Deferred — cannot be a standalone `.dts` now; authored when the device's own port/recon lands:**
-- `csw-gate` — `CurrentControlledSwitchDefinition` is `internalOnly: true` (typeId −1), not placeable via the builder. csw IS ported, but its parity needs the component made placeable, or a hand-built deck / Surface-1 element test — a harness-surface gap.
+- `csw-gate` — **NO LONGER DEFERRED** (2026-06-03): the CurrentControlledSwitch was made placeable (real typeId, `internalOnly` dropped) and a `W`-card emit added to the netlist generator, so `csw-gate.dts` is a standalone harness fixture (DcVsrc + R + CSW + controlling branch).
 - `asrc-gate` — `src/components/active/bsource.ts` does not exist yet; the B source is built by the asrc port (#19/#27), which also adds the generator's B-source emitter. Fixture authored then.
 - `jfet2-gate`, `mes-gate`, `mos3-gate` — **NO LONGER DEFERRED** (2026-06-03): each device class is built by its `wholeClass` recon, and the harness gate fixture is authored by the GateMerge stage against the freshly-built class (MCP pointed at the worktree, where `circuit_build`/`circuit_save` can instantiate the device), then harness-gated bit-exact vs ngspice. mos3 additionally required its 43 v41 hunks classified PORT (core device → `mosfet3.ts`) vs NO-COUNTERPART (sensitivity/noise/distortion/pole-zero/delete/struct families) in `planning/mos3-decisions.json`.
 - `nodeset-gate` / `ic-gate` — **NO LONGER DEFERRED** (input surface built 2026-06-01). The harness input surface for `.nodeset`/`.ic` now exists: `ComparisonSession` resolves author/`.dts`-supplied nodeset/IC NAMES → digiTS node IDs (`_resolveNodesetNames` / `_resolveIcNames`), emits them as `.nodeset`/`.ic` cards on the auto-generated ngspice deck (`netlist-generator.ts`), seeds the resolved ICs into the digiTS compiled circuit's `ics` Map, and `harness_start` reads optional `circuit.nodesets`/`circuit.ics` objects from the `.dts` JSON so `harness_start({dtsPath})` alone self-contains the stimulus. Both fixtures DRIVE the harness pre-port (ngspice honours the cards; digiTS still uses the blanket 1e10 pin, so a stimulus-driven divergence surfaces — the recon's job to close).

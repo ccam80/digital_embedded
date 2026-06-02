@@ -52,12 +52,12 @@ function makeTroubleTrackingHandler(
       for (const el of instances) {
         el.load(lctx);
         if (lctx.noncon.value > 0) {
-          // cktload.c:64-65 — clear the trouble node and element so a stale
-          // blame from a prior iteration does not leak. The device's own
-          // convTest (dioconv.c:61) sets CKTtroubleElt; the NR-layer niConvTest
-          // sets CKTtroubleNode.
+          // cktload.c:64-65 — reset ONLY the trouble node when noncon rises.
+          // CKTtroubleElt is set by each non-converging device during its own
+          // load/convTest (swload.c:96, dioconv.c:61) and must SURVIVE the load
+          // loop so that element's blame reaches the NR reporter; ngspice never
+          // clears CKTtroubleElt here.
           ctx.troubleNode = null;
-          ctx.troubleElt = null;
         }
       }
     },

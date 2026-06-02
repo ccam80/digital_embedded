@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T19:59:57.959Z",
+    "generated": "2026-06-02T20:29:37.050Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -41945,11 +41945,11 @@
         4041
       ],
       "hunkHash": "74783e98cb9e457c",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Transient main-loop done-test (the DCtran for(;;) loop + CKTfinalTime break, simplified in v41). digiTS does not mirror ngspice in-DCtran transient loop control — termination is structured in coordinator.ts:521-535 as a target-driven step loop (advance to each output target until finalTime). The C done-test control structure has no line-isomorphic digiTS counterpart; architectural divergence in the same class as the cktsetup re-entry / CKTlastNode items (analysis/cktsetup.c#h003-h006).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null

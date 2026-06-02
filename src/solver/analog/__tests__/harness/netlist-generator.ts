@@ -815,7 +815,13 @@ function emitPrimitive(
     const dropOutI = requireParam(props, def, modelKey, "dropOutI", rawLabel);
     const iThreshold  = (pullInI + dropOutI) / 2;
     const iHysteresis = (pullInI - dropOutI) / 2;
-    const senseLabel = props.get<string>("ctrlBranch");
+    // ctrlBranch names the controlling V-source. From a composite,
+    // resolveSubElementProps already wrote the canonical sibling label
+    // (`V<parent>_<sub>`); standalone, it is the user's V-source label, which
+    // ngspice infers as a V-source only when it begins with `V`. Canonicalize
+    // to the V prefix (idempotent for the composite path), matching the CCVS /
+    // CCCS senseSourceLabel handling.
+    const senseLabel = canonicalizeSpiceLabel(props.get<string>("ctrlBranch"), "V");
     const wLabel = canonicalizeSpiceLabel(rawLabel, "W");
     const modelName = `CSWMODEL_${wLabel}`;
     const normallyClosed = props.has("normallyClosed") ? !!props.get<boolean>("normallyClosed") : false;

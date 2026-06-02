@@ -1026,10 +1026,10 @@
       "rationale": null
     },
     "analysis/dctran.c#h010": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "Transient main-loop done-test (the DCtran for(;;) loop + CKTfinalTime break, simplified in v41). digiTS does not mirror ngspice in-DCtran transient loop control — termination is structured in coordinator.ts:521-535 as a target-driven step loop (advance to each output target until finalTime). The C done-test control structure has no line-isomorphic digiTS counterpart; architectural divergence in the same class as the cktsetup re-entry / CKTlastNode items (analysis/cktsetup.c#h003-h006)."
     },
     "analysis/dctran.c#h011": {
       "state": "PENDING",

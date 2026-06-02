@@ -297,6 +297,16 @@ export class AcAnalysis {
       );
     }
 
+    // acsetp.c:25-29,35-39 (ACsetParm AC_START/AC_STOP): reject a negative
+    // sweep endpoint before building the frequency array. 0 is permitted
+    // (the v41 bound is `< 0.0`, not `<= 0.0`).
+    if (params.fStart < 0) {
+      throw new Error("Frequency of < 0 is invalid for AC start");
+    }
+    if (params.fStop < 0) {
+      throw new Error("Frequency of < 0 is invalid for AC stop");
+    }
+
     // Step 3: Build frequency array
     const frequencies = buildFrequencyArray(params);
     const numFreq = frequencies.length;
