@@ -510,10 +510,10 @@
       "rationale": "CKTmodCrt C heap alloc of a GENmodel + new GENinstanceFree/GENmodelFree heap-free helpers. digiTS creates model objects in the compiler; JS GC frees them. PLANNING.md 5(a)."
     },
     "analysis/cktncdump.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/dc-operating-point.ts::cktncDump",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktncdump.c::CKTncDump(",
-      "rationale": null
+      "rationale": "CKTncDump node-name C-string filter (strstr(name,\"#\")->strchr(name,\"#\"), cktncdump.c:24). digiTS cktncDump operates purely on numeric matrix indices (i<matrixSize, delta/tol) with no node->name inspection - the C-string name filter has no behavioral counterpart. Front-end DCop/debug stdout dump surface, no digiTS existence. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5 (file/hunk has no behavioral existence in our port). ESC-018."
     },
     "analysis/cktnoise.c#h001": {
       "state": "NO-COUNTERPART",
@@ -828,34 +828,34 @@
       "rationale": null
     },
     "analysis/cktsopt.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsopt.c::static IFparm OPTtbl[] = {",
-      "rationale": null
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Row: cshunt (OPT_CSHUNT)."
     },
     "analysis/cktsopt.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsopt.c::static IFparm OPTtbl[] = {",
-      "rationale": null
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Rows: indverbosity (OPT_INDVERBOSITY), xmu (OPT_XMU)."
     },
     "analysis/cktsopt.c#h006": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsopt.c::static IFparm OPTtbl[] = {",
-      "rationale": null
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Desc-string edit: time -> \"Total analysis time (seconds)\"."
     },
     "analysis/cktsopt.c#h007": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsopt.c::static IFparm OPTtbl[] = {",
-      "rationale": null
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Desc-string edit: trancuriters -> \"Transient iterations for the last time point\"."
     },
     "analysis/cktsopt.c#h008": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/cktsopt.c::static IFparm OPTtbl[] = {",
-      "rationale": null
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Rows: noopac trailing comma + epsmin (OPT_EPSMIN)."
     },
     "analysis/cktspdum.c#h001": {
       "state": "NO-COUNTERPART",
@@ -888,10 +888,10 @@
       "rationale": "CKTtrouble body (continued) — further TRCV-sweep failure-message cases. .dc transfer-curve sweep OUT of scope (#54). NO-COUNTERPART per PLANNING.md §5."
     },
     "analysis/ckttrunc.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-terr.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/ckttrunc.c::CKTtrunc(CKTcircuit *ckt, double *timeStep)",
-      "rationale": null
+      "rationale": "CKTtrunc STEPDEBUG `#endif STEPDEBUG`->`#endif` C-preprocessor comment edit on the STEPDEBUG printf(at time %g, delta %g, CKTdeltaOld[0]) block (ckttrunc.c:73). digiTS ckt-terr.ts is a numerical LTE reimplementation (cktTerr/cktTerrVoltage) with no STEPDEBUG block, no #endif, no CKTdeltaOld[0] printf. C debug-print preprocessor block with no digiTS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-022."
     },
     "analysis/com_optran.h#h001": {
       "state": "NO-COUNTERPART",
@@ -900,10 +900,10 @@
       "rationale": "Prototype header for com_optran (the optran command). optran (transient-based OP) is a separate analysis driver digiTS does not implement; see optran.c. PLANNING.md 5(a) + open question on optran scope."
     },
     "analysis/dcop.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dcop.c::DCop(CKTcircuit *ckt, int notused)",
-      "rationale": null
+      "rationale": "DCop front-end: deletes the commented-out CKTncDump-by-name block and restructures the converged!=0 failure branch (dcop.c:82-96). digiTS DCop is reimplemented as the phase-ladder solveDcOperatingPoint (onPhaseBegin/onPhaseEnd, dcopResult); the failure path emits a dc-op-failed diagnostic, not the C fprintf(stdout,\"DC solution failed\")/CKTncDump-by-name. The v26 commented-block + indented converged!=0 -pre-image is not line-isomorphic; it is a front-end stdout debug dump with no digiTS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-018."
     },
     "analysis/dcpss.c#h001": {
       "state": "NO-COUNTERPART",

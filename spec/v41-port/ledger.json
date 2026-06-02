@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T04:34:43.658Z",
+    "generated": "2026-06-02T05:01:19.171Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 148,
+    "progressEntriesApplied": 161,
     "progressEntriesStaleIgnored": 7
   },
   "files": [
@@ -38940,11 +38940,11 @@
         1677
       ],
       "hunkHash": "e5e54b9508f62a2a",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/dc-operating-point.ts::cktncDump",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTncDump node-name C-string filter (strstr(name,\"#\")->strchr(name,\"#\"), cktncdump.c:24). digiTS cktncDump operates purely on numeric matrix indices (i<matrixSize, delta/tol) with no node->name inspection - the C-string name filter has no behavioral counterpart. Front-end DCop/debug stdout dump surface, no digiTS existence. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5 (file/hunk has no behavioral existence in our port). ESC-018.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -39343,10 +39343,12 @@
         1973
       ],
       "hunkHash": "8f4f05cc162f949e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). CKTop dispatch + new_gmin/OPtran wiring already at v41 post-image in src/solver/analog/dc-operating-point.ts solveDcOperatingPoint: the new_gmin fallback ladder is present and wired at dc-operating-point.ts:391-408 (numGminSteps<=1 -> dynamicGmin; on !converged && !dyngmin falls through to newGmin, gminViaNew gate), matching cktop.c CKTop dispatch. OPtran is a no-op on the default nooptran path (analysis-scope.md), and the OPtran call lives in the recon-blocked cktop.c#h001 (analysis#recon/opTran), out of this hunk. v26 -pre-image (no-new_gmin dispatch) absent; recorded APPLIED against present v41 construct per the ESC-003/ESC-014 precedent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39374,10 +39376,12 @@
         2005
       ],
       "hunkHash": "134778b8c0f3da67",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). cktop.c CKTconvTest has no standalone digiTS counterpart by design; the node-level convergence test it modifies is realized as niConvTest (src/solver/analog/newton-raphson.ts:416, rebuild of ngspice NIconvTest niconv.c:20-83, cited newton-raphson.ts:386-440). v26 -pre-image absent; behavior present, recorded APPLIED."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39405,10 +39409,12 @@
         2114
       ],
       "hunkHash": "15e20890d8a540b2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). dynamic_gmin body already at v41: src/solver/analog/dc-operating-point.ts dynamicGmin (function at :677) uses the v41 factor floor `factor = Math.max(Math.sqrt(factor), 1.00005)` (dc-operating-point.ts:727) and the while(true)+break loop with saveSnapshot/restoreSnapshot (:701-755). v26 bare `factor=sqrt(factor)` -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39436,10 +39442,12 @@
         2151
       ],
       "hunkHash": "8594e321123729cf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). dynamic_gmin success/break + post-loop final NIiter solve already at v41: dc-operating-point.ts dynamicGmin success-break `if (diagGmin <= gtarget) break` (:709-711), failed-ramp break (:738-748), post-loop clean runNR(params.maxIterations, diagGmin) (:765-768). v26 success/failed-flag while-loop -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39467,10 +39475,12 @@
         2354
       ],
       "hunkHash": "ab4f2cd7c02e9292",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). new_gmin is a full port of v41 cktop.c new_gmin: src/solver/analog/dc-operating-point.ts newGmin (function at :810), ramps device CKTgmin (ctx.loadCtx.cktGmin) leaving CKTdiagGmin untouched (:822-824), zeroRhsOldAndState at entry (:818), MODEINITJCT firstmode (:820), per the documented variable map (:798-808). v26 (no new_gmin) -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39498,10 +39508,12 @@
         2396
       ],
       "hunkHash": "9c8b5d1d66829977",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). spice3_gmin already at v41: src/solver/analog/dc-operating-point.ts spice3Gmin (function at :914) ramps diagGmin over numGminSteps decades (gminFactor, :925-946) with MODEINITJCT->MODEINITFLOAT and a final clean solve (:948-952), citing cktop.c:291/319/338. v26 -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39529,10 +39541,12 @@
         2448
       ],
       "hunkHash": "dbc64135623b5fc9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). gillespie_src / spice3_src source-stepping already at v41: src/solver/analog/dc-operating-point.ts gillespieSrc (function at :1017, cktop.c:369-569) captures gminstart (:1027), MODEINITJCT firstmode (:1029), scaleAllSources(0) + single zeroRhsOldAndState entry (:1030-1033); spice3Src (function at :972, cktop.c:583-628) uniform linear ramp. v26 -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39560,10 +39574,12 @@
         2612
       ],
       "hunkHash": "0fc187f0926e08ce",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). gillespie_src adaptive source-ramp body already at v41: src/solver/analog/dc-operating-point.ts gillespieSrc zero-source solve + converged-state snapshot capture and per-step save-on-success/restore-on-retry (cktop.c:463-470/502-509/539-545 cited gillespieSrc :1012-1015, body from :1038). v26 -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -39591,10 +39607,12 @@
         2677
       ],
       "hunkHash": "25016c31ae750753",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). gillespie_src converged-exit (CKTgmin/CKTdiagGmin restore to gminstart) already at v41: src/solver/analog/dc-operating-point.ts gillespieSrc restores gminStart at converged exit (gminStart captured :1027, cktop.c:369-569). v26 -pre-image absent."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -40211,10 +40229,12 @@
         2982
       ],
       "hunkHash": "960664596b0c16eb",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/timestep.ts::TimestepController",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-020). The AlmostEqualUlps(time,CKTtime,3) ignore-guard (cktsetbk.c:27-36, all-+) is present: src/solver/analog/timestep.ts TimestepController.addBreakpoint `if (almostEqualUlps(time, this._lastAcceptedSimTime, 3)) return;` (timestep.ts:778, cited :772-777). _lastAcceptedSimTime is the controller CKTtime. Guard realized by reimplementation (binary-search splice); recorded APPLIED against the present guard. cktsetbk.c#h002 (CKTbreaks null-guard on the beyond-end linear-scan branch) left PENDING: digiTS has no linear CKTbreaks[]/CKTbreakSize end-scan branch (binary-search splice), so that branch is genuinely absent - per ESC-020 a separate disposition."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -40583,11 +40603,11 @@
         3150
       ],
       "hunkHash": "6f32757ecd1a0f67",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Row: cshunt (OPT_CSHUNT).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40614,11 +40634,11 @@
         3159
       ],
       "hunkHash": "8982ca1d818ef596",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Rows: indverbosity (OPT_INDVERBOSITY), xmu (OPT_XMU).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40645,11 +40665,11 @@
         3168
       ],
       "hunkHash": "c7cd4ae850446c5b",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Desc-string edit: time -> \"Total analysis time (seconds)\".",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40676,11 +40696,11 @@
         3177
       ],
       "hunkHash": "3b8a265a2183c46e",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Desc-string edit: trancuriters -> \"Transient iterations for the last time point\".",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40707,11 +40727,11 @@
         3188
       ],
       "hunkHash": "dd492e85d5bd0557",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "OPTtbl[] IFparm option-descriptor table declaration row (cktsopt.c). The OPTtbl is the ngspice option-name->integer-index descriptor table consumed by the .options deck-card parser; digiTS has no OPTtbl integer-index table and no .options card parser - it carries options as typed config fields read via CKTCircuitContext.configure(). This is a pure C declaration (IFparm struct-array row / desc-string) with no behavioral content and no line-isomorphic TS counterpart, the classic ngspice-declaration-with-no-counterpart shape. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-007/ESC-016. Rows: noopac trailing comma + epsmin (OPT_EPSMIN).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40893,11 +40913,11 @@
         3636
       ],
       "hunkHash": "03b82f818180108e",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/ckt-terr.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "CKTtrunc STEPDEBUG `#endif STEPDEBUG`->`#endif` C-preprocessor comment edit on the STEPDEBUG printf(at time %g, delta %g, CKTdeltaOld[0]) block (ckttrunc.c:73). digiTS ckt-terr.ts is a numerical LTE reimplementation (cktTerr/cktTerrVoltage) with no STEPDEBUG block, no #endif, no CKTdeltaOld[0] printf. C debug-print preprocessor block with no digiTS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-022.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -40955,11 +40975,11 @@
         3709
       ],
       "hunkHash": "b24666e683688574",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "DCop front-end: deletes the commented-out CKTncDump-by-name block and restructures the converged!=0 failure branch (dcop.c:82-96). digiTS DCop is reimplemented as the phase-ladder solveDcOperatingPoint (onPhaseBegin/onPhaseEnd, dcopResult); the failure path emits a dc-op-failed diagnostic, not the C fprintf(stdout,\"DC solution failed\")/CKTncDump-by-name. The v26 commented-block + indented converged!=0 -pre-image is not line-isomorphic; it is a front-end stdout debug dump with no digiTS counterpart. Frozen-Phase-0 NO-COUNTERPART per PLANNING.md §5. ESC-018.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -54952,10 +54972,12 @@
         229
       ],
       "hunkHash": "cb2f7535be54a450",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/monte-carlo.ts::SeededRng.gaussian (no current behavioral counterpart - see Q2)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-014). gauss0 already at the v41 split form: src/solver/analog/monte-carlo.ts SeededRng.gauss0 `v1 = 2.0 * this.combLCGTaus() - 1.0; v2 = 2.0 * this.combLCGTaus() - 1.0;` (monte-carlo.ts:360-361, randnumb.c:202-203). v26 `v1=drand();v2=drand();` -pre-image absent - the blocking recon maths-misc#recon/randnumb (APPLIED) built SeededRng straight to v41. Recorded APPLIED against the present v41 construct."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -54983,10 +55005,12 @@
         253
       ],
       "hunkHash": "579d53a6c1f1d862",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/monte-carlo.ts::SeededRng.gaussian (no current behavioral counterpart - see Q2)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-014). The whole new v41 gauss1() function is present line-for-line: src/solver/analog/monte-carlo.ts SeededRng.gauss1 (monte-carlo.ts:376-385, randnumb.c:220-231) - reproducible polar Box-Muller, two uniforms per call, returns v2*fac with no caching latch. All-+ hunk; post-image present. Recorded APPLIED."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -55045,10 +55069,12 @@
         337
       ],
       "hunkHash": "6780580bcd30da31",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/sources/ac-voltage-source.ts::boxMuller / exprand+com_sseed (no current behavioral counterpart - see Q2)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-014). exprand already has no checkseed() call: src/solver/analog/monte-carlo.ts SeededRng.exprand `return -Math.log(this.combLCGTaus()) * mean;` (monte-carlo.ts:430-432, randnumb.c:278-283). The v26 `checkseed();` -line is absent. The +block com_sseed/setseedinfo is ngspice frontend command-layer (wordlist/cp_getvar/srand/getpid/cp_vset) with no behavioral counterpart, consistent with the frozen NO-COUNTERPART rationale on randnumb.c h001-h003. Recorded APPLIED against the present v41 SeededRng."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",

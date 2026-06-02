@@ -1400,6 +1400,123 @@
         "MATCH (reconstruction). VERIFICATION.md sec1a both legs satisfied. SPEC-PRESENCE GATE: spec/v41-port/reconstruction/maths-misc-randnumb.md present in main checkout (RATIFIED 2026-05-30, RNG-1=SEED-INJECTION). (a) Source isomorphism re-derived INDEPENDENTLY (rename-maps NOT consulted) against fresh ref/ngspice/src/maths/misc/randnumb.c. tsFile src/solver/analog/monte-carlo.ts. SeededRng holds eight uint32 state words _s1.._s8 mapped 1:1 to CombState1..8 (randnumb.c:54-59); Park-Miller _state removed. tauS (monte-carlo.ts:308-311) bijective with TauS (randnumb.c:125-129): b=(((state<<c1)^state)>>>c2), return (((state&m)<<c3)^b), every shift/xor/mask forced uint32 via >>>0 (C logical >> on unsigned matches JS >>>). lgcs (:316-318)=LGCS (:131-134) A1*state+A2 via Math.imul(a1,state)+a2 >>>0 (low-32 wrap of C unsigned multiply). combLCGTaus (:323-330)=randnumb.c:140-148: tauS(_s1,13,19,12,0xFFFFFFFE)^tauS(_s2,2,25,4,0xFFFFFFF8)^tauS(_s3,3,11,17,0xFFFFFFF0)^lgcs(_s4,1664525,1013904223), scaled 2.3283064365387e-10 with >>>0 before the double multiply. combLCGTausInt (:334-340)=randnumb.c:154-162 over _s5.._s8, no scaling. drand (:343-345)=2*x-1 (randnumb.c:95-98); next()/uniform() re-rooted onto combLCGTaus/drand. gauss0 (:356-372) bijective with randnumb.c:195-215: polar loop r=v1*v1+v2*v2 while r>=1, fac=sqrt(-2*log(r)/r), glgset=v1*fac, gliset=false, return v2*fac; off-call returns cached _glgset (latch is instance state). gauss1 (:376-385)=randnumb.c:220-231; rgauss (:389-398)=randnumb.c:240-254; poisson (:413-427)=randnumb.c:260-274 (P=exp(-lambda), P*=lambda/k, cap max_k=1000); exprand (:430-432)=randnumb.c:278-283 (-log(u)*mean). setState (:285-303) injects CombState1..8 via >>>0 per RNG-1=SEED-INJECTION (Acceptance #6/#9). Cosine-form Box-Muller deleted. Frontend hunks h001-h003 (checkseed/com_sseed/cp_getvar shell) correctly NOT ported (NO-COUNTERPART); CombLCGTaus2/CombLCGTausInt2 inlined test-duplicates correctly NOT ported (arithmetically identical). Bijective over reconstructed scope. (b) GATE: no ngspice divergence circuit applies (RNG bit stream is not a solver matrix); the test IS the gate per contract. Ran node_modules/.bin/vitest run src/solver/analog/__tests__/monte-carlo.test.ts -t SeededRng in the worktree: 10 passed, 0 failed, 13 skipped. Covers seeded-stream reproducibility, setState bit-identity (combLCGTaus + combLCGTausInt 200 draws each across two streams), gauss0 cached-second-value latch reconstructed from raw uniforms (first==v2*fac, second==v1*fac), polar Box-Muller moments (|mean|<0.1, 0.9<std<1.1), drand [-1,1), combLCGTausInt uint32, exprand reproducible/non-negative, poisson integer in [0,1000]. FILE-SCOPE: git diff --name-only = monte-carlo.ts + monte-carlo.test.ts (recon tsFiles) + .vitest-failures.json (test-runner artifact, not committed). No over-application."
       ],
       "escalation": null
+    },
+    "analysis/cktop.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "8f4f05cc162f949e",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). CKTop dispatch + new_gmin/OPtran wiring already at v41 post-image in src/solver/analog/dc-operating-point.ts solveDcOperatingPoint: the new_gmin fallback ladder is present and wired at dc-operating-point.ts:391-408 (numGminSteps<=1 -> dynamicGmin; on !converged && !dyngmin falls through to newGmin, gminViaNew gate), matching cktop.c CKTop dispatch. OPtran is a no-op on the default nooptran path (analysis-scope.md), and the OPtran call lives in the recon-blocked cktop.c#h001 (analysis#recon/opTran), out of this hunk. v26 -pre-image (no-new_gmin dispatch) absent; recorded APPLIED against present v41 construct per the ESC-003/ESC-014 precedent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "134778b8c0f3da67",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). cktop.c CKTconvTest has no standalone digiTS counterpart by design; the node-level convergence test it modifies is realized as niConvTest (src/solver/analog/newton-raphson.ts:416, rebuild of ngspice NIconvTest niconv.c:20-83, cited newton-raphson.ts:386-440). v26 -pre-image absent; behavior present, recorded APPLIED."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "15e20890d8a540b2",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). dynamic_gmin body already at v41: src/solver/analog/dc-operating-point.ts dynamicGmin (function at :677) uses the v41 factor floor `factor = Math.max(Math.sqrt(factor), 1.00005)` (dc-operating-point.ts:727) and the while(true)+break loop with saveSnapshot/restoreSnapshot (:701-755). v26 bare `factor=sqrt(factor)` -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "8594e321123729cf",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). dynamic_gmin success/break + post-loop final NIiter solve already at v41: dc-operating-point.ts dynamicGmin success-break `if (diagGmin <= gtarget) break` (:709-711), failed-ramp break (:738-748), post-loop clean runNR(params.maxIterations, diagGmin) (:765-768). v26 success/failed-flag while-loop -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "ab4f2cd7c02e9292",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). new_gmin is a full port of v41 cktop.c new_gmin: src/solver/analog/dc-operating-point.ts newGmin (function at :810), ramps device CKTgmin (ctx.loadCtx.cktGmin) leaving CKTdiagGmin untouched (:822-824), zeroRhsOldAndState at entry (:818), MODEINITJCT firstmode (:820), per the documented variable map (:798-808). v26 (no new_gmin) -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "9c8b5d1d66829977",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). spice3_gmin already at v41: src/solver/analog/dc-operating-point.ts spice3Gmin (function at :914) ramps diagGmin over numGminSteps decades (gminFactor, :925-946) with MODEINITJCT->MODEINITFLOAT and a final clean solve (:948-952), citing cktop.c:291/319/338. v26 -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "dbc64135623b5fc9",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). gillespie_src / spice3_src source-stepping already at v41: src/solver/analog/dc-operating-point.ts gillespieSrc (function at :1017, cktop.c:369-569) captures gminstart (:1027), MODEINITJCT firstmode (:1029), scaleAllSources(0) + single zeroRhsOldAndState entry (:1030-1033); spice3Src (function at :972, cktop.c:583-628) uniform linear ramp. v26 -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "0fc187f0926e08ce",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). gillespie_src adaptive source-ramp body already at v41: src/solver/analog/dc-operating-point.ts gillespieSrc zero-source solve + converged-state snapshot capture and per-step save-on-success/restore-on-retry (cktop.c:463-470/502-509/539-545 cited gillespieSrc :1012-1015, body from :1038). v26 -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktop.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "25016c31ae750753",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-019). gillespie_src converged-exit (CKTgmin/CKTdiagGmin restore to gminstart) already at v41: src/solver/analog/dc-operating-point.ts gillespieSrc restores gminStart at converged exit (gminStart captured :1027, cktop.c:369-569). v26 -pre-image absent."
+      ],
+      "escalation": null
+    },
+    "analysis/cktsetbk.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "960664596b0c16eb",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-020). The AlmostEqualUlps(time,CKTtime,3) ignore-guard (cktsetbk.c:27-36, all-+) is present: src/solver/analog/timestep.ts TimestepController.addBreakpoint `if (almostEqualUlps(time, this._lastAcceptedSimTime, 3)) return;` (timestep.ts:778, cited :772-777). _lastAcceptedSimTime is the controller CKTtime. Guard realized by reimplementation (binary-search splice); recorded APPLIED against the present guard. cktsetbk.c#h002 (CKTbreaks null-guard on the beyond-end linear-scan branch) left PENDING: digiTS has no linear CKTbreaks[]/CKTbreakSize end-scan branch (binary-search splice), so that branch is genuinely absent - per ESC-020 a separate disposition."
+      ],
+      "escalation": null
+    },
+    "maths-misc/randnumb.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "cb2f7535be54a450",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-014). gauss0 already at the v41 split form: src/solver/analog/monte-carlo.ts SeededRng.gauss0 `v1 = 2.0 * this.combLCGTaus() - 1.0; v2 = 2.0 * this.combLCGTaus() - 1.0;` (monte-carlo.ts:360-361, randnumb.c:202-203). v26 `v1=drand();v2=drand();` -pre-image absent - the blocking recon maths-misc#recon/randnumb (APPLIED) built SeededRng straight to v41. Recorded APPLIED against the present v41 construct."
+      ],
+      "escalation": null
+    },
+    "maths-misc/randnumb.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "579d53a6c1f1d862",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-014). The whole new v41 gauss1() function is present line-for-line: src/solver/analog/monte-carlo.ts SeededRng.gauss1 (monte-carlo.ts:376-385, randnumb.c:220-231) - reproducible polar Box-Muller, two uniforms per call, returns v2*fac with no caching latch. All-+ hunk; post-image present. Recorded APPLIED."
+      ],
+      "escalation": null
+    },
+    "maths-misc/randnumb.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "6780580bcd30da31",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED 2026-06-02 (kind-1, ESC-014). exprand already has no checkseed() call: src/solver/analog/monte-carlo.ts SeededRng.exprand `return -Math.log(this.combLCGTaus()) * mean;` (monte-carlo.ts:430-432, randnumb.c:278-283). The v26 `checkseed();` -line is absent. The +block com_sseed/setseedinfo is ngspice frontend command-layer (wordlist/cp_getvar/srand/getpid/cp_vset) with no behavioral counterpart, consistent with the frozen NO-COUNTERPART rationale on randnumb.c h001-h003. Recorded APPLIED against the present v41 SeededRng."
+      ],
+      "escalation": null
     }
   }
 }
