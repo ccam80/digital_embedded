@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T19:16:37.888Z",
+    "generated": "2026-06-02T19:59:57.959Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -2769,234 +2769,234 @@
       "ngspiceFile": "src/spicelib/devices/mos3/Makefile.am",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "Automake libmos3_la_SOURCES list. digiTS has no autotools build; MOS3 registers via Mosfet3N/Mosfet3P Definitions in register-all.ts. Both hunks only drop the deleted mos3dest.c/mos3mdel.c source entries (themselves NO-COUNTERPART C-heap-free files)."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "IFparm MOS3mPTable[] model-param table - the source of truth for the level-3 model param set; counterpart is mosfet3.ts MOSFET3_*_PARAM_DEFS / modelRegistry.paramDefs. Two hunks flip alias-row flags (delvt0 IOPR->IOPUR; input_delta IOPR->IOP); the aliased params (delvto/input_delta) are present and unchanged. PENDING, blocked by mos3#recon/wholeClass (no v26 MOS3 baseline in digiTS to apply onto)."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3acld.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3acLoad AC small-signal companion load -> Mosfet3AnalogElement.stampAc(). AC is implemented (analysis-scope.md; project_ac_solver_unified). Hunk is MOS3nextModel/MOS3instances/MOS3nextInstance accessor-macro renames only; AC conductances/cap admittances unchanged. PENDING, blocked by mos3#recon/wholeClass."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3ask.c",
       "status": "modified",
       "hunks": 3,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3ask integer-id IFvalue getter dispatcher (which-id switch returning IFvalue). digiTS has no integer-id ask API - params/outputs are read by name from the property bag / getPinCurrents. Three hunks are MOS3modPtr(here) accessor-macro renames inside the CAPGS/CAPGD/CAPGB overlap-cap getter cases; the underlying quantities exist in the reconstructed device, but the integer-id getter mechanism has no digiTS counterpart (same disposition as dio/jfet2 ask/mask)."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3conv.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3convTest convergence test (cdhat/cbhat current-prediction). In the digiTS unified-interface model the check is folded inline into load() at the Check-flag site (mos3load.c:1045-1051) incrementing ctx.noncon; conceptually Mosfet3AnalogElement.checkConvergence. Hunk is accessor-macro renames only. PENDING, blocked by mos3#recon/wholeClass."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3defs.h",
       "status": "modified",
       "hunks": 4,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "Instance/model structs + state #defines + param-id enums. Four hunks: h001 noise-source enum + sMOS3instance GENinstance plumbing + const node fields (NC); h002 removes the old noise #define block + surrounds the NONOISE MOS3nVar array (NC); h003 sMOS3model GENmodel plumbing (NC); h004 device/model param-id #define->enum reformat - digiTS has no IFparm integer-id dispatch (params resolve by name). The MOS3 state-slot layout (MOSFET3_SCHEMA, 17 slots) is rebuilt by the reconstruction, not from this header."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3del.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3delete - the v41 form is a C-heap FREE() teardown (FREE(inst->MOS3sens)); the v26 form unlinked one instance from a linked list. digiTS is GC-managed; no allocator, no destructor, no instance list, no sensitivity struct. Both hunks are device teardown."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3dest.c",
       "status": "deleted",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "Whole-file deletion of MOS3destroy - a C-heap FREE() loop releasing every MOS3model/MOS3instance. digiTS is GC-managed; no model/instance lists. File deleted in v41."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3dist.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3disto distortion stamp, entered only under D_TWOF1/D_THRF1/D_F1MF2/D_F1PF2/D_2F1MF2 Volterra modes. Distortion not implemented (analysis-scope.md). The single hunk is the accessor-macro rename inside the distortion-mode-gated loop."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3dset.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3dSetup distortion setup (precomputes the cross-derivative Volterra kernels consumed by MOS3disto). Distortion not implemented (analysis-scope.md). The single hunk is the accessor-macro rename."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3ext.h",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "C extern-prototype header. The single hunk only removes the extern decls of the deleted heap fns (MOS3destroy/MOS3mDelete) and re-signatures MOS3delete to the GENinstance teardown form. digiTS has no prototype headers; signatures are TS class members. No surviving declaration change with a counterpart."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3ic.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3getic .ic/UIC initial-condition capture (registered as DEVsetic; grabs icVBS/icVDS/icVGS from external node voltages when not given). digiTS has no per-element setic/getic engine hook - DEFER (non-blocking), same disposition as jfet2 getic (OQ-JFET2-GETIC) and mes getic. The single hunk is the accessor-macro rename."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3init.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "SPICEdev MOS3info dispatch struct converted to C99 designated initialisers. digiTS has no SPICEdev table - registration is the reconstructed Mosfet3N/Mosfet3P component definitions in register-all.ts, method binding is which methods the element class implements. The only non-cosmetic change is DEVdestroy/DEVmodDelete set NULL (the deleted heap fns); every surviving function-pointer disposition is unchanged. No new slot, default, or capability."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3load.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3load DC/transient companion load - the level-3 semi-empirical drain-current core (moseq3: XJ short-channel, ETA static feedback, THETA mobility modulation, VMAX velocity saturation, KAPPA channel-length modulation) plus bulk diodes, Meyer caps, charge integration and Y-matrix stamps -> Mosfet3AnalogElement.load(). Hunk is accessor-macro renames only; the level-3 arithmetic is unchanged v26->v41. PENDING, blocked by mos3#recon/wholeClass."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3mdel.c",
       "status": "deleted",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "Whole-file deletion of MOS3mDelete - a C-heap FREE() unlinking one MOS3model from the model list and freeing its instances. digiTS is GC-managed; no model list. File deleted in v41."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3noi.c",
       "status": "modified",
       "hunks": 3,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3noise noise analysis (noizDens[MOS3NSRCS] thermal/flicker densities, NOISE_ADD_OUTVAR plot names). Noise not implemented (analysis-scope.md). Three hunks: h001 removes a dead char name[] local, h002 accessor renames, h003 NOISE_ADD_OUTVAR macro refactor of the plot-name registration. Whole file belongs to noise."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3par.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3param instance-param setter (m/w/l/as/ad/ps/pd/nrs/nrd/off/icvbs/icvds/icvgs/temp/dtemp/ic) -> Mosfet3AnalogElement.setParam()/constructor. h001 is the cp_getvar(\"scale\",...) signature bump (extra arg) + switch-spacing cosmetics (scale is upstream in digiTS, no cp_getvar global - same convention as MOS1); h002 adds explicit FALLTHROUGH comments on the MOS3_IC vector parse (behavior unchanged, 3->2->1 D-S/G-S/B-S fallthrough). PENDING, blocked by mos3#recon/wholeClass."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3pzld.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3pzLoad(..., SPcomplex *s) pole-zero load - stamps the complex admittance for the PZ sweep. Pole-zero not implemented (analysis-scope.md). The single hunk is the accessor-macro rename."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3sacl.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3sAcLoad sensitivity AC-load - operates on ckt->CKTsenInfo / info->SENparms / MOS3senParmNo. digiTS has no per-device sensitivity (no CKTsenInfo/SenCond/SENstruct). Two hunks: h001 accessor renames inside the PERTURBATION loop, h002 an (int) cast on MOS3sens_l in the senParmNo index. Whole file belongs to sensitivity."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3set.c",
       "status": "modified",
       "hunks": 3,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3setup model defaults + per-instance prime-node alloc + 22-cell TSTALLOC (PORT -> Mosfet3AnalogElement.setup); MOS3unsetup node teardown (NO-COUNTERPART - digiTS has no device teardown, engine rebuilt fresh per compile). Three hunks: h001/h002 MOS3setup accessor renames (PORT); h003 the MOS3unsetup drain/source-prime delete-order rewrite (>0 guards) -> NO-COUNTERPART."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3sld.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3sLoad sensitivity load - computes charge sensitivities (MOS3dphi*_dl/dw) keyed on info->SENparms/MOS3senParmNo. digiTS has no per-device sensitivity. Two hunks: h001 accessor renames, h002 an (int) cast on MOS3sens_l in the senParmNo index. Whole file belongs to sensitivity."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3sprt.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3sPrint sensitivity debug printout (printf of LEVEL 3 MOSFET sensitivity values). digiTS has no sensitivity analysis and no per-device stdout. The single hunk is the accessor-macro rename."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3sset.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3sSetup sensitivity setup (SENstruct *info) - assigns MOS3senParmNo into the sensitivity parameter table. digiTS has no SENstruct/sensitivity analysis. The single hunk is the accessor-macro rename."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3supd.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
+      "classification": "NO-COUNTERPART",
       "tsFile": null,
-      "planningNote": null
+      "planningNote": "MOS3sUpdate sensitivity update - recomputes charge sensitivities (MOS3dphi*_dl/dw) into the sensitivity tables. digiTS has no per-device sensitivity. Two hunks: h001 accessor renames, h002 an (int) cast on MOS3sens_l in the senParmNo index. Whole file belongs to sensitivity."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3temp.c",
       "status": "modified",
       "hunks": 2,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3temp temperature pass - model preprocessing (oxideCapFactor, gamma/phi-from-nsub, alpha, coeffDepLayWidth, narrowFactor) + per-instance corrections (tTransconductance/tSurfMob/tPhi/tVto/tVbi/tSatCur, junction-cap temp scaling, vcrit) -> Mosfet3AnalogElement.computeTemperature()/_computeTempInstance(). Two hunks are accessor-macro renames over the model walk (h001) and instance walk (h002). PENDING, blocked by mos3#recon/wholeClass."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": "src/spicelib/devices/mos3/mos3trun.c",
       "status": "modified",
       "hunks": 1,
-      "classification": null,
-      "tsFile": null,
-      "planningNote": null
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/mosfet3.ts",
+      "planningNote": "MOS3trunc LTE/timestep - CKTterr on the three Meyer-gate charges MOS3qgs/MOS3qgd/MOS3qgb -> Mosfet3AnalogElement.getLteTimestep() (cktTerr on QGS/QGD/QGB). The single hunk is accessor-macro renames over the model/instance walk. PENDING, blocked by mos3#recon/wholeClass."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/mos6.md",
@@ -28922,11 +28922,11 @@
         50
       ],
       "hunkHash": "01e53abe5fc3ff73",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Automake libmos3_la_SOURCES fragment removing the mos3dest.c source entry. digiTS has no autotools build; the component is registered via src/components/register-all.ts. The removed entry is itself a C-heap-free file (NO-COUNTERPART). No behavioral content.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -28953,11 +28953,11 @@
         58
       ],
       "hunkHash": "16f2c88514781de9",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Automake libmos3_la_SOURCES fragment removing the mos3mdel.c source entry. digiTS has no autotools build; registration is via register-all.ts. The removed entry is itself a C-heap-free file (NO-COUNTERPART). No behavioral content.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -28985,7 +28985,7 @@
       ],
       "hunkHash": "dc008af5271dae1e",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3*Element model param defs (MOSFET3_*_PARAM_DEFS / modelRegistry.paramDefs)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29016,7 +29016,7 @@
       ],
       "hunkHash": "417272b277b68dad",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3*Element model param defs (MOSFET3_*_PARAM_DEFS / modelRegistry.paramDefs)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29047,7 +29047,7 @@
       ],
       "hunkHash": "f333f85cab744bf6",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.stampAc()",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29077,11 +29077,11 @@
         116
       ],
       "hunkHash": "e7740df267439019",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3ask integer-id IFvalue getter dispatcher, MOS3_CAPGS case (gate-source cap + overlap). digiTS has no integer-id ask API - params/outputs are read by name from the property bag / getPinCurrents. The hunk is MOS3modPtr(here)-> accessor-macro renames inside this getter case; the underlying quantity exists in the reconstructed device, but the which-id getter mechanism has no digiTS counterpart (same disposition as dio/jfet2 ask/mask).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29108,11 +29108,11 @@
         131
       ],
       "hunkHash": "e89f791fa9cede34",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3ask integer-id IFvalue getter dispatcher, MOS3_CAPGD case (gate-drain cap + overlap). digiTS has no integer-id ask API - params/outputs are read by name from the property bag. The hunk is MOS3modPtr(here)-> accessor-macro renames inside this getter case; the which-id getter mechanism has no digiTS counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29139,11 +29139,11 @@
         146
       ],
       "hunkHash": "b64d9538d6b9337a",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3ask integer-id IFvalue getter dispatcher, MOS3_CAPGB case (gate-bulk cap + overlap). digiTS has no integer-id ask API - params/outputs are read by name from the property bag. The hunk is MOS3modPtr(here)-> accessor-macro renames inside this getter case; the which-id getter mechanism has no digiTS counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29171,7 +29171,7 @@
       ],
       "hunkHash": "bcb11ac26316024c",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.checkConvergence (folded inline into load() at the Check-flag site per the unified-interface model)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29201,11 +29201,11 @@
         210
       ],
       "hunkHash": "36d05da39ae12930",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Mixed hunk, both halves NO-COUNTERPART: (1) adds the MOS3RDNOIZ/MOS3RSNOIZ/MOS3IDNOIZ/MOS3FLNOIZ/MOS3TOTNOIZ/MOS3NSRCS noise-source-index enum - indices into the MOS3nVar noise-density array consumed solely by MOS3noise; noise not implemented (analysis-scope.md). (2) embeds struct GENinstance gen into sMOS3instance and macro-lifts MOS3modPtr/MOS3nextInstance/MOS3name/MOS3states onto gen.GEN*, plus const-qualifies the d/g/s/b node-id fields - pure C struct-layout/dispatch plumbing; digiTS holds instance fields as TS members and state in the reconstructed MOSFET3_SCHEMA StatePool, with no GENinstance base, no IFuid, no instance list.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29232,11 +29232,11 @@
         226
       ],
       "hunkHash": "7f46a48b367bc333",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Removes the old MOS3RDNOIZ..MOS3NSRCS #define block (relocated to h001's enum) and surrounds the NONOISE-guarded MOS3nVar[NSTATVARS][MOS3NSRCS] noise-density array declaration. Both the removed defines and the MOS3nVar array are noise-only constructs; noise not implemented (analysis-scope.md). No consumer in any implemented analysis.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29263,11 +29263,11 @@
         247
       ],
       "hunkHash": "3c7e5d8ce1c75b06",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Embeds struct GENmodel gen into sMOS3model and macro-lifts MOS3modType/MOS3nextModel/MOS3instances/MOS3modName onto gen.GEN*, dropping the hand-rolled linked-list fields. Pure C struct-layout/dispatch plumbing; digiTS has no GENmodel base, no model list, no IFuid - the reconstructed device holds model params as TS members.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29294,11 +29294,11 @@
         519
       ],
       "hunkHash": "24ef4da85ff7c526",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Device-question and model-parameter id #define->enum reformat (MOS3_W..MOS3_DTEMP and MOS3_MOD_VTO..MOS3_MOD_DELVTO renumbered into C enums, byte-identical values). This is the IFparm dispatch-id table; digiTS has no IFparm ask/param-id integer dispatch - params resolve by name in setParam/paramDefs. No new param, no changed default, no value change (same disposition as jfet2 defs.h#h004).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29325,11 +29325,11 @@
         532
       ],
       "hunkHash": "defad757a7be206c",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3delete file-header comment-block removal (drops the empty /* */ block above the includes). Part of the device-teardown file; digiTS has no device teardown (engine rebuilt fresh per compile). No behavioral content.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29356,11 +29356,11 @@
         560
       ],
       "hunkHash": "813d34e5baad3f0b",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Rewrites MOS3delete from the v26 linked-list-unlink-and-FREE(here) form to the v41 GENinstance teardown form (MOS3delete(GENinstance *gen_inst) { FREE(inst->MOS3sens); }). digiTS is GC-managed; no allocator, no destructor, no instance list, no MOS3sens sensitivity struct. Device teardown has no digiTS counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29387,11 +29387,11 @@
         603
       ],
       "hunkHash": "d7097ff99cadede6",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Whole-file deletion of MOS3destroy - a C-heap FREE() loop releasing every MOS3model and MOS3instance. digiTS is GC-managed; no model/instance lists. File deleted in v41.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29418,11 +29418,11 @@
         622
       ],
       "hunkHash": "1d28813266a924ee",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3disto distortion stamp, entered only under D_TWOF1/D_THRF1/D_F1MF2/D_F1PF2/D_2F1MF2 Volterra modes (CKTcurJob == DISTOAN). Distortion not implemented: no distortion engine file, no distortion AnalogEngine method, no distortion MCP tool (analysis-scope.md). The single hunk is the linked-list-walk accessor rename inside the distortion-mode-gated loop.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29449,11 +29449,11 @@
         641
       ],
       "hunkHash": "4c501189b625e1da",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3dSetup precomputes the cross-derivative Volterra kernels consumed by MOS3disto. Distortion not implemented (analysis-scope.md). The single hunk is the linked-list-walk accessor rename.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29480,11 +29480,11 @@
         659
       ],
       "hunkHash": "06f11486ed3ccf0a",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "C extern-prototype header. The hunk removes the extern decls of MOS3destroy and MOS3mDelete (deleted C-heap-free functions) and re-signatures MOS3delete from (GENmodel*,IFuid,GENinstance**) to (GENinstance*) - the device-teardown form. digiTS has no prototype headers; signatures are TS class members. No surviving declaration change with a counterpart.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29511,11 +29511,11 @@
         674
       ],
       "hunkHash": "eddb29af4bd8a665",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3getic .ic/UIC initial-condition capture (registered as DEVsetic; seeds MOS3icVBS/icVDS/icVGS from external node voltages when not given). digiTS has no per-element setic/getic engine hook - engine-phase-deferred (non-blocking), same disposition as jfet2 getic (OQ-JFET2-GETIC) and mes getic. The single hunk is the accessor-macro rename over the model/instance walk.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29542,11 +29542,11 @@
         804
       ],
       "hunkHash": "e319e4bf441ae4f0",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICEdev MOS3info dispatch struct converted to C99 designated initialisers. digiTS has no SPICEdev table - registration is the reconstructed Mosfet3N/Mosfet3P component definitions in register-all.ts, and which DEV* slots are non-NULL is captured by which methods the element class implements. Examined hunk-by-hunk: every surviving function-pointer assignment is unchanged v26->v41; the only non-cosmetic change is DEVdestroy/DEVmodDelete set NULL (the deleted heap fns). No new slot, default, or capability.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29574,7 +29574,7 @@
       ],
       "hunkHash": "a86cb65739202037",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.load()",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29604,11 +29604,11 @@
         869
       ],
       "hunkHash": "e63a5c1a7046e729",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Whole-file deletion of MOS3mDelete - a C-heap FREE() unlinking one MOS3model from the model list and freeing its instances. digiTS is GC-managed; no model list. File deleted in v41.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29635,11 +29635,11 @@
         881
       ],
       "hunkHash": "5f93428bfe66c1bb",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Inside MOS3noise (noise analysis): removes the now-dead char name[N_MXVLNTH] local used to build noise plot names. Noise not implemented: no noise method on AnalogElement, no noise engine, no noise MCP tool (analysis-scope.md).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29666,11 +29666,11 @@
         892
       ],
       "hunkHash": "3acc3abac7fdb35a",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Inside MOS3noise: MOS3nextModel/MOS3instances/MOS3nextInstance accessor-macro renames over the noise model/instance walk. The enclosing routine is noise analysis; noise not implemented (analysis-scope.md).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29697,11 +29697,11 @@
         941
       ],
       "hunkHash": "69d5766215f678d1",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "Inside MOS3noise: replaces the hand-rolled TREALLOC/IFnewUid plot-name emission with NOISE_ADD_OUTVAR for the N_DENS and INT_NOIZ noise-output cases. Noise not implemented (analysis-scope.md).",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29729,7 +29729,7 @@
       ],
       "hunkHash": "91437846517a3d67",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setParam() / constructor (instance param setter; scale is upstream, switch-spacing cosmetic)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29760,7 +29760,7 @@
       ],
       "hunkHash": "c58173434e886dfd",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setParam() MOS3_IC vector parse (3->2->1 D-S/G-S/B-S fallthrough)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29790,11 +29790,11 @@
         995
       ],
       "hunkHash": "6f0eb5803744d453",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3pzLoad(..., SPcomplex *s) stamps the complex admittance for the pole-zero sweep. Pole-zero not implemented: no PZ method on the AnalogEngine interface, no PZ engine file, no PZ MCP tool (analysis-scope.md). The single hunk is the accessor-macro rename.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29821,11 +29821,11 @@
         1012
       ],
       "hunkHash": "ceba28b792120f9a",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sAcLoad sensitivity AC-load - operates on ckt->CKTsenInfo with SENstatus = PERTURBATION over the state vector. digiTS implements no per-device sensitivity (no CKTsenInfo/SenCond/SENstruct). The hunk is the accessor-macro rename inside the perturbation loop. Whole file belongs to sensitivity.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29852,11 +29852,11 @@
         1023
       ],
       "hunkHash": "6ec2b4bf0dbe50b7",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sAcLoad sensitivity AC-load, the SENparms iparmno loop. Adds an (int) cast on here->MOS3sens_l in the (MOS3senParmNo + sens_l) sensitivity-parameter index. digiTS has no per-device sensitivity (no SENparms/senParmNo). Whole file belongs to sensitivity.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29884,7 +29884,7 @@
       ],
       "hunkHash": "e997e3c24f4af758",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setup() (model-default / type-default walk)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29915,7 +29915,7 @@
       ],
       "hunkHash": "6058332de2f6d207",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setup() (instance walk / geometry-IC defaults / prime-node alloc / 22-cell TSTALLOC)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -29945,11 +29945,11 @@
         1081
       ],
       "hunkHash": "d1c3a26beac52013",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3unsetup node teardown - CKTdltNNum on the drain/source prime nodes with the v41 (>0) delete-order rewrite. digiTS has no device teardown; the engine is rebuilt fresh per compile (no CKTdltNNum analogue, no persistent prime-node pool to release). Same disposition as the delete/destroy/unsetup family.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -29976,11 +29976,11 @@
         1100
       ],
       "hunkHash": "9fb4f9d12dcb93c4",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sLoad sensitivity load - computes charge sensitivities into the sensitivity tables keyed on info->SENparms/MOS3senParmNo. digiTS implements no per-device sensitivity (no CKTsenInfo/SenCond). The hunk is the accessor-macro rename over the model/instance walk. Whole file belongs to sensitivity.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -30007,11 +30007,11 @@
         1112
       ],
       "hunkHash": "5164cd1bee547e61",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sLoad sensitivity load, the sens_w branch (Osxp*_dw stores). Adds an (int) cast on here->MOS3sens_l in the (MOS3senParmNo + sens_l) sensitivity-parameter index. digiTS has no per-device sensitivity. Whole file belongs to sensitivity.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -30038,11 +30038,11 @@
         1133
       ],
       "hunkHash": "af8228868a4479c4",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sPrint sensitivity debug printout (printf of LEVEL 3 MOSFET sensitivity model/instance values). digiTS has no sensitivity analysis and no per-device stdout. The single hunk is the accessor-macro rename.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -30069,11 +30069,11 @@
         1152
       ],
       "hunkHash": "0c2f4810f04768b3",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sSetup(SENstruct *info, ...) sensitivity setup - assigns MOS3senParmNo into the SENstruct sensitivity-parameter table. digiTS has no SENstruct and no sensitivity analysis (analysis-scope.md). The single hunk is the accessor-macro rename.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -30100,11 +30100,11 @@
         1171
       ],
       "hunkHash": "c376eded2dcb41bb",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sUpdate sensitivity update - recomputes charge sensitivities (MOS3dphi*_dl) into the sensitivity tables. digiTS has no per-device sensitivity. The hunk is the accessor-macro rename over the model/instance walk. Whole file belongs to sensitivity.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -30131,11 +30131,11 @@
         1183
       ],
       "hunkHash": "aa36a400882354ca",
-      "state": "PENDING",
+      "state": "NO-COUNTERPART",
       "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "MOS3sUpdate sensitivity update, the sens_w branch (sxp*_dw accumulation). Adds an (int) cast on here->MOS3sens_l in the (MOS3senParmNo + sens_l) sensitivity-parameter index. digiTS has no per-device sensitivity. Whole file belongs to sensitivity.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": "mos3#recon/wholeClass"
@@ -30163,7 +30163,7 @@
       ],
       "hunkHash": "bbd8d2324f430296",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.computeTemperature() (model preprocessing walk)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -30194,7 +30194,7 @@
       ],
       "hunkHash": "2bed43ce26578336",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement._computeTempInstance() (per-instance correction walk)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -30225,7 +30225,7 @@
       ],
       "hunkHash": "3ba8359f36ce67cb",
       "state": "PENDING",
-      "tsFunction": null,
+      "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.getLteTimestep() (cktTerr on QGS/QGD/QGB)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
@@ -63088,7 +63088,18 @@
       "kind": "reconstruction",
       "diffDoc": "spec/ngspice-v41-model-diffs/mos3.md",
       "ngspiceFile": null,
-      "ngspiceBaseline": [],
+      "ngspiceBaseline": [
+        "src/spicelib/devices/mos3/mos3defs.h",
+        "src/spicelib/devices/mos3/mos3.c",
+        "src/spicelib/devices/mos3/mos3par.c",
+        "src/spicelib/devices/mos3/mos3mpar.c",
+        "src/spicelib/devices/mos3/mos3set.c",
+        "src/spicelib/devices/mos3/mos3temp.c",
+        "src/spicelib/devices/mos3/mos3load.c",
+        "src/spicelib/devices/mos3/mos3acld.c",
+        "src/spicelib/devices/mos3/mos3conv.c",
+        "src/spicelib/devices/mos3/mos3trun.c"
+      ],
       "fileStatus": null,
       "hunkIndex": 0,
       "hunkHeader": null,
@@ -63099,7 +63110,7 @@
       "addedLines": 0,
       "removedLines": 0,
       "docLineRange": null,
-      "title": "MOS level-3 whole-class build",
+      "title": "Build the complete ngspice MOS LEVEL 3 (semi-empirical short-channel) MOSFET device as a new digiTS analog element (4-terminal D/G/S/B), faithful to the v26 ngspice baseline: the level-3 drain-current core (moseq3 - XJ short-channel fshort, ETA static-feedback threshold shift, THETA gate-mobility modulation, VMAX velocity saturation, KAPPA channel-length modulation), bulk diodes + Meyer caps + charge integration, 17-slot StatePool schema, 22-cell TSTALLOC, the model preprocessing temperature pass (gamma/phi-from-nsub, alpha, coeffDepLayWidth, narrowFactor), AC small-signal load, LTE/trunc, and instance/model param setters. MOS3 does not exist in digiTS today (mosfet.ts is level-1 only); reconstruct to v26 so the v41 diff hunks apply as ordinary per-hunk deltas.",
       "spec": "spec/v41-port/reconstruction/mos3-wholeClass.md",
       "specExists": true,
       "tsFile": "src/components/semiconductors/mosfet3.ts",
@@ -63110,7 +63121,7 @@
         "src/components/semiconductors/__tests__/mosfet3.test.ts",
         "src/components/semiconductors/__tests__/mosfet3-mcp.test.ts"
       ],
-      "tsFunction": null,
+      "tsFunction": "Mosfet3AnalogElement (setup/load/stampAc/computeTemperature/_computeTempInstance/getLteTimestep/setParam/checkConvergence) + MOSFET3_SCHEMA 17-slot state schema + MOSFET3_*_PARAM_DEFS + Mosfet3NDefinition/Mosfet3PDefinition + src/components/register-all.ts registration (devQmeyer made reachable from mosfet.ts)",
       "blocks": [
         "mos3/Makefile.am#h001",
         "mos3/Makefile.am#h002",

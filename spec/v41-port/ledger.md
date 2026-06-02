@@ -1,6 +1,6 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-02T19:16:37.888Z
+Generated: 2026-06-02T19:59:57.959Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
@@ -19,11 +19,11 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 477 |
+| PENDING        | 446 |
 | APPLIED        | 192 |
 | ESCALATED      | 6 |
 | STALE          | 7 |
-| NO-COUNTERPART | 1134 |
+| NO-COUNTERPART | 1165 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
 is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED, no STALE). A STALE item
@@ -376,32 +376,32 @@ never a full re-port.
 | src/spicelib/devices/mos2/mos2supd.c | modified | 2 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/mos2/mos2temp.c | modified | 2 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/mos2/mos2trun.c | modified | 1 | NO-COUNTERPART | _TBD_ |
-| src/spicelib/devices/mos3/Makefile.am | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3acld.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3ask.c | modified | 3 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3conv.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3defs.h | modified | 4 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3del.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3dest.c | deleted | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3dist.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3dset.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3ext.h | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3ic.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3init.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3load.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3mdel.c | deleted | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3noi.c | modified | 3 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3par.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3pzld.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3sacl.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3set.c | modified | 3 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3sld.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3sprt.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3sset.c | modified | 1 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3supd.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3temp.c | modified | 2 | _TBD_ | _TBD_ |
-| src/spicelib/devices/mos3/mos3trun.c | modified | 1 | _TBD_ | _TBD_ |
+| src/spicelib/devices/mos3/Makefile.am | modified | 2 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3.c | modified | 2 | PORT | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3acld.c | modified | 1 | PORT | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3ask.c | modified | 3 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3conv.c | modified | 1 | PORT | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3defs.h | modified | 4 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3del.c | modified | 2 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3dest.c | deleted | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3dist.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3dset.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3ext.h | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3ic.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3init.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3load.c | modified | 1 | PORT | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3mdel.c | deleted | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3noi.c | modified | 3 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3par.c | modified | 2 | PORT | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3pzld.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3sacl.c | modified | 2 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3set.c | modified | 3 | REVIEW-CLASS | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3sld.c | modified | 2 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3sprt.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3sset.c | modified | 1 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3supd.c | modified | 2 | NO-COUNTERPART | _TBD_ |
+| src/spicelib/devices/mos3/mos3temp.c | modified | 2 | PORT | src/components/semiconductors/mosfet3.ts |
+| src/spicelib/devices/mos3/mos3trun.c | modified | 1 | PORT | src/components/semiconductors/mosfet3.ts |
 | src/spicelib/devices/mos6/Makefile.am | modified | 1 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/mos6/mos6ask.c | modified | 3 | NO-COUNTERPART | _TBD_ |
 | src/spicelib/devices/mos6/mos6conv.c | modified | 1 | NO-COUNTERPART | _TBD_ |

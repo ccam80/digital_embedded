@@ -171,8 +171,9 @@ pass here first.
 | mos1 | `NMOS`, `PMOS` | `mosfet-inverter.dts` | ~EXISTS |
 | vdmos | `VDMOSN`, `VDMOSP` | `vdmos-power-switch.dts` (+ ac/primenode/bodydiode/quasisat/selfheat) | ~EXISTS |
 | jfet | `NJFET`, `PJFET` | `jfet-gate.dts` (DcVsrc + R + JFET amp) | ＋AUTHOR |
-| jfet2 | (built by `jfet2#recon/wholeClass`) | `jfet2-gate.dts` | ＋AUTHOR (with recon) |
-| mes | (built by `mes#recon/wholeClass`) | `mes-gate.dts` | ＋AUTHOR (with recon) |
+| jfet2 | (built by `jfet2#recon/wholeClass`) | `src/solver/analog/__tests__/ngspice-parity/fixtures/jfet2-gate.dts` | RUNNABLE — gateKind=`harness`; the .dts is authored by the GateMerge stage against the freshly-built class (MCP→worktree) then harness-gated |
+| mes | (built by `mes#recon/wholeClass`) | `src/solver/analog/__tests__/ngspice-parity/fixtures/mes-gate.dts` | RUNNABLE — gateKind=`harness`; authored by GateMerge against the built class |
+| mos3 | (built by `mos3#recon/wholeClass`) | `src/solver/analog/__tests__/ngspice-parity/fixtures/mos3-gate.dts` | RUNNABLE — gateKind=`harness`; authored by GateMerge against the built class (after the 43-hunk PORT/NC classification in `planning/mos3-decisions.json`) |
 
 ### Engine reconstructions (own targeted fixtures)
 The shared solver / NR / integration / sparse paths are gated implicitly by every
@@ -197,7 +198,7 @@ Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the devi
 **Deferred — cannot be a standalone `.dts` now; authored when the device's own port/recon lands:**
 - `csw-gate` — `CurrentControlledSwitchDefinition` is `internalOnly: true` (typeId −1), not placeable via the builder. csw IS ported, but its parity needs the component made placeable, or a hand-built deck / Surface-1 element test — a harness-surface gap.
 - `asrc-gate` — `src/components/active/bsource.ts` does not exist yet; the B source is built by the asrc port (#19/#27), which also adds the generator's B-source emitter. Fixture authored then.
-- `jfet2-gate`, `mes-gate` — components built by their `wholeClass` recons; fixtures authored with the recon.
+- `jfet2-gate`, `mes-gate`, `mos3-gate` — **NO LONGER DEFERRED** (2026-06-03): each device class is built by its `wholeClass` recon, and the harness gate fixture is authored by the GateMerge stage against the freshly-built class (MCP pointed at the worktree, where `circuit_build`/`circuit_save` can instantiate the device), then harness-gated bit-exact vs ngspice. mos3 additionally required its 43 v41 hunks classified PORT (core device → `mosfet3.ts`) vs NO-COUNTERPART (sensitivity/noise/distortion/pole-zero/delete/struct families) in `planning/mos3-decisions.json`.
 - `nodeset-gate` / `ic-gate` — **NO LONGER DEFERRED** (input surface built 2026-06-01). The harness input surface for `.nodeset`/`.ic` now exists: `ComparisonSession` resolves author/`.dts`-supplied nodeset/IC NAMES → digiTS node IDs (`_resolveNodesetNames` / `_resolveIcNames`), emits them as `.nodeset`/`.ic` cards on the auto-generated ngspice deck (`netlist-generator.ts`), seeds the resolved ICs into the digiTS compiled circuit's `ics` Map, and `harness_start` reads optional `circuit.nodesets`/`circuit.ics` objects from the `.dts` JSON so `harness_start({dtsPath})` alone self-contains the stimulus. Both fixtures DRIVE the harness pre-port (ngspice honours the cards; digiTS still uses the blanket 1e10 pin, so a stimulus-driven divergence surfaces — the recon's job to close).
 - `tf-gate` — no `.tf` surface in `src/headless` or `scripts/mcp`; built by `analysis#recon/tf`. Fixture authored then.
 - randnumb — RUNNABLE NOW (not deferred): gateKind=`self-compare`, the loop runs `monte-carlo.test.ts` (seeded reproducibility) as the gate; no `.dts` divergence circuit. Only the bit-exact-via-TRNOISE check (Acceptance #9) defers to vsrc's noise arm.
