@@ -769,3 +769,63 @@ Verifier pass over the 7 vsrc functionGroups in worktree `.wt/vsrc`. 22 hunks re
 - **digiTS:** `src/components/sources/ac-voltage-source.ts` — the PORTABLE CORE of h002 IS present and bijective (acMag default 1 / acPhase default 0 at 940-941; `acReal=acMag*cos(acPhase*π/180)`, `acImag=acMag*sin(...)` at stampAc 1310-1312). The RFSPICE port machinery is correctly NO-COUNTERPART. But the `ERR_INFO` value-warning rewrite has NO counterpart: Grep = zero matches for `IFerrorf`/`ERR_INFO`/`DC 0 assumed`/`time=0 value`. digiTS has no `SPfrontEnd` device-warning channel. The warning is diagnostic-only (no matrix/RHS effect, no numerical-parity impact), but it is an unported v41 construct.
 - **Architecture change required:** a front-end/device warning-emission channel — beyond `ac-voltage-source.ts`.
 - **Decision needed from user:** frozen NO-COUNTERPART (front-end ERR_INFO diagnostic, no numerical effect) vs authorize a device-warning channel.
+
+
+## isrc (independent current source) — TRNOISE/TRRANDOM state-lifecycle gap
+
+Same root cause as the ratified vsrc escalations (vsrcload.c#h013, vsrcacct.c#h008/h009):
+`maths-misc#recon/randnumb` (APPLIED) delivered only the bare `SeededRng` primitives
+(`src/solver/analog/monte-carlo.ts`), NOT the `trnoise_state` / `trrandom_state`
+lifecycle subsystem (`trnoise_state_init/_get/_free`, `trrandom_state_init/_get`, the
+f_alpha 1/f synthesizer, the RTS trap state machine — ngspice frontend `1-f-code.c`).
+The isrc reconstruction (`isrc#recon/coeffWaveforms`, APPLIED) built every non-noise
+waveform arm to v41 but the TRNOISE/TRRANDOM branch of
+`AcCurrentSourceAnalogImpl._initCoeffModel` (ac-current-source.ts:463-470) THROWS,
+because the state subsystem it would construct is absent.
+
+### ESC-isrc-par-trnoise-free — `isrc/isrcpar.c#h003` (ISRCparam TRNOISE alter-free)
+- **Trigger:** cross-subsystem dependency (§6). Faithful port requires the `trnoise_state` subsystem, outside the functionGroup tsFile.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/isrc/isrcpar.c:213-217` (diff `isrc.md` 1098-1108): adds `trnoise_state_free(here->ISRCtrnoise_state);` ahead of the `trnoise_state_init(NA,TS,NALPHA,NAMP,RTSAM,RTSCAPT,RTSEMT)` constructor, so an `alter` command frees the prior generator state before re-init.
+- **digiTS:** `src/components/sources/ac-current-source.ts:463-470` — the `_initCoeffModel` TRNOISE branch throws (no `_trnoiseState`, no `trnoise_state_init`). The v41 `+` lines have no construct to land in.
+- **Architecture change required:** build the `trnoise_state` lifecycle subsystem (1-f-code.c equivalent) beyond `ac-current-source.ts`.
+- **Decision needed from user:** frozen NO-COUNTERPART (TRNOISE state lifecycle) vs authorize the trnoise_state subsystem recon (task #24).
+
+### ESC-isrc-par-trrandom-free — `isrc/isrcpar.c#h004` (ISRCparam TRRANDOM alter-free)
+- **Trigger:** cross-subsystem dependency (§6). Faithful port requires the `trrandom_state` subsystem, outside the functionGroup tsFile.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/isrc/isrcpar.c:242-246` (diff `isrc.md` 1109-1118): adds `tfree(here->ISRCtrrandom_state);` ahead of the `trrandom_state_init(rndtype,TS,TD,PARAM1,PARAM2)` constructor, so an `alter` command frees the prior generator state before re-init.
+- **digiTS:** `src/components/sources/ac-current-source.ts:463-470` — the `_initCoeffModel` TRRANDOM branch throws (no `_trrandomState`, no `trrandom_state_init`). The v41 `+` lines have no construct to land in.
+- **Architecture change required:** build the `trrandom_state` lifecycle subsystem beyond `ac-current-source.ts`.
+- **Decision needed from user:** frozen NO-COUNTERPART (TRRANDOM state lifecycle) vs authorize the trrandom_state subsystem recon (task #24).
+
+### ESC-isrc-acct-newcompat — `isrc/isrcacct.c#h004` (ISRCaccept PULSE newcompat.xs arm)
+- **Raised by:** verifier
+- **Trigger:** cross-subsystem / Phase-0 split required (§6). Faithful application needs a `newcompat`/XSPICE compat-mode subsystem digiTS lacks, or a Phase-0 hunk split to NO-COUNTERPART the verifier may not perform (§7).
+- **ngspice:** `ref/ngspice/src/spicelib/devices/isrc/isrcacct.c:83-93` + `:98-100` (diff `isrc.md` 155-165, inside hunk `#h004` docLineRange 130-269): the `if (newcompat.xs) { phase=PHASE/360; phase=fmod(phase,1); deltat=phase*PER; while(deltat>0) deltat-=PER; time+=deltat; tshift=TD-deltat; }` phase-normalization arm and the `if (!newcompat.xs && time>tmax) {/* nothing */}` guard.
+- **digiTS:** `src/components/sources/ac-current-source.ts:709-714` — `_acceptNgspice` PULSE implements only the v26-baseline `if (PHASE > 0.0) tmax = PHASE*PER` pulse-count cap; the newcompat.xs arm is absent (labelled "blocked hunk" in the comment). The rest of `#h004` (coeff guards, period-fold, the four-arm CKTsetBreak chain) IS bijective with ac:697-756.
+- **What is blocked:** a line-isomorphic / Tier-2-bijective image of `#h004`. The newcompat.xs arm is an un-ported v41 construct inside an in-scope PENDING hunk (VERIFICATION.md §2 Tier 2 automatic fail). digiTS has no `newcompat`/compat-mode flag.
+- **Architecture change required:** either a digiTS compat-mode subsystem (engine-wide, beyond `ac-current-source.ts`) OR a Phase-0 ledger split of `isrc/isrcacct.c#h004` isolating the newcompat.xs arm as a frozen NO-COUNTERPART sub-item.
+- **Precedent:** the sibling VSRC carved this exact construct out by a Phase-0 split (`vsrcacct.c` newcompat NO-COUNTERPART; `vsrcacct.c#h004` APPLIED carries only the decl reshape). The ISRC ledger hunk was never split, so the construct remains inline in `#h004`.
+- **Decision needed from user:** mirror the VSRC Phase-0 split for `isrc/isrcacct.c#h004` (newcompat.xs arm → frozen NO-COUNTERPART, PORT remainder = PHASE>0 cap + CKTsetBreak chain), then rebuild the ledger — OR authorize a digiTS compat-mode subsystem.
+- **Resolution:** _pending_
+
+### ESC-isrc-load-newcompat — `isrc/isrcload.c#h004` (ISRCload PULSE newcompat.xs arm)
+- **Raised by:** verifier
+- **Trigger:** cross-subsystem / Phase-0 split required (§6) — identical construct to ESC-isrc-acct-newcompat, value path.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/isrc/isrcload.c:104-118` (diff `isrc.md` 808-823, hunk `#h004` docLineRange 784-853): the `if (newcompat.xs) { ...; time+=deltat; }` value-path arm and the `if (!newcompat.xs && time>tmax) value=V1` guard.
+- **digiTS:** the shared engine `src/components/sources/ac-voltage-source.ts:218-237` (`evaluateNgspiceWaveform` PULSE arm) takes only the v26 `PHASE>0 ⇒ tmax=PHASE*PER` path (newcompat arm absent, labelled blocked at :220-222). The non-compat V1/V2 ladder + period-fold IS bijective.
+- **What is blocked:** a Tier-2-bijective image of `#h004` — the newcompat.xs value-path arm is an un-ported v41 construct in an in-scope PENDING hunk.
+- **Architecture change required:** as ESC-isrc-acct-newcompat (compat-mode subsystem OR Phase-0 split of `isrc/isrcload.c#h004`).
+- **Precedent:** VSRC `vsrcload.c#h004` is the frozen NO-COUNTERPART carve-out of this same arm.
+- **Decision needed from user:** Phase-0 split mirroring `vsrcload.c#h004`, or a compat-mode subsystem.
+- **Resolution:** _pending_
+
+### ESC-isrc-load-trnoise — `isrc/isrcload.c#h014` (ISRCload TRNOISE value arm)
+- **Raised by:** verifier
+- **Trigger:** cross-subsystem dependency (§6). The TRNOISE value arm requires the `trnoise_state` lifecycle subsystem outside the functionGroup tsFile.
+- **ngspice:** `ref/ngspice/src/spicelib/devices/isrc/isrcload.c:310-353` (diff `isrc.md` 972-1007): the `timezero` reset state machine on the 0→t jump, `n1=floor(time/TS)`, `value = trnoise_state_get(state,ckt,n1) + (V2-V1)*(time/TS-n1)`, the RTS `+= RTSAM` when `time>=RTScapTime`, and the DC add.
+- **digiTS:** `src/components/sources/ac-voltage-source.ts:347-359` — `evaluateNgspiceWaveform` TRNOISE/TRRANDOM arm THROWS (consumed by `AcCurrentSourceAnalogImpl._evaluate`). No `trnoise_state` lifecycle.
+- **What is blocked:** the TRNOISE value computation. `maths-misc#recon/randnumb` delivered only SeededRng primitives, not `trnoise_state_init/_get/_free`, the f_alpha 1/f synthesizer, or the timezero/top/RTS-trap state.
+- **Architecture change required:** the `trnoise_state` subsystem (ngspice frontend 1-f-code.c equivalent), beyond `ac-current-source.ts`/`ac-voltage-source.ts`.
+- **Precedent:** identical cross-subsystem gap as the ratified VSRC `vsrcload.c#h013` (ESCALATED) and `isrc/isrcpar.c#h003`/`#h004` (ESCALATED). Tracked as task #24.
+- **Decision needed from user:** frozen NO-COUNTERPART (TRNOISE value lifecycle) vs authorize the `trnoise_state` subsystem recon (task #24).
+- **Resolution:** _pending_
