@@ -366,7 +366,7 @@ export function evaluateNgspiceWaveform(
  * engine (criterion #11). `square` / `triangle` / `sawtooth` map onto a PULSE
  * coefficient vector and `sine` onto a SINE vector, so the verified
  * `evaluateNgspiceWaveform` switch is the SINGLE evaluation path for these
- * waveforms — the legacy `computeWaveformValue` arms are removed. Returning
+ * waveforms — they have no `computeWaveformValue` arm. Returning
  * `null` means the waveform has no ngspice VSRCfunctionType counterpart
  * (`sweep` / `am` / `fm`) or is owned by another device path (`expression` →
  * ASRC, `noise` → deterministic TRNOISE) and stays on the extension/throw path.
@@ -380,7 +380,7 @@ export function evaluateNgspiceWaveform(
  * shifts the waveform left in time, identical to the harness deck emitter.
  *
  * @returns the (functionType, coeffs) pair, or null when the enum has no
- *   ngspice counterpart and must drive the legacy/extension path.
+ *   ngspice counterpart and must drive the digiTS-native extension path.
  */
 export function enumWaveformCoeffs(
   waveform: Waveform,
@@ -437,9 +437,9 @@ export function enumWaveformCoeffs(
  * TRNOISE / TRRANDOM) is evaluated by `evaluateNgspiceWaveform`. This function
  * carries the digiTS-only waveforms layered over that core (#16 §2,
  * IN-class additive-behavior rule): `sweep` / `fm` have no ngspice
- * VSRCfunctionType counterpart, and `am` is the legacy named-parameter
- * abstraction retained for `.dig` files that predate the SPICE-token (AM)
- * path. The `square` / `triangle` / `sawtooth` / `sine` enums are re-expressed
+ * VSRCfunctionType counterpart, and `am` is the digiTS-native named-parameter
+ * form (a `.dig` file may set it directly, distinct from the SPICE-token AM
+ * path). The `square` / `triangle` / `sawtooth` / `sine` enums are re-expressed
  * onto the coefficient engine via `enumWaveformCoeffs` and evaluated by
  * `evaluateNgspiceWaveform` — they no longer have a `computeWaveformValue` arm.
  * `noise` is removed (replaced by the deterministic TRNOISE arm).
@@ -781,7 +781,7 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     // SPICE function token (vsrcpar.c:79-286): PULSE / SINE / EXP / SFFM / AM /
     // PWL / TRNOISE / TRRANDOM. When set, the coefficient model drives the
-    // waveform from `coeffs`; when empty, the legacy named-param / digiTS-only
+    // waveform from `coeffs`; when empty, the digiTS-native named-parameter
     // waveform above drives evaluation.
     key: "funcType",
     type: PropertyType.STRING,
@@ -887,8 +887,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
   private readonly _getTime: () => number;
 
   // ngspice independent-source waveform model (sVSRCinstance, vsrcdefs.h:50-93).
-  // _functionType is null when no SPICE function token is given (the legacy
-  // named-param / digiTS-only extension path drives the waveform instead).
+  // _functionType is null when no SPICE function token is given (the
+  // digiTS-native named-parameter extension path drives the waveform instead).
   private _functionType: FunctionType | null = null;   // VSRCfunctionType (vsrcdefs.h:50)
   private _functionOrder = 0;                            // VSRCfunctionOrder (vsrcdefs.h:51)
   private _coeffs: Float64Array = new Float64Array(0);   // VSRCcoeffs (vsrcdefs.h:54)
@@ -972,8 +972,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     // vsrcpar.c:79-286 — a SPICE-style function token (PULSE/SINE/EXP/SFFM/AM/
     // PWL/TRNOISE/TRRANDOM) populates the coefficient model via applyCoeffs.
     // The token + coefficient vector arrive through the property bag (`funcType`
-    // + `coeffs`); when absent, _functionType stays null and the legacy named /
-    // digiTS-only waveform drives evaluation through the extension engine.
+    // + `coeffs`); when absent, _functionType stays null and the digiTS-native
+    // named-parameter waveform drives evaluation through the extension engine.
     this._initCoeffModel(props);
 
     // Parse expression once at creation for expression waveform mode.
@@ -1094,8 +1094,8 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       this._fallTime,
     );
     if (built === null) {
-      // No ngspice counterpart: clear any previously-derived coefficient model
-      // so the extension / throw path drives evaluation.
+      // No ngspice counterpart: clear the coefficient model so the
+      // extension / throw path drives evaluation.
       this._functionType = null;
       this._funcTGiven = false;
       this._coeffs = new Float64Array(0);
@@ -1257,7 +1257,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
    * under MODEDCOP|MODEDCTRANCURVE with dcGiven, the MODEDC time=0 gate
    * (vsrcload.c:84-88), then either the ngspice coefficient switch
    * (evaluateNgspiceWaveform) when a SPICE function token is given, or the
-   * legacy named / digiTS-only extension engine (computeWaveformValue).
+   * digiTS-native named-parameter extension engine (computeWaveformValue).
    */
   private _evaluate(cktMode: number, t: number): number {
     // vsrcload.c:74-82 — DC-value branch: short-circuit when in a DC-op /
@@ -1272,7 +1272,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       // ngspice coefficient model (PULSE/SINE/EXP/SFFM/AM/PWL/TRNOISE/TRRANDOM).
       return evaluateNgspiceWaveform(this._functionType, this._coeffs, this._functionOrder, time, this._stepContext());
     }
-    // Legacy named-param / digiTS-only extension path.
+    // digiTS-native named-parameter extension path.
     if (this._waveform === "expression") {
       return this._parsedExpr !== null ? evaluateExpression(this._parsedExpr, { t: time }) : 0;
     }
@@ -1488,7 +1488,7 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
    * Mirrors ngspice VSRCaccept (vsrcacct.c:22-321). When a SPICE function token
    * is given (_funcTGiven) the breakpoint schedule is re-rooted on the stored
    * _breakTime + _coeffs[] (the ngspice VSRCbreak_time gate, vsrcacct.c:94/162).
-   * Otherwise the legacy named / digiTS-only waveforms (square / triangle /
+   * Otherwise the digiTS-native named-parameter waveforms (square / triangle /
    * sawtooth / noise) keep the SAMETIME phase-boundary scheme below.
    *
    * SAMETIME(a,b) := |a-b| <= 1e-7 * PW. PW maps to `halfPeriod - riseTime`

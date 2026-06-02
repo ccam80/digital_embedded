@@ -303,8 +303,8 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
   private _lastSrcFact = 1;
 
   // ngspice independent-source waveform model (shared with VSRC; isrcdefs.h
-  // mirrors vsrcdefs.h:50-93). null _functionType => legacy named / digiTS-only
-  // extension path drives the waveform.
+  // mirrors vsrcdefs.h:50-93). A null _functionType means the digiTS-native
+  // named-parameter extension path drives the waveform.
   private _functionType: FunctionType | null = null;
   private _functionOrder = 0;
   private _coeffs: Float64Array = new Float64Array(0);
