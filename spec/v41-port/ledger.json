@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-02T22:34:16.960Z",
+    "generated": "2026-06-02T22:44:28.005Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,8 +12,8 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 223,
-    "progressEntriesStale": 6,
+    "progressEntriesApplied": 224,
+    "progressEntriesStale": 5,
     "staleItems": [
       {
         "id": "vsrc#recon/waveformModel",
@@ -29,10 +29,6 @@
       },
       {
         "id": "sw#recon/icParam",
-        "from": "APPLIED"
-      },
-      {
-        "id": "cccs#recon/multiplier",
         "from": "APPLIED"
       },
       {
@@ -62359,15 +62355,13 @@
         "cccs/cccsload.c#h001"
       ],
       "hunkHash": "f89cef3ead6341ac",
-      "state": "STALE",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "MATCH. Reconstruction item. VERIFICATION.md sec1a satisfied on both legs: (a) source isomorphic to the ngspice baseline (re-derived independently from fresh reads of ref/ngspice/src/spicelib/devices/cccs/{cccspar.c,cccsload.c} + the cccs.c m IFparm row; rename-maps NOT consulted). The named spec spec/v41-port/reconstruction/cccs-multiplier.md does NOT exist (ledger item records specExists:false); the ledger item itself supplies ngspiceBaseline=[cccspar.c,cccsdefs.h,cccsload.c] and tsFunction prescribing 'add an M instance parameter to CCCS_PARAM_DEFS, store via setParam, fold into the stamped coefficient faithful to cccspar.c:24-29 CCCScoeff=rValue; if(CCCSmGiven) CCCScoeff*=CCCSmValue' -- verification performed against that ngspice baseline directly, exactly as the APPLIED sibling vccs#recon/multiplierAndIc was handled. AND (b) harness gate clean. ngspice->digiTS correspondence independently re-derived: CCCSmValue (m) <-> M model param in CCCS_PARAM_DEFS; CCCSmGiven <-> props default-1 pattern; CCCScoeff (the coefficient fed to the stamp/expression) <-> effectiveGain = currentGain * M; CCCSparam CCCS_GAIN+CCCS_M fold <-> the behavioral model factory. PART A (params): CCCS_PARAM_DEFS (cccs.ts:62-68) adds M:{default:1, description:'Parallel multiplier'} citing cccs.c:14 IOP('m', CCCS_M, ...) -- the m IFparm row exists in cccs.c. PART B (attribute mapping): CCCS_ATTRIBUTE_MAPPINGS (cccs.ts:352) adds {xmlName:'m', propertyKey:'M', convert: parseFloat, modelParam:true}, mirroring the currentGain mapping (cccs.ts:351). PART C (the fold): behavioral factory (cccs.ts:385-393) reads m=props.getModelParam('M') (default 1), computes effectiveGain = currentGain * m, and for the default 'I(sense)' expression emits `${effectiveGain} * I(sense)` (cccs.ts:389-390). This is bijective with cccspar.c:24-29: CCCS_GAIN sets CCCScoeff=value then `if (CCCSmGiven) CCCScoeff *= CCCSmValue` -- because digiTS reads M with default 1, the unconditional product reproduces the conditional multiply exactly (m=1 when not netlisted -> bare currentGain, matching the untaken-branch case). The downstream stamp (stampOutput cccs.ts:195-213, cccsload.c:35-36) loads gm=derivative unchanged with NO second *m or /m -- matching cccsload.c which loads CCCScoeff verbatim (ledger note line719: 'no second /m or *m at the stamp site'); the whole multiplier effect lives in the parameter-application step. For a user-supplied non-default expression the factory wraps `(${m}) * (${expression})` (cccs.ts:391), scaling the output current by the parallel-device count (m is a topology fact applied to the whole output, identical treatment to the sibling vccs recon). Acceptance: (1) M default 1 declared; (2) m->M modelParam mapping; (3) default-expr output currentGain*M*I(sense), user-expr output expression scaled by M; (4) M unset -> identical to prior CCCS (product is bare currentGain); (5) M hot-loadable via the same props.getModelParam factory path currentGain uses; (6) the blocked cccs/cccsload.c#h001 hunk now applies onto an element that owns M; (7) harness gate below. HARNESS GATE (server_restart -> harness_start dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll on src/solver/analog/__tests__/ngspice-parity/fixtures/cccs-gate.dts [the task's spec/v41-port/fixtures/cccs-gate.dts path does not exist; this is the only cccs-gate.dts in tree -- DcVsrc vs1 -> rsense; senseVsrc 0V sense branch -> CCCS sense+; CCCS out+ -> Rload, the F-element current-mirror gate] -> harness_run -> harness_first_divergence): firstDivergence NULL across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape, earliest null); 107/107 tran steps converged, 0 failed, avgIterations 2.028 both engines, stepCount delta 0. The gate exercises m=1 (default) so the bare-currentGain path is bit-exact against ngspice's F device. FILE-SCOPE CHECK: `git diff --name-only` source change is solely src/components/active/cccs.ts (the recon's sole tsFile); the diff is exactly the three prescribed additions (M param def, m->M mapping, factory fold incl. the (m)*(expr) wrap for non-default expressions) and nothing else. Other diffed paths (.omc/*, .vitest-failures.json, ref/ngspice submodule pointer, spec/v41-port/*, .claude/worktrees/*) are orchestration/env state, not source over-application."
+        "parallel iso-verify + gate clean on [cccs-gate.dts]"
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "2f3476d25b5badfb"
+      "escalation": null
     },
     {
       "id": "dio#recon/diotempUpdate",
