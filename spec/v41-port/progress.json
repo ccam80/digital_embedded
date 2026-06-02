@@ -1709,9 +1709,10 @@
     },
     "maths-misc#recon/randnumb": {
       "state": "APPLIED",
-      "hunkHash": "d9c75de8f24f7445",
+      "hunkHash": "be4d6c0108cd465a",
       "attempts": 0,
       "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/monte-carlo.test.ts -t SeededRng]",
         "MATCH (reconstruction). VERIFICATION.md sec1a both legs satisfied. SPEC-PRESENCE GATE: spec/v41-port/reconstruction/maths-misc-randnumb.md present in main checkout (RATIFIED 2026-05-30, RNG-1=SEED-INJECTION). (a) Source isomorphism re-derived INDEPENDENTLY (rename-maps NOT consulted) against fresh ref/ngspice/src/maths/misc/randnumb.c. tsFile src/solver/analog/monte-carlo.ts. SeededRng holds eight uint32 state words _s1.._s8 mapped 1:1 to CombState1..8 (randnumb.c:54-59); Park-Miller _state removed. tauS (monte-carlo.ts:308-311) bijective with TauS (randnumb.c:125-129): b=(((state<<c1)^state)>>>c2), return (((state&m)<<c3)^b), every shift/xor/mask forced uint32 via >>>0 (C logical >> on unsigned matches JS >>>). lgcs (:316-318)=LGCS (:131-134) A1*state+A2 via Math.imul(a1,state)+a2 >>>0 (low-32 wrap of C unsigned multiply). combLCGTaus (:323-330)=randnumb.c:140-148: tauS(_s1,13,19,12,0xFFFFFFFE)^tauS(_s2,2,25,4,0xFFFFFFF8)^tauS(_s3,3,11,17,0xFFFFFFF0)^lgcs(_s4,1664525,1013904223), scaled 2.3283064365387e-10 with >>>0 before the double multiply. combLCGTausInt (:334-340)=randnumb.c:154-162 over _s5.._s8, no scaling. drand (:343-345)=2*x-1 (randnumb.c:95-98); next()/uniform() re-rooted onto combLCGTaus/drand. gauss0 (:356-372) bijective with randnumb.c:195-215: polar loop r=v1*v1+v2*v2 while r>=1, fac=sqrt(-2*log(r)/r), glgset=v1*fac, gliset=false, return v2*fac; off-call returns cached _glgset (latch is instance state). gauss1 (:376-385)=randnumb.c:220-231; rgauss (:389-398)=randnumb.c:240-254; poisson (:413-427)=randnumb.c:260-274 (P=exp(-lambda), P*=lambda/k, cap max_k=1000); exprand (:430-432)=randnumb.c:278-283 (-log(u)*mean). setState (:285-303) injects CombState1..8 via >>>0 per RNG-1=SEED-INJECTION (Acceptance #6/#9). Cosine-form Box-Muller deleted. Frontend hunks h001-h003 (checkseed/com_sseed/cp_getvar shell) correctly NOT ported (NO-COUNTERPART); CombLCGTaus2/CombLCGTausInt2 inlined test-duplicates correctly NOT ported (arithmetically identical). Bijective over reconstructed scope. (b) GATE: no ngspice divergence circuit applies (RNG bit stream is not a solver matrix); the test IS the gate per contract. Ran node_modules/.bin/vitest run src/solver/analog/__tests__/monte-carlo.test.ts -t SeededRng in the worktree: 10 passed, 0 failed, 13 skipped. Covers seeded-stream reproducibility, setState bit-identity (combLCGTaus + combLCGTausInt 200 draws each across two streams), gauss0 cached-second-value latch reconstructed from raw uniforms (first==v2*fac, second==v1*fac), polar Box-Muller moments (|mean|<0.1, 0.9<std<1.1), drand [-1,1), combLCGTausInt uint32, exprand reproducible/non-negative, poisson integer in [0,1000]. FILE-SCOPE: git diff --name-only = monte-carlo.ts + monte-carlo.test.ts (recon tsFiles) + .vitest-failures.json (test-runner artifact, not committed). No over-application."
       ],
       "escalation": null
@@ -1812,6 +1813,24 @@
       "attempts": 0,
       "verifierNotes": [
         "MISMATCH (Tier 2 bijection). v41 cktsetbk.c:85 beyond-end-of-table guard is `if(ckt->CKTbreaks && time-ckt->CKTbreaks[ckt->CKTbreakSize-1]<=ckt->CKTminBreak)` — a single non-null-array guard `ckt->CKTbreaks &&` prepended to the proximity test. The applier ported this at src/solver/analog/timestep.ts:818 as `if (this._breakpoints.length > 0 && lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`. The `this._breakpoints.length > 0` conjunct correctly mirrors `ckt->CKTbreaks &&` (non-empty array <-> non-null pointer) and the proximity test `time - _breakpoints[lo-1] <= minBreak` mirrors `time-CKTbreaks[size-1]<=minBreak` (at this branch lo===_breakpoints.length, so _breakpoints[lo-1] is CKTbreaks[size-1]). However the extra `lo > 0` conjunct has NO v41 counterpart at the beyond-end branch: v41's end-of-table guard (cktsetbk.c:85) carries no `i>0` term (the `i>0` guard is only in the middle-of-table branch, cktsetbk.c:55, which digiTS already mirrors at timestep.ts:808). At timestep.ts:818 control only arrives when lo===_breakpoints.length, so `lo > 0` is logically identical to `length > 0` (a restated guard, behaviorally bit-identical) but breaks strict construct bijection. REMEDIATION: drop the redundant `lo > 0 && ` so line 818 reads `if (this._breakpoints.length > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`, bijective with v41's single `ckt->CKTbreaks &&` guard."
+      ],
+      "escalation": null
+    },
+    "maths-misc/randnumb.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "b0f65872033ee358",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/monte-carlo.test.ts -t SeededRng]"
+      ],
+      "escalation": null
+    },
+    "maths-misc/randnumb.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "513b3bbc9eeb24cb",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/monte-carlo.test.ts -t SeededRng]"
       ],
       "escalation": null
     },
