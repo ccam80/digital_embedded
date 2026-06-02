@@ -7,9 +7,11 @@
  * The output current equals an expression of the sensed current:
  *   I_out = f(I_sense)  where  I_sense flows into sense+
  *
- * A linear shortcut is provided via the `currentGain` property: when
- * `expression` is the default ("I(sense)"), the effective expression is
- * `currentGain * I(sense)`.
+ * The linear F-element path: when `expression` is the default ("I(sense)"),
+ * the stamped coefficient is the M-folded gain `_effectiveCoeff()` =
+ * `CCCSmGiven ? gain * CCCSmValue : gain` (cccspar.c:25-28), so the output
+ * current is `_effectiveCoeff() * I(sense)` — matching ngspice's scalar
+ * CCCScoeff stamp (cccsload.c:35-36).
  *
  * Per the SPICE F-element convention (ngspice user manual, cccsload.c:35-36):
  * current flows FROM out+, through the source, TO out-. Positive
@@ -62,7 +64,8 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: CCCS_PARAM_DEFS, defaults: CCCS_DEFAULTS } = defineModelParams({
   primary: {
     currentGain: { default: 1.0, description: "Linear current gain β" },
-    // CCCSmValue, cccs.c:14 IOP("m", CCCS_M, ...) — parallel multiplier, default 1
+    // cccs.c:15 IOP("m", CCCS_M, IF_REAL, "Parallel multiplier") — parallel
+    // multiplier folded into the gain coefficient when given (cccspar.c:26-27).
     M: { default: 1, description: "Parallel multiplier" },
   },
 });
@@ -131,6 +134,22 @@ export class CCCSAnalogElement extends ControlledSourceElement {
   // Must be set via setParam("senseSourceLabel", label) before setup() runs.
   private _senseSourceLabel: string = "";
 
+  // cccsdefs.h:33 CCCScoeff — the bare gain coefficient (CCCScoeff pre-fold,
+  // cccspar.c:25). _effectiveCoeff() folds in _mValue when _mGiven.
+  private _gain: number = 1;
+  // cccsdefs.h:35 CCCSmValue — the parallel multiplier (cccspar.c:34).
+  private _mValue: number = 1;
+  // cccsdefs.h:42 CCCSmGiven — multiplier-given flag; gates the
+  // CCCScoeff *= CCCSmValue fold (cccspar.c:26).
+  private _mGiven: boolean = false;
+  // cccsdefs.h:41 CCCScoeffGiven — gain-given flag (cccspar.c:28). Tracks
+  // whether the gain coefficient was netlisted, mirroring CCCScoeffGiven.
+  private _gainGiven: boolean = false;
+  // True for the default linear F-element path ("I(sense)"): the stamped
+  // coefficient is the bare scalar _effectiveCoeff(), matching cccsload.c:35-36.
+  // False for the digiTS-only non-default expression extension.
+  private _linearDefault: boolean = true;
+
   // Resolved controlling branch index (filled in setup()).
   private _contBranch: number = -1;
 
@@ -166,7 +185,39 @@ export class CCCSAnalogElement extends ControlledSourceElement {
   setParam(key: string, value: number | string): void {
     if (key === "senseSourceLabel" && typeof value === "string") {
       this._senseSourceLabel = value;
+    } else if (key === "currentGain" && typeof value === "number") {
+      // cccspar.c:25,28 — store the bare gain coefficient and mark it given.
+      this._gain = value;
+      this._gainGiven = true;
+    } else if (key === "M" && typeof value === "number") {
+      // cccspar.c:34-35 — store the parallel multiplier and mark it given.
+      this._mValue = value;
+      this._mGiven = true;
     }
+  }
+
+  /**
+   * The stamped gain coefficient. cccspar.c:25-28: CCCScoeff = gain; if
+   * (CCCSmGiven) CCCScoeff *= CCCSmValue. The bare gain is scaled by the
+   * parallel multiplier only when m was given, so a CCCS with no m= stamps
+   * exactly the bare gain — bit-identical to ngspice's CCCSmGiven=FALSE skip.
+   */
+  private _effectiveCoeff(): number {
+    return this._mGiven ? this._gain * this._mValue : this._gain;
+  }
+
+  /**
+   * The scalar factor the digiTS-only non-default expression is multiplied by.
+   * cccspar.c:26 gate: the parallel multiplier folds in only when m was given,
+   * so an un-netlisted m is a true no-op on the extension (not a ×1).
+   */
+  private _exprMultiplier(): number {
+    return this._mGiven ? this._mValue : 1;
+  }
+
+  /** Select the linear F-element path vs the digiTS-only expression extension. */
+  setLinearDefault(isLinear: boolean): void {
+    this._linearDefault = isLinear;
   }
 
   protected override _stampLinear(_solver: SparseSolver): void {
@@ -221,7 +272,11 @@ export class CCCSAnalogElement extends ControlledSourceElement {
    */
   getPinCurrents(rhs: Float64Array): number[] {
     const iSense = this._contBranch >= 0 ? rhs[this._contBranch] : 0;
-    const fI = this._compiledExpr(this._ctx);
+    // cccsload.c:35-36 — the stamped coefficient is the M-folded CCCScoeff for
+    // the linear F-element path; the non-default extension scales by the gated
+    // multiplier only. The base expression _compiledExpr is unscaled.
+    const factor = this._linearDefault ? this._effectiveCoeff() : this._exprMultiplier();
+    const fI = factor * this._compiledExpr(this._ctx);
     return [
       iSense,   // sense+: I_sense flows in (through the external sense VSRC)
       -iSense,  // sense-: I_sense flows out
@@ -238,8 +293,16 @@ export class CCCSAnalogElement extends ControlledSourceElement {
   override load(ctx: LoadContext): void {
     this._bindContext(ctx.rhsOld);
     this._stampLinear(ctx.solver);
-    const value = this._compiledExpr(this._ctx);
-    const deriv = this._compiledDeriv(this._ctx);
+    // The base expression is unscaled. cccspar.c:25-28: the stamped coefficient
+    // is the bare gain folded with the parallel multiplier when m was given.
+    // Reading _effectiveCoeff() here (rather than baking a constant at
+    // construction) keeps currentGain and M hot-loadable via setParam: the next
+    // load() re-reads the live _gain / _mValue, so the stamp tracks the change.
+    // For the default linear path f = I(sense), so value = coeff·Isense,
+    // deriv = coeff, gm = coeff, iNR = 0 — the ±CCCScoeff stamp of cccsload.c:35-36.
+    const factor = this._linearDefault ? this._effectiveCoeff() : this._exprMultiplier();
+    const value = factor * this._compiledExpr(this._ctx);
+    const deriv = factor * this._compiledDeriv(this._ctx);
     this.stampOutput(ctx.solver, ctx.rhs, value, deriv, this._ctrlValue);
   }
 }
@@ -381,16 +444,28 @@ export const CCCSDefinition: StandaloneComponentDefinition = {
       kind: "inline",
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
-        const currentGain = props.getModelParam<number>("currentGain");
-        const m = props.getModelParam<number>("M"); // CCCSmValue, default 1
-        // cccspar.c:25-26 — CCCScoeff *= CCCSmValue (m defaults to 1, so the
-        // product is the bare currentGain when m is not netlisted).
-        const effectiveGain = currentGain * m;
-        const rawExpr = parseExpression(expression === "I(sense)"
-          ? `${effectiveGain} * I(sense)`
-          : `(${m}) * (${expression})`);
-        const deriv = simplify(differentiate(rawExpr, "I(sense)"));
-        const el = new CCCSAnalogElement(pinNodes, rawExpr, deriv, "I(sense)", "current");
+        const isLinearDefault = expression === "I(sense)";
+        // The base expression is the unscaled transfer function: I(sense) for
+        // the linear F-element path (cccsload.c:35-36 stamps the scalar
+        // coefficient against it), or the raw user expression for the
+        // digiTS-only extension. The M-fold / gain coefficient is applied at
+        // load() from _effectiveCoeff(), keeping currentGain and M hot-loadable.
+        const baseExpr = parseExpression(isLinearDefault ? "I(sense)" : expression);
+        const deriv = simplify(differentiate(baseExpr, "I(sense)"));
+        const el = new CCCSAnalogElement(pinNodes, baseExpr, deriv, "I(sense)", "current");
+        el.setLinearDefault(isLinearDefault);
+        // cccspar.c:24-36 — drive the gain and parallel multiplier through the
+        // public setParam path so the *Given flags mirror ngspice's
+        // CCCScoeffGiven / CCCSmGiven (props.isModelParamGiven == ngspice
+        // *Given). When a param is not netlisted, the field default holds the
+        // ngspice default (CCCScoeff=1 / CCCSmValue=1, CCCSmGiven=FALSE), so the
+        // fold is skipped exactly as ngspice skips it.
+        if (props.isModelParamGiven("currentGain")) {
+          el.setParam("currentGain", props.getModelParam<number>("currentGain"));
+        }
+        if (props.isModelParamGiven("M")) {
+          el.setParam("M", props.getModelParam<number>("M"));
+        }
         // Wire the sense-source link via the public setParam path so the
         // build-spec entry point can drive CCCS without reaching past the
         // factory boundary. Empty string = unset; setup() will throw with
