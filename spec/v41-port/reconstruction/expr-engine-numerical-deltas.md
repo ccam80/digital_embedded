@@ -5,8 +5,10 @@ that ngspice's B-source expression machinery applies and the digiTS expression
 subsystem currently lacks. The scope is **contained** to the expression
 subsystem — `src/solver/analog/expression-evaluate.ts`,
 `src/solver/analog/expression-differentiate.ts`,
-`src/solver/analog/expression.ts` (parser function-set only, for the hyperbolic
-functions), and `src/solver/analog/model-parser.ts` (atto suffix). It does
+`src/solver/analog/expression.ts` (both its parser function-set **and** its
+runtime evaluator function map `BUILTIN_FUNCTIONS` — see the single-clamped-map
+invariant in the STANCE section), and `src/solver/analog/model-parser.ts` (atto
+suffix). It does
 **not** reach
 into protected engine/compiler infra (no `compiler.ts`, no solver, no node
 allocation), and it does **not** attempt to reproduce ngspice's parse-tree
@@ -32,11 +34,20 @@ The user has resolved every open decision this spec previously raised:
 - **RKM (`inpeval.c#h006`): OUT → NO-COUNTERPART.**
 - **`PTddt`: OUT for now → NO-COUNTERPART**, tracked as a deferred asrc /
   B-source capability, not built in this recon.
-- **`simplify()` parallel math table:** if, after this recon, the constant-fold
-  path is fully covered by the ported `BUILTIN_FUNCTIONS`, the `simplify()`
-  parallel `mathFns` table is **deleted** (single source of truth), not kept in
-  sync. The implementer verifies coverage before deleting (Acceptance
-  criterion 3).
+- **Single clamped `BUILTIN_FUNCTIONS` map (mandatory, not optional):** digiTS
+  currently has **two** runtime evaluators, each with its own `BUILTIN_FUNCTIONS`
+  literal — `expression-evaluate.ts:47–66` (used by `evaluate` /
+  `compileExpression`) and `expression.ts:108–127` (used by `evaluateExpression`,
+  which the arbitrary-expression sources call on the load path). Both must carry
+  the PTexp/PTlog/PTlog10 clamps and the hyperbolic adds, so the two literals are
+  **deduped into one exported, clamped `BUILTIN_FUNCTIONS`** that both files
+  import. This is a hard requirement, not a "dedupe if convenient" (see the
+  STANCE invariant and Acceptance criterion 3).
+- **`simplify()` parallel math table:** the `simplify()` constant-fold `mathFns`
+  table (`expression-differentiate.ts:336–342`) is a third parallel copy. After
+  this recon it folds through the single clamped `BUILTIN_FUNCTIONS` and the
+  `mathFns` literal is **deleted** (single source of truth), not kept in sync.
+  The implementer verifies coverage before deleting (Acceptance criterion 3).
 
 The USER-DECISION section that previously listed these is retained below only as
 a record of the resolved tradeoff; nothing in it remains open.
@@ -55,8 +66,11 @@ current `ref/ngspice` file and line and explains the mechanism in present tense
 ## STANCE — the AST architecture is ACCEPTED DIVERGENCE
 
 digiTS's expression engine is an **independent typed recursive-descent parser
-producing an `ExprNode` discriminated-union AST** (`expression.ts`), evaluated by
-`expression-evaluate.ts` (a name → `Math.*` `BUILTIN_FUNCTIONS` map) and
+producing an `ExprNode` discriminated-union AST** (`expression.ts`), evaluated
+along two runtime paths — `expression.ts`'s `evaluateExpression`
+(`expression.ts:408–458`, using the `BUILTIN_FUNCTIONS` literal at
+`expression.ts:108–127`) and `expression-evaluate.ts`'s `evaluate` /
+`compileExpression` (using the literal at `expression-evaluate.ts:47–66`) — and
 differentiated symbolically by `expression-differentiate.ts`. ngspice's B-source
 expression engine is a **yacc/bison parse-tree builder** with ref-counted node
 constructors and function-pointer dispatch tables.
@@ -88,6 +102,48 @@ them as such; they are not MISMATCH and not gaps):
 This stance is what lets the genuinely numerical deltas below be ported
 *surgically* into the existing AST evaluator/differentiator without dragging in
 the parse-tree scaffolding.
+
+### Single-clamped-map invariant (load-bearing for Deltas 1, 2, 6)
+
+There are **two** live runtime evaluators in this subsystem, each with its own
+`BUILTIN_FUNCTIONS` literal, and a **third** parallel math-function table inside
+`simplify()`:
+
+1. `expression-evaluate.ts:47–66` — consumed by `evaluate` (tree-walk,
+   `expression-evaluate.ts:112–120`) and `compileExpression` (closure,
+   `expression-evaluate.ts:193–201`).
+2. `expression.ts:108–127` — consumed by `evaluateExpression`
+   (`expression.ts:439–446`), a full runtime tree-walk. **This is the map the
+   arbitrary-expression sources actually call on the load path:**
+   `ac-voltage-source.ts:1285` and `ac-current-source.ts:576` both invoke
+   `evaluateExpression(this._parsedExpr, { t: time })` inside `_evaluate()`,
+   whose return feeds the DC/transient stamp value
+   (`ac-voltage-source.ts:1251`, `ac-current-source.ts:596,642`).
+3. `expression-differentiate.ts:336–342` — the `simplify()` constant-fold
+   `mathFns` table.
+
+A clamp placed only on map (1) would leave map (2) un-clamped, so a B-source
+expression `exp(300)` evaluated through the source load path returns
+`Infinity` (bare `Math.exp`) where ngspice's `PTexp` returns `1e99` — precisely
+the divergence Deltas 1/2 exist to remove, on the very path they target.
+Therefore the **invariant** for this recon is:
+
+> The clamped `exp`/`log`/`log10` implementations and the `sinh`/`cosh`/`tanh`
+> additions live in **one exported, clamped `BUILTIN_FUNCTIONS`** that is the
+> **single source of truth** for every runtime function lookup. Both
+> `expression.ts`'s `evaluateExpression` and `expression-evaluate.ts`'s
+> `evaluate`/`compileExpression` import that one map; the two per-file literals
+> are deleted. `simplify()` folds through the same map; its `mathFns` literal is
+> deleted.
+
+The new import edge is non-circular: today `expression-evaluate.ts` imports only
+`type ExprNode` + `UnknownNodeKindError` from `expression.ts`, and
+`expression-differentiate.ts` imports only node constructors from
+`expression.ts`. The shared clamped map may be defined in (or re-exported from)
+`expression.ts` and imported by `expression-evaluate.ts` and
+`expression-differentiate.ts`, or hoisted to a small dedicated module the three
+import — the implementer picks whichever keeps the dependency acyclic; all three
+target files are in scope, so no out-of-scope edit is introduced.
 
 ---
 
@@ -126,10 +182,13 @@ return 1e99` branch — it fires regardless of compat mode. The first branch
 `ref/ngspice/src/include/ngspice/inpptree.h:171–172`) is the PSPICE-compat path
 and is **USER-DECISION** (see below), NOT part of this delta.
 
-**digiTS target:** `expression-evaluate.ts` `BUILTIN_FUNCTIONS` map
-(`expression-evaluate.ts:47–66`), the `exp` entry. The current entry is the bare
-`exp: Math.exp` (line 55). It must become a function that returns `1e99` when
-`arg > 227.9559242` and `Math.exp(arg)` otherwise.
+**digiTS target:** the shared clamped `BUILTIN_FUNCTIONS` map (per the
+single-clamped-map invariant), `exp` entry. The current entries are the bare
+`exp: Math.exp` in **both** runtime maps (`expression-evaluate.ts:55` and
+`expression.ts:116`). The clamped `exp` must return `1e99` when
+`arg > 227.9559242` and `Math.exp(arg)` otherwise, and must be the single
+implementation both runtime paths see (so the source load path through
+`evaluateExpression` is clamped too — see the invariant).
 
 > Note on operand: `227.9559242` is `ln(1e99)` to ngspice's printed precision;
 > the implementation must use the **literal `227.9559242`** and the literal
@@ -171,9 +230,10 @@ Both clamps are **unconditional** (no compat gate). `HUGE` is the C library
 `HUGE_VAL` = `+Infinity` (IEEE-754 `Number.POSITIVE_INFINITY` in TS). The
 `arg == 0 → -1e99` value is the literal `-1e99`.
 
-**digiTS target:** `expression-evaluate.ts` `BUILTIN_FUNCTIONS` map, the `log`
-and `log10` entries (currently bare `log: Math.log` line 57, `log10:
-Math.log10` line 57). Each must become:
+**digiTS target:** the shared clamped `BUILTIN_FUNCTIONS` map, the `log` and
+`log10` entries (currently bare `log: Math.log` / `log10: Math.log10` in both
+runtime maps — `expression-evaluate.ts:56`/`:57` and `expression.ts:117`/`:118`).
+Each clamped entry must become:
 
 - `arg < 0` → return `Number.POSITIVE_INFINITY` (= C `HUGE`);
 - `arg === 0` → return `-1e99`;
@@ -181,7 +241,8 @@ Math.log10` line 57). Each must become:
 
 The order matters: test `< 0` first, then `=== 0`, then the library call —
 matching the C control flow line-for-line so the `-0.0` and boundary behavior is
-identical.
+identical. As with `exp`, the clamped `log`/`log10` are the single implementation
+both runtime paths see.
 
 > Adjacent note (informational, NOT in this delta's scope): `PTsqrt`
 > (`ptfuncs.c:318–324`) also returns `HUGE` for `arg < 0`, and `PTdiv`
@@ -232,7 +293,7 @@ must build the same `1 + tan²` expression ngspice builds, so the evaluated
 derivative is bit-identical.
 
 `tan` is present in digiTS's `BUILTIN_FUNCTIONS`
-(`expression.ts:111`, `expression-evaluate.ts:51`), so the rebuilt derivative is
+(`expression.ts:111`, `expression-evaluate.ts:50`), so the rebuilt derivative is
 fully evaluable — no new function is required.
 
 ### Delta 4 — `PTdifferentiate` PTF_TANH derivative correction (`1/cosh² → 1 − tanh²`)
@@ -273,23 +334,29 @@ evaluable before its derivative can be exercised).
 ### Delta 6 — hyperbolic function-set expansion (`sinh` / `cosh` / `tanh`)
 
 **ngspice** registers `sinh` / `cosh` / `tanh` in the B-source function table
-(`funcs[]`, `inpptree.c:151–154`) dispatching to `PTsinh` / `PTcosh` / `PTtanh`
-(`ptfuncs.c`), each a bare `sinh` / `cosh` / `tanh` library call (no range
-clamp). The user has ruled these **IN**.
+(`funcs[]`, `inpptree.c:144,151,154` — `cosh` at 144, `sinh` at 151, `tanh` at
+154) dispatching to `PTcosh` / `PTsinh` / `PTtanh`
+(`ptfuncs.c:263–267,312–316,332–336`), each a bare `cosh` / `sinh` / `tanh`
+library call (no range clamp). The user has ruled these **IN**.
 
 **digiTS targets (function-set is three-surface — parser + evaluator +
 differentiator must agree):**
 
-- `expression-evaluate.ts` `BUILTIN_FUNCTIONS` (`:47–66`): add
-  `sinh: Math.sinh`, `cosh: Math.cosh`, `tanh: Math.tanh`. (`compileExpression`
-  shares this same map, so both evaluation paths pick them up.)
-- `expression.ts` `BUILTIN_FUNCTIONS` (`:108–127`): the parser's known-function
-  set is a parallel literal in this file; add the same three entries so the
-  tokenizer/parser accepts `sinh(...)` / `cosh(...)` / `tanh(...)` as calls
-  rather than rejecting them. (The implementer confirms whether `expression.ts`
-  and `expression-evaluate.ts` can share one exported map; if so, dedupe to a
-  single source of truth — see Acceptance criterion 3 on the analogous
-  `simplify` dedupe.)
+- **Shared clamped `BUILTIN_FUNCTIONS`** (per the single-clamped-map invariant):
+  add `sinh: Math.sinh`, `cosh: Math.cosh`, `tanh: Math.tanh` to the single
+  exported map. Because that one map is the source of truth for **both**
+  `evaluateExpression` (`expression.ts`) and `evaluate`/`compileExpression`
+  (`expression-evaluate.ts`), all three runtime lookup paths pick the new
+  functions up from one place — there is no second literal to keep in sync.
+- The parser (`expression.ts` `_parsePrimary`, line 357) already builds a
+  `call` node for **any** identifier followed by `(...)` — it does not consult
+  `BUILTIN_FUNCTIONS` at parse time. The function-name gate is at **evaluate**
+  time: `evaluateExpression` (`expression.ts:441–443`) and
+  `evaluate`/`compileExpression` throw "Unknown function" when the name is absent
+  from the map. So `sinh(...)` / `cosh(...)` / `tanh(...)` already parse today and
+  currently throw only at evaluation; adding the three entries to the shared map
+  makes them **evaluable** (and, with the differentiate cases below,
+  differentiable). No separate parser accept-list exists or is added.
 - `expression-differentiate.ts`: add `sinh` (derivative `cosh(g)`) and `cosh`
   (derivative `sinh(g)`) single-arg cases, plus the `tanh` case from Delta 4
   (`1 − tanh²(g)`). ngspice has no `PTdifferentiate` case for `sinh`/`cosh`
@@ -321,10 +388,14 @@ pass"). So the atto suffix is recorded done but is **absent here**.
 
 **Disposition:** treat Delta 5 as **PORT-via-this-recon, trivial** — when this
 recon is implemented on a branch where `ca384593` is not present, add `["A",
-1e-18]` to `SPICE_SUFFIXES`. Placement: the array is matched longest-suffix-first
-in practice via the suffix parse at `model-parser.ts:117–124`; `"A"` is a
-single character that does not prefix-collide with the existing multi-char
-suffixes, so it may be appended after `["F", 1e-15]`. If the implementer's
+1e-18]` to `SPICE_SUFFIXES`. Placement: the parsed suffix is matched
+**first-match-wins** by iterating the array in order and testing
+`suffix === sfx || suffix.startsWith(sfx)` (`model-parser.ts:131–135`), against
+the suffix extracted at `model-parser.ts:117–124`. `"A"` is safe to append after
+`["F", 1e-15]`: none of the existing nine entries (`MEG, T, G, K, M, U, N, P, F`)
+is a prefix of an atto suffix, so a leading-`A` suffix falls through to the new
+entry; and `"A"` being a single character cannot, via `startsWith`, wrongly
+swallow any existing metric suffix. If the implementer's
 branch already carries `ca384593` (entry present), record Delta 5 as **already
 APPLIED — no action**, do not duplicate the entry. This spec does not re-port a
 present entry; it only records the requirement and the branch discrepancy so the
@@ -364,45 +435,52 @@ the tradeoff and the ruling.
 
 ## Acceptance criteria
 
-1. `expression-evaluate.ts` `BUILTIN_FUNCTIONS` `exp` entry returns `1e99` when
+1. The shared clamped `BUILTIN_FUNCTIONS` `exp` entry returns `1e99` when
    `arg > 227.9559242` (literal operands, character-matching
    `ptfuncs.c:277–278`) and `Math.exp(arg)` otherwise. The `newcompat.ps`
    EXPARGMAX linear branch is **absent** (it is USER-DECISION #3).
-2. `expression-evaluate.ts` `BUILTIN_FUNCTIONS` `log` and `log10` entries each
+2. The shared clamped `BUILTIN_FUNCTIONS` `log` and `log10` entries each
    return `Number.POSITIVE_INFINITY` for `arg < 0`, `-1e99` for `arg === 0`, and
-   the library value otherwise — in that test order, matching `ptfuncs.c:287–304`
+   the library value otherwise — in that test order, matching `ptfuncs.c:286–304`
    line-for-line.
-3. Both `evaluate()` (tree-walk, `expression-evaluate.ts:112–120`) and
-   `compileExpression()` (closure, `expression-evaluate.ts:193–201`) paths route
-   `exp`/`log`/`log10` through the clamped implementations — they share the
-   single `BUILTIN_FUNCTIONS` map, so a change to the map satisfies both; the
-   verifier confirms no second un-clamped `Math.exp`/`Math.log`/`Math.log10` call
-   site exists in the evaluator. The `simplify()` constant-fold table
-   (`mathFns` at `expression-differentiate.ts:336–342`) is a parallel duplicate
-   of the math-function set. After this recon, the implementer must do ONE of:
-   (a) if the clamped `BUILTIN_FUNCTIONS` map fully covers every function
-   `simplify`'s `mathFns` folds (i.e. the constant-fold path can call the same
-   clamped implementations), **delete** the `mathFns` table and have `simplify`
-   fold through the single `BUILTIN_FUNCTIONS` source of truth — this is the
-   ruled-preferred outcome (no parallel table kept in sync); or (b) if a
-   coverage gap prevents deletion, document the specific gap and route the
-   overlapping entries (`exp`/`log`/`log10`) through the clamped behavior so
-   constant folding agrees with runtime (a constant `exp(300)` must fold to
-   `1e99`, not `Infinity`). The implementer verifies coverage before choosing
-   (a).
+3. **Single-clamped-map invariant (BLOCKING).** There is exactly **one**
+   exported, clamped `BUILTIN_FUNCTIONS` map, and it is the source of truth for
+   every runtime function lookup. The verifier confirms:
+   (i) `expression.ts`'s `evaluateExpression` (`expression.ts:439–446`) and
+   `expression-evaluate.ts`'s `evaluate` (`:112–120`) and `compileExpression`
+   (`:193–201`) all resolve `exp`/`log`/`log10`/`sinh`/`cosh`/`tanh` from that
+   one map — the per-file literals at `expression.ts:108–127` and
+   `expression-evaluate.ts:47–66` are deleted, not edited-in-parallel;
+   (ii) **no** un-clamped `Math.exp`/`Math.log`/`Math.log10` call site for these
+   three functions survives in either runtime evaluator — in particular the
+   source load path through `evaluateExpression`
+   (`ac-voltage-source.ts:1285`, `ac-current-source.ts:576`) sees the clamped
+   `exp` so a B-source `exp(300)` returns `1e99`, not `Infinity`;
+   (iii) the `simplify()` constant-fold table (`mathFns` at
+   `expression-differentiate.ts:336–342`) is **deleted** and `simplify` folds
+   through the same shared clamped map, so a constant `exp(300)` folds to `1e99`
+   (matching runtime), not `Infinity`. The shared map covers every function the
+   old `mathFns` listed (`sin cos tan asin acos atan exp log log10 sqrt abs
+   floor ceil round`) plus the new hyperbolics, so deletion loses no
+   constant-fold coverage; the implementer confirms this coverage before
+   deleting. The new import edge is acyclic (per the STANCE invariant: define or
+   re-export the shared map from `expression.ts` or a small dedicated module the
+   three files import).
 4. `expression-differentiate.ts` `tan` case (currently lines 157–159) builds the
    derivative `1 + tan²(g)` (`add(one(), pow(callNode("tan", [g]), two()))`),
    matching `inpptree.c:508–513`; the prior `1/cos²(g)` form is gone. The chain
    rule `* g'` continues to be applied by the surrounding `mul(fPrimeG, dg)`
    (`expression-differentiate.ts:204`). The comment cites `inpptree.c:508–513`
    in present tense with no era tag.
-5. The hyperbolic functions `sinh` / `cosh` / `tanh` are added to the engine
-   function set: present in `expression-evaluate.ts` `BUILTIN_FUNCTIONS`
-   (`Math.sinh`/`Math.cosh`/`Math.tanh`) and accepted by the `expression.ts`
-   parser. `expression-differentiate.ts` gains `tanh` (`1 − tanh²(g)`, matching
-   `inpptree.c:515–520`), `sinh` (`cosh(g)`), and `cosh` (`sinh(g)`) single-arg
-   cases. No clamp is applied to any of the three (ngspice `PTsinh`/`PTcosh`/
-   `PTtanh` apply none).
+5. The hyperbolic functions `sinh` / `cosh` / `tanh` are added to the **shared
+   clamped `BUILTIN_FUNCTIONS`** (`Math.sinh`/`Math.cosh`/`Math.tanh`), so both
+   runtime evaluators resolve and evaluate them from one map (no second literal);
+   they already parse (the parser builds a `call` node for any `ident(...)`), so
+   the map addition is what makes them evaluate instead of throwing "Unknown
+   function". `expression-differentiate.ts` gains `tanh` (`1 − tanh²(g)`,
+   matching `inpptree.c:515–520`), `sinh` (`cosh(g)`), and `cosh` (`sinh(g)`)
+   single-arg cases. No clamp is applied to any of the three (ngspice
+   `PTcosh`/`PTsinh`/`PTtanh` apply none).
 6. `model-parser.ts` `SPICE_SUFFIXES` contains exactly one `["A", 1e-18]` entry
    (atto), added if and only if not already present on the building branch (no
    duplicate). The verifier checks the **actual working tree**, not the ledger
@@ -410,8 +488,13 @@ the tradeoff and the ruling.
 7. No file outside `expression-evaluate.ts`, `expression-differentiate.ts`,
    `expression.ts`, and `model-parser.ts` is touched. No parse-tree / yacc
    machinery, no `controlled_exit`, no compat-mode flag, no `ddt`, no RKM are
-   introduced. (`expression.ts` is touched ONLY to add the three hyperbolic
-   functions to its parser function set — not to build any tree-node machinery.)
+   introduced. (`expression.ts` is touched to host or import the shared clamped
+   `BUILTIN_FUNCTIONS` — clamps + hyperbolics — and to delete its now-redundant
+   local literal; it is **not** touched to build any tree-node machinery. The
+   ASRC source files `ac-voltage-source.ts` / `ac-current-source.ts` are **not**
+   edited — they already call `evaluateExpression`, which now resolves through
+   the shared clamped map by virtue of the dedupe, so the load path is clamped
+   without changing the call sites.)
 8. The numerical behavior is verified with targeted unit tests on the expression
    subsystem (per the project test policy for engine-numerical changes — targeted
    tests, not the full suite): `exp(228) === 1e99`, `exp(227) === Math.exp(227)`;
@@ -420,9 +503,15 @@ the tradeoff and the ruling.
    bit-identically to `1 + tan(x)²`, and of `tanh(x)` to `1 − tanh(x)²`, at
    representative `x`; `sinh`/`cosh`/`tanh` parse, evaluate (`=== Math.sinh` etc.),
    and differentiate (`d sinh = cosh`, `d cosh = sinh`); `parseSpiceValue("1a")
-   === 1e-18`. These assert the ngspice numeric contract directly (no harness is
-   required — these functions are not on the matrix/RHS path and have no ngspice
-   per-iteration signal to diff; the contract is the scalar return value).
+   === 1e-18`. Additionally, the clamp must be asserted on **both** runtime
+   paths, not just one: `evaluateExpression(parseExpression("exp(300)"), {})
+   === 1e99` (the `expression.ts` path the ASRC sources use) AND
+   `evaluate(parseExpression("exp(300)"), ctx) === 1e99` (the
+   `expression-evaluate.ts` path) — both must return `1e99`, proving the single
+   shared map is wired into both evaluators. These assert the ngspice numeric
+   contract directly (no harness is required — these functions are not on the
+   matrix/RHS path and have no ngspice per-iteration signal to diff; the contract
+   is the scalar return value).
 
 ---
 
@@ -441,7 +530,7 @@ spec in the agent report. Total PENDING parser hunks in these four files: **48**
 |---|---|---|---|
 | `parser/ptfuncs.c#h005` | `PTexp` unconditional `>227.9559242 → 1e99` (`ptfuncs.c:277–278`, diff-doc 9679–9692) **and** `PTlog` `==0 → -1e99` (diff-doc 9694–9704) | `expression-evaluate.ts` `BUILTIN_FUNCTIONS.exp` + `.log` | Delta 1 + Delta 2 (the `newcompat.ps` exp arm inside this hunk is the OUT sub-part, not built) |
 | `parser/ptfuncs.c#h006` | `PTlog10` `==0 → -1e99` (diff-doc 9707–9713) | `expression-evaluate.ts` `BUILTIN_FUNCTIONS.log10` | Delta 2 |
-| `parser/inpptree.c#h010` | `PTdifferentiate` PTF_TAN `1/cos² → 1+tan²` **and** PTF_TANH `1/cosh² → 1−tanh²` (`inpptree.c:508–520`, diff-doc 8911–8933) | `expression-differentiate.ts` `tan`/`tanh` cases + hyperbolic add in `expression.ts`/`expression-evaluate.ts` | Delta 3 + Delta 4 + Delta 6 |
+| `parser/inpptree.c#h010` | `PTdifferentiate` PTF_TAN `1/cos² → 1+tan²` **and** PTF_TANH `1/cosh² → 1−tanh²` (`inpptree.c:508–520`, diff-doc 8911–8933) | `expression-differentiate.ts` `tan`/`tanh`/`sinh`/`cosh` cases + hyperbolic add to the shared clamped `BUILTIN_FUNCTIONS` | Delta 3 + Delta 4 + Delta 6 |
 | `parser/inpeval.c#h005` | `'a'/'A' → 1e-18` atto suffix | `model-parser.ts` `SPICE_SUFFIXES` | Delta 5 (verify present on branch; add if absent) |
 
 > `parser/ptfuncs.c#h005` straddles `PTexp` and `PTlog`; both clamps are the

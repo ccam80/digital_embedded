@@ -231,7 +231,8 @@ Narrative": every reconstructed comment cites the current
 `ref/ngspice/.../<file>` line and explains the mechanism in present tense, with
 no `v26`/`v41`/era tags and no migration narrative. SPICE-correctness per CLAUDE.md
 "SPICE-Correct Implementations Only": the Kull block matches `bjtload.c`
-operand-for-operand (Part 4 forbidden-shapes).
+operand-for-operand (Part 4) and the full temperature pass matches `bjttemp.c`
+operand-for-operand (Part 7).
 
 ---
 
@@ -388,9 +389,10 @@ and appends seven QS slots after `BJTgdsub`, giving `BJTnumStates 33`:
 Per CLAUDE.md "No accept() — all state in StatePool" and MEMORY.md
 `feedback_schema_lookups_over_exports`, declare one slot per `#define`, **same
 order** (the order is the state-vector layout the integrator/predictor index by).
-The existing 22-slot schema (the present file has 24 entries minus VSUB/CDSUB/…;
-verified the present schema runs VBE..GDSUB at indices 0..23) gains `VBCX`/`VRCI`
-inserted at indices 2/3 and seven appended:
+The existing schema (`bjt.ts:1098-1123`) has **exactly 24 slots**, `VBE`(0)
+through `GDSUB`(23) — and that includes `VSUB`(21)/`CDSUB`(22)/`GDSUB`(23). It
+gains `VBCX`/`VRCI` inserted at indices 2/3 (shifting `CC`..`GDSUB` down by 2) and
+seven QS slots appended, for `BJTnumStates 33`:
 
 ```ts
 // cite: bjtdefs.h state #defines (diff bjt.md:561-620), BJTnumStates 33.
@@ -473,12 +475,19 @@ this recon needs (with `bjtsetup.c` defaults):
 | `BJT_MOD_TISS1` | `tiss1` | `BJTtiss1` (+Given) | `0.0` (`:358-360`) |
 | `BJT_MOD_TISS2` | `tiss2` | `BJTtiss2` (+Given) | `0.0` (`:361-363`) |
 
-The SOA self-heating limits (`pd_max`/`ic_max`/`ib_max`/`te_max`/`rth0`, defaults
-`1e99`, `bjtsetup.c:392-403`) are **OUT OF SCOPE** for this recon — they are the
-`bjtsoachk.c` self-heating subsystem, not QS. Flag (b): they are pure
-operating-area-check params with no QS coupling; reconstructing them belongs to a
-separate SOA recon, not here. List them as NO-COUNTERPART-for-this-recon so the
-implementer does not pull them in.
+The SOA operating-area limit params (`ic_max`/`ib_max`/`pd_max`/`te_max`/`rth0`)
+are ported **declare-only** in this recon (added to `BJT_PARAM_DEFS` so the param
+table matches v41 and round-trips through `setParam`), but their numerical
+**consumption** is deferred to the diagnostic follow-on `bjt#recon/soaWarnings`
+(see the Scope section's "Reclassified — SOA" subsection and the SOA-grep finding:
+`bjtsoachk.c` reads `CKTrhsOld`/`CKTstate0` and emits `soa_printf` warnings only —
+no matrix/RHS write, `rth0` is a `pd_max` derating divisor at `bjtsoachk.c:119`,
+not a thermal node). Defaults from `bjtsetup.c:382-403`: `ic_max`/`ib_max`/
+`pd_max`/`te_max` default `1e99`; **`rth0` has NO default** (absent from
+`bjtsetup.c:382-403`) — it is consumed only when `rth0Given` (and the consumption
+lives in `bjtsoachk.c`, not this recon). Declare `RTH0` given-gated with no
+synthesized default. These params have no `load()`/`setup()` numerical effect, so
+the declarations are parity-neutral.
 
 ### digiTS counterpart
 
@@ -640,8 +649,9 @@ later becomes `here->BJTcapbcx`.
 - **next2 unconditional state writes** (`bjt.md:2276-2288`):
   `s0[VBCX]=vbcx`, `s0[VRCI]=vrci`, and `s0[IRCI]=Irci`,
   `s0[IRCI_VRCI]=Irci_Vrci`, `s0[IRCI_VBCI]=Irci_Vbci`, `s0[IRCI_VBCX]=Irci_Vbcx`.
-  These four `Irci_*` writes are also done inside the SenCond branch
-  (`bjt.md:2237-2239`) — SenCond is NO-COUNTERPART (sensitivity).
+  The three `Irci_*` writes (`Irci_Vrci`/`Irci_Vbci`/`Irci_Vbcx`, NOT `Irci`
+  itself) are also done inside the SenCond branch (`bjtload.c:784-786`,
+  `bjt.md:2237-2239`) — SenCond is NO-COUNTERPART (sensitivity).
 
 ### 4e — collCX Y-stamps + RHS (rebuild of `bjtload.c`, `bjt.md:2305-2364`)
 
@@ -784,77 +794,245 @@ computed for parity of the voltage set, not the tolerance arithmetic.
 
 ---
 
-## Part 7 — `computeBjtTempParams()` (BJTtemp): QS temp params + the BEtSatCur/BCtSatCur split
+## Part 7 — `computeBjtTempParams()` (BJTtemp): full v41 temperature reconstruction
 
-### ngspice baseline
+**This recon rewrites `computeBjtTempParams` (`bjt.ts:348`) to the FULL v41
+`bjttemp.c` logic** — every `tlev`/`tlevc` branch, every per-parameter
+temperature-coefficient (tempco) multiplier, the area folding, `pbfact1`, the
+BE/BC saturation-current split, the `mje`/`mjc`/`mjs > 0.999` grading limit, and
+the QS temp block. Nothing in the temperature pass is deferred or dropped. The
+formulas below are transcribed operand-for-operand from
+`ref/ngspice/src/spicelib/devices/bjt/bjttemp.c` (verified by hand); the
+implementer produces bit-exact code from them without re-deriving.
 
-Two QS-relevant blocks in `bjttemp.c`:
+### BjtTempParams field additions
 
-1. **BEtSatCur / BCtSatCur split** (`:166-213`): v41 splits the single `tSatCur`
-   into separate BE and BC temperature-adjusted saturation currents. When BOTH
-   `BJTBEsatCurGiven` AND `BJTBCsatCurGiven`, `BEtSatCur`/`BCtSatCur` use the
-   `ibe`/`ibc` model values with `emissionCoeffF`/`R`-scaled Arrhenius factors
-   (`:170-177`); otherwise both fall back to `tSatCur` (`:173,179`). Area folding:
-   `BCtSatCur *= areab` (vertical) / `areac` (lateral) (`:198-202`); the subst
-   `tSubSatCur` area scaling (`:203-213`).
-2. **QS temp params** (`:215-229`, gated on `BJTintCollResistGiven`):
-   - if `quasimod == 1`: temperature-scale via `rT = temp/tnom`:
-     `tintCollResist = intCollResist * pow(rT, tempExpRCI)` (`:218`);
-     `tepiSatVoltage = epiSatVoltage * pow(rT, tempExpVO)` (`:219`);
-     `tepiDoping = epiDoping * pow(rT, tempExpIS) * exp(-energyGapQS*(1-rT)/vt)`
-     (`:220-223`).
-   - else (`quasimod != 1`): pass through —
-     `tintCollResist = intCollResist`, `tepiSatVoltage = epiSatVoltage`,
-     `tepiDoping = epiDoping` (`:225-227`).
+Add to the `BjtTempParams` shape returned by `computeBjtTempParams` and consumed
+by `load()`/`stampAc()`: `tBEtSatCur`, `tBCtSatCur` (the split satcurs);
+`tintCollResist`, `tepiSatVoltage`, `tepiDoping` (QS). The existing fields
+(`tSatCur`, `tSubSatCur`, `tinvRollOffF/R`, `tcollectorConduct`,
+`temitterConduct`, `tbaseResist`, `tminBaseResist`, `tbaseCurrentHalfResist`,
+`temissionCoeffF/R`, `tleakBEemissionCoeff`, `tleakBCemissionCoeff`,
+`ttransitTimeHighCurrentF`, `ttransitTimeF/R`, `tjunctionExpBE/BC/Sub`,
+`temissionCoeffS`, `tBetaF/R`, `tBEleakCur`, `tBCleakCur`, `tBEcap`, `tBEpot`,
+`tBCcap`, `tBCpot`, `tSubcap`, `tSubpot`, `tDepCap`, `tf1`..`tf7`, `tVcrit`,
+`tSubVcrit`, `tinvEarlyVoltF/R`) all keep their meaning but their formulas gain
+the tempco multipliers and area factors below.
 
-### digiTS counterpart
+Thread the new model params into the param object from `makeTp()`
+(`bjt.ts:1204-1218`) and the L0 path (`bjt.ts:526`):
+`IBE`/`IBC`/`RCO`/`VO`/`GAMMA`/`QUASIMOD`/`EGQS`/`XRCI`/`XD` (QS) plus the full
+TLEV/TLEVC tempco set (`TLEV`, `TLEVC`, and the `t<x>1`/`t<x>2` pairs
+`TBF1/2`,`TBR1/2`,`TIKF1/2`,`TIKR1/2`,`TIRB1/2`,`TNC1/2`,`TNE1/2`,`TNF1/2`,
+`TNR1/2`,`TRB1/2`,`TRC1/2`,`TRE1/2`,`TRM1/2`,`TVAF1/2`,`TVAR1/2`,`TITF1/2`,
+`TTF1/2`,`TTR1/2`,`TMJE1/2`,`TMJC1/2`,`TMJS1/2`,`TNS1/2`,`TIS1/2`,`TISE1/2`,
+`TISC1/2`,`TISS1/2`, plus `CTC`/`CTE`/`CTS`,`TVJE`/`TVJC`/`TVJS`, `XTB`=`betaExp`)
+with their `bjtsetup.c` defaults (the `t<x>1`/`t<x>2` default `0.0`; `tlev`/`tlevc`
+default `0`). `dt = temp − tnom`; `vt = temp·CONSTKoverQ`;
+`vtnom = CONSTKoverQ·tnom`; `fact1 = tnom/REFTEMP`; `fact2 = temp/REFTEMP`
+(`bjttemp.c:44-45,81,149-150`).
 
-`computeBjtTempParams` (`bjt.ts:348`) gains:
-- New `BjtTempParams` fields: `tBEtSatCur`, `tBCtSatCur`, `tintCollResist`,
-  `tepiSatVoltage`, `tepiDoping`. Thread `IBE`/`IBC`/`RCO`/`VO`/`GAMMA`/`QUASIMOD`/
-  `EGQS`/`XRCI`/`XD` (+ their Given flags) into the param object passed from
-  `makeTp()` (`bjt.ts:1204-1218`) and the L0 path (`bjt.ts:526`).
-- Port the BEtSatCur/BCtSatCur split: the existing `tSatCur` computation stays;
-  add the BE/BC fork keyed on `ibeGiven && ibcGiven`. Area folding (`*areab`/
-  `*areac`) for `BCtSatCur` (`:198-202`) — and crucially, the v41 area folding for
-  `tcollectorConduct`/`temitterConduct`/`tbaseResist`/etc. that Part 4a relies on
-  must be applied here (the load no longer multiplies by AREA).
-- Port the QS temp block gated on `rcoGiven`, with the `quasimod==1` vs else fork,
-  exactly per `:215-229`. `rT = temp/tnom`; `vt` is the instance `vt`; `tempExpIS`
-  is the existing `XTI` param.
+### 7a — per-quantity tempco multipliers + area folding (`bjttemp.c:83-147`)
 
-### TLEV / TLEVC — scope flag (b)
+Each per-instance quantity is `model param · (1 + t<x>1·dt + t<x>2·dt²)` then
+area-folded. Transcribe (cite each to `bjttemp.c` line):
 
-The `bjttemp.c` `tlev`/`tlevc` branches (e.g. `:166 (tlev==0||1)`, `:183 (tlev==3)`,
-`:231-235 bfactor`) gate the **entire** temp pass, including the BEtSatCur/BCtSatCur
-split. The present digiTS `computeBjtTempParams` implements the `tlev==0`
-(default) path only. **`tlev`/`tlevc` are a BROADER temperature-equation-selector
-subsystem** (the `tbf1`/`tbf2`/`tikf1`/… ~60 temperature-coefficient params) that
-is NOT part of QS. The QS block sits *inside* the `tlev`-gated region but only the
-`quasimod` selector (`:216`) gates the QS-specific math; `quasimod` is independent
-of `tlev`.
+```ts
+// bjttemp.c:83-87 — forward Early-voltage inverse (guarded on VAF given & ≠0)
+tinvEarlyVoltF = (vafGiven && VAF !== 0) ? 1/(VAF*(1+TVAF1*dt+TVAF2*dt*dt)) : 0;   // :84
+// bjttemp.c:88-93 — forward roll-off inverse, area-folded (/AREA)
+if (ikfGiven && IKF !== 0) { tinvRollOffF = 1/(IKF*(1+TIKF1*dt+TIKF2*dt*dt)); tinvRollOffF /= AREA; } else tinvRollOffF = 0; // :89-90
+tinvEarlyVoltR = (varGiven && VAR !== 0) ? 1/(VAR*(1+TVAR1*dt+TVAR2*dt*dt)) : 0;   // :95
+if (ikrGiven && IKR !== 0) { tinvRollOffR = 1/(IKR*(1+TIKR1*dt+TIKR2*dt*dt)); tinvRollOffR /= AREA; } else tinvRollOffR = 0; // :100-101
+// bjttemp.c:105-110 — collector conductance, area-folded (·AREA)
+if (rcGiven && RC !== 0) { tcollectorConduct = 1/(RC*(1+TRC1*dt+TRC2*dt*dt)); tcollectorConduct *= AREA; } else tcollectorConduct = 0; // :106-107
+if (reGiven && RE !== 0) { temitterConduct = 1/(RE*(1+TRE1*dt+TRE2*dt*dt)); temitterConduct *= AREA; } else temitterConduct = 0;       // :112-113
+tbaseResist = RB*(1+TRB1*dt+TRB2*dt*dt);            tbaseResist /= AREA;            // :118-119
+tminBaseResist = RBM*(1+TRM1*dt+TRM2*dt*dt);        tminBaseResist /= AREA;          // :120-121
+tbaseCurrentHalfResist = IRB*(1+TIRB1*dt+TIRB2*dt*dt); tbaseCurrentHalfResist *= AREA; // :122-123
+temissionCoeffF = NF*(1+TNF1*dt+TNF2*dt*dt);                                          // :124
+temissionCoeffR = NR*(1+TNR1*dt+TNR2*dt*dt);                                          // :125
+tleakBEemissionCoeff = NE*(1+TNE1*dt+TNE2*dt*dt);                                     // :126
+tleakBCemissionCoeff = NC*(1+TNC1*dt+TNC2*dt*dt);                                     // :127
+ttransitTimeHighCurrentF = ITF*(1+TITF1*dt+TITF2*dt*dt); ttransitTimeHighCurrentF *= AREA; // :128-129
+ttransitTimeF = TF*(1+TTF1*dt+TTF2*dt*dt);                                            // :130
+ttransitTimeR = TR*(1+TTR1*dt+TTR2*dt*dt);                                            // :131
+// bjttemp.c:132-146 — junction grading w/ tempco, then the >0.999 limit clamp
+tjunctionExpBE = MJE*(1+TMJE1*dt+TMJE2*dt*dt);                                        // :132
+if (tjunctionExpBE > 0.999) { tjunctionExpBE = 0.999; /* warn mje limited */ }       // :133-136
+tjunctionExpBC = MJC*(1+TMJC1*dt+TMJC2*dt*dt);                                        // :137
+if (tjunctionExpBC > 0.999) { tjunctionExpBC = 0.999; /* warn mjc limited */ }       // :138-141
+tjunctionExpSub = MJS*(1+TMJS1*dt+TMJS2*dt*dt);                                       // :142
+if (tjunctionExpSub > 0.999) { tjunctionExpSub = 0.999; /* warn mjs limited */ }     // :143-146
+temissionCoeffS = NS*(1+TNS1*dt+TNS2*dt*dt);                                          // :147
+```
+The `> 0.999` clamps are BUILT (they prevent a `1/(1−mj)` blow-up at
+`bjttemp.c:316-322`); route the warning through `ctx.diagnostics`. (`MJS` here is
+`exponentialSubstrate`.)
 
-**FLAG:** This recon needs only the `quasimod` fork and the default-`tlev` BE/BC
-split (the `tlev==0||1` arm at `:166-182`, which is what digiTS already implements
-for `tSatCur`). The `tlev==3` arm (`:183-197`) and the full TLEV
-temperature-coefficient subsystem are **OUT OF SCOPE** — reconstructing them is a
-separate `bjt#recon/tlev` (or similar) effort. The implementer must NOT pull the
-TLEV subsystem in. If the BE/BC split at default `tlev` cannot be implemented
-without the broader TLEV machinery (it can — the `tlev==0` arm is
-self-contained), escalate. The QS temp block (`:215-229`) is `tlev`-independent
-(it keys only on `quasimod`) and is fully in scope.
+### 7b — band-gap factors + the satcur/leakage `tlev` arms (`bjttemp.c:149-258`)
 
-**Forbidden shapes:** implementing the `tlev==3` Arrhenius-by-coefficient arm
-(out of scope); temp-scaling `epiCharge`/`QCO` (it is raw in `load`); using
-`Math.pow(rT, …)` is correct here (ngspice uses `pow`, `:218-223` — this is the
-one place `pow` matches); caching the QS temp results across `setCircuitTemp`.
+```ts
+// bjttemp.c:149-160 — temp & nominal band-gap factors
+vt = temp*KoverQ; fact2 = temp/REFTEMP;
+egfet  = 1.16 - (7.02e-4*temp*temp)/(temp+1108);                                     // :151-152
+arg    = -egfet/(2*CONSTboltz*temp) + 1.1150877/(CONSTboltz*(REFTEMP+REFTEMP));       // :153-154
+pbfact = -2*vt*(1.5*Math.log(fact2)+CHARGE*arg);                                     // :155
+egfet1 = 1.16 - (7.02e-4*tnom*tnom)/(tnom+1108);                                     // :156-157
+arg1   = -egfet1/(2*CONSTboltz*tnom) + 1.1150877/(CONSTboltz*(REFTEMP+REFTEMP));      // :158-159
+pbfact1 = -2*vtnom*(1.5*Math.log(fact1)+CHARGE*arg1);                                // :160
+ratlog  = Math.log(temp/tnom);                                                       // :162
+ratio1  = temp/tnom - 1;                                                             // :163
+factlog = ratio1*EG/vt + XTI*ratlog;                                                 // :164-165  (EG=energyGap, XTI=tempExpIS)
+
+// bjttemp.c:166-197 — saturation currents, tlev==0/1 vs tlev==3
+if (tlev === 0 || tlev === 1) {
+  let factor = Math.exp(factlog);                                                    // :167
+  tSatCur = AREA * IS * factor;                                                      // :168
+  if (ibeGiven && ibcGiven) { factor = Math.exp(factlog/NF); tBEtSatCur = AREA*IBE*factor; } // :170-171
+  else tBEtSatCur = tSatCur;                                                         // :173
+  if (ibeGiven && ibcGiven) { factor = Math.exp(factlog/NR); tBCtSatCur = IBC*factor; }      // :176-177
+  else tBCtSatCur = tSatCur;                                                         // :179
+  if (issGiven) tSubSatCur = ISS * factor;                                           // :181-182  (note: uses the last `factor`)
+} else if (tlev === 3) {
+  tSatCur = AREA * Math.pow(IS, 1+TIS1*dt+TIS2*dt*dt);                               // :184
+  if (ibeGiven && ibcGiven) tBEtSatCur = AREA*Math.pow(IBE, 1+TIS1*dt+TIS2*dt*dt);   // :186
+  else tBEtSatCur = tSatCur;                                                         // :188
+  if (ibeGiven && ibcGiven) tBCtSatCur = Math.pow(IBC, 1+TIS1*dt+TIS2*dt*dt);        // :191
+  else tBCtSatCur = tSatCur;                                                         // :193
+  if (issGiven) tSubSatCur = Math.pow(ISS, 1+TISS1*dt+TISS2*dt*dt);                  // :195-196
+}
+// bjttemp.c:198-213 — BC/sub satcur area folding (subs orientation)
+if (!isLateral) tBCtSatCur *= AREAB; else tBCtSatCur *= AREAC;                       // :198-202
+if (issGiven) {
+  if (ibeGiven && ibcGiven) { if (!isLateral) tSubSatCur *= AREAC; else tSubSatCur *= AREAB; } // :205-209
+  else tSubSatCur *= AREA;                                                           // :211
+}
+
+// bjttemp.c:215-229 — QS temp block (gated on rcoGiven)
+if (rcoGiven) {
+  if (QUASIMOD === 1) {
+    const rT = temp/tnom;                                                            // :217
+    tintCollResist = RCO * Math.pow(rT, XRCI);                                       // :218  (XRCI=tempExpRCI)
+    tepiSatVoltage = VO  * Math.pow(rT, XD);                                         // :219  (XD=tempExpVO)
+    const xvar1 = Math.pow(rT, XTI);                                                 // :220  (XTI=tempExpIS)
+    const xvar2 = -EGQS*(1.0-rT)/vt;                                                 // :221  (EGQS=energyGapQS)
+    const xvar3 = Math.exp(xvar2);                                                   // :222
+    tepiDoping = GAMMA * xvar1 * xvar3;                                              // :223  (GAMMA=epiDoping)
+  } else { tintCollResist = RCO; tepiSatVoltage = VO; tepiDoping = GAMMA; }          // :225-227
+}
+
+// bjttemp.c:231-243 — beta temp factor (tlev gates bfactor; tempco overrides)
+let bfactor;
+if (tlev === 0) bfactor = Math.exp(ratlog*XTB);                                      // :231-232  (XTB=betaExp)
+else if (tlev === 1) bfactor = 1 + XTB*dt;                                           // :233-234
+tBetaF = (tbf1Given || tbf2Given) ? BF*(1+TBF1*dt+TBF2*dt*dt) : BF*bfactor;          // :236-239
+tBetaR = (tbr1Given || tbr2Given) ? BR*(1+TBR1*dt+TBR2*dt*dt) : BR*bfactor;          // :240-243
+
+// bjttemp.c:245-258 — leakage currents, tlev==0/1 vs ==3, then BC area fold
+if (tlev === 0 || tlev === 1) {
+  tBEleakCur = AREA * ISE * Math.exp(factlog/NE) / bfactor;                          // :246-247
+  tBCleakCur =        ISC * Math.exp(factlog/NC) / bfactor;                          // :248-249
+} else if (tlev === 3) {
+  tBEleakCur = AREA * Math.pow(ISE, 1+TISE1*dt+TISE2*dt*dt);                         // :251
+  tBCleakCur =        Math.pow(ISC, 1+TISC1*dt+TISC2*dt*dt);                         // :252
+}
+if (!isLateral) tBCleakCur *= AREAB; else tBCleakCur *= AREAC;                       // :254-257
+```
+Note `bfactor` is left undefined for `tlev ∉ {0,1}`; ngspice only ever reaches the
+`bfactor` use under the same `tlev` gate, so the port mirrors that (do not
+synthesize a default).
+
+### 7c — junction capacitances, tlevc==0 vs tlevc==1 (`bjttemp.c:260-313`)
+
+The `tlevc==0` arm uses `pbfact1` (the NOMINAL-temp factor, the v41 fix — NOT
+`pbfact`). Each of BE/BC/Sub follows the same shape; transcribe all three:
+
+```ts
+// BE cap — bjttemp.c:260-275
+if (tlevc === 0) {
+  let pbo = (VJE - pbfact1)/fact1;                                                   // :261
+  let gmaold = (VJE - pbo)/pbo;                                                      // :262
+  tBEcap = CJE / (1 + tjunctionExpBE*(4e-4*(tnom-REFTEMP) - gmaold));                // :263-265
+  tBEpot = fact2*pbo + pbfact;                                                       // :266
+  let gmanew = (tBEpot - pbo)/pbo;                                                   // :267
+  tBEcap *= 1 + tjunctionExpBE*(4e-4*(temp-REFTEMP) - gmanew);                       // :268-269
+} else if (tlevc === 1) {
+  tBEcap = CJE*(1 + CTE*dt);                                                         // :271-272
+  tBEpot = VJE - TVJE*dt;                                                            // :273
+}
+tBEcap *= AREA;                                                                      // :275
+// BC cap — bjttemp.c:276-294  (same shape with VJC/CJC/CTC/TVJC/tjunctionExpBC)
+if (tlevc === 0) {
+  let pbo = (VJC - pbfact1)/fact1;                                                   // :277
+  let gmaold = (VJC - pbo)/pbo;                                                      // :278
+  tBCcap = CJC / (1 + tjunctionExpBC*(4e-4*(tnom-REFTEMP) - gmaold));                // :279-281
+  tBCpot = fact2*pbo + pbfact;                                                       // :282
+  let gmanew = (tBCpot - pbo)/pbo;                                                   // :283
+  tBCcap *= 1 + tjunctionExpBC*(4e-4*(temp-REFTEMP) - gmanew);                       // :284-285
+} else if (tlevc === 1) {
+  tBCcap = CJC*(1 + CTC*dt);                                                         // :287-288
+  tBCpot = VJC - TVJC*dt;                                                            // :289
+}
+if (!isLateral) tBCcap *= AREAB; else tBCcap *= AREAC;                               // :291-294
+// Sub cap — bjttemp.c:295-313  (VJS=potentialSubstrate, CJS=capSub, CTS, TVJS, tjunctionExpSub)
+if (tlevc === 0) {
+  let pbo = (VJS - pbfact1)/fact1;                                                   // :296
+  let gmaold = (VJS - pbo)/pbo;                                                      // :297
+  tSubcap = CJS / (1 + tjunctionExpSub*(4e-4*(tnom-REFTEMP) - gmaold));              // :298-300
+  tSubpot = fact2*pbo + pbfact;                                                      // :301
+  let gmanew = (tSubpot - pbo)/pbo;                                                  // :302
+  tSubcap *= 1 + tjunctionExpSub*(4e-4*(temp-REFTEMP) - gmanew);                     // :303-304
+} else if (tlevc === 1) {
+  tSubcap = CJS*(1 + CTS*dt);                                                        // :306-307
+  tSubpot = VJS - TVJS*dt;                                                           // :308
+}
+if (!isLateral) tSubcap *= AREAC; else tSubcap *= AREAB;                             // :310-313
+```
+NOTE the substrate cap area fold is **swapped** vs BC (`AREAC` for VERTICAL, `:311`)
+— transcribe exactly.
+
+### 7d — depletion-cap fit coefficients (`bjttemp.c:315-333`)
+
+Unchanged by the tempco set but recomputed from the new `tBEpot`/`tBCpot`/
+`tjunctionExp*`; `xfc = log(1 − FC)` (`bjttemp.c:68`, `FC=depletionCapCoeff`):
+
+```ts
+tDepCap = FC * tBEpot;                                                               // :315
+tf1 = tBEpot*(1 - Math.exp((1 - tjunctionExpBE)*xfc))/(1 - tjunctionExpBE);          // :316-318
+tf4 = FC * tBCpot;                                                                   // :319
+tf5 = tBCpot*(1 - Math.exp((1 - tjunctionExpBC)*xfc))/(1 - tjunctionExpBC);          // :320-322
+tVcrit = vt*Math.log(vt/(CONSTroot2*tSatCur));                                       // :323-324
+if (issGiven) tSubVcrit = vt*Math.log(vt/(CONSTroot2*tSubSatCur));                   // :325-327
+tf2 = Math.exp((1 + tjunctionExpBE)*xfc);                                            // :328
+tf3 = 1 - FC*(1 + tjunctionExpBE);                                                   // :329-330
+tf6 = Math.exp((1 + tjunctionExpBC)*xfc);                                            // :331
+tf7 = 1 - FC*(1 + tjunctionExpBC);                                                   // :332-333
+```
+
+### Required constraints
+
+- The area folding here (`·AREA`/`/AREA`/`·AREAB`/`·AREAC`) is the SAME refactor
+  Part 4a removes from `load()` and Part 5 removes from `stampAc()`; they must
+  move in lockstep.
+- `tempExpIS` (=`XTI`), `tempExpRCI` (=`XRCI`/`cn`), `tempExpVO` (=`XD`/`d`),
+  `energyGapQS` (=`EGQS`/`vg`), `betaExp` (=`XTB`), `epiDoping` (=`GAMMA`/`gamma`)
+  are the model→digiTS name mappings used above.
+- `pow` is correct everywhere ngspice writes `pow` (`:184,191,196,218-220,251,252`);
+  do NOT substitute the `exp(c·log(arg))` identity there.
+- Do NOT cache the temp results across `setCircuitTemp` — recompute on every temp
+  change (the MOS1 pattern, `bjt.ts` setParam re-runs the temp pass).
+- The QS temp params (`tintCollResist`/`tepiSatVoltage`/`tepiDoping`) are computed
+  here; `epiCharge`/`QCO` is NOT temp-scaled (it is used raw in `load()`, Part 4c).
 
 ---
 
 ## Allowed-difference / NO-COUNTERPART (by design — do NOT reconstruct)
 
-These are the pure C-struct mechanics and out-of-scope subsystems the diff
-touches; they are allowed-difference and must NOT generate digiTS work:
+These are the pure C-struct mechanics and analysis surfaces digiTS has no
+counterpart for; they are allowed-difference and must NOT generate digiTS work.
+(This list is genuine architectural non-counterparts ONLY — every real numerical
+feature, including the full TLEV/TLEVC subsystem, is built; see Part 7.)
 
 - **GENinstance/GENmodel embedding** (`bjtdefs.h` `bjt.md:447-465,627-641`): the
   `struct GENinstance gen` embedding and the `BJTmodPtr(inst)`/`BJTnextInstance`/
@@ -876,13 +1054,22 @@ touches; they are allowed-difference and must NOT generate digiTS work:
   C memory management; NO-COUNTERPART.
 - **`bjtpzld.c`** PZ-load collCX block (`bjt.md:2759-2850`): pole-zero analysis is
   not a digiTS surface — NO-COUNTERPART.
-- **`bjtnoise.c`/`bjtdisto.c`/`bjtsacl.c`/`bjtsoachk.c`** (`bjt.md:2642-2889+`):
-  noise / distortion / sensitivity-AC / SOA-self-heating — all out of scope
-  (noise/disto/sens are NO-COUNTERPART subsystems; SOA is a separate recon).
-- **SOA self-heating model params** `pd_max`/`ic_max`/`ib_max`/`te_max`/`rth0`
-  (`bjtsetup.c:392-403`): out of scope for QS — separate SOA recon.
-- **TLEV/TLEVC temperature-coefficient subsystem** (`bjttemp.c` tlev branches +
-  ~60 `t*1`/`t*2` params): out of scope — separate recon (Part 7 flag b).
+- **`bjtnoise.c`/`bjtdisto.c`/`bjtsacl.c`** (`bjt.md:2642-2889+`):
+  noise / distortion / sensitivity-AC — NO-COUNTERPART subsystems digiTS lacks
+  these analysis surfaces.
+
+Items that are **NOT** in this list (they are real behavior, built or sequenced,
+never dropped):
+- **TLEV/TLEVC** is BUILT here in full (Part 7) — every `tlev`/`tlevc` branch, the
+  tempco multipliers, the `>0.999` grading limit. Not out of scope.
+- **SOA** (`bjtsoachk.c` `BJTsoaCheck`, the `ic_max`/`ib_max`/`pd_max`/`te_max`/
+  `rth0` limits) is a diagnostic warning pass (reads only, `soa_printf`, no
+  matrix/RHS write `bjtsoachk.c:44-138`; `rth0` is a `pd_max` derating divisor at
+  `:119`, not a thermal node). Its model params are ported declare-only here; the
+  consumption is the sequenced follow-on `bjt#recon/soaWarnings` (PENDING,
+  specExists:false). The existing ledger hunk `bjt/bjtsoachk.c#h001` (currently
+  mis-filed NO-COUNTERPART) should be reclassified to `blockedBy:
+  bjt#recon/soaWarnings` — flagged for the orchestrator. NOT NO-COUNTERPART.
 
 ## Constructs that genuinely reach outside `bjt.ts`
 
@@ -932,19 +1119,26 @@ by `bjtsetup.c:433` (device-local `CKTmkVolt`) and `setup-context.ts:31-33`
 6. `checkConvergence` reads the third junction `vbcx` from `nodeCX` and computes
    `delvbcx` (`bjtconv.c`, `bjt.md:397-402`) without altering the `cchat`/`cbhat`
    tolerance test.
-7. `computeBjtTempParams` produces `tBEtSatCur`/`tBCtSatCur` (the BE/BC split at
-   default `tlev`) and, gated on `rcoGiven`, the QS temp params
+7. `computeBjtTempParams` is rewritten to the FULL v41 `bjttemp.c` pass (Part 7):
+   the `tlev==0/1` AND `tlev==3` saturation-current + leakage arms, the
+   `tlevc==0` AND `tlevc==1` junction-cap formulas, every per-parameter tempco
+   multiplier `(1+t<x>1·dt+t<x>2·dt²)`, the area folding, `pbfact1`, the
+   `mje`/`mjc`/`mjs > 0.999` grading clamp, the BE/BC satcur split
+   (`tBEtSatCur`/`tBCtSatCur`), and the QS temp params
    `tintCollResist`/`tepiSatVoltage`/`tepiDoping` with the `quasimod==1` vs
-   pass-through fork (`bjttemp.c:215-229`); TLEV `tlev==3`/coefficient machinery
-   is NOT pulled in.
+   pass-through fork (`bjttemp.c:215-229`). Nothing in the temperature pass is
+   deferred or dropped; parity holds at ANY `tlev`/`tlevc` value. (SOA limit
+   params are declare-only; their consumption is `bjt#recon/soaWarnings`.)
 8. Harness parity (CLAUDE.md harness-first): a `.dts` NPN with `rco`/`vo`/`gamma`/
    `qco` set (Kull active) and a control NPN without `rco` (classic GP) both reach
    `harness_first_divergence` = null across voltage/matrix/state/shape at every
    DC-OP NR iteration and every transient step against the ngspice DLL —
    bit-exact, no tolerance qualifier. The classic-GP control proves the gate-off
-   path is byte-preserved. Verified via `harness_start`→`harness_run`→
-   `harness_first_divergence`→`harness_topology_diff` (confirms collCX node +
-   coupling cells match slot order)→`harness_matrix_diff`.
+   path is byte-preserved; **a third device setting `tlev`/`tlevc` (and a tempco
+   pair, e.g. `tbf1`/`tmje1`) proves the full TLEV/TLEVC temperature pass (Part 7)
+   reaches bit-exact parity at non-default `tlev`/`tlevc`**. Verified via
+   `harness_start`→`harness_run`→`harness_first_divergence`→`harness_topology_diff`
+   (confirms collCX node + coupling cells match slot order)→`harness_matrix_diff`.
 9. Three-surface tests (CLAUDE.md): Surface 1 headless (`ComparisonSession` per
    `docs/api-reference/test-tools.md`) covering Kull-active DC-OP/transient + the
    classic-GP control; Surface 2 MCP (`circuit_build`→`circuit_compile`→
