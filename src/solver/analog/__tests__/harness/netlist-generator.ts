@@ -57,6 +57,10 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   VDMOSP:          { prefix: "M", modelType: "VDMOS" },
   NJFET:           { prefix: "J", modelType: "NJF" },
   PJFET:           { prefix: "J", modelType: "PJF" },
+  // ngspice MESFET `Z<name> nd ng ns <model>` with `.model <name> NMF`/`PMF`.
+  // The N/P-ness is the model-card type keyword (mesmpar.c NMF/PMF flags).
+  NMESFET:         { prefix: "Z", modelType: "NMF" },
+  PMESFET:         { prefix: "Z", modelType: "PMF" },
   VCVS:            { prefix: "E" },
   VCCS:            { prefix: "G" },
   CCVS:            { prefix: "H" },
@@ -703,6 +707,16 @@ function emitPrimitive(
     return [line];
   }
   if (spec.prefix === "J") {
+    const modelName = `${label}_${spec.modelType}`;
+    const line = `${label} ${nodeAt(nodes, 2, rawLabel, "D")} ${nodeAt(nodes, 0, rawLabel, "G")} ${nodeAt(nodes, 1, rawLabel, "S")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
+    if (!modelCards.has(modelName)) {
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+    }
+    return [line];
+  }
+  if (spec.prefix === "Z") {
+    // ngspice MESFET instance line: `Z<name> nd ng ns <model>` (mes.c:66-70
+    // MESnames Drain/Gate/Source). pinLayout order [G, S, D] → deck order D G S.
     const modelName = `${label}_${spec.modelType}`;
     const line = `${label} ${nodeAt(nodes, 2, rawLabel, "D")} ${nodeAt(nodes, 0, rawLabel, "G")} ${nodeAt(nodes, 1, rawLabel, "S")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {

@@ -44,6 +44,7 @@ export const NGSPICE_LOAD_ORDER = {
   MUT:  28,
   ISRC: 29,
   JFET: 30,
+  MES:  31,  // dev.c:184-189- get_mes_info, between jfet/jfet2 and mos1
   MOS:  35,
   RES:  40,
   SW:   42,
@@ -86,6 +87,7 @@ export type DeviceFamily =
   | "DIO"
   | "BJT"
   | "JFET"
+  | "MES"
   | "MOS"
   | "BEHAVIORAL"
   | "CPL"
@@ -134,6 +136,8 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
   PMOS:            NGSPICE_LOAD_ORDER.MOS,
   NJFET:           NGSPICE_LOAD_ORDER.JFET,
   PJFET:           NGSPICE_LOAD_ORDER.JFET,
+  NMESFET:         NGSPICE_LOAD_ORDER.MES,
+  PMESFET:         NGSPICE_LOAD_ORDER.MES,
   // Switches
   CurrentControlledSwitch: NGSPICE_LOAD_ORDER.CSW,
   // Behavioral / controlled sources
@@ -181,6 +185,8 @@ export const TYPE_ID_TO_DEVICE_FAMILY: Readonly<Record<string, DeviceFamily>> = 
   PMOS:            "MOS",
   NJFET:           "JFET",
   PJFET:           "JFET",
+  NMESFET:         "MES",
+  PMESFET:         "MES",
   // Switches
   CurrentControlledSwitch: "CSW",
   // Behavioral / controlled sources
@@ -241,6 +247,9 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   // J name D G S model
   NJFET:           ["D", "G", "S"],
   PJFET:           ["D", "G", "S"],
+  // Z name D G S model (mes.c:66-70 MESnames = Drain/Gate/Source)
+  NMESFET:         ["D", "G", "S"],
+  PMESFET:         ["D", "G", "S"],
   // T name pos1 neg1 pos2 neg2 Z0=... TD=...
   // ngspice TRAnames (tra.c:32-37): ["P1+","P1-","P2+","P2-"] → digiTS [P1b,P1a,P2b,P2a].
   TransmissionLine: ["P1b", "P1a", "P2b", "P2a"],
