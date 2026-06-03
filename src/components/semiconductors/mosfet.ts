@@ -1417,8 +1417,30 @@ function _createMosfetElementWithPolarity(
         if (tp.czbs > 0 || tp.czbssw > 0) {
           if (vbs < tp.tDepCap) {
             const argS = 1 - vbs / tp.tBulkPot;
-            const sargS = Math.exp(-params.MJ * Math.log(argS));
-            const sargswS = Math.exp(-params.MJSW * Math.log(argS));
+            let sargS: number;
+            let sargswS: number;
+            // mos1load.c:591-620: the following block looks somewhat long and
+            // messy, but since most users use the default grading coefficients
+            // of .5, and sqrt is MUCH faster than an exp(log()) we use this
+            // special case code to buy time. (as much as 10% of total job time!)
+            if (params.MJ === params.MJSW) {
+              if (params.MJ === 0.5) {
+                sargS = sargswS = 1 / Math.sqrt(argS);
+              } else {
+                sargS = sargswS = Math.exp(-params.MJ * Math.log(argS));
+              }
+            } else {
+              if (params.MJ === 0.5) {
+                sargS = 1 / Math.sqrt(argS);
+              } else {
+                sargS = Math.exp(-params.MJ * Math.log(argS));
+              }
+              if (params.MJSW === 0.5) {
+                sargswS = 1 / Math.sqrt(argS);
+              } else {
+                sargswS = Math.exp(-params.MJSW * Math.log(argS));
+              }
+            }
             s0[this._stateBase + SLOT_QBS] = tp.tBulkPot * (
               tp.czbs * (1 - argS * sargS) / (1 - params.MJ)
               + tp.czbssw * (1 - argS * sargswS) / (1 - params.MJSW));
@@ -1436,8 +1458,26 @@ function _createMosfetElementWithPolarity(
         if (tp.czbd > 0 || tp.czbdsw > 0) {
           if (vbd < tp.tDepCap) {
             const argD = 1 - vbd / tp.tBulkPot;
-            const sargD = Math.exp(-params.MJ * Math.log(argD));
-            const sargswD = Math.exp(-params.MJSW * Math.log(argD));
+            let sargD: number;
+            let sargswD: number;
+            // mos1load.c:652-675: the following block looks somewhat long and
+            // messy, but since most users use the default grading coefficients
+            // of .5, and sqrt is MUCH faster than an exp(log()) we use this
+            // special case code to buy time. (as much as 10% of total job time!)
+            if (params.MJ === 0.5 && params.MJSW === 0.5) {
+              sargD = sargswD = 1 / Math.sqrt(argD);
+            } else {
+              if (params.MJ === 0.5) {
+                sargD = 1 / Math.sqrt(argD);
+              } else {
+                sargD = Math.exp(-params.MJ * Math.log(argD));
+              }
+              if (params.MJSW === 0.5) {
+                sargswD = 1 / Math.sqrt(argD);
+              } else {
+                sargswD = Math.exp(-params.MJSW * Math.log(argD));
+              }
+            }
             s0[this._stateBase + SLOT_QBD] = tp.tBulkPot * (
               tp.czbd * (1 - argD * sargD) / (1 - params.MJ)
               + tp.czbdsw * (1 - argD * sargswD) / (1 - params.MJSW));
