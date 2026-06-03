@@ -344,17 +344,6 @@ export class TimestepController {
       this._savedDelta = params.tStop != null
         ? params.tStop / 50
         : params.maxTimeStep;
-
-      // dctran.c:291-294 (job-entry init): CKTdeltaOld[i] = CKTmaxStep for all
-      // 7 slots. ngspice re-runs this on every .tran entry; configure() is our
-      // .tran entry, and the constructor's seed used whatever maxTimeStep the
-      // engine was built with (the default when a caller constructs first, then
-      // configures the real maxStep). Re-seeding here keeps deltaOld[1] = the
-      // run's maxStep, so the MODEINIT(PRED|TRAN) predictor's
-      // xfact = CKTdelta / CKTdeltaOld[1] matches ngspice exactly.
-      for (let i = 0; i < this._deltaOld.length; i++) {
-        this._deltaOld[i] = params.maxTimeStep;
-      }
     } else if (this.currentDt > params.maxTimeStep) {
       // Mid-run: only clamp currentDt down to the new ceiling; never raise.
       this.currentDt = params.maxTimeStep;

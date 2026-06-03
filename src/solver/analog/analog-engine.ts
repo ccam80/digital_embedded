@@ -1991,6 +1991,14 @@ export class MNAEngine implements AnalogEngine {
     }
 
     if (cac.statePool) {
+      // dctran.c:291- CKTorder = 1.
+      this._timestep.currentOrder = 1;
+
+      // dctran.c:292-294- CKTdeltaOld[i] = CKTmaxStep for all 7 slots.
+      for (let i = 0; i < ctx.deltaOld.length; i++) {
+        ctx.deltaOld[i] = this._params.maxTimeStep;
+      }
+
       // dctran.c:346- CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN
       // Preserve MODEUIC only; replace the analysis and INITF bits entirely.
       const uic = ctx.cktMode & MODEUIC;
