@@ -2219,6 +2219,16 @@
         "parallel iso-verify + gate clean on [src/solver/analog/__tests__/expression.test.ts, src/solver/analog/__tests__/expression-evaluate.test.ts, src/solver/analog/__tests__/expression-differentiate.test.ts]"
       ],
       "escalation": null
+    },
+    "csw/cswload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "0356f87171730b2e",
+      "ref": "harvested:48223c4",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/ngspice-parity/fixtures/csw-gate.dts]"
+      ],
+      "escalation": null
     }
   }
 }

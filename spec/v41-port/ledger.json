@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-03T03:26:19.177Z",
+    "generated": "2026-06-03T03:48:50.074Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 238,
+    "progressEntriesApplied": 239,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -14709,10 +14709,12 @@
         946
       ],
       "hunkHash": "0356f87171730b2e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement.load() (state-decision branches + CSWswitchstate indexing + commented-out CSWctrlvalue FIXME + 2x2 stamp)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/ngspice-parity/fixtures/csw-gate.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
