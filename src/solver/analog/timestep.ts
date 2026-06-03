@@ -810,8 +810,11 @@ export class TimestepController {
     }
 
     // cktsetbk.c:84-101- beyond the end of the table. Skip when within minBreak
-    // of the last breakpoint; otherwise append.
-    if (lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;
+    // of the last breakpoint; otherwise append. cktsetbk.c:84 guards the
+    // last-entry compare with `ckt->CKTbreaks &&`: an empty/absent breaks
+    // array can never be "very close to its last entry", so it falls through
+    // to the append. `this._breakpoints` is the array pointer counterpart.
+    if (this._breakpoints && lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;
     this._breakpoints.splice(lo, 0, time);
   }
 
