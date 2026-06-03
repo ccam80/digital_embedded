@@ -553,27 +553,25 @@ export class TimestepController {
       this._lastTempBreakpoint = 1.0e30;
     }
 
-    // dctran.c:624-638 (XSPICE)- pop loop on permanent CKTbreaks queue using
-    // CKTminBreak. ngspice's pop is shift-only; sources register their next
-    // edge via DEVaccept → CKTsetBreak after the step is accepted. We mirror
-    // that via element.acceptStep(simTime, addBP) in MNAEngine.step()-
-    // refilling from `popped.source` here would re-insert the same edge inside
-    // the loop and spin (next > simTime is true when next sits within minBreak
-    // of simTime, which the next pop iteration then re-pops).
+    // dctran.c:610-621 (XSPICE)- throw out any permanent breakpoint with time
+    // <= current time or in the very near future, unless it is the final stop
+    // break. ngspice's pop is shift-only; sources register their next edge via
+    // DEVaccept → CKTsetBreak after the step is accepted. We mirror that via
+    // element.acceptStep(simTime, addBP) in MNAEngine.step()- refilling from
+    // `popped.source` here would re-insert the same edge inside the loop and
+    // spin (next > simTime is true when next sits within minBreak of simTime,
+    // which the next pop iteration then re-pops).
     //
-    // Order matters: this pop runs BEFORE the late-clamp below, so the
-    // late-clamp sees the NEXT permanent breakpoint, not the one we just
-    // landed on.
-    while (this._breakpoints.length > 2) {
-      const bp = this._breakpoints[0]!;
-      if (!(almostEqualUlps(bp, simTime, 100) || bp <= simTime + this._minBreak)) break;
+    // The `breaks[0] < finalTime` clause guards the perpetual finalTime
+    // sentinel from being popped (dctran.c:612). Order matters: this pop runs
+    // BEFORE the late-clamp below, so the late-clamp sees the NEXT permanent
+    // breakpoint, not the one we just landed on.
+    while (
+      (this._breakpoints[0]! <= simTime + this._minBreak ||
+        almostEqualUlps(this._breakpoints[0]!, simTime, 100)) &&
+      this._breakpoints[0]! < this._finalTime
+    ) {
       this._clrBreak();
-    }
-    if (this._breakpoints.length === 2) {
-      const bp = this._breakpoints[0]!;
-      if ((almostEqualUlps(bp, simTime, 100) || bp <= simTime + this._minBreak) && bp < this._finalTime) {
-        this._clrBreak();
-      }
     }
 
     // dctran.c:640-644 (XSPICE)- late-clamp on permanent CKTbreaks queue.
