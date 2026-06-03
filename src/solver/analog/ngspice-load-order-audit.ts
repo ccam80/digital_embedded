@@ -18,6 +18,7 @@ const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>(
   "MOS",
   "JFET",
   "MES",
+  "JFET2",
   "TRA",
   // Controlled sources emit F/H/E/G primitive cards via netlist-generator's
   // emitPrimitive. Their pin-label-order entries gate compiler node-allocation

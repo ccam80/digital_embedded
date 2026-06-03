@@ -1,0 +1,708 @@
+{
+  "circuit": {
+    "description": "Tier-3 gate: N-channel JFET2 (Parker-Skellern) common-source, biased by verified DcVoltageSources + a verified resistor. Vdd-Rd-drain, gate reverse-biased, source to gnd. Exercises DC-OP bias and transient.",
+    "elements": [
+      {
+        "id": "31b0acb5-4e3e-46a9-b702-a24b55ff280e",
+        "position": {
+          "x": 0,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 10
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "Vdd",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 10
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b93e51e2-387f-424c-b797-157f74bf9aa9",
+        "position": {
+          "x": 12,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "Rd",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c212ae95-5101-4d43-942f-8cf9a5935f23",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "_pinElectrical": {
+            "D": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "G": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "S": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "D": false,
+            "G": false,
+            "S": false
+          },
+          "label": "J1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "JFET2N"
+      },
+      {
+        "id": "7c1e153e-035b-471b-9724-212a00dfc377",
+        "position": {
+          "x": 36,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": -1
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "Vgg",
+          "position": [
+            0,
+            24
+          ],
+          "voltage": -1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "6eb522f4-05c4-4bab-a049-2f8d5ec23654",
+        "position": {
+          "x": 48,
+          "y": 4
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "jfet2-gate",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 5,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 3
+          },
+          {
+            "x": 23,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 3
+          },
+          {
+            "x": 23,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 3
+          },
+          {
+            "x": 29,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 3
+          },
+          {
+            "x": 33,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 3
+          },
+          {
+            "x": 33,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 5
+          },
+          {
+            "x": 42,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 5
+          },
+          {
+            "x": 42,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 3
+          },
+          {
+            "x": 48,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 0
+          },
+          {
+            "x": 41,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 2
+          },
+          {
+            "x": 32,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 2
+          },
+          {
+            "x": 32,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 0
+          },
+          {
+            "x": 41,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 35,
+            "y": 0
+          },
+          {
+            "x": 34,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 0
+          },
+          {
+            "x": 34,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 2
+          },
+          {
+            "x": 48,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 4
+          },
+          {
+            "x": -1,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 4
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 24,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 9
+          },
+          {
+            "x": 36,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 9
+          },
+          {
+            "x": 43,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 9
+          },
+          {
+            "x": 43,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 1
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

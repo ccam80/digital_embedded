@@ -33,6 +33,13 @@ import {
 interface ElementSpec {
   prefix: string;
   modelType?: string;
+  /**
+   * ngspice `.model` `level=` selector. SPICE shares a model-type keyword
+   * (e.g. NJF/PJF, NMOS/PMOS) across implementation levels and disambiguates
+   * via `level=`: JFET2 (Parker-Skellern) is `NJF/PJF level=2`, MOS3 is
+   * `NMOS/PMOS level=3`. Absent ⇒ level 1 / default; no `level=` token emitted.
+   */
+  modelLevel?: number;
 }
 
 const ELEMENT_SPECS: Record<string, ElementSpec> = {
@@ -57,6 +64,10 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   VDMOSP:          { prefix: "M", modelType: "VDMOS" },
   NJFET:           { prefix: "J", modelType: "NJF" },
   PJFET:           { prefix: "J", modelType: "PJF" },
+  // PS-model JFET2 (Parker-Skellern): `J<name> nd ng ns <model>` with
+  // `.model <name> NJF/PJF (level=2 ...)`. level=2 selects get_jfet2_info (dev.c:185).
+  JFET2N:          { prefix: "J", modelType: "NJF", modelLevel: 2 },
+  JFET2P:          { prefix: "J", modelType: "PJF", modelLevel: 2 },
   // ngspice MESFET `Z<name> nd ng ns <model>` with `.model <name> NMF`/`PMF`.
   // The N/P-ness is the model-card type keyword (mesmpar.c NMF/PMF flags).
   NMESFET:         { prefix: "Z", modelType: "NMF" },
@@ -587,7 +598,7 @@ function emitPrimitive(
     }
     const modelName = `${label}_${spec.modelType}`;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission, spec.modelLevel));
     }
     return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${modelName}${instanceParamSuffix(paramDefs, props)}`];
   }
@@ -649,7 +660,7 @@ function emitPrimitive(
     const modelName = `${label}_${spec.modelType}`;
     const line = `${label} ${nodeAt(nodes, 0, rawLabel, "anode")} ${nodeAt(nodes, 1, rawLabel, "cathode")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission, spec.modelLevel));
     }
     return [line];
   }
@@ -657,7 +668,7 @@ function emitPrimitive(
     const modelName = `${label}_${spec.modelType}`;
     const line = `${label} ${nodeAt(nodes, 1, rawLabel, "C")} ${nodeAt(nodes, 0, rawLabel, "B")} ${nodeAt(nodes, 2, rawLabel, "E")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission, spec.modelLevel));
     }
     return [line];
   }
@@ -702,7 +713,7 @@ function emitPrimitive(
     }
     const line = `${label} ${d} ${g} ${s} ${b} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission, spec.modelLevel));
     }
     return [line];
   }
@@ -710,7 +721,7 @@ function emitPrimitive(
     const modelName = `${label}_${spec.modelType}`;
     const line = `${label} ${nodeAt(nodes, 2, rawLabel, "D")} ${nodeAt(nodes, 0, rawLabel, "G")} ${nodeAt(nodes, 1, rawLabel, "S")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission, spec.modelLevel));
     }
     return [line];
   }
@@ -720,7 +731,7 @@ function emitPrimitive(
     const modelName = `${label}_${spec.modelType}`;
     const line = `${label} ${nodeAt(nodes, 2, rawLabel, "D")} ${nodeAt(nodes, 0, rawLabel, "G")} ${nodeAt(nodes, 1, rawLabel, "S")} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
     if (!modelCards.has(modelName)) {
-      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
+      modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission, spec.modelLevel));
     }
     return [line];
   }
@@ -1044,8 +1055,14 @@ function modelCardSuffix(
   paramDefs: readonly ParamDef[],
   props: PropertyBag,
   emission: ModelEmissionSpec | undefined,
+  modelLevel?: number,
 ): string {
   const parts: string[] = [];
+
+  // ngspice disambiguates shared model-type keywords by `level=` (inpdomod.c
+  // reads it before dispatching to the per-level model parser). Emit it first
+  // so e.g. `NJF (level=2 ...)` selects the Parker-Skellern JFET2.
+  if (modelLevel !== undefined) parts.push(`level=${modelLevel}`);
 
   if (emission?.modelCardPrefix) parts.push(...emission.modelCardPrefix);
 
