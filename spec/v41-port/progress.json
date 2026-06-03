@@ -1,6 +1,146 @@
 {
   "_comment": "Loop-progress overlay - written by the port loop, never by hand-editing ledger.json. The verifier records APPLIED here; the applier/verifier record ESCALATED and attempts here. build-ledger.mjs applies it so ledger.json is fully derived (diffs + splits.json + planning/*-decisions.json + progress.json). Each item entry: state (PENDING|APPLIED|ESCALATED - never NO-COUNTERPART, which is planning-frozen), attempts (int), verifierNotes (string[]), escalation (object|null, required when ESCALATED), hunkHash (the item hunkHash when the entry was recorded - if the diff later drifts, the stale entry is ignored).",
   "items": {
+    "analysis/dctran.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a365f7aed1c1add3",
+      "ref": "harvested:a5139b55",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/dctran.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "d7035024957159bb",
+      "ref": "harvested:a5139b55",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/dctran.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "554a21765921a496",
+      "ref": "harvested:60ba719f",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/dctran.c#h012": {
+      "state": "APPLIED",
+      "hunkHash": "fdc3803a4bfcc2bc",
+      "ref": "harvested:60ba719f",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/dctran.c#h013": {
+      "state": "APPLIED",
+      "hunkHash": "cb012a2808654983",
+      "ref": "harvested:60ba719f",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/dctran.c#h014": {
+      "state": "APPLIED",
+      "hunkHash": "8f717d33f3a50e68",
+      "ref": "harvested:60ba719f",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "35851845f4cc49d6",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "5533248ebdb7f45d",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "069cabb0b9f7faae",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "a12c0ea9c283ee2d",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "9513c479941a3660",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "ee11f8b97150b84d",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "27b630ca7ed2892a",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "852b0ebb9015ebb2",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
+      "escalation": null
+    },
     "analysis#recon/cktIcRhsOldSeed": {
       "state": "APPLIED",
       "hunkHash": "97be2fc0d2ab6e2a",
@@ -1809,11 +1949,12 @@
       "escalation": null
     },
     "analysis/cktsetbk.c#h002": {
-      "state": "PENDING",
-      "hunkHash": "",
+      "state": "APPLIED",
+      "hunkHash": "c3ad16f6ef889e8b",
+      "ref": "harvested:b393ecc9",
       "attempts": 0,
       "verifierNotes": [
-        "MISMATCH (Tier 2 bijection). v41 cktsetbk.c:85 beyond-end-of-table guard is `if(ckt->CKTbreaks && time-ckt->CKTbreaks[ckt->CKTbreakSize-1]<=ckt->CKTminBreak)` — a single non-null-array guard `ckt->CKTbreaks &&` prepended to the proximity test. The applier ported this at src/solver/analog/timestep.ts:818 as `if (this._breakpoints.length > 0 && lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`. The `this._breakpoints.length > 0` conjunct correctly mirrors `ckt->CKTbreaks &&` (non-empty array <-> non-null pointer) and the proximity test `time - _breakpoints[lo-1] <= minBreak` mirrors `time-CKTbreaks[size-1]<=minBreak` (at this branch lo===_breakpoints.length, so _breakpoints[lo-1] is CKTbreaks[size-1]). However the extra `lo > 0` conjunct has NO v41 counterpart at the beyond-end branch: v41's end-of-table guard (cktsetbk.c:85) carries no `i>0` term (the `i>0` guard is only in the middle-of-table branch, cktsetbk.c:55, which digiTS already mirrors at timestep.ts:808). At timestep.ts:818 control only arrives when lo===_breakpoints.length, so `lo > 0` is logically identical to `length > 0` (a restated guard, behaviorally bit-identical) but breaks strict construct bijection. REMEDIATION: drop the redundant `lo > 0 && ` so line 818 reads `if (this._breakpoints.length > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`, bijective with v41's single `ckt->CKTbreaks &&` guard."
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
       ],
       "escalation": null
     },

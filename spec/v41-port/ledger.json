@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-03T00:56:28.805Z",
+    "generated": "2026-06-03T03:16:06.077Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 224,
+    "progressEntriesApplied": 238,
     "progressEntriesStale": 5,
     "staleItems": [
       {
@@ -38064,10 +38064,12 @@
         155
       ],
       "hunkHash": "35851845f4cc49d6",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38095,10 +38097,12 @@
         410
       ],
       "hunkHash": "5533248ebdb7f45d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38126,10 +38130,12 @@
         427
       ],
       "hunkHash": "069cabb0b9f7faae",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38157,10 +38163,12 @@
         450
       ],
       "hunkHash": "a12c0ea9c283ee2d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38188,10 +38196,12 @@
         483
       ],
       "hunkHash": "9513c479941a3660",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38219,10 +38229,12 @@
         505
       ],
       "hunkHash": "ee11f8b97150b84d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38250,10 +38262,12 @@
         539
       ],
       "hunkHash": "27b630ca7ed2892a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -38281,10 +38295,12 @@
         677
       ],
       "hunkHash": "852b0ebb9015ebb2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/ac-analysis.ts::AcAnalysis.run",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -40607,11 +40623,11 @@
         2991
       ],
       "hunkHash": "c3ad16f6ef889e8b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/timestep.ts::TimestepController",
       "attempts": 0,
       "verifierNotes": [
-        "MISMATCH (Tier 2 bijection). v41 cktsetbk.c:85 beyond-end-of-table guard is `if(ckt->CKTbreaks && time-ckt->CKTbreaks[ckt->CKTbreakSize-1]<=ckt->CKTminBreak)` — a single non-null-array guard `ckt->CKTbreaks &&` prepended to the proximity test. The applier ported this at src/solver/analog/timestep.ts:818 as `if (this._breakpoints.length > 0 && lo > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`. The `this._breakpoints.length > 0` conjunct correctly mirrors `ckt->CKTbreaks &&` (non-empty array <-> non-null pointer) and the proximity test `time - _breakpoints[lo-1] <= minBreak` mirrors `time-CKTbreaks[size-1]<=minBreak` (at this branch lo===_breakpoints.length, so _breakpoints[lo-1] is CKTbreaks[size-1]). However the extra `lo > 0` conjunct has NO v41 counterpart at the beyond-end branch: v41's end-of-table guard (cktsetbk.c:85) carries no `i>0` term (the `i>0` guard is only in the middle-of-table branch, cktsetbk.c:55, which digiTS already mirrors at timestep.ts:808). At timestep.ts:818 control only arrives when lo===_breakpoints.length, so `lo > 0` is logically identical to `length > 0` (a restated guard, behaviorally bit-identical) but breaks strict construct bijection. REMEDIATION: drop the redundant `lo > 0 && ` so line 818 reads `if (this._breakpoints.length > 0 && time - this._breakpoints[lo - 1]! <= minBreak) return;`, bijective with v41's single `ckt->CKTbreaks &&` guard."
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
       ],
       "rationale": null,
       "escalation": null,
@@ -41696,10 +41712,12 @@
         3899
       ],
       "hunkHash": "a365f7aed1c1add3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -41727,10 +41745,12 @@
         3907
       ],
       "hunkHash": "d7035024957159bb",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -42006,10 +42026,12 @@
         4077
       ],
       "hunkHash": "554a21765921a496",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -42037,10 +42059,12 @@
         4092
       ],
       "hunkHash": "fdc3803a4bfcc2bc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -42068,10 +42092,12 @@
         4101
       ],
       "hunkHash": "cb012a2808654983",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -42099,10 +42125,12 @@
         4147
       ],
       "hunkHash": "8f717d33f3a50e68",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts, rc-lowpass-ac.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -62353,7 +62381,7 @@
         "bjt/bjttemp.c#h011",
         "bjt/bjttrunc.c#h001"
       ],
-      "hunkHash": "a853ce8b212a2a37",
+      "hunkHash": "f02af1a96d93e4ab",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -63008,7 +63036,7 @@
         "jfet2/jfet2temp.c#h003",
         "jfet2/jfet2trun.c#h001"
       ],
-      "hunkHash": "701d0ef4589ddeb6",
+      "hunkHash": "d695ae006c0f8780",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -63224,7 +63252,7 @@
         "mes/mestemp.c#h001",
         "mes/mestrunc.c#h001"
       ],
-      "hunkHash": "65a6198380846b12",
+      "hunkHash": "b622ee587d108322",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -63349,7 +63377,7 @@
         "mos3/mos3temp.c#h002",
         "mos3/mos3trun.c#h001"
       ],
-      "hunkHash": "18d143359532f075",
+      "hunkHash": "0e2050ea749aadc1",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -63432,7 +63460,7 @@
         "parser/inpptree.c#h010",
         "parser/inpeval.c#h005"
       ],
-      "hunkHash": "611e4c45c9702953",
+      "hunkHash": "753666d3551632e6",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -63558,7 +63586,7 @@
         "sw/swacload.c#h001",
         "sw/swacload.c#h002"
       ],
-      "hunkHash": "24b269993296d2ea",
+      "hunkHash": "c38f56e41d21689b",
       "state": "STALE",
       "attempts": 0,
       "verifierNotes": [
