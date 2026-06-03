@@ -1189,3 +1189,25 @@ the next run. The mes worktree never touched MAIN's `src/` (`mainSrcClean=true`)
 - **What is blocked:** the entire mes unit merge. No harness/self-compare run was possible (`circuit_build`/`harness_*` on `mes-gate.dts` were never reached — the registry the harness depends on cannot be constructed while the audit throws). The gate fixture `src/solver/analog/__tests__/ngspice-parity/fixtures/mes-gate.dts` was therefore neither authored nor exercised this pass.
 - **Decision needed from user:** re-run the mes unit after the implementer makes the MES family deck-emitting in `src/solver/analog/ngspice-load-order.ts` (so the deck-emitting-families set and `TYPE_ID_TO_DECK_PIN_LABEL_ORDER` agree on MES), restoring a green compile gate; then the harness/self-compare gate on `mes-gate.dts` can run. Resume from `.wt-failed/mes.diff`.
 - **Resolution:** _pending_
+
+---
+
+## analysis/traninit.c::TRANinit — `nostepsizelimit` maxStep override (cp command-variable subsystem absent)
+
+- **source=analysis/traninit.c#h002 (TRANinit body) | verdict=ESCALATE (feature gap, out-of-functionGroup infrastructure).** Ledger maps this hunk to `MNAEngine.init` in `src/solver/analog/analog-engine.ts`. Paired header hunk h001 (`#include cpextern.h`, traninit.c:10) is the C header for the same subsystem.
+- **ngspice file:line:** `ref/ngspice/src/spicelib/analysis/traninit.c:29-34`:
+  ```c
+  if(ckt->CKTmaxStep == 0) {
+      if ((ckt->CKTstep < ( ckt->CKTfinalTime - ckt->CKTinitTime )/50.0) && !cp_getvar("nostepsizelimit", CP_BOOL, NULL, 0))
+          ckt->CKTmaxStep = ckt->CKTstep;
+      else
+          ckt->CKTmaxStep = ( ckt->CKTfinalTime - ckt->CKTinitTime )/50.0;
+  }
+  ```
+  The v41 behavioral delta over v26 is the `&& !cp_getvar("nostepsizelimit", CP_BOOL, NULL, 0)` clause: `set nostepsizelimit` overrides the `(tStop-tStart)/50` cap on `CKTmaxStep`.
+- **digiTS file:** `src/solver/analog/analog-engine.ts` (`MNAEngine.init`, lines 178-217). `MNAEngine.init` does NOT compute the `(finalTime-initTime)/50` maxStep default; digiTS receives `maxTimeStep` as a pre-resolved `SimulationParams` value (`src/solver/analog/ckt-context.ts:765` seeds `deltaOld` from `params.maxTimeStep`). The default + override would live in the param-resolution layer that feeds `SimulationParams`, not in `MNAEngine.init`.
+- **Quantities that differ:** there is no digiTS counterpart for `cp_getvar("nostepsizelimit", ...)`. digiTS has no cp command-interpreter variable store (no `set <var>` surface); a search of `src/solver/analog/**` finds no `nostepsizelimit` and no `(finalTime-initTime)/50` maxStep-default computation. Faithfully porting h002 requires (a) a cp-variable subsystem with a `nostepsizelimit` boolean, and (b) wiring the `(tStop-tStart)/50` maxStep default + that override into param resolution — both outside the `MNAEngine.init` functionGroup and its tsFile.
+- **Why architectural, not numerical:** no harness divergence is implicated; this is a missing user-settable configuration option, not an arithmetic-order or accumulation bug. h001 (`#include cpextern.h`) is the C header for that subsystem and has no TS counterpart by design.
+- **Files a faithful fix would touch:** a new cp-variable store module; the `SimulationParams` resolution layer (outside `src/solver/analog/analog-engine.ts`); plus `MNAEngine.init` / param plumbing. Blast radius extends beyond the functionGroup, so per VERIFICATION.md §6 (cross-group / feature digiTS lacks) it is the user's call.
+- **Decision needed from user:** rule on whether `nostepsizelimit` (a cp command-variable override of the maxStep cap) is in scope for the v41 port. If in scope, approve building the cp-variable subsystem + param-resolution wiring as a separate unit. If out of scope, record it as an accepted scope divergence in `analysis-scope.md` / the device decisions overlay (a user action). h001/h002 stay PENDING/ESCALATED until then.
+- **Resolution:** _pending_
