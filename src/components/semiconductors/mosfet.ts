@@ -1205,7 +1205,7 @@ function _createMosfetElementWithPolarity(
               ctx.limitingCollector.push({
                 elementIndex: this.elementIndex ?? -1,
                 label: this.label,
-                junction: "GS", limitType: "fetlim",
+                junction: "GD", limitType: "fetlim",
                 vBefore: vgdBefore, vAfter: vgd,
                 wasLimited: vgd !== vgdBefore,
               });
