@@ -363,6 +363,10 @@ export class CKTCircuitContext {
       this._tempCtx = {
         cktTemp: this.cktTemp,
         cktNomTemp: this.cktNomTemp,
+        // cite: diotemp.c:208 — the diode breakdown match reads CKTreltol.
+        reltol: this.reltol,
+        // cite: diosetup.c:92-103,190-191 — diode setup floors read CKTepsmin.
+        epsmin: this.cktEpsmin,
         _indVerbosity: this.cktIndVerbosity,
         diagnostics: this.diagnostics,
       };

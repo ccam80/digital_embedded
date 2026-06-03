@@ -171,6 +171,11 @@ function canonicalizeNgspiceDeviceType(ngspiceType: string): string | null {
     "capacitor": "capacitor", "inductor": "inductor",
     "diode": "diode", "bjt": "bjt",
     "mos1": "mosfet", "mosfet": "mosfet", "jfet": "jfet",
+    // mos3init.c:12 .name="Mos3"; mos3defs.h state layout is identical to
+    // mos1defs.h (17 states, vbd=0..cqbs=16) so MOS3 reuses MOSFET_MAPPING.
+    "mos3": "mosfet",
+    // jfet2init.c:12 .name="JFET2" (Parker-Skellern); mesinit.c:12 .name="MES".
+    "jfet2": "jfet2", "mes": "mes",
     // ngspice VDMOSinfo.name = "VDMOS" (vdmosinit.c:12), lowercased here.
     "vdmos": "vdmos",
     "switch": "vswitch",

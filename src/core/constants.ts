@@ -40,3 +40,28 @@ export const REFTEMP = 27.0 + CONSTCtoK;
 
 /** Thermal voltage at REFTEMP (300.15 K): REFTEMP * CONSTKoverQ, in volts. */
 export const VT = REFTEMP * CONSTKoverQ;
+
+/** Speed of light in m/s (ref/ngspice/src/include/ngspice/const.h:19). */
+export const CONSTc = 299792458;
+
+/**
+ * Vacuum permeability in H/m (ref/ngspice/src/include/ngspice/const.h:43):
+ * `4.0 * CONSTpi * 1E-7`. CONSTpi's IEEE-754 double equals Math.PI.
+ */
+export const CONSTmuZero = 4.0 * Math.PI * 1e-7;
+
+/**
+ * Vacuum permittivity in F/m (ref/ngspice/src/include/ngspice/const.h:46):
+ * `1.0 / (CONSTmuZero * CONSTc * CONSTc)`, from e0*u0*c^2 = 1.
+ */
+export const CONSTepsZero = 1.0 / (CONSTmuZero * CONSTc * CONSTc);
+
+/** Relative permittivity of SiO2 (ref/ngspice/src/include/ngspice/const.h:51). */
+export const CONSTepsrSiO2 = 3.9;
+
+/**
+ * SiO2 permittivity in F/m (ref/ngspice/src/include/ngspice/const.h:53):
+ * `CONSTepsrSiO2 * CONSTepsZero`. Used by the level=3 diode parasitic metal /
+ * poly overlap caps (diosetup.c:285-290).
+ */
+export const CONSTepsSiO2 = CONSTepsrSiO2 * CONSTepsZero;

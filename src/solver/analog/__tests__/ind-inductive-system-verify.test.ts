@@ -44,7 +44,7 @@ function makeMut(
 }
 
 function tempCtxOf(diagnostics: DiagnosticCollector, indVerbosity: number): TempContext {
-  return { cktTemp: 300.15, cktNomTemp: 300.15, _indVerbosity: indVerbosity, diagnostics };
+  return { cktTemp: 300.15, cktNomTemp: 300.15, reltol: 1e-3, epsmin: 1e-28, _indVerbosity: indVerbosity, diagnostics };
 }
 
 describe("verifyInductiveSystems — Surface 1 headless", () => {

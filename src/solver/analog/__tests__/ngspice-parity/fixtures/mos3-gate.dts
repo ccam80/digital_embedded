@@ -1,0 +1,493 @@
+{
+  "circuit": {
+    "description": "NMOS3 common-source amp: V_DD=5V, R_D=10k, NMOS3 short channel (L=1u, theta/vmax/kappa/eta/xj/nfs set so the level-3 corrections are non-trivial), bulk tied to ground, V_IN square 0/2.5V 10kHz",
+    "elements": [
+      {
+        "id": "vdd",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "V_DD",
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "tun-vdd-pos",
+        "position": {
+          "x": 5,
+          "y": 0
+        },
+        "properties": {
+          "NetName": "VDD"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-vdd",
+        "position": {
+          "x": -1,
+          "y": 0
+        },
+        "properties": {
+          "label": "GND_VDD"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "rd",
+        "position": {
+          "x": 0,
+          "y": 6
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "R_D",
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "tun-vdd-rda",
+        "position": {
+          "x": -1,
+          "y": 6
+        },
+        "properties": {
+          "NetName": "VDD"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-vout-rdb",
+        "position": {
+          "x": 5,
+          "y": 6
+        },
+        "properties": {
+          "NetName": "VOUT"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "m1",
+        "position": {
+          "x": 0,
+          "y": 10
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "CBD": 0,
+            "CBS": 0,
+            "CGBO": 0,
+            "CGDO": 1e-11,
+            "CGSO": 1e-11,
+            "CJ": 0,
+            "CJSW": 0,
+            "DELTA": 1,
+            "ETA": 0.1,
+            "FC": 0.5,
+            "GAMMA": 0.5,
+            "IS": 1e-14,
+            "JS": 0,
+            "KAPPA": 0.5,
+            "KF": 0,
+            "KP": 0.00006,
+            "L": 0.000001,
+            "LD": 0,
+            "MJ": 0.5,
+            "MJSW": 0.33,
+            "NFS": 10000000000,
+            "NSUB": 10000000000000000,
+            "PB": 0.8,
+            "PHI": 0.6,
+            "RD": 0,
+            "RS": 0,
+            "RSH": 0,
+            "THETA": 0.05,
+            "TOX": 2e-8,
+            "UO": 600,
+            "VMAX": 100000,
+            "VTO": 0.7,
+            "W": 0.00002,
+            "XJ": 4e-7
+          },
+          "_pinElectrical": {
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "D": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "G": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "S": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "B": false,
+            "D": false,
+            "G": false,
+            "S": false
+          },
+          "label": "M1"
+        },
+        "rotation": 0,
+        "type": "NMOS3"
+      },
+      {
+        "id": "tun-vin-m1g",
+        "position": {
+          "x": -1,
+          "y": 10
+        },
+        "properties": {
+          "NetName": "VIN"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-vout-m1d",
+        "position": {
+          "x": 5,
+          "y": 9
+        },
+        "properties": {
+          "NetName": "VOUT"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-m1s",
+        "position": {
+          "x": 5,
+          "y": 11
+        },
+        "properties": {
+          "label": "GND_M1S"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "gnd-m1b",
+        "position": {
+          "x": -1,
+          "y": 11
+        },
+        "properties": {
+          "label": "GND_M1B"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "vin",
+        "position": {
+          "x": 0,
+          "y": 16
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1.25,
+            "dcOffset": 1.25,
+            "fallTime": 1e-9,
+            "frequency": 10000,
+            "phase": 0,
+            "riseTime": 1e-9
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "amplitude": 1.25,
+          "dcOffset": 1.25,
+          "frequency": 10000,
+          "label": "V_IN",
+          "waveform": "square"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "tun-vin-vinpos",
+        "position": {
+          "x": 5,
+          "y": 16
+        },
+        "properties": {
+          "NetName": "VIN"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-vin",
+        "position": {
+          "x": -1,
+          "y": 16
+        },
+        "properties": {
+          "label": "GND_VIN"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "MOS3 Common-Source Amplifier",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 0
+          },
+          {
+            "x": 5,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": -1,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 6
+          },
+          {
+            "x": -1,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 6
+          },
+          {
+            "x": 5,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 10
+          },
+          {
+            "x": -1,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 9
+          },
+          {
+            "x": 5,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 11
+          },
+          {
+            "x": 5,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 11
+          },
+          {
+            "x": -1,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 16
+          },
+          {
+            "x": 5,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 16
+          },
+          {
+            "x": -1,
+            "y": 16
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

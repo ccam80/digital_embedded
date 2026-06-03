@@ -25,6 +25,15 @@ interface ParamSpec {
 export const kelvinToCelsius = (v: number): number => v - 273.15;
 
 /**
+ * Metre→Angstrom converter for the diode level=3 oxide thicknesses XOM/XOI.
+ * ngspice's DIOmParam scales the netlisted value by 1e-10 into metres
+ * (diompar.c:258,262: `model->DIOmetalOxideThick = value->rValue * 1e-10`), so a
+ * digiTS value held in metres must be pre-divided by 1e-10 before it crosses the
+ * netlist boundary for ngspice to recover the same metre value.
+ */
+export const meterToAngstrom = (v: number): number => v / 1e-10;
+
+/**
  * Compact declaration that generates both the parameter schema (ParamDef[])
  * and the default values record from a single source of truth.
  *

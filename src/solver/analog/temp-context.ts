@@ -18,6 +18,20 @@ export interface TempContext {
   /** Nominal (reference) temperature in Kelvin (ngspice: CKTnomTemp). */
   cktNomTemp: number;
   /**
+   * Relative tolerance (ngspice CKTreltol, cktdefs.h). Read by the diode
+   * breakdown-voltage matching iteration (diotemp.c:208 — `tol =
+   * ckt->CKTreltol*cbv`) to set the convergence band of the brkdEmissionCoeff
+   * fixed-point solve. Threaded through the temperature pass because
+   * DIOtempUpdate runs inside the temperature callback, not load().
+   */
+  reltol: number;
+  /**
+   * Minimum log-argument floor (ngspice CKTepsmin, cktdefs.h:323). Read by the
+   * diode saturation-current and high-injection knee floors (diosetup.c:92-103,
+   * 190-191) so the subsequent log/exp evaluations stay in-domain.
+   */
+  epsmin: number;
+  /**
    * ngspice CKTindverbosity (cktdefs.h:111). Diagnostic-level integer
    * controlling the `MUTtemp` Cholesky-verify pass:
    *   0 = no verification;

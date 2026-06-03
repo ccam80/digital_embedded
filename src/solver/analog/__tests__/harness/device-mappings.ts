@@ -312,6 +312,52 @@ export const JFET_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
+// MES (GaAs MESFET, ngspice MES — Statz model). 13-state layout
+// (mesdefs.h:150-162) name-for-name identical to JFET1; distinct device type.
+// cg/cd are the gate/drain branch currents; source by KCL = -(cg+cd).
+// ---------------------------------------------------------------------------
+export const MES_MAPPING: DeviceMapping = {
+  deviceType: "mes",
+  slotToNgspice: {
+    VGS: 0, VGD: 1, CG: 2, CD: 3, CGD: 4, GM: 5, GDS: 6,
+    GGS: 7, GGD: 8, QGS: 9, CQGS: 10, QGD: 11, CQGD: 12,
+  },
+  ngspiceToSlot: {
+    0: "VGS", 1: "VGD", 2: "CG", 3: "CD", 4: "CGD", 5: "GM", 6: "GDS",
+    7: "GGS", 8: "GGD", 9: "QGS", 10: "CQGS", 11: "QGD", 12: "CQGD",
+  },
+  pinCurrents: {
+    G: [{ slot: "CG", sign: 1 }],
+    D: [{ slot: "CD", sign: 1 }],
+    S: [{ slot: "CG", sign: -1 }, { slot: "CD", sign: -1 }],
+  },
+};
+
+// ---------------------------------------------------------------------------
+// JFET2 (Parker-Skellern, ngspice JFET2). 19-state layout (jfet2defs.h:164-182):
+// states 0-12 match JFET1, plus the PS dynamic states qds/cqds/pave/vtrap/
+// vgstrap (13-17). Slot 18 (JFET2unknown) is unused and omitted.
+// ---------------------------------------------------------------------------
+export const JFET2_MAPPING: DeviceMapping = {
+  deviceType: "jfet2",
+  slotToNgspice: {
+    VGS: 0, VGD: 1, CG: 2, CD: 3, CGD: 4, GM: 5, GDS: 6,
+    GGS: 7, GGD: 8, QGS: 9, CQGS: 10, QGD: 11, CQGD: 12,
+    QDS: 13, CQDS: 14, PAVE: 15, VTRAP: 16, VGSTRAP: 17,
+  },
+  ngspiceToSlot: {
+    0: "VGS", 1: "VGD", 2: "CG", 3: "CD", 4: "CGD", 5: "GM", 6: "GDS",
+    7: "GGS", 8: "GGD", 9: "QGS", 10: "CQGS", 11: "QGD", 12: "CQGD",
+    13: "QDS", 14: "CQDS", 15: "PAVE", 16: "VTRAP", 17: "VGSTRAP",
+  },
+  pinCurrents: {
+    G: [{ slot: "CG", sign: 1 }],
+    D: [{ slot: "CD", sign: 1 }],
+    S: [{ slot: "CG", sign: -1 }, { slot: "CD", sign: -1 }],
+  },
+};
+
+// ---------------------------------------------------------------------------
 // VDMOS (LTspice-compatible vertical DMOS power MOSFET, ngspice VDMOS)
 // ---------------------------------------------------------------------------
 // ngspice vdmos state offsets (vdmosdefs.h:251-274, VDMOSnumStates=18):
@@ -414,6 +460,8 @@ export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
   bjt: BJT_MAPPING,
   mosfet: MOSFET_MAPPING,
   jfet: JFET_MAPPING,
+  jfet2: JFET2_MAPPING,
+  mes: MES_MAPPING,
   vdmos: VDMOS_MAPPING,
   vswitch: VSWITCH_MAPPING,
 };
@@ -427,10 +475,16 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
   PnpBJT: "bjt",
   NMOS: "mosfet",
   PMOS: "mosfet",
+  NMOS3: "mosfet",
+  PMOS3: "mosfet",
   VDMOSN: "vdmos",
   VDMOSP: "vdmos",
   NJFET: "jfet",
   PJFET: "jfet",
+  JFET2N: "jfet2",
+  JFET2P: "jfet2",
+  NMESFET: "mes",
+  PMESFET: "mes",
   Diode: "diode",
   Zener: "diode",
   Varactor: "varactor",

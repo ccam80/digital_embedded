@@ -151,6 +151,7 @@ import { PnpBjtDefinition } from "./semiconductors/bjt.js";
 import { NmosfetDefinition } from "./semiconductors/mosfet.js";
 import { PmosfetDefinition } from "./semiconductors/mosfet.js";
 import { VdmosNDefinition, VdmosPDefinition } from "./semiconductors/vdmos.js";
+import { Mosfet3NDefinition, Mosfet3PDefinition } from "./semiconductors/mosfet3.js";
 import { NJfetDefinition } from "./semiconductors/njfet.js";
 import { PJfetDefinition } from "./semiconductors/pjfet.js";
 import { NMesfetDefinition, PMesfetDefinition } from "./semiconductors/mesfet.js";
@@ -451,6 +452,8 @@ export function createDefaultRegistry(
   registry.register(PmosfetDefinition);
   registry.register(VdmosNDefinition);
   registry.register(VdmosPDefinition);
+  registry.register(Mosfet3NDefinition);
+  registry.register(Mosfet3PDefinition);
   registry.register(NJfetDefinition);
   registry.register(PJfetDefinition);
   registry.register(NMesfetDefinition);

@@ -578,7 +578,7 @@ export function computeCapacitances(
  * Caller must double (MODETRANOP / MODEINITSMSIG) or add previous-step half
  * (normal MODETRAN integration, mos1load.c:789-806).
  */
-function devQmeyer(
+export function devQmeyer(
   vgs: number, vgd: number, _vgb: number,
   von: number, vdsat: number,
   phi: number, cox: number,
@@ -858,7 +858,7 @@ function _createMosfetElementWithPolarity(
     // for TEMP. When false, instance temp = ckt->CKTtemp.
     private _tempGiven = props.isModelParamGiven("TEMP");
     // Last TempContext received from engine; used by setParam("TEMP") hot-load path.
-    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM, _indVerbosity: 2 };
+    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: params.TNOM, reltol: 1e-3, epsmin: 1e-28, _indVerbosity: 2 };
 
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);

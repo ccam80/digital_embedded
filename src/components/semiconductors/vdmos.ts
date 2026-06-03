@@ -427,7 +427,7 @@ function _createVdmosElementWithType(
     private _hTcasetp = -1; private _hCktTcktT = -1; private _hCktTtp = -1;
     private _hTpcktT = -1;
 
-    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: p.TNOM, _indVerbosity: 2 };
+    private _lastCtx: TempContext = { cktTemp: REFTEMP, cktNomTemp: p.TNOM, reltol: 1e-3, epsmin: 1e-28, _indVerbosity: 2 };
 
     constructor(pinNodes: ReadonlyMap<string, number>) {
       super(pinNodes);
