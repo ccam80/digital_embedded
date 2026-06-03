@@ -1,0 +1,1184 @@
+{
+  "device": "bjt",
+  "diffDoc": "spec/ngspice-v41-model-diffs/bjt.md",
+  "_help": "Planning overlay applied by build-ledger.mjs. Per file: classification (PORT|NO-COUNTERPART|REVIEW-CLASS), tsFile, planningNote. Per item: state (PENDING|NO-COUNTERPART only - planning never sets APPLIED/ESCALATED), tsFunction, functionGroup (optional override), rationale (required iff state=NO-COUNTERPART). The optional `reconstruction` section declares v26-baseline reconstruction items (id must contain \"#recon/\"); each needs spec, blocks (>=1 hunk id), tsFile, tsFunction. Edit THIS file, never ledger.json; then re-run build-ledger.mjs.",
+  "files": {
+    "src/spicelib/devices/bjt/Makefile.am": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Autotools source list. digiTS registers components via src/core/registry.ts; no autotools build. PLANNING.md 5 case (a). Both hunks drop the deleted C-heap files bjtdest.c / bjtmdel.c."
+    },
+    "src/spicelib/devices/bjt/bjt.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "IFparm BJTmPTable model param-name table. Counterpart is BJT_SPICE_L1_PARAM_DEFS (defineModelParams). Per-hunk: the BJT_COMPAT comment block is C-comment plumbing; the new v41 model-param rows (ibe/ibc, rco/vo/gamma/qco, tiss1/2, quasimod/vg/cn/d, ic/ib/pd/te_max/rth0) and alias-flag rows PORT onto the param defs."
+    },
+    "src/spicelib/devices/bjt/bjtacld.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "AC small-signal load (BJTacLoad). AC is implemented engine-wide (analysis-scope.md: ac-analysis.ts, defaultStampAcHandler, optional AnalogElement.stampAc hook). BjtL1Element has NO stampAc method yet -> all three hunks blocked by reconstruction bjt#recon/stampAc; the v41 collCX AC stamps ride on top as ordinary deltas."
+    },
+    "src/spicelib/devices/bjt/bjtask.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTask - instance/operating-point IFparm value getter. digiTS has no IFparm ask API. Every case is a getter with no digiTS counterpart; the v41 * BJTtype polarity factor and the new COLLCXNODE case live only inside this absent API. All hunks NO-COUNTERPART."
+    },
+    "src/spicelib/devices/bjt/bjtconv.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTconvTest - per-NR convergence test. digiTS folds the cchat/cbhat convergence prediction inline into BjtL1Element.load (bjtload.c:331-337 cite at bjt.ts). The v41 delta adds the vbcx/delvbcx prediction for the internal-collector-resistance node. PORT."
+    },
+    "src/spicelib/devices/bjt/bjtdefs.h": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "Instance/model structs + state-vector macros + ID enums. Counterparts: BJT_L1_SCHEMA (state slots), BJT_SPICE_L1_PARAM_DEFS + the params bag. Per-hunk: GENinstance/GENmodel embedding, const node-id qualifiers, define->enum reformat and the noise-source-index enum are C mechanics; the new state slots (vbcx/vrci/qbcx/irci_*), the BEtSatCur/BCtSatCur split, tf2/3/6/7, the collCX node + matrix pointers and new model fields are v41-additive structure that maps onto the schema/param defs."
+    },
+    "src/spicelib/devices/bjt/bjtdel.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C-heap free. v41 reduces BJTdelete to FREE(inst->BJTsens) (sensitivity scratch). digiTS is GC-managed and has no sensitivity (analysis-scope.md). PLANNING.md 5 case (a)."
+    },
+    "src/spicelib/devices/bjt/bjtdest.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Whole-file deletion of BJTdestroy - a C-heap free loop releasing every model/instance. digiTS is GC-managed. File deleted in v41. PLANNING.md 5 case (a)."
+    },
+    "src/spicelib/devices/bjt/bjtdisto.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTdisto - distortion (Volterra-kernel) analysis load. Distortion is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjtdset.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTdSetup - distortion-analysis setup (computes Volterra EqualDeriv terms). Distortion is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b). The area-removal here mirrors the DC change but lives entirely inside the distortion setup."
+    },
+    "src/spicelib/devices/bjt/bjtext.h": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C extern-prototype header. Hunks remove the BJTdestroy/BJTmDelete prototypes (deleted heap funcs), change BJTdelete signature, drop a register qualifier. digiTS has no prototype headers. PLANNING.md 5 case (a)."
+    },
+    "src/spicelib/devices/bjt/bjtgetic.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTgetic - DEVsetic initial-condition seeding. digiTS seeds IC inside BjtL1Element.load under MODEUIC from ICVBE/ICVCE (bjt.ts:1442-1456). The single hunk is purely the linked-list-walk accessor rename; the IC body is unchanged v26->v41 and has no separate digiTS getic method. NO-COUNTERPART."
+    },
+    "src/spicelib/devices/bjt/bjtinit.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "SPICEdev BJTinfo dispatch struct -> C99 designated initializers. digiTS registers via the component registry; method binding is the class. All non-NULL func-ptr assignments preserved; only DEVdestroy/DEVmodDelete set NULL (deleted heap funcs). No new param slot / default / capability. PLANNING.md 5 case (a) / 4 glue note."
+    },
+    "src/spicelib/devices/bjt/bjtload.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "Transient/DC companion load (BJTload). Counterpart is BjtL1Element.load (createSpiceL1BjtElement). v41 deltas: area-scaling relocation, separate ibe/ibc leakage, substrate-current BJTsubSatCurGiven gating, ttype=type*subs, and the new Kull quasi-saturation / internal-collector-resistance block (vrci/vbcx/Irci/Qbci + collCX stamps). All PENDING onto the existing v26 Gummel-Poon load."
+    },
+    "src/spicelib/devices/bjt/bjtmask.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTmAsk - model-param IFparm value getter. digiTS has no model-param ask API. Every hunk is a getter case with no digiTS counterpart. All NO-COUNTERPART."
+    },
+    "src/spicelib/devices/bjt/bjtmdel.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Whole-file deletion of BJTmDelete - a C-heap free unlinking a model. GC language; no model destructor/linked list. File deleted in v41. PLANNING.md 5 case (a)."
+    },
+    "src/spicelib/devices/bjt/bjtmpar.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTmParam - model-param setter. Counterpart is the params bag populated via props.getModelParam (+ setParam). The new v41 cases PORT as new param wiring; the removed C2/C4 cases are the alias collapse. All PENDING."
+    },
+    "src/spicelib/devices/bjt/bjtnoise.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTnoise - noise analysis. Noise is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjtparam.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTparam - instance-param setter. Counterpart is BjtL1Element.setParam / the instance params. Both hunks are cosmetic (switch whitespace, FALLTHROUGH comments); logic byte-identical. All NO-COUNTERPART."
+    },
+    "src/spicelib/devices/bjt/bjtpzld.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTpzLoad - pole-zero load (SPcomplex *s stamps). Pole-zero is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b). Includes the v41 collCX PZ stamps, all inside the PZ-only body."
+    },
+    "src/spicelib/devices/bjt/bjtsacl.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTsAcLoad - sensitivity AC load. Sensitivity is NOT implemented (analysis-scope.md: no SENstruct/senParmNo in src/). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjtsetup.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "Matrix-pointer alloc + model default-value processing + state sizing (BJTsetup). Counterpart is BjtL1Element.setup. v41 deltas: BEsatCur/BCsatCur defaults, the active c2/c4>1e-4 IS-scaling, intCollResist/epi/quasimod/tiss/SOA defaults, the new collCX-node allocation (CKTmkVolt) and the collCX TSTALLOC block. BJTunsetup has no digiTS counterpart (GC) - handled per-hunk."
+    },
+    "src/spicelib/devices/bjt/bjtsload.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTsLoad - sensitivity load. Sensitivity is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjtsoachk.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTsoaCheck - safe-operating-area check. SOA is NOT implemented (analysis-scope.md: no soaCheck method, no CKTsoaMaxWarns analogue). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjtsprt.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTsPrint - sensitivity debug printout. Sensitivity is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b). Pure stdout."
+    },
+    "src/spicelib/devices/bjt/bjtsset.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTsSetup - sensitivity setup (assigns BJTsenParmNo into info->SENparms). Sensitivity is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjtsupd.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "BJTsUpdate - sensitivity update. Sensitivity is NOT implemented (analysis-scope.md). PLANNING.md 5 case (b)."
+    },
+    "src/spicelib/devices/bjt/bjttemp.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "Temperature / default-value processing (BJTtemp). Counterpart is BjtL1Element.computeTemperature + computeBjtTempParams. v41 deltas: separate BEtSatCur/BCtSatCur, area-folding relocated into temp, f2/f3/f6/f7 lifted to per-instance temperature-dependent, mje/mjc/mjs 0.999 clamps, separate nominal-temp band-gap (pbfact1/egfet1/vtnom), intCollResist quasimod temperature adjust. All PENDING."
+    },
+    "src/spicelib/devices/bjt/bjttrunc.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "planningNote": "BJTtrunc - LTE/timestep contribution. Counterpart is BjtL1Element.getLteTimestep (cktTerr over qbe/qbc/qsub). v41 adds the qbcx term under intCollResistGiven. PORT."
+    }
+  },
+  "items": {
+    "bjt/Makefile.am#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/Makefile.am::libbjt_la_SOURCES",
+      "rationale": "Automake libbjt_la_SOURCES fragment; drops bjtdest.c. No autotools build in digiTS."
+    },
+    "bjt/Makefile.am#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/Makefile.am::libbjt_la_SOURCES",
+      "rationale": "Automake libbjt_la_SOURCES fragment; drops bjtmdel.c. No autotools build in digiTS."
+    },
+    "bjt/bjt.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjt.c::file-header",
+      "rationale": "Removes the BJT_COMPAT preprocessor-symbol explanatory comment block. Pure C source-comment removal; no behavioral content."
+    },
+    "bjt/bjt.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjt.c#h009": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
+      "functionGroup": "bjt/bjt.c::BJTmPTable",
+      "rationale": null
+    },
+    "bjt/bjtacld.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc)",
+      "functionGroup": "bjt/bjtacld.c::BJTacLoad",
+      "rationale": null
+    },
+    "bjt/bjtacld.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc)",
+      "functionGroup": "bjt/bjtacld.c::BJTacLoad",
+      "rationale": null
+    },
+    "bjt/bjtacld.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc) - the v41 model->BJTintCollResistGiven collCX AC stamp block",
+      "functionGroup": "bjt/bjtacld.c::BJTacLoad",
+      "rationale": null
+    },
+    "bjt/bjtask.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtask.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtask.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtask.c#h004": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtask.c#h005": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtask.c#h006": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtask.c#h007": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtask.c::BJTask",
+      "rationale": "BJTask is an IFparm operating-point/value getter; digiTS exposes no ask vtable. The v41 * BJTtype polarity factor and the new COLLCXNODE case exist only inside this absent API."
+    },
+    "bjt/bjtconv.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (inline cchat/cbhat convergence prediction, bjtload.c:331-337)",
+      "functionGroup": "bjt/bjtconv.c::BJTconvTest",
+      "rationale": null
+    },
+    "bjt/bjtconv.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (inline cchat/cbhat convergence prediction, bjtload.c:331-337) - adds vbcx/delvbcx prediction for the internal-collector-resistance node",
+      "functionGroup": "bjt/bjtconv.c::BJTconvTest",
+      "rationale": null
+    },
+    "bjt/bjtconv.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (inline cchat/cbhat convergence prediction, bjtload.c:331-337)",
+      "functionGroup": "bjt/bjtconv.c::BJTconvTest",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdefs.h::noise-src-enum",
+      "rationale": "Relocates the BJT noise-source index enum (BJTRCNOIZ..BJTNSRCS). Noise is not implemented (analysis-scope.md); the indices key into the absent noise-source array."
+    },
+    "bjt/bjtdefs.h#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
+      "functionGroup": "bjt/bjtdefs.h::sBJTinstance",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
+      "functionGroup": "bjt/bjtdefs.h::sBJTinstance",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
+      "functionGroup": "bjt/bjtdefs.h::sBJTinstance",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
+      "functionGroup": "bjt/bjtdefs.h::sBJTinstance",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
+      "functionGroup": "bjt/bjtdefs.h::sBJTinstance",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
+      "functionGroup": "bjt/bjtdefs.h::sBJTinstance",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_L1_SCHEMA state slots",
+      "functionGroup": "bjt/bjtdefs.h::BJTstate-macros",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h009": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdefs.h::noise-src-enum",
+      "rationale": "Removes the noise-source define block (superseded by the enum relocated in h001) plus the sensitivity sensxp macro region. Noise/sensitivity not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdefs.h#h010": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
+      "functionGroup": "bjt/bjtdefs.h::sBJTmodel",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h011": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
+      "functionGroup": "bjt/bjtdefs.h::sBJTmodel",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h012": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
+      "functionGroup": "bjt/bjtdefs.h::sBJTmodel",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h013": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
+      "functionGroup": "bjt/bjtdefs.h::sBJTmodel",
+      "rationale": null
+    },
+    "bjt/bjtdefs.h#h014": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdefs.h::sBJTmodel",
+      "rationale": "#define->enum BJT_MOD_*/BJT_QUEST_* param-id dispatch table for IFparm integer dispatch; digiTS keys params by string name, so the integer enum has no counterpart (it incidentally enumerates QS+SOA+TLEV ids)."
+    },
+    "bjt/bjtdel.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdel.c::BJTdelete",
+      "rationale": "C-heap free: v41 BJTdelete reduces to FREE(inst->BJTsens) (sensitivity scratch). GC language; no sensitivity in digiTS."
+    },
+    "bjt/bjtdest.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdest.c::BJTdestroy",
+      "rationale": "Whole-file deletion of BJTdestroy (C-heap free loop over all models/instances). GC language; no destructor. File deleted in v41."
+    },
+    "bjt/bjtdisto.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdisto.c::BJTdisto",
+      "rationale": "BJTdisto is the distortion (Volterra) analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdisto.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdisto.c::BJTdisto",
+      "rationale": "BJTdisto is the distortion (Volterra) analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdisto.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdisto.c::BJTdisto",
+      "rationale": "BJTdisto is the distortion (Volterra) analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h004": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h005": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h006": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h007": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h008": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h009": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h010": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtdset.c#h011": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtdset.c::BJTdSetup",
+      "rationale": "BJTdSetup computes Volterra-kernel derivative terms for the distortion analysis; distortion is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtext.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtext.h::extern-prototypes",
+      "rationale": "C extern-prototype header: removes the BJTdestroy/BJTmDelete prototypes (deleted heap funcs) and changes BJTdelete signature. digiTS has no prototype headers."
+    },
+    "bjt/bjtext.h#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtext.h::extern-prototypes",
+      "rationale": "C extern-prototype header: drops a register qualifier on BJTdSetup prototype. digiTS has no prototype headers; BJTdSetup itself is distortion (NO-COUNTERPART)."
+    },
+    "bjt/bjtgetic.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load MODEUIC/ICVBE/ICVCE seeding (bjt.ts:1442-1456)",
+      "functionGroup": "bjt/bjtgetic.c::BJTgetic",
+      "rationale": "BJTgetic only v41 change is the linked-list-walk accessor rename (model->BJTnextModel -> BJTnextModel(model)); the IC body is byte-identical v26->v41. digiTS seeds IC inline in load() and has no separate getic method or model/instance linked list to rename."
+    },
+    "bjt/bjtinit.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtinit.c::BJTinfo",
+      "rationale": "SPICEdev BJTinfo dispatch struct -> C99 designated initializers. digiTS registers via the component registry; method binding is the class. All non-NULL func-ptr assignments preserved; only DEVdestroy/DEVmodDelete set NULL (deleted heap funcs). No new param slot / default / capability."
+    },
+    "bjt/bjtload.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h009": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h010": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h011": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h012": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h013": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h014": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h015": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h016": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h017": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h018": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h019": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h020": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h021": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h022": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h023": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h024": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h025": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h026": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h027": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h028": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h029": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h030": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h031": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h032": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h033": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h034": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next1:      vtn=vt*here->BJTtemissionCoeffF;",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h035": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::next2:",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h036": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "functionGroup": "bjt/bjtload.c::load:",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h037": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::load:",
+      "rationale": null
+    },
+    "bjt/bjtload.c#h038": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
+      "functionGroup": "bjt/bjtload.c::load:",
+      "rationale": null
+    },
+    "bjt/bjtmask.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmask.c::BJTmAsk",
+      "rationale": "BJTmAsk is the model-param IFparm value getter; digiTS exposes no model-param ask vtable. Each case (including the new v41 param getters) has no digiTS counterpart."
+    },
+    "bjt/bjtmask.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmask.c::BJTmAsk",
+      "rationale": "BJTmAsk is the model-param IFparm value getter; digiTS exposes no model-param ask vtable. Each case (including the new v41 param getters) has no digiTS counterpart."
+    },
+    "bjt/bjtmask.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmask.c::BJTmAsk",
+      "rationale": "BJTmAsk is the model-param IFparm value getter; digiTS exposes no model-param ask vtable. Each case (including the new v41 param getters) has no digiTS counterpart."
+    },
+    "bjt/bjtmask.c#h004": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmask.c::BJTmAsk",
+      "rationale": "BJTmAsk is the model-param IFparm value getter; digiTS exposes no model-param ask vtable. Each case (including the new v41 param getters) has no digiTS counterpart."
+    },
+    "bjt/bjtmask.c#h005": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmask.c::BJTmAsk",
+      "rationale": "BJTmAsk is the model-param IFparm value getter; digiTS exposes no model-param ask vtable. Each case (including the new v41 param getters) has no digiTS counterpart."
+    },
+    "bjt/bjtmask.c#h006": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmask.c::BJTmAsk",
+      "rationale": "BJTmAsk is the model-param IFparm value getter; digiTS exposes no model-param ask vtable. Each case (including the new v41 param getters) has no digiTS counterpart."
+    },
+    "bjt/bjtmdel.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtmdel.c::BJTmDelete",
+      "rationale": "Whole-file deletion of BJTmDelete (C-heap free unlinking a model). GC language; no model destructor/linked list. File deleted in v41."
+    },
+    "bjt/bjtmpar.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
+      "functionGroup": "bjt/bjtmpar.c::BJTmParam",
+      "rationale": null
+    },
+    "bjt/bjtmpar.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
+      "functionGroup": "bjt/bjtmpar.c::BJTmParam",
+      "rationale": null
+    },
+    "bjt/bjtmpar.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
+      "functionGroup": "bjt/bjtmpar.c::BJTmParam",
+      "rationale": null
+    },
+    "bjt/bjtmpar.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
+      "functionGroup": "bjt/bjtmpar.c::BJTmParam",
+      "rationale": null
+    },
+    "bjt/bjtmpar.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
+      "functionGroup": "bjt/bjtmpar.c::BJTmParam",
+      "rationale": null
+    },
+    "bjt/bjtmpar.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
+      "functionGroup": "bjt/bjtmpar.c::BJTmParam",
+      "rationale": null
+    },
+    "bjt/bjtnoise.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtnoise.c::BJTnoise",
+      "rationale": "BJTnoise is the noise analysis; noise is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtnoise.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtnoise.c::BJTnoise",
+      "rationale": "BJTnoise is the noise analysis; noise is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtnoise.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtnoise.c::BJTnoise",
+      "rationale": "BJTnoise is the noise analysis; noise is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtnoise.c#h004": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtnoise.c::BJTnoise",
+      "rationale": "BJTnoise is the noise analysis; noise is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtnoise.c#h005": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtnoise.c::BJTnoise",
+      "rationale": "BJTnoise is the noise analysis; noise is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtparam.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtparam.c::BJTparam",
+      "rationale": "Cosmetic switch(param)->switch (param) whitespace change in BJTparam (instance-param setter). No behavioral content."
+    },
+    "bjt/bjtparam.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtparam.c::BJTparam",
+      "rationale": "Adds /* FALLTHROUGH */ source comments on the BJT_IC case to suppress -Wimplicit-fallthrough. C-comment-only; IC handling logic byte-identical v26->v41."
+    },
+    "bjt/bjtpzld.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtpzld.c::BJTpzLoad",
+      "rationale": "BJTpzLoad is the pole-zero load (SPcomplex *s stamps); pole-zero is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtpzld.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtpzld.c::BJTpzLoad",
+      "rationale": "BJTpzLoad is the pole-zero load (SPcomplex *s stamps); pole-zero is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtpzld.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtpzld.c::BJTpzLoad",
+      "rationale": "BJTpzLoad is the pole-zero load (SPcomplex *s stamps); pole-zero is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtpzld.c#h004": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtpzld.c::BJTpzLoad",
+      "rationale": "BJTpzLoad is the pole-zero load (SPcomplex *s stamps); pole-zero is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtsacl.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsacl.c::BJTsAcLoad",
+      "rationale": "BJTsAcLoad is the sensitivity AC load (info->SENstatus, BJTsenGpi perturbation vectors); sensitivity is not implemented (analysis-scope.md: no SENstruct/senParmNo in src/)."
+    },
+    "bjt/bjtsacl.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsacl.c::BJTsAcLoad",
+      "rationale": "BJTsAcLoad is the sensitivity AC load (info->SENstatus, BJTsenGpi perturbation vectors); sensitivity is not implemented (analysis-scope.md: no SENstruct/senParmNo in src/)."
+    },
+    "bjt/bjtsacl.c#h003": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsacl.c::BJTsAcLoad",
+      "rationale": "BJTsAcLoad is the sensitivity AC load (info->SENstatus, BJTsenGpi perturbation vectors); sensitivity is not implemented (analysis-scope.md: no SENstruct/senParmNo in src/)."
+    },
+    "bjt/bjtsetup.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
+      "functionGroup": "bjt/bjtsetup.c::BJTsetup",
+      "rationale": null
+    },
+    "bjt/bjtsetup.c#h009": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsetup.c::BJTunsetup",
+      "rationale": "BJTunsetup - the model-walk that frees the internal prime/collCX nodes. digiTS is GC-managed and allocates internal nodes at compile-time expansion; there is no element unsetup pass to free them. The hunk is the v41 reordering of that C node-free walk."
+    },
+    "bjt/bjtsload.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsload.c::BJTsLoad",
+      "rationale": "BJTsLoad is the sensitivity load; sensitivity is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtsload.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsload.c::BJTsLoad",
+      "rationale": "Removes a duplicated CKTstate1 restore inside BJTsLoad; the whole function is sensitivity-only and sensitivity is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtsoachk.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "functionGroup": "bjt/bjtsoachk.c::BJTsoaCheck",
+      "rationale": null
+    },
+    "bjt/bjtsprt.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsprt.c::BJTsPrint",
+      "rationale": "BJTsPrint is sensitivity debug stdout; sensitivity is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtsset.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsset.c::BJTsSetup",
+      "rationale": "BJTsSetup assigns BJTsenParmNo into info->SENparms; sensitivity is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjtsupd.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "bjt/bjtsupd.c::BJTsUpdate",
+      "rationale": "BJTsUpdate recomputes charge sensitivities into the SENstruct; sensitivity is not implemented (analysis-scope.md)."
+    },
+    "bjt/bjttemp.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h004": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h005": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h006": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h007": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h008": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h009": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h010": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttemp.c#h011": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
+      "functionGroup": "bjt/bjttemp.c::BJTtemp",
+      "rationale": null
+    },
+    "bjt/bjttrunc.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.getLteTimestep (cktTerr over qbe/qbc/qsub; v41 adds qbcx under intCollResistGiven)",
+      "functionGroup": "bjt/bjttrunc.c::BJTtrunc",
+      "rationale": null
+    }
+  },
+  "reconstruction": {
+    "bjt#recon/stampAc": {
+      "title": "Rebuild BJTacLoad as BjtL1Element.stampAc (the linearized small-signal AC stamp: gpi/gmu/gm/go/gx conductances + jw*{cqbe,cqbc,cqbx,cqsub,cexbc} capacitive susceptances into the BJT matrix cells)",
+      "spec": "spec/v41-port/reconstruction/bjt-stampac.md",
+      "ngspiceBaseline": [
+        "src/spicelib/devices/bjt/bjtacld.c"
+      ],
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (no allocation in stampAc; reuse matrix handles allocated once in setup(), mirroring the BJTsetup TSTALLOC / BJTacLoad pure-stamp function boundary); reads the gpi/gmu/gm/go/gx and cqbe/cqbc/cqbx/cqsub/cexbc state slots that load() already populates",
+      "functionGroup": "bjt/bjtacld.c::BJTacLoad",
+      "blocks": [
+        "bjt/bjtacld.c#h001",
+        "bjt/bjtacld.c#h002",
+        "bjt/bjtacld.c#h003"
+      ],
+      "state": "PENDING"
+    },
+    "bjt#recon/quasiSaturation": {
+      "title": "BJT Kull quasi-saturation subsystem + v41 area/Arrhenius temperature refactor + full TLEV/TLEVC temperature parity",
+      "spec": "spec/v41-port/reconstruction/bjt-quasisaturation.md",
+      "ngspiceBaseline": "src/spicelib/devices/bjt/{bjtdefs.h,bjtsetup.c,bjtload.c,bjtacld.c,bjtconv.c,bjttemp.c}",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "tsFiles": [
+        "src/components/semiconductors/bjt.ts"
+      ],
+      "tsFunction": "BJT QS subsystem (collCX node + state slots + Kull load/acld/conv + area/Arrhenius/TLEV temp)",
+      "functionGroup": "bjt/bjtload.c::BJTload(GENmodel *inModel, CKTcircuit *ckt)",
+      "blocks": [
+        "bjt/bjt.c#h002",
+        "bjt/bjt.c#h003",
+        "bjt/bjt.c#h004",
+        "bjt/bjt.c#h005",
+        "bjt/bjt.c#h006",
+        "bjt/bjt.c#h007",
+        "bjt/bjt.c#h008",
+        "bjt/bjt.c#h009",
+        "bjt/bjtconv.c#h001",
+        "bjt/bjtconv.c#h002",
+        "bjt/bjtconv.c#h003",
+        "bjt/bjtdefs.h#h002",
+        "bjt/bjtdefs.h#h003",
+        "bjt/bjtdefs.h#h004",
+        "bjt/bjtdefs.h#h005",
+        "bjt/bjtdefs.h#h006",
+        "bjt/bjtdefs.h#h007",
+        "bjt/bjtdefs.h#h008",
+        "bjt/bjtdefs.h#h010",
+        "bjt/bjtdefs.h#h011",
+        "bjt/bjtdefs.h#h012",
+        "bjt/bjtdefs.h#h013",
+        "bjt/bjtload.c#h001",
+        "bjt/bjtload.c#h002",
+        "bjt/bjtload.c#h003",
+        "bjt/bjtload.c#h004",
+        "bjt/bjtload.c#h005",
+        "bjt/bjtload.c#h006",
+        "bjt/bjtload.c#h007",
+        "bjt/bjtload.c#h008",
+        "bjt/bjtload.c#h009",
+        "bjt/bjtload.c#h010",
+        "bjt/bjtload.c#h012",
+        "bjt/bjtload.c#h013",
+        "bjt/bjtload.c#h014",
+        "bjt/bjtload.c#h015",
+        "bjt/bjtload.c#h016",
+        "bjt/bjtload.c#h017",
+        "bjt/bjtload.c#h018",
+        "bjt/bjtload.c#h019",
+        "bjt/bjtload.c#h020",
+        "bjt/bjtload.c#h021",
+        "bjt/bjtload.c#h022",
+        "bjt/bjtload.c#h023",
+        "bjt/bjtload.c#h024",
+        "bjt/bjtload.c#h025",
+        "bjt/bjtload.c#h026",
+        "bjt/bjtload.c#h027",
+        "bjt/bjtload.c#h028",
+        "bjt/bjtload.c#h029",
+        "bjt/bjtload.c#h030",
+        "bjt/bjtload.c#h031",
+        "bjt/bjtload.c#h032",
+        "bjt/bjtload.c#h033",
+        "bjt/bjtload.c#h034",
+        "bjt/bjtload.c#h035",
+        "bjt/bjtload.c#h037",
+        "bjt/bjtload.c#h038",
+        "bjt/bjtmpar.c#h001",
+        "bjt/bjtmpar.c#h002",
+        "bjt/bjtmpar.c#h003",
+        "bjt/bjtmpar.c#h004",
+        "bjt/bjtmpar.c#h005",
+        "bjt/bjtmpar.c#h006",
+        "bjt/bjtsetup.c#h001",
+        "bjt/bjtsetup.c#h002",
+        "bjt/bjtsetup.c#h003",
+        "bjt/bjtsetup.c#h004",
+        "bjt/bjtsetup.c#h005",
+        "bjt/bjtsetup.c#h006",
+        "bjt/bjtsetup.c#h007",
+        "bjt/bjtsetup.c#h008",
+        "bjt/bjttemp.c#h001",
+        "bjt/bjttemp.c#h002",
+        "bjt/bjttemp.c#h003",
+        "bjt/bjttemp.c#h004",
+        "bjt/bjttemp.c#h005",
+        "bjt/bjttemp.c#h006",
+        "bjt/bjttemp.c#h007",
+        "bjt/bjttemp.c#h008",
+        "bjt/bjttemp.c#h009",
+        "bjt/bjttemp.c#h010",
+        "bjt/bjttemp.c#h011",
+        "bjt/bjttrunc.c#h001"
+      ],
+      "state": "PENDING"
+    },
+    "bjt#recon/soaWarnings": {
+      "title": "BJT safe-operating-area diagnostic warnings (BJTsoaCheck) — read-only, no matrix/RHS effect; deferred follow-on",
+      "spec": "spec/v41-port/reconstruction/bjt-soa-warnings.md",
+      "tsFile": "src/components/semiconductors/bjt.ts",
+      "tsFiles": [
+        "src/components/semiconductors/bjt.ts"
+      ],
+      "tsFunction": "BJT SOA diagnostic check (icMax/ibMax/pdMax/vXXmax warnings)",
+      "functionGroup": "bjt/bjtsoachk.c::BJTsoaCheck",
+      "blocks": [
+        "bjt/bjtsoachk.c#h001"
+      ],
+      "state": "PENDING"
+    }
+  }
+}

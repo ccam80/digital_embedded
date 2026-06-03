@@ -162,7 +162,7 @@ pass here first.
 | ccvs | `CCVS` | `ccvs-gate.dts` (DcVsrc + sense branch + CCVS + R load) | ＋AUTHOR |
 | sw | (voltage-controlled switch — confirm type) | `sw-gate.dts` (DcVsrc + R + Switch + control vsrc) | ＋AUTHOR |
 | csw | `CurrentControlledSwitchAnalogElement` (made placeable 2026-06-03) | `src/solver/analog/__tests__/ngspice-parity/fixtures/csw-gate.dts` (DcVsrc + R + CSW + controlling branch) | RUNNABLE — gateKind=`harness`; component made placeable (real typeId, `internalOnly` dropped) + `W`-card emit added to the netlist generator; fixture authored with the change |
-| asrc | (behavioral/arbitrary source — confirm type) | `asrc-gate.dts` (ASRC expression + R) | ＋AUTHOR |
+| asrc | `BV` / `BI` (B-element, built by `asrc#recon/wholeClass`) | `asrc-gate.dts` (algebraic ASRC expression + R) | RUNNABLE — from-scratch device; recon builds `bsource.ts` + the B-source emitter, consumes the existing engine; GateMerge authors an ALGEBRAIC fixture (advanced-expression parity follows `expr-engine#recon/numericalDeltas`) |
 
 ### Tier 3 — on Tier 2
 | Device | digiTS component | Gate fixture(s) | Status |
@@ -188,12 +188,12 @@ device gate above; these recons need dedicated stimulus:
 ### Expression-engine (un-frozen 2026-06-03)
 | Unit | Gate fixture(s) | Status |
 |---|---|---|
-| `expr-engine` (parser `inpptree.c`/`inpeval.c`/`ptfuncs.c`/`ifeval.c` → `expression.ts` / `expression-evaluate.ts` / `model-parser.ts`) | gateKind=`self-compare`, gateFixtures=[`src/solver/analog/__tests__/expression.test.ts`, `src/solver/analog/__tests__/expression-evaluate.test.ts`, `src/solver/analog/__tests__/expression-differentiate.test.ts`] | RUNNABLE — 53 mapped PENDING hunks (the ngspice B-source parse-tree evaluator + function table ported onto digiTS's existing expression engine). Gated by the existing expression suite (no-regression); bit-exact-via-B-source harness follows with asrc. Parser card-reader + model groups stay frozen. |
+| `expr-engine` (`expr-engine#recon/numericalDeltas` → `expression-evaluate.ts` / `expression-differentiate.ts` / `model-parser.ts`) | gateKind=`self-compare`, gateFixtures=[`src/solver/analog/__tests__/expression.test.ts`, `src/solver/analog/__tests__/expression-evaluate.test.ts`, `src/solver/analog/__tests__/expression-differentiate.test.ts`] | RUNNABLE — the recon blocks 4 v41 PORT hunks (PTexp/PTlog/PTlog10 clamps, tan/tanh derivative, atto suffix) + adds the sinh/cosh/tanh function set onto the digiTS AST engine. The other 43 parser hunks are NO-COUNTERPART (yacc/parse-tree machinery, compatmode, RKM, error/debug — no AST counterpart). `ddt`/`idt` is a DEFERRED follow-on (`expr-engine#recon/ddtState`, stateful/integration-coupled evaluator). Gated by the existing expression suite (no-regression); bit-exact-via-B-source harness follows with asrc. Parser card-reader + model groups stay frozen. |
 
 ## Fixture work list (tier-ordered — "fixtures set up")
 Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the device's own port/recon — reason given).
 1. **Tier 0/1:** ~~`vsrc-dc-only` (dropped — degenerate)~~ · ✅`vsrc-ac-square-rload` · ✅`vsrc-ac-sine-rload` · ✅`isrc-dc-rload` · ✅`isrc-ac-rload`.
-2. **Tier 2:** ✅`vccs-gate` · ✅`vcvs-gate` · ✅`cccs-gate` · ✅`ccvs-gate` · ✅`sw-gate` · ⛔`csw-gate` · ⛔`asrc-gate`.
+2. **Tier 2:** ✅`vccs-gate` · ✅`vcvs-gate` · ✅`cccs-gate` · ✅`ccvs-gate` · ✅`sw-gate` · 🔨`csw-gate` · 🔨`asrc-gate` (GateMerge-authored).
 3. **Tier 3:** ✅`jfet-gate` · ⛔`jfet2-gate` · ⛔`mes-gate`.
 4. **Engine:** ✅`nodeset-gate` + ✅`ic-gate` (input surface built — `.nodeset`/`.ic` read from `.dts`, emitted to ngspice + seeded into digiTS ics; both DRIVE pre-port) · ⛔`tf-gate` · ✅ randnumb (self-compare via `monte-carlo.test.ts` — no `.dts`).
 
@@ -202,7 +202,7 @@ Status: ✅ built+saved+emits-to-ngspice · ⛔ deferred (authored with the devi
 
 **Deferred — cannot be a standalone `.dts` now; authored when the device's own port/recon lands:**
 - `csw-gate` — **NO LONGER DEFERRED** (2026-06-03): the CurrentControlledSwitch was made placeable (real typeId, `internalOnly` dropped) and a `W`-card emit added to the netlist generator, so `csw-gate.dts` is a standalone harness fixture (DcVsrc + R + CSW + controlling branch).
-- `asrc-gate` — `src/components/active/bsource.ts` does not exist yet; the B source is built by the asrc port (#19/#27), which also adds the generator's B-source emitter. Fixture authored then.
+- `asrc-gate` — **NO LONGER DEFERRED** (2026-06-03): asrc is a from-scratch device (`asrc#recon/wholeClass`, specExists:true) that builds `bsource.ts` (BV/BI) + the netlist-generator B-source emitter and consumes the EXISTING expression engine (asrc-wholeClass.md:686-690) — it does not block on expr-engine. GateMerge authors `asrc-gate.dts` with ALGEBRAIC expressions; advanced-expression bit-exact parity follows `expr-engine#recon/numericalDeltas`.
 - `jfet2-gate`, `mes-gate`, `mos3-gate` — **NO LONGER DEFERRED** (2026-06-03): each device class is built by its `wholeClass` recon, and the harness gate fixture is authored by the GateMerge stage against the freshly-built class (MCP pointed at the worktree, where `circuit_build`/`circuit_save` can instantiate the device), then harness-gated bit-exact vs ngspice. mos3 additionally required its 43 v41 hunks classified PORT (core device → `mosfet3.ts`) vs NO-COUNTERPART (sensitivity/noise/distortion/pole-zero/delete/struct families) in `planning/mos3-decisions.json`.
 - `nodeset-gate` / `ic-gate` — **NO LONGER DEFERRED** (input surface built 2026-06-01). The harness input surface for `.nodeset`/`.ic` now exists: `ComparisonSession` resolves author/`.dts`-supplied nodeset/IC NAMES → digiTS node IDs (`_resolveNodesetNames` / `_resolveIcNames`), emits them as `.nodeset`/`.ic` cards on the auto-generated ngspice deck (`netlist-generator.ts`), seeds the resolved ICs into the digiTS compiled circuit's `ics` Map, and `harness_start` reads optional `circuit.nodesets`/`circuit.ics` objects from the `.dts` JSON so `harness_start({dtsPath})` alone self-contains the stimulus. Both fixtures DRIVE the harness pre-port (ngspice honours the cards; digiTS still uses the blanket 1e10 pin, so a stimulus-driven divergence surfaces — the recon's job to close).
 - `tf-gate` — no `.tf` surface in `src/headless` or `scripts/mcp`; built by `analysis#recon/tf`. Fixture authored then.

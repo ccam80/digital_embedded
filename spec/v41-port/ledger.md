@@ -1,14 +1,14 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-02T22:44:28.005Z
+Generated: 2026-06-03T00:56:28.805Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
 - Diff docs: **34**
 - ngspice files touched: **698**
 - Parent hunks enumerated: **1756**
-- v26-baseline reconstruction items: **33**
-- Ledger items (hunks + sub-items + reconstruction): **1816** (47 sub-items, 33 reconstruction)
+- v26-baseline reconstruction items: **37**
+- Ledger items (hunks + sub-items + reconstruction): **1820** (47 sub-items, 37 reconstruction)
 - Planning decisions overlays applied: **34**
 - Lines: +23664 / -18407
 
@@ -19,11 +19,11 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 424 |
+| PENDING        | 383 |
 | APPLIED        | 215 |
 | ESCALATED      | 6 |
 | STALE          | 5 |
-| NO-COUNTERPART | 1166 |
+| NO-COUNTERPART | 1211 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
 is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED, no STALE). A STALE item
@@ -36,7 +36,7 @@ never a full re-port.
 | Diff doc | ngspice files | Items |
 |---|---|---|
 | spec/ngspice-v41-model-diffs/asrc.md | 20 | 30 |
-| spec/ngspice-v41-model-diffs/bjt.md | 30 | 151 |
+| spec/ngspice-v41-model-diffs/bjt.md | 30 | 153 |
 | spec/ngspice-v41-model-diffs/cap.md | 23 | 38 |
 | spec/ngspice-v41-model-diffs/cccs.md | 16 | 19 |
 | spec/ngspice-v41-model-diffs/ccvs.md | 15 | 19 |
@@ -67,7 +67,7 @@ never a full re-port.
 | spec/ngspice-v41-engine-diffs/maths-ni.md | 11 | 27 |
 | spec/ngspice-v41-engine-diffs/maths-poly.md | 2 | 2 |
 | spec/ngspice-v41-engine-diffs/maths-sparse.md | 5 | 12 |
-| spec/ngspice-v41-engine-diffs/parser.md | 57 | 173 |
+| spec/ngspice-v41-engine-diffs/parser.md | 57 | 175 |
 | null | 1 | 1 |
 
 ## Per-file item counts
