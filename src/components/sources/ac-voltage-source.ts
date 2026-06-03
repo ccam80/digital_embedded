@@ -976,6 +976,18 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     // named-parameter waveform drives evaluation through the extension engine.
     this._initCoeffModel(props);
 
+    // A transient function token bakes the offset into its own coefficients
+    // (SINE VO; PULSE V1/V2 = dcOffset ∓ amplitude — see enumWaveformCoeffs), so
+    // the emitted ngspice card carries no separate `DC` token and VSRCdcGiven is
+    // false. Match it: with a function present the MODEDCOP/MODEDCTRANCURVE
+    // DC-value short-circuit (vsrcload.c:74-82) must NOT fire — the operating
+    // point comes from sampling the function at time 0 (vsrcload.c:84-88), which
+    // is PULSE V1 (= dcOffset − amplitude) for square/triangle/sawtooth and VO
+    // for sine, not the bare dcOffset.
+    if (this._funcTGiven) {
+      this._dcGiven = false;
+    }
+
     // Parse expression once at creation for expression waveform mode.
     this._parsedExpr = null;
     this._parseError = null;
@@ -1219,6 +1231,10 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       // mutated named params so the next load() reads coefficients consistent
       // with the new amplitude/frequency/phase/rise/fall.
       if (this._enumDerivedCoeffs) this._deriveEnumCoeffs();
+      // A baked-offset function carries no separate `DC` token (VSRCdcGiven
+      // false); keep the .op short-circuit disabled so the operating point
+      // samples the function at time 0 (vsrcload.c:74-88).
+      if (this._funcTGiven) this._dcGiven = false;
     }
   }
 
