@@ -1959,7 +1959,7 @@ export class MNAEngine implements AnalogEngine {
    *
    *     ckt->CKTmode = (ckt->CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN;
    *     ckt->CKTag[0] = ckt->CKTag[1] = 0;
-   *     bcopy(ckt->CKTstate0, ckt->CKTstate1,
+   *     memcpy(ckt->CKTstate1, ckt->CKTstate0,
    *           (size_t) ckt->CKTnumStates * sizeof(double));
    *
    * Three statements. No cktLoad, no NR, no device.accept sweep, no
@@ -2005,8 +2005,8 @@ export class MNAEngine implements AnalogEngine {
       ctx.ag[0] = 0;
       ctx.ag[1] = 0;
 
-      // dctran.c:349-350- bcopy(CKTstate0, CKTstate1, numStates*sizeof(double))
-      // Copy current state into the "last accepted" slot. No seeding of
+      // dctran.c:349-350- memcpy(CKTstate1, CKTstate0, numStates*sizeof(double))
+      // Copy current state (state0) into the "last accepted" slot (state1). No seeding of
       // state2..state7 yet- ngspice does that in the first-step acceptance
       // block (dctran.c:795-799), not here. See step()'s _stepCount === 0
       // branch for that seeding.
