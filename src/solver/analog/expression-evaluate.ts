@@ -8,7 +8,7 @@
  */
 
 import type { ExprNode } from "./expression.js";
-import { UnknownNodeKindError } from "./expression.js";
+import { UnknownNodeKindError, BUILTIN_FUNCTIONS } from "./expression.js";
 
 // ---------------------------------------------------------------------------
 // ExpressionContext
@@ -36,33 +36,13 @@ export interface ExpressionContext {
 }
 
 // ---------------------------------------------------------------------------
-// Built-in constants and math functions (shared with base parser)
+// Built-in constants (math functions resolve through the shared, clamped
+// BUILTIN_FUNCTIONS imported from expression.ts)
 // ---------------------------------------------------------------------------
 
 const BUILTIN_CONSTANTS: Record<string, number> = {
   pi: Math.PI,
   e: Math.E,
-};
-
-const BUILTIN_FUNCTIONS: Record<string, (...args: number[]) => number> = {
-  sin: Math.sin,
-  cos: Math.cos,
-  tan: Math.tan,
-  asin: Math.asin,
-  acos: Math.acos,
-  atan: Math.atan,
-  atan2: Math.atan2,
-  exp: Math.exp,
-  log: Math.log,
-  log10: Math.log10,
-  sqrt: Math.sqrt,
-  abs: Math.abs,
-  min: Math.min,
-  max: Math.max,
-  floor: Math.floor,
-  ceil: Math.ceil,
-  round: Math.round,
-  pow: Math.pow,
 };
 
 // ---------------------------------------------------------------------------

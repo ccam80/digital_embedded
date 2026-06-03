@@ -105,17 +105,67 @@ const BUILTIN_CONSTANTS: Record<string, number> = {
   e: Math.E,
 };
 
-const BUILTIN_FUNCTIONS: Record<string, (...args: number[]) => number> = {
+/**
+ * PTexp overflow ceiling (`ptfuncs.c:273-281`): for arg above 227.9559242 the
+ * exponential is pinned to 1e99 rather than overflowing to Infinity. Below the
+ * threshold it is the library exp.
+ */
+function ptExp(arg: number): number {
+  if (arg > 227.9559242)
+    return 1e99;
+  else
+    return Math.exp(arg);
+}
+
+/**
+ * PTlog domain clamp (`ptfuncs.c:286-294`): negative argument returns HUGE
+ * (IEEE +Infinity), a zero argument returns -1e99 (the iteration-start guard
+ * for op/dc), and the positive domain is the library log.
+ */
+function ptLog(arg: number): number {
+  if (arg < 0.0)
+    return Number.POSITIVE_INFINITY;
+  if (arg === 0)
+    return -1e99;
+  return Math.log(arg);
+}
+
+/**
+ * PTlog10 domain clamp (`ptfuncs.c:296-304`): same negative/zero guards as
+ * ptLog, positive domain is the library log10.
+ */
+function ptLog10(arg: number): number {
+  if (arg < 0.0)
+    return Number.POSITIVE_INFINITY;
+  if (arg === 0)
+    return -1e99;
+  return Math.log10(arg);
+}
+
+/**
+ * Single source of truth for every runtime expression-function lookup. Both
+ * runtime evaluators (`evaluateExpression` here, and `evaluate` /
+ * `compileExpression` in `expression-evaluate.ts`) and the constant-fold pass
+ * in `expression-differentiate.ts` resolve functions from this one map.
+ *
+ * `exp`/`log`/`log10` carry the ngspice PTexp/PTlog/PTlog10 clamps
+ * (`ptfuncs.c:273-304`). `sinh`/`cosh`/`tanh` are the bare library hyperbolics
+ * matching PTsinh/PTcosh/PTtanh (`ptfuncs.c:263-267,312-316,332-336`).
+ */
+export const BUILTIN_FUNCTIONS: Record<string, (...args: number[]) => number> = {
   sin: Math.sin,
   cos: Math.cos,
   tan: Math.tan,
+  sinh: Math.sinh,
+  cosh: Math.cosh,
+  tanh: Math.tanh,
   asin: Math.asin,
   acos: Math.acos,
   atan: Math.atan,
   atan2: Math.atan2,
-  exp: Math.exp,
-  log: Math.log,
-  log10: Math.log10,
+  exp: ptExp,
+  log: ptLog,
+  log10: ptLog10,
   sqrt: Math.sqrt,
   abs: Math.abs,
   min: Math.min,

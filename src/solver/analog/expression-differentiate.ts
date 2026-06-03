@@ -11,7 +11,7 @@
  */
 
 import type { ExprNode } from "./expression.js";
-import { numNode, binOp, unaryOp, callNode } from "./expression.js";
+import { numNode, binOp, unaryOp, callNode, BUILTIN_FUNCTIONS } from "./expression.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -155,8 +155,20 @@ export function differentiate(expr: ExprNode, variable: string): ExprNode {
             fPrimeG = neg(callNode("sin", [g]));
             break;
           case "tan":
-            // d/dx(tan(g)) = 1/cos²(g) * g'
-            fPrimeG = div(one(), pow(callNode("cos", [g]), two()));
+            // d/dx tan(g) = (1 + tan²(g)) · g'  (inpptree.c:508-513)
+            fPrimeG = add(one(), pow(callNode("tan", [g]), two()));
+            break;
+          case "sinh":
+            // d/dx sinh(g) = cosh(g) · g'
+            fPrimeG = callNode("cosh", [g]);
+            break;
+          case "cosh":
+            // d/dx cosh(g) = sinh(g) · g'
+            fPrimeG = callNode("sinh", [g]);
+            break;
+          case "tanh":
+            // d/dx tanh(g) = (1 − tanh²(g)) · g'  (inpptree.c:515-520)
+            fPrimeG = sub(one(), pow(callNode("tanh", [g]), two()));
             break;
           case "asin":
             // d/dx(asin(g)) = 1/sqrt(1-g²) * g'
@@ -330,17 +342,12 @@ export function simplify(expr: ExprNode): ExprNode {
 
     case "call": {
       const args = expr.args.map(simplify);
-      // Constant fold single-arg math functions
+      // Constant fold single-arg math functions through the shared clamped
+      // BUILTIN_FUNCTIONS, so a folded exp/log/log10 matches the runtime clamp.
       if (args.length === 1 && args[0].kind === "number") {
         const v = args[0].value;
-        const mathFns: Record<string, (x: number) => number> = {
-          sin: Math.sin, cos: Math.cos, tan: Math.tan,
-          asin: Math.asin, acos: Math.acos, atan: Math.atan,
-          exp: Math.exp, log: Math.log, log10: Math.log10,
-          sqrt: Math.sqrt, abs: Math.abs,
-          floor: Math.floor, ceil: Math.ceil, round: Math.round,
-        };
-        if (expr.fn in mathFns) return numNode(mathFns[expr.fn](v));
+        const impl = BUILTIN_FUNCTIONS[expr.fn];
+        if (impl !== undefined) return numNode(impl(v));
       }
       return callNode(expr.fn, args);
     }

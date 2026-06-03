@@ -81,6 +81,7 @@ export interface ParsedSubcircuit {
  *   N   = 1e-9
  *   P   = 1e-12
  *   F   = 1e-15
+ *   A   = 1e-18
  */
 const SPICE_SUFFIXES: Array<[string, number]> = [
   ["MEG", 1e6],
@@ -92,6 +93,7 @@ const SPICE_SUFFIXES: Array<[string, number]> = [
   ["N", 1e-9],
   ["P", 1e-12],
   ["F", 1e-15],
+  ["A", 1e-18],
 ];
 
 /**
@@ -102,7 +104,7 @@ const SPICE_SUFFIXES: Array<[string, number]> = [
  * - Scientific notation: "1e-15", "14.34E-15"
  * - SPICE suffix: "4.7K", "100P", "1.5MEG", "100M"
  */
-function parseSpiceValue(raw: string): number {
+export function parseSpiceValue(raw: string): number {
   const s = raw.trim();
   if (s === "") return NaN;
 
