@@ -32,15 +32,18 @@ export interface ProjectConfig {
    *                    pivot search (calls FindBiggestInColExclude on every
    *                    tied element instead of once at the end).
    *
-   * Default is 'modified' to preserve digiTS's historical behaviour. Flip
-   * to 'conventional' to align bit-exact with the bundled ngspice DLL on
-   * pivot-order-sensitive circuits.
+   * Default is 'conventional' to match ngspice's build: spconfig.h:211 defines
+   * `MODIFIED_MARKOWITZ NO`, so the shared library compiles the conventional
+   * QuicklySearchDiagonal (spfactor.c:1468, the `#else` arm). Bit-exact parity
+   * requires the same variant; the two diverge only on Markowitz ties (e.g. the
+   * symmetric V1-branch tie in a diode bridge), where they break the tie in
+   * opposite directions and pick a different pivot.
    */
   markowitz: MarkowitzVariant;
 }
 
 const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
-  markowitz: 'modified',
+  markowitz: 'conventional',
 };
 
 let active: ProjectConfig = { ...DEFAULT_PROJECT_CONFIG };

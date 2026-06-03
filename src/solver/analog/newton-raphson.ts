@@ -740,18 +740,22 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     const convergenceFailedElements = ctx.convergenceFailures;
     convergenceFailedElements.length = 0;
     let elemConverged = true;
-    if (iteration > 0) {
-      for (let k = 0; k < ctx.elementsWithConvergence.length; k++) {
-        const el = ctx.elementsWithConvergence[k];
-        if (!el.checkConvergence!(ctx.loadCtx)) {
-          ctx.noncon = 1;
-          elemConverged = false;
-          ctx.troubleElt = el;                         // dioconv.c:61 — CKTtroubleElt = here
-          if (ctx.detailedConvergence) {
-            convergenceFailedElements.push(el.label ?? `element_${elements.indexOf(el)}`);
-          } else {
-            break;                                     // first blamed device is enough
-          }
+    // Device-level convTest runs EVERY iteration, mirroring ngspice's per-device
+    // convTest embedded in CKTload (dioconv.c:55-62), which is not gated on
+    // iterno. Only the node-level NIconvTest below carries the iterno!=1 guard
+    // (niiter.c:1202). Gating this sweep on the iteration would suppress the
+    // device blame list (CKTtroubleElt / the devConvFailed counterpart) on the
+    // first iteration, where ngspice already reports it.
+    for (let k = 0; k < ctx.elementsWithConvergence.length; k++) {
+      const el = ctx.elementsWithConvergence[k];
+      if (!el.checkConvergence!(ctx.loadCtx)) {
+        ctx.noncon = 1;
+        elemConverged = false;
+        ctx.troubleElt = el;                         // dioconv.c:61 — CKTtroubleElt = here
+        if (ctx.detailedConvergence) {
+          convergenceFailedElements.push(el.label ?? `element_${elements.indexOf(el)}`);
+        } else {
+          break;                                     // first blamed device is enough
         }
       }
     }
@@ -774,6 +778,12 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // single convergence indicator (= CKTnoncon), so a converged iteration has
     // ctx.noncon === 0.
     const globalConverged = ctx.noncon === 0;
+    // ngspice's NI capture exposes a single converged flag = (CKTnoncon==0 &&
+    // iterno!=1) (niiter.c:1231); the bridge copies it into both globalConverged
+    // and elemConverged. Mirror that for the reported flag so the harness
+    // compares like with like — the device-level blame survives in
+    // convergenceFailedElements, matched against ngspice's devConvFailed list.
+    elemConverged = globalConverged;
 
     // ---- STEP I: Newton damping (ngspice niiter.c:1020-1046) ----
     if (ctx.nodeDamping && ctx.noncon !== 0 && isDcop(ctx.cktMode) && iteration > 0) {

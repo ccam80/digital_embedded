@@ -1973,21 +1973,16 @@ export class MNAEngine implements AnalogEngine {
     const ctx = this._ctx!;
     ctx.rhs.set(result.nodeVoltages);
 
-    // ngspice keeps the converged DCOP solution in CKTrhsOld implicitly via
-    // the NR pointer-swap pattern in niiter.c:631-632 (final iteration's
-    // SMPsolve writes the answer to CKTrhs, then CKTrhsOld <-> CKTrhs swap
-    // leaves CKTrhsOld holding the converged DCOP). dctran.c:346-350 then
-    // never touches CKTrhsOld because it already carries the right values.
-    //
-    // digiTS's DCOP returns a separate result object, so we have to mirror
-    // the buffer parity explicitly. Without this, every internal node
-    // allocated by ctx.makeVolt (BJT primes, MOSFET primes, JFET primes,
-    // diode posPrime, polarized-cap nCap, crystal/mutual-inductor coupling
-    // nodes) reads zero from rhsOld at NR iteration >= 1 of the first
-    // transient step- the cond1=true MODEINITTRAN branch hides this on
-    // iteration 0 only. Manifests as NaN/garbage on UIC + non-zero IC and
-    // as silent wrong companion currents on the standard transient path.
-    ctx.rhsOld.set(result.nodeVoltages);
+    // ctx.rhsOld is the NR initial guess for the first transient point. ngspice
+    // carries CKTrhsOld there untouched (dctran.c:346-350 never writes it), and
+    // CKTrhsOld holds the DCOP's PRE-final-iterate vector: NIiter swaps
+    // CKTrhsOld<->CKTrhs at the top of each iteration and returns pre-swap on
+    // convergence (niiter.c:944-955), so after the converged final solve
+    // CKTrhsOld is the iterate that fed it, NOT the converged answer in CKTrhs.
+    // The DCOP NR loop here already leaves ctx.rhsOld at exactly that pre-final
+    // iterate (its own pre-swap return), for every node including ctx.makeVolt
+    // primes. Overwriting it with the converged result.nodeVoltages would seed
+    // the transient from the wrong vector and break first-point parity.
 
     for (const el of _elements) {
       if (typeof (el as any).initVoltages === "function") {
