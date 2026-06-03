@@ -592,6 +592,13 @@ export function buildFrequencyArray(params: AcParams): Float64Array {
   }
 
   if (type === "dec") {
+    // ngspice acan.c:85-88 DECADE startfreq guard: a non-positive start
+    // frequency makes log10(stop/start) undefined, so ACan rejects it with
+    // E_PARMVAL before computing freqDelta. The error-return is rendered here
+    // as a throw (this function's control-flow exit channel).
+    if (fStart <= 0) {
+      throw new Error("ERROR: AC startfreq <= 0");
+    }
     // ngspice acan.c:89 num_steps = floor(|log10(stop/start)| * n_per_dec).
     // freqDelta from acan.c:90; we emit fStart * freqDelta^i for
     // i = 0..num_steps (inclusive) to mirror the C-side sweep loop's
@@ -607,7 +614,13 @@ export function buildFrequencyArray(params: AcParams): Float64Array {
     return freqs;
   }
 
-  // 'oct'- ngspice acan.c:98-99 freqDelta = exp(log(2)/n_per_octave);
+  // 'oct'- ngspice acan.c:93-97 OCTAVE startfreq guard mirrors the DECADE
+  // one: a non-positive start frequency is rejected with E_PARMVAL before
+  // freqDelta is computed, rendered here as a throw.
+  if (fStart <= 0) {
+    throw new Error("ERROR: AC startfreq <= 0");
+  }
+  // ngspice acan.c:98-99 freqDelta = exp(log(2)/n_per_octave);
   // num_steps mirrors the DEC case (floor of log2 span * n_per_octave),
   // with num_steps + 1 emission.
   const numSteps = Math.floor(Math.abs(Math.log2(fStop / fStart)) * numPoints);
