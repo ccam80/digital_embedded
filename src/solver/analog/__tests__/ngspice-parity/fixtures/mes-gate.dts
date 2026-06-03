@@ -1,0 +1,774 @@
+{
+  "circuit": {
+    "description": "NMESFET Statz gate fixture: DC bias on, transient gate sine, AC small-signal sweep",
+    "elements": [
+      {
+        "id": "a2b99b32-4f2e-4919-a338-2d5adeec5999",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "VDD",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "9b3bec1a-065c-4cb2-b4a9-bde8b952d938",
+        "position": {
+          "x": 0,
+          "y": 7
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 0.1,
+            "dcOffset": -0.5,
+            "frequency": 1000
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "amplitude": 0.1,
+          "dcOffset": -0.5,
+          "frequency": 1000,
+          "label": "VG",
+          "position": [
+            0,
+            8
+          ],
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "ed21e92c-5f68-499f-9405-57951ab3a04c",
+        "position": {
+          "x": 12,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "label": "RD",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "0e5c8e72-9bfe-4917-afc0-5c69091d79f2",
+        "position": {
+          "x": 24,
+          "y": 2
+        },
+        "properties": {
+          "_pinElectrical": {
+            "D": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "G": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "S": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "D": false,
+            "G": false,
+            "S": false
+          },
+          "label": "M1",
+          "model": "spice",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "NMESFET"
+      },
+      {
+        "id": "48d7cdad-027e-4bd2-97b5-dfe8fbf65b37",
+        "position": {
+          "x": 36,
+          "y": 6
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "mes-gate",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 11,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 0
+          },
+          {
+            "x": 17,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 0
+          },
+          {
+            "x": 30,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 0
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 7
+          },
+          {
+            "x": 5,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 7
+          },
+          {
+            "x": 9,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 7
+          },
+          {
+            "x": 9,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 4
+          },
+          {
+            "x": 18,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 2
+          },
+          {
+            "x": 23,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 3
+          },
+          {
+            "x": 29,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 6
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 3
+          },
+          {
+            "x": 33,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 3
+          },
+          {
+            "x": 33,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 6
+          },
+          {
+            "x": 36,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 6,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 18,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 8
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 24,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 7
+          },
+          {
+            "x": -1,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 6
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 7
+          },
+          {
+            "x": -2,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 7
+          },
+          {
+            "x": -2,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 12
+          },
+          {
+            "x": 12,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 12
+          },
+          {
+            "x": 18,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 12
+          },
+          {
+            "x": 18,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 11
+          },
+          {
+            "x": 24,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 11
+          },
+          {
+            "x": 31,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 11
+          },
+          {
+            "x": 31,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
