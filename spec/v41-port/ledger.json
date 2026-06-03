@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-03T03:16:06.077Z",
+    "generated": "2026-06-03T03:26:19.177Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -13,7 +13,7 @@
     "totalAdded": 23664,
     "totalRemoved": 18407,
     "progressEntriesApplied": 238,
-    "progressEntriesStale": 5,
+    "progressEntriesStale": 6,
     "staleItems": [
       {
         "id": "vsrc#recon/waveformModel",
@@ -33,6 +33,10 @@
       },
       {
         "id": "analysis#recon/tf",
+        "from": "APPLIED"
+      },
+      {
+        "id": "expr-engine#recon/numericalDeltas",
         "from": "APPLIED"
       }
     ]
@@ -63461,11 +63465,15 @@
         "parser/inpeval.c#h005"
       ],
       "hunkHash": "753666d3551632e6",
-      "state": "PENDING",
+      "state": "STALE",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/expression.test.ts, src/solver/analog/__tests__/expression-evaluate.test.ts, src/solver/analog/__tests__/expression-differentiate.test.ts]"
+      ],
       "rationale": null,
-      "escalation": null
+      "escalation": null,
+      "staleFrom": "APPLIED",
+      "staleHash": "611e4c45c9702953"
     },
     {
       "id": "expr-engine#recon/ddtState",

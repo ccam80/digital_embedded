@@ -2209,6 +2209,16 @@
         "APPLIED 2026-06-03 (isrc unit, parallel iso-verify). parallel iso-verify + gate clean on [isrc-dc-rload.dts, isrc-ac-rload.dts]: firstDivergence full-null across all classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape) on the DC-OP+transient run (107/107 steps) and full-null AC (solution/shape/matrix/rhs, 61/61 points). ref src/spicelib/devices/isrc/isrcpar.c:63-79."
       ],
       "escalation": null
+    },
+    "expr-engine#recon/numericalDeltas": {
+      "state": "APPLIED",
+      "hunkHash": "611e4c45c9702953",
+      "ref": "harvested:af7f8435",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/expression.test.ts, src/solver/analog/__tests__/expression-evaluate.test.ts, src/solver/analog/__tests__/expression-differentiate.test.ts]"
+      ],
+      "escalation": null
     }
   }
 }
