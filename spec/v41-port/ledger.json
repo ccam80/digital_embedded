@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-03T03:48:50.074Z",
+    "generated": "2026-06-03T03:53:07.149Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 239,
+    "progressEntriesApplied": 256,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -25734,10 +25734,12 @@
         1257
       ],
       "hunkHash": "4b963f57d1231b29",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() Shichman-Hodges drain-current block",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25765,10 +25767,12 @@
         1282
       ],
       "hunkHash": "66efc53193a1ccfb",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() saturation/linear region (gm/gds/gmbs)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25796,10 +25800,12 @@
         1291
       ],
       "hunkHash": "647bc8948a1226ad",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25827,10 +25833,12 @@
         1300
       ],
       "hunkHash": "6214f592c3df4b9a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() cd = mode*cdrain - cbd (mosfet.ts ~1293 cite)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25858,10 +25866,12 @@
         1524
       ],
       "hunkHash": "ef81f497c9a1581f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() bulk-source depletion-cap qbs/capbs block (const double arg localisation)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25889,10 +25899,12 @@
         1548
       ],
       "hunkHash": "186f9c7bc33d5c54",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() bulk-drain depletion-cap qbd/capbd block (const double arg localisation)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25920,10 +25932,12 @@
         1582
       ],
       "hunkHash": "55514ab488babae5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() NIintegrate qbd/qbs (mosfet.ts niIntegrate calls)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25951,10 +25965,12 @@
         1591
       ],
       "hunkHash": "3677ae013eb8636d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() noncon block (mosfet.ts:1661-1662)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25982,10 +25998,12 @@
         1652
       ],
       "hunkHash": "9248c8b707c3e96a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() next2 vbs/vbd/vgs/vds store + DEVqmeyer (devQmeyer, mosfet.ts:580-624)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26013,10 +26031,12 @@
         1661
       ],
       "hunkHash": "b85e509c30b526b3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() Meyer cap capgs/capgd/capgb (MODETRANOP/SMSIG double, mosfet.ts:1481-1486)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26044,10 +26064,12 @@
         1670
       ],
       "hunkHash": "e3b37ef9d0a613ea",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26075,10 +26097,12 @@
         1691
       ],
       "hunkHash": "85117dc38b320e75",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() Meyer-charge predictor extrapolation (qgs/qgd/qgb)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26106,10 +26130,12 @@
         1710
       ],
       "hunkHash": "410d46c87eee3d51",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() gate-cap NIintegrate + ceqgs/ceqgd/ceqgb (bypass label)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26137,10 +26163,12 @@
         1727
       ],
       "hunkHash": "be59a06ace5b9e1e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() ceqgs/ceqgd/ceqgb assembly",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26168,10 +26196,12 @@
         1769
       ],
       "hunkHash": "04d6730ed762b962",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() RHS load (ceqbs/ceqbd/cdreq into gNode/bNode/dPrime/sPrime)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26199,10 +26229,12 @@
         1788
       ],
       "hunkHash": "164129afa29be2e1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() Y-matrix stamp (DPdp/SPsp/Dd/Gg etc.)",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26230,10 +26262,12 @@
         1805
       ],
       "hunkHash": "71bb07f31b66ea33",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() Y-matrix stamp tail (SPdp/SPg/SPs/SPb) + end-of-function",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",

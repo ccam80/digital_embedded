@@ -2229,6 +2229,176 @@
         "parallel iso-verify + gate clean on [src/solver/analog/__tests__/ngspice-parity/fixtures/csw-gate.dts]"
       ],
       "escalation": null
+    },
+    "mos1/mos1load.c#h017": {
+      "state": "APPLIED",
+      "hunkHash": "4b963f57d1231b29",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h018": {
+      "state": "APPLIED",
+      "hunkHash": "66efc53193a1ccfb",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h019": {
+      "state": "APPLIED",
+      "hunkHash": "647bc8948a1226ad",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h020": {
+      "state": "APPLIED",
+      "hunkHash": "6214f592c3df4b9a",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h021": {
+      "state": "APPLIED",
+      "hunkHash": "ef81f497c9a1581f",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h022": {
+      "state": "APPLIED",
+      "hunkHash": "186f9c7bc33d5c54",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h023": {
+      "state": "APPLIED",
+      "hunkHash": "55514ab488babae5",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h024": {
+      "state": "APPLIED",
+      "hunkHash": "3677ae013eb8636d",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h025": {
+      "state": "APPLIED",
+      "hunkHash": "9248c8b707c3e96a",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h026": {
+      "state": "APPLIED",
+      "hunkHash": "b85e509c30b526b3",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h027": {
+      "state": "APPLIED",
+      "hunkHash": "e3b37ef9d0a613ea",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h028": {
+      "state": "APPLIED",
+      "hunkHash": "85117dc38b320e75",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h029": {
+      "state": "APPLIED",
+      "hunkHash": "410d46c87eee3d51",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h030": {
+      "state": "APPLIED",
+      "hunkHash": "be59a06ace5b9e1e",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h031": {
+      "state": "APPLIED",
+      "hunkHash": "04d6730ed762b962",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h032": {
+      "state": "APPLIED",
+      "hunkHash": "164129afa29be2e1",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h033": {
+      "state": "APPLIED",
+      "hunkHash": "71bb07f31b66ea33",
+      "ref": "harvested:88cc671",
+      "attempts": 0,
+      "verifierNotes": [
+        "parallel iso-verify + gate clean on [mosfet-inverter.dts]"
+      ],
+      "escalation": null
     }
   }
 }
