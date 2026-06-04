@@ -976,6 +976,12 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
     // named-parameter waveform drives evaluation through the extension engine.
     this._initCoeffModel(props);
 
+    // vsrctemp.c:44-67 — value-presence + DC-vs-transient-time-0 notices. Runs
+    // on the as-parsed VSRCdcGiven / VSRCfuncTGiven, before the function-token
+    // dcGiven clearing below (which is a digiTS stamp-path concern, not part of
+    // VSRCtemp).
+    this._checkTime0DcConsistency();
+
     // A transient function token bakes the offset into its own coefficients
     // (SINE VO; PULSE V1/V2 = dcOffset ∓ amplitude — see enumWaveformCoeffs), so
     // the emitted ngspice card carries no separate `DC` token and VSRCdcGiven is
@@ -997,6 +1003,38 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
         this._parsedExpr = parseExpression(exprText);
       } catch (err) {
         this._parseError = err instanceof ExprParseError ? err.message : String(err);
+      }
+    }
+  }
+
+  /**
+   * VSRCtemp value-presence and time-0 consistency notices (vsrctemp.c:44-67).
+   * When neither a DC value nor a transient function type is given, ngspice
+   * emits an ERR_INFO notice that DC 0 is assumed. Otherwise, when both a DC
+   * value and a transient function type are given (and the type is not
+   * TRNOISE / TRRANDOM / EXTERNAL), the DC value seeds the .OP while the
+   * transient waveform starts from its time-0 value; ngspice emits an ERR_INFO
+   * notice when the two differ by more than 3 ULPs. AM and PWL read the time-0
+   * value from VSRCcoeffs[1]; all other function types from VSRCcoeffs[0]. Both
+   * branches are diagnostic only — they change no numeric value.
+   */
+  private _checkTime0DcConsistency(): void {
+    if (!this._dcGiven && !this._funcTGiven) {
+      // vsrctemp.c:44-49 — no DC value, no transient value.
+      // eslint-disable-next-line no-console
+      console.warn(`${this.label}: has no value, DC 0 assumed`);
+    } else if (this._dcGiven && this._funcTGiven
+        && this._functionType !== FunctionType.TRNOISE
+        && this._functionType !== FunctionType.TRRANDOM
+        && this._functionType !== FunctionType.EXTERNAL) {
+      // vsrctemp.c:57-60 — AM and PWL take coeffs[1]; all others coeffs[0].
+      const time0value = (this._functionType === FunctionType.AM
+                       || this._functionType === FunctionType.PWL)
+        ? this._coeffs[1] : this._coeffs[0];
+      // vsrctemp.c:62-66 — 3-ULP AlmostEqualUlps tolerance on the notice gate.
+      if (!almostEqualUlps(time0value, this._dcValue, 3)) {
+        // eslint-disable-next-line no-console
+        console.warn(`${this.label}: dc value used for op instead of transient time=0 value.`);
       }
     }
   }
