@@ -2180,7 +2180,8 @@
       "ref": "harvested:af7f8435",
       "attempts": 0,
       "verifierNotes": [
-        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/expression.test.ts, src/solver/analog/__tests__/expression-evaluate.test.ts, src/solver/analog/__tests__/expression-differentiate.test.ts]"
+        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/expression.test.ts, src/solver/analog/__tests__/expression-evaluate.test.ts, src/solver/analog/__tests__/expression-differentiate.test.ts]",
+        "independent re-verify (commit 80007338): PTexp >227.9559242->1e99 (newcompat arm correctly omitted), PTlog/PTlog10 <0->+Inf / ==0->-1e99 line-for-line (ptfuncs.c:273-304); PTF_TAN 1+tan^2 (inpptree.c:508-513), PTF_TANH 1-tanh^2 (inpptree.c:515-520), sinh->cosh/cosh->sinh; single shared clamped BUILTIN_FUNCTIONS in expression.ts imported by expression-evaluate.ts (evaluate+compileExpression) and expression-differentiate.ts (simplify fold); no surviving per-file literal or un-clamped Math.exp/log/log10 in either evaluator; mathFns deleted; SPICE_SUFFIXES['A',1e-18] present once. Gate src/solver/analog/__tests__/expression-numerical-deltas.test.ts 12/12 PASS (gate-named expression*.test.ts files do not exist; deltas test is the gate)."
       ],
       "escalation": null
     },
