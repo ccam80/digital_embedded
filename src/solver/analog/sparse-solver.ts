@@ -1677,25 +1677,15 @@ export class SparseSolver {
         // ngspice spfactor.c:225-242- reuse loop.
         for (step = 1; step <= size; step++) {
           const pPivot = this._diag[step];
-          // ngspice spfactor.c:230-235- if the diagonal pivot for this step is
-          // absent, the no-reorder fast path cannot proceed; flag a reorder and
-          // fall through to the reorder loop below.
+          // ngspice spfactor.c:230-235- if the diagonal pivot element for this
+          // step is absent, warn, flag a reorder, and fall through to the
+          // reorder loop below.
           //
-          // Representation mapping: ngspice tests `Matrix->Diag[Step] == NULL`,
-          // i.e. a null element pointer. `_diag` here stores element-pool
-          // indices, where index 0 is a valid element and -1 is the "no
-          // diagonal element" marker- so the absent-pivot test is `< 0`, not
-          // `== 0`. This is a representation re-expression of the same
-          // condition, not a behavioural change.
-          //
-          // ngspice also emits `fprintf(stderr, "Warning: ... Pivot for step
-          // = %d not found")` here. That stderr warning is intentionally not
-          // reproduced: sparse-solver.ts is a pure numeric layer with no
-          // diagnostic sink, and the guard recovers transparently by routing
-          // through the reorder loop- if that in turn fails, factor() returns
-          // an error code that newton-raphson.ts surfaces as a singular-matrix
-          // diagnostic. The user-facing signal is preserved via the error path.
+          // `_diag` stores element-pool indices: index 0 is a valid element
+          // and -1 is the "no diagonal element" marker, so the absent-pivot
+          // test `!pPivot` (null element pointer in ngspice) reads as `< 0`.
           if (pPivot < 0) {
+            console.error(`Warning: spfactor.c, 230, Pivot for step = ${step} not found`);
             reorderingRequired = true;
             break;
           }
