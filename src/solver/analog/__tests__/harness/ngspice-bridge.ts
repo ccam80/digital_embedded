@@ -746,6 +746,10 @@ export class NgspiceBridge {
   private _acPoints: RawNgspiceAcPoint[] = [];
   private _rawTopology: RawNgspiceTopology | null = null;
   private _topology: NgspiceTopology | null = null;
+  /** Captured [transferFunction, inputResistance, outputResistance] from the last runTf. */
+  private _tfOutputs: [number, number, number] | null = null;
+  /** Bound `tf_register` export, or null if the DLL predates it (not yet rebuilt). */
+  private _tfRegisterFn: any = null;
 
   constructor(dllPath: string) {
     this._dllPath = dllPath;
@@ -801,8 +805,37 @@ export class NgspiceBridge {
     this._registerIterationCallback(koffi, uid);
     this._registerOuterCallback(koffi, uid);
     this._registerAcCallback(koffi, uid);
+    // .tf capture is optional: a DLL built before the tf_register export
+    // (tfanal.c) lacks the symbol, in which case func() throws on resolution.
+    // Tolerate it so dcop/tran/ac runs keep working; runTf() reports the gap.
+    try {
+      this._registerTfCallback(koffi, uid);
+    } catch {
+      this._tfRegisterFn = null;
+    }
 
     this._cmd = this._lib.func("int ngSpice_Command(str)");
+  }
+
+  /**
+   * Register the `.tf` capture callback. ngspice fires this once at the end of
+   * TFanal (tfanal.c, `done:` label), passing the three computed scalars
+   * (outputs[0..2]: transfer ratio, input resistance, output resistance) by
+   * value before OUTpData hands them to the front-end plot. Reads them straight
+   * from the C `outputs[]` array, so the comparison is bit-exact with no vector
+   * name parsing or plot round-tripping.
+   */
+  private _registerTfCallback(koffi: any, uid: string): void {
+    const TfCb = koffi.proto(`void tf_cb${uid}(double, double, double)`);
+    const callback = koffi.register(
+      (tf: number, rin: number, rout: number) => {
+        this._tfOutputs = [tf, rin, rout];
+      },
+      koffi.pointer(TfCb),
+    );
+    const registerFn = this._lib.func(`void tf_register(tf_cb${uid}*)`);
+    registerFn(callback);
+    this._tfRegisterFn = registerFn;
   }
 
   /**
@@ -1239,6 +1272,35 @@ export class NgspiceBridge {
   /** Per-frequency AC capture from the last `runAc` call (in sweep order). */
   getAcPoints(): RawNgspiceAcPoint[] { return this._acPoints.slice(); }
 
+  /**
+   * Issue ngspice `tf <output> <insrc>` (com_dctf.c → TFanal).
+   *
+   * `output` is the output-variable expression in ngspice syntax (`v(node)` or
+   * a source current `i(vsrc)`); `insrc` is the input source label. TFanal runs
+   * a DC operating point then two RHS-injection re-solves over the factored
+   * Jacobian (tfanal.c) and the tf_register callback captures the three scalars.
+   */
+  runTf(output: string, insrc: string): void {
+    if (!this._tfRegisterFn) {
+      throw new Error(
+        "ngspice DLL lacks the tf_register export (tfanal.c)- rebuild the DLL " +
+        "(make-install-vngspice) before running .tf parity.",
+      );
+    }
+    this._iterations = [];
+    this._outerEvents = [];
+    this._tfOutputs = null;
+    // ngspice lowercases device/node identifiers on parse, and CKTfndBranch /
+    // CKTfndDev (tfanal.c:49,82) look up the lowercased name; an uppercased
+    // source label (e.g. "V1") misses, so TFanal returns E_NOTFOUND before the
+    // tf_register fire site and we capture nothing. Lower-case the command
+    // tokens to match the stored names (ngspice identifiers are case-insensitive).
+    this._cmd(`tf ${output.toLowerCase()} ${insrc.toLowerCase()}`);
+  }
+
+  /** The three `.tf` scalars from the last `runTf` call, or null if none ran. */
+  getTfOutputs(): [number, number, number] | null { return this._tfOutputs; }
+
   getTopology(): NgspiceTopology | null { return this._topology; }
   getRawTopology(): RawNgspiceTopology | null { return this._rawTopology; }
 
@@ -1257,6 +1319,7 @@ export class NgspiceBridge {
       this._lib.func("void ni_outer_register(void*)")(null);
       this._lib.func("void ni_instrument_register(void*)")(null);
       this._lib.func("void ni_topology_register(void*)")(null);
+      if (this._tfRegisterFn) this._lib.func("void tf_register(void*)")(null);
       this._lib = null;
     }
   }
@@ -1280,7 +1343,8 @@ export type NgspiceJobAnalysis =
   | { kind: "dcop" }
   | { kind: "optran"; opstepsize: string; opfinaltime: string; opramptime: string }
   | { kind: "tran"; tStop: string; tStep: string; tMax?: string }
-  | { kind: "ac"; type: "dec" | "oct" | "lin"; n: number; fStart: number; fStop: number };
+  | { kind: "ac"; type: "dec" | "oct" | "lin"; n: number; fStart: number; fStop: number }
+  | { kind: "tf"; output: string; insrc: string };
 
 /**
  * Fully self-describing ngspice run request. Carries everything the worker
@@ -1304,11 +1368,13 @@ export interface NgspiceJobSpec {
  * same node-mapping the DC/TRAN path gets for free inside `CaptureSession`.
  */
 export interface NgspiceRunResult {
-  analysis: "dcop" | "tran" | "ac";
+  analysis: "dcop" | "tran" | "ac" | "tf";
   /** Populated for dcop / tran. */
   session: CaptureSession | null;
   /** Populated for ac. */
   acPoints: RawNgspiceAcPoint[] | null;
+  /** Populated for tf: [transferFunction, inputResistance, outputResistance]. */
+  tfOutputs: [number, number, number] | null;
   /** Raw + parsed ngspice topology (needed by AC caller for node mapping). */
   ngspiceTopology: NgspiceTopology | null;
   rawNgspiceTopology: RawNgspiceTopology | null;
@@ -1339,6 +1405,7 @@ export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<Ngspice
         analysis: "dcop",
         session: bridge.getCaptureSession(),
         acPoints: null,
+        tfOutputs: null,
         ngspiceTopology: bridge.getTopology(),
         rawNgspiceTopology: bridge.getRawTopology(),
       };
@@ -1355,6 +1422,7 @@ export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<Ngspice
         analysis: "dcop",
         session: bridge.getCaptureSession(),
         acPoints: null,
+        tfOutputs: null,
         ngspiceTopology: bridge.getTopology(),
         rawNgspiceTopology: bridge.getRawTopology(),
       };
@@ -1364,6 +1432,17 @@ export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<Ngspice
         analysis: "tran",
         session: bridge.getCaptureSession(),
         acPoints: null,
+        tfOutputs: null,
+        ngspiceTopology: bridge.getTopology(),
+        rawNgspiceTopology: bridge.getRawTopology(),
+      };
+    } else if (spec.analysis.kind === "tf") {
+      bridge.runTf(spec.analysis.output, spec.analysis.insrc);
+      return {
+        analysis: "tf",
+        session: null,
+        acPoints: null,
+        tfOutputs: bridge.getTfOutputs(),
         ngspiceTopology: bridge.getTopology(),
         rawNgspiceTopology: bridge.getRawTopology(),
       };
@@ -1373,6 +1452,7 @@ export async function runNgspiceInProcess(spec: NgspiceJobSpec): Promise<Ngspice
         analysis: "ac",
         session: null,
         acPoints: bridge.getAcPoints(),
+        tfOutputs: null,
         ngspiceTopology: bridge.getTopology(),
         rawNgspiceTopology: bridge.getRawTopology(),
       };

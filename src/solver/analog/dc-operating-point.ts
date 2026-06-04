@@ -34,7 +34,6 @@ import { cktLoad } from "./ckt-load.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
 import {
   setInitf,
-  isTranOp,
   MODEINITJCT, MODEINITFLOAT, MODEINITSMSIG,
 } from "./ckt-mode.js";
 
@@ -244,11 +243,15 @@ function cktop(
  * analysis boundaries- matches niiter.c:1070-1071's post-converge INITF
  * landing mode.
  *
- * Runs ONLY on the standalone .OP path (!isTranOp(ctx.cktMode)). The
- * transient-boot DCOP path (dctran.c:230-346) has no smsig load and callers
- * must skip this function- gate on !isTranOp(ctx.cktMode) at each call site.
+ * The smsig load belongs to the analysis driver, not the convergence ladder:
+ * ngspice runs it from DCop (dcop.c:153) and ACan, but not from DCtran
+ * (dctran.c:230-346) or TFanal (tfanal.c). `solveDcOperatingPoint` is the bare
+ * CKTop ladder- it leaves the matrix factored and does NOT call this. The .OP
+ * caller (MNAEngine.dcOperatingPoint) and the AC caller (AcAnalysis) invoke
+ * this after a converged solve; the transient boot (_transientDcop) and `.tf`
+ * (transferFunction, which re-solves the factored matrix) skip it.
  */
-function dcopFinalize(ctx: CKTCircuitContext): void {
+export function dcopFinalize(ctx: CKTCircuitContext): void {
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITSMSIG);
   cktLoad(ctx);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
@@ -302,7 +305,11 @@ export function cktncDump(
  * Find the DC operating point of the circuit using the ngspice CKTop
  * three-level fallback stack (cktop.c:20-79).
  *
- * Writes results into ctx.dcopResult. Returns void.
+ * Writes results into ctx.dcopResult. Returns void. This is the bare CKTop
+ * ladder (cktop.c): on convergence it leaves the Jacobian factored. The
+ * MODEINITSMSIG small-signal load (dcop.c:153) is NOT run here- the .OP and AC
+ * analysis drivers append `dcopFinalize` themselves, while the transient boot
+ * and `.tf` re-solve the factored matrix and skip it (tfanal.c:44 / dctran.c).
  *
  * @param ctx - Circuit context holding all solver state, buffers, and options
  */
@@ -358,13 +365,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 
   if (directResult.converged) {
     ctx.dcopVoltages.set(ctx.rhs);
-    // ngspice DCtran (dctran.c:230-346) performs NO CKTload after the
-    // transient-boot CKTop returns. The initSmsig load fires only from DCop
-    // (dcop.c:127,153) on the standalone .OP path. Gate on !isTranOp(ctx.cktMode)
-    // so transient-boot DCOP skips the smsig pass entirely.
-    if (!isTranOp(ctx.cktMode)) {
-      dcopFinalize(ctx);
-    }
     diagnostics.emit(
       makeDiagnostic(
         "dc-op-converged",
@@ -410,10 +410,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 
   if (gminResult.converged) {
     ctx.dcopVoltages.set(ctx.rhs);
-    // smsig load is .OP-only- skip on transient-boot DCOP (dctran.c:230-346).
-    if (!isTranOp(ctx.cktMode)) {
-      dcopFinalize(ctx);
-    }
     const gminMethod = gminViaNew
       ? "new-gmin"
       : (numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin");
@@ -454,10 +450,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 
   if (srcResult.converged) {
     ctx.dcopVoltages.set(ctx.rhs);
-    // smsig load is .OP-only- skip on transient-boot DCOP (dctran.c:230-346).
-    if (!isTranOp(ctx.cktMode)) {
-      dcopFinalize(ctx);
-    }
     const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
     const srcLabel = numSrcSteps <= 1 ? "Gillespie source stepping" : "spice3 source stepping";
     const srcExplanation = numSrcSteps <= 1
@@ -499,10 +491,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     const opTranConverged = ctx.opTranFallback();
     if (opTranConverged) {
       ctx.dcopVoltages.set(ctx.rhs);
-      // smsig load is .OP-only- skip on transient-boot DCOP (dctran.c:230-346).
-      if (!isTranOp(ctx.cktMode)) {
-        dcopFinalize(ctx);
-      }
       diagnostics.emit(
         makeDiagnostic(
           "dc-op-source-step",

@@ -24,7 +24,7 @@
 
 import { SparseSolver } from "./sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
-import { solveDcOperatingPoint } from "./dc-operating-point.js";
+import { solveDcOperatingPoint, dcopFinalize } from "./dc-operating-point.js";
 import { CKTCircuitContext } from "./ckt-context.js";
 import { MODEAC, MODEUIC, MODEDCOP, MODEINITJCT } from "./ckt-mode.js";
 import type { AnalogElement } from "./element.js";
@@ -282,6 +282,16 @@ export class AcAnalysis {
     dcCtx.loadCtx.dt = 0;
     solveDcOperatingPoint(dcCtx);
     const dcResult = dcCtx.dcopResult;
+
+    // acan.c / ACan — like DCop (dcop.c:153), AC appends the MODEINITSMSIG
+    // small-signal CKTload after CKTop converges, re-stamping each nonlinear
+    // device's small-signal quantities into state0. `solveDcOperatingPoint` is
+    // the bare CKTop ladder and no longer does this itself, so the AC driver
+    // runs the finalize here (the per-frequency complex stamp pass re-assembles
+    // its own matrix, so the un-factored real matrix this leaves is irrelevant).
+    if (dcResult.converged) {
+      dcopFinalize(dcCtx);
+    }
 
     // After DC OP, nonlinear elements have their small-signal parameters set.
     // We don't need the DC voltages explicitly- they're baked into element state.

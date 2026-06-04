@@ -29,7 +29,7 @@ import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
 import type { StepRecord, NRAttemptRecord } from "./convergence-log.js";
 
-import { solveDcOperatingPoint, runTransferFunction } from "./dc-operating-point.js";
+import { solveDcOperatingPoint, runTransferFunction, dcopFinalize } from "./dc-operating-point.js";
 import type { DcOpNRPhase, DcOpNRAttemptOutcome, TfPortSpec } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
@@ -819,7 +819,15 @@ export class MNAEngine implements AnalogEngine {
    * voltages in `ctx.rhs` so subsequent `step()` calls start from the
    * correct operating point.
    */
-  dcOperatingPoint(): DcOpResult {
+  /**
+   * The bare CKTop convergence ladder (ngspice cktop.c): runs the DC-OP mode
+   * ladder and, on success, leaves the Jacobian factored. Does NOT run the
+   * MODEINITSMSIG small-signal load- that is the analysis driver's job
+   * (dcOperatingPoint appends it for `.op`; AcAnalysis appends it for AC). The
+   * transient boot (_transientDcop) and `.tf` (transferFunction) share this bare
+   * ladder, matching ngspice DCtran / TFanal calling CKTop, not DCop.
+   */
+  private _runDcOpLadder(): DcOpResult {
     if (!this._compiled) {
       return {
         converged: false,
@@ -830,7 +838,6 @@ export class MNAEngine implements AnalogEngine {
       };
     }
 
-    const { elements } = this._compiled;
     this._diagnostics.clear();
     // niiter.c:1341-1343 — NIresetwarnmsg() zeroes the singular-matrix warning
     // counter at the head of each analysis, so DC-OP gets a fresh six-message
@@ -937,24 +944,38 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
-    if (result.converged) {
-      // dcop.c:127- `.op` leaves the circuit in MODEDCOP|MODEINITSMSIG.
-      // NO transient seeding (no MODEINITTRAN, no ag[]=0, no state0->state1
-      // copy- those are dctran.c:346-350, exclusive to the transient-boot
-      // path in _transientDcop). Mirror only what dcop.c:127 + dcop.c:153
-      // actually do here: write rhs from the DCOP solution, refresh
-      // element-side voltage caches, set the post-CKTop mode.
-      ctx.rhs.set(result.nodeVoltages);
-      for (const el of elements) {
-        const initVoltages = (el as { initVoltages?: (rhs: Float64Array) => void }).initVoltages;
-        if (typeof initVoltages === "function") {
-          initVoltages.call(el, ctx.rhs);
-        }
-      }
-      const uic = ctx.cktMode & MODEUIC;
-      ctx.cktMode = uic | MODEDCOP | MODEINITSMSIG;
-    }
+    return result;
+  }
 
+  /**
+   * Standalone `.op` DC operating point (ngspice DCop, dcop.c). Runs the bare
+   * CKTop ladder (`_runDcOpLadder`, which leaves the matrix factored) and then
+   * appends the MODEINITSMSIG small-signal load (dcop.c:153) that DCop performs
+   * after CKTop returns. The transient boot (_transientDcop) and `.tf`
+   * (transferFunction) call `_runDcOpLadder` directly and skip this finalize,
+   * matching ngspice DCtran / TFanal calling CKTop, not DCop.
+   */
+  dcOperatingPoint(): DcOpResult {
+    const result = this._runDcOpLadder();
+    if (!this._compiled || !result.converged) return result;
+    const ctx = this._ctx!;
+    // dcop.c:153- the smsig CKTload re-stamps small-signal device quantities
+    // (e.g. capacitor geqcb) into state0 and un-factors the matrix; `.op` does
+    // not re-solve, so the lost factorization is harmless here.
+    dcopFinalize(ctx);
+    // dcop.c:127- `.op` leaves the circuit in MODEDCOP|MODEINITSMSIG. NO
+    // transient seeding (no MODEINITTRAN, no ag[]=0, no state0->state1 copy-
+    // those are dctran.c:346-350, exclusive to _transientDcop). Write rhs from
+    // the DCOP solution and refresh element-side voltage caches.
+    ctx.rhs.set(result.nodeVoltages);
+    for (const el of this._compiled.elements) {
+      const initVoltages = (el as { initVoltages?: (rhs: Float64Array) => void }).initVoltages;
+      if (typeof initVoltages === "function") {
+        initVoltages.call(el, ctx.rhs);
+      }
+    }
+    const uic = ctx.cktMode & MODEUIC;
+    ctx.cktMode = uic | MODEDCOP | MODEINITSMSIG;
     return result;
   }
 
@@ -1425,8 +1446,11 @@ export class MNAEngine implements AnalogEngine {
       output = { kind: "node", nodePos, nodeNeg };
     }
 
-    // tfanal.c:44 — operating point. Leaves the Jacobian factored on success.
-    const dcop = this.dcOperatingPoint();
+    // tfanal.c:44 — CKTop operating point via the bare ladder, which leaves the
+    // Jacobian factored on success. NOT dcOperatingPoint(): that appends the
+    // `.op` smsig CKTload (dcop.c:153) which would un-factor the matrix before
+    // the re-solves below. TFanal calls CKTop, not DCop.
+    const dcop = this._runDcOpLadder();
     if (!dcop.converged) {
       return fail("Transfer-function analysis requires a converged DC operating point.", false, dcop.diagnostics);
     }

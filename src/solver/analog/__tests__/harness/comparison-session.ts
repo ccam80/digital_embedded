@@ -19,7 +19,7 @@ import { ComponentRegistry } from "../../../../core/registry.js";
 import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js";
 import type { Circuit } from "../../../../core/circuit.js";
 import type { MNAEngine } from "../../analog-engine.js";
-import type { SimulationParams } from "../../../../core/analog-engine-interface.js";
+import type { SimulationParams, TfResult } from "../../../../core/analog-engine-interface.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import {
   captureTopology,
@@ -476,6 +476,9 @@ export class ComparisonSession {
   protected _acSession: AcCaptureSession | null = null;
   protected _ngAcSession: AcCaptureSession | null = null;
   protected _ngAcSessionReindexed: AcCaptureSession | null = null;
+  // TF parity (.tf). Populated by runTf; null otherwise.
+  protected _tfOurs: TfResult | null = null;
+  protected _tfNgspice: [number, number, number] | null = null;
 
   // Node mapping
   protected _nodeMap: NodeMapping[] = [];
@@ -499,7 +502,7 @@ export class ComparisonSession {
   protected _comparisons: ComparisonResult[] | null = null;
 
   // Analysis type
-  protected _analysis: "dcop" | "tran" | "ac" | null = null;
+  protected _analysis: "dcop" | "tran" | "ac" | "tf" | null = null;
 
   // ComponentRegistry for netlist generation
   private _registry!: ComponentRegistry;
@@ -892,6 +895,91 @@ export class ComparisonSession {
 
     this._hasRun = true;
     this._assertMatrixStructuralParity();
+  }
+
+  /**
+   * Run a DC small-signal transfer function (`.tf`) on both engines and capture
+   * the three scalars for a paired comparison.
+   *
+   *   - ours: `coordinator.transferFunction({ inputSource, output })`
+   *     (MNAEngine.transferFunction → runTransferFunction, the tfanal.c port).
+   *   - ngspice: `tf <ngOutput> <inputSource>` via the guarded worker, captured
+   *     bit-exact through the tf_register hook at tfanal.c `done:`.
+   *
+   * `output` is the digiTS output label (a node label resolved via labelToNodeId,
+   * or an `I(<src>)` source current); `ngOutput` is the matching ngspice
+   * expression. The deck names nodes by stringified digiTS node id
+   * (netlist-generator.ts), so a digiTS output on node id N maps to `v(N)`.
+   */
+  async runTf(params: { inputSource: string; output: string; ngOutput: string }): Promise<void> {
+    this._ensureInited();
+    if (this._hasRun) return;
+
+    this._analysis = "tf";
+    this._comparisons = null;
+    this._structuralFindings = [];
+
+    // Our side: the .tf driver re-solves the factored DC-OP Jacobian (tfanal.c).
+    if (this._coordinator) {
+      this._tfOurs = this._coordinator.transferFunction({
+        inputSource: params.inputSource,
+        output: params.output,
+      });
+    }
+
+    if (!this._opts.selfCompare && this._cirClean) {
+      try {
+        const spec: NgspiceJobSpec = {
+          dllPath: this._dllPath,
+          netlist: this._materializeCir(),
+          analysis: { kind: "tf", output: params.ngOutput, insrc: params.inputSource },
+        };
+        const runResult = await runNgspiceGuarded(spec);
+        this._tfNgspice = runResult.tfOutputs;
+        if (runResult.ngspiceTopology) this._buildNodeMapping(runResult.ngspiceTopology);
+      } catch (e: any) {
+        this.errors.push(`ngspice .tf failed: ${e.message}`);
+        this._tfNgspice = null;
+      }
+    } else if (this._opts.selfCompare && this._tfOurs) {
+      this._tfNgspice = [
+        this._tfOurs.transferFunction,
+        this._tfOurs.inputResistance,
+        this._tfOurs.outputResistance,
+      ];
+    }
+
+    this._hasRun = true;
+  }
+
+  /** The digiTS `.tf` result from the last `runTf`, or null. */
+  tfOurs(): TfResult | null { return this._tfOurs; }
+
+  /** The ngspice `.tf` [transferFunction, inputResistance, outputResistance], or null. */
+  tfNgspice(): [number, number, number] | null { return this._tfNgspice; }
+
+  /**
+   * Paired `.tf` comparison: per-scalar (ours, ngspice, absDelta) plus the max
+   * abs delta across all three. Null if either side is missing.
+   */
+  tfCompare(): {
+    transferFunction: { ours: number; ngspice: number; absDelta: number };
+    inputResistance: { ours: number; ngspice: number; absDelta: number };
+    outputResistance: { ours: number; ngspice: number; absDelta: number };
+    maxAbsDelta: number;
+  } | null {
+    if (!this._tfOurs || !this._tfNgspice) return null;
+    const o = this._tfOurs;
+    const [ntf, nrin, nrout] = this._tfNgspice;
+    const tf = { ours: o.transferFunction, ngspice: ntf, absDelta: Math.abs(o.transferFunction - ntf) };
+    const rin = { ours: o.inputResistance, ngspice: nrin, absDelta: Math.abs(o.inputResistance - nrin) };
+    const rout = { ours: o.outputResistance, ngspice: nrout, absDelta: Math.abs(o.outputResistance - nrout) };
+    return {
+      transferFunction: tf,
+      inputResistance: rin,
+      outputResistance: rout,
+      maxAbsDelta: Math.max(tf.absDelta, rin.absDelta, rout.absDelta),
+    };
   }
 
   /**
