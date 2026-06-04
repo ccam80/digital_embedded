@@ -2596,6 +2596,552 @@
         "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
       ],
       "escalation": null
+    },
+    "dio/dioconv.c#h002": {
+      "state": "ESCALATED",
+      "ref": "apply:dio",
+      "attempts": 1,
+      "hunkHash": "5121e585ff172799",
+      "escalation": {
+        "kind": "out-of-group-coupling",
+        "summary": "dio device-completion harness gate non-null on diode-canon-cap-rc.dts; root cause is engine NR iteration-count / predictor-entry divergence in src/solver/analog/newton-raphson.ts (niiter.c:1202-1205 port), NOT in any dio file. The dioconv.c#h002 hunk (convergence temperature term) is itself bijective+present in diode.ts:checkConvergence; this item is the anchor for the convergence-functionGroup locus only.",
+        "ngspiceCite": "src/maths/ni/niiter.c:1202-1205 (if ((CKTnoncon==0)&&(iterno!=1)) CKTnoncon=NIconvTest; else CKTnoncon=1)",
+        "digitsFile": "src/solver/analog/newton-raphson.ts:519-602,763-786",
+        "requiredEdit": "Align first-transient-NR-iteration accounting so the post-predictor solve is iterno==1 forced-noncon (never accepted on its first pass), matching ngspice. Cross-subsystem engine change affecting all devices transient convergence; beyond dio applier tsFiles (diode.ts).",
+        "evidence": "step16 tranNR: bit-identical state0/state1-3/rhs/residual/matrix/post-solve voltage; ours iterationCount=1 accepted (noncon=0), ngspice iterationCount=2 (noncon=1 at iter0). firstDivergence.earliest=state d1.VD step17 iter0 absDelta 6.28e-6. Device-level diode load()/checkConvergence bit-exact (diode-resistor/diode-bridge/diode-canon-temp-sweep all firstDivergence null).",
+        "detail": "See ESCALATIONS.md 2026-06-05 dio entry."
+      },
+      "verifierNotes": [
+        "APPLIER 2026-06-05: 22 dio hunks already at v41 (both recons APPLIED, diode.ts written straight at v41) — zero-line delta, ready-for-verify. The PRIOR-REJECTION empty-diff catch is the legitimate already-at-v41 state, not a non-landed edit. Device-level harness bit-exact on 3 dio fixtures. The ONE non-null fixture (diode-canon-cap-rc.dts) is an out-of-group engine NR iteration-count divergence escalated here; it cannot be fixed in diode.ts."
+      ]
+    },
+    "dio/dio.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a4abd529d2f58bc1",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dio.c:19 (dio/dio.c::DIOpTable)."
+      ],
+      "escalation": null
+    },
+    "dio/dio.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "d9bff29fc80aa1c1",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dio.c:108 (dio/dio.c::DIOmPTable)."
+      ],
+      "escalation": null
+    },
+    "dio/dioacld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "7339c045e515f889",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioacld.c:23 (dio/dioacld.c::DIOacLoad)."
+      ],
+      "escalation": null
+    },
+    "dio/dioacld.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "ef355ae319af311e",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioacld.c:42 (dio/dioacld.c::DIOacLoad)."
+      ],
+      "escalation": null
+    },
+    "dio/dioask.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "c7f136f0bf44826d",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioask.c:48 (dio/dioask.c::DIOask)."
+      ],
+      "escalation": null
+    },
+    "dio/dioconv.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "d3004ad86c878435",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioconv.c:21 (dio/dioconv.c::DIOconvTest)."
+      ],
+      "escalation": null
+    },
+    "dio/dioconv.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "79ec5f042a7dd4bf",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioconv.c:58 (dio/dioconv.c::DIOconvTest)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "786e7ac9c031c3d5",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:86 (dio/diodefs.h::sDIOinstance)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h003": {
+      "state": "APPLIED",
+      "hunkHash": "8321342feb0de782",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:112 (dio/diodefs.h::sDIOinstance)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h004": {
+      "state": "APPLIED",
+      "hunkHash": "69af0bbb9875ddef",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:139 (dio/diodefs.h::sDIOinstance)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h005": {
+      "state": "APPLIED",
+      "hunkHash": "a91b156490d0fb0c",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:180 (dio/diodefs.h::sDIOinstance)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h007": {
+      "state": "APPLIED",
+      "hunkHash": "fc6af5fbc3bd769f",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:198 (dio/diodefs.h::DIOstate-macros)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h008": {
+      "state": "APPLIED",
+      "hunkHash": "3f74bf791a83e699",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:275 (dio/diodefs.h::sDIOmodel)."
+      ],
+      "escalation": null
+    },
+    "dio/diodefs.h#h009": {
+      "state": "APPLIED",
+      "hunkHash": "df974720858fa16c",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:345 (dio/diodefs.h::sDIOmodel)."
+      ],
+      "escalation": null
+    },
+    "dio/diogetic.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "6d9c00eb98c12d92",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diogetic.c:22 (dio/diogetic.c::DIOgetic)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "3b7704c67bc9f71e",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:25 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "576b7fbd7b3d8d3e",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:45 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "cde22d3cb9a448fa",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:56 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "31c59a50e11af704",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:95 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "5bd019d2aeeed1a0",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:116 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "2a93df182b9f9012",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:128 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "69517929265c1544",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:157 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "d2b37c9a2646a798",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:198 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "533e16fd6f52d7f0",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:222 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "2e80c014955f1a0e",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:265 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "2519be345f15010a",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:356 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h012": {
+      "state": "APPLIED",
+      "hunkHash": "aebba3c8889eecec",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:368 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h013": {
+      "state": "APPLIED",
+      "hunkHash": "64c55e4d162859c3",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:391 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h014": {
+      "state": "APPLIED",
+      "hunkHash": "89bfc8bb70f1d922",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:403 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h015": {
+      "state": "APPLIED",
+      "hunkHash": "2424f3fed29cb015",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:433 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h017": {
+      "state": "APPLIED",
+      "hunkHash": "efc4f3c879e84707",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:490 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h018": {
+      "state": "APPLIED",
+      "hunkHash": "67a2535825f1cfed",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:508 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h019": {
+      "state": "APPLIED",
+      "hunkHash": "83dff1153da15d0a",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:516 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/dioload.c#h020": {
+      "state": "APPLIED",
+      "hunkHash": "bbaac4c0906d4422",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:564 (dio/dioload.c::DIOload)."
+      ],
+      "escalation": null
+    },
+    "dio/diompar.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "0822af4ca60002c7",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diompar.c:209 (dio/diompar.c::DIOmParam)."
+      ],
+      "escalation": null
+    },
+    "dio/dioparam.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "e12b2efb25febc2d",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioparam.c:33 (dio/dioparam.c::DIOparam)."
+      ],
+      "escalation": null
+    },
+    "dio/dioparam.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "a54b0e6c8f7d7cd4",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioparam.c:65 (dio/dioparam.c::DIOparam)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "87de003f6d86aa45",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:15 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "3fed4225d6e3ed44",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:24 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "8bf0527240939a1f",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:89 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "8013617bc9b36123",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:170 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "86a46743427f43b8",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:256 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "bf9e63341ecad21a",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:295 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "89852aebecdb6e1a",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:322 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diosetup.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "c4bc2e5d27563215",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:337 (dio/diosetup.c::DIOsetup)."
+      ],
+      "escalation": null
+    },
+    "dio/diotemp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "023ccc7732b68f66",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diotemp.c:5 (dio/diotemp.c::DIOtempUpdate)."
+      ],
+      "escalation": null
+    },
+    "dio/diotemp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "d1007500e5653765",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diotemp.c:13 (dio/diotemp.c::DIOtempUpdate)."
+      ],
+      "escalation": null
+    },
+    "dio/diotrunc.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a57a21c385c066f0",
+      "ref": "verify:dio",
+      "attempts": 0,
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diotrunc.c:18 (dio/diotrunc.c::DIOtrunc)."
+      ],
+      "escalation": null
     }
   }
 }

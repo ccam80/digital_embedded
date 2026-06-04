@@ -1254,3 +1254,35 @@ the next run. The mes worktree never touched MAIN's `src/` (`mainSrcClean=true`)
 
 - **Decision needed from user:** record `analysis/dctran.c#h006` as APPLIED in `spec/v41-port/progress.json` (hunkHash + evidence `src/solver/analog/analog-engine.ts:2261`, the line-isomorphic `cac.statePool.states[1].set(cac.statePool.states[0])` already-present counterpart of the `memcpy(CKTstate1, CKTstate0, ...)` post-image), then the dctran.c group (h004,h005,h007,h008,h009 NO-COUNTERPART + h006 APPLIED) is fully dispositioned and can close.
 - **Resolution:** _pending_
+
+
+---
+
+## ESCALATION — dio unit: device-completion harness gate non-null on diode-canon-cap-rc.dts (engine NR iteration-count divergence, out-of-group)
+
+**Date:** 2026-06-05
+**Unit:** dio (applier). **Anchor item:** `dio/dioconv.c#h002` (recorded ESCALATED as the convergence-functionGroup locus; the fix is NOT in this hunk's file).
+
+### In-scope work is COMPLETE — the 22 dio hunks are already at v41
+All 15 functionGroups in the dio task (dio.c::DIOpTable/DIOmPTable, dioacld.c::DIOacLoad, dioask.c::DIOask, dioconv.c::DIOconvTest, diodefs.h::sDIOinstance/DIOstate-macros/sDIOmodel, diogetic.c::DIOgetic, dioload.c::DIOload, diompar.c::DIOmParam, dioparam.c::DIOparam, diosetup.c::DIOsetup, diotemp.c::DIOtempUpdate, diotrunc.c::DIOtrunc) are already present and bijective in src/components/semiconductors/diode.ts. Both reconstructions (dio#recon/diotempUpdate, dio#recon/v41NewFeatures) are APPLIED; diode.ts was written straight at v41 by them, so each hunk has a legitimate zero-line delta (TASK.md §6 'Already at v41'). diode.ts type-checks clean. Confirmed bit-exact at the DEVICE level by the harness on three dio fixtures — diode-resistor.dts, diode-canon-temp-sweep.dts, diode-bridge.dts — all firstDivergence null (107/107, 107/107, 107/107 steps).
+
+### The blocker — a NON-dio engine divergence on the fourth fixture
+diode-canon-cap-rc.dts (diode + 1k R + AcVoltageSource sine 100kHz, CJO=10pF TT=1ns) gates RED: firstDivergence.earliest = state class, d1.VD, step 17 iter 0, absDelta 6.28e-6 (96/113 comparison points fail downstream).
+
+Root cause established with harness evidence (NOT theorized):
+- Onset is step 16 tranNR. Predictor handoff is bit-identical both sides (endNodeNorm 0.4949934173736803). Then OURS does iterationCount=1 and accepts (endNodeNorm 0.4949809261713189); ngspice does iterationCount=2 (endNodeNorm 0.4949809259765358). divergenceNorm 1.95e-10.
+- At step16 iter0 the diode load is bit-identical on both sides: same state0 (VD=0.4949934173736803, ID=9.337553903375724e-6, GEQ=3.6220896254178633e-4), same state1/2/3, same rhs (-1.6995349826855847e-4), same residual, same matrix, same post-solve voltage (0.4949809261713189). The ONLY difference is the convergence verdict: ngspice noncon=1 (forces a 2nd NR iteration), ours noncon=0/globalConverged=true (accepts).
+- Because the diode load()/checkConvergence() are deterministic functions of these identical inputs, the divergence CANNOT originate in diode.ts. It is the NR loop's iteration-count / predictor-entry interaction with the iterno!=1 gate.
+
+### Citations
+- ngspice niiter.c:1202-1205 — `if ((CKTnoncon==0) && (iterno!=1)) CKTnoncon=NIconvTest(ckt); else CKTnoncon=1;` (forces non-convergence on iterno==1).
+- digiTS src/solver/analog/newton-raphson.ts:771-775 mirrors it as `if (ctx.noncon===0 && iteration>0) ctx.noncon=niConvTest(ctx); else ctx.noncon=1;`.
+- Both force noncon=1 on the first solve, so both SHOULD do >=2 iterations at step16. ngspice does; digiTS exits after 1. The gap is a predictor-vs-iteration-counting offset at the transient NR entry (the post-predictor solve is iterno==1 in ngspice but enters with iteration already past the iteration>0 gate in digiTS), in newton-raphson.ts (the niiter.c port) — NOT in any dio file.
+
+### Out-of-scope coupling (TASK.md §8 case 2 / VERIFICATION.md §6 cross-group)
+- dio applier tsFiles: src/components/semiconductors/diode.ts, spec/v41-port/rename-maps/dio.md.
+- Closing the gap requires editing src/solver/analog/newton-raphson.ts (the transient NR iteration-count / predictor-entry gate around lines 519-602 and 763-786). That is a cross-subsystem engine change affecting EVERY device's transient convergence, well beyond a compile-forced conformance edit in diode.ts. It cannot be fixed in the dio recon's files.
+
+### Decision needed from user
+Route the transient-NR iteration-count / predictor-entry divergence to the engine unit (niiter.c port in src/solver/analog/newton-raphson.ts): align digiTS's first-transient-NR-iteration accounting with ngspice's iterno==1 forced-noncon so the post-predictor solve is never accepted on its first pass. With that engine fix, diode-canon-cap-rc.dts gates null and dio device-completion can close. The 22 dio hunks themselves are ready-for-verification (already at v41, device-level bit-exact on diode-resistor / diode-branch / diode-canon-temp-sweep).
+- **Resolution:** _pending_
