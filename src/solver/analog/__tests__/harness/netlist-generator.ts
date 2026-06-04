@@ -58,6 +58,10 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   PnpBJT:          { prefix: "Q", modelType: "PNP" },
   NMOS:            { prefix: "M", modelType: "NMOS" },
   PMOS:            { prefix: "M", modelType: "PMOS" },
+  // SPICE3 MOS level 3: `M<name> nd ng ns nb <model>` with
+  // `.model <name> NMOS/PMOS (level=3 ...)`. level=3 selects MOS3load (dev.c MOS3).
+  NMOS3:           { prefix: "M", modelType: "NMOS", modelLevel: 3 },
+  PMOS3:           { prefix: "M", modelType: "PMOS", modelLevel: 3 },
   // VDMOS: ngspice `M<name> nd ng ns <model>` with `.model <name> VDMOS(...)`.
   // The N/P-ness is a model-card flag (nchan/pchan), not a separate model type.
   VDMOSN:          { prefix: "M", modelType: "VDMOS" },
@@ -698,12 +702,12 @@ function emitPrimitive(
   if (spec.prefix === "M") {
     const modelName = `${label}_${spec.modelType}`;
     let d: number, g: number, s: number, b: number;
-    if (typeId === "NMOS") {
+    if (typeId === "NMOS" || typeId === "NMOS3") {
       d = nodeAt(nodes, 2, rawLabel, "D");
       g = nodeAt(nodes, 0, rawLabel, "G");
       s = nodeAt(nodes, 1, rawLabel, "S");
       b = s;
-    } else if (typeId === "PMOS") {
+    } else if (typeId === "PMOS" || typeId === "PMOS3") {
       d = nodeAt(nodes, 1, rawLabel, "D");
       g = nodeAt(nodes, 0, rawLabel, "G");
       s = nodeAt(nodes, 2, rawLabel, "S");

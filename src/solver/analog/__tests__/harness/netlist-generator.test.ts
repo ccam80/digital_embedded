@@ -173,7 +173,7 @@ describe("generateSpiceNetlist", () => {
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "VAC"]]));
     // Should emit SIN(VO VA FREQ TD THETA PHASE_DEG), NOT the old "DC 0.5 AC 1.5"
-    expect(netlist).toContain("VAC 0 1 SIN(0.5 1.5 1000 0 0 0)");
+    expect(netlist).toContain("VAC 0 1 AC 1 0 SIN(0.5 1.5 1000 0 0 0)");
     expect(netlist).not.toContain("DC 0.5 AC 1.5");
   });
 
@@ -189,7 +189,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Vin"]]));
-    expect(netlist).toContain("Vin 0 1 SIN(0 2 500 0 0 90)");
+    expect(netlist).toContain("Vin 0 1 AC 1 0 SIN(0 2 500 0 0 90)");
   });
 
   it("AcVoltageSource square: emits PULSE transient specifier", () => {
@@ -214,7 +214,7 @@ describe("generateSpiceNetlist", () => {
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Vin"]]));
     // V1 = 1.9 - 0.1 = 1.7999999999999998 (floating point), V2 = 2, PER = 0.001
-    expect(netlist).toContain("Vin 0 1 PULSE(");
+    expect(netlist).toContain("Vin 0 1 AC 1 0 PULSE(");
     expect(netlist).toContain("1.7999999999999998"); // V1 = dc - amp (floating point)
     expect(netlist).toContain("1e-9");  // TR and TF
     expect(netlist).toContain("0.001)"); // PER at end of PULSE args
@@ -240,7 +240,7 @@ describe("generateSpiceNetlist", () => {
     // riseTime=0, fallTime=0
     // phaseShift=0, rawTD=-0, td=(0%0.001+0.001)%0.001=0
     // PW = 0.0005 - 0 - 0 = 0.0005
-    expect(netlist).toContain("Vsq 0 1 PULSE(-5 5 0 0 0 0.0005 0.001)");
+    expect(netlist).toContain("Vsq 0 1 AC 1 0 PULSE(-5 5 0 0 0 0.0005 0.001)");
   });
 
   it("DcCurrentSource: I prefix with DC keyword", () => {
@@ -259,7 +259,7 @@ describe("generateSpiceNetlist", () => {
     // phaseShift=0, rawTD=0, td=0
     // PW = 0.0005 - 0 - 0 = 0.0005
     // V1 = 0-2 = -2, V2 = 0+2 = 2
-    // pins: [neg=1, pos=0] → posNode=nodes[1]=0, negNode=nodes[0]=1
+    // pins: n+ = pin 0, n- = pin 1 (matches DcCurrentSource) → posNode=nodes[0]=1, negNode=nodes[1]=0
     const props = new PropertyBag();
     props.setModelParam("amplitude", 2);
     props.setModelParam("dcOffset", 0);
@@ -273,7 +273,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Iac"]]));
-    expect(netlist).toContain("Iac 0 1 PULSE(-2 2 0 0 0 0.0005 0.001)");
+    expect(netlist).toContain("Iac 1 0 AC 1 0 PULSE(-2 2 0 0 0 0.0005 0.001)");
     expect(netlist).not.toContain("AC 2");
   });
 
@@ -289,7 +289,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Iac"]]));
-    expect(netlist).toContain("Iac 0 1 SIN(0 1.5 500 0 0 0)");
+    expect(netlist).toContain("Iac 1 0 AC 1 0 SIN(0 1.5 500 0 0 0)");
     expect(netlist).not.toContain("AC 1.5");
   });
 
@@ -305,7 +305,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Iac"]]));
-    expect(netlist).toContain("Iac 0 1 SIN(0 3 1000 0 0 90)");
+    expect(netlist).toContain("Iac 1 0 AC 1 0 SIN(0 3 1000 0 0 90)");
   });
 
   it("NpnBJT: Q prefix, 3 nodes, NPN model card with params", () => {
@@ -360,7 +360,7 @@ describe("generateSpiceNetlist", () => {
     expect(r).toContain(".model M1_NMOS NMOS");
   });
 
-  it("NJFET: J prefix, NMF model type", () => {
+  it("NJFET: J prefix, NJF model type", () => {
     const props = new PropertyBag();
     props.setModelParam("IDSS", 0.01);
     const compiled = makeCompiled(
@@ -368,11 +368,11 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NJFET", props)]]),
     );
     const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "J1"]]));
-    expect(r).toContain("J1 1 3 2 J1_NMF");
-    expect(r).toContain(".model J1_NMF NMF");
+    expect(r).toContain("J1 1 3 2 J1_NJF");
+    expect(r).toContain(".model J1_NJF NJF");
   });
 
-  it("PJFET: J prefix, PMF model type", () => {
+  it("PJFET: J prefix, PJF model type", () => {
     const props = new PropertyBag();
     props.setModelParam("IDSS", 0.005);
     const compiled = makeCompiled(
@@ -380,8 +380,8 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("PJFET", props)]]),
     );
     const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "J2"]]));
-    expect(r).toContain("J2 1 3 2 J2_PMF");
-    expect(r).toContain(".model J2_PMF PMF");
+    expect(r).toContain("J2 1 3 2 J2_PJF");
+    expect(r).toContain(".model J2_PJF PJF");
   });
 
   it("falls back to element_N label when elementLabels has no entry", () => {

@@ -300,11 +300,64 @@ export function buildCaptureSession(
     return { source: "ngspice", topology: buildTopologySnapshot(topology, 0), steps };
   }
 
-  // Build a map from simTimeStart → outer event for quick lookup
-  const outerByTime = new Map<number, RawNgspiceOuterEvent>();
+  // Iterations and outer events are matched to steps with this tolerance. A
+  // reject-redo's FP rewind (CKTtime -= delta) drifts CKTsimTimeStart by a few
+  // ULPs, so the tolerance must keep one step's solves together while staying
+  // far below the smallest real timestep (CKTdelmin is many orders larger).
+  const STEP_GROUP_TOL = 1e-20;
+
+  // ngspice fires ni_fire_outer_cb once per transient solve decision (dctran.c:
+  // 369 accept / 945 LTE reject / 813 nrFail / 960 finalFailure; optran.c mirrors
+  // these for the pseudo-transient OP). They arrive in fire order, one per tranNR
+  // solve attempt, and are consumed by flushAttempt below.
+  //
+  // A reject-redo rewinds CKTtime (CKTtime -= CKTdelta) before re-solving, and
+  // T + delta - delta != T in floating point- so the reject and the redo's
+  // accept fire at CKTsimTimeStart values that differ by a few ULPs. Iterations
+  // are grouped into steps with STEP_GROUP_TOL (below), so the event->attempt
+  // match MUST use the same tolerance: an exact-time key would split the
+  // ULP-shifted accept onto its own bucket and orphan the redo's solve attempt.
+  // outerByTime: step time -> ordered events for that step. ULP-adjacent times
+  // are merged onto the first key seen (a reject-redo rewinds CKTtime and
+  // T + delta - delta != T in floating point, so the reject and the redo-accept
+  // drift apart by a few ULPs- they must share one key). Events arrive in time
+  // order, so only the most-recent key can be within tolerance of a new event.
+  const outerByTime = new Map<number, RawNgspiceOuterEvent[]>();
+  let lastKey: number | undefined;
   for (const ev of outerEvents) {
-    outerByTime.set(ev.simTimeStart, ev);
+    const key = (lastKey !== undefined && Math.abs(ev.simTimeStart - lastKey) <= STEP_GROUP_TOL)
+      ? lastKey
+      : ev.simTimeStart;
+    const list = outerByTime.get(key);
+    if (list) {
+      list.push(ev);
+    } else {
+      outerByTime.set(key, [ev]);
+      lastKey = key;
+    }
   }
+  // Resolve a step time to its (ULP-merged) event key: exact hit is the common
+  // case; the tolerance scan only fires for a step whose key drifted by ULPs.
+  const keyFor = (t: number): number | undefined => {
+    if (outerByTime.has(t)) return t;
+    for (const k of outerByTime.keys()) if (Math.abs(k - t) <= STEP_GROUP_TOL) return k;
+    return undefined;
+  };
+  const outerCursor = new Map<number, number>();
+  const consumeOuterOutcome = (t: number): NRAttemptOutcome | null => {
+    const key = keyFor(t);
+    if (key === undefined) return null;
+    const list = outerByTime.get(key)!;
+    const idx = outerCursor.get(key) ?? 0;
+    if (idx >= list.length) return null;
+    outerCursor.set(key, idx + 1);
+    const ev = list[idx]!;
+    if (ev.lteRejected) return "lteRejectedRetry";
+    if (ev.nrFailed) return "nrFailedRetry";
+    if (ev.finalFailure) return "finalFailure";
+    if (ev.accepted) return "accepted";
+    return null;
+  };
 
   let currentStep: PendingStep | null = null;
   let prevIteration = -1;
@@ -315,6 +368,29 @@ export function buildCaptureSession(
     if (!pa || pa.iterations.length === 0) {
       step.pendingAttempt = null;
       return;
+    }
+    // A transient NR solve (tranNR) carries an authoritative verdict from
+    // ngspice's ni_fire_outer_cb (dctran.c). Consume the step's outer events in
+    // fire order- one per solve- so a reject-redo step labels the rejected
+    // solve lteRejectedRetry and the final solve accepted, instead of the
+    // phase-derived guess. tranPredictor handoffs and DC-op gmin/source
+    // sub-solves fire no outer events and keep the caller-supplied outcome.
+    if (pa.phase === "tranNR") {
+      // Every transient solve fires exactly one accept/reject decision via
+      // ni_fire_outer_cb- both the .tran time-stepper (dctran.c:369/945/813/960)
+      // and the OPtran pseudo-transient ramp (optran.c, same accept/reject
+      // points). The outer event is the authoritative verdict; consume the
+      // step's events in fire order. A missing event means the event stream and
+      // the captured solve attempts have desynchronized- fail loudly.
+      const ov = consumeOuterOutcome(step.stepStartTime);
+      if (ov === null) {
+        throw new Error(
+          `ngspice bridge: tranNR solve at simTimeStart=${step.stepStartTime} has ` +
+          `no matching ni_fire_outer_cb event (one accept/reject decision per ` +
+          `transient solve is expected; dctran.c / optran.c).`,
+        );
+      }
+      outcome = ov;
     }
     const lastIter = pa.iterations[pa.iterations.length - 1]!;
     const attemptIndexInStep = step.attempts.length;
@@ -406,9 +482,13 @@ export function buildCaptureSession(
       }
     }
 
-    // Populate lteDt on the last iteration of the accepted attempt from
-    // RawNgspiceOuterEvent.nextDelta (the LTE-proposed next timestep).
-    const outerEv = outerByTime.get(step.stepStartTime);
+    // Populate lteDt on the last iteration of the accepted attempt from the
+    // LAST outer event at this step's key (the accepted solve's nextDelta- the
+    // LTE-proposed next timestep). The step's transient .op (MODETRANOP) accept
+    // may precede it on the same key, so take the last, not the first.
+    const ndKey = keyFor(step.stepStartTime);
+    const ndList = ndKey !== undefined ? outerByTime.get(ndKey) : undefined;
+    const outerEv = ndList && ndList.length > 0 ? ndList[ndList.length - 1] : undefined;
     if (
       outerEv !== undefined &&
       typeof outerEv.nextDelta === "number" &&
@@ -443,18 +523,13 @@ export function buildCaptureSession(
     // 3/4: Open or switch step
     if (currentStep === null) {
       currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
-    } else if (Math.abs(stepStartTimeOfRaw - currentStep.stepStartTime) > 1e-20) {
+    } else if (Math.abs(stepStartTimeOfRaw - currentStep.stepStartTime) > STEP_GROUP_TOL) {
       // Step boundary: flush current attempt with appropriate outcome
       if (currentStep.pendingAttempt) {
-        const outerEv = outerByTime.get(currentStep.stepStartTime);
-        let outcome: NRAttemptOutcome = "accepted";
-        if (outerEv) {
-          if (outerEv.lteRejected) outcome = "lteRejectedRetry";
-          else if (outerEv.nrFailed) outcome = "nrFailedRetry";
-          else if (outerEv.finalFailure) outcome = "finalFailure";
-          else if (outerEv.accepted) outcome = "accepted";
-        }
-        flushAttempt(currentStep, outcome);
+        // The tranNR verdict is consumed from the ordered outer events inside
+        // flushAttempt; this default covers a non-transient final attempt
+        // (e.g. a converged DC-op sub-solve at the step boundary).
+        flushAttempt(currentStep, "accepted");
       }
       flushStep(currentStep);
       currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
@@ -488,6 +563,9 @@ export function buildCaptureSession(
         } else if (currentStep.pendingAttempt.iterations.length > 0) {
           const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
           if (lastIter.globalConverged) {
+            // A converged DC-op gmin/source stepping sub-solve. Transient tranNR
+            // solves never reach here- flushAttempt resolves them from the
+            // ordered outer events (and throws on a missing one).
             outcome = "dcopSubSolveConverged";
           } else {
             outcome = "nrFailedRetry";
@@ -563,18 +641,16 @@ export function buildCaptureSession(
   // Flush last step
   if (currentStep !== null) {
     if (currentStep.pendingAttempt) {
-      const outerEv = outerByTime.get(currentStep.stepStartTime);
-      let outcome: NRAttemptOutcome = "accepted";
-      if (outerEv) {
-        if (outerEv.finalFailure) outcome = "finalFailure";
-        else if (outerEv.lteRejected) outcome = "lteRejectedRetry";
-        else if (outerEv.nrFailed) outcome = "nrFailedRetry";
-        else if (outerEv.accepted) outcome = "accepted";
-      } else if (currentStep.pendingAttempt.iterations.length > 0) {
-        const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
-        outcome = lastIter.globalConverged ? "accepted" : "finalFailure";
-      }
-      flushAttempt(currentStep, outcome);
+      // The tranNR verdict is consumed from the ordered outer events inside
+      // flushAttempt. This default covers a non-transient final attempt: a
+      // converged one is accepted, otherwise it is the run's final failure.
+      const pend = currentStep.pendingAttempt;
+      const lastIter = pend.iterations.length > 0
+        ? pend.iterations[pend.iterations.length - 1]!
+        : undefined;
+      const fallback: NRAttemptOutcome =
+        lastIter && !lastIter.globalConverged ? "finalFailure" : "accepted";
+      flushAttempt(currentStep, fallback);
     }
     flushStep(currentStep);
   }

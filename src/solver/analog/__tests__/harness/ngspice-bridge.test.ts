@@ -112,17 +112,15 @@ describe("ngspice-bridge lteDt mapping- synthetic", () => {
     expect(lastIter.lteDt).toBeUndefined();
   });
 
-  it("no outer event → lteDt is undefined on last iteration", () => {
+  it("transient solve with no outer event throws (event-stream desync guard)", () => {
     const t = 3e-9;
     const iters = [
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    const session = makeSession(iters, []);
-
-    const step = session.steps[0]!;
-    const acceptedAttempt = step.attempts[step.acceptedAttemptIndex]!;
-    const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
-    expect(lastIter.lteDt).toBeUndefined();
+    // dctran fires exactly one ni_fire_outer_cb per transient solve, so a tranNR
+    // attempt with no event means the event stream and the captured solves
+    // desynchronized- the bridge must fail loudly, not fabricate an outcome.
+    expect(() => makeSession(iters, [])).toThrow(/no matching ni_fire_outer_cb/);
   });
 });
 

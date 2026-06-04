@@ -87,7 +87,11 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 0,    cktMode: MODEDCOP,  iteration: 0, converged: true, dt: 0 }),
       makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN,  iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    const session = makeSession(iters);
+    // The transient point fires one accept (dctran.c:369); the DC-op point fires none.
+    const outerEvents: RawNgspiceOuterEvent[] = [
+      { simTimeStart: 1e-9, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
+    ];
+    const session = makeSession(iters, outerEvents);
     expect(session.steps.length).toBe(2);
     expect(session.steps[0].stepStartTime).toBe(0);
     expect(session.steps[1].stepStartTime).toBe(1e-9);
@@ -103,7 +107,13 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 0, converged: false, dt: 5e-10 }),
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 1, converged: true,  dt: 5e-10 }),
     ];
-    const session = makeSession(iters);
+    // dctran fires one outer event per solve: the first fails (813 nrFail), the
+    // retry at the reduced dt accepts (369).
+    const outerEvents: RawNgspiceOuterEvent[] = [
+      { simTimeStart: t, delta: 1e-9,  lteRejected: 0, nrFailed: 1, accepted: 0, finalFailure: 0, nextDelta: 0 },
+      { simTimeStart: t, delta: 5e-10, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 5e-10 },
+    ];
+    const session = makeSession(iters, outerEvents);
     expect(session.steps.length).toBe(1);
     // Two attempts: first failed (iter reset boundary), second accepted
     expect(session.steps[0].attempts.length).toBe(2);
@@ -156,7 +166,13 @@ describe("ngspice-bridge grouping- ss6.1 state machine", () => {
       makeRaw({ simTimeStart: 1e-9, cktMode: MODETRAN,   iteration: 0, converged: true, dt: 1e-9 }),
       makeRaw({ simTimeStart: 2e-9, cktMode: MODETRAN,   iteration: 0, converged: true, dt: 1e-9 }),
     ];
-    const session = makeSession(iters);
+    // Each transient point fires one accept (dctran.c:369).
+    const outerEvents: RawNgspiceOuterEvent[] = [
+      { simTimeStart: 0,    delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
+      { simTimeStart: 1e-9, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
+      { simTimeStart: 2e-9, delta: 1e-9, lteRejected: 0, nrFailed: 0, accepted: 1, finalFailure: 0, nextDelta: 1e-9 },
+    ];
+    const session = makeSession(iters, outerEvents);
     expect(session.steps.length).toBe(3);
     expect(session.steps[0].stepStartTime).toBe(0);
     expect(session.steps[1].stepStartTime).toBe(1e-9);

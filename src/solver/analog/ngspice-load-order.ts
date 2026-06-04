@@ -136,6 +136,8 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
   PnpBJT:          NGSPICE_LOAD_ORDER.BJT,
   NMOS:            NGSPICE_LOAD_ORDER.MOS,
   PMOS:            NGSPICE_LOAD_ORDER.MOS,
+  NMOS3:           NGSPICE_LOAD_ORDER.MOS,
+  PMOS3:           NGSPICE_LOAD_ORDER.MOS,
   NJFET:           NGSPICE_LOAD_ORDER.JFET,
   PJFET:           NGSPICE_LOAD_ORDER.JFET,
   NMESFET:         NGSPICE_LOAD_ORDER.MES,
@@ -187,6 +189,8 @@ export const TYPE_ID_TO_DEVICE_FAMILY: Readonly<Record<string, DeviceFamily>> = 
   PnpBJT:          "BJT",
   NMOS:            "MOS",
   PMOS:            "MOS",
+  NMOS3:           "MOS",
+  PMOS3:           "MOS",
   NJFET:           "JFET",
   PJFET:           "JFET",
   NMESFET:         "MES",
@@ -250,6 +254,9 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   // numbering only sees three distinct nodes
   NMOS:            ["D", "G", "S"],
   PMOS:            ["D", "G", "S"],
+  // M name D G S B model (level=3 MOS3; same three external nodes as MOS1)
+  NMOS3:           ["D", "G", "S"],
+  PMOS3:           ["D", "G", "S"],
   // J name D G S model
   NJFET:           ["D", "G", "S"],
   PJFET:           ["D", "G", "S"],
