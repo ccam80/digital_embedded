@@ -92,6 +92,24 @@ export interface SimulationParams {
   tStop?: number;
   /** Shunt conductance applied to all nodes (S). ngspice: CKTgshunt. Default 0. */
   gshunt?: number;
+  /**
+   * Shunt capacitance (F) added from every external/netlist voltage node to
+   * ground, realized as one real capacitor leaf per node — ngspice
+   * `.option cshunt` (cktsopt.c:244, the OPTtbl row). Unlike gshunt (a
+   * diagonal-conductance stamp, ngspice CKTgshunt), cshunt is NOT a load-path
+   * quantity: ngspice's CKTcshunt is assigned once (cktdojob.c:74) and never
+   * read in any load / iteration path; the real work is INPpas4
+   * (inppas4.c:54-75) instantiating one Capacitor-to-ground device per voltage
+   * node. INPpas4 runs right after INPpas2 (spiceif.c:168,177), before device
+   * setup mints internal nodes, so it covers the netlist-declared nodes
+   * (external + subcircuit-expansion) only — per-device-internal nodes get no
+   * shunt cap. The injected capacitors stamp through the ordinary capacitor
+   * companion model, so cshunt's effect is a reactive dQ/dt contribution seen
+   * only in transient/AC, exactly as a netlisted `C <node> 0 val` would be.
+   * Active only when > 0 (inp.c:466 — sr <= 0 is skipped). Default -1 = off
+   * (cktntask.c:90, tsk->TSKcshunt = -1).
+   */
+  cshunt?: number;
   /** Number of gmin stepping levels. 1 = dynamic (default), >1 = spice3. ngspice: CKTnumGminSteps */
   numGminSteps?: number;
   /**
@@ -245,6 +263,10 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   gmin: 1e-12,
   nodeDamping: false,
   gshunt: 0,
+  // cktntask.c:90 — application default tsk->TSKcshunt = -1 (disabled). Any
+  // value <= 0 (the inp.c:466 sr<=0 rejection) leaves the circuit byte-
+  // identical to cshunt-absent; the injection pass gates on cshunt > 0.
+  cshunt: -1,
   diagGmin: 0,
   pivotAbsTol: 0,
   pivotRelTol: 1e-3,

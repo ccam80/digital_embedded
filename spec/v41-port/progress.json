@@ -1226,6 +1226,15 @@
       ],
       "escalation": null
     },
+    "analysis#recon/cshunt": {
+      "state": "APPLIED",
+      "hunkHash": "",
+      "attempts": 0,
+      "verifierNotes": [
+        "APPLIED. _injectCshuntCapacitors (analog-engine.ts) is isomorphic to ngspice INPpas4 (re-derived independently from ref/ngspice/src/spicelib/parser/inppas4.c:29-77): gate cshunt>0 = inp.c:466 sr<=0 rejection (cktntask.c:90 default -1=off); iterates compiler-allocated node range 1..cac.nodeCount = the external/netlist NODE_VOLTAGE set at INPpas4 time (inppas4.c:56 node->type==NODE_VOLTAGE && number>0), device-internal nodes (minted later by the per-element setup() loop into _nodeTable with number>nodeCount, the CKTsetup analogue per spiceif.c:177,195 / cktdojob.c:161) correctly EXCLUDED; one AnalogCapacitorElement per node named capac<n>shunt, pos->nodeSlot / neg->ground slot 0 (inppas4.c:62-63 bindNode(1,node)/2nd=gnd), capacitance=cshunt (inppas4.c:67 INPpName); leaves setup()-driven with same setupCtx, appended to cac.elements + elementsByFamily rebuilt fresh (family-dispatch sort-cache correctness) + ctx _poolBackedElements refreshed before state alloc. No new stamp (CapacitorElement reused verbatim, capacitor.ts:280 2-arg ctor). No cktCshunt field added (cktdojob.c:74 set-but-unused). sparse-solver.ts untouched. Hot-loadable: configure() re-init() when the >0-gated value changes (analog-engine.ts:1694-1719); init() strips prior _cshuntLeaves to avoid double-injection. SimulationParams.cshunt + DEFAULT_SIMULATION_PARAMS.cshunt=-1 declared (analog-engine-interface.ts). Comment hygiene clean (present-tense ngspice citations, no version tags). File scope: analog-engine-interface.ts + analog-engine.ts (named tsFiles); capacitor.ts unmodified (Part D requires reuse). comparison-session.ts is the Part-E harness gate touch the spec mandates (cshunt option + _materializeCir .options cshunt=<val> deck card) — deck-text injection, no divergence-logic change. Three untracked recon test/fixture files (cshunt-injection.test.ts, ngspice-parity/cshunt-parity.test.ts, fixtures/cshunt-gate.dts) are the mandated three-surface tests (criteria 6-8). GATE after server_restart: harness firstDivergence null across ALL 8 classes on resistive-divider.dts, rc-transient.dts, inductor-rl-step.dts (off-path/default proves criterion 2 byte-identical). On-path Surface-3 (cshunt-parity.test.ts, DLL set): cshunt=1e-9 bit-exact all signal classes null + topology parity 6/6 elements with diode internal anode excluded (criteria 7-8) — 3/3 pass. cshunt-injection.test.ts 5/5 (Surface 1/2). Verified against inppas4.c:29-77 + spiceif.c:163-195."
+      ],
+      "escalation": null
+    },
     "maths-ni/nicomcof.c#h001": {
       "state": "APPLIED",
       "hunkHash": "541ef79fde2e6d7f",

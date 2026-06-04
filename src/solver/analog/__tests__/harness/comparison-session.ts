@@ -301,6 +301,18 @@ export interface ComparisonSessionOptions {
    * ngspice side).
    */
   ics?: ReadonlyMap<string, number>;
+  /**
+   * `.option cshunt` value (F) applied to BOTH engines: configured on the
+   * digiTS engine as `params.cshunt` (so MNAEngine._setup injects a shunt cap
+   * per voltage node, inppas4.c:54-75) and emitted as an `.options cshunt=<val>`
+   * card on the auto-generated ngspice deck (so ngspice's INPpas4 injects the
+   * matching caps). Both sides then see the identical set of injected caps —
+   * same value, same per-voltage-node coverage, same node order. Active only
+   * when > 0 (inp.c:466). Ignored when `cirPath` is supplied (the author owns
+   * the deck) or when `selfCompare` is true (no ngspice side, but the digiTS
+   * config still applies).
+   */
+  cshunt?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -621,6 +633,15 @@ export class ComparisonSession {
       return;
     }
 
+    // `.option cshunt` (Part E of the cshunt recon): configure the value on the
+    // digiTS engine before its lazy _setup() runs, so the injection pass adds
+    // one shunt cap per voltage node (inppas4.c:54-75). The matching
+    // `.options cshunt=<val>` card is injected into the ngspice deck by
+    // _materializeCir so both engines see the identical caps.
+    if (this._opts.cshunt !== undefined && this._opts.cshunt > 0) {
+      this._engine.configure({ cshunt: this._opts.cshunt });
+    }
+
     const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
     this._elementLabels = buildElementLabelMap(compiled);
     this._ourTopology = captureTopology(
@@ -743,18 +764,32 @@ export class ComparisonSession {
   private _materializeCir(): string {
     if (!this._cirClean) return "";
     if (this._opts.cirPath) return this._cirClean;
+
+    // Option cards injected immediately after the title (generateSpiceNetlist
+    // puts the title on line 0) so they precede every device card.
+    const cards: string[] = [];
+
     const K = this._engine.circuitTemp;
     // ngspice's default operating temperature is 27 degC = 300.15 K (CKTtemp
     // initialisation in CKTinit.c). At the default, injecting an explicit
     // .options TEMP=27 card perturbs ngspice's setup ordering by ~1 ULP
     // versus no card at all; skip injection at default to preserve bit-exact
     // parity for fixtures running at the default temperature.
-    if (Math.abs(K - 300.15) < 1e-12) return this._cirClean;
-    const celsius = K - 273.15;
-    // generateSpiceNetlist puts the title on line 0; inject the options card
-    // immediately after so it precedes every device card.
+    if (Math.abs(K - 300.15) >= 1e-12) {
+      cards.push(`.options TEMP=${K - 273.15}`);
+    }
+
+    // `.option cshunt` (Part E of the cshunt recon): emit the matching card so
+    // ngspice's INPpas4 (inppas4.c:54-75) injects one shunt cap per voltage
+    // node, the same set the digiTS engine adds via params.cshunt. Active only
+    // when > 0 (inp.c:466 — sr <= 0 is skipped).
+    if (this._opts.cshunt !== undefined && this._opts.cshunt > 0) {
+      cards.push(`.options cshunt=${this._opts.cshunt}`);
+    }
+
+    if (cards.length === 0) return this._cirClean;
     const lines = this._cirClean.split("\n");
-    lines.splice(1, 0, `.options TEMP=${celsius}`);
+    lines.splice(1, 0, ...cards);
     return lines.join("\n");
   }
 

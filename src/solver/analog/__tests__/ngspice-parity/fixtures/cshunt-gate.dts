@@ -1,0 +1,535 @@
+{
+  "circuit": {
+    "description": "cshunt gate fixture: V1 sine (0.3V amp, 0V offset, 1kHz) -> R1=1k -> mid; D1(RS=10,IS=1e-14,N=1) mid->gnd mints a device-internal anode node (excluded from cshunt); R2=10k mid->gnd. Smooth sine keeps the diode in a gentle regime for bit-exact baseline. Transient run with .option cshunt proves external/netlist-only injection: in and mid get a shunt cap, the diode internal anode does not.",
+    "elements": [
+      {
+        "id": "0f532f36-e8e1-49c2-8756-0176fa67e6a6",
+        "position": {
+          "x": 0,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 0.3,
+            "dcOffset": 0,
+            "frequency": 1000,
+            "phase": 0
+          },
+          "amplitude": 0.3,
+          "dcOffset": 0,
+          "frequency": 1000,
+          "label": "V1",
+          "phase": 0,
+          "position": [
+            0,
+            0
+          ],
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "ea4aa214-eef2-46ae-8ea1-80054e3ed9dc",
+        "position": {
+          "x": 12,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "4373409d-fc0b-46a6-9812-d9da7f358553",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "label": "R2",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "080d6059-cd61-4110-a7ad-9565cb9f6944",
+        "position": {
+          "x": 24,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BV": "_inf",
+            "CJO": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IS": 1e-14,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1,
+            "RS": 10,
+            "TT": 0,
+            "VJ": 1,
+            "XTI": 3
+          },
+          "label": "D1",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "9c353ba9-2c2e-452e-bc2b-ea640a5178cb",
+        "position": {
+          "x": 36,
+          "y": 4
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "cshunt-gate",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 5,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 4
+          },
+          {
+            "x": 23,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 3
+          },
+          {
+            "x": 20,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 3
+          },
+          {
+            "x": 20,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 4
+          },
+          {
+            "x": 23,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 3
+          },
+          {
+            "x": 18,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 3
+          },
+          {
+            "x": 21,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 3
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 4
+          },
+          {
+            "x": 29,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 4
+          },
+          {
+            "x": 33,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 4
+          },
+          {
+            "x": 33,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 0
+          },
+          {
+            "x": 33,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 3
+          },
+          {
+            "x": -1,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 3
+          },
+          {
+            "x": -2,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 9
+          },
+          {
+            "x": 24,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 9
+          },
+          {
+            "x": 30,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 9
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

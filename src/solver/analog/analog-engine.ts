@@ -47,6 +47,9 @@ import {
 import { cktTemp } from "./ckt-temp.js";
 import { runByDeviceFamily } from "./family-dispatch.js";
 import { assertPoolIsSoleMutableState } from "./state-schema.js";
+import type { DeviceFamily } from "./ngspice-load-order.js";
+import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { PropertyBag } from "../../core/properties.js";
 
 // ---------------------------------------------------------------------------
 // MNAEngine
@@ -83,6 +86,15 @@ export class MNAEngine implements AnalogEngine {
   private _compiled: ConcreteCompiledAnalogCircuit | null = null;
 
   private _elements: readonly AnalogElement[] = [];
+
+  /**
+   * Capacitor leaves injected by the `.option cshunt` pass (inppas4.c:54-75),
+   * one per non-ground voltage node. Tracked so a re-init() on the same
+   * compiled circuit can strip the prior pass's leaves before _setup() injects
+   * a fresh set — without this, a reused ConcreteCompiledAnalogCircuit.elements
+   * array would accumulate a duplicate shunt cap per node on every init().
+   */
+  private _cshuntLeaves: AnalogCapacitorElement[] = [];
 
   // -------------------------------------------------------------------------
   // Setup-phase state (A4.2)
@@ -143,6 +155,17 @@ export class MNAEngine implements AnalogEngine {
   init(circuit: CompiledCircuit): void {
     const compiled = circuit as ConcreteCompiledAnalogCircuit;
     this._compiled = compiled;
+    // Strip any cshunt capacitor leaves a prior init()/_setup() on this same
+    // compiled circuit appended to compiled.elements (inppas4.c:54-75 injects
+    // a fresh leaf per voltage node every setup pass; re-running on the same
+    // array would otherwise double-inject). The fresh pass re-creates them.
+    if (this._cshuntLeaves.length > 0) {
+      const injected = new Set<AnalogElement>(this._cshuntLeaves);
+      const base = compiled.elements.filter(el => !injected.has(el));
+      compiled.elements.length = 0;
+      compiled.elements.push(...base);
+      this._cshuntLeaves = [];
+    }
     this._elements = compiled.elements;
 
     const { elements } = compiled;
@@ -1609,6 +1632,10 @@ export class MNAEngine implements AnalogEngine {
     // If you copy this merge pattern elsewhere (parameter-sweep, monte-carlo),
     // copy the baseline-strip too.
     const baseline: SimulationParams = { ...this._params };
+    // Capture the pre-merge cshunt so a structural change (a different injected
+    // shunt-cap set, inppas4.c:54-75) can be detected after the merge below and
+    // force a structural rebuild (the gate -1 default normalises to "off").
+    const prevCshunt = this._params.cshunt ?? -1;
     const transientInputsChanged =
       "tStop" in params ||
       "outputStep" in params ||
@@ -1666,6 +1693,30 @@ export class MNAEngine implements AnalogEngine {
     if ("indVerbosity" in params && this._ctx && this._isSetup) {
       const cac = this._compiled as ConcreteCompiledAnalogCircuit | null;
       if (cac) cktTemp(this._ctx, cac.elementsByFamily);
+    }
+
+    // `.option cshunt` is a STRUCTURAL param: its value selects a set of
+    // injected shunt-cap leaves (inppas4.c:54-75), built in _setup() and
+    // therefore frozen once _setup() has run (_setup early-returns on
+    // _isSetup). To keep cshunt hot-loadable like every other SimulationParams
+    // field, a post-setup change to the active value must rebuild the circuit
+    // so the next analysis re-runs _setup() and injects the new set. Both the
+    // old and new values are normalised through the `> 0` gate (inp.c:466,
+    // sr<=0 = off), so off->on, on->off, and on->different-on all rebuild while
+    // off->off (e.g. -1 -> 0) is a no-op. init() performs the full structural
+    // reset (strips the prior injected leaves, resets _maxEqNum / _numStates /
+    // _nodeTable, re-wires the solver/ctx); the params just merged above are
+    // preserved (init does not touch _params), so the rebuilt _setup() reads
+    // the new cshunt. Mirrors the engine's "fresh structure per compile"
+    // contract for the one param that changes the element set.
+    if (this._isSetup && this._compiled) {
+      const newCshunt = this._params.cshunt ?? -1;
+      const wasActive = prevCshunt > 0;
+      const nowActive = newCshunt > 0;
+      const changed = wasActive !== nowActive || (nowActive && newCshunt !== prevCshunt);
+      if (changed) {
+        this.init(this._compiled);
+      }
     }
   }
 
@@ -1824,11 +1875,27 @@ export class MNAEngine implements AnalogEngine {
     for (const el of this._elements) {  // already NGSPICE_LOAD_ORDER-sorted
       el.setup(setupCtx);
     }
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit;
+
+    // inppas4.c:29-77 — `.option cshunt`: add a capacitor to ground from every
+    // external/netlist voltage node. ngspice runs INPpas4 (spiceif.c:177) right
+    // after INPpas2 (spiceif.c:168) builds ckt->CKTnodes from the netlist
+    // instance lines, and BEFORE CKTsetup sizes the matrix and mints any
+    // device-internal nodes. Here it runs after the per-element setup() loop
+    // above and before the state/matrix/handle allocation below; the leaves
+    // bind to the compiler-allocated nodes 1..nodeCount (external + composite-
+    // internal), not the per-device-internal nodes the setup() loop just minted
+    // into _nodeTable (those are the DEVsetup analogue, post-INPpas4 in
+    // ngspice). The injected leaves are setup()-driven with the SAME setupCtx
+    // (so their Norton stamps and state slots are allocated like any element)
+    // and become members of the element set the matrix sizing, family dispatch,
+    // and load walk all see.
+    this._injectCshuntCapacitors(setupCtx, cac);
+
     // Single state pool ownership invariant: cac.statePool and ctx.statePool
     // must reference the same object after _setup. allocateStateBuffers adopts
     // a pre-built pool if its size matches; otherwise it allocates one and we
     // write it back here. Either way, both references converge.
-    const cac = this._compiled as ConcreteCompiledAnalogCircuit;
     this._ctx!.allocateStateBuffers(this._numStates, cac.statePool ?? null);
     cac.statePool = this._ctx!.statePool!;
     this._ctx!.allocateRowBuffers(this._solver.matrixSize);
@@ -1887,6 +1954,144 @@ export class MNAEngine implements AnalogEngine {
     }
 
     this._isSetup = true;
+  }
+
+  /**
+   * `.option cshunt` injection pass — port of INPpas4 (inppas4.c:29-77).
+   *
+   * inppas4.c:41-42 returns immediately when the option is unset; here the
+   * gate is `cshunt > 0`, reproducing the inp.c:466 `sr <= 0` rejection (the
+   * -1 default and any non-positive value leave the circuit untouched).
+   *
+   * inppas4.c:54-75 walks ckt->CKTnodes and, for every voltage node with
+   * number > 0 (inppas4.c:56 — `node->type == NODE_VOLTAGE && node->number >
+   * 0`), instantiates one Capacitor device to ground (csval, named
+   * capac<n>shunt). Per spiceif.c:163-183, ckt->CKTnodes at INPpas4 time holds
+   * only the netlist-declared (external + subcircuit-expansion) voltage nodes —
+   * device-internal nodes are minted later in CKTsetup. digiTS's matching set
+   * is the compiler-allocated range 1..nodeCount; iterating it ascending is
+   * node-number / deck-encounter order, the same first-encounter discipline as
+   * ngspice's CKTnodes walk, so the injected caps are created in ngspice's node
+   * order and the per-model instance list and matrix element-pool order match.
+   *
+   * Every leaf is the ordinary CapacitorElement (inppas4.c:60 reuses ngspice's
+   * stock Capacitor device); no new stamp or load code. The leaf is setup()-
+   * driven with the same setupCtx (so its Norton stamp and state slots are
+   * allocated like any element) and appended to the element set so it
+   * participates in state allocation, family dispatch, matrix sizing, and the
+   * load walk. Per-device-internal voltage nodes (a diode's DIOposPrime, etc.,
+   * minted by the per-element setup() loop into _nodeTable with number >
+   * nodeCount) get NO shunt cap — they do not exist at ngspice's INPpas4 time.
+   *
+   * CKTcshunt itself is set-but-unused in ngspice (cktdojob.c:74 assigns it,
+   * no load path reads it), so no analogous field is carried on the context;
+   * the value lives on params.cshunt and is consumed only here.
+   */
+  private _injectCshuntCapacitors(
+    setupCtx: SetupContext,
+    cac: ConcreteCompiledAnalogCircuit,
+  ): void {
+    // inp.c:466 / cktntask.c:90 — active only when > 0; the -1 default is off.
+    const cshunt = this._params.cshunt ?? -1;
+    if (!(cshunt > 0)) return;
+
+    // inppas4.c:55 walks ckt->CKTnodes for NODE_VOLTAGE nodes with number > 0
+    // (inppas4.c:56). The load-bearing phase fact (spiceif.c:163-183): INPpas4
+    // (spiceif.c:177) runs immediately after INPpas2 (spiceif.c:168), which
+    // builds the node table from the NETLIST instance lines only. Device-
+    // internal nodes (e.g. a diode's DIOposPrime, allocated in DIOsetup) are
+    // minted later, during CKTsetup — AFTER the whole INP parse returns — so
+    // they are NOT in ckt->CKTnodes at INPpas4 time and get NO shunt cap.
+    // ckt->CKTnodes at INPpas4 therefore holds exactly the external /
+    // netlist-declared voltage nodes (including subcircuit-expansion internal
+    // nodes, which INPpas2 does create).
+    //
+    // digiTS's matching node set is the compiler-allocated range 1..nodeCount:
+    // the external net nodes plus the composite (subcircuit) internal nodes the
+    // unified compiler pre-allocates via expandCompositeInstance (the INPpas2 /
+    // subckt-expansion analogue) — all NODE_VOLTAGE. Per-device-internal
+    // voltage nodes and branch (current) rows are minted by each element's
+    // setup() (the DEVsetup / CKTsetup analogue) into _nodeTable with numbers >
+    // nodeCount; those are NOT shunt-capped, matching ngspice. Iterating
+    // 1..nodeCount ascending is node-number / deck-encounter order, the same
+    // first-encounter discipline as ngspice's CKTnodes walk (matrix
+    // element-pool parity).
+    const leaves: AnalogCapacitorElement[] = [];
+    for (let nodeNumber = 1; nodeNumber <= cac.nodeCount; nodeNumber++) {
+      // inppas4.c:58-67 — one Capacitor device to ground, value = csval, named
+      // capac<n>shunt. bindNode(1, node) ties the top node to the voltage node
+      // and the 2nd node to ground (inppas4.c:62-63). The leaf's pinNodes map
+      // carries that binding directly: pos -> the voltage node, neg -> ground.
+      const leaf = this._makeCshuntCapacitor(`capac${nodeNumber}shunt`, nodeNumber, cshunt);
+      // capsetup.c:102-117 — allocate the state base and the Norton-stamp
+      // handles, the same setup() every netlisted capacitor runs.
+      leaf.setup(setupCtx);
+      leaves.push(leaf);
+    }
+    if (leaves.length === 0) return;
+
+    this._cshuntLeaves = leaves;
+
+    // Append the injected leaves to the shared element set so every downstream
+    // _setup step (state allocation, family dispatch, matrix sizing, load walk)
+    // sees them — the digiTS analogue of ngspice's INPpas4-created capacitors
+    // being members of the circuit before CKTsetup runs.
+    cac.elements.push(...leaves);
+    this._elements = cac.elements;
+    this._buildDeviceMap(leaves, "");
+
+    // Rebuild elementsByFamily as a FRESH map so runByDeviceFamily's per-map
+    // sort cache (family-dispatch.ts:36-39, keyed on the map instance) re-sorts
+    // with the CAP bucket the injected leaves now belong to. Mutating the
+    // existing readonly bucket arrays in place would leave the cached sorted
+    // entries pointing at the stale arrays. The CAP family
+    // (AnalogCapacitorElement.deviceFamily) bucket gains the leaves in node
+    // order, appended after any netlisted capacitors.
+    const rebuilt = new Map<DeviceFamily, AnalogElement[]>();
+    for (const [family, instances] of cac.elementsByFamily) {
+      rebuilt.set(family, [...instances]);
+    }
+    for (const leaf of leaves) {
+      const bucket = rebuilt.get(leaf.deviceFamily);
+      if (bucket) bucket.push(leaf);
+      else rebuilt.set(leaf.deviceFamily, [leaf]);
+    }
+    const rebuiltReadonly: ReadonlyMap<DeviceFamily, readonly AnalogElement[]> = rebuilt;
+    (cac as { elementsByFamily: ReadonlyMap<DeviceFamily, readonly AnalogElement[]> })
+      .elementsByFamily = rebuiltReadonly;
+    this._ctx!.elementsByFamily = rebuiltReadonly;
+
+    // Refresh the ctx-side derived element views so the post-setup state
+    // allocation and convergence walk include the injected leaves.
+    // allocateStateBuffers (ckt-context.ts:977) iterates _poolBackedElements to
+    // call initState on each leaf; the leaves are pool-backed capacitors, so
+    // they must be in that list before the pool is sized below.
+    this._ctx!.elements = cac.elements;
+    (this._ctx as { _poolBackedElements: readonly AnalogElement[] })
+      ._poolBackedElements = cac.elements.filter(isPoolBacked);
+  }
+
+  /**
+   * Construct one cshunt Capacitor leaf (inppas4.c:58-67). The PropertyBag
+   * carries `capacitance = value` marked given (the INPpName("capacitance",
+   * csval) analogue, inppas4.c:67); the pinNodes map binds pos to the voltage
+   * node and neg to ground slot 0 (the bindNode(1, node) / "2nd node = gnd"
+   * analogue, inppas4.c:62-63).
+   */
+  private _makeCshuntCapacitor(
+    label: string,
+    nodeSlot: number,
+    value: number,
+  ): AnalogCapacitorElement {
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", value);
+    const pinNodes = new Map<string, number>([
+      ["pos", nodeSlot],
+      ["neg", 0],
+    ]);
+    const leaf = new AnalogCapacitorElement(pinNodes, props);
+    leaf.label = label;
+    return leaf;
   }
 
   private _buildSetupContext(): SetupContext {
