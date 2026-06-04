@@ -120,7 +120,7 @@ describe("convergence regression", () => {
       analysis: "dcop",
     });
 
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
+    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopInitFloat", phaseAttemptIndex: 0 });
     const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
     expect(lastIter.elementStates["d1"].VD).toBeGreaterThan(0);
     expect(lastIter.elementStates["d1"].GEQ).toBeGreaterThan(0);
@@ -137,7 +137,7 @@ describe("convergence regression", () => {
     });
 
     // After DC op, d1's VD in state0 should be non-zero (forward voltage)
-    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
+    const detail = session.getAttempt({ stepIndex: 0, phase: "dcopInitFloat", phaseAttemptIndex: 0 });
     const lastIter = detail.iterations[detail.iterations.length - 1].ours!;
 
     // Confirm dcop produced a real diode forward voltage
@@ -181,7 +181,7 @@ describe("convergence regression", () => {
       buildCircuit: buildHwrCircuit,
       analysis: "dcop",
     });
-    const detailBefore = sessionBefore.getAttempt({ stepIndex: 0, phase: "dcopDirect", phaseAttemptIndex: 0 });
+    const detailBefore = sessionBefore.getAttempt({ stepIndex: 0, phase: "dcopInitFloat", phaseAttemptIndex: 0 });
     const lastIterBefore = detailBefore.iterations[detailBefore.iterations.length - 1].ours!;
     expect(lastIterBefore.elementStates["d1"].VD).toBeGreaterThan(0.5);
 

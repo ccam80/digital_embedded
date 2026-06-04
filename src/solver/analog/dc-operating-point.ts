@@ -802,16 +802,20 @@ function dynamicGmin(
     }
   }
 
-  // ngspice cktop.c dynamic_gmin: post-loop `converged = NIiter(ckt, iterlim);`
-  // runs with CKTdiagGmin left at the loop's final value- gtarget after a
-  // successful ramp, or the just-failed step's diagGmin after a failed one.
-  // `diagGmin` holds exactly that value at both break points: the success
-  // break tests `diagGmin <= gtarget`, and the failure break exits the else
-  // branch before it rewrites diagGmin. Previously this passed `gshunt`, which
-  // diverged from ngspice (v26 and v41 alike). rhsOld is not touched- it
-  // carries forward from the last NIiter exit inside the while loop.
+  // ngspice cktop.c dynamic_gmin resets `ckt->CKTdiagGmin = ckt->CKTgshunt;`
+  // (cktop.c:250) BEFORE the terminal `converged = NIiter(ckt, iterlim);`
+  // (cktop.c:261), and sets the phase gmin to 0 (cktop.c:260
+  // `ni_set_phase_flags(0, 0.0, 1.0)`). The function header is explicit
+  // (cktop.c:157-158): "no path out of this code allows ckt->CKTdiagGmin to be
+  // anything but CKTgshunt". So the terminal solve runs the gmin-free circuit
+  // (diagonal conductance = gshunt, default 0), re-converging the true circuit
+  // from the ramp's converged guess. A circuit that only held together under
+  // the ramp's diagonal gmin- e.g. an inductor-short DC branch-current
+  // singularity- FAILS this solve, which is what makes CKTop fall through to
+  // source stepping and then OPtran. rhsOld is not touched- it carries forward
+  // from the last NIiter exit inside the while loop.
   onPhaseBegin?.("dcopGminDynamic", 0);
-  const cleanResult = runNR(ctx, params.maxIterations, diagGmin, null);
+  const cleanResult = runNR(ctx, params.maxIterations, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 

@@ -667,7 +667,14 @@ export function createStepCaptureHook(
      */
     endAttempt(outcome: NRAttemptOutcome, converged: boolean): void {
       const iterations = iterCapture.getSnapshots();
-      if (iterations.length > 0 || pendingAttempts.length === 0) {
+      // An attempt is a solve that actually ran NR iterations. ngspice's CKTop
+      // emits no attempt when it skips the direct NR (CKTnoOpIter; cktop.c:47,57),
+      // and the ngspice bridge- which groups captured iterations into attempts-
+      // never produces a zero-iteration attempt. solveDcOperatingPoint fires the
+      // dcopInitJct begin/end around that skipped direct solve, so dropping empty
+      // attempts here keeps the OURS list matched: otherwise a phantom
+      // 0-iteration attempt shifts every attempt index by one versus ngspice.
+      if (iterations.length > 0) {
         // Derive role from phase and position within the step
         let role: import("./types.js").AttemptRole | undefined;
         if (currentAttemptPhase === "dcopInitJct") {

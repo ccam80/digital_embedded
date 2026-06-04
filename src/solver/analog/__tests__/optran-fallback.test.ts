@@ -106,30 +106,32 @@ describe("OPtran option plumbing — Surface 1 (headless)", () => {
 });
 
 describe("OPtran default-off invariant — Surface 1 (headless)", () => {
-  it("leaves the DC-OP path unchanged when optran is unset", () => {
-    // With optran unset, the singular-inductor circuit resolves via the
-    // existing static ladder (digiTS's dynamic-gmin reaches the source-pinned
-    // node voltages). The OPtran fallback must NOT run- the method is one of
-    // the static-ladder methods, never "optran".
-    const { coordinator, engine } = loadFixture();
+  it("with optran unset, the singular circuit fails the static ladder and never reaches OPtran", () => {
+    // The inductor-short fixture has no DC operating point: an ideal inductor
+    // bridging two source-pinned nodes is a DC branch-current singularity that
+    // gmin (a node-to-ground conductance) cannot resolve. With optran unset,
+    // ngspice's CKTop exhausts direct NR + gmin + source stepping and returns
+    // non-converged- OPtran is opt-in (cktop.c:101-108, optran.c:51 nooptran).
+    // digiTS matches: the static ladder fails and the fallback never runs, so
+    // the reported method is the last static strategy, gillespie-src.
+    const { coordinator } = loadFixture();
     const result = coordinator.dcOperatingPoint();
     expect(result).not.toBeNull();
-    expect(result!.converged).toBe(true);
+    expect(result!.converged).toBe(false);
     expect(result!.method).not.toBe("optran");
-    // Source-pinned nodes land on their source values either way.
-    expect(sourcePinVoltage(engine, "V1")).toBeCloseTo(3, 6);
-    expect(sourcePinVoltage(engine, "V2")).toBeCloseTo(5, 6);
+    expect(result!.method).toBe("gillespie-src");
   });
 
-  it("produces a bitwise-identical DC-OP solution with optran enabled but never reached", () => {
-    // optran enabled but the static ladder already converges- the fallback is
-    // only invoked AFTER direct NR + gmin + source stepping all fail
-    // (cktop.c:101-108). Since the static ladder succeeds here, enabling optran
-    // changes nothing: same method, same node voltages, bit-for-bit.
+  it("enabling optran resolves the singular circuit the static ladder cannot", () => {
+    // optran-OFF: the static ladder fails (above). optran-ON: CKTop invokes the
+    // OPtran pseudo-transient only after the static ladder fails (cktop.c:104),
+    // and it settles the circuit to its source-pinned node voltages. This is the
+    // fallback's entire purpose- it runs exactly when, and only when, the static
+    // ladder cannot resolve the operating point.
     const base = loadFixture();
     const baseResult = base.coordinator.dcOperatingPoint();
-    const baseV1 = sourcePinVoltage(base.engine, "V1");
-    const baseV2 = sourcePinVoltage(base.engine, "V2");
+    expect(baseResult).not.toBeNull();
+    expect(baseResult!.converged).toBe(false);
 
     const withOpt = loadFixture();
     withOpt.coordinator.configure({
@@ -139,11 +141,10 @@ describe("OPtran default-off invariant — Surface 1 (headless)", () => {
       opramptime: 0,
     });
     const optResult = withOpt.coordinator.dcOperatingPoint();
-
-    expect(baseResult).not.toBeNull();
     expect(optResult).not.toBeNull();
-    expect(optResult!.method).toBe(baseResult!.method);
-    expect(sourcePinVoltage(withOpt.engine, "V1")).toBe(baseV1);
-    expect(sourcePinVoltage(withOpt.engine, "V2")).toBe(baseV2);
+    expect(optResult!.converged).toBe(true);
+    expect(optResult!.method).toBe("optran");
+    expect(sourcePinVoltage(withOpt.engine, "V1")).toBeCloseTo(3, 6);
+    expect(sourcePinVoltage(withOpt.engine, "V2")).toBeCloseTo(5, 6);
   });
 });
