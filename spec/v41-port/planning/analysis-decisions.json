@@ -990,16 +990,16 @@
       "rationale": "CKTsizeIncr=100 + LTRA CKTtimePoints TMALLOC: the LTRA lossy-transmission-line device is out of the frozen v41 device-class scope (frozen construct ltra-lossy-transmission-line) and CKTsizeIncr is a C array-growth detail. No counterpart."
     },
     "analysis/dctran.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "dctran.c:235-255 stdout fprintf console progress block; the engine-agnostic engine has no console/front-end output path. Same NO-COUNTERPART class as the already-frozen dctran.c#h003/#h010."
     },
     "analysis/dctran.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "dctran.c:257-260 SPfrontEnd->OUTendPlot front-end plot callback; no digiTS counterpart (engine emits no plots). NO-COUNTERPART, same class as dctran.c#h003/#h010."
     },
     "analysis/dctran.c#h006": {
       "state": "PENDING",
@@ -1008,22 +1008,22 @@
       "rationale": null
     },
     "analysis/dctran.c#h007": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "dctran.c:419 #ifdef XSPICE g_ipc/wantevtdata event-data IPC; XSPICE event layer is not ported (frozen). NO-COUNTERPART."
     },
     "analysis/dctran.c#h008": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "dctran.c:445-451 #ifdef XSPICE ipc_send_data block; XSPICE IPC not ported (frozen). NO-COUNTERPART."
     },
     "analysis/dctran.c#h009": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "analysis/dctran.c::DCtran(CKTcircuit *ckt,",
-      "rationale": null
+      "rationale": "dctran.c:468-470 CKTdump output-capture gate; no front-end output dump in the engine-agnostic engine. NO-COUNTERPART, same class as dctran.c#h003/#h010."
     },
     "analysis/dctran.c#h010": {
       "state": "NO-COUNTERPART",

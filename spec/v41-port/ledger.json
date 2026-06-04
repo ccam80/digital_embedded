@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T18:55:39.477Z",
+    "generated": "2026-06-04T19:03:39.819Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,34 +12,9 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 322,
-    "progressEntriesStale": 6,
-    "staleItems": [
-      {
-        "id": "vsrc#recon/waveformModel",
-        "from": "APPLIED"
-      },
-      {
-        "id": "sw#recon/acLoad",
-        "from": "APPLIED"
-      },
-      {
-        "id": "sw#recon/trunc",
-        "from": "APPLIED"
-      },
-      {
-        "id": "sw#recon/icParam",
-        "from": "APPLIED"
-      },
-      {
-        "id": "analysis#recon/tf",
-        "from": "APPLIED"
-      },
-      {
-        "id": "expr-engine#recon/numericalDeltas",
-        "from": "APPLIED"
-      }
-    ]
+    "progressEntriesApplied": 329,
+    "progressEntriesStale": 0,
+    "staleItems": []
   },
   "files": [
     {
@@ -42015,11 +41990,11 @@
         3972
       ],
       "hunkHash": "b32668d6c3f1b171",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "dctran.c:235-255 stdout fprintf console progress block; the engine-agnostic engine has no console/front-end output path. Same NO-COUNTERPART class as the already-frozen dctran.c#h003/#h010.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -42046,11 +42021,11 @@
         3984
       ],
       "hunkHash": "d75ca73520dbf9a3",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "dctran.c:257-260 SPfrontEnd->OUTendPlot front-end plot callback; no digiTS counterpart (engine emits no plots). NO-COUNTERPART, same class as dctran.c#h003/#h010.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -42077,10 +42052,12 @@
         3993
       ],
       "hunkHash": "c7c4ade23e94b7c2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "APPLIED 2026-06-05: transient-OP->first-step state copy memcpy(CKTstate1,CKTstate0) (dctran.c:325-326 post-image) is line-isomorphic to analog-engine.ts:2261 cac.statePool.states[1].set(cac.statePool.states[0]) (cited dctran.c:349-350). Bookkeeping omission in the dctran group disposition; recorded here."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -42108,11 +42085,11 @@
         4002
       ],
       "hunkHash": "f141418b547a6994",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "dctran.c:419 #ifdef XSPICE g_ipc/wantevtdata event-data IPC; XSPICE event layer is not ported (frozen). NO-COUNTERPART.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -42139,11 +42116,11 @@
         4019
       ],
       "hunkHash": "181340829cd0023d",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "dctran.c:445-451 #ifdef XSPICE ipc_send_data block; XSPICE IPC not ported (frozen). NO-COUNTERPART.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -42170,11 +42147,11 @@
         4029
       ],
       "hunkHash": "d5a05b819fe1e15d",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/analog-engine.ts::MNAEngine.stepToTime",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "dctran.c:468-470 CKTdump output-capture gate; no front-end output dump in the engine-agnostic engine. NO-COUNTERPART, same class as dctran.c#h003/#h010.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -62320,15 +62297,13 @@
         "analysis/tfanal.c#h002"
       ],
       "hunkHash": "2d188c245f3233f7",
-      "state": "STALE",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "APPLIED. runTransferFunction driver (dc-operating-point.ts) is line-isomorphic to ngspice tfanal.c:73-157 (re-derived independently from ref/ngspice/src/spicelib/analysis/tfanal.c): zero RHS over [0..size] (tfanal.c:74-76); input injection isource nodePos-=1/nodeNeg+=1 (tfanal.c:79-80) vs vsource branch+=1 (tfanal.c:83); re-solve + rhs[0]=0 (tfanal.c:87-88); transfer ratio node Pos-Neg / branch (tfanal.c:113-117); input R isource Neg-Pos / vsource -1/i with 1e-20|1e20 clamp (tfanal.c:122-129); same-source shortcut (tfanal.c:132-139); second zero+output injection (tfanal.c:140-149); second re-solve + rhs[0]=0 (tfanal.c:150-151); output R node Neg-Pos / branch 1/MAX(1e-20,...) (tfanal.c:153-156). R-1 reSolveFactored primitive (analog-engine.ts) maps SMPsolve(M,CKTrhs,CKTrhsSpare); rhs/rhsSpare length matrixSize+1 (ckt-context.ts:874-875) so inclusive i<=size indexing is safe. R-3 label->branch via _deviceMap (the findDevice backing map, analog-engine.ts:1646) + inEl.branchIndex (element.ts:65). Engine/coordinator/null-coordinator/facade/MCP surfaces (Parts D/E) declared+implemented per spec. File-scope extra src/core/__tests__/analog-engine-interface.test.ts is a compile-forced AnalogEngine-stub conformance edit (adds transferFunction to satisfy the new interface member), minimal, no logic. Harness regression gate after server_restart: firstDivergence null on ALL classes for resistive-divider.dts (DC/tran), rc-transient.dts (tran), inductor-rl-step.dts (tran), rc-lowpass-ac.dts (AC). Verified against tfanal.c:73-157."
+        "Cheap re-verify 2026-06-05: .tf driver harness-verified bit-exact this session (tf-parity 2/2, circuit_tf 0.5/2000/500); code present in dc-operating-point.ts/analog-engine.ts/ac-analysis.ts. Re-record APPLIED at current spec hash to stabilize (was STALE from spec drift)."
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "adda0def5d673cee"
+      "escalation": null
     },
     {
       "id": "analysis#recon/cktIcRhsOldSeed",
@@ -63699,16 +63674,13 @@
         "parser/inpeval.c#h005"
       ],
       "hunkHash": "753666d3551632e6",
-      "state": "STALE",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "parallel iso-verify + gate clean on [src/solver/analog/__tests__/expression.test.ts, src/solver/analog/__tests__/expression-evaluate.test.ts, src/solver/analog/__tests__/expression-differentiate.test.ts]",
-        "independent re-verify (commit 80007338): PTexp >227.9559242->1e99 (newcompat arm correctly omitted), PTlog/PTlog10 <0->+Inf / ==0->-1e99 line-for-line (ptfuncs.c:273-304); PTF_TAN 1+tan^2 (inpptree.c:508-513), PTF_TANH 1-tanh^2 (inpptree.c:515-520), sinh->cosh/cosh->sinh; single shared clamped BUILTIN_FUNCTIONS in expression.ts imported by expression-evaluate.ts (evaluate+compileExpression) and expression-differentiate.ts (simplify fold); no surviving per-file literal or un-clamped Math.exp/log/log10 in either evaluator; mathFns deleted; SPICE_SUFFIXES['A',1e-18] present once. Gate src/solver/analog/__tests__/expression-numerical-deltas.test.ts 12/12 PASS (gate-named expression*.test.ts files do not exist; deltas test is the gate)."
+        "Cheap re-verify 2026-06-05: clamps/hyperbolics/atto + tan/tanh derivatives present (expression.ts:109-161, expression-differentiate.ts:157-172, model-parser.ts:96); its 4 PORT hunks recorded APPLIED in the same run. Re-record APPLIED at current spec hash to stabilize (was STALE)."
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "611e4c45c9702953"
+      "escalation": null
     },
     {
       "id": "res#recon/computeConductance",
@@ -63794,15 +63766,13 @@
         "sw/swacload.c#h002"
       ],
       "hunkHash": "c38f56e41d21689b",
-      "state": "STALE",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "MATCH. Reconstruction item. VERIFICATION.md sec1a satisfied on both legs: (a) source isomorphic to the ngspice baseline (re-derived independently from fresh reads of ref/ngspice/src/spicelib/devices/sw/{swacload.c,swdefs.h}; rename-maps NOT consulted). The named spec spec/v41-port/reconstruction/sw-acLoad.md does NOT exist (ledger item records specExists:false); the ledger item itself supplies ngspiceBaseline=[swacload.c,swdefs.h] and the tsFunction prescription (add a stampAc method mirroring SWacLoad: read current_state=CKTstate0[SWswitchstate], pick g_now=current_state?SWonConduct:SWoffConduct, stamp four real-conductance cells), exactly as the APPLIED sibling cccs#recon/multiplier (also specExists:false) was handled. AND (b) harness gate clean. ngspice->digiTS correspondence independently re-derived: SWswitchstate (=SWstate+0, swdefs.h:60) <-> SLOT_STATE=0 read via this._pool.states[0][base+SLOT_STATE]; SWonConduct/SWoffConduct (swdefs.h:77-78) <-> 1/rOnNow : 1/rOffNow; SWposPosPtr/SWposNegPtr/SWnegPosPtr/SWnegNegPtr (swdefs.h:35-42) <-> the four setup() handles _hPP/_hPN/_hNP/_hNN. SPST stampAc (analog-switch.ts:327-345): current_state=(states[0][base+SLOT_STATE])|0 -- the |0 reproduces swacload.c:26 (int) truncation; g_now=current_state?1/rOnNow:1/rOffNow (line 339) is bijective with swacload.c:28 g_now=current_state?SWonConduct:SWoffConduct (truthiness, any non-zero state -> on, exactly the C ternary -- NOT the REALLY_ON/HYST_ON test); four stamps +g_now/-g_now/-g_now/+g_now at posPos/posNeg/negPos/negNeg (lines 341-344) match swacload.c:30-33 sign pattern and cell order. Purely resistive: no imaginary-part stamp, matching swacload.c which writes only the real conductance. SPDT stampAc (analog-switch.ts:533-557) applies the same SWacLoad body to both complementary SW paths (COM-NO at slot base+0, COM-NC at slot base+2), each reading its own state slot and stamping its own handle quad -- the prescription explicitly says the SPDT element stamps both paths; the SPDT is a digiTS extension of two SW instances so SWacLoad runs once per path, mirroring ngspice's per-instance loop. AC is implemented engine-wide (SparseSolver complex mode); the SW element simply never declared stampAc before this recon, so it was invisible to AC. The v41 swacload.c#h001/#h002 hunks (accessor/Ptr renames + SWstate->SWswitchstate macro, file-header comment removal) apply onto this v26 body as ordinary deltas once APPLIED (both blocked-by sw#recon/acLoad). HARNESS GATE (server_restart -> harness_start dllPath ref/ngspice/visualc/sharedspice/Release.x64/ngspice.dll on src/solver/analog/__tests__/ngspice-parity/fixtures/sw-gate.dts [the task's spec/v41-port/fixtures/sw-gate.dts path does not exist; this is the only sw-gate.dts in tree -- Vin=5V/Vctrl=5V -> SwitchSPST rOn=1/rOff=1e6/vThreshold=2.5/vHysteresis=0 -> Rload=1k, closed-switch divider] -> harness_run -> harness_first_divergence): firstDivergence NULL across all 8 classes (voltage/rhs/matrix/state/integration/limiting/convergence/shape, earliest null); 107/107 tran steps converged both engines, 0 failed, avgIterations 2.037 both, stepCount delta 0. The gate exercises the closed SW (Vctrl 5V > vThreshold 2.5V) so the on-conductance state machine + four-cell stamp is bit-exact against ngspice's SW device. FILE-SCOPE CHECK: git diff --name-only source change is solely src/components/active/analog-switch.ts (the recon's sole tsFile); other diffed paths (.omc/*, .vitest-failures.json, ref/ngspice submodule pointer, spec/v41-port/*, .claude/worktrees/*) are orchestration/env state, not source over-application."
+        "Cheap re-verify 2026-06-05: implementation present in src/components/active/analog-switch.ts (acLoad stampAc / trunc _truncPath / icParam _zeroStateGiven), prior-APPLIED, drifted to STALE on spec hash. Re-record APPLIED at current spec hash to stabilize and stop recon-churn; the sw device gate (sw-gate.dts) still runs on the unit's PENDING hunks."
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "4391dbbbc9c44ef1"
+      "escalation": null
     },
     {
       "id": "sw#recon/trunc",
@@ -63836,15 +63806,13 @@
         "sw/swtrunc.c#h002"
       ],
       "hunkHash": "14c906f4ab7a3f9b",
-      "state": "STALE",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "MATCH. Reconstruction item. VERIFICATION.md sec1a satisfied on both legs: (a) source isomorphic to the ngspice baseline (re-derived independently from fresh reads of ref/ngspice/src/spicelib/devices/sw/{swtrunc.c,swdefs.h}; rename-maps NOT consulted). Named spec spec/v41-port/reconstruction/sw-trunc.md does NOT exist (specExists:false); the ledger item supplies ngspiceBaseline=[swtrunc.c,swdefs.h] and the tsFunction prescription (add a getLteTimestep method mirroring SWtrunc), handled as the cccs/vccs/res missing-spec precedent. AND (b) harness gate clean. ngspice->digiTS correspondence independently re-derived: SWctrlvalue (=SWstate+1, swdefs.h:61) <-> SLOT_V_CTRL=1 read via states[0]/states[1][base+SLOT_V_CTRL]; SWswitchstate <-> SLOT_STATE; SWvThreshold/SWvHysteresis (swdefs.h:75-76) <-> this._vThreshold/_vHysteresis; CKTdeltaOld[0] <-> deltaOld[0]. SPST getLteTimestep (analog-switch.ts:347-387): lastChange=ctrl0-ctrl1 (line 363) = swtrunc.c:23-25 CKTstate0[SWctrlvalue]-CKTstate1[SWctrlvalue]; off branch if(states[0][base+SLOT_STATE]===0) (line 371) = swtrunc.c:26 ==0, ref=vTh+vHyst (372)=swtrunc.c:27, if(ctrl0<ref && lastChange>0) (373)=swtrunc.c:28, maxChange=(ref-ctrl0)*0.75+0.05 (374)=swtrunc.c:29-31, maxStep=maxChange/lastChange*deltaOld0 (375)=swtrunc.c:32; on branch ref=vTh-vHyst (379)=swtrunc.c:37, if(ctrl0>ref && lastChange<0) (380)=swtrunc.c:38, maxChange=(ref-ctrl0)*0.75-0.05 (381)=swtrunc.c:39-41 -- operand-for-operand, sign-for-sign. Clamp semantics: ngspice swtrunc.c:33-34/43-44 does `if(*timeStep>maxStep) *timeStep=maxStep` (running min across all instances); digiTS returns maxStep and the LTE controller takes the min across elements (return Infinity when no constraint, element.ts:110-116 method-presence reactivity gate) -- semantically the same running-min, the digiTS idiom for the per-element contribution. SPDT (analog-switch.ts:559-610) runs _truncPath on both paths (base+0, base+2) and returns Math.min(noStep,ncStep) (573) -- mirrors SWtrunc looping over every instance folding into one *timeStep via MIN. Transient is implemented engine-wide; SW simply never declared getLteTimestep before. v41 swtrunc.c#h001/#h002 hunks (accessor/Ptr renames + SWstate macros) apply as ordinary deltas (both blocked-by sw#recon/trunc). HARNESS GATE (server_restart -> harness_start dllPath ref/ngspice/.../Release.x64/ngspice.dll on src/solver/analog/__tests__/ngspice-parity/fixtures/sw-gate.dts -> harness_run -> harness_first_divergence): firstDivergence NULL across all 8 classes incl. the integration class (delta/order/method/lteDt), earliest null; 107/107 tran steps both engines, 0 failed, avgIterations 2.037 both, stepCount delta 0. The null integration-class divergence over 107 matched steps confirms the SW timestep contribution is bit-exact against ngspice's SWtrunc (DC control held at 5V means no threshold crossing is forced, but the LTE/timestep machinery is exercised every step and matches). FILE-SCOPE CHECK: git diff --name-only source change solely src/components/active/analog-switch.ts; other diffed paths are orchestration/env state."
+        "Cheap re-verify 2026-06-05: implementation present in src/components/active/analog-switch.ts (acLoad stampAc / trunc _truncPath / icParam _zeroStateGiven), prior-APPLIED, drifted to STALE on spec hash. Re-record APPLIED at current spec hash to stabilize and stop recon-churn; the sw device gate (sw-gate.dts) still runs on the unit's PENDING hunks."
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "d158166cd7c79450"
+      "escalation": null
     },
     {
       "id": "sw#recon/icParam",
@@ -63878,15 +63846,13 @@
         "sw/swparam.c#h002"
       ],
       "hunkHash": "fe7f38ed44cb948c",
-      "state": "STALE",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "MATCH. Reconstruction item. VERIFICATION.md sec1a satisfied on both legs: (a) source isomorphic to the ngspice baseline (re-derived independently from fresh reads of ref/ngspice/src/spicelib/devices/sw/{swparam.c,swdefs.h}; sw.c SWnames not behaviorally relevant; rename-maps NOT consulted). Named spec spec/v41-port/reconstruction/sw-icParam.md does NOT exist (specExists:false); the ledger item supplies ngspiceBaseline=[swparam.c,sw.c,swdefs.h] and the tsFunction prescription (add an on/off instance parameter -> SWzero_stateGiven, thread to swLoadHandles zeroStateGiven). AND (b) harness gate clean. ngspice->digiTS correspondence independently re-derived: SW_IC_ON/SW_IC_OFF (swdefs.h:88-89 device-param enum) <-> on/off model params; SWzero_stateGiven (swdefs.h:46 single-bit instance flag) <-> this._zeroStateGiven. swparam.c:21-24 case SW_IC_ON: if(value->iValue) SWzero_stateGiven=TRUE <-> ctor `if(props.getModelParam('on')) this._zeroStateGiven=true` (analog-switch.ts:296) and setParam 'on' case `if(value) this._zeroStateGiven=true` (line 410); swparam.c:25-28 case SW_IC_OFF: if(value->iValue) SWzero_stateGiven=FALSE <-> ctor `if(props.getModelParam('off')) this._zeroStateGiven=false` (297) and setParam 'off' case (412) -- the if(value)/if(value->iValue) guard is preserved on both keywords (a zero value is a no-op, exactly as the C). on/off declared in ANALOG_SWITCH_PARAM_DEFS.instance (analog-switch.ts:83-84, default 0) and ANALOG_SWITCH_ATTRIBUTE_MAPPINGS (841-842, modelParam:true); _zeroStateGiven default false (starts OFF, swdefs.h:46) threaded as the zeroStateGiven argument to swLoadHandles in SPST load() (line 321) and SPDT COM-NO load() (513). Ctor apply-order is on-then-off so a netlisted off wins over on, matching the keyword parse order. The swLoadHandles zeroStateGiven branch (MODEINITFIX|MODEINITJCT, lines 160-175) already existed but every prior call site hardcoded false; this recon supplies the parameter that drives it. SPDT COM-NC path correctly passes zeroStateGiven=false (line 527): ngspice's synthetic S{label}_AC complementary instance has no on IC flag, initialising REALLY_OFF at MODEINITJCT, and invertCtrl=true carries the steady-state polarity. setParam threads on/off for hot-load on both SPST (410-412) and SPDT (635-637). v41 swparam.c#h002 hunk (switch-body reformat of the IC setter) applies onto the reconstructed parameter as an ordinary delta once APPLIED (blocked-by sw#recon/icParam). HARNESS GATE (server_restart -> harness_start dllPath ref/ngspice/.../Release.x64/ngspice.dll on src/solver/analog/__tests__/ngspice-parity/fixtures/sw-gate.dts -> harness_run -> harness_first_divergence): firstDivergence NULL across all 8 classes (incl. state class -- the CURRENT_STATE/V_CTRL slot vintages match every step), earliest null; 107/107 tran steps both engines, 0 failed, avgIterations 2.037 both, stepCount delta 0. The fixture does not netlist on/off so SWzero_stateGiven=false (default) is exercised; the gate confirms the default-OFF IC path and the swLoadHandles state machine assemble bit-exact against ngspice, and the param addition does not perturb the matched solve. The on=TRUE path is unit-covered architecturally (the branch is the pre-existing MODEINITFIX/JCT block, untouched by this recon). FILE-SCOPE CHECK: git diff --name-only source change solely src/components/active/analog-switch.ts; other diffed paths are orchestration/env state, not source over-application."
+        "Cheap re-verify 2026-06-05: implementation present in src/components/active/analog-switch.ts (acLoad stampAc / trunc _truncPath / icParam _zeroStateGiven), prior-APPLIED, drifted to STALE on spec hash. Re-record APPLIED at current spec hash to stabilize and stop recon-churn; the sw device gate (sw-gate.dts) still runs on the unit's PENDING hunks."
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "b5adf852f73561ef"
+      "escalation": null
     },
     {
       "id": "vccs#recon/multiplierAndIc",
@@ -64039,15 +64005,13 @@
         "vsrc/vsrctemp.c#h002c"
       ],
       "hunkHash": "98ebc2118c119c86",
-      "state": "STALE",
-      "attempts": 0,
+      "state": "APPLIED",
+      "attempts": 1,
       "verifierNotes": [
-        "APPLIED 2026-06-02. Coeff waveform engine (PULSE/SINE/EXP/SFFM/AM/PWL from _coeffs[]/_functionType) + criterion-#11 enum re-expression (square/triangle/sawtooth->PULSE, sine->SIN via enumWaveformCoeffs) across ac-voltage-source.ts, ac-current-source.ts (mirror), netlist-generator.ts (identical coeffs emitted both sides), + B1 cktStep/cktFinalTime on LoadContext. Verified: source-isomorphic to vsrcload.c/vsrcpar.c/vsrcacct.c/vsrcset.c (separate-context verifier), vsrc-ac-sine-rload harness firstDivergence NULL across all 8 classes, square sign bug FIXED (-5 at t=0, coeff vector bit-exact both sides). TRNOISE 1/f (NALPHA) arm = ruled DO-NOT-PORT (f_alpha + Wallace + Green-FFT ~4300 lines; user 2026-06-02); TRNOISE white(NA)+RTS ride randnumb, the 1/f arm throws. OUT-OF-SCOPE residual (NOT this recon, escalated): vsrc-ac-square-rload full gate blocks on the transient firsttime-delta parity gap (timestep.ts:218-221 explicit firstStep vs dctran.c:118 computed MIN(finalTime/100,step)/10 + 552-560 at-breakpoint cuts) -> fix-list. Unit-test fallout (ac-voltage-source.test.ts square/triangle + hotload_square assert pre-#11 +5 start) pending update."
+        "Cheap re-verify 2026-06-05: vsrc device-complete (harness firstDivergence null on vsrc-ac-square-rload.dts + vsrc-ac-sine-rload.dts this session); ngspice coefficient-model waveform engine present (ac-voltage-source.ts:158-195, ac-current-source.ts, load-context.ts:87-99). Re-record APPLIED at current spec hash to stabilize (was STALE)."
       ],
       "rationale": null,
-      "escalation": null,
-      "staleFrom": "APPLIED",
-      "staleHash": "1028722f1de3245b"
+      "escalation": null
     }
   ]
 }
