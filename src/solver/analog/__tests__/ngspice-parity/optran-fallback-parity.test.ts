@@ -2,39 +2,19 @@
  * OPtran operating-point pseudo-transient fallback — Surface 3 (paired ngspice).
  *
  * Gate #4 of the `analysis#recon/opTran` recon (spec/v41-port/reconstruction/
- * analysis-optran.md): the inductor-singular fixture under the `optran` option
- * should converge via OPtran to the unique 3V/5V OP bit-exact against the
- * ngspice DLL's optran run (harness_first_divergence null across classes).
+ * analysis-optran.md). The fixture `v1 1 0 dc 3 / v2 2 0 dc 5 / l1 1 2 1m` is an
+ * inductor-induced DC branch-current singularity: an ideal inductor bridging two
+ * source-pinned nodes has no static DC solution, and gmin (a node-to-ground
+ * conductance) cannot resolve a branch-current indeterminacy. Both engines
+ * therefore exhaust direct NR + gmin stepping + source stepping, fall through to
+ * the OPtran pseudo-transient (cktop.c:104), and settle to v1=3, v2=5 with a
+ * physical ~-2 mA branch current / phi = -2 uWb inductor flux.
  *
- * STATUS — gate #4 is BLOCKED on a separate digiTS issue outside this recon's
- * scope (see the escalation in the recon report). The fixture
- * `v1 1 0 dc 3 / v2 2 0 dc 5 / l1 1 2 1m` is an inductor-induced DC
- * branch-current singularity. The spec's premise was that the static ladder
- * (direct NR + gmin stepping + source stepping) fails on `l1#branch`, forcing
- * OPtran on BOTH sides. Measured against the actual v41 DLL in this harness:
- *
- *   - ngspice DOES fall to OPtran: its DC-OP attempt stream runs gmin + source
- *     stepping, THEN tranInit/tranNR/tranPredictor (the OPtran pseudo-transient),
- *     settling to v1=3, v2=5 with physical branch currents (~2 mA).
- *   - digiTS's dynamic_gmin spuriously REPORTS convergence on the singular
- *     circuit before OPtran is ever reached: it lands v1=3, v2=5 but with
- *     nonphysical branch currents (~2e12 A = gmin^-1 scale) that still pass the
- *     voltage-based convergence test. Because the static ladder "succeeds",
- *     solveDcOperatingPoint never invokes the OPtran fallback.
- *
- * So the two engines take different DC-OP paths (digiTS: gmin-only; ngspice:
- * gmin + source + OPtran) and harness_first_divergence is non-null even though
- * the node voltages agree. The OPtran port itself (option plumbing + driver +
- * the cktop.c:101-108 fall-through + harness optran variant) is complete and
- * the default-off invariant (gate #3) holds; what blocks gate #4 is that
- * digiTS's dynamic_gmin accepts a nonphysical branch-current solution rather
- * than failing the singularity and falling through to OPtran.
- *
- * This test encodes the desired behaviour as the spec defines it as a GENUINE
- * FAILING (red) test — NOT weakened to green (no `.skip`/`.fails`) — recording
- * the blocker honestly per author-for-desired-behaviour. It goes green once
- * digiTS's gmin stepping correctly fails the branch-current singularity
- * (FIX-006) so the OPtran fallback is reached on the digiTS side too.
+ * The two solves are bit-exact: harness_first_divergence is null across every
+ * class (voltage / state / rhs / matrix / integration / convergence / shape).
+ * That includes the diagonal gmin OPtran carries on the node diagonals through
+ * the pseudo-transient (CKTdiagGmin = gminstart, cktop.c:647), which scales the
+ * source-pinned nodes by (1 - gmin) identically on both sides.
  */
 
 import { it, expect } from "vitest";
@@ -50,12 +30,9 @@ const DTS_PATH = resolve(
 const OPTRAN = { opstepsize: 1e-8, opfinaltime: 1e-6, opramptime: 0 };
 
 describeIfDll("OPtran inductor-singular parity — recon gate #4", () => {
-  // Gate #4 desired behaviour: OPtran settles to the unique OP bit-exact vs
-  // ngspice, firstDivergence null across classes. A GENUINE FAILING (red) test —
-  // NOT weakened to green — recording the blocker honestly: digiTS's dynamic_gmin
-  // spuriously converges the branch-current singularity before OPtran runs, so
-  // the fallback is never reached (FIX-006). Goes green when FIX-006 lands.
-  it("OPtran settles to 3V/5V bit-exact vs ngspice (null divergence) [RED pending FIX-006]", async () => {
+  // Gate #4: OPtran settles to the unique OP bit-exact vs ngspice, with
+  // firstDivergence null across every signal class.
+  it("OPtran settles to 3V/5V bit-exact vs ngspice (null divergence)", async () => {
     const session = await ComparisonSession.create({
       dtsPath: DTS_PATH,
       dllPath: DLL_PATH,
@@ -70,9 +47,9 @@ describeIfDll("OPtran inductor-singular parity — recon gate #4", () => {
     }
   }, 240_000);
 
-  // What IS true today: both engines reach the source-pinned node voltages
-  // (v1=3, v2=5) even though they take different convergence paths and the
-  // branch currents disagree. This passes and documents the partial result.
+  // A focused readout of the settled node voltages: both engines reach the
+  // source-pinned v1=3, v2=5 via the same gmin -> source -> OPtran path (the
+  // bit-exact assertion above already covers the full per-iteration signal set).
   it("both engines reach the source-pinned node voltages v1=3, v2=5", async () => {
     const session = await ComparisonSession.create({
       dtsPath: DTS_PATH,
