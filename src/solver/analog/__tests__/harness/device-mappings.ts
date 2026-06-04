@@ -113,53 +113,54 @@ export const DIODE_MAPPING: DeviceMapping = {
 // ---------------------------------------------------------------------------
 // BJT (SPICE L1- Gummel-Poon)
 // ---------------------------------------------------------------------------
-// ngspice bjt state offsets (bjtdefs.h:289-313):
-//   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5,
-//   BJTgm=6, BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11,
-//   BJTqsub=12, BJTcqsub=13, BJTqbx=14, BJTcqbx=15, BJTgx=16,
-//   BJTcexbc=17, BJTgeqcb=18, BJTgcsub=19, BJTgeqbx=20,
-//   BJTvsub=21, BJTcdsub=22, BJTgdsub=23
+// ngspice BJT state offsets (bjtdefs.h:316-341, BJTnumStates=33):
+//   BJTvbe=0, BJTvbc=1, BJTvbcx=2, BJTvrci=3, BJTcc=4, BJTcb=5,
+//   BJTgpi=6, BJTgmu=7, BJTgm=8, BJTgo=9, BJTqbe=10, BJTcqbe=11,
+//   BJTqbc=12, BJTcqbc=13, BJTqsub=14, BJTcqsub=15, BJTqbx=16,
+//   BJTcqbx=17, BJTgx=18, BJTcexbc=19, BJTgeqcb=20, BJTgcsub=21,
+//   BJTgeqbx=22, BJTvsub=23, BJTcdsub=24, BJTgdsub=25, then the
+//   quasi-saturation slots BJTirci=26 .. BJTgbcx=32 (bjtdefs.h:342-348).
 //
-// Post-W1.2 rename: digiTS schema matches ngspice slot names for the
-// resistive/cap-storage portion. Post-W1.9 close-out rename: QSUB/CQSUB
-// now match ngspice bjtdefs.h BJTqsub=12 / BJTcqsub=13 exactly.
+// BJTvbcx (2) and BJTvrci (3) are the quasi-saturation epitaxial-collector
+// slots; the digiTS L1 Gummel-Poon schema does not carry them, so ngspice
+// offsets 2 and 3 are intentionally unmapped (not compared). Every digiTS
+// slot below maps to its ngspice offset by name.
 //
-// Note on augmentation: our GPI/GMU/CC/CB (slots 4,5,2,3) are cap-augmented
-// during transient- bjtload.c:725-734 lumps cap companion geq/ieq into
-// these slots. The mappings below therefore compare our cap-augmented
-// values against ngspice's CKTstate0 offsets, which are likewise augmented.
+// GPI/GMU/CC/CB (ngspice offsets 6,7,4,5) are cap-augmented during transient-
+// bjtload.c lumps the cap companion geq/ieq into these slots on both sides, so
+// the comparison is augmented-against-augmented.
 
-// BJT pin currents: CC=BJTcc (collector terminal current, slot 2) and
-// CB=BJTcb (base terminal current, slot 3) are the directly-stored
-// terminal currents. Emitter is not in CKTstate- ngspice derives it
-// by KCL: Ie = -(Ic + Ib). bjtdefs.h:289-313 has no BJTce.
+// BJT pin currents: CC=BJTcc (collector terminal current, offset 4) and
+// CB=BJTcb (base terminal current, offset 5) are the directly-stored
+// terminal currents. Emitter is not in CKTstate- ngspice derives it by
+// KCL: Ie = -(Ic + Ib). bjtdefs.h has no BJTce.
 export const BJT_MAPPING: DeviceMapping = {
   deviceType: "bjt",
   slotToNgspice: {
     VBE: 0,
     VBC: 1,
-    CC: 2,
-    CB: 3,
-    GPI: 4,
-    GMU: 5,
-    GM: 6,
-    GO: 7,
-    QBE: 8,
-    CQBE: 9,
-    QBC: 10,
-    CQBC: 11,
-    QSUB: 12,
-    CQSUB: 13,
-    QBX: 14,
-    CQBX: 15,
-    GX: 16,
-    CEXBC: 17,
-    GEQCB: 18,
-    GCSUB: 19,
-    GEQBX: 20,
-    VSUB: 21,
-    CDSUB: 22,
-    GDSUB: 23,
+    CC: 4,
+    CB: 5,
+    GPI: 6,
+    GMU: 7,
+    GM: 8,
+    GO: 9,
+    QBE: 10,
+    CQBE: 11,
+    QBC: 12,
+    CQBC: 13,
+    QSUB: 14,
+    CQSUB: 15,
+    QBX: 16,
+    CQBX: 17,
+    GX: 18,
+    CEXBC: 19,
+    GEQCB: 20,
+    GCSUB: 21,
+    GEQBX: 22,
+    VSUB: 23,
+    CDSUB: 24,
+    GDSUB: 25,
   },
   pinCurrents: {
     C: [{ slot: "CC", sign: 1 }],
@@ -169,28 +170,28 @@ export const BJT_MAPPING: DeviceMapping = {
   ngspiceToSlot: {
     0: "VBE",
     1: "VBC",
-    2: "CC",
-    3: "CB",
-    4: "GPI",
-    5: "GMU",
-    6: "GM",
-    7: "GO",
-    8: "QBE",
-    9: "CQBE",
-    10: "QBC",
-    11: "CQBC",
-    12: "QSUB",
-    13: "CQSUB",
-    14: "QBX",
-    15: "CQBX",
-    16: "GX",
-    17: "CEXBC",
-    18: "GEQCB",
-    19: "GCSUB",
-    20: "GEQBX",
-    21: "VSUB",
-    22: "CDSUB",
-    23: "GDSUB",
+    4: "CC",
+    5: "CB",
+    6: "GPI",
+    7: "GMU",
+    8: "GM",
+    9: "GO",
+    10: "QBE",
+    11: "CQBE",
+    12: "QBC",
+    13: "CQBC",
+    14: "QSUB",
+    15: "CQSUB",
+    16: "QBX",
+    17: "CQBX",
+    18: "GX",
+    19: "CEXBC",
+    20: "GEQCB",
+    21: "GCSUB",
+    22: "GEQBX",
+    23: "VSUB",
+    24: "CDSUB",
+    25: "GDSUB",
   },
 };
 

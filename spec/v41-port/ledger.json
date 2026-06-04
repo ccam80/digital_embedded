@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T15:37:10.619Z",
+    "generated": "2026-06-04T15:48:10.035Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -62241,7 +62241,7 @@
         "analysis/cktntask.c#h004",
         "analysis/cktsopt.c#h003"
       ],
-      "hunkHash": "40e93346e3b6319c",
+      "hunkHash": "07b9502c7908edf8",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],

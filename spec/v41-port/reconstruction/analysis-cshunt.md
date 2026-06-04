@@ -1,12 +1,13 @@
 # Reconstruction spec — `analysis#recon/cshunt`
 
 Add ngspice's `.option cshunt=val` feature: a real capacitor of value `val`
-from **every non-ground voltage node to ground**, instantiated **after** node
-setup so device-internal voltage nodes are included. digiTS carries **no**
+from **every non-ground EXTERNAL/NETLIST voltage node to ground**, instantiated
+during parse (`INPpas4`) **before** `CKTsetup` mints any device-internal node, so
+**device-internal voltage nodes are EXCLUDED**. digiTS carries **no**
 cshunt today (verified: zero matches for `cshunt`/`cShunt`/`CShunt` under
 `src/`), so a circuit run with `.option cshunt=<val>` differs from ngspice by the
-entire set of injected ground capacitors — every voltage node is missing its
-shunt-cap charge contribution.
+entire set of injected ground capacitors — every external/netlist voltage node is
+missing its shunt-cap charge contribution.
 
 `analysis#recon/cshunt` is a **structural-match** reconstruction (`CLAUDE.md`
 "Structural match, not semantic"): the faithful port reproduces ngspice's
@@ -100,13 +101,23 @@ Four ngspice functions, read by hand, define the rule:
    equation rows (`NODE_CURRENT`) are skipped. Each capacitor's top node is the
    voltage node, its second node is ground (`inppas4.c:62-63`).
 
-3. **Phase order** (`spiceif.c:163-183`): `INPpas4` runs **after** `INPpas2`
-   (`spiceif.c:168` — node building, which allocates every node including
-   device-internal nodes minted by device setup) and **before** `INPpas3`
-   (`spiceif.c:181` — `.nodeset`/`.ic` data). So `ckt->CKTnodes` at INPpas4 time
-   already contains **device-internal voltage nodes** (e.g. a BJT internal
-   collector/base/emitter, a diode internal anode) — those get a shunt cap too.
-   This is the load-bearing timing fact for the digiTS port shape.
+3. **Phase order** (`spiceif.c:163-183`): inside `if_inpdeck` the order is
+   `INPpas1` (`spiceif.c:163` — `.model` lines) → `INPpas2` (`spiceif.c:168` —
+   scans the instance lines and builds `ckt->CKTnodes` from the **netlist-named
+   nodes only**) → `INPpas4` (`spiceif.c:177` — the cshunt injection; the inline
+   comment at `spiceif.c:176` reads "If option cshunt is given, add capacitors to
+   each voltage node") → `INPpas3` (`spiceif.c:181` — `.nodeset`/`.ic` data), then
+   `if_inpdeck` **RETURNS** (`spiceif.c:195`). Crucially, `CKTsetup` — where each
+   device's `setup()` mints its **internal** nodes via `CKTmkVolt` (e.g.
+   `diosetup.c:312` mints `DIOposPrimeNode`, the diode internal anode; `BJTsetup`
+   / `MOSsetup` mint the BJT/MOS internal nodes) — runs **LATER and SEPARATELY**,
+   at `cktdojob.c:161` (reached via `if_run`/`CKTdojob`, **after** `if_inpdeck`
+   has returned). Therefore at INPpas4 time `ckt->CKTnodes` contains **only the
+   external/netlist voltage nodes** (including subcircuit-expansion internal nodes,
+   which INPpas2 does create); **device-internal voltage nodes DO NOT EXIST yet**
+   and get **no** shunt cap. This is the load-bearing timing fact for the digiTS
+   port shape: INPpas4 is a pre-`CKTsetup` parse pass, not a post-device-setup
+   pass.
 
 4. **`CKTcshunt` is set but unused** (`cktdojob.c:74`): the task→circuit copy
    block assigns `ckt->CKTcshunt = task->TSKcshunt;` and nothing downstream reads
@@ -123,10 +134,10 @@ Four ngspice functions, read by hand, define the rule:
 |---|---|---|---|
 | `eval_opt` `cshunt=` scan + `sr <= 0` gate | parse + positivity gate | `SimulationParams.cshunt` field, gated `cshunt > 0` | `inp.c:457-471` |
 | `cp_vset("cshunt_value", …)` cp-var | the parsed value carried to the injector | `params.cshunt` threaded to the engine | `inp.c:469` |
-| `INPpas4` node walk | the injection pass | the post-`_setup` injection pass in `MNAEngine._setup` (Part C) | `inppas4.c:54-75` |
-| `node->type == NODE_VOLTAGE && number>0` | node selection | `_nodeTable` entries with `type === "voltage"` and `number > 0` (Part C) | `inppas4.c:56` |
-| `ckt->CKTnodes` (post-INPpas2, incl. device-internal) | node set including device-internal nodes | the engine `_nodeTable` after the per-element `setup()` loop (`analog-engine.ts:1824-1826`) | `spiceif.c:168,177` |
-| `newInstance` of `Capacitor` + `bindNode(1, node)` / 2nd→gnd | one Capacitor-to-ground per node | a `CapacitorElement` (`capacitor.ts:137`) with `capacitance = val`, pins `pos→node`, `neg→0` | `inppas4.c:60-67` |
+| `INPpas4` node walk | the injection pass | the injection pass `_injectCshuntCapacitors` in `MNAEngine._setup` (Part C) | `inppas4.c:54-75` |
+| `node->type == NODE_VOLTAGE && number>0` | node selection | the compiler-allocated voltage-node range `1..nodeCount` (external + composite-internal), iterated ascending (Part C) | `inppas4.c:56` |
+| `ckt->CKTnodes` (post-INPpas2, pre-`CKTsetup`: external/netlist nodes ONLY) | the external/netlist voltage-node set, device-internal nodes EXCLUDED | the compiler-allocated node range `1..cac.nodeCount` (`analog-engine.ts`), NOT the post-device-internal-setup `_nodeTable` | `spiceif.c:168,177,195`; `cktdojob.c:161` |
+| `newInstance` of `Capacitor` + `bindNode(1, node)` / 2nd→gnd | one Capacitor-to-ground per external/netlist node | an `AnalogCapacitorElement` (`capacitor.ts:137`) with `capacitance = val`, pins `pos→nodeSlot`, `neg→0` | `inppas4.c:60-67` |
 | `INPpName("capacitance", csval)` | set the cap value | the injected element's `capacitance` model param = `params.cshunt` | `inppas4.c:67` |
 | `ckt->CKTcshunt = task->TSKcshunt` (set, unused) | circuit-struct copy of the option | (no load-path read; the value lives on `params.cshunt`) | `cktdojob.c:74` |
 | `tsk->TSKcshunt = -1` (app default) | default = disabled | `params.cshunt` default `-1` (off) | `cktntask.c:90` |
@@ -140,17 +151,22 @@ Four ngspice functions, read by hand, define the rule:
   has `gshunt?` (`:93-94`) but no `cshunt?`. `DEFAULT_SIMULATION_PARAMS`
   (`:232-…`) has `gshunt: 0` (`:247`) but no cshunt. No engine/load/parser path
   references it.
-- **The node table that the injection pass consumes already exists.** The engine
-  mints every node (external and device-internal) through `_makeNode`
-  (`analog-engine.ts:1918-1922`), which pushes `{ name, number, type:
-  "voltage"|"current" }` onto `_nodeTable`. Device-internal voltage nodes are
-  minted by each element's `setup()` via `ctx.makeVolt` (`_buildSetupContext`,
-  `analog-engine.ts:1904`). `_setup()` runs the per-element setup loop
-  (`analog-engine.ts:1824-1826`), after which `_nodeTable` holds the full node set
-  — the exact `ckt->CKTnodes`-after-INPpas2 analogue. `buildNodeTypes`
-  (`ckt-context.ts:1061-1067`) already classifies each slot
-  `"voltage"|"current"` from this table (the `NODE_VOLTAGE`/`NODE_CURRENT`
-  analogue, ported from `cktload.c:175-178`).
+- **The external/netlist voltage-node set the injection pass consumes already
+  exists as the compiler-allocated range `1..cac.nodeCount`.** The unified
+  compiler pre-allocates the external net nodes plus the composite (subcircuit)
+  internal nodes via `expandCompositeInstance` (the INPpas2 / subckt-expansion
+  analogue) into the range `1..nodeCount`; these are the netlist-declared
+  NODE_VOLTAGE nodes that exist at ngspice's INPpas4 time. Per-device-internal
+  voltage nodes and branch (current) rows are minted **later** by each element's
+  `setup()` via `ctx.makeVolt`/`ctx.makeCur` (the `CKTsetup`/`DEVsetup` analogue,
+  `_buildSetupContext`, `analog-engine.ts:1904`), pushed onto `_nodeTable` by
+  `_makeNode` (`analog-engine.ts:1918-1922`) with numbers **>`nodeCount`**. The
+  injection pass therefore iterates `1..cac.nodeCount` — the
+  `ckt->CKTnodes`-at-INPpas4-time analogue (external/netlist nodes only) — and
+  does **NOT** iterate the post-`setup()` `_nodeTable` (which would wrongly include
+  device-internal nodes that did not exist at ngspice's INPpas4). `buildNodeTypes`
+  (`ckt-context.ts:1061-1067`) classifies each slot `"voltage"|"current"` (the
+  `NODE_VOLTAGE`/`NODE_CURRENT` analogue, ported from `cktload.c:175-178`).
 - **The capacitor element is the reuse target.** `CapacitorElement`
   (`capacitor.ts:137-146`) is constructed from `(instanceId, position, rotation,
   mirror, props)` with a `capacitance` model param (`capacitor.ts:71`,
@@ -180,14 +196,22 @@ beside `gshunt` (`analog-engine-interface.ts:93-94`):
 
 ```ts
 /**
- * Shunt capacitance (F) added from every non-ground voltage node to ground,
- * realized as one real capacitor leaf per node — ngspice `.option cshunt`
- * (cktsopt.c:244, OPTtbl row). Unlike gshunt (a diagonal-conductance stamp,
- * ngspice CKTgshunt), cshunt is NOT a load-path quantity: ngspice's CKTcshunt
- * is set once (cktdojob.c:74) and never read; the real work is INPpas4
- * (inppas4.c:54-75) instantiating a Capacitor-to-ground per voltage node.
+ * Shunt capacitance (F) added from every external/netlist voltage node to
+ * ground, realized as one real capacitor leaf per node — ngspice
+ * `.option cshunt` (cktsopt.c:244, the OPTtbl row). Unlike gshunt (a
+ * diagonal-conductance stamp, ngspice CKTgshunt), cshunt is NOT a load-path
+ * quantity: ngspice's CKTcshunt is assigned once (cktdojob.c:74) and never
+ * read in any load / iteration path; the real work is INPpas4
+ * (inppas4.c:54-75) instantiating one Capacitor-to-ground device per voltage
+ * node. INPpas4 runs right after INPpas2 (spiceif.c:168,177), before device
+ * setup mints internal nodes (CKTsetup, cktdojob.c:161, after if_inpdeck
+ * returns at spiceif.c:195), so it covers the netlist-declared nodes
+ * (external + subcircuit-expansion) only — per-device-internal nodes get no
+ * shunt cap. The injected capacitors stamp through the ordinary capacitor
+ * companion model, so cshunt's effect is a reactive dQ/dt contribution seen
+ * only in transient/AC, exactly as a netlisted `C <node> 0 val` would be.
  * Active only when > 0 (inp.c:466 — sr <= 0 is skipped). Default -1 = off
- * (cktntask.c:90 — tsk->TSKcshunt = -1).
+ * (cktntask.c:90, tsk->TSKcshunt = -1).
  */
 cshunt?: number;
 ```
@@ -223,14 +247,18 @@ field of Part A, the same way the present `gshunt`/`indVerbosity`/`epsmin` optio
 are surfaced as typed fields rather than an `OPTtbl`/`TSKtask` struct walk. Those
 four lines are the blocked hunks; this recon supplies the field they target.
 
-## Part C — The INPpas4-faithful post-`_setup` injection pass
+## Part C — The INPpas4-faithful injection pass (external/netlist nodes only)
 
 This is the core of the reconstruction. It reproduces `INPpas4`
-(`inppas4.c:29-77`) at the digiTS phase that corresponds to
-"after INPpas2, before INPpas3" — i.e. **inside `MNAEngine._setup()`, after the
-per-element `setup()` loop has minted every device-internal node into
-`_nodeTable`, and before the matrix-size-dependent state/handle allocation that
-consumes the final element/node set.**
+(`inppas4.c:29-77`) at the digiTS phase that corresponds to ngspice's
+"after INPpas2, before INPpas3 — and crucially **before** `CKTsetup`". Because
+INPpas4 is a parse-time pass that runs while `ckt->CKTnodes` still holds only the
+netlist-declared nodes (`spiceif.c:168,177,195`; `CKTsetup` not until
+`cktdojob.c:161`), the pass injects over the **external/netlist voltage-node set
+only** — the compiler-allocated range `1..cac.nodeCount`. Per-device-internal
+nodes, which the per-element `setup()` loop mints into `_nodeTable` later, are
+**EXCLUDED**, exactly matching ngspice (where those nodes do not exist at INPpas4
+time).
 
 ### Placement
 
@@ -238,92 +266,109 @@ consumes the final element/node set.**
 
 1. `_buildSetupContext()` (`:1823`);
 2. the per-element `setup()` loop (`:1824-1826`) — this is the
-   `INPpas2`-node-building analogue: every element, including composites,
-   mints its external and **device-internal voltage nodes** via `ctx.makeVolt`,
-   so `_nodeTable` is complete here;
+   `CKTsetup`/`DEVsetup` analogue: every element, including composites, mints its
+   **device-internal voltage nodes** via `ctx.makeVolt` into `_nodeTable` with
+   numbers `>nodeCount`. These nodes are the digiTS analogue of the nodes ngspice
+   mints in `CKTsetup` (`diosetup.c:312` etc.), which run **after** INPpas4 — so
+   they are NOT cshunt targets;
 3. state-buffer / row-buffer allocation, nodeset/IC handles, `buildNodeTypes`,
    topology diagnostics, the initial temperature pass (`:1832-1869`).
 
 The cshunt injection pass is inserted **immediately after the per-element
 `setup()` loop (after `:1826`) and before the state/matrix allocation
-(`:1832`)** — so the injected capacitor leaves are part of the element set the
-matrix sizing, state allocation, family-dispatch grouping, and load walk all see,
-exactly as ngspice's INPpas4-created capacitors are part of the circuit before
-`CKTsetup` sizes the matrix. (ngspice order: INPpas2 → INPpas4 → CKTsetup; the
-injected caps exist before the matrix is allocated. The digiTS `_setup`
-per-element loop is the setup pass; the cshunt caps are appended to the element
-set after it so they participate in every downstream `_setup` step.)
+(`:1832`)** — the point at which the injected capacitor leaves still become part
+of the element set the matrix sizing, state allocation, family-dispatch grouping,
+and load walk all see, exactly as ngspice's INPpas4-created capacitors are part of
+the circuit before `CKTsetup` sizes the matrix. The pass iterates the
+compiler-allocated external/netlist node range `1..cac.nodeCount` — NOT the
+post-`setup()` `_nodeTable` — so it shunts precisely the nodes that exist at
+ngspice's INPpas4 time and excludes the device-internal nodes the `setup()` loop
+just minted. (ngspice order: INPpas2 → INPpas4 → `if_inpdeck` returns → later
+`CKTsetup`; the injected caps exist before the matrix is allocated but the
+device-internal nodes do not yet exist when INPpas4 runs.)
 
-> **Insertion-point precondition.** The injected `CapacitorElement` leaves must
-> themselves be `setup()`-driven (they allocate a Norton stamp in `setup()`,
-> `capacitor.ts:343`). Therefore the pass (a) constructs the leaves, then (b)
-> runs `el.setup(setupCtx)` on each injected leaf with the SAME `setupCtx`, then
-> (c) appends them to `this._elements` so the subsequent state/matrix/family
-> steps include them. The injected leaf's `pos` pin binds to the voltage node's
-> slot and its `neg` pin binds to ground (slot 0) — the `bindNode(1, node)` /
-> "2nd node is gnd" analogue (`inppas4.c:62-63`). The implementer wires the
-> leaf's two pins to `(nodeSlot, 0)` directly (these leaves are engine-injected,
-> not compiler-placed, so they carry an explicit node binding rather than a
-> pin-layout resolution). No new node is minted for the cap — it reuses the
-> existing voltage node and ground.
+> **Insertion-point precondition.** The injected `AnalogCapacitorElement` leaves
+> must themselves be `setup()`-driven (they allocate a Norton stamp in `setup()`,
+> `capacitor.ts:343`). Therefore the pass (a) constructs the leaves for nodes
+> `1..nodeCount`, then (b) runs `el.setup(setupCtx)` on each injected leaf with
+> the SAME `setupCtx`, then (c) appends them to `cac.elements` / `this._elements`
+> so the subsequent state/matrix/family steps include them. The injected leaf's
+> `pos` pin binds to the voltage node's slot and its `neg` pin binds to ground
+> (slot 0) — the `bindNode(1, node)` / "2nd node is gnd" analogue
+> (`inppas4.c:62-63`). The implementer wires the leaf's two pins to
+> `(nodeSlot, 0)` directly via the leaf's `pinNodes` map (these leaves are
+> engine-injected, not compiler-placed, so they carry an explicit node binding
+> rather than a pin-layout resolution). No new node is minted for the cap — it
+> reuses the existing external/netlist voltage node and ground.
 
 ### The pass (rebuild of `inppas4.c:41-76`)
 
 ```ts
-// inppas4.c:29-77 — `.option cshunt`: add a capacitor from every non-ground
-// voltage node to ground. ngspice runs this in INPpas4, AFTER INPpas2 builds the
-// node table (so device-internal nodes are present, spiceif.c:168,177) and
-// before the matrix is sized. Here it runs after the per-element setup() loop
-// (which minted every device-internal voltage node into _nodeTable) and before
-// the state/matrix allocation, the same phase boundary.
+// inppas4.c:29-77 — `.option cshunt`: add a capacitor to ground from every
+// external/netlist voltage node. ngspice runs INPpas4 (spiceif.c:177) right
+// after INPpas2 (spiceif.c:168) builds ckt->CKTnodes from the netlist instance
+// lines, and BEFORE CKTsetup (cktdojob.c:161, reached only after if_inpdeck
+// returns at spiceif.c:195) sizes the matrix and mints any device-internal node
+// (e.g. diosetup.c:312). Here it runs after the per-element setup() loop above
+// and before the state/matrix allocation; the leaves bind to the
+// compiler-allocated nodes 1..nodeCount (external + composite-internal), NOT the
+// per-device-internal nodes the setup() loop just minted into _nodeTable (those
+// are the DEVsetup analogue, post-INPpas4 in ngspice, so they get no shunt cap).
 const cshunt = this._params.cshunt ?? -1;
 // inp.c:466 — sr <= 0 is skipped; cshunt is active only when > 0. The -1
 // default (cktntask.c:90) therefore leaves the circuit untouched.
 if (cshunt > 0) {
-  for (const node of this._nodeTable) {
-    // inppas4.c:56 — node->type == NODE_VOLTAGE && node->number > 0. Skip branch
-    // (current) rows and the ground node (number 0).
-    if (node.type !== "voltage" || node.number <= 0) continue;
+  for (let nodeNumber = 1; nodeNumber <= cac.nodeCount; nodeNumber++) {
+    // inppas4.c:56 — node->type == NODE_VOLTAGE && node->number > 0. The
+    // compiler-allocated range 1..nodeCount is exactly the netlist-declared
+    // voltage nodes (external + subcircuit-expansion internal); ground is 0 and
+    // is excluded by starting at 1. Branch (current) rows and device-internal
+    // nodes live above nodeCount and are not iterated.
     // inppas4.c:58-67 — one Capacitor device to ground, value = csval, named
-    // capac<n>shunt. Reuse the existing CapacitorElement; bind pos→node,
+    // capac<n>shunt. Reuse the existing AnalogCapacitorElement; bind pos→node,
     // neg→ground (inppas4.c:62-63 "the top node, second node is gnd").
-    const leaf = this._makeCshuntCapacitor(`capac${node.number}shunt`, cshunt);
+    const leaf = this._makeCshuntCapacitor(`capac${nodeNumber}shunt`, nodeNumber, cshunt);
     leaf.setup(setupCtx);                 // capacitor.ts:343 — allocate the Norton stamp
-    this._bindCshuntLeafNodes(leaf, node.number, /*ground*/ 0);
-    this._elements.push(leaf);
+    leaves.push(leaf);
   }
+  // append leaves to cac.elements / _elements, rebuild elementsByFamily, refresh
+  // ctx-side derived views (see implementation for the full bookkeeping).
 }
 ```
 
-The helper `_makeCshuntCapacitor(name, value)` constructs a `CapacitorElement`
-with a `PropertyBag` carrying `capacitance = value` (the `INPpName("capacitance",
-csval)` analogue, `inppas4.c:67`); `_bindCshuntLeafNodes(leaf, nodeSlot, 0)`
-binds the leaf's `pos`/`neg` pin slots to `(nodeSlot, 0)`. The implementer reuses
-whatever node-binding mechanism the engine already uses for an element's resolved
-pin slots — the load-bearing requirement is `pos = nodeSlot`, `neg = 0`.
+The helper `_makeCshuntCapacitor(name, nodeSlot, value)` constructs an
+`AnalogCapacitorElement` from a `PropertyBag` carrying `capacitance = value` (the
+`INPpName("capacitance", csval)` analogue, `inppas4.c:67`) and a `pinNodes` map
+binding `pos → nodeSlot`, `neg → 0` (the `bindNode(1, node)` / "2nd node = gnd"
+analogue, `inppas4.c:62-63`). The leaves are engine-injected, so they carry their
+node binding directly in `pinNodes` rather than via pin-layout resolution — the
+load-bearing requirement is `pos = nodeSlot`, `neg = 0`.
 
 ### Node selection — deck-encounter order
 
 ngspice walks `ckt->CKTnodes` in **node-list order** (`inppas4.c:55` — `for (node
 = ckt->CKTnodes; node; node = node->next)`), which is first-encounter (node
 number) order — the order `INPpas2`/`INPtermInsert` minted the numbers (see
-`parser#recon/nodeAllocOrder`). digiTS's `_nodeTable` is appended in mint order by
-`_makeNode` (`analog-engine.ts:1920`), so iterating `_nodeTable` in array order
-**is** node-number / deck-encounter order. The injected capacitors are therefore
-created in the same node order ngspice creates them, so the per-model instance
-list and the matrix element-pool order match — required for matrix element-pool
-parity (the same first-encounter discipline `nodeAllocOrder` enforces for node
-numbering).
+`parser#recon/nodeAllocOrder`). At INPpas4 time that list holds only the
+netlist-declared nodes `1..N`. digiTS's compiler allocates the same
+external/netlist nodes into the contiguous range `1..nodeCount` in deck-encounter
+order, so iterating `1..cac.nodeCount` ascending **is** node-number /
+deck-encounter order. The injected capacitors are therefore created in the same
+node order ngspice creates them, so the per-model instance list and the matrix
+element-pool order match — required for matrix element-pool parity (the same
+first-encounter discipline `nodeAllocOrder` enforces for node numbering).
 
-> **Match ngspice's node set exactly — do NOT minimize.** Per the task directive
-> and `CLAUDE.md` "No Pragmatic Patches": the injection covers **every**
-> non-ground voltage node, **including device-internal voltage nodes** (BJT
-> internal C/B/E, diode internal anode, MOSFET internal D/S, etc.). It is NOT
-> restricted to user-facing external nodes. A device-internal node is in
-> `_nodeTable` with `type === "voltage"` after that device's `setup()`, so the
-> pass picks it up automatically — exactly as ngspice's `CKTnodes` walk does.
-> Current/branch rows (`type === "current"`, the `NODE_CURRENT` analogue) get no
-> cap.
+> **Match ngspice's node set exactly — EXTERNAL/NETLIST nodes only, do NOT
+> over-inject.** Per the ngspice phase order (`spiceif.c:163-195`; `CKTsetup` not
+> until `cktdojob.c:161`): the injection covers **every non-ground external /
+> netlist voltage node** and **EXCLUDES device-internal voltage nodes** (BJT
+> internal C/B/E, diode internal anode `DIOposPrime`, MOSFET internal D/S, etc.).
+> Those device-internal nodes are minted by `CKTsetup`, which runs **after**
+> INPpas4, so they do not exist when ngspice injects the shunt caps. In digiTS
+> they appear in `_nodeTable` with numbers `>nodeCount` only after the per-element
+> `setup()` loop; the pass iterates `1..cac.nodeCount` and therefore never touches
+> them — exactly as ngspice's INPpas4 `CKTnodes` walk does not. Current/branch
+> rows (the `NODE_CURRENT` analogue) get no cap.
 
 ## Part D — The capacitor-reuse mechanism (no new stamp)
 
@@ -360,16 +405,26 @@ deck card — on a small multi-node circuit, and shows `harness_first_divergence
 null.
 
 **Circuit (`cshunt-gate.dts`).** A small multi-node circuit with at least one
-device-internal voltage node so the gate proves the device-internal coverage of
-Part C — e.g. a voltage source driving an RC into a diode (the diode mints an
-internal anode node) plus a second resistive node, run in **transient** (so the
+device-internal voltage node so the gate proves the device-internal **EXCLUSION**
+of Part C — e.g. a voltage source driving an RC into a diode (the diode mints an
+internal anode node `DIOposPrime` in its `setup()` / ngspice `CKTsetup`,
+`diosetup.c:312`) plus a second resistive node, run in **transient** (so the
 shunt caps' reactive contribution is observable; a pure DC-OP would show the caps
 as opens and under-exercise the feature). The fixture sets a `cshunt` value large
 enough to perturb the transient waveform measurably (e.g. `cshunt=1e-9`).
 
+The diode internal anode is the load-bearing fixture choice: if digiTS wrongly
+shunted device-internal nodes (post-`setup()` `_nodeTable` entries with number
+`>nodeCount`), it would inject one extra cap that ngspice does NOT inject (ngspice
+mints `DIOposPrime` in `CKTsetup`, after INPpas4 has already finished injecting
+caps), and `harness_first_divergence` would be non-null. Bit-exact parity on this
+fixture is therefore positive proof that the device-internal anode is correctly
+**excluded** on both sides — the external/netlist-only scope is provably correct.
+
 **digiTS side.** The fixture / `ComparisonSession` configures the engine with
 `params.cshunt = 1e-9` (the typed field of Part A). The injection pass (Part C)
-adds one cap per voltage node, including the diode's internal anode.
+adds one cap per external/netlist voltage node (`1..nodeCount`) and **does not**
+add a cap on the diode's internal anode — matching ngspice.
 
 **ngspice side — harness deck injection.** ngspice must receive an `.options
 cshunt=1e-9` card so its INPpas4 injects the matching caps. The harness deck
@@ -402,28 +457,35 @@ per-step solution match bit-exact.
    `-1` default and any value `<= 0` leave the circuit byte-identical to
    cshunt-absent. A DC-OP / transient with default params produces NO injected
    caps and is unchanged from today.
-3. The injection pass lives in `MNAEngine._setup()`
+3. The injection pass (`_injectCshuntCapacitors`) lives in `MNAEngine._setup()`
    (`analog-engine.ts:1820-1890`), inserted **after** the per-element `setup()`
    loop (`:1826`) and **before** the state/matrix/handle allocation (`:1832`),
-   reproducing ngspice's INPpas4 phase (after INPpas2 node-building, before the
-   matrix is sized — `spiceif.c:168,177`). It reads `this._params.cshunt`.
-4. Node selection matches `inppas4.c:56` exactly: every `_nodeTable` entry with
-   `type === "voltage"` and `number > 0` gets one capacitor; `type === "current"`
-   (branch) rows and the ground node (`number 0`) get none. **Device-internal
-   voltage nodes are included** — the pass runs after every element's `setup()`
-   has minted them into `_nodeTable`. The walk is in `_nodeTable` array order
-   (= node-number / deck-encounter order, `_makeNode` mint order), matching
-   `inppas4.c:55`'s `CKTnodes` first-encounter walk for matrix element-pool
-   parity.
-5. Each injected leaf is a real `CapacitorElement` (`capacitor.ts:137`) with
+   reproducing ngspice's INPpas4 phase — after INPpas2 node-building
+   (`spiceif.c:168`), before `CKTsetup` (`cktdojob.c:161`, reached only after
+   `if_inpdeck` returns at `spiceif.c:195`) sizes the matrix and mints
+   device-internal nodes. It reads `this._params.cshunt`.
+4. Node selection reproduces `inppas4.c:56`'s `NODE_VOLTAGE && number > 0` against
+   the **external/netlist node set ONLY**: the pass iterates the
+   compiler-allocated voltage-node range `1..cac.nodeCount` (external +
+   subcircuit-expansion internal nodes — the `ckt->CKTnodes`-at-INPpas4-time
+   analogue) and the ground node (`number 0`) is excluded by starting at 1.
+   **Device-internal voltage nodes are EXCLUDED** — they are minted by each
+   element's `setup()` into `_nodeTable` with numbers `>nodeCount` (the `CKTsetup`
+   analogue, which runs after INPpas4 in ngspice), and the pass does not iterate
+   them; branch (current) rows likewise get no cap. The walk is `1..nodeCount`
+   ascending (= node-number / deck-encounter order), matching `inppas4.c:55`'s
+   `CKTnodes` first-encounter walk for matrix element-pool parity.
+5. Each injected leaf is a real `AnalogCapacitorElement` (`capacitor.ts:137`) with
    `capacitance = params.cshunt` (the `INPpName("capacitance", csval)` analogue,
-   `inppas4.c:67`), `pos` bound to the voltage node slot and `neg` bound to
-   ground slot 0 (the `bindNode(1, node)` / "2nd node = gnd" analogue,
-   `inppas4.c:62-63`), named `capac<n>shunt` (`inppas4.c:58`). Each leaf is
-   `setup()`-driven and appended to `this._elements` so it participates in state
-   allocation, family dispatch, matrix sizing, and the load walk. **No new
-   stamp / load code is added** — the leaves stamp through the unchanged
-   `CapacitorElement` load path.
+   `inppas4.c:67`), `pos` bound to the external/netlist voltage-node slot and
+   `neg` bound to ground slot 0 (the `bindNode(1, node)` / "2nd node = gnd"
+   analogue, `inppas4.c:62-63`), named `capac<n>shunt` (`inppas4.c:58`). Each leaf
+   is `setup()`-driven with the same `setupCtx` and appended to `cac.elements` /
+   `this._elements` (with `elementsByFamily` rebuilt and the ctx-side derived
+   element views refreshed) so it participates in state allocation, family
+   dispatch, matrix sizing, and the load walk. **No new stamp / load code is
+   added** — the leaves stamp through the unchanged `AnalogCapacitorElement` load
+   path.
 6. No `cktCshunt` field is added to `CKTCircuitContext` — `CKTcshunt` is
    set-but-unused in ngspice (no load-path read, verified: only `cktdojob.c:74`
    assign + `com_option.c:81`/`spiceif.c:1480` print/dump). The value is carried
@@ -432,7 +494,8 @@ per-step solution match bit-exact.
    `src/solver/analog/sparse-solver.ts` is unmodified.
 7. **STRICT bit-exact harness gate.** A `cshunt-gate` fixture (Part E) — a small
    multi-node transient circuit with at least one device-internal voltage node
-   (e.g. a diode internal anode) — run with `cshunt=1e-9` on **both** engines
+   (e.g. a diode internal anode, which must get NO shunt cap on either side) —
+   run with `cshunt=1e-9` on **both** engines
    (digiTS via `params.cshunt`; ngspice via an `.options cshunt=1e-9` deck card
    injected by `_materializeCir`) produces `harness_first_divergence`
    `earliest === null` across all four signal classes
@@ -482,4 +545,4 @@ as ordinary deltas:
 indverbosity/xmu/epsmin params or the C struct-copy/dispatch-table plumbing, and
 do NOT block on this recon, per their `analysis-decisions.json` rationales.)
 
-Status: PENDING — authored 2026-06-05, awaiting user ratification.
+Status: RATIFIED 2026-06-05 (corrected node-scope to ngspice ground truth: INPpas4 pre-CKTsetup, external/netlist nodes only)
