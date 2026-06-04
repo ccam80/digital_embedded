@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T17:51:32.629Z",
+    "generated": "2026-06-04T18:14:32.321Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 269,
+    "progressEntriesApplied": 273,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -59552,10 +59552,14 @@
         4150
       ],
       "hunkHash": "57aa3fa0644161cf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/model-parser.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. atto suffix [A,1e-18] appended to SPICE_SUFFIXES (model-parser.ts:96). ngspice inpeval.c INPevaluate h005.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -60984,10 +60988,14 @@
         8933
       ],
       "hunkHash": "403ed115f2b67e11",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/expression-differentiate.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. PTdifferentiate tan->1+tan^2, tanh->1-tanh^2, cosh->sinh, sinh->cosh (expression-differentiate.ts:157-172). ngspice inpptree.c:462-520.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -62009,10 +62017,14 @@
         9706
       ],
       "hunkHash": "858e947619d1495d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/expression-evaluate.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. PTcosh bare cosh -> shared BUILTIN_FUNCTIONS cosh:Math.cosh (expression.ts:160); PTexp/PTlog clamps in ptExp/ptLog (expression.ts:115-130). ngspice ptfuncs.c:264-294.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -62040,10 +62052,14 @@
         9715
       ],
       "hunkHash": "01377787ae3f0e29",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/expression-evaluate.ts",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. PTlog10 arg<0->+Inf, ==0->-1e99, else Math.log10 in ptLog10 (expression.ts:137-143). ngspice ptfuncs.c:297-304.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
