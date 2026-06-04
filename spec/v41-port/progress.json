@@ -1342,6 +1342,42 @@
       ],
       "escalation": null
     },
+    "analysis/cktdojob.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "be5a0c75eb046e1c",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier-2 construct, satisfied by analysis#recon/cshunt APPLIED, committed 0899c50f). ngspice cktdojob.c:74 `ckt->CKTcshunt = task->TSKcshunt;` is the set-but-unused task->circuit copy. Independently re-derived: CKTcshunt is assigned exactly once (cktdojob.c:74) and never read in any load/iteration/convergence path (grep CKTcshunt across analysis/devices = the one assign + com_option.c print + spiceif.c dump only). Correct digiTS counterpart per recon criterion 6: the value lives on params.cshunt (analog-engine-interface.ts:112) and is consumed only by the INPpas4 injection pass (_injectCshuntCapacitors, analog-engine.ts:1990); NO cktCshunt field is added to CKTCircuitContext (a dead field would be the inverse structural-match violation). Verified absent: zero cshunt/CKTcshunt matches in ckt-context.ts. Empty ckt-context.ts diff is the RATIFIED-correct end-state, not a missed edit."
+      ],
+      "escalation": null
+    },
+    "analysis/cktntask.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier-2 construct, satisfied by analysis#recon/cshunt APPLIED, committed 0899c50f). ngspice cktntask.c:60 `tsk->TSKcshunt = def->TSKcshunt;` is the special-task def-copy row inside CKTnewTask. Independently re-derived: digiTS has no TSKtask layer, so the def->task copy collapses bijectively to the single SimulationParams.cshunt field whose default IS the def value — DEFAULT_SIMULATION_PARAMS.cshunt = -1 (analog-engine-interface.ts:269). Construct match: the C 'copy default into new task slot' has no task-slot analogue; the typed field default is the single source (recon Part A). hunkHash blank in ledger.json entry."
+      ],
+      "escalation": null
+    },
+    "analysis/cktntask.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier-2 construct, satisfied by analysis#recon/cshunt APPLIED, committed 0899c50f). ngspice cktntask.c:90 `tsk->TSKcshunt = -1;` is the application-default (disabled) assignment in the default-task branch of CKTnewTask. Independently re-derived: maps to DEFAULT_SIMULATION_PARAMS.cshunt = -1 (analog-engine-interface.ts:269), with the inline comment citing cktntask.c:90 (sr<=0/<=0 leaves circuit byte-identical). The injection gate is `cshunt > 0` (analog-engine.ts:1996), reproducing inp.c:466 sr<=0 rejection, so -1 = off. Construct match. hunkHash blank in ledger.json entry."
+      ],
+      "escalation": null
+    },
+    "analysis/cktsopt.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH (Tier-2 construct, satisfied by analysis#recon/cshunt APPLIED, committed 0899c50f). ngspice cktsopt.c:175-176 `case OPT_CSHUNT: task->TSKcshunt = val->rValue;` (the .options cshunt setter) + cktsopt.c:244 OPTtbl row `{ \"cshunt\", OPT_CSHUNT, IF_SET|IF_REAL, ... }`. Independently re-derived: digiTS surfaces the option as the typed SimulationParams.cshunt?: number field (analog-engine-interface.ts:112), exactly as the already-applied gshunt/epsmin/indverbosity options are surfaced as typed fields rather than an OPTtbl/TSKtask struct walk (recon Part B). Construct match. hunkHash blank in ledger.json entry."
+      ],
+      "escalation": null
+    },
     "maths-ni/nicomcof.c#h001": {
       "state": "APPLIED",
       "hunkHash": "541ef79fde2e6d7f",
