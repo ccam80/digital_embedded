@@ -2548,6 +2548,54 @@
         "MATCH. spsmp.c#h002 (Col==-1 absent-column guard, spsmp.c:464-466) realized as the intCol===-1 early-return in SparseSolver.findElement (sparse-solver.ts:711-717): intRow=this._extToIntRow[row]; intCol=this._extToIntCol[col] == Row=ExtToIntRowMap[Row]; Col=ExtToIntColMap[Col]; if(intCol===-1||intRow===-1) return -1 == if(Col==-1) return NULL (symmetric unseen-row early-out is the explicit form of ngspice chain-walk miss); then _spcFindElementInCol(intCol,intRow,false) == FirstInCol[Col]+spcFindElementInCol(...,NO). h002 was blockedBy maths-sparse#recon/nodesetIcRowZero (now APPLIED, committed d40f0162); findElement landed in that prior committed work and is verified isomorphic over the final result per VERIFICATION.md. createIfMissing=false never reaches _spcCreateElement so _insertionOrder/element-pool order is untouched. File-scope clean."
       ],
       "escalation": null
+    },
+    "parser/ptfuncs.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "858e947619d1495d",
+      "ref": "verify:expr-engine",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. PTcosh bare cosh -> shared BUILTIN_FUNCTIONS cosh:Math.cosh (expression.ts:160); PTexp/PTlog clamps in ptExp/ptLog (expression.ts:115-130). ngspice ptfuncs.c:264-294.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
+      "escalation": null
+    },
+    "parser/ptfuncs.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "01377787ae3f0e29",
+      "ref": "verify:expr-engine",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. PTlog10 arg<0->+Inf, ==0->-1e99, else Math.log10 in ptLog10 (expression.ts:137-143). ngspice ptfuncs.c:297-304.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
+      "escalation": null
+    },
+    "parser/inpptree.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "403ed115f2b67e11",
+      "ref": "verify:expr-engine",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. PTdifferentiate tan->1+tan^2, tanh->1-tanh^2, cosh->sinh, sinh->cosh (expression-differentiate.ts:157-172). ngspice inpptree.c:462-520.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
+      "escalation": null
+    },
+    "parser/inpeval.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "57aa3fa0644161cf",
+      "ref": "verify:expr-engine",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/parser/. atto suffix [A,1e-18] appended to SPICE_SUFFIXES (model-parser.ts:96). ngspice inpeval.c INPevaluate h005.",
+        "Shared clamped BUILTIN_FUNCTIONS single-source (expression.ts) sanctioned by recon expr-engine#recon/numericalDeltas scope+criterion3-BLOCKING; expression.ts in recon scope (spec lines 7-11, criterion 7).",
+        "gate clean: tsc exit 0 (no expr-engine-file errors); 91/91 targeted expression tests pass incl dual-path clamp (expression-numerical-deltas.test.ts). tsFiles committed at 80007338; worktree diff empty is committed-not-lost."
+      ],
+      "escalation": null
     }
   }
 }
