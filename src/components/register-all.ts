@@ -183,6 +183,7 @@ import { VCVSDefinition } from "./active/vcvs.js";
 import { VCCSDefinition } from "./active/vccs.js";
 import { CCVSDefinition } from "./active/ccvs.js";
 import { CCCSDefinition } from "./active/cccs.js";
+import { BVDefinition, BIDefinition } from "./active/bsource.js";
 import { SchmittInvertingDefinition } from "./active/schmitt-trigger.js";
 import { SchmittNonInvertingDefinition } from "./active/schmitt-trigger.js";
 import { SwitchSPSTDefinition } from "./active/analog-switch.js";
@@ -486,6 +487,8 @@ export function createDefaultRegistry(
   registry.register(VCCSDefinition);
   registry.register(CCVSDefinition);
   registry.register(CCCSDefinition);
+  registry.register(BVDefinition);
+  registry.register(BIDefinition);
   registry.register(SchmittInvertingDefinition);
   registry.register(SchmittNonInvertingDefinition);
   registry.register(SwitchSPSTDefinition);

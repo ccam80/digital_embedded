@@ -27,6 +27,10 @@ const DECK_EMITTING_FAMILIES: ReadonlySet<DeviceFamily> = new Set<DeviceFamily>(
   "CCVS",
   "VCCS",
   "VCVS",
+  // ASRC behavioural B-source: BV emits `B out+ out- V=expr`, BI emits
+  // `B out+ out- I=expr` (two output node tokens). Its pin-label-order row gates
+  // the compiler node-allocation walk's parity with ngspice's INPpas2 rule.
+  "ASRC",
   // Single-card switch / coupling: CSW emits `W out+ out- VSENSE model` (two output
   // node tokens); MUT emits `K L1 L2 k`, referencing inductors by name and minting
   // no nodes (its deck-pin row is the empty []). Both are genuine single-card

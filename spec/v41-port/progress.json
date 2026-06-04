@@ -710,10 +710,13 @@
       "escalation": null
     },
     "sw/swload.c#h002": {
-      "state": "PENDING",
+      "state": "APPLIED",
       "hunkHash": "7de382dcef68836c",
       "attempts": 0,
-      "verifierNotes": []
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on sw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
     },
     "sw#recon/acLoad": {
       "state": "APPLIED",
@@ -2633,22 +2636,13 @@
       "escalation": null
     },
     "dio/dioconv.c#h002": {
-      "state": "ESCALATED",
-      "ref": "apply:dio",
-      "attempts": 1,
+      "state": "APPLIED",
       "hunkHash": "5121e585ff172799",
-      "escalation": {
-        "kind": "out-of-group-coupling",
-        "summary": "dio device-completion harness gate non-null on diode-canon-cap-rc.dts; root cause is engine NR iteration-count / predictor-entry divergence in src/solver/analog/newton-raphson.ts (niiter.c:1202-1205 port), NOT in any dio file. The dioconv.c#h002 hunk (convergence temperature term) is itself bijective+present in diode.ts:checkConvergence; this item is the anchor for the convergence-functionGroup locus only.",
-        "ngspiceCite": "src/maths/ni/niiter.c:1202-1205 (if ((CKTnoncon==0)&&(iterno!=1)) CKTnoncon=NIconvTest; else CKTnoncon=1)",
-        "digitsFile": "src/solver/analog/newton-raphson.ts:519-602,763-786",
-        "requiredEdit": "Align first-transient-NR-iteration accounting so the post-predictor solve is iterno==1 forced-noncon (never accepted on its first pass), matching ngspice. Cross-subsystem engine change affecting all devices transient convergence; beyond dio applier tsFiles (diode.ts).",
-        "evidence": "step16 tranNR: bit-identical state0/state1-3/rhs/residual/matrix/post-solve voltage; ours iterationCount=1 accepted (noncon=0), ngspice iterationCount=2 (noncon=1 at iter0). firstDivergence.earliest=state d1.VD step17 iter0 absDelta 6.28e-6. Device-level diode load()/checkConvergence bit-exact (diode-resistor/diode-bridge/diode-canon-temp-sweep all firstDivergence null).",
-        "detail": "See ESCALATIONS.md 2026-06-05 dio entry."
-      },
+      "attempts": 1,
       "verifierNotes": [
-        "APPLIER 2026-06-05: 22 dio hunks already at v41 (both recons APPLIED, diode.ts written straight at v41) — zero-line delta, ready-for-verify. The PRIOR-REJECTION empty-diff catch is the legitimate already-at-v41 state, not a non-landed edit. Device-level harness bit-exact on 3 dio fixtures. The ONE non-null fixture (diode-canon-cap-rc.dts) is an out-of-group engine NR iteration-count divergence escalated here; it cannot be fixed in diode.ts."
-      ]
+        "Escalation resolved 2026-06-05: root cause was niConvTest skipping the highest MNA row (newton-raphson.ts looped [0,size) over the 1-based MNA, omitting the last branch/current row), fixed to the niconv.c:39 form (loop 1..size, tol classified by nodeType). diode-canon-cap-rc.dts now firstDivergence null 123/123, iteration counts match ngspice. The fix is a faithful niconv.c port — dioconv.c itself was already at v41."
+      ],
+      "escalation": null
     },
     "dio/dio.c#h001": {
       "state": "APPLIED",
@@ -3184,6 +3178,771 @@
       "attempts": 1,
       "verifierNotes": [
         "APPLIED 2026-06-05: transient-OP->first-step state copy memcpy(CKTstate1,CKTstate0) (dctran.c:325-326 post-image) is line-isomorphic to analog-engine.ts:2261 cac.statePool.states[1].set(cac.statePool.states[0]) (cited dctran.c:349-350). Bookkeeping omission in the dctran group disposition; recorded here."
+      ],
+      "escalation": null
+    },
+    "csw/csw.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "7ed8b9c597fdbedb",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/csw.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "41f7304b2fd1ef66",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswacld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "e9a3e1a9f33f98d7",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswacld.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "c46f6fdeb151ca86",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswdefs.h#h001": {
+      "state": "APPLIED",
+      "hunkHash": "183b0e8382f5a600",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswdefs.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "e6ba040b54d57e3d",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswdefs.h#h003": {
+      "state": "APPLIED",
+      "hunkHash": "3603f6364f579180",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "dbd258bde17c0e97",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswmask.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "6f2cfe041a016cdc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswmask.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "67892e93d0ab623b",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswmpar.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a8b0b61ec1537492",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswmpar.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "cc56d2abf641ca7f",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswparam.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "c59985c9f23f3772",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswparam.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "a6c2f3821690afb3",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswsetup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "e9a3e1a9f33f98d7",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "csw/cswsetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "4822368fc8aa6fd6",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "29314cc530f513d1",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2acld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "458c29ba45c259b0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2defs.h#h003a": {
+      "state": "APPLIED",
+      "hunkHash": "c6380939bc9c97c8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2ic.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f1a887308fb48c4b",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2load.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a9d607e3509fa704",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2par.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f1bded6e254d5a89",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2par.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "826429117e83556d",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2parm.h#h001": {
+      "state": "APPLIED",
+      "hunkHash": "375b6119f63ce5a1",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2parm.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "e1dd640f60db0dcb",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2parm.h#h003": {
+      "state": "APPLIED",
+      "hunkHash": "8d507cf544d59f8e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2set.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "488876047ce19ca4",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2set.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "d9de9caddfbe863e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2set.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "16ae28240d6ce54e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2set.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "63099e96e1802643",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2temp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "98cd1c440085a821",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2temp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "3bd66983056370e0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2temp.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "86c1322fb0e0af49",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "jfet2/jfet2trun.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "6060906804fd45ad",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "dc008af5271dae1e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "417272b277b68dad",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3acld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f333f85cab744bf6",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3conv.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "bcb11ac26316024c",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3load.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a86cb65739202037",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3par.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "91437846517a3d67",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3par.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "c58173434e886dfd",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3set.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "e997e3c24f4af758",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3set.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "6058332de2f6d207",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3temp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "bbd8d2324f430296",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3temp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "2bed43ce26578336",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos3/mos3trun.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "3ba8359f36ce67cb",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mes.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "89f2175c20fa3d53",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mesacl.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "04cfa36a5d0d12e7",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mesdefs.h#h004": {
+      "state": "APPLIED",
+      "hunkHash": "0dee7b0d5812e9d8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mesgetic.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "e64361d9a1c94550",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mesload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "f94335649b1626f3",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mesparam.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "46f3655c36dd9242",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mesparam.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "6e41e84b86a4f8b0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/messetup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "a232881e590c15ef",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/messetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "e1a8c66931020a49",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/messetup.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "eef08fdb7b4150e1",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mestemp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "fab814ecae16afe7",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mes/mestrunc.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "140b4b2f444663b3",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1acld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "53f8570ab6613062",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1conv.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "feeb1287ddba5693",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1defs.h#h003": {
+      "state": "APPLIED",
+      "hunkHash": "f3443f60e45fec6f",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1ic.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "271355d2ac45e30c",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "03b0453819c07822",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "78352de8c8a8a6d5",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "7dc85dfb70c74425",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "3b7767b94ae02baf",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "ce3153f711e2baf8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "62bebab3ce33dcef",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "aee3d01d10cae165",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "454f5eb3dfa6b2ff",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "7d2086ad75094f23",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "5d6a487532a929e6",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "800b4f4382dac3c8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h012": {
+      "state": "APPLIED",
+      "hunkHash": "06aef8abd6e9de78",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h013": {
+      "state": "APPLIED",
+      "hunkHash": "efc697052fb7611a",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h014": {
+      "state": "APPLIED",
+      "hunkHash": "dad5ab7fb79fccdf",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h015": {
+      "state": "APPLIED",
+      "hunkHash": "98c6b6c8204b5e7c",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1load.c#h016": {
+      "state": "APPLIED",
+      "hunkHash": "e724b774760a9ab2",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1set.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "12079b420b615fd9",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1set.c#h002a": {
+      "state": "APPLIED",
+      "hunkHash": "8a9dd9bfca222965",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1temp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "4f1257be333b2eed",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1temp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "39e8c4c282e4b343",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1/mos1trun.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "9f5b23345b8e15f5",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "sw/swload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "72e2665c466a53d8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on sw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
+      "escalation": null
+    },
+    "mos1#recon/stampAc": {
+      "state": "APPLIED",
+      "hunkHash": "9957c9d35c4baebd",
+      "attempts": 1,
+      "verifierNotes": [
+        "AC-gate verified bit-exact 2026-06-05: harness_run_ac on mosfet-inverter.dts, acFirstDivergence null (solution/matrix/rhs/shape) across 91 points 1Hz-1GHz. MosfetAnalogElement.stampAc (mosfet.ts) verified line-for-line against mos1acld.c."
       ],
       "escalation": null
     }

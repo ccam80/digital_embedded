@@ -10,8 +10,8 @@
 
 import { describe, it, expect, afterAll } from "vitest";
 import { resolve } from "path";
-import { existsSync } from "fs";
 import { ComparisonSession } from "./comparison-session.js";
+import { describeIfDll, DLL_PATH } from "../ngspice-parity/parity-helpers.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
 import type { CaptureSession, MatrixEntrySentinel } from "./types.js";
@@ -20,13 +20,9 @@ function isSentinel(v: number | MatrixEntrySentinel): v is MatrixEntrySentinel {
   return typeof v === "object" && v !== null && "kind" in v;
 }
 
-const DLL_PATH = process.env.NGSPICE_DLL_PATH ?? "";
-const HAS_DLL = DLL_PATH !== "" && existsSync(DLL_PATH);
-const describeGate = HAS_DLL ? describe : describe.skip;
-
 const DTS_PATH = resolve(process.cwd(), "fixtures/rlc-transient.dts");
 
-describeGate("step-alignment: exact stepStartTime equality between engines", () => {
+describeIfDll("step-alignment: exact stepStartTime equality between engines", () => {
   let session: ComparisonSession;
 
   afterAll(() => {

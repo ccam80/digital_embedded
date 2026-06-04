@@ -2115,6 +2115,15 @@ export class MNAEngine implements AnalogEngine {
       },
       findBranch(label) { return engine._findBranch(label, this); },
       findDevice(label) { return engine._deviceMap.get(label) ?? null; },
+      // ASRCsetup IF_NODE resolution (asrcset.c:104-105): net label → node id.
+      // 0 sentinel = ground / unknown net, matching ngspice's CKTfndNode miss.
+      findNode(label) {
+        const n = label.trim();
+        if (n === "" || n === "0" || n.toLowerCase() === "gnd" || n.toLowerCase() === "ground") {
+          return 0;
+        }
+        return engine._compiled?.labelToNodeId.get(n) ?? 0;
+      },
     };
   }
 

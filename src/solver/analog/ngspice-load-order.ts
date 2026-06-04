@@ -33,6 +33,7 @@
  */
 export const NGSPICE_LOAD_ORDER = {
   URC:  0,   // dev.c:141- MUST precede both resistors and capacitors
+  ASRC: 1,   // dev.c:153 get_asrc_info — immediately after URC, before BJT
   BJT:  2,
   CAP:  17,
   CCCS: 18,
@@ -76,6 +77,7 @@ export type DeviceFamily =
   | "MUT"
   | "VSRC"
   | "ISRC"
+  | "ASRC"
   | "VCVS"
   | "VCCS"
   | "CCVS"
@@ -151,6 +153,9 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
   VCVS:            NGSPICE_LOAD_ORDER.VCVS,
   CCCS:            NGSPICE_LOAD_ORDER.CCCS,
   CCVS:            NGSPICE_LOAD_ORDER.CCVS,
+  // ASRC behavioural B-source (dev.c:153) — V-mode (BV) and I-mode (BI).
+  BV:              NGSPICE_LOAD_ORDER.ASRC,
+  BI:              NGSPICE_LOAD_ORDER.ASRC,
 };
 
 /**
@@ -204,6 +209,8 @@ export const TYPE_ID_TO_DEVICE_FAMILY: Readonly<Record<string, DeviceFamily>> = 
   VCVS:            "VCVS",
   CCCS:            "CCCS",
   CCVS:            "CCVS",
+  BV:              "ASRC",
+  BI:              "ASRC",
 };
 
 /**
@@ -277,6 +284,11 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   // Deck: `E/Gname out+ out- ctrl+ ctrl- gain`.
   VCCS:            ["out+", "out-", "ctrl+", "ctrl-"],
   VCVS:            ["out+", "out-", "ctrl+", "ctrl-"],
+  // ASRC B-card: `B<name> n+ n- V=expr` / `I=expr`. Controllers are referenced
+  // symbolically inside the expression (V(node) / I(source)), not as deck node
+  // tokens, so only the two output nodes appear on the card.
+  BV:              ["out+", "out-"],
+  BI:              ["out+", "out-"],
   // Transformer / TappedTransformer are MULTI-LINE composites (see
   // MULTI_LINE_COMPOSITES below): they decompose into per-winding `L` cards plus a
   // `K` coupling, so there is NO single deck card with a fixed node-token order.

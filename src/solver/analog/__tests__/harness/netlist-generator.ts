@@ -80,6 +80,9 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   VCCS:            { prefix: "G" },
   CCVS:            { prefix: "H" },
   CCCS:            { prefix: "F" },
+  // ASRC behavioural B-source: `B<name> n+ n- V=expr` (BV) / `I=expr` (BI).
+  BV:              { prefix: "B" },
+  BI:              { prefix: "B" },
   // InternalCccs is the internal-only flavour of CCCS used inside composites
   // (e.g. Optocoupler). Same ngspice F-card; the sense V-source is identified
   // by a `{ kind: "ref" }` peer reference rather than user-facing sense pins.
@@ -237,6 +240,15 @@ interface EmitCtx {
    * ngspice side.
    */
   preAllocatedNodes: ReadonlyMap<string, number>;
+  /**
+   * Compiler `labelToNodeId` map (component/net label → MNA node id). The
+   * B-source (BV/BI) emit branch rewrites the `V(net)` controllers inside its
+   * expression to the deck's stringified node id (the harness names ngspice
+   * nodes by digiTS node id), so the ngspice B-card references the same nodes
+   * digiTS allocated. `I(source)` controllers are referenced by the (V-prefix
+   * canonicalized) source name, exactly as ngspice's B-card does.
+   */
+  labelToNodeId: ReadonlyMap<string, number>;
 }
 
 function allocateInternalNet(ctx: EmitCtx): number {
@@ -322,6 +334,7 @@ export function generateSpiceNetlist(
   const emitCtx: EmitCtx = {
     nextInternalNet: compiled.nodeCount + 1,
     preAllocatedNodes: preAllocatedByName,
+    labelToNodeId: compiled.labelToNodeId,
   };
 
   for (const i of emitOrder) {
@@ -775,6 +788,21 @@ function emitPrimitive(
     const gain = requireParam(props, def, modelKey, "gain", rawLabel);
     const senseRef = props.get<string>("sense");
     return [`${label} ${nodeAt(nodes, 0, rawLabel, "pos")} ${nodeAt(nodes, 1, rawLabel, "neg")} ${senseRef} ${gain}`];
+  }
+
+  if (typeId === "BV" || typeId === "BI") {
+    // ASRC behavioural B-source. pinLayout [out+, out-] → `B<name> n+ n- V=expr`
+    // (BV) / `I=expr` (BI). The expression's V(net)/I(source) controllers are
+    // rewritten to the deck namespace: V(net) → V(<nodeId>) (the harness names
+    // ngspice nodes by digiTS node id), I(source) → I(<V-canonicalized source>)
+    // (ngspice references the controlling source by name, like the F/H cards).
+    // The tc1/tc2/temp/dtemp/reciproctc/m/reciprocm instance tokens trail.
+    const outKey = typeId === "BV" ? "V" : "I";
+    const exprText = props.getOrDefault<string>("expression", "0");
+    const deckExpr = rewriteBSourceExpression(exprText, ctx);
+    const outP = nodeAt(nodes, 0, rawLabel, "out+");
+    const outN = nodeAt(nodes, 1, rawLabel, "out-");
+    return [`${label} ${outP} ${outN} ${outKey}=${deckExpr}${instanceParamSuffix(paramDefs, props)}`];
   }
 
   // ---------------------------------------------------------------------------
@@ -1497,6 +1525,31 @@ function resolveSubElementNumeric(
  * "V(ctrl)" for VCVS/VCCS, "I(sense)" for CCVS/CCCS). Empty string or the
  * sentinel are both treated as linear.
  */
+/**
+ * Rewrite a B-source expression's controlling references into the ngspice deck
+ * namespace. `V(net)` → `V(<nodeId>)` (the harness names ngspice nodes by the
+ * stringified digiTS node id, so the B-card resolves the same node digiTS
+ * allocated), `I(source)` → `I(<V-canonicalized source name>)` (ngspice's
+ * B-card samples a controlling source's current by name, same canonicalization
+ * the F/H sense-source references use). Ground/0 nets map to node `0`. A `V(net)`
+ * whose label has no node id is left verbatim so ngspice surfaces the unknown
+ * net rather than silently mapping it to ground.
+ */
+function rewriteBSourceExpression(expr: string, ctx: EmitCtx): string {
+  // V(label) — node-voltage controller.
+  let out = expr.replace(/\bV\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)/g, (_m, net: string) => {
+    const lower = net.toLowerCase();
+    if (net === "0" || lower === "gnd" || lower === "ground") return "V(0)";
+    const id = ctx.labelToNodeId.get(net);
+    return id === undefined ? `V(${net})` : `V(${id})`;
+  });
+  // I(source) — branch-current controller, referenced by V-canonicalized name.
+  out = out.replace(/\bI\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)/g, (_m, src: string) => {
+    return `I(${canonicalizeSpiceLabel(src, "V")})`;
+  });
+  return out;
+}
+
 function assertLinearControlExpression(
   props: PropertyBag,
   typeId: string,

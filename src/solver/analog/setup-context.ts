@@ -51,4 +51,13 @@ export interface SetupContext {
    *  DEVnameHash is populated in cktcrte.c at instance creation, well
    *  before CKTsetup). Returns null if not found. */
   findDevice(deviceLabel: string): AnalogElement | null;
+
+  /** Port of the node-name → 1-based MNA row lookup ngspice performs in
+   *  ASRCsetup for IF_NODE controllers (`vars[i].nValue->number`,
+   *  asrcset.c:104-105). Resolves a circuit net label (the `V(label)` argument
+   *  of a B-source / behavioural expression) to its allocated node id, reading
+   *  the compiler's `labelToNodeId` map (the same map the runtime controlled-
+   *  source context resolves voltages through). Returns 0 when no node carries
+   *  that label, matching ngspice's unknown-node sentinel. */
+  findNode(nodeLabel: string): number;
 }

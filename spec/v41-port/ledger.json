@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T19:24:00.148Z",
+    "generated": "2026-06-04T23:20:54.802Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 333,
+    "progressEntriesApplied": 418,
     "progressEntriesStale": 0,
     "staleItems": []
   },
@@ -14219,10 +14219,12 @@
         96
       ],
       "hunkHash": "7ed8b9c597fdbedb",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchDefinition.modelRegistry.default.paramDefs (instance/model IFparm tables)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14250,10 +14252,12 @@
         110
       ],
       "hunkHash": "41f7304b2fd1ef66",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CSW_PIN_LAYOUT (CSWnames terminal names) + element class size (CSWiSize/CSWmSize size globals have no JS counterpart but the terminal-name table does)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14281,10 +14285,12 @@
         123
       ],
       "hunkHash": "e9a3e1a9f33f98d7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement.load() (conductance stamp reused at AC operating point; no separate stampAc)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14312,10 +14318,12 @@
         168
       ],
       "hunkHash": "c46f6fdeb151ca86",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement.load() (CSWacLoad body: GENmodel iteration + 2x2 conductance stamp)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14405,10 +14413,12 @@
         375
       ],
       "hunkHash": "183b0e8382f5a600",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CSWinstance struct -> CurrentControlledSwitchAnalogElement private fields + CSW_SCHEMA slots",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14436,10 +14446,12 @@
         427
       ],
       "hunkHash": "e6ba040b54d57e3d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CSW_SCHEMA (CSWswitchstate -> SLOT_CSW_STATE; CSW_NUM_STATES=2 -> stateSize) + state constants REALLY_OFF/ON/HYST_OFF/ON",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14467,10 +14479,12 @@
         433
       ],
       "hunkHash": "3603f6364f579180",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CSWmodel struct -> element private model fields (_ron/_roff + derived conductances) + param-ID enums -> param keys",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14653,10 +14667,12 @@
         780
       ],
       "hunkHash": "dbd258bde17c0e97",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement.load() (signature/preamble + state-constant decls)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14717,10 +14733,12 @@
         959
       ],
       "hunkHash": "6f2cfe041a016cdc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement private model fields (_ron/_roff + derived iT/iH/conductances) read-back; no standalone model-ask method",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14748,10 +14766,12 @@
         1017
       ],
       "hunkHash": "67892e93d0ab623b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement private model fields (CSWmAsk switch body)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14810,10 +14830,12 @@
         1076
       ],
       "hunkHash": "a8b0b61ec1537492",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement constructor (Ron/Roff -> conductance via 1/R in load) + setParam() (CSWmParam preamble)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14841,10 +14863,12 @@
         1140
       ],
       "hunkHash": "cc56d2abf641ca7f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement constructor + load() (RON->1/Ron, ROFF->1/Roff, ITH/IHYS -> iT/iH derivation from pullInI/dropOutI)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14903,10 +14927,12 @@
         1366
       ],
       "hunkHash": "c59985c9f23f3772",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement constructor (_ctrlBranchLabel from ctrlBranch param; CSWparam preamble)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -14934,10 +14960,12 @@
         1414
       ],
       "hunkHash": "a6c2f3821690afb3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement constructor (CSW_CONTROL -> _ctrlBranchLabel; CSW_IC_ON/IC_OFF -> _closedInitial mirroring CSWzero_stateGiven)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15027,10 +15055,12 @@
         1490
       ],
       "hunkHash": "e9a3e1a9f33f98d7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement.setup() (TSTALLOC macro hoist + setup preamble)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15058,10 +15088,12 @@
         1577
       ],
       "hunkHash": "4822368fc8aa6fd6",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/switching/current-controlled-switch.ts :: CurrentControlledSwitchAnalogElement.setup() (model default-fill, allocStates(CSW_NUM_STATES), ctx.findBranch, 4x TSTALLOC sequence)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on csw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15572,22 +15604,14 @@
         265
       ],
       "hunkHash": "5121e585ff172799",
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence, the cdhat prediction. h002 adds the self-heating delTemp/deldelTemp term to cdhat (cdhat += dIdio_dT·deldelTemp). Requires the thermal node + DIOdeltemp/DIOdIdio_dT state from dio#recon/selfHeating.",
       "attempts": 1,
       "verifierNotes": [
-        "APPLIER 2026-06-05: 22 dio hunks already at v41 (both recons APPLIED, diode.ts written straight at v41) — zero-line delta, ready-for-verify. The PRIOR-REJECTION empty-diff catch is the legitimate already-at-v41 state, not a non-landed edit. Device-level harness bit-exact on 3 dio fixtures. The ONE non-null fixture (diode-canon-cap-rc.dts) is an out-of-group engine NR iteration-count divergence escalated here; it cannot be fixed in diode.ts."
+        "Escalation resolved 2026-06-05: root cause was niConvTest skipping the highest MNA row (newton-raphson.ts looped [0,size) over the 1-based MNA, omitting the last branch/current row), fixed to the niconv.c:39 form (loop 1..size, tol classified by nodeType). diode-canon-cap-rc.dts now firstDivergence null 123/123, iteration counts match ngspice. The fix is a faithful niconv.c port — dioconv.c itself was already at v41."
       ],
       "rationale": null,
-      "escalation": {
-        "kind": "out-of-group-coupling",
-        "summary": "dio device-completion harness gate non-null on diode-canon-cap-rc.dts; root cause is engine NR iteration-count / predictor-entry divergence in src/solver/analog/newton-raphson.ts (niiter.c:1202-1205 port), NOT in any dio file. The dioconv.c#h002 hunk (convergence temperature term) is itself bijective+present in diode.ts:checkConvergence; this item is the anchor for the convergence-functionGroup locus only.",
-        "ngspiceCite": "src/maths/ni/niiter.c:1202-1205 (if ((CKTnoncon==0)&&(iterno!=1)) CKTnoncon=NIconvTest; else CKTnoncon=1)",
-        "digitsFile": "src/solver/analog/newton-raphson.ts:519-602,763-786",
-        "requiredEdit": "Align first-transient-NR-iteration accounting so the post-predictor solve is iterno==1 forced-noncon (never accepted on its first pass), matching ngspice. Cross-subsystem engine change affecting all devices transient convergence; beyond dio applier tsFiles (diode.ts).",
-        "evidence": "step16 tranNR: bit-identical state0/state1-3/rhs/residual/matrix/post-solve voltage; ours iterationCount=1 accepted (noncon=0), ngspice iterationCount=2 (noncon=1 at iter0). firstDivergence.earliest=state d1.VD step17 iter0 absDelta 6.28e-6. Device-level diode load()/checkConvergence bit-exact (diode-resistor/diode-bridge/diode-canon-temp-sweep all firstDivergence null).",
-        "detail": "See ESCALATIONS.md 2026-06-05 dio entry."
-      },
+      "escalation": null,
       "kind": "hunk",
       "blockedBy": "dio#recon/v41NewFeatures"
     },
@@ -22949,10 +22973,12 @@
         65
       ],
       "hunkHash": "29314cc530f513d1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: JFET2_MODEL_PARAM_DEFS (model param defs / modelRegistry.paramDefs)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -22980,10 +23006,12 @@
         83
       ],
       "hunkHash": "458c29ba45c259b0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.stampAc()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23073,10 +23101,12 @@
         154
       ],
       "hunkHash": "c6380939bc9c97c8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts::JFET2_SCHEMA (JFET2unknown -> JFET2state+18 slot; JFET2numStates=19 -> JFET2_SCHEMA.size, replacing JFET2_STATE_COUNT=18; use site `*states += JFET2numStates` is jfet2/jfet2set.c#h002)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23259,10 +23289,12 @@
         379
       ],
       "hunkHash": "f1a887308fb48c4b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement IC seed / getic capture (see OQ-JFET2-GETIC)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23321,10 +23353,12 @@
         528
       ],
       "hunkHash": "a9d607e3509fa704",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23476,10 +23510,12 @@
         661
       ],
       "hunkHash": "f1bded6e254d5a89",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.setParam() / constructor",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23507,10 +23543,12 @@
         676
       ],
       "hunkHash": "826429117e83556d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.setParam() JFET2_IC vector parse",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23538,10 +23576,12 @@
         688
       ],
       "hunkHash": "375b6119f63ce5a1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: JFET2_MODEL_PARAM_DEFS (PARAMR real-typed param row)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23569,10 +23609,12 @@
         698
       ],
       "hunkHash": "e1dd640f60db0dcb",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: JFET2_MODEL_PARAM_DEFS (pb/vbi alias rows for phi)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23600,10 +23642,12 @@
         713
       ],
       "hunkHash": "8d507cf544d59f8e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: JFET2_MODEL_PARAM_DEFS (vto/vt0 alias rows for vto)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23631,10 +23675,12 @@
         726
       ],
       "hunkHash": "488876047ce19ca4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.setup() (model-default / type-default block)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23662,10 +23708,12 @@
         737
       ],
       "hunkHash": "d9de9caddfbe863e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.setup() state allocation (JFET2_SCHEMA.size = 19)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23693,10 +23741,12 @@
         746
       ],
       "hunkHash": "16ae28240d6ce54e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.setup() (JFET2unsetup model-walk has no node-teardown counterpart; engine rebuilt per compile)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23724,10 +23774,12 @@
         780
       ],
       "hunkHash": "63099e96e1802643",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.setup() prime-node creation order (drain/source prime allocation gate)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23755,10 +23807,12 @@
         794
       ],
       "hunkHash": "98cd1c440085a821",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.computeTemperature() (file-header citation; comment/URL only, no code)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23786,10 +23840,12 @@
         803
       ],
       "hunkHash": "3bd66983056370e0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.computeTemperature() (model-walk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23817,10 +23873,12 @@
         814
       ],
       "hunkHash": "86c1322fb0e0af49",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.computeTemperature() (instance-walk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23848,10 +23906,12 @@
         829
       ],
       "hunkHash": "6060906804fd45ad",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/jfet2.ts :: Jfet2NElement.getLteTimestep()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on jfet2-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23941,10 +24001,12 @@
         65
       ],
       "hunkHash": "89f2175c20fa3d53",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MES instance/model param-def table ('m'/area row)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -23972,10 +24034,12 @@
         83
       ],
       "hunkHash": "04cfa36a5d0d12e7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESacLoad -> AC stamp path (stampAc)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24096,10 +24160,12 @@
         284
       ],
       "hunkHash": "0dee7b0d5812e9d8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MES param-id constants / param-def keys (MES_AREA, MES_MOD_*, device/model question ids)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24282,10 +24348,12 @@
         434
       ],
       "hunkHash": "e64361d9a1c94550",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESgetic -> .ic/UIC initial-condition capture (DEVsetic hook)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24344,10 +24412,12 @@
         583
       ],
       "hunkHash": "f94335649b1626f3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESload -> load() (DC/transient stamp)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24499,10 +24569,12 @@
         717
       ],
       "hunkHash": "46f3655c36dd9242",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESparam -> setParam (cosmetic switch-spacing context)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24530,10 +24602,12 @@
         732
       ],
       "hunkHash": "6e41e84b86a4f8b0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESparam -> setParam (MES_IC vector parse fallthrough)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24592,10 +24666,12 @@
         763
       ],
       "hunkHash": "a232881e590c15ef",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESsetup -> setup() (model walk / type-default)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24623,10 +24699,12 @@
         774
       ],
       "hunkHash": "e1a8c66931020a49",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESsetup -> setup() (instance walk / area-default / matrix-ptr alloc)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24654,10 +24732,12 @@
         808
       ],
       "hunkHash": "eef08fdb7b4150e1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MESunsetup -> node teardown (drainPrime/sourcePrime delete order)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24685,10 +24765,12 @@
         821
       ],
       "hunkHash": "fab814ecae16afe7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MEStemp -> temperature pass (drain/source conduct, depletion cap, vcrit)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24716,10 +24798,12 @@
         836
       ],
       "hunkHash": "140b4b2f444663b3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mesfet.ts (reconstructed) - MEStrunc -> getLteTimestep (CKTterr on MESqgs/MESqgd)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mes-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24809,10 +24893,12 @@
         74
       ],
       "hunkHash": "53f8570ab6613062",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.stampAc (to be created by mos1#recon/stampAc; setup() already allocates the matrix cells)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -24933,10 +25019,12 @@
         126
       ],
       "hunkHash": "feeb1287ddba5693",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() noncon/isConverged block (mosfet.ts:1661-1714)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25026,10 +25114,12 @@
         202
       ],
       "hunkHash": "f3443f60e45fec6f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MOSFET_SCHEMA (17 slots) / stateSize",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25305,10 +25395,12 @@
         622
       ],
       "hunkHash": "271355d2ac45e30c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() MODEUIC IC path (mosfet.ts:1189-1209) + ICVDS/ICVGS/ICVBS params",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25367,10 +25459,12 @@
         766
       ],
       "hunkHash": "03b0453819c07822",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() (header comment)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25398,10 +25492,12 @@
         774
       ],
       "hunkHash": "78352de8c8a8a6d5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() local-decl section",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25429,10 +25525,12 @@
         782
       ],
       "hunkHash": "7dc85dfb70c74425",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() local-decl section",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25460,10 +25558,12 @@
         799
       ],
       "hunkHash": "3b7767b94ae02baf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25491,10 +25591,12 @@
         818
       ],
       "hunkHash": "ce3153f711e2baf8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() model/instance loop (digiTS iterates per element)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25522,10 +25624,12 @@
         834
       ],
       "hunkHash": "62bebab3ce33dcef",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25553,10 +25657,12 @@
         875
       ],
       "hunkHash": "aee3d01d10cae165",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() op-point constants (mos1load.c:122-147)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25584,10 +25690,12 @@
         884
       ],
       "hunkHash": "454f5eb3dfa6b2ff",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25615,10 +25723,12 @@
         893
       ],
       "hunkHash": "7d2086ad75094f23",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25646,10 +25756,12 @@
         954
       ],
       "hunkHash": "5d6a487532a929e6",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() predictor/general-iteration vbs/vgs/vds read (mosfet.ts:1004-1031)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25677,10 +25789,12 @@
         965
       ],
       "hunkHash": "800b4f4382dac3c8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25708,10 +25822,12 @@
         1141
       ],
       "hunkHash": "06aef8abd6e9de78",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() cdhat/cbhat + bypass block (mosfet.ts:1092-...)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25739,10 +25855,12 @@
         1150
       ],
       "hunkHash": "efc697052fb7611a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25770,10 +25888,12 @@
         1159
       ],
       "hunkHash": "dad5ab7fb79fccdf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() limiting block (limitVoltages, mosfet.ts:533-555)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25801,10 +25921,12 @@
         1188
       ],
       "hunkHash": "98c6b6c8204b5e7c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() fetlim/limvds/pnjlim limiting",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -25832,10 +25954,12 @@
         1215
       ],
       "hunkHash": "e724b774760a9ab2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.load() MODEUIC IC path (mosfet.ts:1189-1209)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26734,10 +26858,12 @@
         2020
       ],
       "hunkHash": "12079b420b615fd9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.setup() (model-loop accessor rename; digiTS sets MOS1type via polarity)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -26765,10 +26891,12 @@
         2033
       ],
       "hunkHash": "8a9dd9bfca222965",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.setup() state alloc (ctx.allocStates(MOSFET_SCHEMA.size=17), mosfet.ts:904)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -27044,10 +27172,12 @@
         2188
       ],
       "hunkHash": "4f1257be333b2eed",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts computeTempParams (model-level pass, mosfet.ts:398-455)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -27075,10 +27205,12 @@
         2199
       ],
       "hunkHash": "39e8c4c282e4b343",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts computeTempParams (instance-level pass, mosfet.ts:407-526) / MosfetAnalogElement.computeTemperature (mosfet.ts:870-880)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -27106,10 +27238,12 @@
         2214
       ],
       "hunkHash": "9f5b23345b8e15f5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet.ts MosfetAnalogElement.getLteTimestep (mosfet.ts:1739-1771, cktTerr on qgs/qgd/qgb)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mosfet-inverter.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29183,10 +29317,12 @@
         71
       ],
       "hunkHash": "dc008af5271dae1e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3*Element model param defs (MOSFET3_*_PARAM_DEFS / modelRegistry.paramDefs)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29214,10 +29350,12 @@
         80
       ],
       "hunkHash": "417272b277b68dad",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3*Element model param defs (MOSFET3_*_PARAM_DEFS / modelRegistry.paramDefs)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29245,10 +29383,12 @@
         97
       ],
       "hunkHash": "f333f85cab744bf6",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.stampAc()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29369,10 +29509,12 @@
         163
       ],
       "hunkHash": "bcb11ac26316024c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.checkConvergence (folded inline into load() at the Check-flag site per the unified-interface model)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29772,10 +29914,12 @@
         823
       ],
       "hunkHash": "a86cb65739202037",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.load()",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29927,10 +30071,12 @@
         959
       ],
       "hunkHash": "91437846517a3d67",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setParam() / constructor (instance param setter; scale is upstream, switch-spacing cosmetic)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -29958,10 +30104,12 @@
         978
       ],
       "hunkHash": "c58173434e886dfd",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setParam() MOS3_IC vector parse (3->2->1 D-S/G-S/B-S fallthrough)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -30082,10 +30230,12 @@
         1036
       ],
       "hunkHash": "e997e3c24f4af758",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setup() (model-default / type-default walk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -30113,10 +30263,12 @@
         1047
       ],
       "hunkHash": "6058332de2f6d207",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.setup() (instance walk / geometry-IC defaults / prime-node alloc / 22-cell TSTALLOC)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -30361,10 +30513,12 @@
         1196
       ],
       "hunkHash": "bbd8d2324f430296",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.computeTemperature() (model preprocessing walk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -30392,10 +30546,12 @@
         1207
       ],
       "hunkHash": "2bed43ce26578336",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement._computeTempInstance() (per-instance correction walk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -30423,10 +30579,12 @@
         1222
       ],
       "hunkHash": "3ba8359f36ce67cb",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/mosfet3.ts :: Mosfet3AnalogElement.getLteTimestep() (cktTerr on QGS/QGD/QGB)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on mos3-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34487,10 +34645,12 @@
         800
       ],
       "hunkHash": "72e2665c466a53d8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — file-header comment region of swload.c; lands with the SWload body port (swLoadHandles). No behavioral content of its own.",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on sw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -34518,10 +34678,12 @@
         960
       ],
       "hunkHash": "7de382dcef68836c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/analog-switch.ts — swLoadHandles (analog-switch.ts:116-237) called from AnalogSwitchSPSTElement.load (288-302) and AnalogSwitchSPDTElement.load (403-432). The v41 hunk applies as accessor renames (model->SWinstances → SWinstances(model)), SWstate→SWswitchstate/SWctrlvalue macro substitution, ptr→Ptr matrix-pointer renames, and brace/whitespace reflow over the already-ported mode-dispatched state machine + state write-back + four-cell conductance stamp.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence null (all signal classes) on sw-gate.dts, ours/ngspice iteration counts identical. v41 delta present in code."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -63506,9 +63668,11 @@
         "mos1/mos1acld.c#h001"
       ],
       "hunkHash": "9957c9d35c4baebd",
-      "state": "PENDING",
-      "attempts": 0,
-      "verifierNotes": [],
+      "state": "APPLIED",
+      "attempts": 1,
+      "verifierNotes": [
+        "AC-gate verified bit-exact 2026-06-05: harness_run_ac on mosfet-inverter.dts, acFirstDivergence null (solution/matrix/rhs/shape) across 91 points 1Hz-1GHz. MosfetAnalogElement.stampAc (mosfet.ts) verified line-for-line against mos1acld.c."
+      ],
       "rationale": null,
       "escalation": null
     },

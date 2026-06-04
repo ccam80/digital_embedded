@@ -11,7 +11,7 @@
  */
 
 import type { ExprNode } from "./expression.js";
-import { numNode, binOp, unaryOp, callNode, BUILTIN_FUNCTIONS } from "./expression.js";
+import { numNode, binOp, unaryOp, callNode, ternaryNode, BUILTIN_FUNCTIONS } from "./expression.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -87,6 +87,26 @@ export function differentiate(expr: ExprNode, variable: string): ExprNode {
     case "builtin-func":
       // random() has no meaningful derivative
       return zero();
+
+    case "ternary":
+      // d/dx(cond ? a : b) = cond ? D(a) : D(b) (inpptree.c:381-383).
+      return ternaryNode(
+        expr.cond,
+        differentiate(expr.then, variable),
+        differentiate(expr.else, variable),
+      );
+
+    case "ddt":
+      // d/dx(ddt(u)) = 0 (inpptree.c:570-573).
+      return zero();
+
+    case "pwl":
+      // d/dx(pwl) is the pwl_derivative sibling; its own derivative is 0
+      // (inpptree.c:561-568). The editor evaluator never produces pwl nodes,
+      // so this arm exists only for union exhaustiveness.
+      return expr.derivative
+        ? zero()
+        : { kind: "pwl", arg: expr.arg, points: expr.points, derivative: true };
 
     case "unary": {
       // d/dx(-f) = -(d/dx(f))
@@ -285,7 +305,17 @@ export function simplify(expr: ExprNode): ExprNode {
     case "circuit-current":
     case "builtin-var":
     case "builtin-func":
+    case "ddt":
+    case "pwl":
       return expr;
+
+    case "ternary":
+      return {
+        kind: "ternary",
+        cond: simplify(expr.cond),
+        then: simplify(expr.then),
+        else: simplify(expr.else),
+      };
 
     case "unary": {
       const operand = simplify(expr.operand);
@@ -357,5 +387,305 @@ export function simplify(expr: ExprNode): ExprNode {
       void exhaustive;
       return expr as ExprNode;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// B-source (IFeval) differentiation — ngspice PTdifferentiate (inpptree.c:256)
+// ---------------------------------------------------------------------------
+
+/** Constant-node predicate / reader for the ngspice-faithful builders. */
+function isConst(e: ExprNode): e is { kind: "number"; value: number } {
+  return e.kind === "number";
+}
+
+/**
+ * ngspice `mkb` (inpptree.c:772-883): build a binary node with the SAME
+ * constant-folding and 0/1 identity pruning ngspice applies while assembling
+ * derivative trees. Folds two constants for + - * / ^ (`^` via the signed
+ * `pow`, inpptree.c:798), prunes 0/1 per inpptree.c:802-842. Reproducing this
+ * exactly keeps the digiTS derivative tree structurally identical to ngspice's,
+ * which the bit-exact harness gate requires.
+ */
+function mkb(op: "+" | "-" | "*" | "/" | "^", left: ExprNode, right: ExprNode): ExprNode {
+  if (isConst(left) && isConst(right)) {
+    const l = left.value, r = right.value;
+    switch (op) {
+      case "*": return numNode(l * r);
+      case "/": return numNode(l / r);
+      case "+": return numNode(l + r);
+      case "-": return numNode(l - r);
+      case "^": return numNode(Math.pow(l, r));
+    }
+  }
+  switch (op) {
+    case "*":
+      if (isConst(left) && left.value === 0) return left;
+      if (isConst(right) && right.value === 0) return right;
+      if (isConst(left) && left.value === 1) return right;
+      if (isConst(right) && right.value === 1) return left;
+      break;
+    case "/":
+      if (isConst(left) && left.value === 0) return left;
+      if (isConst(right) && right.value === 1) return left;
+      break;
+    case "+":
+      if (isConst(left) && left.value === 0) return right;
+      if (isConst(right) && right.value === 0) return left;
+      break;
+    case "-":
+      if (isConst(right) && right.value === 0) return left;
+      if (isConst(left) && left.value === 0) return mkfBSource("uminus", right);
+      break;
+    case "^":
+      if (isConst(right) && right.value === 0) return numNode(1.0);
+      if (isConst(right) && right.value === 1) return left;
+      break;
+  }
+  return binOp(op, left, right);
+}
+
+/**
+ * ngspice `mkf` (inpptree.c:885+): build a function-call node. No constant
+ * folding (matching ngspice). `uminus` maps to the unary-`-` AST node so it
+ * shares the existing evaluator/compiler arm; every other name is a `call`
+ * routed through BSOURCE_FUNCTIONS at compile time.
+ */
+function mkfBSource(fn: string, arg: ExprNode): ExprNode {
+  if (fn === "uminus") return unaryOp("-", arg);
+  return callNode(fn, [arg]);
+}
+
+/**
+ * `differentiateBSource(expr, valueIndex, kind, label)` — the ngspice
+ * PTdifferentiate (inpptree.c:256-758) counterpart for the B-source tree.
+ *
+ * Unlike the editor-facing `differentiate`, this produces the EXACT ngspice
+ * derivative-tree shapes the bit-exact harness gate needs: `abs'→sgn`
+ * (inpptree.c:397-399), `^`/`pow` constant-exp via `pwr(a,b-1)`
+ * (inpptree.c:332-340,644-651), `min`/`max` via the comparison ternary
+ * (inpptree.c:575-606), and the full added-function rules (Part 0.C).
+ *
+ * The differentiation variable is identified by `(kind, label)`: a
+ * `circuit-voltage` matches when `kind === "node"` and labels match; a
+ * `circuit-current` matches when `kind === "branch"`. Every other leaf
+ * differentiates to 0.
+ */
+export function differentiateBSource(
+  expr: ExprNode,
+  kind: "node" | "branch",
+  label: string,
+): ExprNode {
+  const d = (e: ExprNode): ExprNode => differentiateBSource(e, kind, label);
+
+  switch (expr.kind) {
+    case "number":
+      return numNode(0);
+
+    // PT_TIME / PT_TEMPERATURE / PT_FREQUENCY → 0 (inpptree.c:261-266).
+    case "builtin-var":
+    case "builtin-func":
+      return numNode(0);
+
+    case "variable":
+      // Plain symbolic variables are never B-source controllers.
+      return numNode(0);
+
+    case "circuit-voltage":
+      return kind === "node" && expr.label === label ? numNode(1.0) : numNode(0);
+
+    case "circuit-current":
+      return kind === "branch" && expr.label === label ? numNode(1.0) : numNode(0);
+
+    case "unary":
+      // d(-u) = -(du); reuse the uminus builder.
+      return mkfBSource("uminus", d(expr.operand));
+
+    case "ternary":
+      // d/d (cond ? a : b) = cond ? da : db (inpptree.c:381-383).
+      return ternaryNode(expr.cond, d(expr.then), d(expr.else));
+
+    case "ddt":
+      // d(ddt(u)) = 0 (inpptree.c:570-573).
+      return numNode(0);
+
+    case "pwl":
+      // d(pwl(u,...)) = pwl_derivative(u,...) carrying the SAME breakpoints
+      // (inpptree.c:561-564). pwl_derivative's own derivative is 0.
+      if (expr.derivative) return numNode(0);
+      return { kind: "pwl", arg: expr.arg, points: expr.points, derivative: true };
+
+    case "binary": {
+      const { op, left, right } = expr;
+      switch (op) {
+        case "+":
+        case "-":
+          return mkb(op, d(left), d(right));
+        case "*":
+          // d(a*b) = da*b + a*db (inpptree.c:288-289).
+          return mkb("+", mkb("*", d(left), right), mkb("*", left, d(right)));
+        case "/":
+          // d(a/b) = (da*b - a*db) / b^2 (inpptree.c:297-301).
+          return mkb("/",
+            mkb("-", mkb("*", d(left), right), mkb("*", left, d(right))),
+            mkb("^", right, numNode(2.0)));
+        case "^":
+          // `^` : a^b → |a|^b. inpptree.c:330-366.
+          if (isConst(right)) {
+            // b const: b * pwr(a, b-1) * D(a) (inpptree.c:342-348, default compat).
+            return mkb("*",
+              mkb("*", numNode(right.value),
+                callNode("pwr", [left, numNode(right.value - 1.0)])),
+              d(left));
+          }
+          if (isConst(left)) {
+            // a const: pow(a,b) * (D(b) * log(|a|)) (inpptree.c:353-355).
+            return mkb("*",
+              callNode("pow", [left, right]),
+              mkb("*", d(right), callNode("log", [callNode("abs", [left])])));
+          }
+          // general: pow(a,b) * (b*D(a)/a + D(b)*log(|a|)) (inpptree.c:360-365).
+          return mkb("*",
+            callNode("pow", [left, right]),
+            mkb("+",
+              mkb("*", right, mkb("/", d(left), left)),
+              mkb("*", d(right), callNode("log", [callNode("abs", [left])]))));
+      }
+      break;
+    }
+
+    case "call": {
+      const { fn, args } = expr;
+
+      // Two-argument power forms pow(a,b) / pwr(a,b) (inpptree.c:610-738).
+      if ((fn === "pow" || fn === "pwr") && args.length === 2) {
+        const a = args[0]!, b = args[1]!;
+        if (fn === "pow") {
+          if (isConst(b)) {
+            // b const: b * pwr(a, b-1) * D(a) (inpptree.c:644-651).
+            return mkb("*",
+              mkb("*", numNode(b.value), callNode("pwr", [a, numNode(b.value - 1)])),
+              d(a));
+          }
+          if (isConst(a)) {
+            // a const: pow(a,b) * (D(b) * log(|a|)) (inpptree.c:652-657).
+            return mkb("*", callNode("pow", [a, b]),
+              mkb("*", d(b), callNode("log", [callNode("abs", [a])])));
+          }
+          // general (inpptree.c:658-669).
+          return mkb("*", callNode("pow", [a, b]),
+            mkb("+",
+              mkb("*", b, mkb("/", d(a), a)),
+              mkb("*", d(b), callNode("log", [callNode("abs", [a])]))));
+        }
+        // pwr (inpptree.c:683-728).
+        if (isConst(b)) {
+          // b const: b * pow(a, b-1) * D(a) (inpptree.c:711-719).
+          return mkb("*",
+            mkb("*", numNode(b.value), callNode("pow", [a, numNode(b.value - 1.0)])),
+            d(a));
+        }
+        // general: pwr(a,b) * (b*D(a)/a + D(b)*log(|a|)) (inpptree.c:721-728).
+        return mkb("*", callNode("pwr", [a, b]),
+          mkb("+",
+            mkb("*", b, mkb("/", d(a), a)),
+            mkb("*", d(b), callNode("log", [callNode("abs", [a])]))));
+      }
+
+      // min(a,b) / max(a,b): the comparison ternary (inpptree.c:575-606).
+      if ((fn === "min" || fn === "max") && args.length === 2) {
+        const a = args[0]!, b = args[1]!;
+        const cmp = fn === "min" ? "lt0" : "gt0";
+        return ternaryNode(callNode(cmp, [mkb("-", a, b)]), d(a), d(b));
+      }
+
+      // atan2(y,x) — the existing engine's total-derivative shape is reused
+      // (no ngspice PTF_ATAN2 derivative ships; atan2 is not in funcs[]). Kept
+      // for parity with the editor evaluator; B-source decks should not use it.
+      if (fn === "atan2" && args.length === 2) {
+        const y = args[0]!, x = args[1]!;
+        const denom = mkb("+", mkb("^", x, numNode(2)), mkb("^", y, numNode(2)));
+        return mkb("+",
+          mkb("*", mkb("/", x, denom), d(y)),
+          mkb("*", mkb("/", mkfBSource("uminus", y), denom), d(x)));
+      }
+
+      // Single-argument functions: chain rule fpr(u) * D(u) (inpptree.c:746-748).
+      if (args.length === 1) {
+        const u = args[0]!;
+        const du = d(u);
+        const fpr = bsourceFuncDerivative(fn, u);
+        if (fpr === null) return numNode(0); // floor/ceil/nint/u/eq0..le0/sgn → 0
+        return mkb("*", fpr, du);
+      }
+
+      return numNode(0);
+    }
+
+    default: {
+      const exhaustive: never = expr;
+      void exhaustive;
+      return numNode(0);
+    }
+  }
+}
+
+/**
+ * Per-function derivative `f'(u)` for the single-argument B-source functions,
+ * the chain-rule factor of `differentiateBSource` (ngspice PTdifferentiate's
+ * PT_FUNCTION arm, inpptree.c:396-573). Returns null for functions whose
+ * derivative is the constant 0 (those that contribute `0 * D(u) = 0`): sgn, u,
+ * eq0..le0, floor, ceil, nint. `uminus`'s derivative is the constant −1
+ * (inpptree.c:557-559), but the unary `-` AST node is handled directly in
+ * `differentiateBSource`, so it never reaches here.
+ */
+function bsourceFuncDerivative(fn: string, u: ExprNode): ExprNode | null {
+  switch (fn) {
+    case "abs":   // sgn(u) (inpptree.c:397-399)
+      return callNode("sgn", [u]);
+    case "sgn":   // 0 (inpptree.c:401-403)
+    case "u":     // 0 (inpptree.c:522-530)
+    case "eq0": case "ne0": case "gt0": case "lt0": case "ge0": case "le0":
+    case "floor": case "ceil": case "nint": // 0 (inpptree.c:536-546)
+      return null;
+    case "acos":  // -1 / sqrt(1 - u^2) (inpptree.c:405-412)
+      return mkb("/", numNode(-1.0), callNode("sqrt", [mkb("-", numNode(1.0), mkb("^", u, numNode(2.0)))]));
+    case "acosh": // 1 / sqrt(u^2 - 1) (inpptree.c:414-422)
+      return mkb("/", numNode(1.0), callNode("sqrt", [mkb("-", mkb("^", u, numNode(2.0)), numNode(1.0))]));
+    case "asin":  // 1 / sqrt(1 - u^2) (inpptree.c:424-431)
+      return mkb("/", numNode(1.0), callNode("sqrt", [mkb("-", numNode(1.0), mkb("^", u, numNode(2.0)))]));
+    case "asinh": // 1 / sqrt(u^2 + 1) (inpptree.c:433-440)
+      return mkb("/", numNode(1.0), callNode("sqrt", [mkb("+", mkb("^", u, numNode(2.0)), numNode(1.0))]));
+    case "atan":  // 1 / (1 + u^2) (inpptree.c:442-448)
+      return mkb("/", numNode(1.0), mkb("+", mkb("^", u, numNode(2.0)), numNode(1.0)));
+    case "atanh": // 1 / (1 - u^2) (inpptree.c:450-456)
+      return mkb("/", numNode(1.0), mkb("-", numNode(1.0), mkb("^", u, numNode(2.0))));
+    case "cos":   // -sin(u) (inpptree.c:458-460)
+      return mkfBSource("uminus", callNode("sin", [u]));
+    case "cosh":  // sinh(u) (inpptree.c:462-464)
+      return callNode("sinh", [u]);
+    case "exp":   // exp(u) (inpptree.c:474-476, default compat)
+      return callNode("exp", [u]);
+    case "log": case "ln": // 1 / u (inpptree.c:485-487)
+      return mkb("/", numNode(1.0), u);
+    case "log10": // M_LOG10E / u (inpptree.c:489-491)
+      return mkb("/", numNode(Math.LOG10E), u);
+    case "sin":   // cos(u) (inpptree.c:493-495)
+      return callNode("cos", [u]);
+    case "sinh":  // cosh(u) (inpptree.c:497-499)
+      return callNode("cosh", [u]);
+    case "sqrt":  // 1 / (2 * sqrt(u)) (inpptree.c:501-506)
+      return mkb("/", numNode(1.0), mkb("*", numNode(2.0), callNode("sqrt", [u])));
+    case "tan":   // 1 + tan(u)^2 (inpptree.c:508-513)
+      return mkb("+", numNode(1.0), mkb("^", callNode("tan", [u]), numNode(2.0)));
+    case "tanh":  // 1 - tanh(u)^2 (inpptree.c:515-520)
+      return mkb("-", numNode(1.0), mkb("^", callNode("tanh", [u]), numNode(2.0)));
+    case "uramp": // u(u) (inpptree.c:532-534)
+      return callNode("u", [u]);
+    case "u2":    // u(u) - u(u-1) (inpptree.c:548-555)
+      return mkb("-", callNode("u", [u]), callNode("u", [mkb("-", u, numNode(1.0))]));
+    default:
+      // Unknown single-arg function: no derivative rule → 0.
+      return null;
   }
 }

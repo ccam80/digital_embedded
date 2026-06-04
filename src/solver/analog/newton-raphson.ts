@@ -398,8 +398,9 @@ export function devCapVdmos(
  * ngspice → digiTS map:
  *   ckt                       → ctx
  *   size = SMPmatSize(...)    → ctx.solver.matrixSize
- *   node->type == SP_VOLTAGE  → i < ctx.nodeCount (voltage rows precede branch
- *                               rows in the 1-based MNA layout)
+ *   node->type == SP_VOLTAGE  → ctx.nodeType(i) === "voltage" (cktload.c:178
+ *                               reads n->type; branch/current rows are
+ *                               nodeType "current" and use CKTabstol)
  *   CKTrhs[i] / CKTrhsOld[i]  → ctx.rhs[i] / ctx.rhsOld[i]
  *   CKTreltol                 → ctx.reltol
  *   CKTvoltTol                → ctx.voltTol
@@ -407,16 +408,15 @@ export function devCapVdmos(
  *   CKTtroubleNode = i        → ctx.troubleNode = i
  *   CKTtroubleElt  = NULL     → ctx.troubleElt = null
  *
- * Row indexing: niconv.c iterates `for (i=1;i<=size;i++)` (1-based). digiTS
- * iterates `[0, matrixSize)` so the row SET tested is byte-for-byte the set
- * tested by the prior inline loop (newton-raphson.ts row loop) — row 0 is the
- * ground sentinel (ctx.rhs[0] forced to 0 after solve), exactly as ngspice's
- * row 0 is the same ground sentinel its loop starts past.
+ * Row indexing: tests rows i = 1 .. size inclusive (size = ctx.solver.matrixSize),
+ * mirroring niconv.c:39 `for (i=1;i<=size;i++)`. Row 0 is the ground equation
+ * (ctx.rhs[0] held at 0) and is not tested; the loop runs through the highest
+ * row — the last branch/current equation (e.g. a voltage-source branch).
  */
 function niConvTest(ctx: CKTCircuitContext): number {
-  const { rhs, rhsOld, reltol, voltTol, iabstol, nodeCount } = ctx;
+  const { rhs, rhsOld, reltol, voltTol, iabstol } = ctx;
   const size = ctx.solver.matrixSize;
-  for (let i = 0; i < size; i++) {
+  for (let i = 1; i <= size; i++) {
     const newV = rhs[i];
     const oldV = rhsOld[i];
     // niconv.c:43-47 — a NaN solution row is non-convergence; the tol test below
@@ -426,7 +426,7 @@ function niConvTest(ctx: CKTCircuitContext): number {
     }
     // niconv.c:48-50,60-62 — SP_VOLTAGE rows use CKTvoltTol; branch rows use
     // CKTabstol.
-    const tol = i < nodeCount
+    const tol = ctx.nodeType(i) === "voltage"
       ? reltol * Math.max(Math.abs(oldV), Math.abs(newV)) + voltTol
       : reltol * Math.max(Math.abs(oldV), Math.abs(newV)) + iabstol;
     // niconv.c:51,56-57,63,68-69 — the first row over tolerance blames the node

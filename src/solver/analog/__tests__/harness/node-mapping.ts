@@ -151,6 +151,16 @@ export function buildDirectNodeMapping(
 ): NodeMapping[] {
   const mappings: NodeMapping[] = [];
 
+  // ngspice node names are case-insensitive identifiers. Internally-minted nodes
+  // (CKTmkVolt suffixes, e.g. a BJT's "collCX") keep their source case in the
+  // node table, so a case-sensitive lookup misses them while every all-lowercase
+  // suffix (int1, collector, …) happened to match. Resolve every lookup against
+  // a case-folded view of nodeNames to match ngspice's own semantics; this is a
+  // no-op for the numeric voltage-node keys and the already-lowercased branch
+  // candidates, and fixes the mixed-case internal-node keys.
+  const ngLookup = new Map<string, number>();
+  for (const [name, idx] of ngTopology.nodeNames) ngLookup.set(name.toLowerCase(), idx);
+
   // 0. Ground sentinel: both engines reserve slot 0 for ground (always 0V).
   // Without this, reindexNgspiceSession would leave our slot 0 as NaN.
   mappings.push({
@@ -162,7 +172,7 @@ export function buildDirectNodeMapping(
 
   // 1. Voltage nodes: our node ID N → ngspice node named "N", at slot N.
   for (let nodeId = 1; nodeId <= ourTopology.nodeCount; nodeId++) {
-    const ngspiceIndex = ngTopology.nodeNames.get(String(nodeId));
+    const ngspiceIndex = ngLookup.get(String(nodeId).toLowerCase());
     if (ngspiceIndex === undefined) continue;
 
     const label = ourTopology.nodeLabels.get(nodeId) ?? `node_${nodeId}`;
@@ -216,7 +226,7 @@ export function buildDirectNodeMapping(
     let ngspiceIndex: number | undefined;
     let resolvedName = "";
     for (const cand of candidates) {
-      const idx = ngTopology.nodeNames.get(cand);
+      const idx = ngLookup.get(cand);
       if (idx !== undefined) { ngspiceIndex = idx; resolvedName = cand; break; }
     }
     if (ngspiceIndex === undefined) continue;
@@ -250,7 +260,7 @@ export function buildDirectNodeMapping(
     for (const entry of nodeTable) {
       if (claimed.has(entry.number)) continue;
       const ngName = entry.name.toLowerCase();
-      const ngspiceIndex = ngTopology.nodeNames.get(ngName);
+      const ngspiceIndex = ngLookup.get(ngName);
       if (ngspiceIndex === undefined) continue;
       const label = ourTopology.nodeLabels.get(entry.number)
         ?? entry.name.replace("#", ":");

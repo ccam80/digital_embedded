@@ -122,9 +122,13 @@ export const DIODE_MAPPING: DeviceMapping = {
 //   quasi-saturation slots BJTirci=26 .. BJTgbcx=32 (bjtdefs.h:342-348).
 //
 // BJTvbcx (2) and BJTvrci (3) are the quasi-saturation epitaxial-collector
-// slots; the digiTS L1 Gummel-Poon schema does not carry them, so ngspice
-// offsets 2 and 3 are intentionally unmapped (not compared). Every digiTS
-// slot below maps to its ngspice offset by name.
+// junction voltages; BJTirci..BJTgbcx (26-32) are the Kull epi-current, its
+// three derivatives, and the base-collCX charge/cap/conductance. The digiTS L1
+// Gummel-Poon schema carries all nine (BJT_L1_SCHEMA, bjt.ts), so they map to
+// their ngspice offsets by name below. With rco unset (classic Gummel-Poon)
+// both sides hold them at 0 (vbcx tracks vbc), so they compare cleanly on a
+// classic-GP control; with rco given they exercise the epitaxial region.
+// Every digiTS slot below maps to its ngspice offset by name.
 //
 // GPI/GMU/CC/CB (ngspice offsets 6,7,4,5) are cap-augmented during transient-
 // bjtload.c lumps the cap companion geq/ieq into these slots on both sides, so
@@ -139,6 +143,8 @@ export const BJT_MAPPING: DeviceMapping = {
   slotToNgspice: {
     VBE: 0,
     VBC: 1,
+    VBCX: 2,
+    VRCI: 3,
     CC: 4,
     CB: 5,
     GPI: 6,
@@ -161,6 +167,13 @@ export const BJT_MAPPING: DeviceMapping = {
     VSUB: 23,
     CDSUB: 24,
     GDSUB: 25,
+    IRCI: 26,
+    IRCI_VRCI: 27,
+    IRCI_VBCI: 28,
+    IRCI_VBCX: 29,
+    QBCX: 30,
+    CQBCX: 31,
+    GBCX: 32,
   },
   pinCurrents: {
     C: [{ slot: "CC", sign: 1 }],
@@ -170,6 +183,8 @@ export const BJT_MAPPING: DeviceMapping = {
   ngspiceToSlot: {
     0: "VBE",
     1: "VBC",
+    2: "VBCX",
+    3: "VRCI",
     4: "CC",
     5: "CB",
     6: "GPI",
@@ -192,6 +207,13 @@ export const BJT_MAPPING: DeviceMapping = {
     23: "VSUB",
     24: "CDSUB",
     25: "GDSUB",
+    26: "IRCI",
+    27: "IRCI_VRCI",
+    28: "IRCI_VBCI",
+    29: "IRCI_VBCX",
+    30: "QBCX",
+    31: "CQBCX",
+    32: "GBCX",
   },
 };
 
