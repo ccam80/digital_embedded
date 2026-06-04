@@ -710,9 +710,10 @@ export class SparseSolver {
     // (spalloc.c:255-259 lazy assignment), and is NOT created here.
     const intRow = this._extToIntRow[row];
     const intCol = this._extToIntCol[col];
-    // spsmp.c:464-466- an absent column has no element. The symmetric unseen-
-    // row case (an ext row never assigned an internal slot cannot match any
-    // stored Element->Row) yields the same absent verdict.
+    // spsmp.c:464-466- an absent column has no element (the `Col == -1`
+    // guard). The symmetric unseen-row case is made explicit here: an ext row
+    // never assigned an internal slot cannot match any stored Element->Row, so
+    // it yields the same absent verdict ngspice's chain walk leaves implicit.
     if (intCol === -1 || intRow === -1) return -1;
     // spsmp.c:468-469- walk the column chain read-only; createIfMissing=false
     // never reaches _spcCreateElement, so the element pool is untouched.
