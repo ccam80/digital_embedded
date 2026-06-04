@@ -2528,6 +2528,26 @@
         "VERIFIED 2026-06-05: harness mes-gate.dts (Release.x64 DLL) firstDivergence null across all 8 classes; 107/107 steps, identical iteration profile. Class built mesfet.ts (Statz), registered register-all.ts:459-460; FIX-015 typeids present."
       ],
       "escalation": null
+    },
+    "maths-sparse/spfactor.c#h002b": {
+      "state": "APPLIED",
+      "hunkHash": "ded1f57924d4e240",
+      "ref": "verify:maths-sparse",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. spfactor.c#h002b == ngspice spOrderAndFactor reuse-loop pivot guard (spfactor.c:228-235). digiTS _spOrderAndFactor (sparse-solver.ts:1678-1691): const pPivot=this._diag[step] == pPivot=Matrix->Diag[Step]; if(pPivot<0) == if(!pPivot) (element-pool index, -1==NULL pointer); console.error(`Warning: spfactor.c, 230, Pivot for step = ${step} not found`) == fprintf(stderr,\"Warning: spfactor.c, 230, Pivot for step = %d not found\n\",Step) identical text+citation; reorderingRequired=true == ReorderingRequired=YES; break == break. Diff restores the previously-suppressed stderr warning line-for-line. File-scope clean: worktree diff = src/solver/analog/sparse-solver.ts only (7+/17- = comment trim + warning restore), no stray logic."
+      ],
+      "escalation": null
+    },
+    "maths-sparse/spsmp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "39f4e6f103e2be01",
+      "ref": "verify:maths-sparse",
+      "attempts": 0,
+      "verifierNotes": [
+        "MATCH. spsmp.c#h002 (Col==-1 absent-column guard, spsmp.c:464-466) realized as the intCol===-1 early-return in SparseSolver.findElement (sparse-solver.ts:711-717): intRow=this._extToIntRow[row]; intCol=this._extToIntCol[col] == Row=ExtToIntRowMap[Row]; Col=ExtToIntColMap[Col]; if(intCol===-1||intRow===-1) return -1 == if(Col==-1) return NULL (symmetric unseen-row early-out is the explicit form of ngspice chain-walk miss); then _spcFindElementInCol(intCol,intRow,false) == FirstInCol[Col]+spcFindElementInCol(...,NO). h002 was blockedBy maths-sparse#recon/nodesetIcRowZero (now APPLIED, committed d40f0162); findElement landed in that prior committed work and is verified isomorphic over the final result per VERIFICATION.md. createIfMissing=false never reaches _spcCreateElement so _insertionOrder/element-pool order is untouched. File-scope clean."
+      ],
+      "escalation": null
     }
   }
 }
