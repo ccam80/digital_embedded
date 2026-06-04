@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T17:11:52.899Z",
+    "generated": "2026-06-04T17:51:32.629Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
