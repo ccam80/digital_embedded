@@ -1082,6 +1082,16 @@ export class MNAEngine implements AnalogEngine {
     const ctx = this._ctx!;
     const statePool = (this._compiled as ConcreteCompiledAnalogCircuit).statePool ?? null;
 
+    // optran.c runs its NIiter with CKTdiagGmin as CKTop left it. gillespie_src's
+    // exit unconditionally sets CKTdiagGmin = CKTgmin = gminstart (cktop.c:647),
+    // and the opramptime==0 path never resets it (the optran.c:333-345 reset block
+    // is gated on opramptime>0). So the pseudo-transient solves with the device
+    // gmin on the node diagonals- on a DC branch-current singularity that scales
+    // the source-pinned nodes by (1 - gmin). ctx.refreshTolerances below reloads
+    // diagonalGmin from params.diagGmin (unset -> 0), so capture the inherited
+    // value now and restore it after.
+    const inheritedDiagGmin = ctx.diagonalGmin;
+
     // optran.c:326-338- opramptime>0 init: zero CKTrhsOld + CKTstate0 and solve
     // with all sources at zero (CKTsrcFact=0) before the ramp begins. For the
     // common opramptime==0 path this block is skipped and sources run at full
@@ -1135,6 +1145,9 @@ export class MNAEngine implements AnalogEngine {
     // currentOrder=1, deltaOld[i]=maxTimeStep, currentDt=firstStep).
     this._timestep = new TimestepController(opParams, ctx.deltaOld);
     ctx.refreshTolerances(opParams);
+    // Restore the gmin CKTop left on the diagonal (cktop.c:647); refreshTolerances
+    // just reset it to params.diagGmin (unset -> 0). optran.c's NIiter inherits it.
+    ctx.diagonalGmin = inheritedDiagGmin;
 
     // optran.c:409,411- CKTmode = (mode & MODEUIC) | MODETRAN | MODEINITTRAN;
     // CKTag[0]=CKTag[1]=0. The OPtran pass starts in transient mode with the
