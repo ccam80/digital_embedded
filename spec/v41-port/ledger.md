@@ -1,6 +1,6 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-04T19:03:39.819Z
+Generated: 2026-06-04T19:24:00.148Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
@@ -19,8 +19,8 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 198 |
-| APPLIED        | 327 |
+| PENDING        | 194 |
+| APPLIED        | 331 |
 | ESCALATED      | 1 |
 | STALE          | 0 |
 | NO-COUNTERPART | 1292 |
