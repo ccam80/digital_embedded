@@ -163,6 +163,111 @@
       ],
       "escalation": null
     },
+    "analysis/acan.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "4f30a8ca85647560",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/acan.c:11-19. Hunk adds two XSPICE-gated C includes (#include \"ngspice/evt.h\", #include \"ngspice/enh.h\") inside #ifdef XSPICE plus a trailing-space whitespace fix on the gtri header comment. digiTS has no XSPICE event/enh subsystem and no C #include — the includes are NO-COUNTERPART preprocessor plumbing. The function's behavioral content (the ACan freq-delta + startfreq guard) lives in AcAnalysis.run + buildFrequencyArray (ac-analysis.ts:245-533, :587-645) and is independently APPLIED via acan.c#h003-h010. No non-include line in this hunk has a TS counterpart; nothing to add.",
+        "gate clean: server_restart + harness AC firstDivergence null across all 4 AC classes (solution/shape/matrix/rhs) on rc-lowpass-ac.dts (61/61 points, presence both=61); typecheck exit 0.",
+        "tsFile committed-not-lost: ac-analysis.ts present at HEAD (b011d416 harvest); worktree diff empty for the tsFile is committed-not-lost — the gated worktree build IS this implementation."
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "5362afb641267428",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/acan.c:40-63. Hunk is pure C pointer-style cosmetics: ACan(CKTcircuit *ckt -> CKTcircuit* ckt; (ACAN *) -> (ACAN*); IFuid */runDesc * star-spacing; XSPICE comment indentation. No semantic content. TS has no C pointer-declaration syntax — the entire hunk is whitespace/style with no TS counterpart. ACan's actual body (the freq sweep) is APPLIED via acan.c#h003-h010 in AcAnalysis.run.",
+        "gate clean: AC firstDivergence null on rc-lowpass-ac.dts; typecheck exit 0.",
+        "tsFile committed-not-lost: ac-analysis.ts present at HEAD."
+      ],
+      "escalation": null
+    },
+    "analysis/acan.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "1f00be36cdd9604c",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/acan.c:440-457 (CKTacLoad tail). Hunk is a single trailing-whitespace fix: a blank line containing four spaces becomes a clean blank line before the STATloadTime accumulation + return(OK). No semantic content; pure whitespace with no TS counterpart. The CKTacLoad per-type DEVacLoad behavior is realized by AcAnalysis.run's runByDeviceFamily(stampAc,...) loop (ac-analysis.ts:419), APPLIED via the acan.c body hunks.",
+        "gate clean: AC firstDivergence null on rc-lowpass-ac.dts; typecheck exit 0.",
+        "tsFile committed-not-lost: ac-analysis.ts present at HEAD."
+      ],
+      "escalation": null
+    },
+    "analysis/acsetp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "b0ef899ebf4d7700",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/acsetp.c:24-29 (AC_START). Hunk relaxes the start-frequency reject from `value->rValue <= 0.0` to `< 0.0` and updates the message to 'Frequency of < 0 is invalid for AC start' (0 now permitted). digiTS ac-analysis.ts:313-315 implements `if (params.fStart < 0) throw new Error(\"Frequency of < 0 is invalid for AC start\")` — strict-< bound + identical message, bijective construct match.",
+        "gate clean: AC firstDivergence null on rc-lowpass-ac.dts; typecheck exit 0.",
+        "tsFile committed-not-lost: ac-analysis.ts present at HEAD (b011d416 harvest)."
+      ],
+      "escalation": null
+    },
+    "analysis/acsetp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "510d9e50acfb748a",
+      "ref": "harvested:b011d416",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/acsetp.c:34-39 (AC_STOP). Hunk relaxes the stop-frequency reject from `<= 0.0` to `< 0.0` and updates the message to 'Frequency of < 0 is invalid for AC stop'. digiTS ac-analysis.ts:316-318 implements `if (params.fStop < 0) throw new Error(\"Frequency of < 0 is invalid for AC stop\")` — strict-< bound + identical message, bijective construct match.",
+        "gate clean: AC firstDivergence null on rc-lowpass-ac.dts; typecheck exit 0.",
+        "tsFile committed-not-lost: ac-analysis.ts present at HEAD."
+      ],
+      "escalation": null
+    },
+    "analysis/tfanal.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "ad48997c2e1c1923",
+      "ref": "harvested:b0cc8f3d",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/tfanal.c:93-95 (post-image). Hunk is the C accessor-macro refactor for the input-source RHS injection: ckt->CKTrhs[ptr->GENnode1] -= 1 / [ptr->GENnode2] += 1  ->  CKTrhs[GENnode(ptr)[0]] -= 1 / [GENnode(ptr)[1]] += 1 (same indices, struct-field to array-accessor). digiTS dc-operating-point.ts runTransferFunction:638-639 implements rhs[port.input.nodePos] -= 1 / rhs[port.input.nodeNeg] += 1, where nodePos=GENnode[0], nodeNeg=GENnode[1] — same indices, same signs, bijective construct match. blockedBy analysis#recon/tf cleared (recon APPLIED 3611bf11; tf driver present dc-operating-point.ts:626-695).",
+        "iso verified line-by-line vs tfanal.c:73-157: RHS zero [0..size] (633), input inject (637-643), re-solve+rhs[0]=0 (646-647), transfer ratio Pos-Neg/branch (650-655), input-R Neg-Pos/-1/i 1e-20 clamp (658-664), same-source shortcut (667-669), second zero+output inject (671-678), output-R (687-692).",
+        "tsFile committed-not-lost: dc-operating-point.ts runTransferFunction present at HEAD (b0cc8f3d). typecheck exit 0."
+      ],
+      "escalation": null
+    },
+    "analysis/tfanal.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "64f01dee3ea0c131",
+      "ref": "harvested:b0cc8f3d",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/tfanal.c:136-138 (post-image). Hunk is the C accessor-macro refactor for the input-resistance (isource branch): outputs[1] = CKTrhs[ptr->GENnode2] - CKTrhs[ptr->GENnode1]  ->  CKTrhs[GENnode(ptr)[1]] - CKTrhs[GENnode(ptr)[0]]. digiTS dc-operating-point.ts runTransferFunction:660 implements inputResistance = rhs[port.input.nodeNeg] - rhs[port.input.nodePos] (nodeNeg=GENnode[1], nodePos=GENnode[0]) — same indices, same order, bijective construct match. blockedBy analysis#recon/tf cleared.",
+        "tsFile committed-not-lost: dc-operating-point.ts runTransferFunction present at HEAD (b0cc8f3d). typecheck exit 0."
+      ],
+      "escalation": null
+    },
+    "analysis/traninit.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "2a4ee941cbdd7286",
+      "ref": "harvested:33120c26",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/traninit.c:10. Hunk adds the single C include #include \"ngspice/cpextern.h\" (declares cp_getvar, used by h002's nostepsizelimit lookup). digiTS has no C #include and no cp_getvar runtime-variable subsystem — the include is NO-COUNTERPART preprocessor plumbing. The behavioral content it enables (the nostepsizelimit option) is realized as the typed boolean field SimulationParams.nostepsizelimit (core/analog-engine-interface.ts:46) consumed in resolveSimulationParams:323, APPLIED via traninit.c#h002. No line-isomorphic TS counterpart for the include itself.",
+        "tsFile committed-not-lost: the nostepsizelimit field + gate are present at HEAD (introduced 33120c26). typecheck exit 0."
+      ],
+      "escalation": null
+    },
+    "analysis/traninit.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "20b8ea686b42a26d",
+      "ref": "harvested:33120c26",
+      "attempts": 0,
+      "verifierNotes": [
+        "iso re-derived independently vs ref/ngspice/src/spicelib/analysis/traninit.c:26-34 (post-image). Hunk: comment-text update + the CKTmaxStep auto-derivation `if (CKTmaxStep == 0) { if (CKTstep < (CKTfinalTime-CKTinitTime)/50.0 && !cp_getvar(\"nostepsizelimit\",CP_BOOL,NULL,0)) CKTmaxStep=CKTstep; else CKTmaxStep=(CKTfinalTime-CKTinitTime)/50.0; }`. digiTS resolveSimulationParams (core/analog-engine-interface.ts:309-330) is a bijective construct match: userMax==0/null gate (311), span=(tStop-tStart)/50 (321), `(params.outputStep < span && !params.nostepsizelimit) ? params.outputStep : span` (322-325) maps CKTstep->outputStep, span->(CKTfinalTime-CKTinitTime)/50, cp_getvar(nostepsizelimit)->params.nostepsizelimit. CKTdelmin=1e-11*CKTmaxStep at :332. Note actual port site is resolveSimulationParams, not the planning-hint MNAEngine.init; same function-group semantics (TRANinit copies .tran params + derives CKTmaxStep), structurally faithful.",
+        "tsFile committed-not-lost: the gate is present at HEAD (33120c26). typecheck exit 0; transient gates exercise this derivation."
+      ],
+      "escalation": null
+    },
     "analysis#recon/cktIcRhsOldSeed": {
       "state": "APPLIED",
       "hunkHash": "97be2fc0d2ab6e2a",
