@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T18:25:42.903Z",
+    "generated": "2026-06-04T18:55:39.477Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 273,
+    "progressEntriesApplied": 322,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -15238,10 +15238,13 @@
         78
       ],
       "hunkHash": "a4abd529d2f58bc1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DIODE_PARAM_DEFS.instance (the lm/lp/wm/wp level-3 instance geometry params) and a new THERMAL instance flag param. The IFparm DIOpTable rows map to instance-param entries in defineModelParams.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dio.c:19 (dio/dio.c::DIOpTable)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15393,10 +15396,13 @@
         153
       ],
       "hunkHash": "d9bff29fc80aa1c1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DIODE_PARAM_DEFS (the new model params: isr/nr recombination; rth0/cth0 self-heating; id_max/te_max/pd_max SOA; lm/lp/wm/wp/xom/xoi/xm/xp level-3 geometry) plus the new 'Tj' thermal terminal in the diode pin layout (buildDiodePinDeclarations / pinNodes). The DIOmPTable rows + DIOnames Tj entry map to model-param entries and the pin declaration.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dio.c:108 (dio/dio.c::DIOmPTable)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15424,10 +15430,13 @@
         174
       ],
       "hunkHash": "7339c045e515f889",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEAC capacitance/conductance companion-stamp block (capGate path, diode.ts:804-877). digiTS folds the AC small-signal stamp into load() under MODEAC rather than a separate stampAc method; the ngspice DIOacLoad gspr/geq/xceq imaginary-half stamps are that path. h001 is the accessor rename plus the `gspr = DIOtConductance` area-relocation (area folded into DIOtConductance in diotemp now).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioacld.c:23 (dio/dioacld.c::DIOacLoad)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15455,10 +15464,13 @@
         200
       ],
       "hunkHash": "ef355ae319af311e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, MODEAC path, new self-heating thermal-node AC stamp block (DIOtempPos/PosPrime/Neg/Temp + posTemp/posPrimeTemp/negTemp ptrs, xgcTt). Requires the thermal node and the dIth_*/gcTt instance state introduced by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioacld.c:42 (dio/dioacld.c::DIOacLoad)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15486,10 +15498,13 @@
         214
       ],
       "hunkHash": "c7f136f0bf44826d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — the DIOthermal flag accessor (a getThermal-equivalent on DiodeAnalogElement, read of the THERMAL param). Introduced together with the self-heating subsystem; blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioask.c:48 (dio/dioask.c::DIOask)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15548,10 +15563,13 @@
         246
       ],
       "hunkHash": "d3004ad86c878435",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence (diode.ts:880-901). h001 is the local-var declaration (delTemp/deldelTemp) + accessor rename; in digiTS this maps to the function-local additions in checkConvergence.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioconv.c:21 (dio/dioconv.c::DIOconvTest)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15579,12 +15597,22 @@
         265
       ],
       "hunkHash": "5121e585ff172799",
-      "state": "PENDING",
+      "state": "ESCALATED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence, the cdhat prediction. h002 adds the self-heating delTemp/deldelTemp term to cdhat (cdhat += dIdio_dT·deldelTemp). Requires the thermal node + DIOdeltemp/DIOdIdio_dT state from dio#recon/selfHeating.",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "APPLIER 2026-06-05: 22 dio hunks already at v41 (both recons APPLIED, diode.ts written straight at v41) — zero-line delta, ready-for-verify. The PRIOR-REJECTION empty-diff catch is the legitimate already-at-v41 state, not a non-landed edit. Device-level harness bit-exact on 3 dio fixtures. The ONE non-null fixture (diode-canon-cap-rc.dts) is an out-of-group engine NR iteration-count divergence escalated here; it cannot be fixed in diode.ts."
+      ],
       "rationale": null,
-      "escalation": null,
+      "escalation": {
+        "kind": "out-of-group-coupling",
+        "summary": "dio device-completion harness gate non-null on diode-canon-cap-rc.dts; root cause is engine NR iteration-count / predictor-entry divergence in src/solver/analog/newton-raphson.ts (niiter.c:1202-1205 port), NOT in any dio file. The dioconv.c#h002 hunk (convergence temperature term) is itself bijective+present in diode.ts:checkConvergence; this item is the anchor for the convergence-functionGroup locus only.",
+        "ngspiceCite": "src/maths/ni/niiter.c:1202-1205 (if ((CKTnoncon==0)&&(iterno!=1)) CKTnoncon=NIconvTest; else CKTnoncon=1)",
+        "digitsFile": "src/solver/analog/newton-raphson.ts:519-602,763-786",
+        "requiredEdit": "Align first-transient-NR-iteration accounting so the post-predictor solve is iterno==1 forced-noncon (never accepted on its first pass), matching ngspice. Cross-subsystem engine change affecting all devices transient convergence; beyond dio applier tsFiles (diode.ts).",
+        "evidence": "step16 tranNR: bit-identical state0/state1-3/rhs/residual/matrix/post-solve voltage; ours iterationCount=1 accepted (noncon=0), ngspice iterationCount=2 (noncon=1 at iter0). firstDivergence.earliest=state d1.VD step17 iter0 absDelta 6.28e-6. Device-level diode load()/checkConvergence bit-exact (diode-resistor/diode-bridge/diode-canon-temp-sweep all firstDivergence null).",
+        "detail": "See ESCALATIONS.md 2026-06-05 dio entry."
+      },
       "kind": "hunk",
       "blockedBy": "dio#recon/v41NewFeatures"
     },
@@ -15610,10 +15638,13 @@
         274
       ],
       "hunkHash": "79ec5f042a7dd4bf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.checkConvergence, the CKTtroubleElt store site. h003 is the whitespace normalization of the troubleElt assignment (tab→spaces). The CKTtroubleElt/CKTnoncon bump maps to checkConvergence returning false; no behavioral change in this hunk.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioconv.c:58 (dio/dioconv.c::DIOconvTest)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15672,10 +15703,13 @@
         375
       ],
       "hunkHash": "786e7ac9c031c3d5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement instance fields / pinNodes. The new `const int DIOtempNode` is the self-heating thermal node; in digiTS this is the new 'Tj' pin in pinNodes. The GENinstance struct embedding, const node-id qualifiers, and ptr→Ptr matrix-pointer renames have no digiTS counterpart (pinNodes is a ReadonlyMap; stamps use opaque handles), but the hunk as a whole introduces the thermal node, so it is PENDING blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:86 (dio/diodefs.h::sDIOinstance)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15703,10 +15737,13 @@
         413
       ],
       "hunkHash": "8321342feb0de782",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement instance fields + DIODE_PARAM_DEFS. Adds the level-3 instance Given-flags (DIOlengthMetalGiven etc.) and instance fields (DIOlengthMetal/Poly, DIOwidthMetal/Poly) plus the `int DIOthermal` self-heating flag. The level-3 geometry fields are blocked by dio#recon/level3GeoCap; the DIOthermal flag by dio#recon/selfHeating. functionGroup-split tracked in §5 of the review (the hunk mixes two reconstructions).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:112 (dio/diodefs.h::sDIOinstance)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15734,10 +15771,13 @@
         436
       ],
       "hunkHash": "69af0bbb9875ddef",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — the temperature-derivative working fields mirroring DioTempParams (DIOtConductance_dT, DIOtSatCur_dT, DIOtSatSWCur_dT, DIOtTunSatCur_dT, DIOtTunSatSWCur_dT). These _dT derivatives feed the self-heating Jacobian; they are introduced by the diotemp.c rewrite. Blocked by dio#recon/diotempUpdate (which rebuilds the v26 temp body the derivatives extend) and consumed by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:139 (dio/diodefs.h::sDIOinstance)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15765,10 +15805,13 @@
         452
       ],
       "hunkHash": "a91b156490d0fb0c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement instance fields. Adds DIOtRecSatCur/DIOtRecSatCur_dT (recombination, blocked by dio#recon/recombination), the dIth_dVrs/dIth_dVdio/dIth_dT/gcTt/dIrs_dT/dIdio_dT self-heating Jacobian-cache fields (blocked by dio#recon/selfHeating), and DIOcmetal/DIOcpoly level-3 parasitic caps (blocked by dio#recon/level3GeoCap). Mixed; whole hunk PENDING (the dominant introduction is the self-heating Jacobian cache).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:180 (dio/diodefs.h::sDIOinstance)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15827,10 +15870,13 @@
         503
       ],
       "hunkHash": "fc6af5fbc3bd769f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DIODE_SCHEMA (defineStateSchema) + SLOT_* constants + stateSize. Adds the new state-slot macros DIOqth (thermal cap charge), DIOcqth (thermal cap current), DIOdeltemp (thermal voltage), DIOdIdio_dT, and bumps DIOnumStates from 5 to 9. The DIOdphidp/DIOsensxp/DIOnumSenStates macros it also touches are sensitivity (NO-COUNTERPART per analysis-scope.md), but the new self-heating state slots dominate and require the schema expansion; whole hunk PENDING blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:198 (dio/diodefs.h::DIOstate-macros)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15858,10 +15904,13 @@
         534
       ],
       "hunkHash": "3f74bf791a83e699",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — model-param Given-flag equivalents (the props.isModelParamGiven checks) and DIODE_PARAM_DEFS. Adds the new model Given-flags: DIOid_maxGiven/DIOpd_maxGiven/DIOte_maxGiven (SOA), DIOrecSatCurGiven/DIOrecEmissionCoeffGiven (recombination), DIOrth0Given/DIOcth0Given (self-heating), and the eight level-3 geometry Given-flags. Also embeds `struct GENmodel gen` + accessor macros (no digiTS counterpart). Blocked across recombination/selfHeating/level3GeoCap; whole hunk PENDING.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:275 (dio/diodefs.h::sDIOmodel)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -15889,10 +15938,13 @@
         735
       ],
       "hunkHash": "df974720858fa16c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DIODE_PARAM_DEFS (new model param fields: DIOid_max/pd_max/te_max, DIOrecSatCur/recEmissionCoeff, DIOrth0/cth0, the eight level-3 geometry doubles) and the DIOtempUpdate forward-declaration (maps to the dioTemp(Temp) signature). The DIO_*/DIO_MOD_* `#define`→`enum` reformat is byte-identical-value C reformatting with no digiTS integer-id counterpart, but the hunk also adds the new param-id constants (DIO_LM..DIO_XP, DIO_MOD_ISR..DIO_MOD_XP, DIO_THERMAL); whole hunk PENDING, blocked across recombination/selfHeating/level3GeoCap.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diodefs.h:345 (dio/diodefs.h::sDIOmodel)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16106,10 +16158,13 @@
         900
       ],
       "hunkHash": "6d9c00eb98c12d92",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEUIC initial-condition branch (vd = params.IC, diode.ts:618-619). ngspice DIOgetic seeds DIOinitCond from the external node voltages when IC is not given; digiTS reads params.IC under the MODEINITJCT+MODETRANOP+MODEUIC gate. The single hunk is the linked-list-walk accessor rename inside the IC-retrieval loop.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diogetic.c:22 (dio/diogetic.c::DIOgetic)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16168,10 +16223,13 @@
         1042
       ],
       "hunkHash": "3b7704c67bc9f71e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, function-local declarations. Adds cdb_dT/cdsw_dT temperature derivatives of the bottom/sidewall currents; in digiTS these are load()-local values feeding the self-heating Jacobian. Blocked by dio#recon/diotempUpdate (the derivatives) and consumed by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:25 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16199,10 +16257,13 @@
         1052
       ],
       "hunkHash": "576b7fbd7b3d8d3e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, function-local declarations for the recombination current path (gen_fac, gen_fac_vd, t1, evd_rec, cdb_rec, gdb_rec, cdb_rec_dT). Blocked by dio#recon/recombination.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:45 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16230,10 +16291,13 @@
         1094
       ],
       "hunkHash": "cde22d3cb9a448fa",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, function-local declarations for self-heating (deldelTemp, delTemp, Temp, ceqqth, Ith, gcTt, vrs, dIdio_dT, dIth_dVdio, dIrs_dT, dIth_dVrs, dIth_dT, csat_dT, csatsw_dT, argsw_dT) and the Check_dio/Check_th split. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:56 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16261,10 +16325,13 @@
         1116
       ],
       "hunkHash": "31c59a50e11af704",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the per-instance init block. Sets Check_th from the selfheat predicate, reorders the cd/cdb/gd/gdb/cdsw init, and relocates `gspr = DIOtConductance` (area now folded into DIOtConductance by diotemp). The gspr area-relocation is blocked by dio#recon/diotempUpdate; the Check_th/selfheat predicate by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:95 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16292,10 +16359,13 @@
         1127
       ],
       "hunkHash": "5bd019d2aeeed1a0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the sensitivity-seed branch (CKTsenInfo). digiTS has no sensitivity (analysis-scope.md), so the CKTsenInfo wrapper has no counterpart; the behavioral content this hunk adds is the delTemp seeding from CKTstate0/1 inside that path, which lands in the MODEINIT* vd/delTemp dispatch in load(). Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:116 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16323,10 +16393,13 @@
         1154
       ],
       "hunkHash": "2a93df182b9f9012",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEINITSMSIG/MODEINITTRAN/MODEINITJCT/MODEINITFIX vd-selection chain (diode.ts:610-645). Adds delTemp seeding alongside each vd seed (delTemp from CKTstate0/1, or 0.0 in the off/JCT cases). Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:128 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16354,10 +16427,13 @@
         1190
       ],
       "hunkHash": "69517929265c1544",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the MODEINITPRED branch (diode.ts:628-639). Adds the state1→state0 copies for DIOdeltemp/DIOdIdio_dT/DIOqth, the DEVpred(delTemp) prediction, the qth init (cth0·delTemp), and the MODEINITTRAN qth history copy. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:157 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16385,10 +16461,13 @@
         1212
       ],
       "hunkHash": "d2b37c9a2646a798",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load / checkConvergence bypass path. Adds the deldelTemp tolerance test to the bypass condition (skip recompute only if both current and temperature predictions are within tol), storing delTemp/dIdio_dT on bypass. digiTS has no NOBYPASS path in load() today; the thermal-prediction term is part of the self-heating subsystem. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:198 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16416,10 +16495,13 @@
         1255
       ],
       "hunkHash": "533e16fd6f52d7f0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the pnjlim block (diode.ts:649-674). Renames Check→Check_dio and adds the DEVlimitlog(delTemp, ...) thermal-step limiter call (digiTS limitlog already exists in newton-raphson.ts:295). The thermal limiting is part of self-heating. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:222 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16447,10 +16529,13 @@
         1343
       ],
       "hunkHash": "2e80c014955f1a0e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the `next1:` block opening. Adds the selfheat Temp = DIOtemp + delTemp re-evaluation via DIOtempUpdate(Temp) and the csat_dT/csatsw_dT assignment from the temperature-derivative fields, plus gspr. The DIOtempUpdate re-eval at perturbed Temp requires the parameterized temp function (dio#recon/diotempUpdate); the selfheat gating by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:265 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16478,10 +16563,13 @@
         1352
       ],
       "hunkHash": "2519be345f15010a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the sidewall current block (diode.ts:697-726). Adds cdsw_dT temperature-derivative terms to each sidewall region (forward/reverse/breakdown) and the merged csat_dT += csatsw_dT. Blocked by dio#recon/diotempUpdate (the _dT derivatives extend the temp body).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:356 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16509,10 +16597,13 @@
         1372
       ],
       "hunkHash": "aebba3c8889eecec",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load / computeDiodeIV, the bottom-current forward region. Adds cdb_dT and the entire recombination-current sub-block (vterec, evd_rec, cdb_rec, gen_fac via tJctPot/tGradingCoeff, gdb_rec, cdb_rec_dT) gated on DIOrecSatCurGiven. Blocked by dio#recon/recombination (the recombination block) and dio#recon/diotempUpdate (cdb_dT).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:368 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16540,10 +16631,13 @@
         1381
       ],
       "hunkHash": "64c55e4d162859c3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, sidewall tunneling current. Adds cdsw_dT tunneling-derivative term. Tunneling (DIOtTunSatSWCur) is a v26 feature digiTS never ported, and the _dT derivative extends it. Blocked by dio#recon/diotempUpdate.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:391 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16571,10 +16665,13 @@
         1390
       ],
       "hunkHash": "89bfc8bb70f1d922",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, bottom tunneling current. Adds cdb_dT tunneling-derivative term. Tunneling (DIOtTunSatCur) is a v26 feature digiTS never ported, and the _dT derivative extends it. Blocked by dio#recon/diotempUpdate.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:403 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16602,10 +16699,13 @@
         1410
       ],
       "hunkHash": "2424f3fed29cb015",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the cd/gd assembly + IKF/IKR knee limiting (diode.ts:737-769). Adds dIdio_dT = cdb_dT + cdsw_dT (self-heating Jacobian) and changes the knee-current gates from `model->DIOforwardKneeCurrent > 0.0` to `model->DIOforwardKneeCurrentGiven` (same for reverse). The Given-flag gate change is blocked by dio#recon/diotempUpdate (where the *KneeCurrentGiven epsmin-disable defaulting lives, diosetup.c h-block); dIdio_dT by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:433 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16664,10 +16764,13 @@
         1434
       ],
       "hunkHash": "efc4f3c879e84707",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the charge-storage block (diode.ts:811-821) + computeJunctionCharge. Two changes: (1) `diffcharge = TT*cd` (the v41 merge of bottom + sidewall diffusion charge into the total current cd, replacing separate diffcharge/diffchargeSW; diffcap = TT*gd likewise) — a genuine arithmetic relocation, PORT; (2) `capd += DIOcmetal + DIOcpoly` adds the level-3 parasitic caps, blocked by dio#recon/level3GeoCap.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:490 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16695,10 +16798,13 @@
         1443
       ],
       "hunkHash": "67a2535825f1cfed",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the small-signal/transient charge store-back. Adds the SenCond store of dIdio_dT (sensitivity wrapper, no digiTS counterpart) and the selfheat NIintegrate(cth0, qth) → gcTt/ceqqth thermal-capacitor companion with its MODEINITTRAN cqth history copy. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:508 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16726,10 +16832,13 @@
         1488
       ],
       "hunkHash": "83dff1153da15d0a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load / checkConvergence, the non-convergence bump. Changes `if (Check == 1)` to `if ((Check_th == 1) || (Check_dio == 1))` so a thermal-limiting event also flags non-convergence. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:516 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16757,10 +16866,13 @@
         1504
       ],
       "hunkHash": "bbaac4c0906d4422",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.load, the `next2:` state store-back + stamp block (diode.ts:775-800). Adds the DIOdeltemp/DIOdIdio_dT state writes, the entire self-heating power/Jacobian computation (vrs, Ith = vd·cd + vrs²·gspr, dIrs_dT, dIth_dVrs/dVdio/dT, gcTt cache), the thermal RHS contributions to posNode/posPrimeNode/negNode/tempNode, and the 7 thermal-node matrix stamps (tempPos/tempPosPrime/tempNeg/tempTemp/posTemp/posPrimeTemp/negTemp). Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioload.c:564 (dio/dioload.c::DIOload)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -16881,10 +16993,13 @@
         1690
       ],
       "hunkHash": "0822af4ca60002c7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — model-param application in createDiodeElement (params object reads) and DiodeAnalogElement.setParam. The new DIOmParam setter cases map to new entries in DIODE_PARAM_DEFS + their setParam handling: id_max/pd_max/te_max (SOA, blocked by dio#recon/selfHeating), isr/nr (blocked by dio#recon/recombination), rth0/cth0 (blocked by dio#recon/selfHeating), lm/lp/wm/wp/xom/xoi/xm/xp with the xom/xoi ×1e-10 unit scaling (blocked by dio#recon/level3GeoCap). Whole hunk PENDING.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diompar.c:209 (dio/diompar.c::DIOmParam)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17036,10 +17151,13 @@
         1795
       ],
       "hunkHash": "e12b2efb25febc2d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — instance-param reads in createDiodeElement / setParam. Drops the `* scale` factor from the DIO_W/DIO_L instance setters (scale now applied in the level-3 setup path) and adds the DIO_THERMAL instance-flag setter (here->DIOthermal = value->iValue != 0). The W/L de-scale is blocked by dio#recon/level3GeoCap; the THERMAL flag by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioparam.c:33 (dio/dioparam.c::DIOparam)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17067,10 +17185,13 @@
         1820
       ],
       "hunkHash": "a54b0e6c8f7d7cd4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — instance-param reads in createDiodeElement / setParam. Adds the level-3 instance geometry setters (DIO_LM/DIO_LP/DIO_WM/DIO_WP → DIOlengthMetal/lengthPoly/widthMetal/widthPoly with their Given-flags). Blocked by dio#recon/level3GeoCap.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: dioparam.c:65 (dio/dioparam.c::DIOparam)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17191,10 +17312,13 @@
         1881
       ],
       "hunkHash": "87de003f6d86aa45",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup / createDiodeElement model defaulting. Adds the `#include fteext.h` (C plumbing, no counterpart) and the `cp_getvar(\"scale\", CP_REAL, &scale)` read that feeds the level-3 area/perimeter and cmetal/cpoly scaling. The scale read is part of the level-3 geometric-cap path. Blocked by dio#recon/level3GeoCap.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:15 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17222,10 +17346,13 @@
         1896
       ],
       "hunkHash": "3fed4225d6e3ed44",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — model-param defaulting in createDiodeElement. Changes the IKF/IKR (forward/reverse knee) defaulting: instead of `if(!given) set 0`, v41 keeps the Given-flag and, if given but < CKTepsmin, clears the Given-flag with a warning. Pairs with the dioload.c h015 `*KneeCurrentGiven` gate change. The IKF/IKR knee path exists in digiTS (diode.ts:742-768) but the epsmin-disable defaulting is part of the v26-baseline temp/setup defaulting digiTS never fully ported. Blocked by dio#recon/diotempUpdate.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:24 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17253,10 +17380,13 @@
         1918
       ],
       "hunkHash": "8bf0527240939a1f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — model-param defaulting in createDiodeElement / DiodeAnalogElement.setup. Adds the model defaults: id_max/pd_max/te_max=1e99 (SOA), recEmissionCoeff=2 / recSatCur=1e-14 (recombination), the DIOsatCur CKTepsmin floor, DIOnomTemp=CKTnomTemp, DIOconductance from DIOresist, rth0=0/cth0=1e-5 (self-heating), and the eight level-3 geometry defaults (lengthMetal/Poly, widthMetal/Poly =0; metalOxideThick/polyOxideThick =1e-6; metalMaskOffset/polyMaskOffset =0). Spans recombination/selfHeating/level3GeoCap/diotempUpdate; whole hunk PENDING. The dominant introduction (satCur floor, nomTemp, conductance) is the v26 setup-defaulting under dio#recon/diotempUpdate; the rest are reconstruction-specific defaults.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:89 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17284,10 +17414,13 @@
         1992
       ],
       "hunkHash": "8013617bc9b36123",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the instance-loop area/perimeter + level-3 geometry derivation. Adds the model/instance-walk rename, the DIOcmetal/DIOcpoly init, and the level=3 block: area/pj scaled by scale², the wm/lm/wp/lp instance-or-model selection, and the CONSTepsSiO2-based parasitic metal/poly overlap-capacitance computation. Blocked by dio#recon/level3GeoCap (requires CONSTepsSiO2, the geometry params, and the level=3 model branch).",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:170 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17315,10 +17448,13 @@
         2031
       ],
       "hunkHash": "86a46743427f43b8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup + DIODE_SCHEMA. Changes `*states += 5` to `*states += DIOnumStates` (the 5→9 state-slot expansion for the self-heating thermal-cap and delTemp/dIdio_dT slots) and the sensitivity `2 * SENparms` to `DIOnumSenStates * SENparms` (sensitivity, NO-COUNTERPART per analysis-scope.md). The state-count expansion is the self-heating subsystem. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:256 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17346,10 +17482,13 @@
         2043
       ],
       "hunkHash": "bf9e63341ecad21a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the selfheat predicate computation (int selfheat = DIOtempNode>0 && DIOthermal && DIOrth0Given) inserted before the TSTALLOC macro. This gates the thermal-node matrix allocations in h007. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:295 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17377,10 +17516,13 @@
         2052
       ],
       "hunkHash": "89852aebecdb6e1a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the TSTALLOC sequence (diode.ts:580-587). Adds the seven self-heating thermal-node TSTALLOC allocations (DIOtempPos/tempPosPrime/tempNeg/tempTemp/posTemp/posPrimeTemp/negTemp) gated on the selfheat predicate, mirroring the existing allocElement handle pattern. Blocked by dio#recon/selfHeating.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:322 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17408,10 +17550,13 @@
         2070
       ],
       "hunkHash": "c4bc2e5d27563215",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.setup, the DIOunsetup posPrime-node teardown. Changes the unsetup guard to `DIOposPrimeNode > 0` and always resets DIOposPrimeNode = 0. digiTS allocates the prime node in setup() via ctx.makeVolt (diode.ts:573-578); unsetup/node-release has a partial counterpart (the internalLabels / engine node lifecycle). The guard-and-reset change is a structural refinement of node teardown — PORT.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diosetup.c:337 (dio/diosetup.c::DIOsetup)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17656,10 +17801,13 @@
         2318
       ],
       "hunkHash": "023ccc7732b68f66",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — dioTemp() / DiodeAnalogElement.computeTemperature (the doc comment heading). The hunk is the top-of-function comment dedent (4-space indent removed). Maps to the dioTemp() docstring; no behavioral content, but it sits in the diotemp.c rewrite. Blocked by dio#recon/diotempUpdate.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diotemp.c:5 (dio/diotemp.c::DIOtempUpdate)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17687,10 +17835,13 @@
         2799
       ],
       "hunkHash": "d1007500e5653765",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — dioTemp() and DiodeAnalogElement.computeTemperature. The whole DIOtemp→DIOtempUpdate(model, here, Temp, ckt) rewrite: the temperature body is extracted into a function taking an explicit Temp (so self-heating can re-evaluate at Temp+delTemp), the DIOgradingCoeffMax cp_getvar grading-coeff limit, ALL _dT temperature derivatives (tSatCur_dT, tSatSWCur_dT, tTunSatCur_dT, tTunSatSWCur_dT, tRecSatCur_dT, tConductance_dT), the recombination tRecSatCur scaling, the tlev/tlevc branch selection, TM1/TM2 grading-temp, the breakdown-matching iteration, area-scaled DIOtConductance, and the sidewall tF2SW/tF3SW/tDepSWCap. digiTS's dioTemp implements only a subset of the v26 body (no tlev/tlevc, TM1/TM2, TTT1/TTT2, TRS/TRS2, tunneling, brkdEmissionCoeff, full sidewall cap), so the v26 baseline must be reconstructed before this rewrite applies. Blocked by dio#recon/diotempUpdate; the _dT derivatives are further consumed by dio#recon/selfHeating and tRecSatCur by dio#recon/recombination.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diotemp.c:13 (dio/diotemp.c::DIOtempUpdate)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -17718,10 +17869,13 @@
         2814
       ],
       "hunkHash": "a57a21c385c066f0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/diode.ts — DiodeAnalogElement.getLteTimestep (diode.ts:910-931, delegates to cktTerr on the cap charge slot). The single hunk is the linked-list-walk accessor rename inside the CKTterr(DIOcapCharge) call site. PORT-cosmetic; not blocked.",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "Independently re-derived bijective vs ref/ngspice/src/spicelib/devices/dio/. diode.ts written straight at v41 (recons dio#recon/diotempUpdate + selfHeating APPLIED) — legitimate zero-line delta (already-at-v41), NOT a non-landed edit. tsc clean for diode.ts.",
+        "v41 evidence: diotrunc.c:18 (dio/diotrunc.c::DIOtrunc)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
