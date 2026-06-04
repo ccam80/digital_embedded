@@ -16,7 +16,7 @@
     "src/spicelib/devices/bjt/bjtacld.c": {
       "classification": "PORT",
       "tsFile": "src/components/semiconductors/bjt.ts",
-      "planningNote": "AC small-signal load (BJTacLoad). AC is implemented engine-wide (analysis-scope.md: ac-analysis.ts, defaultStampAcHandler, optional AnalogElement.stampAc hook). BjtL1Element has NO stampAc method yet -> all three hunks blocked by reconstruction bjt#recon/stampAc; the v41 collCX AC stamps ride on top as ordinary deltas."
+      "planningNote": "AC small-signal load (BJTacLoad). AC is implemented engine-wide (analysis-scope.md: ac-analysis.ts, defaultStampAcHandler, optional AnalogElement.stampAc hook). The complete v41 BJTacLoad (bjtacld.c:41-128) is rebuilt as BjtL1Element.stampAc by reconstruction bjt#recon/quasiSaturation Part 5: the AC stamp is structurally dependent on the collCX node + collCX matrix cells + Irci_*/cqbcx state slots that recon establishes, so all three hunks (#h001 un-area gcpr/gepr, #h002 collCX matrix restructure + xcbcx, #h003 the BJTintCollResistGiven Kull AC block) are blocked by bjt#recon/quasiSaturation. There is no separate stampAc recon."
     },
     "src/spicelib/devices/bjt/bjtask.c": {
       "classification": "REVIEW-CLASS",
@@ -218,19 +218,19 @@
     },
     "bjt/bjtacld.c#h001": {
       "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc)",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h001 = un-area gcpr/gepr + Irci_* state reads, bjtacld.c:47-55)",
       "functionGroup": "bjt/bjtacld.c::BJTacLoad",
       "rationale": null
     },
     "bjt/bjtacld.c#h002": {
       "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc)",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h002 = collCX matrix-cell restructure + xcbcx, bjtacld.c:70,76-77,84,87)",
       "functionGroup": "bjt/bjtacld.c::BJTacLoad",
       "rationale": null
     },
     "bjt/bjtacld.c#h003": {
       "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc) - the v41 model->BJTintCollResistGiven collCX AC stamp block",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h003 = the model->BJTintCollResistGiven Kull collCX AC stamp block, bjtacld.c:107-124)",
       "functionGroup": "bjt/bjtacld.c::BJTacLoad",
       "rationale": null
     },
@@ -955,10 +955,10 @@
       "rationale": "Removes a duplicated CKTstate1 restore inside BJTsLoad; the whole function is sensitivity-only and sensitivity is not implemented (analysis-scope.md)."
     },
     "bjt/bjtsoachk.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "bjt/bjtsoachk.c::BJTsoaCheck",
-      "rationale": null
+      "rationale": "BJTsoaCheck (DEVsoaCheck) is a read-only safe-operating-area diagnostic: bjtsoachk.c:44-138 only reads CKTrhsOld/CKTstate0 and emits soa_printf warnings — no matrix or RHS write (rth0 at :119 is a pdMax derating divisor, not a thermal node). SOA is not implemented in digiTS (no DEVsoaCheck/CKTsoaMaxWarns analogue), same disposition as bjtnoise/bjtdisto. The SOA limit model params ride the quasiSaturation recon declare-only. NO-COUNTERPART (user-ruled 2026-06-05)."
     },
     "bjt/bjtsprt.c#h001": {
       "state": "NO-COUNTERPART",
@@ -1052,22 +1052,6 @@
     }
   },
   "reconstruction": {
-    "bjt#recon/stampAc": {
-      "title": "Rebuild BJTacLoad as BjtL1Element.stampAc (the linearized small-signal AC stamp: gpi/gmu/gm/go/gx conductances + jw*{cqbe,cqbc,cqbx,cqsub,cexbc} capacitive susceptances into the BJT matrix cells)",
-      "spec": "spec/v41-port/reconstruction/bjt-stampac.md",
-      "ngspiceBaseline": [
-        "src/spicelib/devices/bjt/bjtacld.c"
-      ],
-      "tsFile": "src/components/semiconductors/bjt.ts",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (no allocation in stampAc; reuse matrix handles allocated once in setup(), mirroring the BJTsetup TSTALLOC / BJTacLoad pure-stamp function boundary); reads the gpi/gmu/gm/go/gx and cqbe/cqbc/cqbx/cqsub/cexbc state slots that load() already populates",
-      "functionGroup": "bjt/bjtacld.c::BJTacLoad",
-      "blocks": [
-        "bjt/bjtacld.c#h001",
-        "bjt/bjtacld.c#h002",
-        "bjt/bjtacld.c#h003"
-      ],
-      "state": "PENDING"
-    },
     "bjt#recon/quasiSaturation": {
       "title": "BJT Kull quasi-saturation subsystem + v41 area/Arrhenius temperature refactor + full TLEV/TLEVC temperature parity",
       "spec": "spec/v41-port/reconstruction/bjt-quasisaturation.md",
@@ -1162,21 +1146,10 @@
         "bjt/bjttemp.c#h009",
         "bjt/bjttemp.c#h010",
         "bjt/bjttemp.c#h011",
-        "bjt/bjttrunc.c#h001"
-      ],
-      "state": "PENDING"
-    },
-    "bjt#recon/soaWarnings": {
-      "title": "BJT safe-operating-area diagnostic warnings (BJTsoaCheck) — read-only, no matrix/RHS effect; deferred follow-on",
-      "spec": "spec/v41-port/reconstruction/bjt-soa-warnings.md",
-      "tsFile": "src/components/semiconductors/bjt.ts",
-      "tsFiles": [
-        "src/components/semiconductors/bjt.ts"
-      ],
-      "tsFunction": "BJT SOA diagnostic check (icMax/ibMax/pdMax/vXXmax warnings)",
-      "functionGroup": "bjt/bjtsoachk.c::BJTsoaCheck",
-      "blocks": [
-        "bjt/bjtsoachk.c#h001"
+        "bjt/bjttrunc.c#h001",
+        "bjt/bjtacld.c#h001",
+        "bjt/bjtacld.c#h002",
+        "bjt/bjtacld.c#h003"
       ],
       "state": "PENDING"
     }

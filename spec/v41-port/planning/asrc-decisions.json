@@ -1,0 +1,330 @@
+{
+  "device": "asrc",
+  "diffDoc": "spec/ngspice-v41-model-diffs/asrc.md",
+  "_help": "Planning overlay applied by build-ledger.mjs. Per file: classification (PORT|NO-COUNTERPART|REVIEW-CLASS), tsFile, planningNote. Per item: state (PENDING|NO-COUNTERPART only - planning never sets APPLIED/ESCALATED), tsFunction, functionGroup (optional override), rationale (required iff state=NO-COUNTERPART). The optional `reconstruction` section declares v26-baseline reconstruction items (id must contain \"#recon/\"); each needs spec, blocks (>=1 hunk id), tsFile, tsFunction. Edit THIS file, never ledger.json; then re-run build-ledger.mjs.",
+  "files": {
+    "src/spicelib/devices/asrc/Makefile.am": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "Automake libasrc_la_SOURCES list. C build system; digiTS registers components via register-all.ts / core/registry.ts. No behavioral content. PLANNING.md §5 case (a)."
+    },
+    "src/spicelib/devices/asrc/asrc.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "IFparm ASRCpTable[] param table + ASRCnames[]/size globals. Source of truth for the asrc param set (i/v parse-tree, temp/dtemp/tc1/tc2/reciproctc, and v41-new m/reciprocm). Counterpart is the B-source modelRegistry paramDefs. Absorbed into asrc#recon/wholeClass; the v41 m/reciprocm rows are blocked PENDING hunk h001."
+    },
+    "src/spicelib/devices/asrc/asrcacld.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCacLoad — AC small-signal load. AC implemented (analysis-scope.md). Stamps the unit V-source quad + the precomputed derivative columns (ASRCacValues) scaled by temperature/multiplier factor. Counterpart is BSourceAnalogElement.stampAc(). Absorbed into the recon; blocked PENDING."
+    },
+    "src/spicelib/devices/asrc/asrcask.c": {
+      "classification": "REVIEW-CLASS",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCask integer-id IFparm value getter (temp/dtemp/tc1/tc2/m + output current/voltage/pos_node/neg_node). digiTS has no integer-id ask API; output quantities are exposed via getPinCurrents()/instance fields, params read by name from the property bag. Getter dispatch is C glue with no counterpart — hunks resolved NO-COUNTERPART per §5 case (a); the underlying readback quantities are part of the recon load/getPinCurrents, not this dispatch shell."
+    },
+    "src/spicelib/devices/asrc/asrcconv.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCconvTest — reltol/voltTol(V)/abstol(I) convergence check on the parse-tree value vs ASRCprev_value. digiTS folds convergence into load() inline ctx.noncon increments (mosfet/diode/bjt pattern). Counterpart is the convergence flag in BSourceAnalogElement.load(). Absorbed into the recon; blocked PENDING."
+    },
+    "src/spicelib/devices/asrc/asrcdefs.h": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "sASRCinstance/sASRCmodel structs + ASRCvOld/ASRCcontVOld state #defines + ASRC_* id enum. Maps to the B-source StateSchema slots, instance fields (type/branch/parse-tree/vars/temp coeffs/m/posPtr), and paramDefs. v41 adds ASRCm/ASRCreciprocm fields + ASRCvars[] index cache + ASRC_M/ASRC_RM enum — blocked PENDING hunks h001/h002."
+    },
+    "src/spicelib/devices/asrc/asrcdel.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "ASRCdelete — C heap free of the instance (INPfreeTree/FREE of acValues/posPtr/vars). JS is GC'd; no instance-teardown counterpart. PLANNING.md §4 (<dev>del.c) / §5 case (a)."
+    },
+    "src/spicelib/devices/asrc/asrcdest.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "ASRCdestroy — C heap free of the module-wide asrc_vals/asrc_derivs scratch buffers. JS is GC'd; the scratch arrays become element-local typed arrays with no explicit destroy. PLANNING.md §4 (<dev>dest.c) / §5 case (a)."
+    },
+    "src/spicelib/devices/asrc/asrcext.h": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "C extern-prototype header (extern int ASRCload(...) etc.). digiTS signatures are TS class members; no prototype headers. PLANNING.md §5 case (a)."
+    },
+    "src/spicelib/devices/asrc/asrcfbr.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCfindBr — for a current-controlled form, locate/create the controlling source's branch equation (CKTmkCur). Counterpart is the controlling-branch resolution in BSourceAnalogElement.setup() (ctx.makeCur / branch lookup), matching the controlled-source-base.ts/CCVS branch-allocation pattern. Absorbed into the recon; blocked PENDING."
+    },
+    "src/spicelib/devices/asrc/asrcinit.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "SPICEdev ASRCinfo dispatch struct (C99 designated initializers). digiTS registration is a component Definition + registry.register(...); which-methods-exist is captured by which methods the element implements. PLANNING.md §5 case (a) / §4 glue note."
+    },
+    "src/spicelib/devices/asrc/asrcinit.h": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "extern decls for ASRCpTable[]/ASRCnames[]/size ints. C prototype header; param tables are TS data structures in digiTS. PLANNING.md §5 case (a)."
+    },
+    "src/spicelib/devices/asrc/asrcitf.h": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "DEV_ASRC itf accessor header. C dispatch glue; digiTS registration is an ES-module import + registry.register. PLANNING.md §5 case (a) / §4 glue note."
+    },
+    "src/spicelib/devices/asrc/asrcload.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCload — the core DC/transient companion load: evaluate the parse tree (IFeval-equivalent → rhs + derivatives), stamp the linearized VCVS/VCCS/CCVS/CCCS Jacobian columns + RHS, store ASRCacValues for small-signal, set ASRCprev_value. Counterpart is BSourceAnalogElement.load() built on src/solver/analog/expression.ts (evaluate + differentiate). v41 adds the m/reciprocm factor + CKTsrcFact MODETRANOP ramp + TREALLOC scratch + ASRCvars[] indexing — blocked PENDING hunks h001/h002/h003."
+    },
+    "src/spicelib/devices/asrc/asrcmdel.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "ASRCmDelete — C heap free of a model and its instance list; the file is DELETED in v41 (Makefile.am drops it, DEVmodDelete set NULL). JS is GC'd; no model-teardown counterpart. PLANNING.md §4 (<dev>mdel.c) / §5 case (a). The deletion itself is faithfully a no-op for digiTS."
+    },
+    "src/spicelib/devices/asrc/asrcpar.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCparam — instance parameter setter (v/i parse-tree, tc1/tc2/reciproctc + v41-new m/reciprocm + temp/dtemp). Counterpart is BSourceAnalogElement.setParam()/constructor param resolution (hot-loadable). v41 adds ASRC_M/ASRC_RM and the ASRC_TEMP/ASRC_DTEMP cases — blocked PENDING hunks h001/h002."
+    },
+    "src/spicelib/devices/asrc/asrcpzld.c": {
+      "classification": "NO-COUNTERPART",
+      "tsFile": null,
+      "planningNote": "ASRCpzLoad — pole-zero analysis load (SPcomplex *s frequency). Pole-zero NOT implemented in digiTS (analysis-scope.md: no PZ AnalogEngine method, no PZ engine file, no PZ MCP tool). PLANNING.md §5 case (b). The file is wholly owned by PZ — it stamps derivatives/factor into the matrix only for the PZ pass; no shared helper for DC/tran/AC."
+    },
+    "src/spicelib/devices/asrc/asrcset.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCsetup + ASRCunsetup — branch-equation allocation for V-form, ASRCposPtr matrix-cell TSTALLOC over the controlling vars (VCVS/VCCS/CCVS/CCCS topologies), shorted-ASRC error, default tc/m fill, ASRCvars[] population. Counterpart is BSourceAnalogElement.setup() (ctx.makeCur + solver.allocElement in the same order, Sparse-Solver-Settled). v41 adds m/reciprocm defaults, the ASRCvars[] cache, the up-front numVars sizing, and the restructured TSTALLOC walk — blocked PENDING hunks h001/h002. ASRCunsetup node teardown has no digiTS counterpart (engine rebuilt per compile)."
+    },
+    "src/spicelib/devices/asrc/asrctemp.c": {
+      "classification": "PORT",
+      "tsFile": "src/components/active/bsource.ts",
+      "planningNote": "ASRCtemp — instance temperature default processing (ASRCtemp = CKTtemp unless given; dtemp handling). Counterpart is BSourceAnalogElement.computeTemperature(). Absorbed into the recon; blocked PENDING."
+    }
+  },
+  "items": {
+    "asrc/Makefile.am#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/Makefile.am::libasrc_la_SOURCES =\t\\",
+      "rationale": "Automake source-list edit (drops asrcmdel.c). C build system; digiTS has no autotools build and registers components via register-all.ts. No behavioral content. PLANNING.md §5 case (a)."
+    },
+    "asrc/asrc.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: B-source modelRegistry paramDefs (ASRCpTable counterpart) — adds m / reciprocm param rows",
+      "functionGroup": "asrc/asrc.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrcacld.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.stampAc() (header/comment hunk for the AC-load function)",
+      "functionGroup": "asrc/asrcacld.c::@2",
+      "rationale": null
+    },
+    "asrc/asrcacld.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.stampAc() (function-doc hunk)",
+      "functionGroup": "asrc/asrcacld.c::Author: 1988 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrcacld.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.stampAc() — unit V-source quad + derivative-column AC stamp scaled by temp/multiplier factor",
+      "functionGroup": "asrc/asrcacld.c::ASRCacLoad(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "asrc/asrcask.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcask.c::@2",
+      "rationale": "Removal of the singh@ / routine-description comment block at the top of ASRCask. Part of the integer-id IFparm value-getter dispatch (ASRCask), which has no digiTS counterpart: digiTS has no integer-id ask API; output quantities (current/voltage) come from getPinCurrents()/instance fields and params are read by name from the property bag. Getter dispatch glue, PLANNING.md §5 case (a). Mirrors the dio/dioask.c REVIEW-CLASS→NO-COUNTERPART precedent."
+    },
+    "asrc/asrcask.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcask.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": "ASRCask switch-body restyle + new ASRC_M getter case. Integer-id IFparm value-getter dispatch with no digiTS counterpart (no ask API). The load-bearing readback quantities (output current/voltage, the m value) are produced by the recon's load()/getPinCurrents() and stored as instance state, not by this dispatch shell. Getter glue, PLANNING.md §5 case (a)."
+    },
+    "asrc/asrcconv.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — inline ctx.noncon convergence increment (reltol/voltTol(V)/abstol(I) on parse-tree value vs prev_value)",
+      "functionGroup": "asrc/asrcconv.c::Author: 1988 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrcdefs.h#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: B-source StateSchema (ASRCvOld/ASRCcontVOld slots) + instance fields (type/branch/tree/vars/temp coeffs/m/posPtr) — struct field set incl. v41-new ASRCm/ASRCreciprocm/ASRCvars",
+      "functionGroup": "asrc/asrcdefs.h::Author: 1985 Thomas L. Quarles",
+      "rationale": null
+    },
+    "asrc/asrcdefs.h#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: ASRC_* param-id enum counterpart (paramDefs id set) — adds ASRC_M / ASRC_RM",
+      "functionGroup": "asrc/asrcdefs.h::extern int asrc_nvals;",
+      "rationale": null
+    },
+    "asrc/asrcdel.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcdel.c::@2",
+      "rationale": "ASRCdelete — C heap free of the instance (INPfreeTree + FREE of acValues/posPtr/vars). JavaScript is garbage-collected; digiTS has no per-instance teardown method. PLANNING.md §4 (<dev>del.c) / §5 case (a)."
+    },
+    "asrc/asrcdest.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcdest.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": "ASRCdestroy — C heap free of the module-wide asrc_vals/asrc_derivs scratch buffers (and their nvals reset). JavaScript is garbage-collected; the scratch arrays become element-local typed arrays with no explicit destroy step. PLANNING.md §4 (<dev>dest.c) / §5 case (a)."
+    },
+    "asrc/asrcext.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcext.h::Copyright 1990 Regents of the University of California.  All rights reserved.",
+      "rationale": "C extern-prototype header (extern int ASRCload(...) etc., re-signatured for the v41 ASRCdelete(GENinstance*)/ASRCdestroy(void) signatures). digiTS signatures are TS class members; no prototype headers exist. PLANNING.md §5 case (a)."
+    },
+    "asrc/asrcfbr.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — controlling-branch resolution (header/loop-restyle hunk)",
+      "functionGroup": "asrc/asrcfbr.c::@2",
+      "rationale": null
+    },
+    "asrc/asrcfbr.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — locate/create controlling source branch eq (ctx.makeCur), matching controlled-source-base.ts/CCVS branch-allocation pattern",
+      "functionGroup": "asrc/asrcfbr.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrcinit.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcinit.c::@8",
+      "rationale": "SPICEdev ASRCinfo dispatch struct converted to C99 designated initializers (DEVparam/DEVload/DEVsetup/... slots, DEVmodDelete now NULL). digiTS registration is a component Definition + registry.register(...); which-methods-exist is captured by which methods the element implements. PLANNING.md §5 case (a) / §4 glue note."
+    },
+    "asrc/asrcinit.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcinit.h::@1",
+      "rationale": "extern decls for ASRCpTable[]/ASRCnames[]/size ints (whitespace-only restyle of the bracket form). C prototype header; the param tables are TS data structures in digiTS. PLANNING.md §5 case (a)."
+    },
+    "asrc/asrcitf.h#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcitf.h::@1",
+      "rationale": "DEV_ASRC itf accessor header (adds a blank line). C dispatch glue; digiTS registration is an ES-module import + registry.register. PLANNING.md §5 case (a) / §4 glue note."
+    },
+    "asrc/asrcload.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — module-scratch init + function-doc hunk",
+      "functionGroup": "asrc/asrcload.c::@2",
+      "rationale": null
+    },
+    "asrc/asrcload.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — function-doc / signature hunk",
+      "functionGroup": "asrc/asrcload.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrcload.c#h003": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — parse-tree eval (expression.ts evaluate+differentiate) → rhs+derivs, VCVS/VCCS/CCVS/CCCS Jacobian+RHS stamp, ASRCvars[] indexing, m/reciprocm factor, CKTsrcFact MODETRANOP ramp, acValues store, prev_value set",
+      "functionGroup": "asrc/asrcload.c::ASRCload(GENmodel *inModel, CKTcircuit *ckt)",
+      "rationale": null
+    },
+    "asrc/asrcmdel.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcmdel.c::@1",
+      "rationale": "ASRCmDelete — C heap free of a model and its instance list; the file is DELETED in v41 (DEVmodDelete slot set NULL, dropped from Makefile.am). JavaScript is garbage-collected; no model-teardown counterpart. The deletion is faithfully a no-op for digiTS. PLANNING.md §4 (<dev>mdel.c) / §5 case (a)."
+    },
+    "asrc/asrcpar.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setParam()/constructor — param-setter header/comment hunk",
+      "functionGroup": "asrc/asrcpar.c::@2",
+      "rationale": null
+    },
+    "asrc/asrcpar.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setParam()/constructor — v/i parse-tree, tc1/tc2/reciproctc, v41-new m/reciprocm, temp/dtemp param cases (hot-loadable)",
+      "functionGroup": "asrc/asrcpar.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrcpzld.c#h001": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcpzld.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": "ASRCpzLoad header/comment + signature hunk. Pole-zero analysis is NOT implemented in digiTS (analysis-scope.md: no PZ AnalogEngine method, no PZ engine file, no PZ MCP tool). PLANNING.md §5 case (b)."
+    },
+    "asrc/asrcpzld.c#h002": {
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
+      "functionGroup": "asrc/asrcpzld.c::ASRCpzLoad(GENmodel *inModel, CKTcircuit *ckt, SPcomplex *s)",
+      "rationale": "ASRCpzLoad body — stamps the unit V-source quad + derivative columns (scaled by 1/factor) into the matrix for the pole-zero pass only (SPcomplex *s is NG_IGNORE'd here but the routine exists solely for the DEVpzLoad dispatch slot). Pole-zero NOT implemented in digiTS (analysis-scope.md). The file is wholly owned by PZ; no shared helper for DC/tran/AC. PLANNING.md §5 case (b)."
+    },
+    "asrc/asrcset.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — TSTALLOC macro / header hunk",
+      "functionGroup": "asrc/asrcset.c::@2",
+      "rationale": null
+    },
+    "asrc/asrcset.c#h002": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — branch-eq alloc (ctx.makeCur), ASRCposPtr matrix-cell allocation over controlling vars (VCVS/VCCS/CCVS/CCCS), shorted-ASRC error, tc/m defaults, ASRCvars[] population, up-front numVars sizing; ASRCunsetup teardown is NO-COUNTERPART (engine rebuilt per compile)",
+      "functionGroup": "asrc/asrcset.c::Author: 1987 Kanwar Jit Singh",
+      "rationale": null
+    },
+    "asrc/asrctemp.c#h001": {
+      "state": "PENDING",
+      "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.computeTemperature() — instance temp default processing (ASRCtemp=CKTtemp unless given; dtemp handling)",
+      "functionGroup": "asrc/asrctemp.c::Author: 1985 Thomas L. Quarles",
+      "rationale": null
+    }
+  },
+  "reconstruction": {
+    "asrc#recon/wholeClass": {
+      "title": "Build the complete v26-baseline ASRC arbitrary/behavioural source (the B-element: V=expr / I=expr) as a new digiTS analog element. Reconstructs the parse-tree-driven controlled source covering all four controlled-source topologies (VCVS/VCCS/CCVS/CCCS) selected by the controlling-variable types, with per-iteration parse-tree evaluation returning rhs + partial derivatives (built on src/solver/analog/expression.ts), the linearized Jacobian/RHS companion stamp, branch-equation allocation for the voltage form, temperature coefficients (tc1/tc2/reciproctc), small-signal (ASRCacValues) precompute, and the convergence test. Faithful to the v26 baseline; the v41 deltas (m/reciprocm multiplier, CKTsrcFact MODETRANOP ramp, ASRCvars[] index cache, TREALLOC scratch, restructured TSTALLOC walk) then apply as the blocked PENDING hunks. Component shape (single B / BV+BI split, modelRegistry) is OQ-1. The unit ALSO OWNS the v41-EXACT IFeval expression-engine contract (Part 0): the combined multi-variable eval(gmin,vals)->{rhs,derivs[]} matching ifeval.c, the PTdivide gmin fudge (PTfudge_factor=gmin*1e-20), and the full v41 funcs[] set (sgn/u/u2/uramp/eq0..le0/nint/asinh/acosh/atanh/pwr/ln + ?: ternary + ddt + pwl + temper) with ptfuncs.c value semantics and inpptree.c PTdifferentiate derivatives, built on expression.ts/expression-evaluate.ts/expression-differentiate.ts. The current engine exposes only a scalar (ctx)->number evaluator and single-variable symbolic differentiation; it has no IFeval shape. Subsumes the STALE expr-engine#recon/numericalDeltas.",
+      "spec": "spec/v41-port/reconstruction/asrc-wholeClass.md",
+      "ngspiceBaseline": [
+        "src/spicelib/devices/asrc/asrcdefs.h",
+        "src/spicelib/devices/asrc/asrc.c",
+        "src/spicelib/devices/asrc/asrcset.c",
+        "src/spicelib/devices/asrc/asrctemp.c",
+        "src/spicelib/devices/asrc/asrcload.c",
+        "src/spicelib/devices/asrc/asrcacld.c",
+        "src/spicelib/devices/asrc/asrcconv.c",
+        "src/spicelib/devices/asrc/asrcfbr.c",
+        "src/spicelib/devices/asrc/asrcpar.c",
+        "src/spicelib/parser/ifeval.c",
+        "src/spicelib/parser/ptfuncs.c",
+        "src/spicelib/parser/inpptree.c"
+      ],
+      "tsFile": "src/components/active/bsource.ts",
+      "tsFiles": [
+        "src/components/active/bsource.ts",
+        "src/components/register-all.ts",
+        "src/solver/analog/ngspice-load-order.ts",
+        "src/solver/analog/expression.ts",
+        "src/solver/analog/expression-evaluate.ts",
+        "src/solver/analog/expression-differentiate.ts",
+        "src/solver/analog/__tests__/harness/netlist-generator.ts"
+      ],
+      "tsFunction": "BSourceAnalogElement (setup/load/stampAc/computeTemperature/setParam/getPinCurrents) on src/components/active/bsource.ts, built on the v41-EXACT IFeval expression-engine contract this unit OWNS (Part 0 of the spec): src/solver/analog/expression.ts (buildBSourceTree + ternary/temper/ddt/pwl AST + full funcs[] set), expression-evaluate.ts (combined eval(gmin,vals)->{rhs,derivs[]} + PTdivide gmin fudge), expression-differentiate.ts (per-var IFeval derivative trees). Plus src/components/register-all.ts (BV/BI registration + deviceFamily ASRC), src/solver/analog/ngspice-load-order.ts (NGSPICE_LOAD_ORDER.ASRC slot), and the harness deck-generator B-element emit path src/solver/analog/__tests__/harness/netlist-generator.ts (ELEMENT_SPECS B-prefix + emitPrimitive BV/BI branch) so the acceptance #12 harness gate is runnable. Subsumes/supersedes the STALE expr-engine#recon/numericalDeltas (parser-decisions.json), which only covered the exp/log clamps + tan/tanh derivs + atto + sinh/cosh/tanh; the asrc build re-verifies that ground.",
+      "functionGroup": "asrc/wholeClass",
+      "blocks": [
+        "asrc/asrc.c#h001",
+        "asrc/asrcacld.c#h001",
+        "asrc/asrcacld.c#h002",
+        "asrc/asrcacld.c#h003",
+        "asrc/asrcconv.c#h001",
+        "asrc/asrcdefs.h#h001",
+        "asrc/asrcdefs.h#h002",
+        "asrc/asrcfbr.c#h001",
+        "asrc/asrcfbr.c#h002",
+        "asrc/asrcload.c#h001",
+        "asrc/asrcload.c#h002",
+        "asrc/asrcload.c#h003",
+        "asrc/asrcpar.c#h001",
+        "asrc/asrcpar.c#h002",
+        "asrc/asrcset.c#h001",
+        "asrc/asrcset.c#h002",
+        "asrc/asrctemp.c#h001"
+      ],
+      "state": "PENDING"
+    }
+  }
+}

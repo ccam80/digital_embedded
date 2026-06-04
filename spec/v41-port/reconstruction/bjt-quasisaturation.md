@@ -206,11 +206,14 @@ lines cited):
   vbcx/delvbcx (`bjt.md:375-402`).
 - `ref/ngspice/src/spicelib/devices/bjt/bjttemp.c` — the BEtSatCur/BCtSatCur
   split (`:166-213`) and the QS temp params (`:215-229`).
-- `ref/ngspice/src/spicelib/devices/bjt/bjtacld.c` — the collCX AC restructure +
-  the `BJTintCollResistGiven` AC block (`bjt.md:205-286`). **The AC stamp itself
-  is owned by `bjt#recon/stampAc`** (already RATIFIED, `bjt-stampac.md`); this
-  recon supplies the prerequisite re-layout (collCX node, collCX cells, the
-  `Irci_*`/`cqbcx` state slots) that `bjtacld.c#h002`/`#h003` ride on. See Part 5.
+- `ref/ngspice/src/spicelib/devices/bjt/bjtacld.c` — the COMPLETE v41 AC
+  small-signal stamp `BJTacLoad` (`bjtacld.c:41-128`): the un-area `gcpr`/`gepr`,
+  the collCX matrix-cell restructure, the `xcbcx` susceptance, and the
+  `BJTintCollResistGiven` Kull AC block (`bjt.md:205-286`). **This recon owns the
+  entire `BjtL1Element.stampAc` body** — the three `bjtacld.c` hunks
+  (`#h001`/`#h002`/`#h003`) are this recon's `blocks` because the AC stamp is
+  structurally dependent on the collCX node + cells + `Irci_*`/`cqbcx` slots this
+  recon establishes. See Part 5.
 
 digiTS targets (all within the BJT class):
 
@@ -539,7 +542,7 @@ folded into the temperature-corrected quantities). In `load()`:
 - `gcpr = tcollectorConduct` / `gepr = temitterConduct` (no `*AREA`,
   `bjt.md:2306,2310`); today `* params.AREA` (`bjt.ts:1419-1420`). Area folds into
   `tcollectorConduct`/`temitterConduct` in `computeBjtTempParams`. **This must move
-  in lockstep with the `stampAc` change** (`bjt#recon/stampAc` Part D `#h001`) so
+  in lockstep with the `stampAc` un-area change** (Part 5a, `bjtacld.c:47-48`) so
   DC and AC stay consistent — they share `tp.tcollectorConduct`.
 - `oik = tinvRollOffF` / `oikr = tinvRollOffR` (no `/AREA`); `c2 = tBEleakCur`,
   `c4 = tBCleakCur` (area/areab/areac folded in temp), `xjrb = tbaseCurrentHalfResist`.
@@ -710,47 +713,212 @@ must gain it even when `rco` unset, because `collCX` exists whenever `RC!=0`).
 
 ---
 
-## Part 5 — `stampAc()` (BJTacLoad)
+## Part 5 — `stampAc()` (BJTacLoad): the COMPLETE v41 AC small-signal stamp
 
-**The AC stamp body is owned by `bjt#recon/stampAc`** (RATIFIED,
-`bjt-stampac.md`), which defers its `bjtacld.c#h002` (collCX restructure) and
-`#h003` (the `BJTintCollResistGiven` AC block) **explicitly to this recon's Kull
-re-layout** (see `bjt-stampac.md` Part D and §"Blocked hunks"). This recon
-supplies the prerequisites those two hunks ride on:
+**This recon OWNS the entire `BjtL1Element.stampAc` body** (`bjt.ts:2107-2177`),
+rebuilt to match the current `ref/ngspice/src/spicelib/devices/bjt/bjtacld.c`
+tree **line-for-line** (`bjtacld.c:41-128`, the body of `BJTacLoad`). `bjtacld.c`
+is a single function; one recon owns the whole AC stamp. There is **no separate
+`bjt#recon/stampAc`** — its three blocked hunks (`bjtacld.c#h001`/`#h002`/`#h003`)
+are this recon's `blocks` (the AC stamp is structurally dependent on the collCX
+node + collCX matrix cells + `Irci_*`/`cqbcx` state slots this recon establishes
+in Parts 1–2, so it cannot be a distinct, separately-buildable item).
 
-1. The `collCX` node + the collCX matrix handles (`_hCollCollCX`,
-   `_hCollCXColl`, `_hCollCXcollCX`, and the four `rco`-gated coupling handles) —
-   Part 1.
-2. The `Irci_Vrci`/`Irci_Vbci`/`Irci_Vbcx`/`CQBCX` state slots — Part 2.
+The three hunks together rebuild the complete v41 `bjtacld.c`:
+- `#h001` (`bjt.md:205-233`): the header — the GENmodel/GENinstance accessor
+  renames (NO-COUNTERPART for the closure-based TS walk), the **un-area-scaling**
+  of `gcpr`/`gepr` (`bjtacld.c:47-48`, `*BJTarea` removed because area is folded
+  into `BJTtcollectorConduct`/`BJTtemitterConduct` inside `bjttemp`, Part 7), and
+  the `Irci_Vrci`/`Irci_Vbci`/`Irci_Vbcx` state reads (`bjtacld.c:53-55`).
+- `#h002` (`bjt.md:234-261`): the **collCX matrix-cell restructure** —
+  `BJTcolPrimeColPrimePtr += m*(gmu+go)` drops the `+gcpr` (`bjtacld.c:76`);
+  `BJTcollCXcollCXPtr += m*(gcpr)` (`:77`); the two terminal cells move to collCX
+  `BJTcollCollCXPtr`/`BJTcollCXCollPtr += m*(-gcpr)` (`:84`,`:87`); plus the
+  `xcbcx = cqbcx·ω` susceptance read (`:70`).
+- `#h003` (`bjt.md:262-286`): the `if (model->BJTintCollResistGiven)` block
+  (`bjtacld.c:107-124`) — the Kull internal-collector-resistance AC cross-terms.
 
-With those in place, the `stampAc` changes are:
+### 5a — gather the saved small-signal parameters (`bjtacld.c:45-70`)
 
-- **un-area-scaling of gcpr/gepr** (`bjt.md:220-223` / `bjtacld.c#h001`):
-  `gcpr = tp.tcollectorConduct`, `gepr = tp.temitterConduct` (drop `*params.AREA`,
-  now folded in temp) — moves in lockstep with the `load()` change (Part 4a) and
-  the `bjt#recon/stampAc` Part D `#h001`.
-- **collCX restructure** (`bjt.md:240-258` / `bjtacld.c#h002`): the real `gcpr`
-  stamps move off `_hCPCP`/`_hCCP`/`_hCPC` onto `_hCollCXcollCX`/`_hCollCollCX`/
-  `_hCollCXColl`; `_hCPCP` real loses `+gcpr`; add `xcbcx = s0[CQBCX]*omega`.
-- **collCX AC block** (`bjt.md:262-283` / `bjtacld.c#h003`): the
-  `if (rcoGiven)` block stamping `Irci_Vrci`/`Irci_Vbci`/`Irci_Vbcx` (read from
-  `s0`) into the `collCX*`/`colPrime*` cells (real) and `xcbcx` into the
-  base-prime/collCX cells (imaginary half via `stampElementImag`), per
-  `bjt.md:266-283`.
+`m = params.M` (`bjtacld.c:45`). `gcpr`/`gepr` are now the **un-area** temperature
+conductances (area folded in `bjttemp`, Part 7) — drop `*params.AREA`:
 
-**This recon does NOT re-author the v26 AC baseline** (Parts A-C of
-`bjt-stampac.md`); it makes `bjtacld.c#h002`/`#h003` applicable by landing the
-re-layout. The implementer of THIS recon lands the collCX handles + slots; the AC
-deltas land as the two named hunks once both recons are APPLIED. (If the
-orchestrator sequences this recon after `bjt#recon/stampAc` is APPLIED, the two AC
-hunks can be applied as part of this recon's blast radius — fold them in per
-MEMORY.md `feedback_no_latent_bugs` rather than leaving the AC path
-half-migrated.)
+```ts
+// cite: bjtacld.c:47-48 — gcpr/gepr terminal conductances; area is folded into
+// BJTtcollectorConduct/BJTtemitterConduct in bjttemp, so no AREA factor here.
+const gcpr = tp.tcollectorConduct;   // bjtacld.c:47
+const gepr = tp.temitterConduct;     // bjtacld.c:48
+const gpi = s0[base + SLOT_GPI];     // bjtacld.c:49
+const gmu = s0[base + SLOT_GMU];     // bjtacld.c:50
+let gm    = s0[base + SLOT_GM];      // bjtacld.c:51
+const go  = s0[base + SLOT_GO];      // bjtacld.c:52
+// cite: bjtacld.c:53-55 — Kull epi-current derivatives saved by load() (Part 4d).
+const Irci_Vrci = s0[base + SLOT_IRCI_VRCI]; // bjtacld.c:53
+const Irci_Vbci = s0[base + SLOT_IRCI_VBCI]; // bjtacld.c:54
+const Irci_Vbcx = s0[base + SLOT_IRCI_VBCX]; // bjtacld.c:55
+```
 
-**Forbidden shapes:** allocating cells in `stampAc`; leaving the AC `gcpr` cells
-on the classic-GP `_hCPCP`/`_hCCP`/`_hCPC` after the collCX node exists (DC and AC
-must agree on which cell carries `gcpr`); using `capbcx` without the `2*` —
-verify against `bjtacld.c` (the cap doubling convention) when landing `#h002`.
+The un-area-scaling moves in **lockstep** with the `load()` change (Part 4a) and
+the `computeBjtTempParams` area folding (Part 7a) — DC and AC share
+`tp.tcollectorConduct`/`tp.temitterConduct`, so they must agree on whether AREA is
+applied.
+
+### 5b — excess-phase rotation of `gm` (`bjtacld.c:56-63`)
+
+Unchanged by the collCX restructure; transcribe operand-for-operand (the
+`gm = gm + go` then `gm = gm·cos(arg) − go` re-assignment, `xgm = −gm·sin(arg)`
+reading the **post-add** `gm`):
+
+```ts
+// cite: bjtacld.c:56-63 — excess-phase rotation: arg = td·ω; gm augmented by go,
+// rotated by cos(arg) and offset by −go; xgm is the quadrature term −gm·sin(arg).
+let xgm = 0;                      // bjtacld.c:56
+const td = tp.excessPhaseFactor;  // bjtacld.c:57
+if (td !== 0) {
+  const arg = td * omega;         // bjtacld.c:59
+  gm = gm + go;                   // bjtacld.c:60
+  xgm = -gm * Math.sin(arg);      // bjtacld.c:61 (reads the post-add gm)
+  gm = gm * Math.cos(arg) - go;   // bjtacld.c:62
+}
+```
+
+### 5c — capacitive susceptances (`bjtacld.c:64-70`)
+
+`xc* = cq* · ω` is the imaginary admittance of each junction-charge derivative.
+**`xcbcx` is NEW** (`bjtacld.c:70`) and reads the QS slot `CQBCX` (Part 2):
+
+```ts
+const gx   = s0[base + SLOT_GX];               // bjtacld.c:64
+const xcpi = s0[base + SLOT_CQBE]  * omega;    // bjtacld.c:65
+const xcmu = s0[base + SLOT_CQBC]  * omega;    // bjtacld.c:66
+const xcbx = s0[base + SLOT_CQBX]  * omega;    // bjtacld.c:67
+const xcsub= s0[base + SLOT_CQSUB] * omega;    // bjtacld.c:68
+const xcmcb= s0[base + SLOT_CEXBC] * omega;    // bjtacld.c:69
+const xcbcx= s0[base + SLOT_CQBCX] * omega;    // bjtacld.c:70 (Kull base–collCX charge)
+```
+
+### 5d — the complex matrix stamp, collCX form (`bjtacld.c:72-106`)
+
+Each `*(BJT<cell>Ptr) += m*(expr)` maps to `solver.stampElement(this._h<cell>, m*(expr))`
+and each `*(BJT<cell>Ptr + 1) += m*(expr)` (the `+1` complex slot) maps to
+`solver.stampElementImag(this._h<cell>, m*(expr))`. The handles are the matrix
+cells allocated once in `setup()` (Part 1b); the collCX terminal cells use the
+**renamed** handles `_hCollCollCX` (entry 1) / `_hCollCXColl` (entry 4) and the
+new self-cell `_hCollCXcollCX` (entry 24). The v41 collCX-split form (cite every
+line against the current `bjtacld.c` tree, verified by hand):
+
+```ts
+// cite: bjtacld.c:72-106 — complex matrix stamps, v41 collCX-split form; real
+// half via stampElement, imaginary `*(ptr+1)` slot via stampElementImag.
+solver.stampElement(this._hCC,            m * (gcpr));            // bjtacld.c:72  BJTcolColPtr
+solver.stampElement(this._hBB,            m * (gx));              // bjtacld.c:73  BJTbaseBasePtr
+solver.stampElementImag(this._hBB,        m * (xcbx));            // bjtacld.c:74  BJTbaseBasePtr+1
+solver.stampElement(this._hEE,            m * (gepr));            // bjtacld.c:75  BJTemitEmitPtr
+solver.stampElement(this._hCPCP,          m * (gmu + go));        // bjtacld.c:76  BJTcolPrimeColPrimePtr (NO +gcpr — split onto collCX:77)
+solver.stampElement(this._hCollCXcollCX,  m * (gcpr));            // bjtacld.c:77  BJTcollCXcollCXPtr
+solver.stampElementImag(this._hCPCP,      m * (xcmu + xcbx));     // bjtacld.c:78  BJTcolPrimeColPrimePtr+1
+solver.stampElementImag(this._hSubstConSubstCon, m * (xcsub));   // bjtacld.c:79  BJTsubstConSubstConPtr+1
+solver.stampElement(this._hBPBP,          m * (gx + gpi + gmu));  // bjtacld.c:80  BJTbasePrimeBasePrimePtr
+solver.stampElementImag(this._hBPBP,      m * (xcpi + xcmu + xcmcb)); // bjtacld.c:81  BJTbasePrimeBasePrimePtr+1
+solver.stampElement(this._hEPEP,          m * (gpi + gepr + gm + go)); // bjtacld.c:82  BJTemitPrimeEmitPrimePtr
+solver.stampElementImag(this._hEPEP,      m * (xcpi + xgm));      // bjtacld.c:83  BJTemitPrimeEmitPrimePtr+1
+solver.stampElement(this._hCollCollCX,    m * (-gcpr));           // bjtacld.c:84  BJTcollCollCXPtr (renamed from BJTcolColPrimePtr)
+solver.stampElement(this._hBBP,           m * (-gx));             // bjtacld.c:85  BJTbaseBasePrimePtr
+solver.stampElement(this._hEEP,           m * (-gepr));           // bjtacld.c:86  BJTemitEmitPrimePtr
+solver.stampElement(this._hCollCXColl,    m * (-gcpr));           // bjtacld.c:87  BJTcollCXCollPtr (renamed from BJTcolPrimeColPtr)
+solver.stampElement(this._hCPBP,          m * (-gmu + gm));       // bjtacld.c:88  BJTcolPrimeBasePrimePtr
+solver.stampElementImag(this._hCPBP,      m * (-xcmu + xgm));     // bjtacld.c:89  BJTcolPrimeBasePrimePtr+1
+solver.stampElement(this._hCPEP,          m * (-gm - go));        // bjtacld.c:90  BJTcolPrimeEmitPrimePtr
+solver.stampElementImag(this._hCPEP,      m * (-xgm));            // bjtacld.c:91  BJTcolPrimeEmitPrimePtr+1
+solver.stampElement(this._hBPB,           m * (-gx));             // bjtacld.c:92  BJTbasePrimeBasePtr
+solver.stampElement(this._hBPCP,          m * (-gmu));            // bjtacld.c:93  BJTbasePrimeColPrimePtr
+solver.stampElementImag(this._hBPCP,      m * (-xcmu - xcmcb));   // bjtacld.c:94  BJTbasePrimeColPrimePtr+1
+solver.stampElement(this._hBPEP,          m * (-gpi));            // bjtacld.c:95  BJTbasePrimeEmitPrimePtr
+solver.stampElementImag(this._hBPEP,      m * (-xcpi));           // bjtacld.c:96  BJTbasePrimeEmitPrimePtr+1
+solver.stampElement(this._hEPE,           m * (-gepr));           // bjtacld.c:97  BJTemitPrimeEmitPtr
+solver.stampElement(this._hEPCP,          m * (-go));             // bjtacld.c:98  BJTemitPrimeColPrimePtr
+solver.stampElementImag(this._hEPCP,      m * (xcmcb));           // bjtacld.c:99  BJTemitPrimeColPrimePtr+1
+solver.stampElement(this._hEPBP,          m * (-gpi - gm));       // bjtacld.c:100 BJTemitPrimeBasePrimePtr
+solver.stampElementImag(this._hEPBP,      m * (-xcpi - xgm - xcmcb)); // bjtacld.c:101 BJTemitPrimeBasePrimePtr+1
+solver.stampElementImag(this._hSS,        m * (xcsub));           // bjtacld.c:102 BJTsubstSubstPtr+1
+solver.stampElementImag(this._hSCS,       m * (-xcsub));          // bjtacld.c:103 BJTsubstConSubstPtr+1
+solver.stampElementImag(this._hSSC,       m * (-xcsub));          // bjtacld.c:104 BJTsubstSubstConPtr+1
+solver.stampElementImag(this._hBCP,       m * (-xcbx));           // bjtacld.c:105 BJTbaseColPrimePtr+1
+solver.stampElementImag(this._hCPB,       m * (-xcbx));           // bjtacld.c:106 BJTcolPrimeBasePtr+1
+```
+
+Two load-bearing stamp-order subtleties (carried from the shared-diagonal
+directive in CLAUDE.md):
+
+1. **The substrate-connection cell is an alias.** `_hSubstConSubstCon` is not a
+   distinct allocation: `setup()` aliases it to `_hCPCP` (vertical, `subs>0`) or
+   `_hBPBP` (lateral), matching ngspice `BJTsubstConSubstConPtr =
+   BJTcolPrimeColPrimePtr` / `BJTbasePrimeBasePrimePtr` (`bjtsetup.c:521-527`).
+   The `xcsub` imaginary stamp (`bjtacld.c:79`) accumulates into the **same**
+   matrix cell as the `xcmu+xcbx` stamp (`:78`); emit `_hCPCP`'s imaginary stamp
+   (`:78`) **before** `_hSubstConSubstCon`'s (`:79`) so the FP accumulation order
+   matches ngspice.
+2. **`xcmcb`/`xcsub`/`xcbx` are imaginary-only.** The substrate triple
+   (`:102-104`) and the base–colPrime susceptance pair (`:105-106`) have no real
+   partner — `stampElementImag` only.
+
+### 5e — the `BJTintCollResistGiven` Kull AC block (`bjtacld.c:107-124`)
+
+All-additions, gated on `rcoGiven` (the closure flag, Part 1a). When `rco` is
+unset this block is skipped (classic GP), exactly as `bjtacld.c:107`'s
+`if (model->BJTintCollResistGiven)` guard. The repeated `+=` into the shared
+collCX/colPrime cells MUST be emitted in this exact order — they accumulate on
+shared cells and the FP accumulation order is load-bearing:
+
+```ts
+// cite: bjtacld.c:107-124 — Kull internal-collector-resistance AC cross-terms,
+// gated on BJTintCollResistGiven; Irci_* are the saved DC-OP derivatives (5a),
+// xcbcx the base–collCX charge susceptance (5c).
+if (rcoGiven) {
+  solver.stampElement(this._hCollCXcollCX,   m *  Irci_Vrci);  // bjtacld.c:108 BJTcollCXcollCXPtr
+  solver.stampElement(this._hCollCXColPrime, m * -Irci_Vrci);  // bjtacld.c:109 BJTcollCXColPrimePtr
+  solver.stampElement(this._hCollCXBasePrime,m *  Irci_Vbci);  // bjtacld.c:110 BJTcollCXBasePrimePtr
+  solver.stampElement(this._hCollCXColPrime, m * -Irci_Vbci);  // bjtacld.c:111 BJTcollCXColPrimePtr
+  solver.stampElement(this._hCollCXBasePrime,m *  Irci_Vbcx);  // bjtacld.c:112 BJTcollCXBasePrimePtr
+  solver.stampElement(this._hCollCXcollCX,   m * -Irci_Vbcx);  // bjtacld.c:113 BJTcollCXcollCXPtr
+  solver.stampElement(this._hColPrimeCollCX, m * -Irci_Vrci);  // bjtacld.c:114 BJTcolPrimeCollCXPtr
+  solver.stampElement(this._hCPCP,           m *  Irci_Vrci);  // bjtacld.c:115 BJTcolPrimeColPrimePtr
+  solver.stampElement(this._hCPBP,           m * -Irci_Vbci);  // bjtacld.c:116 BJTcolPrimeBasePrimePtr
+  solver.stampElement(this._hCPCP,           m *  Irci_Vbci);  // bjtacld.c:117 BJTcolPrimeColPrimePtr
+  solver.stampElement(this._hCPBP,           m * -Irci_Vbcx);  // bjtacld.c:118 BJTcolPrimeBasePrimePtr
+  solver.stampElement(this._hColPrimeCollCX, m *  Irci_Vbcx);  // bjtacld.c:119 BJTcolPrimeCollCXPtr
+  solver.stampElementImag(this._hBPBP,       m *  xcbcx);      // bjtacld.c:120 BJTbasePrimeBasePrimePtr+1
+  solver.stampElementImag(this._hCollCXcollCX, m *  xcbcx);    // bjtacld.c:121 BJTcollCXcollCXPtr+1
+  solver.stampElementImag(this._hBasePrimeCollCX, m * -xcbcx); // bjtacld.c:122 BJTbasePrimeCollCXPtr+1
+  solver.stampElementImag(this._hCollCXBasePrime, m * -xcbcx); // bjtacld.c:123 BJTcollCXBasePrimePtr+1
+}
+```
+
+The four `rco`-gated coupling handles (`_hCollCXColPrime`, `_hColPrimeCollCX`,
+`_hCollCXBasePrime`, `_hBasePrimeCollCX`) are allocated in `setup()` only inside
+the `if (rcoGiven)` TSTALLOC guard (Part 1b entries 25–28), so the cells this
+block stamps exist exactly when this block runs.
+
+### Comment hygiene (CLAUDE.md "Code Comments — No Historical Narrative")
+
+After this recon lands, `bjt.ts` `stampAc` **is** the v41 collCX form, so every
+comment cites the current `ref/ngspice/.../bjtacld.c:72-124` line and explains the
+mechanism in present tense. There is **no `v26`/`v41`/era tag** and **no migration
+narrative** in the reconstructed source comments. In particular, the present
+defect — `bjt.ts:2147` comment-and-code carrying the v26 `m*(gmu+go+gcpr)` lump on
+`_hCPCP`, and `:2154`/`:2157` carrying `-gcpr` on `_hCCP`/`_hCPC` — is resolved
+**by construction**: those three cells are rewritten to the collCX-split form
+(`:76`/`:84`/`:87` above), so the code and its `bjtacld.c` citation agree.
+
+**Forbidden shapes:** allocating cells in `stampAc` (`BJTacLoad` is a pure stamp
+function — all cells come from `setup()`, Part 1b); leaving the AC `gcpr` cells on
+the classic-GP `_hCPCP`/`_hCCP`/`_hCPC` after the collCX node exists (DC Part 4e
+and AC Part 5d MUST agree on which cell carries `gcpr`); re-associating any operand
+(`gmu+go` on `:76` must NOT silently re-add `gcpr`; `gpi+gepr+gm+go` on `:82` is
+fixed-order); collapsing the duplicate `+=` stamps in 5e into single combined
+expressions (`_hCollCXcollCX += Irci_Vrci` then `+= -Irci_Vbcx` are TWO stamps,
+`bjtacld.c:108,113`); emitting the 5e block when `rco` unset; emitting `xcbcx`
+stamps outside the `rcoGiven` guard (`bjtacld.c:120-123` are inside the `if`).
 
 ---
 
@@ -1113,9 +1281,12 @@ by `bjtsetup.c:433` (device-local `CKTmkVolt`) and `setup-context.ts:31-33`
    (`bjt.md:2305-2364`) in the exact accumulation order. The area-scaling refactor
    (`csat`→`tBEtSatCur`/`tBCtSatCur`, gcpr/gepr/rbpi un-AREA-scaled) co-lands.
    With `rco` unset, DC results are bit-identical to the present classic-GP path.
-5. `stampAc` un-area-scales gcpr/gepr and the collCX AC restructure + `rcoGiven`
-   AC block (`bjtacld.c#h002`/`#h003`) land on the re-layout, consistent with
-   `bjt#recon/stampAc`; no `allocElement` in `stampAc`.
+5. `stampAc` is rebuilt as the COMPLETE v41 `BJTacLoad` (`bjtacld.c:41-128`,
+   Part 5): un-area `gcpr`/`gepr` (`#h001`), the collCX matrix restructure +
+   `xcbcx` (`#h002`), and the `rcoGiven` Kull AC block `bjtacld.c:107-124`
+   (`#h003`). Every stamp cites the current `bjtacld.c` line; no `allocElement` in
+   `stampAc`; with `rco` unset the 5e block is skipped (classic-GP AC unchanged
+   except the `gcpr` cell moves to `collCX`, which exists whenever `RC!=0`).
 6. `checkConvergence` reads the third junction `vbcx` from `nodeCX` and computes
    `delvbcx` (`bjtconv.c`, `bjt.md:397-402`) without altering the `cchat`/`cbhat`
    tolerance test.
@@ -1196,13 +1367,14 @@ by `bjt#recon/soaWarnings`). Verified against the diff doc line ranges.
 Total currently-PENDING bjt hunks: **90** (verified against
 `spec/v41-port/ledger.json`, `state == "PENDING"`). Routing:
 
-- **QS-PORT (84)** — `blockedBy: bjt#recon/quasiSaturation`. All `bjt.c`,
+- **QS-PORT (87)** — `blockedBy: bjt#recon/quasiSaturation`. All `bjt.c`,
   `bjtmpar.c`, `bjtdefs.h` (except `#h014`), `bjtsetup.c`, `bjtload.c` (except the
-  two substrate-polarity hunks), `bjtconv.c`, `bjttemp.c`, `bjttrunc.c` hunks. The
-  area/Arrhenius refactor + the FULL TLEV/TLEVC logic co-land, so the per-file
-  spans are entangled and routed whole and built in full (SOA param declarations
-  ride along as inert declare-only params per the port notes above; no lines
-  dropped).
+  two substrate-polarity hunks), `bjtconv.c`, `bjttemp.c`, `bjttrunc.c` hunks,
+  **plus the three `bjtacld.c` AC hunks** (`#h001`/`#h002`/`#h003`) — the complete
+  v41 `BJTacLoad` AC stamp is rebuilt here (Part 5). The area/Arrhenius refactor +
+  the FULL TLEV/TLEVC logic co-land, so the per-file spans are entangled and routed
+  whole and built in full (SOA param declarations ride along as inert declare-only
+  params per the port notes above; no lines dropped).
 - **bjtdefs.h#h014 → NO-COUNTERPART (1).** The `#define`→`enum` param-id table
   (`BJT_MOD_*` / `BJT_QUEST_*`). digiTS keys params by string name; the enum
   incidentally lists QS+SOA+TLEV ids but the construct (a C integer-id table for
@@ -1217,10 +1389,15 @@ Total currently-PENDING bjt hunks: **90** (verified against
   carry no QS content and must not gate on this recon. (h011's specific line sits
   in the SenCond branch, which is itself NC, but the behavioral `vsub` polarity
   has a live counterpart in the non-sensitivity reads.)
-- **bjtacld.c#h001/#h002/#h003 → NOT in this recon's `blocks`.** They stay
-  `blockedBy: bjt#recon/stampAc`. This recon supplies their re-layout prerequisite
-  (collCX node + cells + `Irci_*`/`cqbcx` slots); the AC stamp itself is the other
-  recon's deliverable.
+- **bjtacld.c#h001/#h002/#h003 → IN this recon's `blocks`** (`blockedBy:
+  bjt#recon/quasiSaturation`). The complete v41 `BJTacLoad` (`bjtacld.c:41-128`)
+  is rebuilt as `BjtL1Element.stampAc` by this recon (Part 5): the un-area
+  `gcpr`/`gepr` (`#h001`), the collCX matrix restructure + `xcbcx` (`#h002`), and
+  the `BJTintCollResistGiven` Kull AC block (`#h003`). There is no separate
+  `bjt#recon/stampAc` — the AC stamp is structurally dependent on the collCX node,
+  collCX matrix cells, and `Irci_*`/`cqbcx` state slots this recon establishes
+  (Parts 1–2), so it cannot be a distinct, separately-buildable item. Total bjt
+  hunks blocked by this recon: **87** (84 QS-PORT + the 3 `bjtacld.c` AC hunks).
 
 Recommended recon ID: **`bjt#recon/quasiSaturation`**. The machine-readable
 routing is emitted as the final message of this task.

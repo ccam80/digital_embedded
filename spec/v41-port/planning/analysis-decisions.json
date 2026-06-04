@@ -1318,6 +1318,32 @@
         "analysis/cktop.c#h001"
       ],
       "state": "PENDING"
+    },
+    "analysis#recon/cshunt": {
+      "title": "Port ngspice `.option cshunt=val`: a real capacitor of value `val` from every non-ground voltage node to ground, instantiated AFTER node setup (so device-internal voltage nodes are included), reusing the existing CapacitorElement exactly as INPpas4 reuses the Capacitor device. NOT a load-path stamp: ngspice's CKTcshunt is set once (cktdojob.c:74) and never read; the work is INPpas4 (inppas4.c:54-75) creating one Capacitor-to-ground per voltage node, distinct from gshunt's diagonal-conductance stamp. Adds a cshunt?:number SimulationParams field (default -1=off, gated >0) + the post-_setup injection pass in MNAEngine._setup. cshunt is GENUINELY UNPORTED today (no field, no load-path); reconstruct so the 4 ESC-024-escalated option-plumbing hunks apply as ordinary per-hunk deltas.",
+      "spec": "spec/v41-port/reconstruction/analysis-cshunt.md",
+      "ngspiceBaseline": [
+        "src/spicelib/parser/inppas4.c (INPpas4: walk CKTnodes, add one Capacitor-to-ground per NODE_VOLTAGE node, :54-75)",
+        "src/frontend/inp.c (eval_opt: parse cshunt=, sr<=0 gate, cp_vset cshunt_value, :457-471)",
+        "src/spicelib/analysis/cktdojob.c (CKTcshunt = task->TSKcshunt set-but-unused, :74)",
+        "src/spicelib/analysis/cktntask.c (TSKcshunt def-copy :60, app-default -1 :90)",
+        "src/spicelib/analysis/cktsopt.c (OPT_CSHUNT setter :175-177, OPTtbl row :244)"
+      ],
+      "tsFile": "src/core/analog-engine-interface.ts",
+      "tsFiles": [
+        "src/core/analog-engine-interface.ts",
+        "src/solver/analog/analog-engine.ts",
+        "src/components/passives/capacitor.ts"
+      ],
+      "tsFunction": "a cshunt?:number field on SimulationParams (default -1=off) threaded to the engine, plus an INPpas4-faithful injection pass in MNAEngine._setup (after the per-element setup() loop, before state/matrix allocation) that appends one setup()-driven CapacitorElement to ground for every _nodeTable voltage node (number>0), reusing the existing capacitor element with no new stamp",
+      "functionGroup": "analysis/cktdojob.c::CKTdoJob(CKTcircuit *ckt, int reset, TSKtask *task)",
+      "blocks": [
+        "analysis/cktdojob.c#h003",
+        "analysis/cktntask.c#h002",
+        "analysis/cktntask.c#h004",
+        "analysis/cktsopt.c#h003"
+      ],
+      "state": "PENDING"
     }
   }
 }

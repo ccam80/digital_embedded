@@ -1,18 +1,18 @@
 {
   "meta": {
-    "generated": "2026-06-03T03:53:07.149Z",
+    "generated": "2026-06-04T13:29:17.968Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
     "ngspiceFiles": 698,
     "parentHunks": 1756,
-    "totalItems": 1820,
+    "totalItems": 1818,
     "subItems": 47,
-    "reconstructionItems": 37,
+    "reconstructionItems": 35,
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 256,
+    "progressEntriesApplied": 255,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -238,7 +238,7 @@
       "hunks": 3,
       "classification": "PORT",
       "tsFile": "src/components/semiconductors/bjt.ts",
-      "planningNote": "AC small-signal load (BJTacLoad). AC is implemented engine-wide (analysis-scope.md: ac-analysis.ts, defaultStampAcHandler, optional AnalogElement.stampAc hook). BjtL1Element has NO stampAc method yet -> all three hunks blocked by reconstruction bjt#recon/stampAc; the v41 collCX AC stamps ride on top as ordinary deltas."
+      "planningNote": "AC small-signal load (BJTacLoad). AC is implemented engine-wide (analysis-scope.md: ac-analysis.ts, defaultStampAcHandler, optional AnalogElement.stampAc hook). The complete v41 BJTacLoad (bjtacld.c:41-128) is rebuilt as BjtL1Element.stampAc by reconstruction bjt#recon/quasiSaturation Part 5: the AC stamp is structurally dependent on the collCX node + collCX matrix cells + Irci_*/cqbcx state slots that recon establishes, so all three hunks (#h001 un-area gcpr/gepr, #h002 collCX matrix restructure + xcbcx, #h003 the BJTintCollResistGiven Kull AC block) are blocked by bjt#recon/quasiSaturation. There is no separate stampAc recon."
     },
     {
       "diffDoc": "spec/ngspice-v41-model-diffs/bjt.md",
@@ -7589,13 +7589,13 @@
       ],
       "hunkHash": "99e8e0fa93171352",
       "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc)",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h001 = un-area gcpr/gepr + Irci_* state reads, bjtacld.c:47-55)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "bjt#recon/stampAc"
+      "blockedBy": "bjt#recon/quasiSaturation"
     },
     {
       "id": "bjt/bjtacld.c#h002",
@@ -7620,13 +7620,13 @@
       ],
       "hunkHash": "26a7fbedf086e750",
       "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc)",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h002 = collCX matrix-cell restructure + xcbcx, bjtacld.c:70,76-77,84,87)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "bjt#recon/stampAc"
+      "blockedBy": "bjt#recon/quasiSaturation"
     },
     {
       "id": "bjt/bjtacld.c#h003",
@@ -7651,13 +7651,13 @@
       ],
       "hunkHash": "8ca880ad0886b867",
       "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (AC small-signal stamp; absent today, created by bjt#recon/stampAc) - the v41 model->BJTintCollResistGiven collCX AC stamp block",
+      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h003 = the model->BJTintCollResistGiven Kull collCX AC stamp block, bjtacld.c:107-124)",
       "attempts": 0,
       "verifierNotes": [],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "bjt#recon/stampAc"
+      "blockedBy": "bjt#recon/quasiSaturation"
     },
     {
       "id": "bjt/bjtask.c#h001",
@@ -11401,14 +11401,14 @@
         3302
       ],
       "hunkHash": "d02b0707b9394b7d",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "BJTsoaCheck (DEVsoaCheck) is a read-only safe-operating-area diagnostic: bjtsoachk.c:44-138 only reads CKTrhsOld/CKTstate0 and emits soa_printf warnings — no matrix or RHS write (rth0 at :119 is a pdMax derating divisor, not a thermal node). SOA is not implemented in digiTS (no DEVsoaCheck/CKTsoaMaxWarns analogue), same disposition as bjtnoise/bjtdisto. The SOA limit model params ride the quasiSaturation recon declare-only. NO-COUNTERPART (user-ruled 2026-06-05).",
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "bjt#recon/soaWarnings"
+      "blockedBy": null
     },
     {
       "id": "bjt/bjtsprt.c#h001",
@@ -38957,16 +38957,14 @@
         1283
       ],
       "hunkHash": "be5a0c75eb046e1c",
-      "state": "ESCALATED",
+      "state": "PENDING",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [
-        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTdoJob task->ckt copy block (cktdojob.c:40-63). This hunk's new behavioral assignments are `ckt->CKTindverbosity = task->TSKindverbosity` (present: indVerbosity), `ckt->CKTxmu = task->TSKxmu` (present: xmu), AND `ckt->CKTcshunt = task->TSKcshunt` (cktdojob.c, the shunt-capacitor-to-ground param). cshunt is a GENUINELY UNPORTED behavioral param with no ResolvedSimulationParams field and no load-path (Grep cshunt/cShunt/CShunt over src/ = 0 matches). It must NOT be buried under the struct-copy NO-COUNTERPART that covers the present params; escalated as its own gap per ESC-016/ESC-024. Set aside (not workable-PENDING for the scout) pending the cshunt per-param user disposition."
-      ],
+      "verifierNotes": [],
       "rationale": null,
-      "escalation": "ESC-024: cktdojob.c#h003 carries `ckt->CKTcshunt = task->TSKcshunt` (shunt capacitor to ground). cshunt is unported in digiTS (no SimulationParams field, no load-path). The hunk also copies indverbosity/xmu (both present/APPLIED), but the cshunt assignment forbids a clean NO-COUNTERPART of the whole hunk (would bury a real feature gap, PLANNING.md §5 / CLAUDE.md no-pragmatic-patches). Blocked pending the cshunt feature decision (new ResolvedSimulationParams.cshunt field + a load-path adding the per-node shunt conductance). See ESCALATIONS.md ESC-024 and ESC-016.",
+      "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/cshunt"
     },
     {
       "id": "analysis/cktdojob.c#h004",
@@ -39552,16 +39550,14 @@
         1750
       ],
       "hunkHash": "e089c575cbc1cdd4",
-      "state": "ESCALATED",
+      "state": "PENDING",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [
-        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTnewTask def->tsk copy row `tsk->TSKcshunt = def->TSKcshunt` (cktntask.c:57). cshunt is a GENUINELY UNPORTED behavioral param (no ResolvedSimulationParams field, no load-path; Grep cshunt over src/ = 0). Cannot be buried under the struct-copy NO-COUNTERPART (the sibling rows h001/h003/h005/h006 carrying the present indverbosity/xmu/epsmin ARE NO-COUNTERPART). Set aside pending the cshunt per-param user disposition. ESC-024/ESC-016."
-      ],
+      "verifierNotes": [],
       "rationale": null,
-      "escalation": "ESC-024: cktntask.c#h002 is the TSKtask def-copy of `TSKcshunt`. cshunt unported (no field, no load-path). Escalated rather than NO-COUNTERPART to avoid burying the feature gap. Blocked pending the cshunt feature decision. See ESCALATIONS.md ESC-024 and ESC-016.",
+      "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/cshunt"
     },
     {
       "id": "analysis/cktntask.c#h003",
@@ -39616,16 +39612,14 @@
         1766
       ],
       "hunkHash": "22ef6e8a0a17926e",
-      "state": "ESCALATED",
+      "state": "PENDING",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [
-        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTnewTask application-default `tsk->TSKcshunt = -1` (cktntask.c:87). The cshunt default of -1 (disabled). cshunt is a GENUINELY UNPORTED behavioral param (no ResolvedSimulationParams field, no load-path; Grep cshunt over src/ = 0). Cannot be buried under the struct-default-init NO-COUNTERPART (the sibling app-default rows h005/h006 carrying present indverbosity=2/xmu=0.5/epsmin=1e-28 ARE NO-COUNTERPART). Set aside pending the cshunt per-param user disposition. ESC-024/ESC-016."
-      ],
+      "verifierNotes": [],
       "rationale": null,
-      "escalation": "ESC-024: cktntask.c#h004 is the TSKtask app-default `TSKcshunt = -1`. cshunt unported (no field, no load-path). Escalated rather than NO-COUNTERPART. Blocked pending the cshunt feature decision (the default-disabled value -1 is part of the missing surface). See ESCALATIONS.md ESC-024 and ESC-016.",
+      "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/cshunt"
     },
     {
       "id": "analysis/cktntask.c#h005",
@@ -39711,14 +39705,14 @@
         1938
       ],
       "hunkHash": "128339290dc58863",
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "tsFunction": "src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint",
       "attempts": 0,
       "verifierNotes": [
-        "The cktop.c#h001 CKTop OPtran-integration hunk (post-source-step OPtran fall-through, cktop.c:101-108) is built in src/solver/analog/dc-operating-point.ts::solveDcOperatingPoint (commit 248f5c75). Blocked-by analysis#recon/opTran, which is ESCALATED on FIX-006: gate #4 parity is unverifiable until then."
+        "VERIFIED 2026-06-05: unblocked by analysis#recon/opTran APPLIED. CKTop OPtran fall-through at dc-operating-point.ts:490-515 ≡ cktop.c:101-108."
       ],
       "rationale": null,
-      "escalation": "FIX-006 / ESC-025: verification gate (recon analysis#recon/opTran acceptance #4) blocked on FIX-006 - digiTS dynamic_gmin accepts a nonphysical gmin^-1-scale branch current so OPtran is never reached on the digiTS side. See the analysis#recon/opTran escalation and ESCALATIONS.md ESC-025.",
+      "escalation": null,
       "kind": "hunk",
       "blockedBy": "analysis#recon/opTran"
     },
@@ -40975,16 +40969,14 @@
         3142
       ],
       "hunkHash": "12cdf8a01623f9b5",
-      "state": "ESCALATED",
+      "state": "PENDING",
       "tsFunction": "src/solver/analog/ckt-context.ts::CKTCircuitContext",
       "attempts": 0,
-      "verifierNotes": [
-        "ESCALATED 2026-06-02 (final analysis ledger disposition). CKTsetOpt switch cases (cktsopt.c:169-180): `case OPT_EPSMIN: task->TSKepsmin = val->rValue` (present: epsmin) AND `case OPT_CSHUNT: task->TSKcshunt = val->rValue` (cshunt setter). cshunt is a GENUINELY UNPORTED behavioral param (no ResolvedSimulationParams field, no load-path; Grep cshunt over src/ = 0). The OPT_CSHUNT setter case forbids a clean NO-COUNTERPART of the whole hunk; the OPT_INDVERBOSITY/OPT_XMU setter cases (present params) live in the sibling h002 which IS NO-COUNTERPART. Set aside pending the cshunt per-param user disposition. ESC-024/ESC-016."
-      ],
+      "verifierNotes": [],
       "rationale": null,
-      "escalation": "ESC-024: cktsopt.c#h003 carries `case OPT_CSHUNT: task->TSKcshunt = val->rValue` (the .options `cshunt` setter case) alongside OPT_EPSMIN (present). cshunt unported (no field, no load-path). Escalated rather than NO-COUNTERPART to avoid burying the feature gap. Blocked pending the cshunt feature decision (new SimulationParams.cshunt field + load-path). See ESCALATIONS.md ESC-024 and ESC-016.",
+      "escalation": null,
       "kind": "hunk",
-      "blockedBy": null
+      "blockedBy": "analysis#recon/cshunt"
     },
     {
       "id": "analysis/cktsopt.c#h004",
@@ -56981,11 +56973,11 @@
         186
       ],
       "hunkHash": "c0444bf221d4d7d0",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/capacitor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57012,11 +57004,11 @@
         219
       ],
       "hunkHash": "f63eeb069fda0409",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/capacitor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57043,11 +57035,11 @@
         382
       ],
       "hunkHash": "3e646fc8464eeb20",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/diode.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57105,11 +57097,11 @@
         1915
       ],
       "hunkHash": "da473e20e1e96a7a",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vcvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57136,11 +57128,11 @@
         1924
       ],
       "hunkHash": "a6ccb7d702aca14d",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vcvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57167,11 +57159,11 @@
         1937
       ],
       "hunkHash": "5735ebe669e587eb",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/cccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57198,11 +57190,11 @@
         1946
       ],
       "hunkHash": "07d7ee89de510c3a",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/cccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57229,11 +57221,11 @@
         1959
       ],
       "hunkHash": "3406984a577b40ef",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57260,11 +57252,11 @@
         1968
       ],
       "hunkHash": "b3eb8f1165fb90e6",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57291,11 +57283,11 @@
         1981
       ],
       "hunkHash": "8ab32f07dd98351e",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/ccvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57322,11 +57314,11 @@
         1990
       ],
       "hunkHash": "c2c0acb94abee41f",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/ccvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57353,11 +57345,11 @@
         2003
       ],
       "hunkHash": "592731a22a603bea",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-current-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57384,11 +57376,11 @@
         2012
       ],
       "hunkHash": "a93966eac11f7857",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-current-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57415,11 +57407,11 @@
         2025
       ],
       "hunkHash": "6b5563dcdff94fd6",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/njfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57446,11 +57438,11 @@
         2034
       ],
       "hunkHash": "2c6a0e03d5abbebf",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/njfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57477,11 +57469,11 @@
         2045
       ],
       "hunkHash": "8b6dfcd00b3f6d05",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/njfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57508,11 +57500,11 @@
         2058
       ],
       "hunkHash": "a8afe821b28e85e3",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/mutual-inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57539,11 +57531,11 @@
         2067
       ],
       "hunkHash": "83e52d8e9601c7e7",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/mutual-inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57570,11 +57562,11 @@
         2083
       ],
       "hunkHash": "0d8cca63681ad8e5",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57601,11 +57593,11 @@
         2118
       ],
       "hunkHash": "fb7335da5fbfe7fc",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57632,11 +57624,11 @@
         2170
       ],
       "hunkHash": "1d2a027b75d5fbfd",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/mosfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57663,11 +57655,11 @@
         2528
       ],
       "hunkHash": "ea3814a96b21f681",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/mosfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -57973,11 +57965,11 @@
         2883
       ],
       "hunkHash": "5d0a58ef5229fb99",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58004,11 +57996,11 @@
         3116
       ],
       "hunkHash": "a0862e63269a4678",
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58035,11 +58027,11 @@
         3135
       ],
       "hunkHash": "5ddd2200b208afb2",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58066,11 +58058,11 @@
         3157
       ],
       "hunkHash": "a74ee6ce946bfa68",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58097,11 +58089,11 @@
         3204
       ],
       "hunkHash": "7a1da916db68c155",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58128,11 +58120,11 @@
         3213
       ],
       "hunkHash": "9fac34611ee6f2bf",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58159,11 +58151,11 @@
         3229
       ],
       "hunkHash": "03327d2f5a0e91b2",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58190,11 +58182,11 @@
         3242
       ],
       "hunkHash": "4b49173b0dc03b51",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/analog-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58221,11 +58213,11 @@
         3251
       ],
       "hunkHash": "df2b96edb7c485f3",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/analog-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58252,11 +58244,11 @@
         3260
       ],
       "hunkHash": "7ccd33df4f12ff82",
-      "state": "PENDING",
-      "tsFunction": "src/components/active/analog-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58283,11 +58275,11 @@
         3273
       ],
       "hunkHash": "80a9686d1159548a",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/transmission-line-element.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58314,11 +58306,11 @@
         3282
       ],
       "hunkHash": "17dfab58b30efa18",
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/transmission-line-element.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58438,11 +58430,11 @@
         3326
       ],
       "hunkHash": "1966fc42680e869d",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-voltage-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58469,11 +58461,11 @@
         3335
       ],
       "hunkHash": "9462bc63449ef800",
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-voltage-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58500,11 +58492,11 @@
         3348
       ],
       "hunkHash": "84a85994f194f9ad",
-      "state": "PENDING",
-      "tsFunction": "src/components/switching/current-controlled-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58531,11 +58523,11 @@
         3357
       ],
       "hunkHash": "c3925038efde5568",
-      "state": "PENDING",
-      "tsFunction": "src/components/switching/current-controlled-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58562,11 +58554,11 @@
         3366
       ],
       "hunkHash": "58e2bb93f8639a8e",
-      "state": "PENDING",
-      "tsFunction": "src/components/switching/current-controlled-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58810,11 +58802,11 @@
         3474
       ],
       "hunkHash": "07628c4191f5ea56",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58841,11 +58833,11 @@
         3487
       ],
       "hunkHash": "57df2a1398eff94d",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58872,11 +58864,11 @@
         3496
       ],
       "hunkHash": "cefb455d7d2663d8",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58903,11 +58895,11 @@
         3504
       ],
       "hunkHash": "f5ab1bb29718b5b9",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58934,11 +58926,11 @@
         3521
       ],
       "hunkHash": "ffd30bf3dcae5fcc",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58965,11 +58957,11 @@
         3538
       ],
       "hunkHash": "e321700aac14c1ec",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -58996,11 +58988,11 @@
         3558
       ],
       "hunkHash": "bf1e12c08338cd43",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59027,11 +59019,11 @@
         3575
       ],
       "hunkHash": "be62ad4aa7c965a9",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59058,11 +59050,11 @@
         3602
       ],
       "hunkHash": "553905219ba963de",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59089,11 +59081,11 @@
         3625
       ],
       "hunkHash": "845f82e404859ee4",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59120,11 +59112,11 @@
         3634
       ],
       "hunkHash": "4da9d2ce2bb6fa9e",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59151,11 +59143,11 @@
         3643
       ],
       "hunkHash": "3e5973171e9ba723",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59182,11 +59174,11 @@
         3679
       ],
       "hunkHash": "4ce9d9c0688b6dc5",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59213,11 +59205,11 @@
         3727
       ],
       "hunkHash": "5468d17fc4cb921f",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59244,11 +59236,11 @@
         3736
       ],
       "hunkHash": "f2ec469f53eff520",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59306,11 +59298,11 @@
         3774
       ],
       "hunkHash": "3781c2e4d3144e2c",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59337,11 +59329,11 @@
         3987
       ],
       "hunkHash": "88d21074849f0b00",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59647,11 +59639,11 @@
         4942
       ],
       "hunkHash": "cb5e16907fcd061e",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59678,11 +59670,11 @@
         5533
       ],
       "hunkHash": "034e2fc5a1731057",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59709,11 +59701,11 @@
         5578
       ],
       "hunkHash": "9ca99aed1dfd449c",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59740,11 +59732,11 @@
         5856
       ],
       "hunkHash": "b0cb7e8f1779ff01",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59771,11 +59763,11 @@
         5866
       ],
       "hunkHash": "c35b6ede624c2752",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59833,11 +59825,11 @@
         5895
       ],
       "hunkHash": "c28a751e83470a6d",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59864,11 +59856,11 @@
         5910
       ],
       "hunkHash": "c276721249f7355a",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59895,11 +59887,11 @@
         5919
       ],
       "hunkHash": "8a736c45685c8d35",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59926,11 +59918,11 @@
         5930
       ],
       "hunkHash": "3ee42ddf8628182f",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59957,11 +59949,11 @@
         5945
       ],
       "hunkHash": "ecebb1d386f76cce",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -59988,11 +59980,11 @@
         5961
       ],
       "hunkHash": "23a658d9fc2cdf1e",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60019,11 +60011,11 @@
         6096
       ],
       "hunkHash": "9a0fbf5011e72842",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60081,11 +60073,11 @@
         6131
       ],
       "hunkHash": "bab59f1f0fc64add",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60521,11 +60513,11 @@
         8530
       ],
       "hunkHash": "632be1064c5e39b9",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60552,11 +60544,11 @@
         8555
       ],
       "hunkHash": "0418abc481304145",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60583,11 +60575,11 @@
         8564
       ],
       "hunkHash": "8a000d68dcb16db6",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60614,11 +60606,11 @@
         8649
       ],
       "hunkHash": "7bab910bb07d79e3",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -60645,11 +60637,11 @@
         8661
       ],
       "hunkHash": "94eb10c9ca260e9e",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05.",
       "escalation": null,
       "kind": "hunk",
       "blockedBy": null
@@ -62042,14 +62034,14 @@
         9771
       ],
       "hunkHash": "1abb4b37e0c2f1bd",
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression-evaluate.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "attempts": 0,
       "verifierNotes": [],
-      "rationale": null,
+      "rationale": "PTddt transient time-derivative (ptfuncs.c:412-466, adds PTddt to the PTnint tail) — needs CKTtime/MODETRAN history + per-instance ddt state the AST evaluator lacks; RULED OUT per expr-engine-numerical-deltas.md:421-425,552 (RATIFIED 2026-06-03). NO-COUNTERPART (user-ruled 2026-06-05).",
       "escalation": null,
       "kind": "hunk",
-      "blockedBy": "expr-engine#recon/ddtState"
+      "blockedBy": null
     },
     {
       "id": "parser/sperror.c#h001",
@@ -62120,7 +62112,7 @@
         "analysis/tfanal.c#h001",
         "analysis/tfanal.c#h002"
       ],
-      "hunkHash": "6538c481da26c9e6",
+      "hunkHash": "2d188c245f3233f7",
       "state": "STALE",
       "attempts": 0,
       "verifierNotes": [
@@ -62203,13 +62195,58 @@
         "analysis/cktop.c#h001"
       ],
       "hunkHash": "4a01c0b744f8728c",
-      "state": "ESCALATED",
+      "state": "APPLIED",
       "attempts": 0,
       "verifierNotes": [
-        "Port COMPLETE (commit 248f5c75): OPtran pseudo-transient driver + opstepsize/opfinaltime/opramptime option plumbing (default-off) + cktop.c:101-108 post-source-step fall-through + harness optran NgspiceJobAnalysis variant. Acceptance #1-#3 PASS (default-off byte-identical; surfaces 1+2 green). Recorded ESCALATED not APPLIED because acceptance #4 is RED - see escalation."
+        "VERIFIED 2026-06-05: gate #4 PASS — harness inductor-singular fixture (v1 1 0 dc3 / v2 2 0 dc5 / l1 1 2 1m) with optran enabled → firstDivergence null all 8 classes; L1:branch=-1.9999999999979999e-7 A bit-identical both sides. dynamicGmin terminal clean solve (dc-operating-point.ts:805-808 ≡ cktop.c dynamic_gmin) falls to OPtran exactly as ngspice. ESC-025/\"FIX-006\" overturned: no NIconvTest change needed (ngspice has none). optran-fallback-parity + optran-fallback tests 7/7."
       ],
       "rationale": null,
-      "escalation": "FIX-006 / ESC-025: acceptance #4 (bit-exact OPtran convergence parity on the inductor-singular fixture v1 1 0 dc 3 / v2 2 0 dc 5 / l1 1 2 1m) is BLOCKED. digiTS dynamic_gmin spuriously converges the l1 branch-current singularity to a nonphysical ~2e12 A (gmin^-1 scale) solution that passes the voltage-based NIconvTest, so solveDcOperatingPoint reports the static ladder succeeded and never reaches the OPtran fallback - whereas the ngspice DLL fails gmin+source on the branch-current singularity and falls to OPtran (physical ~2mA). Same root as the standing elemConverged ours=true/ngspice=false divergence. Gate #4 cannot pass until FIX-006 (digiTS convergence test must reject gmin-leakage-scale branch currents). The OPtran port itself is correct and simply unreachable on this fixture until then. See ESCALATIONS.md ESC-025 and FIX-006."
+      "escalation": null
+    },
+    {
+      "id": "analysis#recon/cshunt",
+      "kind": "reconstruction",
+      "diffDoc": "spec/ngspice-v41-engine-diffs/analysis.md",
+      "ngspiceFile": null,
+      "ngspiceBaseline": [
+        "src/spicelib/parser/inppas4.c (INPpas4: walk CKTnodes, add one Capacitor-to-ground per NODE_VOLTAGE node, :54-75)",
+        "src/frontend/inp.c (eval_opt: parse cshunt=, sr<=0 gate, cp_vset cshunt_value, :457-471)",
+        "src/spicelib/analysis/cktdojob.c (CKTcshunt = task->TSKcshunt set-but-unused, :74)",
+        "src/spicelib/analysis/cktntask.c (TSKcshunt def-copy :60, app-default -1 :90)",
+        "src/spicelib/analysis/cktsopt.c (OPT_CSHUNT setter :175-177, OPTtbl row :244)"
+      ],
+      "fileStatus": null,
+      "hunkIndex": 0,
+      "hunkHeader": null,
+      "functionGroup": "analysis/cktdojob.c::CKTdoJob(CKTcircuit *ckt, int reset, TSKtask *task)",
+      "isSubItem": false,
+      "parentHunk": null,
+      "blockedBy": null,
+      "addedLines": 0,
+      "removedLines": 0,
+      "docLineRange": null,
+      "title": "Port ngspice `.option cshunt=val`: a real capacitor of value `val` from every non-ground voltage node to ground, instantiated AFTER node setup (so device-internal voltage nodes are included), reusing the existing CapacitorElement exactly as INPpas4 reuses the Capacitor device. NOT a load-path stamp: ngspice's CKTcshunt is set once (cktdojob.c:74) and never read; the work is INPpas4 (inppas4.c:54-75) creating one Capacitor-to-ground per voltage node, distinct from gshunt's diagonal-conductance stamp. Adds a cshunt?:number SimulationParams field (default -1=off, gated >0) + the post-_setup injection pass in MNAEngine._setup. cshunt is GENUINELY UNPORTED today (no field, no load-path); reconstruct so the 4 ESC-024-escalated option-plumbing hunks apply as ordinary per-hunk deltas.",
+      "spec": "spec/v41-port/reconstruction/analysis-cshunt.md",
+      "specExists": true,
+      "tsFile": "src/core/analog-engine-interface.ts",
+      "tsFiles": [
+        "src/core/analog-engine-interface.ts",
+        "src/solver/analog/analog-engine.ts",
+        "src/components/passives/capacitor.ts"
+      ],
+      "tsFunction": "a cshunt?:number field on SimulationParams (default -1=off) threaded to the engine, plus an INPpas4-faithful injection pass in MNAEngine._setup (after the per-element setup() loop, before state/matrix allocation) that appends one setup()-driven CapacitorElement to ground for every _nodeTable voltage node (number>0), reusing the existing capacitor element with no new stamp",
+      "blocks": [
+        "analysis/cktdojob.c#h003",
+        "analysis/cktntask.c#h002",
+        "analysis/cktntask.c#h004",
+        "analysis/cktsopt.c#h003"
+      ],
+      "hunkHash": "40e93346e3b6319c",
+      "state": "PENDING",
+      "attempts": 0,
+      "verifierNotes": [],
+      "rationale": null,
+      "escalation": null
     },
     {
       "id": "asrc#recon/wholeClass",
@@ -62225,7 +62262,10 @@
         "src/spicelib/devices/asrc/asrcacld.c",
         "src/spicelib/devices/asrc/asrcconv.c",
         "src/spicelib/devices/asrc/asrcfbr.c",
-        "src/spicelib/devices/asrc/asrcpar.c"
+        "src/spicelib/devices/asrc/asrcpar.c",
+        "src/spicelib/parser/ifeval.c",
+        "src/spicelib/parser/ptfuncs.c",
+        "src/spicelib/parser/inpptree.c"
       ],
       "fileStatus": null,
       "hunkIndex": 0,
@@ -62237,16 +62277,20 @@
       "addedLines": 0,
       "removedLines": 0,
       "docLineRange": null,
-      "title": "Build the complete v26-baseline ASRC arbitrary/behavioural source (the B-element: V=expr / I=expr) as a new digiTS analog element. Reconstructs the parse-tree-driven controlled source covering all four controlled-source topologies (VCVS/VCCS/CCVS/CCCS) selected by the controlling-variable types, with per-iteration parse-tree evaluation returning rhs + partial derivatives (built on src/solver/analog/expression.ts), the linearized Jacobian/RHS companion stamp, branch-equation allocation for the voltage form, temperature coefficients (tc1/tc2/reciproctc), small-signal (ASRCacValues) precompute, and the convergence test. Faithful to the v26 baseline; the v41 deltas (m/reciprocm multiplier, CKTsrcFact MODETRANOP ramp, ASRCvars[] index cache, TREALLOC scratch, restructured TSTALLOC walk) then apply as the blocked PENDING hunks. Component shape (single B / BV+BI split, modelRegistry) is OQ-1.",
+      "title": "Build the complete v26-baseline ASRC arbitrary/behavioural source (the B-element: V=expr / I=expr) as a new digiTS analog element. Reconstructs the parse-tree-driven controlled source covering all four controlled-source topologies (VCVS/VCCS/CCVS/CCCS) selected by the controlling-variable types, with per-iteration parse-tree evaluation returning rhs + partial derivatives (built on src/solver/analog/expression.ts), the linearized Jacobian/RHS companion stamp, branch-equation allocation for the voltage form, temperature coefficients (tc1/tc2/reciproctc), small-signal (ASRCacValues) precompute, and the convergence test. Faithful to the v26 baseline; the v41 deltas (m/reciprocm multiplier, CKTsrcFact MODETRANOP ramp, ASRCvars[] index cache, TREALLOC scratch, restructured TSTALLOC walk) then apply as the blocked PENDING hunks. Component shape (single B / BV+BI split, modelRegistry) is OQ-1. The unit ALSO OWNS the v41-EXACT IFeval expression-engine contract (Part 0): the combined multi-variable eval(gmin,vals)->{rhs,derivs[]} matching ifeval.c, the PTdivide gmin fudge (PTfudge_factor=gmin*1e-20), and the full v41 funcs[] set (sgn/u/u2/uramp/eq0..le0/nint/asinh/acosh/atanh/pwr/ln + ?: ternary + ddt + pwl + temper) with ptfuncs.c value semantics and inpptree.c PTdifferentiate derivatives, built on expression.ts/expression-evaluate.ts/expression-differentiate.ts. The current engine exposes only a scalar (ctx)->number evaluator and single-variable symbolic differentiation; it has no IFeval shape. Subsumes the STALE expr-engine#recon/numericalDeltas.",
       "spec": "spec/v41-port/reconstruction/asrc-wholeClass.md",
       "specExists": true,
       "tsFile": "src/components/active/bsource.ts",
       "tsFiles": [
         "src/components/active/bsource.ts",
         "src/components/register-all.ts",
-        "src/solver/analog/ngspice-load-order.ts"
+        "src/solver/analog/ngspice-load-order.ts",
+        "src/solver/analog/expression.ts",
+        "src/solver/analog/expression-evaluate.ts",
+        "src/solver/analog/expression-differentiate.ts",
+        "src/solver/analog/__tests__/harness/netlist-generator.ts"
       ],
-      "tsFunction": "BSourceAnalogElement (setup/load/stampAc/computeTemperature/setParam/getPinCurrents) built on src/solver/analog/expression.ts (evaluate + differentiate as the IFparseTree/IFeval counterpart) + src/components/register-all.ts registration",
+      "tsFunction": "BSourceAnalogElement (setup/load/stampAc/computeTemperature/setParam/getPinCurrents) on src/components/active/bsource.ts, built on the v41-EXACT IFeval expression-engine contract this unit OWNS (Part 0 of the spec): src/solver/analog/expression.ts (buildBSourceTree + ternary/temper/ddt/pwl AST + full funcs[] set), expression-evaluate.ts (combined eval(gmin,vals)->{rhs,derivs[]} + PTdivide gmin fudge), expression-differentiate.ts (per-var IFeval derivative trees). Plus src/components/register-all.ts (BV/BI registration + deviceFamily ASRC), src/solver/analog/ngspice-load-order.ts (NGSPICE_LOAD_ORDER.ASRC slot), and the harness deck-generator B-element emit path src/solver/analog/__tests__/harness/netlist-generator.ts (ELEMENT_SPECS B-prefix + emitPrimitive BV/BI branch) so the acceptance #12 harness gate is runnable. Subsumes/supersedes the STALE expr-engine#recon/numericalDeltas (parser-decisions.json), which only covered the exp/log clamps + tan/tanh derivs + atto + sinh/cosh/tanh; the asrc build re-verifies that ground.",
       "blocks": [
         "asrc/asrc.c#h001",
         "asrc/asrcacld.c#h001",
@@ -62266,45 +62310,7 @@
         "asrc/asrcset.c#h002",
         "asrc/asrctemp.c#h001"
       ],
-      "hunkHash": "bdca74e7c3007fea",
-      "state": "PENDING",
-      "attempts": 0,
-      "verifierNotes": [],
-      "rationale": null,
-      "escalation": null
-    },
-    {
-      "id": "bjt#recon/stampAc",
-      "kind": "reconstruction",
-      "diffDoc": "spec/ngspice-v41-model-diffs/bjt.md",
-      "ngspiceFile": null,
-      "ngspiceBaseline": [
-        "src/spicelib/devices/bjt/bjtacld.c"
-      ],
-      "fileStatus": null,
-      "hunkIndex": 0,
-      "hunkHeader": null,
-      "functionGroup": "bjt/bjtacld.c::BJTacLoad",
-      "isSubItem": false,
-      "parentHunk": null,
-      "blockedBy": null,
-      "addedLines": 0,
-      "removedLines": 0,
-      "docLineRange": null,
-      "title": "Rebuild BJTacLoad as BjtL1Element.stampAc (the linearized small-signal AC stamp: gpi/gmu/gm/go/gx conductances + jw*{cqbe,cqbc,cqbx,cqsub,cexbc} capacitive susceptances into the BJT matrix cells)",
-      "spec": "spec/v41-port/reconstruction/bjt-stampac.md",
-      "specExists": true,
-      "tsFile": "src/components/semiconductors/bjt.ts",
-      "tsFiles": [
-        "src/components/semiconductors/bjt.ts"
-      ],
-      "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (no allocation in stampAc; reuse matrix handles allocated once in setup(), mirroring the BJTsetup TSTALLOC / BJTacLoad pure-stamp function boundary); reads the gpi/gmu/gm/go/gx and cqbe/cqbc/cqbx/cqsub/cexbc state slots that load() already populates",
-      "blocks": [
-        "bjt/bjtacld.c#h001",
-        "bjt/bjtacld.c#h002",
-        "bjt/bjtacld.c#h003"
-      ],
-      "hunkHash": "fab31c9cacb1e6c7",
+      "hunkHash": "0e402038f107847c",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -62419,43 +62425,12 @@
         "bjt/bjttemp.c#h009",
         "bjt/bjttemp.c#h010",
         "bjt/bjttemp.c#h011",
-        "bjt/bjttrunc.c#h001"
+        "bjt/bjttrunc.c#h001",
+        "bjt/bjtacld.c#h001",
+        "bjt/bjtacld.c#h002",
+        "bjt/bjtacld.c#h003"
       ],
-      "hunkHash": "f02af1a96d93e4ab",
-      "state": "PENDING",
-      "attempts": 0,
-      "verifierNotes": [],
-      "rationale": null,
-      "escalation": null
-    },
-    {
-      "id": "bjt#recon/soaWarnings",
-      "kind": "reconstruction",
-      "diffDoc": "spec/ngspice-v41-model-diffs/bjt.md",
-      "ngspiceFile": null,
-      "ngspiceBaseline": [],
-      "fileStatus": null,
-      "hunkIndex": 0,
-      "hunkHeader": null,
-      "functionGroup": "bjt/bjtsoachk.c::BJTsoaCheck",
-      "isSubItem": false,
-      "parentHunk": null,
-      "blockedBy": null,
-      "addedLines": 0,
-      "removedLines": 0,
-      "docLineRange": null,
-      "title": "BJT safe-operating-area diagnostic warnings (BJTsoaCheck) — read-only, no matrix/RHS effect; deferred follow-on",
-      "spec": "spec/v41-port/reconstruction/bjt-soa-warnings.md",
-      "specExists": false,
-      "tsFile": "src/components/semiconductors/bjt.ts",
-      "tsFiles": [
-        "src/components/semiconductors/bjt.ts"
-      ],
-      "tsFunction": "BJT SOA diagnostic check (icMax/ibMax/pdMax/vXXmax warnings)",
-      "blocks": [
-        "bjt/bjtsoachk.c#h001"
-      ],
-      "hunkHash": "da9edf78c66ef4a3",
+      "hunkHash": "93572740ed5ae101",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -62625,7 +62600,7 @@
         "dio/diotemp.c#h001",
         "dio/diotemp.c#h002"
       ],
-      "hunkHash": "59911826c0ed7dcb",
+      "hunkHash": "efdc9fffcd369622",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -62698,7 +62673,7 @@
         "dio/diosetup.c#h006",
         "dio/diosetup.c#h007"
       ],
-      "hunkHash": "fa4ee6b0e42d8743",
+      "hunkHash": "e33903323d11cca9",
       "state": "PENDING",
       "attempts": 0,
       "verifierNotes": [],
@@ -63077,9 +63052,11 @@
         "jfet2/jfet2trun.c#h001"
       ],
       "hunkHash": "d695ae006c0f8780",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "VERIFIED 2026-06-05: harness jfet2-gate.dts (Release.x64 DLL) firstDivergence null across all 8 classes; 107/107 steps, identical iteration profile. Class built jfet2.ts (Parker-Skellern), registered register-all.ts:461-462; FIX-015 typeids present."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -63293,9 +63270,11 @@
         "mes/mestrunc.c#h001"
       ],
       "hunkHash": "b622ee587d108322",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "VERIFIED 2026-06-05: harness mes-gate.dts (Release.x64 DLL) firstDivergence null across all 8 classes; 107/107 steps, identical iteration profile. Class built mesfet.ts (Statz), registered register-all.ts:459-460; FIX-015 typeids present."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -63418,9 +63397,11 @@
         "mos3/mos3trun.c#h001"
       ],
       "hunkHash": "0e2050ea749aadc1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "VERIFIED 2026-06-05: harness mos3-gate.dts (Release.x64 DLL) firstDivergence null across all 8 classes; 147/147 steps, 185/185 cells. Class built mosfet3.ts, registered register-all.ts:455-456, TSTALLOC ≡ mos3set.c:234-255."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -63510,42 +63491,6 @@
       "escalation": null,
       "staleFrom": "APPLIED",
       "staleHash": "611e4c45c9702953"
-    },
-    {
-      "id": "expr-engine#recon/ddtState",
-      "kind": "reconstruction",
-      "diffDoc": "spec/ngspice-v41-engine-diffs/parser.md",
-      "ngspiceFile": null,
-      "ngspiceBaseline": [],
-      "fileStatus": null,
-      "hunkIndex": 0,
-      "hunkHeader": null,
-      "functionGroup": "parser/ptfuncs.c::PTnint(double arg1)",
-      "isSubItem": false,
-      "parentHunk": null,
-      "blockedBy": null,
-      "addedLines": 0,
-      "removedLines": 0,
-      "docLineRange": null,
-      "title": "Deferred: ddt()/idt() time-derivative — stateful, NIintegrate-coupled evaluator (new ddt ExprNode + per-instance StatePool slot + ag[] coefficients + differentiate rule)",
-      "spec": "spec/v41-port/reconstruction/expr-engine-ddt-state.md",
-      "specExists": false,
-      "tsFile": "src/solver/analog/expression-evaluate.ts",
-      "tsFiles": [
-        "src/solver/analog/expression-evaluate.ts",
-        "src/solver/analog/expression.ts",
-        "src/solver/analog/expression-differentiate.ts"
-      ],
-      "tsFunction": "ddt/idt stateful evaluator",
-      "blocks": [
-        "parser/ptfuncs.c#h007"
-      ],
-      "hunkHash": "471e4b29fe6bed3f",
-      "state": "PENDING",
-      "attempts": 0,
-      "verifierNotes": [],
-      "rationale": null,
-      "escalation": null
     },
     {
       "id": "res#recon/computeConductance",

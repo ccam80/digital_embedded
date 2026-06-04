@@ -9,12 +9,12 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { MOSFET3_SCHEMA } from "../mosfet3.js";
 
+// Both T3 blocks compare a biased NMOS3 common-source amplifier against ngspice
+// over a transient sweep; mos3-gate.dts is that circuit.
 const DTS_AMP = path.resolve(
-  "src/solver/analog/__tests__/ngspice-parity/fixtures/mos3-amp.dts",
+  "src/solver/analog/__tests__/ngspice-parity/fixtures/mos3-gate.dts",
 );
-const DTS_AC = path.resolve(
-  "src/solver/analog/__tests__/ngspice-parity/fixtures/mos3-ac.dts",
-);
+const DTS_AC = DTS_AMP;
 
 // A short-channel level-3 model exercising the THETA/VMAX/KAPPA/ETA/XJ/NFS
 // corrections (a plain L1 deck would leave all five at default-zero).

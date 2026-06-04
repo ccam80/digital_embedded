@@ -328,22 +328,22 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inp2c.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/capacitor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2c.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2c.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/capacitor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2c.c::void INP2C(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2d.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/diode.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2d.c::Modified: 2001 Paolo Nenzi (Cider Integration)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2dot.c#h001": {
       "state": "NO-COUNTERPART",
@@ -352,118 +352,118 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inp2e.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vcvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2e.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2e.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vcvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2e.c::void INP2E(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2f.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/cccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2f.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2f.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/cccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2f.c::void INP2F(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2g.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2g.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2g.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/vccs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2g.c::void INP2G(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2h.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/ccvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2h.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2h.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/ccvs.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2h.c::void INP2H(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2i.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-current-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2i.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2i.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-current-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2i.c::void INP2I(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2j.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/njfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2j.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2j.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/njfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2j.c::void INP2J(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2j.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/njfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2j.c::void INP2J(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2k.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/mutual-inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2k.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2k.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/mutual-inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2k.c::void INP2K(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2l.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2l.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2l.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/inductor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2l.c::void INP2L(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2m.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/mosfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2m.c::Modified: 2001 Paolo Nenzi (Cider Integration)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2m.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/mosfet.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2m.c::INP2M (CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2n.c#h001": {
       "state": "NO-COUNTERPART",
@@ -520,76 +520,76 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inp2q.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2q.c::Modified: 2001 Paolo Nenzi (Cider Integration)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2q.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/semiconductors/bjt.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2q.c::void INP2Q(CKTcircuit *ckt, INPtables * tab, card * current, CKTnode *gnode)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2r.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2r.c::Remarks:  This code is based on a version written by Serban Popescu which",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2r.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2r.c::void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2r.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2r.c::void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2r.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2r.c::void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2r.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/resistor.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2r.c::void INP2R(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2s.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/analog-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2s.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2s.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/analog-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2s.c::void INP2S(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2s.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/components/active/analog-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2s.c::void INP2S(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2t.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/transmission-line-element.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2t.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2t.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/passives/transmission-line-element.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2t.c::void INP2T(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2u.c#h001": {
       "state": "NO-COUNTERPART",
@@ -610,34 +610,34 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inp2v.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-voltage-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2v.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2v.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/sources/dc-voltage-source.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2v.c::void INP2V(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2w.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/components/switching/current-controlled-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2w.c::Author: 1988 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2w.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/components/switching/current-controlled-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2w.c::void INP2W(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2w.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/components/switching/current-controlled-switch.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inp2w.c::void INP2W(CKTcircuit *ckt, INPtables * tab, card * current)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inp2y.c#h001": {
       "state": "NO-COUNTERPART",
@@ -682,94 +682,94 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inpcfix.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpcfix.c::void INPcaseFix(register char *string)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::Author: 1985 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h006": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h007": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h008": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h009": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h010": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h011": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h012": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h013": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdomod.c#h014": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdomod.c::char *INPdomodel(CKTcircuit *ckt, card * image, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdoopt.c#h001": {
       "state": "NO-COUNTERPART",
@@ -778,16 +778,16 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inpdpar.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdpar.c::Copyright 1990 Regents of the University of California.  All rights reserved.",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpdpar.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpdpar.c::Author: 1985 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inperrc.c#h001": {
       "state": "NO-COUNTERPART",
@@ -844,34 +844,34 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inpgmod.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgmod.c::@1",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgmod.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgmod.c::Modified: 2001 Paolo Nenzi (Cider Integration)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgmod.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgmod.c::char *INPgetMod(CKTcircuit *ckt, char *name, INPmodel ** model, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgmod.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgmod.c::INPparseNumMod( CKTcircuit* ckt, INPmodel *model, INPtables *tab, char **errMess",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgmod.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgmod.c::INPfindParm( char *name, IFparm *table, int numParms )",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgtitl.c#h001": {
       "state": "NO-COUNTERPART",
@@ -880,46 +880,46 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inpgtok.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgtok.c::INPgetTok(char **line, char **token, int gobble)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgtok.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgtok.c::INPgetTok(char **line, char **token, int gobble)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgtok.c#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgtok.c::INPgetUTok(char **line, char **token, int gobble)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgtok.c#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgtok.c::INPgetUTok(char **line, char **token, int gobble)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgtok.c#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgtok.c::INPgetUTok(char **line, char **token, int gobble)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgval.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgval.c::Author: 1985 Thomas L. Quarles",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpgval.c#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpgval.c::IFvalue *INPgetValue(CKTcircuit *ckt, char **line, int type, INPtables * tab)",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inplist.c#h001": {
       "state": "NO-COUNTERPART",
@@ -928,10 +928,10 @@
       "rationale": "SPICE-deck card-reader/parser-pass frontend; digiTS builds circuits from structured .dig/.dts/JSON, no text-deck reader — verified ABSENT."
     },
     "parser/inpmkmod.c#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/model-parser.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpmkmod.c::INPmodel *modtab = NULL;",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inppas1.c#h001": {
       "state": "NO-COUNTERPART",
@@ -1012,34 +1012,34 @@
       "rationale": "Machine-generated Bison parser header (token enums, YYSTYPE union). Whole-file delete (-94). Generated C artifact; PLANNING.md SS5 case (a)."
     },
     "parser/inpptree-parser.y#h001": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpptree-parser.y::@1",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpptree-parser.y#h002": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpptree-parser.y::@22",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpptree-parser.y#h003": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpptree-parser.y::@48",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpptree-parser.y#h004": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpptree-parser.y::expression: exp",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpptree-parser.y#h005": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/inpptree-parser.y::nonempty_arglist:",
-      "rationale": null
+      "rationale": "SPICE-deck text-parser / model-card reader frontend (INP2x device-card readers, INPdomodel/INPgetMod/INPgetTok/INPmakeMod model-card parser, B-source bison grammar). digiTS builds circuits from a structured CircuitSpec graph (.dig/.dts/JSON), not an ngspice text deck — these readers have no runtime counterpart. Verified ABSENT; architectural divergence ruled by user 2026-06-05."
     },
     "parser/inpptree.c#h001": {
       "state": "NO-COUNTERPART",
@@ -1306,10 +1306,10 @@
       "rationale": null
     },
     "parser/ptfuncs.c#h007": {
-      "state": "PENDING",
-      "tsFunction": "src/solver/analog/expression-evaluate.ts",
+      "state": "NO-COUNTERPART",
+      "tsFunction": null,
       "functionGroup": "parser/ptfuncs.c::PTnint(double arg1)",
-      "rationale": null
+      "rationale": "PTddt transient time-derivative (ptfuncs.c:412-466, adds PTddt to the PTnint tail) — needs CKTtime/MODETRAN history + per-instance ddt state the AST evaluator lacks; RULED OUT per expr-engine-numerical-deltas.md:421-425,552 (RATIFIED 2026-06-03). NO-COUNTERPART (user-ruled 2026-06-05)."
     },
     "parser/sperror.c#h001": {
       "state": "NO-COUNTERPART",
@@ -1359,22 +1359,6 @@
         "parser/ptfuncs.c#h006",
         "parser/inpptree.c#h010",
         "parser/inpeval.c#h005"
-      ],
-      "state": "PENDING"
-    },
-    "expr-engine#recon/ddtState": {
-      "title": "Deferred: ddt()/idt() time-derivative — stateful, NIintegrate-coupled evaluator (new ddt ExprNode + per-instance StatePool slot + ag[] coefficients + differentiate rule)",
-      "spec": "spec/v41-port/reconstruction/expr-engine-ddt-state.md",
-      "tsFile": "src/solver/analog/expression-evaluate.ts",
-      "tsFiles": [
-        "src/solver/analog/expression-evaluate.ts",
-        "src/solver/analog/expression.ts",
-        "src/solver/analog/expression-differentiate.ts"
-      ],
-      "tsFunction": "ddt/idt stateful evaluator",
-      "functionGroup": "parser/ptfuncs.c::PTnint(double arg1)",
-      "blocks": [
-        "parser/ptfuncs.c#h007"
       ],
       "state": "PENDING"
     }

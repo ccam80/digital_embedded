@@ -1,14 +1,14 @@
 # v41 port ledger - coverage summary
 
-Generated: 2026-06-03T03:53:07.149Z
+Generated: 2026-06-04T13:29:17.968Z
 Base: 032b1c32 (ngspice master @ 2015-03-08, version-string 26)
 Target: ngspice-41 tag (2275fb85d)
 
 - Diff docs: **34**
 - ngspice files touched: **698**
 - Parent hunks enumerated: **1756**
-- v26-baseline reconstruction items: **37**
-- Ledger items (hunks + sub-items + reconstruction): **1820** (47 sub-items, 37 reconstruction)
+- v26-baseline reconstruction items: **35**
+- Ledger items (hunks + sub-items + reconstruction): **1818** (47 sub-items, 35 reconstruction)
 - Planning decisions overlays applied: **34**
 - Lines: +23664 / -18407
 
@@ -19,11 +19,11 @@ with loop progress carried by content-hash merge. Do not hand-edit it.
 
 | State | Count |
 |---|---|
-| PENDING        | 349 |
-| APPLIED        | 248 |
-| ESCALATED      | 6 |
+| PENDING        | 272 |
+| APPLIED        | 253 |
+| ESCALATED      | 0 |
 | STALE          | 6 |
-| NO-COUNTERPART | 1211 |
+| NO-COUNTERPART | 1287 |
 
 A ralph **run** ends at PENDING = 0. The **job** is done only when every item
 is APPLIED or NO-COUNTERPART (no PENDING, no ESCALATED, no STALE). A STALE item
@@ -36,7 +36,7 @@ never a full re-port.
 | Diff doc | ngspice files | Items |
 |---|---|---|
 | spec/ngspice-v41-model-diffs/asrc.md | 20 | 30 |
-| spec/ngspice-v41-model-diffs/bjt.md | 30 | 153 |
+| spec/ngspice-v41-model-diffs/bjt.md | 30 | 151 |
 | spec/ngspice-v41-model-diffs/cap.md | 23 | 38 |
 | spec/ngspice-v41-model-diffs/cccs.md | 16 | 19 |
 | spec/ngspice-v41-model-diffs/ccvs.md | 15 | 19 |
@@ -57,7 +57,7 @@ never a full re-port.
 | spec/ngspice-v41-model-diffs/vccs.md | 15 | 17 |
 | spec/ngspice-v41-model-diffs/vcvs.md | 15 | 18 |
 | spec/ngspice-v41-model-diffs/vsrc.md | 19 | 64 |
-| spec/ngspice-v41-engine-diffs/analysis.md | 49 | 171 |
+| spec/ngspice-v41-engine-diffs/analysis.md | 49 | 172 |
 | spec/ngspice-v41-engine-diffs/device-dispatch.md | 3 | 22 |
 | spec/ngspice-v41-engine-diffs/include-ngspice.md | 98 | 252 |
 | spec/ngspice-v41-engine-diffs/maths-cmaths.md | 11 | 98 |
@@ -67,7 +67,7 @@ never a full re-port.
 | spec/ngspice-v41-engine-diffs/maths-ni.md | 11 | 27 |
 | spec/ngspice-v41-engine-diffs/maths-poly.md | 2 | 2 |
 | spec/ngspice-v41-engine-diffs/maths-sparse.md | 5 | 12 |
-| spec/ngspice-v41-engine-diffs/parser.md | 57 | 175 |
+| spec/ngspice-v41-engine-diffs/parser.md | 57 | 174 |
 | null | 1 | 1 |
 
 ## Per-file item counts
