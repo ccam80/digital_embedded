@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T14:58:02.253Z",
+    "generated": "2026-06-04T15:37:10.619Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 255,
+    "progressEntriesApplied": 257,
     "progressEntriesStale": 6,
     "staleItems": [
       {
@@ -62601,9 +62601,13 @@
         "dio/diotemp.c#h002"
       ],
       "hunkHash": "efdc9fffcd369622",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "iso re-derived independently against ref/ngspice/src/spicelib/devices/dio/diotemp.c:18-247 — dioTemp() bit-exact: arg1+arg2 sat/tunnel/rec layout (diotemp.c:111-149), both tlevc==0/==1 junction+sidewall arms (diotemp.c:79-109), TM1/TM2 grading + 0.9 gclimit (diotemp.c:50-62), 25-iter brkdEmissionCoeff breakdown match with tlev/TCV adjust + cbv short-circuit (diotemp.c:186-224), F2/F3/F2SW/F3SW exp-forms (diotemp.c:241-246), area-folded TRS/TRS2 tConductance + _dT (diotemp.c:231-239). reltol+epsmin threaded onto TempContext (temp-context.ts:27,33). Part-A param card complete in DIODE_PARAM_DEFS.",
+        "gate clean: server_restart + harness firstDivergence null across all 8 classes on [diode-resistor.dts, diode-bridge.dts]; DC-OP+tran 107/107 converged both fixtures.",
+        "tsFiles already committed at HEAD (cc981161/d082bac0); worktree diff empty for tsFiles is committed-not-lost — gated worktree build IS this implementation (9-slot thermal diodes loaded from worktree)."
+      ],
       "rationale": null,
       "escalation": null
     },
@@ -62674,9 +62678,13 @@
         "dio/diosetup.c#h007"
       ],
       "hunkHash": "e33903323d11cca9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "attempts": 0,
-      "verifierNotes": [],
+      "verifierNotes": [
+        "iso re-derived independently against ref/ngspice/src/spicelib/devices/dio/{dio.c,diosetup.c,dioload.c,diotemp.c}: Tj thermal terminal always-declared (dio.c:137-143), selfheat predicate nodeTemp>0 && THERMAL && rth0Given (diosetup.c:325/dioload.c:80), DIOnumStates=9 schema (QTH/CQTH/DELTEMP/DIDIO_DT), 7 thermal TSTALLOCs in exact diosetup.c:342-348 order, recombination tRecSatCur/_dT arm (diotemp.c:143-149), CONSTepsSiO2 const.h-faithful chain in core/constants.ts, level-3 geometry params + cmetal/cpoly.",
+        "gate clean: server_restart + harness firstDivergence null across all 8 classes on [diode-resistor.dts, diode-bridge.dts]; DC-OP+tran 107/107 converged both fixtures.",
+        "tsFiles already committed at HEAD; constants.ts CONSTepsSiO2 present; diode.ts thermal load/stamps present."
+      ],
       "rationale": null,
       "escalation": null
     },
