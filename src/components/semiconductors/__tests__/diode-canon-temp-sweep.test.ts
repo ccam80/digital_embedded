@@ -26,15 +26,13 @@ const DTS_TEMP_SWEEP = path.resolve(
 //
 // Each describe block opens one ComparisonSession, sets circuit temperature via
 // session.engine.setCircuitTemp(K) before runTransient, and asserts
-// compareAllAttempts() per spec §5. The ngspice side runs at its default
-// temperature (27°C) unless a hand-written .cir with .options TEMP=X is
-// provided — at non-default temperatures, divergences are the honest signal
-// from the digiTS temperature-pass implementation vs ngspice's ambient model.
-//
-// Lane discipline: run once, log honestly. Do not chase parity divergences.
-// Pre-existing diode T3 ULP failures (absDelta ~1e-14) are expected to appear
-// at 300.15 K per the 5.1.c progress entry; non-default temperatures will
-// additionally surface tSatCur/vt divergence from the ambient-temp delta.
+// compareAllAttempts() per spec §5. ComparisonSession._materializeCir injects a
+// matching `.options TEMP=<celsius>` into the ngspice deck, so BOTH engines run
+// at the swept temperature: ngspice's CKTtemp and digiTS's cktTemp/loadCtx.temp
+// (kept in lock-step by CKTContext.setCircuitTempK) drive the same DIOtempUpdate
+// scaling and the same dioload `vt = CONSTKoverQ*deviceTemp`. The diode
+// temperature-scaled saturation current, vcrit, and conductance are therefore
+// bit-exact vs the ngspice DLL at 300.15 K, 350 K, and 400 K.
 // ---------------------------------------------------------------------------
 
 describeIfDll("Diode temperature sweep 300.15 K paired vs ngspice (T3)", () => {

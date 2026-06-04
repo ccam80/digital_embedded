@@ -1793,8 +1793,11 @@ export class MNAEngine implements AnalogEngine {
   setCircuitTemp(K: number): void {
     const ctx = this._ctx;
     if (!ctx) return;
-    ctx.cktTemp = K;
-    ctx.resetTempCtx();
+    // Keep cktTemp AND the load-context temp/vt in lock-step (ngspice's single
+    // CKTtemp drives both DEVtemperature and DEVload's vt). Without the loadCtx
+    // sync, device load() reads a stale ctx.temp while the temp pass below
+    // rescales tIS/tVcrit at the new temperature.
+    ctx.setCircuitTempK(K);
     const compiled = this._compiled as ConcreteCompiledAnalogCircuit | null;
     if (!compiled) return;
     cktTemp(ctx, compiled.elementsByFamily);

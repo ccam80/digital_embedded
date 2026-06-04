@@ -22,7 +22,7 @@ import type { IntegrationMethod } from "./integration.js";
 import { MODEDCOP, MODEINITFLOAT, MODEUIC } from "./ckt-mode.js";
 import type { TempContext } from "./temp-context.js";
 import type { DeviceFamily } from "./ngspice-load-order.js";
-import { REFTEMP, VT } from "../../core/constants.js";
+import { REFTEMP, VT, CONSTKoverQ } from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // LoadCtxImpl- concrete LoadContext with live state-ring access
@@ -380,6 +380,27 @@ export class CKTCircuitContext {
    */
   resetTempCtx(): void {
     this._tempCtx = null;
+  }
+
+  /**
+   * Set the circuit operating temperature (ngspice CKTtemp, ckttemp.c:26).
+   *
+   * ngspice keeps ONE CKTtemp, read by both the temperature pass
+   * (DEVtemperature -> tIS/tVcrit scaling) and the device load
+   * (DEVload's `vt = CONSTKoverQ * CKTtemp`, e.g. dioload.c:104-108, where the
+   * device temperature defaults to CKTtemp absent a per-instance temp). The
+   * load-context `temp` / `vt` therefore must stay in lock-step with `cktTemp`:
+   * if they drift, a device evaluates its conductance with `vt` at one
+   * temperature while its temp-pass quantities are at another (e.g. the diode's
+   * gd = tIS/vte * exp(vcrit/vte) no longer collapses to 1/sqrt(2) at the
+   * MODEINITJCT vcrit init). Invalidates the cached TempContext so the next
+   * temperature pass rebuilds at the new temperature.
+   */
+  setCircuitTempK(K: number): void {
+    this.cktTemp = K;
+    this.loadCtx.temp = K;
+    this.loadCtx.vt = CONSTKoverQ * K;
+    this.resetTempCtx();
   }
 
   // -------------------------------------------------------------------------
