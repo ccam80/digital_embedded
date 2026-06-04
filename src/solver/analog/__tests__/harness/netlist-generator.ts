@@ -796,7 +796,14 @@ function emitPrimitive(
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, `.model ${modelName} SW (VT=${vt} VH=${vh} RON=${ron} ROFF=${roff})`);
     }
-    return [`${label} ${inNode} ${outNode} ${ctrlNode} 0 ${modelName}`];
+    // SW_IC_ON / SW_IC_OFF instance keywords (sw.c:13-14, swparam.c:21-28): a
+    // non-zero `on` seeds SWzero_stateGiven=TRUE, `off` FALSE; off wins (parse
+    // order). ngspice's S-element takes a trailing ON/OFF token; OFF is the
+    // default (SWzero_stateGiven=FALSE) so only ON needs emitting.
+    let icOn = false;
+    if (props.isModelParamGiven("on")  && props.getModelParam<number>("on"))  icOn = true;
+    if (props.isModelParamGiven("off") && props.getModelParam<number>("off")) icOn = false;
+    return [`${label} ${inNode} ${outNode} ${ctrlNode} 0 ${modelName}${icOn ? " ON" : ""}`];
   }
 
   if (typeId === "SwitchSPDT") {
@@ -816,8 +823,15 @@ function emitPrimitive(
     if (!modelCards.has(modelName)) {
       modelCards.set(modelName, `.model ${modelName} SW (VT=${vt} VH=${vh} RON=${ron} ROFF=${roff})`);
     }
+    // SW_IC_ON/SW_IC_OFF (sw.c:13-14): the IC threads only into the COM-NO path
+    // (the _AB instance), matching the single ngspice SW instance that path maps
+    // to; the COM-NC (_AC) synthetic complement starts default-OFF (recon
+    // sw#recon/icParam Part B). off wins over on (parse order).
+    let icOn = false;
+    if (props.isModelParamGiven("on")  && props.getModelParam<number>("on"))  icOn = true;
+    if (props.isModelParamGiven("off") && props.getModelParam<number>("off")) icOn = false;
     return [
-      `${label}_AB ${comNode} ${noNode} ${ctrlNode} 0 ${modelName}`,
+      `${label}_AB ${comNode} ${noNode} ${ctrlNode} 0 ${modelName}${icOn ? " ON" : ""}`,
       `${label}_AC ${comNode} ${ncNode} 0 ${ctrlNode} ${modelName}`,
     ];
   }

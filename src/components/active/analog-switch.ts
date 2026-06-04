@@ -197,7 +197,10 @@ function swLoadHandles(
         } else if (previous_state === REALLY_OFF) {
           current_state = HYST_ON;
         } else {
-          current_state = HYST_OFF;
+          // swload.c:90 — a previous_state outside the four sentinels
+          // (REALLY_OFF/ON, HYST_OFF/ON) is corrupt state: ngspice calls
+          // internalerror and aborts rather than silently defaulting to a value.
+          throw new Error("bad value for previous state in swload");
         }
       }
     }
@@ -309,8 +312,8 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    const rOnNow  = Math.max(this._rOn, 1e-3);
-    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const rOnNow  = this._rOn;   // raw param- ngspice has no Ron floor (swsetup.c:35)
+    const rOffNow = this._rOff;  // raw param- ngspice has no Roff floor (swsetup.c:39)
     swLoadHandles(
       ctx, this._pool, this._stateBase,
       this._nCtrl,
@@ -331,8 +334,8 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
     //
     // swacload.c:26: current_state = (int) CKTstate0[SWswitchstate].
     const current_state = (this._pool.states[0][this._stateBase + SLOT_STATE]) | 0;
-    const rOnNow  = Math.max(this._rOn, 1e-3);
-    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const rOnNow  = this._rOn;   // raw param- ngspice has no Ron floor (swsetup.c:35)
+    const rOffNow = this._rOff;  // raw param- ngspice has no Roff floor (swsetup.c:39)
     // swacload.c:28: g_now = current_state ? SWonConduct : SWoffConduct.
     // Any non-zero state selects the on conductance (truthiness, not the
     // REALLY_ON/HYST_ON test the DC pin-current path uses).
@@ -390,8 +393,8 @@ class AnalogSwitchSPSTElement extends PoolBackedAnalogElement {
     // Pin layout order: in, out, ctrl.
     // Conductance g_now stamped between nIn and nOut; ctrl has no stamp.
     const current_state = this._pool.states[0][this._stateBase + SLOT_STATE];
-    const rOnNow  = Math.max(this._rOn, 1e-3);
-    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const rOnNow  = this._rOn;   // raw param- ngspice has no Ron floor (swsetup.c:35)
+    const rOffNow = this._rOff;  // raw param- ngspice has no Roff floor (swsetup.c:39)
     const g_now = ((current_state === REALLY_ON) || (current_state === HYST_ON))
       ? 1 / rOnNow
       : 1 / rOffNow;
@@ -500,8 +503,8 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    const rOnNow  = Math.max(this._rOn, 1e-3);
-    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const rOnNow  = this._rOn;   // raw param- ngspice has no Ron floor (swsetup.c:35)
+    const rOffNow = this._rOff;  // raw param- ngspice has no Roff floor (swsetup.c:39)
     const gOn  = 1 / rOnNow;   // SWonConduct, swdefs.h:72
     const gOff = 1 / rOffNow;  // SWoffConduct, swdefs.h:73
 
@@ -536,8 +539,8 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
     // path runs the SWacLoad body independently. Purely resistive — no
     // imaginary-part contribution.
     const s0 = this._pool.states[0];
-    const rOnNow  = Math.max(this._rOn, 1e-3);
-    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const rOnNow  = this._rOn;   // raw param- ngspice has no Ron floor (swsetup.c:35)
+    const rOffNow = this._rOff;  // raw param- ngspice has no Roff floor (swsetup.c:39)
 
     // COM-NO path (slot base+0).
     const stateNO = (s0[this._stateBase + 0]) | 0;       // swacload.c:26
@@ -612,8 +615,8 @@ class AnalogSwitchSPDTElement extends PoolBackedAnalogElement {
   getPinCurrents(rhs: Float64Array): number[] {
     // Pin layout order: com, no, nc, ctrl.
     const s0_now = this._pool.states[0];
-    const rOnNow  = Math.max(this._rOn, 1e-3);
-    const rOffNow = Math.max(this._rOff, rOnNow * 2);
+    const rOnNow  = this._rOn;   // raw param- ngspice has no Ron floor (swsetup.c:35)
+    const rOffNow = this._rOff;  // raw param- ngspice has no Roff floor (swsetup.c:39)
     const stateNO = s0_now[this._stateBase + 0];
     const stateNC = s0_now[this._stateBase + 2];
     const gNO = ((stateNO === REALLY_ON) || (stateNO === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;

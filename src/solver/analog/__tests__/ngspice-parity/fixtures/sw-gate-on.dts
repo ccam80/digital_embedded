@@ -1,0 +1,548 @@
+{
+  "circuit": {
+    "description": "Tier-2 gate: voltage-controlled SwitchSPST (ngspice SW) driven by a verified DcVoltageSource control + input, into a verified resistor load. Closed (Vctrl > vThreshold): node(out) = Vin through rOn+Rload divider.",
+    "elements": [
+      {
+        "id": "2265843d-9cc5-4ce7-8080-327268add3a9",
+        "position": {
+          "x": 0,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vin",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "f33df78d-cee3-43da-8870-6b0802e94056",
+        "position": {
+          "x": 24,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vctrl",
+          "position": [
+            0,
+            8
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "57cf28c3-8849-4950-b048-14b612a3259e",
+        "position": {
+          "x": 24,
+          "y": 5
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "Rload",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "ac5b646a-25e2-47d5-9619-f8a12bd67168",
+        "position": {
+          "x": 36,
+          "y": 4
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "b5b48749-2c84-45b3-9db0-3a551040abf0",
+        "position": {
+          "x": 12,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "on": 1,
+            "rOff": 1000000,
+            "rOn": 1,
+            "vHysteresis": 0,
+            "vThreshold": 2.5
+          },
+          "label": "SW1",
+          "on": 1,
+          "position": [
+            12,
+            3
+          ],
+          "rOff": 1000000,
+          "rOn": 1,
+          "vHysteresis": 0,
+          "vThreshold": 2.5
+        },
+        "rotation": 0,
+        "type": "SwitchSPST"
+      }
+    ],
+    "name": "sw-gate",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 5,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 4
+          },
+          {
+            "x": 8,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 23,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 3
+          },
+          {
+            "x": 20,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 3
+          },
+          {
+            "x": 20,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 5
+          },
+          {
+            "x": 23,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 5
+          },
+          {
+            "x": 29,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 5
+          },
+          {
+            "x": 33,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 5
+          },
+          {
+            "x": 33,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 5
+          },
+          {
+            "x": 22,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 5
+          },
+          {
+            "x": 22,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 0
+          },
+          {
+            "x": 29,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 0
+          },
+          {
+            "x": 23,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 0
+          },
+          {
+            "x": 21,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 2
+          },
+          {
+            "x": 36,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 4
+          },
+          {
+            "x": -1,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 4
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 9
+          },
+          {
+            "x": 24,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 9
+          },
+          {
+            "x": 30,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 9
+          },
+          {
+            "x": 30,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 1
+          },
+          {
+            "x": 36,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 11,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 4
+          },
+          {
+            "x": 14,
+            "y": 5
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
