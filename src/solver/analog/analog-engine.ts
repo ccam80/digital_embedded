@@ -1846,9 +1846,17 @@ export class MNAEngine implements AnalogEngine {
     if (!ctx) return;
     // Keep cktTemp AND the load-context temp/vt in lock-step (ngspice's single
     // CKTtemp drives both DEVtemperature and DEVload's vt). Without the loadCtx
-    // sync, device load() reads a stale ctx.temp while the temp pass below
-    // rescales tIS/tVcrit at the new temperature.
+    // sync, device load() reads a stale ctx.temp while the temp pass rescales
+    // tIS/tVcrit at the new temperature.
     ctx.setCircuitTempK(K);
+    // ngspice stores CKTtemp as a field and runs the CKTtemp() pass after
+    // CKTsetup, inside the analysis driver (ckttemp.c:28-33). Mirror that: if
+    // setup() has not run, the stored temperature is applied by the temperature
+    // pass at the end of _setup() on the next analysis — so computeTemperature()
+    // never walks a pre-setup element (e.g. a MUT whose partner inductors are
+    // resolved in setup()). Re-run the pass eagerly only when setup already ran,
+    // so a post-setup temperature change takes effect immediately.
+    if (!this._isSetup) return;
     const compiled = this._compiled as ConcreteCompiledAnalogCircuit | null;
     if (!compiled) return;
     cktTemp(ctx, compiled.elementsByFamily);
