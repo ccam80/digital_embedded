@@ -69,11 +69,11 @@ When comparing digiTS against ngspice, the following words are banned as closing
 - *tolerance* / *within tolerance* / *close enough*- strict bit-exact is the bar; if you can't meet it, escalate
 - *equivalent to* / *equivalent under*- if they're truly equivalent, they match bit-exact; otherwise they're not equivalent
 - *pre-existing* / *pre-existing failure*- an item being old does not make it acceptable
-- *intentional divergence*- every accepted divergence is an item in `spec/architectural-alignment.md`, not an in-line justification
+- *intentional divergence*- every accepted divergence is escalated to the user, not justified in-line
 - *citation divergence* / *documentation hygiene* (used to close a numerical gap)- if the cited ngspice file differs from code behavior, either the code or the citation is wrong; neither is a doc-cleanup task
 - *partial* as a closing verdict on a parity item
 
-**Remedy when you would have used one of these words:** STOP and escalate. The item belongs in `spec/architectural-alignment.md` (architectural divergence) or `spec/fix-list-phase-2-audit.md` (numerical bug). Agents do not add items to `architectural-alignment.md`- that is a user action. Your escalation report includes: the cited ngspice file, the digiTS file, the specific quantities that differ, why you think it's architectural rather than numerical, and the user prompt needed to resolve it.
+**Remedy when you would have used one of these words:** STOP and escalate to the user. In the escalation, distinguish an architectural divergence from a numerical bug- the disposition is a user decision, not an in-line one. Your escalation report includes: the cited ngspice file, the digiTS file, the specific quantities that differ, why you think it's architectural rather than numerical, and the user prompt needed to resolve it.
 
 Rationale: these words, used as closing verdicts, raised the tolerance floor across the project and sheltered real numerical bugs. Banning them at the vocabulary level prevents the drift.
 
@@ -90,7 +90,7 @@ Required instead:
 - A citation to the current `ref/ngspice` file and line (e.g. `nicomcof.c:43-44`), verified by hand against the tree- never invented.
 - An explanation of the mechanism: what the code computes and why, in present tense.
 
-Rationale: historical narrative rots the moment the migration is over, leaks refactor jargon, and tells the reader nothing about current behavior. A verified citation plus a mechanism explanation is durable. This applies to all source comments; the `spec/ngspice-v41-engine-diffs/` and `spec/ngspice-v41-model-diffs/` diff archives are exempt- they are version-framed by definition.
+Rationale: historical narrative leaks refactor jargon and tells the reader nothing about current behavior. A verified citation plus a mechanism explanation is durable. This applies to all source comments.
 
 ### ngspice Comparison Harness- First Tool for Numerical Issues
 
