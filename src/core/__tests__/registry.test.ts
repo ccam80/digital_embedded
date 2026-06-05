@@ -30,6 +30,20 @@ import { createDefaultRegistry } from "../../components/register-all.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * True if `sub` appears within `full` in order (not necessarily contiguous).
+ * The runtime pin set returned by getPins() must be an ordered subsequence of
+ * the static pinLayout: every exposed pin is declared, in layout order, while
+ * conditional pins may be absent on a given instance.
+ */
+function isOrderedSubsequence(sub: readonly string[], full: readonly string[]): boolean {
+  let i = 0;
+  for (const label of full) {
+    if (i < sub.length && sub[i] === label) i++;
+  }
+  return i === sub.length;
+}
+
 function makeMockElement(typeId: string, instanceId: string): CircuitElement {
   return {
     typeId,
@@ -884,19 +898,31 @@ describe("Definition-shape parametric audit (every registered, non-internalOnly 
           expect(el.typeId).toBe(def.name);
         });
 
-        it(`def_${def.name}_element_getPins_length_matches_pinLayout`, () => {
+        it(`def_${def.name}_element_getPins_is_ordered_subsequence_of_pinLayout`, () => {
           const el = def.factory(new PropertyBag());
           const runtimePins = el.getPins();
           expect(Array.isArray(runtimePins) || runtimePins.length !== undefined).toBe(true);
-          expect(runtimePins.length).toBe(def.pinLayout.length);
-        });
-
-        it(`def_${def.name}_element_getPins_labels_match_pinLayout_labels`, () => {
-          const el = def.factory(new PropertyBag());
-          const runtimePins = el.getPins();
+          // pinLayout is the static maximal declaration; getPins() is the
+          // instance-resolved set. The exposed pins must be an ordered
+          // subsequence of the layout — every exposed pin is declared, in layout
+          // order — while conditional pins (e.g. a diode's self-heating Tj) may
+          // be absent on a default instance.
           const runtimeLabels = runtimePins.map((p) => p.label);
           const layoutLabels = def.pinLayout.map((p) => p.label);
-          expect(runtimeLabels).toEqual(layoutLabels);
+          expect(isOrderedSubsequence(runtimeLabels, layoutLabels)).toBe(true);
+        });
+
+        it(`def_${def.name}_element_getPins_includes_all_non_conditional_pins`, () => {
+          const el = def.factory(new PropertyBag());
+          const runtimeLabels = el.getPins().map((p) => p.label);
+          // Only pins flagged `conditional` may be omitted at runtime; every
+          // other declared pin must be exposed by getPins().
+          const requiredLabels = def.pinLayout
+            .filter((p) => !p.conditional)
+            .map((p) => p.label);
+          for (const label of requiredLabels) {
+            expect(runtimeLabels).toContain(label);
+          }
         });
       }
 

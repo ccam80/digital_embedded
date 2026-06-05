@@ -1523,8 +1523,9 @@ function buildDiodePinDeclarations(): PinDeclaration[] {
     {
       // dio.c:140 — Tj is the junction-temperature node (diodefs.h:41
       // DIOtempNode); it carries delTemp (the temperature rise over rth0)
-      // when self-heating is on. Always declared (3-terminal device); wired
-      // into the matrix only when selfheat.
+      // when self-heating is on. Declared in the static layout (3-terminal
+      // device) but exposed by getPins() only when self-heating is configured,
+      // so it is marked conditional; wired into the matrix only when selfheat.
       direction: PinDirection.OUTPUT,
       label: "Tj",
       defaultBitWidth: 1,
@@ -1532,6 +1533,7 @@ function buildDiodePinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      conditional: true,
     },
   ];
 }

@@ -42,7 +42,7 @@ interface ElementSpec {
   modelLevel?: number;
 }
 
-const ELEMENT_SPECS: Record<string, ElementSpec> = {
+export const ELEMENT_SPECS: Record<string, ElementSpec> = {
   Resistor:        { prefix: "R" },
   Capacitor:       { prefix: "C", modelType: "C" },
   Inductor:        { prefix: "L" },

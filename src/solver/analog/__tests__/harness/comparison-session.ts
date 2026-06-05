@@ -38,7 +38,7 @@ import type {
 } from "./types.js";
 import type { AcParams } from "../../ac-analysis.js";
 import { buildDirectNodeMapping, reindexNgspiceSession, reindexNgspiceAcSession } from "./node-mapping.js";
-import { generateSpiceNetlist } from "./netlist-generator.js";
+import { generateSpiceNetlist, ELEMENT_SPECS, canonicalizeSpiceLabel } from "./netlist-generator.js";
 import { matchSlotPattern } from "./glob.js";
 import { installUcrtLibmShim, uninstallUcrtLibmShim } from "./ucrt-libm-shim.js";
 import type {
@@ -1466,8 +1466,17 @@ export class ComparisonSession {
       });
 
       for (const es of ourFinal.elementStates) {
+        const topoEl = this._ourTopology.elements.find(
+          el => el.label.toUpperCase() === es.label.toUpperCase());
+        // ngspice infers device class from the instance-name's first letter, so
+        // the deck generator prefix-canonicalises any label that doesn't already
+        // start with its SPICE prefix (a varactor labelled "VD" is emitted as the
+        // diode "DVD"). Match the ngspice element against that same canonicalised
+        // name so prefixed elements correlate instead of reading back NaN.
+        const prefix = topoEl?.typeId ? ELEMENT_SPECS[topoEl.typeId]?.prefix : undefined;
+        const matchLabel = prefix ? canonicalizeSpiceLabel(es.label, prefix) : es.label;
         const ngEs = ngFinal?.elementStates.find(
-          e => e.label.toUpperCase() === es.label.toUpperCase());
+          e => e.label.toUpperCase() === matchLabel.toUpperCase());
         const slots: Record<string, ComparedValue> = {};
         for (const [slot, value] of Object.entries(es.slots)) {
           const ngValue = ngEs?.slots[slot] ?? NaN;
@@ -1478,8 +1487,6 @@ export class ComparisonSession {
           const ngValue = ngEs?.pinCurrents[pin] ?? NaN;
           pinCurrents[pin] = makeComparedValue(value, ngValue);
         }
-        const topoEl = this._ourTopology.elements.find(
-          el => el.label.toUpperCase() === es.label.toUpperCase());
         components[es.label] = { deviceType: topoEl?.type ?? "unknown", slots, pinCurrents };
       }
     }

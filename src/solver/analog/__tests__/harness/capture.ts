@@ -273,6 +273,7 @@ export function captureTopology(
         index: i,
         label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
         type: normalizeDeviceType(typeId),
+        typeId,
         pinNodeIds: [...el.pinNodes.values()],
       };
     }),

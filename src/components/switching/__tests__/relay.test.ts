@@ -9,13 +9,11 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { createDefaultRegistry } from "../../register-all.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import { CurrentControlledSwitchAnalogElement, CSW_SCHEMA } from "../current-controlled-switch.js";
+import { CurrentControlledSwitchAnalogElement } from "../current-controlled-switch.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
-
-const SLOT_CLOSED = CSW_SCHEMA.indexOf.get("CLOSED")!;
 
 /**
  * Locate a CurrentControlledSwitchAnalogElement sub-element inside the expanded
@@ -517,7 +515,7 @@ describe("RelayDT ctrlBranch path (Wave 2.3)", () => {
       build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 10, vTest: 1, rLoad: 100 }),
     });
     const contactNO = findContactByName(fix, "relayDT:contactNO");
-    expect(fix.pool.state1[contactNO._stateBase + SLOT_CLOSED]).toBe(1);
+    expect(contactNO.isClosed()).toBe(true);
   });
 
   it("contactNC opens when energised", () => {
@@ -525,7 +523,7 @@ describe("RelayDT ctrlBranch path (Wave 2.3)", () => {
       build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 10, vTest: 1, rLoad: 100 }),
     });
     const contactNC = findContactByName(fix, "relayDT:contactNC");
-    expect(fix.pool.state1[contactNC._stateBase + SLOT_CLOSED]).toBe(0);
+    expect(contactNC.isClosed()).toBe(false);
   });
 
   it("contactNO opens when de-energised", () => {
@@ -533,7 +531,7 @@ describe("RelayDT ctrlBranch path (Wave 2.3)", () => {
       build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 0, vTest: 1, rLoad: 100 }),
     });
     const contactNO = findContactByName(fix, "relayDT:contactNO");
-    expect(fix.pool.state1[contactNO._stateBase + SLOT_CLOSED]).toBe(0);
+    expect(contactNO.isClosed()).toBe(false);
   });
 
   it("contactNC closes when de-energised", () => {
@@ -541,7 +539,7 @@ describe("RelayDT ctrlBranch path (Wave 2.3)", () => {
       build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 0, vTest: 1, rLoad: 100 }),
     });
     const contactNC = findContactByName(fix, "relayDT:contactNC");
-    expect(fix.pool.state1[contactNC._stateBase + SLOT_CLOSED]).toBe(1);
+    expect(contactNC.isClosed()).toBe(true);
   });
 });
 

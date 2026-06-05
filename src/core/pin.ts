@@ -44,6 +44,14 @@ export interface PinDeclaration {
   readonly kind: "signal" | "power";
   /** Which face of a subcircuit chip this pin is on (left/right/top/bottom). */
   readonly face?: "left" | "right" | "top" | "bottom";
+  /**
+   * Whether this pin is present only on some instances. `pinLayout` is the static
+   * maximal declaration; an instance's `getPins()` may omit a conditional pin
+   * (e.g. a diode's self-heating `Tj` terminal, exposed only when THERMAL/RTH0
+   * configure self-heating). The exposed pins are always an ordered subsequence of
+   * `pinLayout`; non-conditional pins are always exposed.
+   */
+  readonly conditional?: boolean;
 }
 
 /**

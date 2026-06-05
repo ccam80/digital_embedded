@@ -56,12 +56,15 @@ const CSW_PIN_LAYOUT: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 export const CSW_SCHEMA = defineStateSchema("CurrentControlledSwitch", [
-  { name: "CLOSED",    doc: "Derived conductance flag (1=Ron, 0=Roff)" },
+  // cswdefs.h:61 CSWswitchstate (CSWstate+0), written at cswload.c:129. The
+  // closed/open conductance flag is NOT stored: ngspice keeps no such state
+  // (cswload.c:136-138 computes the conductance transiently), and digiTS's
+  // normallyClosed inversion has no ngspice counterpart — so the flag is
+  // recomputed on demand from this 4-state via isClosed().
   { name: "CSW_STATE", doc: "ngspice CSW 4-state (REALLY_OFF/REALLY_ON/HYST_OFF/HYST_ON)" },
 ]) satisfies StateSchema;
 
-const SLOT_CLOSED    = 0;
-const SLOT_CSW_STATE = 1;
+const SLOT_CSW_STATE = 0;
 
 // ngspice CSW state constants — cswload.c:28-30.
 const REALLY_OFF = 0;
@@ -306,7 +309,6 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
     // mapping while reusing the CSW state machine.
     const energised = current_state === REALLY_ON || current_state === HYST_ON;
     const closed = this._normallyClosed ? !energised : energised;
-    s0[base + SLOT_CLOSED] = closed ? 1 : 0;
 
     const g_now = closed ? 1 / this._ron : 1 / this._roff;
     ctx.solver.stampElement(this._hPP, +g_now);   // cswload.c:143 CSWposPosPtr
@@ -315,13 +317,24 @@ export class CurrentControlledSwitchAnalogElement extends PoolBackedAnalogElemen
     ctx.solver.stampElement(this._hNN, +g_now);   // cswload.c:146 CSWnegNegPtr
   }
 
+  /**
+   * Whether the contact is conducting at the last accepted timepoint. Recomputed
+   * from the committed 4-state CSW_STATE (s1) rather than stored: ngspice keeps
+   * no closed/open flag (cswload.c:136-138 derives the conductance transiently),
+   * and the relay-contact normallyClosed inversion has no ngspice counterpart.
+   */
+  isClosed(): boolean {
+    const state = this._pool.states[1][this._stateBase + SLOT_CSW_STATE];
+    const energised = state === REALLY_ON || state === HYST_ON;
+    return this._normallyClosed ? !energised : energised;
+  }
+
   getPinCurrents(rhs: Float64Array): number[] {
     const posNode = this.pinNodes.get("A1")!;
     const negNode = this.pinNodes.get("B1")!;
     const vA = rhs[posNode];
     const vB = rhs[negNode];
-    const on = this._pool !== undefined &&
-      this._pool.states[1][this._stateBase + SLOT_CLOSED] >= 0.5;
+    const on = this._pool !== undefined && this.isClosed();
     const G = on ? 1 / this._ron : 1 / this._roff;
     const I = G * (vA - vB);
     return [I, -I];

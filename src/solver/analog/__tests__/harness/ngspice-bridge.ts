@@ -179,6 +179,8 @@ function canonicalizeNgspiceDeviceType(ngspiceType: string): string | null {
     // ngspice VDMOSinfo.name = "VDMOS" (vdmosinit.c:12), lowercased here.
     "vdmos": "vdmos",
     "switch": "vswitch",
+    // cswinit.c:14 CSWinfo.name="CSwitch" (the relay-contact current switch).
+    "cswitch": "csw",
   };
   return map[lower] ?? null;
 }

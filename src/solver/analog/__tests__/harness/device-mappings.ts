@@ -77,14 +77,16 @@ export const INDUCTOR_MAPPING: DeviceMapping = {
 // ---------------------------------------------------------------------------
 // Diode
 // ---------------------------------------------------------------------------
-// ngspice dio state offsets (diodefs.h:154-158):
-//   DIOvoltage=0, DIOcurrent=1, DIOconduct=2,
-//   DIOcapCharge=3, DIOcapCurrent=4, DIOinitCond=5 (not compared)
+// ngspice dio state offsets (diodefs.h:196-208, DIOnumStates=9, all allocated
+// for every diode regardless of self-heating):
+//   DIOvoltage=0, DIOcurrent=1, DIOconduct=2, DIOcapCharge=3, DIOcapCurrent=4,
+//   DIOqth=5, DIOcqth=6, DIOdeltemp=7, DIOdIdio_dT=8
 //
-// Post-D-2a rename: digiTS slot for DIOcapCurrent is `CAP_CURRENT` (dual
-// semantics per dioload.c:363: iqcap in MODETRAN, capd in MODEINITSMSIG).
-// The digiTS schema `CCAP` slot is a niIntegrate companion-current output
-// with no ngspice CKTstate correspondence- not mapped.
+// The digiTS slot for DIOcapCurrent is `CAP_CURRENT` (dual semantics per
+// dioload.c:363: iqcap in MODETRAN, capd in MODEINITSMSIG). The thermal states
+// (QTH/CQTH/DELTEMP) and the dI/dT predictor term (DIDIO_DT) are zero when the
+// instance is not self-heating; mapped here so the step-end comparison compares
+// them directly instead of reading NaN off the unmapped ngspice side.
 
 // Diode pin currents: ID at slot 1 is the diode through-current (anode→cathode
 // passive sign). Anode A sees +ID into the device, cathode K sees -ID.
@@ -96,6 +98,10 @@ export const DIODE_MAPPING: DeviceMapping = {
     GEQ: 2,
     Q: 3,
     CAP_CURRENT: 4,
+    QTH: 5,
+    CQTH: 6,
+    DELTEMP: 7,
+    DIDIO_DT: 8,
   },
   ngspiceToSlot: {
     0: "VD",
@@ -103,6 +109,10 @@ export const DIODE_MAPPING: DeviceMapping = {
     2: "GEQ",
     3: "Q",
     4: "CAP_CURRENT",
+    5: "QTH",
+    6: "CQTH",
+    7: "DELTEMP",
+    8: "DIDIO_DT",
   },
   pinCurrents: {
     A: [{ slot: "ID", sign: 1 }],
@@ -471,6 +481,25 @@ export const VSWITCH_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
+// Current-controlled switch (CSW / ngspice W device, CSWinfo.name="CSwitch")
+// ---------------------------------------------------------------------------
+// ngspice csw state offsets (cswdefs.h:59-62, CSW_NUM_STATES=2):
+//   CSWswitchstate=0 (4-state sentinel), CSWctrlvalue=1 (controlling current).
+// digiTS stores only the 4-state sentinel as CSW_STATE (cswload.c:129). The
+// controlling current is read live from the control branch (not pooled) and the
+// closed/open conductance flag is recomputed via isClosed() (no ngspice state —
+// cswload.c:136-138 derives the conductance transiently); neither is mapped.
+export const CSW_MAPPING: DeviceMapping = {
+  deviceType: "csw",
+  slotToNgspice: {
+    CSW_STATE: 0,
+  },
+  ngspiceToSlot: {
+    0: "CSW_STATE",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -487,6 +516,7 @@ export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
   mes: MES_MAPPING,
   vdmos: VDMOS_MAPPING,
   vswitch: VSWITCH_MAPPING,
+  csw: CSW_MAPPING,
 };
 
 // ---------------------------------------------------------------------------
@@ -524,6 +554,7 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
   Triac: "triac",
   SwitchSPST: "vswitch",
   SwitchSPDT: "vswitch",
+  CurrentControlledSwitch: "csw",
 };
 
 /**

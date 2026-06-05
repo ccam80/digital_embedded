@@ -275,6 +275,14 @@ export interface TopologySnapshot {
     index: number;
     label: string;
     type: string;
+    /**
+     * Raw digiTS typeId (e.g. "VaractorDiode"), distinct from `type` which is
+     * the canonical device class. Carried so the step-end element correlation can
+     * resolve the SPICE prefix and match an element whose ngspice instance name
+     * was prefix-canonicalised (a varactor labelled "VD" is emitted as "DVD").
+     * Optional: only our side populates it; the ngspice-derived snapshot omits it.
+     */
+    typeId?: string;
     pinNodeIds: readonly number[];
   }>;
   nodeLabels: Map<number, string>;
