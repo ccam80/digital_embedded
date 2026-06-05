@@ -5,22 +5,18 @@
  * All tests share a single ComparisonSession created in the first test.
  * Skips the entire suite when the ngspice DLL is not available.
  */
-import { describe, it, expect, afterAll } from "vitest";
-import { existsSync } from "fs";
+import { it, expect, afterAll } from "vitest";
 import { resolve } from "path";
 import { ComparisonSession } from "./comparison-session.js";
+import { describeIfDll, DLL_PATH } from "../ngspice-parity/parity-helpers.js";
 import type {
   CaptureSession,
 } from "./types.js";
 
-const DLL_PATH = process.env.NGSPICE_DLL_PATH ?? "";
-const HAS_DLL = DLL_PATH !== "" && existsSync(DLL_PATH);
-const describeGate = HAS_DLL ? describe : describe.skip;
-
 const DTS_PATH = resolve(process.cwd(), "fixtures/hwr-square.dts");
 
 
-describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
+describeIfDll("Stream Verification -- full pipeline (HWR square wave)", () => {
   let session: ComparisonSession;
 
   afterAll(() => {
@@ -45,7 +41,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
       ngspiceIndex: number;
       label: string;
       ngspiceName: string;
-    }> = (session as any)._nodeMap;
+    }> = session.nodeMap;
 
     expect(nodeMap.length).toBeGreaterThan(0);
 
@@ -61,8 +57,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   });
 
   it("2. topology: element type is always a non-empty string", () => {
-    const elements: Array<{ type: string }> = (session as any)._ourTopology
-      .elements;
+    const elements: Array<{ type: string }> = session.ourTopology.elements;
 
     for (const el of elements) {
       expect(typeof el.type).toBe("string");
@@ -74,7 +69,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   });
 
   it("3. topology: matrixRowLabels and matrixColLabels populated", () => {
-    const topo = (session as any)._ourTopology;
+    const topo = session.ourTopology;
     const rowLabels: Map<number, string> = topo.matrixRowLabels;
     const colLabels: Map<number, string> = topo.matrixColLabels;
 
@@ -232,7 +227,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
 
   it("11. limiting events: ngspice captures events (C-side Item 9)", () => {
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      session.ngSessionReindexed ?? session.ngSession;
 
     let foundNgLimiting = false;
     for (const step of ngSession.steps) {
@@ -250,7 +245,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   it("12. state history: state1Slots and state2Slots populated", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      session.ngSessionReindexed ?? session.ngSession;
 
     for (const steps of [ourSteps, ngSession.steps]) {
       let foundState1 = false;
@@ -284,7 +279,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   it("13. pre-solve RHS: populated and not all zero", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
+      session.ngSessionReindexed ?? session.ngSession;
 
     for (const steps of [ourSteps, ngSession.steps]) {
       let foundNonZero = false;

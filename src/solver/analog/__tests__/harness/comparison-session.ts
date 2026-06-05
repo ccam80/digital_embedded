@@ -3577,6 +3577,10 @@ export class ComparisonSession {
   }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get ourTopology(): TopologySnapshot { return this._ourTopology; }
+  /** Raw ngspice capture; null until an analysis runs. */
+  get ngSession(): CaptureSession | null { return this._ngSession; }
+  /** ngspice capture reindexed onto our node ordering, when alignment ran. */
+  get ngSessionReindexed(): CaptureSession | null { return this._ngSessionReindexed; }
   get engine(): MNAEngine { return this._engine; }
 
   /**
