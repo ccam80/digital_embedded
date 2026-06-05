@@ -1054,7 +1054,10 @@ function _createBjtElementWithPolarity(
         // cite: bjtload.c:749-754  icheck++ unless MODEINITFIX && OFF
         if (this._icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
-        if (ctx.limitingCollector) {
+        // A limiting event records a DEVpnjlim call; ngspice calls pnjlim only
+        // in the non-init branch, so push under the same gate (no event at the
+        // MODEINITJCT/SMSIG/TRAN voltage seeds).
+        if (ctx.limitingCollector && (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
           ctx.limitingCollector.push({
             elementIndex: this.elementIndex ?? -1,
             label: this.label,
@@ -2070,7 +2073,10 @@ export function createSpiceL1BjtElement(
         // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF.
         if (this._icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
-        if (ctx.limitingCollector) {
+        // A limiting event records a DEVpnjlim call; ngspice calls pnjlim only
+        // in the non-init branch, so push under the same gate (no event at the
+        // MODEINITJCT/SMSIG/TRAN voltage seeds).
+        if (ctx.limitingCollector && (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
           ctx.limitingCollector.push({
             elementIndex: this.elementIndex ?? -1,
             label: this.label,
