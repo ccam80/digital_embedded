@@ -2561,7 +2561,11 @@ export function createSpiceL1BjtElement(
         s0[base + SLOT_IRCI_VRCI] = Irci_Vrci;
         s0[base + SLOT_IRCI_VBCI] = Irci_Vbci;
         s0[base + SLOT_IRCI_VBCX] = Irci_Vbcx;
-        s0[base + SLOT_GBCX]  = gbcx;
+        // BJTgbcx is never written by ngspice load(): the gbcx local feeds the
+        // collCX/basePrime coupling stamp only (bjtload.c:979-982), and the
+        // bypass path reads the slot's init 0 (bjtload.c:404). Leaving SLOT_GBCX
+        // unwritten keeps it at 0 to match, on both the state vector and the
+        // bypass-stamp value.
       } // end bypass else
 
       // cite: bjtload.c:910-918 — RHS excitation vectors.
@@ -2579,8 +2583,9 @@ export function createSpiceL1BjtElement(
       stampRHS(ctx.rhs, nodeE_int,    m * ceqbe);
       stampRHS(ctx.rhs, 0,            m * -ceqsub);
 
-      // cite: bjtload.c:929-956 — Y-matrix stamps; gcpr migrated from colPrime
-      // to collCX diagonal per v41 (bjtload.c:932,935-936); no AREA factor.
+      // cite: bjtload.c:929-956 — Y-matrix stamps. gcpr (collector ohmic
+      // conductance) stamps on the collCX diagonal (bjtload.c:932,935-936);
+      // no AREA factor (area is folded into the temperature-resolved params).
       solver.stampElement(this._hCC,              m * gcpr);                 // bjtload.c:932
       solver.stampElement(this._hBB,              m * (gx + geqbx));         // bjtload.c:933
       solver.stampElement(this._hEE,              m * gepr);                 // bjtload.c:934
