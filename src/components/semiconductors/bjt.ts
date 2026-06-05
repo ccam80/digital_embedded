@@ -2098,7 +2098,10 @@ export function createSpiceL1BjtElement(
           ctx.limitingCollector.push({
             elementIndex: this.elementIndex ?? -1,
             label: this.label,
-            junction: "SUB",
+            // ngspice records the substrate (collector-substrate) limiting under
+            // junction id 8 = "CS" (the harness JUNCTION_ID_MAP mirrors ngspice's
+            // ni_limit_record ids); use the same label so the event pairs.
+            junction: "CS",
             limitType: "pnjlim",
             vBefore: vsubRaw,
             vAfter: vsubLimited,
