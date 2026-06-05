@@ -4107,6 +4107,816 @@
         "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
       ],
       "escalation": null
+    },
+    "bjt/bjt.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "765d0104fb3d7969",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "5c56f945852df97b",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "a8128b2c41ed20dc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "bc98ffa2e673c754",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "0c0b5f6c92bea334",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "c24dab5e32c8bd05",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "2c9c9f3b5b465507",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjt.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "7ea6686cfa79409b",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtacld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "99e8e0fa93171352",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtacld.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "26a7fbedf086e750",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtacld.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "8ca880ad0886b867",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtconv.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "1da5a3f6d6f44c1e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtconv.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "c6cc19c8a6ced82a",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtconv.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "7d2815fd48c04c86",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "4f83d79bdfedf7f9",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h003": {
+      "state": "APPLIED",
+      "hunkHash": "2ed6594911b1bef5",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h004": {
+      "state": "APPLIED",
+      "hunkHash": "3e1348da25f42d47",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h005": {
+      "state": "APPLIED",
+      "hunkHash": "074b617f7663f5f3",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h006": {
+      "state": "APPLIED",
+      "hunkHash": "e7c9720a6e98d852",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h007": {
+      "state": "APPLIED",
+      "hunkHash": "759ac94e1652a66c",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h008": {
+      "state": "APPLIED",
+      "hunkHash": "7e1119e8632b3863",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h010": {
+      "state": "APPLIED",
+      "hunkHash": "6642e928dc8226d1",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h011": {
+      "state": "APPLIED",
+      "hunkHash": "97d138adac7da784",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h012": {
+      "state": "APPLIED",
+      "hunkHash": "f4208effa6417283",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtdefs.h#h013": {
+      "state": "APPLIED",
+      "hunkHash": "6f7c0542b28bf983",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "3477d0ea392cb116",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "1e98c149e9df660d",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "56bd01d9db4ca9e0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "0c5396d71eeeb757",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "85788b6d6f26686f",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "d500c3ea54faec76",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "d15849c117f667ac",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "23d47610fdd248cc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "ee64ecceeb91ff26",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "c851eb56892ffd9a",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "34dd25540a16afa0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h012": {
+      "state": "APPLIED",
+      "hunkHash": "3396987453d734d4",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h013": {
+      "state": "APPLIED",
+      "hunkHash": "33ab59198bb10dc4",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h014": {
+      "state": "APPLIED",
+      "hunkHash": "2b46d2fb4c31f5c5",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h015": {
+      "state": "APPLIED",
+      "hunkHash": "894eb7ae7861d9c8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h016": {
+      "state": "APPLIED",
+      "hunkHash": "a946fed681fd6401",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h017": {
+      "state": "APPLIED",
+      "hunkHash": "c37ccdc71257dc78",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h018": {
+      "state": "APPLIED",
+      "hunkHash": "b00009a362540ed7",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h019": {
+      "state": "APPLIED",
+      "hunkHash": "e2804af5cb893d64",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h020": {
+      "state": "APPLIED",
+      "hunkHash": "0b2b7ab5a8262c41",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h021": {
+      "state": "APPLIED",
+      "hunkHash": "809284d57fdf8b54",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h022": {
+      "state": "APPLIED",
+      "hunkHash": "c6c1e0745cbf23c2",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h023": {
+      "state": "APPLIED",
+      "hunkHash": "47564f6cd8bcaa6e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h024": {
+      "state": "APPLIED",
+      "hunkHash": "d844c096edbd43b0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h025": {
+      "state": "APPLIED",
+      "hunkHash": "aec05d22e8911d9c",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h026": {
+      "state": "APPLIED",
+      "hunkHash": "03558ad8053ae9bc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h027": {
+      "state": "APPLIED",
+      "hunkHash": "fab2e2cfb4749997",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h028": {
+      "state": "APPLIED",
+      "hunkHash": "e649511dba4553ad",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h029": {
+      "state": "APPLIED",
+      "hunkHash": "95f7d7cb534760fe",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h030": {
+      "state": "APPLIED",
+      "hunkHash": "b852db5705f28109",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h031": {
+      "state": "APPLIED",
+      "hunkHash": "ed3c4922c4152c39",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h032": {
+      "state": "APPLIED",
+      "hunkHash": "4a6051c90787e0a0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h033": {
+      "state": "APPLIED",
+      "hunkHash": "4242113d9674c81f",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h034": {
+      "state": "APPLIED",
+      "hunkHash": "71d384500019361d",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h035": {
+      "state": "APPLIED",
+      "hunkHash": "ad8e3305e26a2733",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h036": {
+      "state": "APPLIED",
+      "hunkHash": "d399d2f040bed1ca",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h037": {
+      "state": "APPLIED",
+      "hunkHash": "10e2ec742eb69e51",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtload.c#h038": {
+      "state": "APPLIED",
+      "hunkHash": "fffff73f502a6140",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtmpar.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "c23c2e2b91ef564f",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtmpar.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "57e2151aaeaf568a",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtmpar.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "948304513c660d0a",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtmpar.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "ec5e004952d3e992",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtmpar.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "c056678d19f740e7",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtmpar.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "51bc4f4d7cd85b51",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "7bf5f4c61b014317",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "c066ed0048ad192f",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "2f622a46c2692c90",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "a38cb78d3926857b",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "d5bf5edeeae32928",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "1ec11ed40b0166dc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "b86fa35fa52f7f91",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjtsetup.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "aaba2e5c0983f8cc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "ab55c0a5a206b7fc",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "62187c2e0254d066",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "eb0666771cc5b05e",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h004": {
+      "state": "APPLIED",
+      "hunkHash": "c2851799a73525e1",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h005": {
+      "state": "APPLIED",
+      "hunkHash": "2729a0e8c3ba7e89",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h006": {
+      "state": "APPLIED",
+      "hunkHash": "f15ae513678d79cf",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h007": {
+      "state": "APPLIED",
+      "hunkHash": "c28387982a3db6c0",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h008": {
+      "state": "APPLIED",
+      "hunkHash": "1e4f159c258a5986",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h009": {
+      "state": "APPLIED",
+      "hunkHash": "160688846b2459ee",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h010": {
+      "state": "APPLIED",
+      "hunkHash": "060fc77c8897c153",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttemp.c#h011": {
+      "state": "APPLIED",
+      "hunkHash": "0b85aa15c82d2584",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt/bjttrunc.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "db65b9245ce548c5",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
+    },
+    "bjt#recon/quasiSaturation": {
+      "state": "APPLIED",
+      "hunkHash": "93572740ed5ae101",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
+      "escalation": null
     }
   }
 }

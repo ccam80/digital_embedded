@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-05T01:05:31.410Z",
+    "generated": "2026-06-05T03:12:50.865Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 436,
+    "progressEntriesApplied": 526,
     "progressEntriesStale": 0,
     "staleItems": []
   },
@@ -7349,10 +7349,12 @@
         87
       ],
       "hunkHash": "765d0104fb3d7969",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7380,10 +7382,12 @@
         98
       ],
       "hunkHash": "5c56f945852df97b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7411,10 +7415,12 @@
         109
       ],
       "hunkHash": "a8128b2c41ed20dc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7442,10 +7448,12 @@
         121
       ],
       "hunkHash": "bc98ffa2e673c754",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7473,10 +7481,12 @@
         146
       ],
       "hunkHash": "0c0b5f6c92bea334",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7504,10 +7514,12 @@
         157
       ],
       "hunkHash": "c24dab5e32c8bd05",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7535,10 +7547,12 @@
         171
       ],
       "hunkHash": "2c9c9f3b5b465507",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7566,10 +7580,12 @@
         200
       ],
       "hunkHash": "7ea6686cfa79409b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS (defineModelParams model-param stanza)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7597,10 +7613,12 @@
         233
       ],
       "hunkHash": "99e8e0fa93171352",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h001 = un-area gcpr/gepr + Irci_* state reads, bjtacld.c:47-55)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7628,10 +7646,12 @@
         261
       ],
       "hunkHash": "26a7fbedf086e750",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h002 = collCX matrix-cell restructure + xcbcx, bjtacld.c:70,76-77,84,87)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7659,10 +7679,12 @@
         286
       ],
       "hunkHash": "8ca880ad0886b867",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.stampAc (complete v41 BJTacLoad rebuilt by bjt#recon/quasiSaturation Part 5; #h003 = the model->BJTintCollResistGiven Kull collCX AC stamp block, bjtacld.c:107-124)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7907,10 +7929,12 @@
         392
       ],
       "hunkHash": "1da5a3f6d6f44c1e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (inline cchat/cbhat convergence prediction, bjtload.c:331-337)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7938,10 +7962,12 @@
         405
       ],
       "hunkHash": "c6cc19c8a6ced82a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (inline cchat/cbhat convergence prediction, bjtload.c:331-337) - adds vbcx/delvbcx prediction for the internal-collector-resistance node",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7969,10 +7995,12 @@
         422
       ],
       "hunkHash": "7d2815fd48c04c86",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (inline cchat/cbhat convergence prediction, bjtload.c:331-337)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8031,10 +8059,12 @@
         482
       ],
       "hunkHash": "4f83d79bdfedf7f9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8062,10 +8092,12 @@
         493
       ],
       "hunkHash": "2ed6594911b1bef5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8093,10 +8125,12 @@
         516
       ],
       "hunkHash": "3e1348da25f42d47",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8124,10 +8158,12 @@
         534
       ],
       "hunkHash": "074b617f7663f5f3",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8155,10 +8191,12 @@
         542
       ],
       "hunkHash": "e7c9720a6e98d852",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8186,10 +8224,12 @@
         560
       ],
       "hunkHash": "759ac94e1652a66c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element instance fields / params bag",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8217,10 +8257,12 @@
         623
       ],
       "hunkHash": "7e1119e8632b3863",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_L1_SCHEMA state slots",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8279,10 +8321,12 @@
         676
       ],
       "hunkHash": "6642e928dc8226d1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8310,10 +8354,12 @@
         716
       ],
       "hunkHash": "97d138adac7da784",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8341,10 +8387,12 @@
         727
       ],
       "hunkHash": "f4208effa6417283",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -8372,10 +8420,12 @@
         748
       ],
       "hunkHash": "6f7c0542b28bf983",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BJT_SPICE_L1_PARAM_DEFS model fields",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9054,10 +9104,12 @@
         1605
       ],
       "hunkHash": "3477d0ea392cb116",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9085,10 +9137,12 @@
         1614
       ],
       "hunkHash": "1e98c149e9df660d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9116,10 +9170,12 @@
         1622
       ],
       "hunkHash": "56bd01d9db4ca9e0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9147,10 +9203,12 @@
         1631
       ],
       "hunkHash": "0c5396d71eeeb757",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9178,10 +9236,12 @@
         1640
       ],
       "hunkHash": "85788b6d6f26686f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9209,10 +9269,12 @@
         1656
       ],
       "hunkHash": "d500c3ea54faec76",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9240,10 +9302,12 @@
         1664
       ],
       "hunkHash": "d15849c117f667ac",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9271,10 +9335,12 @@
         1687
       ],
       "hunkHash": "23d47610fdd248cc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9302,10 +9368,12 @@
         1723
       ],
       "hunkHash": "ee64ecceeb91ff26",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9333,10 +9401,12 @@
         1752
       ],
       "hunkHash": "c851eb56892ffd9a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9364,10 +9434,12 @@
         1761
       ],
       "hunkHash": "34dd25540a16afa0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9395,10 +9467,12 @@
         1787
       ],
       "hunkHash": "3396987453d734d4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9426,10 +9500,12 @@
         1814
       ],
       "hunkHash": "33ab59198bb10dc4",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9457,10 +9533,12 @@
         1829
       ],
       "hunkHash": "2b46d2fb4c31f5c5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9488,10 +9566,12 @@
         1849
       ],
       "hunkHash": "894eb7ae7861d9c8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9519,10 +9599,12 @@
         1877
       ],
       "hunkHash": "a946fed681fd6401",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9550,10 +9632,12 @@
         1890
       ],
       "hunkHash": "c37ccdc71257dc78",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9581,10 +9665,12 @@
         1899
       ],
       "hunkHash": "b00009a362540ed7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9612,10 +9698,12 @@
         1912
       ],
       "hunkHash": "e2804af5cb893d64",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9643,10 +9731,12 @@
         1930
       ],
       "hunkHash": "0b2b7ab5a8262c41",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9674,10 +9764,12 @@
         1967
       ],
       "hunkHash": "809284d57fdf8b54",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9705,10 +9797,12 @@
         2105
       ],
       "hunkHash": "c6c1e0745cbf23c2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9736,10 +9830,12 @@
         2121
       ],
       "hunkHash": "47564f6cd8bcaa6e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9767,10 +9863,12 @@
         2132
       ],
       "hunkHash": "d844c096edbd43b0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9798,10 +9896,12 @@
         2157
       ],
       "hunkHash": "aec05d22e8911d9c",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9829,10 +9929,12 @@
         2190
       ],
       "hunkHash": "03558ad8053ae9bc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9860,10 +9962,12 @@
         2201
       ],
       "hunkHash": "fab2e2cfb4749997",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9891,10 +9995,12 @@
         2212
       ],
       "hunkHash": "e649511dba4553ad",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9922,10 +10028,12 @@
         2224
       ],
       "hunkHash": "95f7d7cb534760fe",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9953,10 +10061,12 @@
         2232
       ],
       "hunkHash": "b852db5705f28109",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -9984,10 +10094,12 @@
         2242
       ],
       "hunkHash": "ed3c4922c4152c39",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10015,10 +10127,12 @@
         2251
       ],
       "hunkHash": "4a6051c90787e0a0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10046,10 +10160,12 @@
         2271
       ],
       "hunkHash": "4242113d9674c81f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10077,10 +10193,12 @@
         2280
       ],
       "hunkHash": "71d384500019361d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10108,10 +10226,12 @@
         2291
       ],
       "hunkHash": "ad8e3305e26a2733",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10139,10 +10259,12 @@
         2300
       ],
       "hunkHash": "d399d2f040bed1ca",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10170,10 +10292,12 @@
         2333
       ],
       "hunkHash": "10e2ec742eb69e51",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10201,10 +10325,12 @@
         2368
       ],
       "hunkHash": "fffff73f502a6140",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.load (createSpiceL1BjtElement)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10449,10 +10575,12 @@
         2537
       ],
       "hunkHash": "c23c2e2b91ef564f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10480,10 +10608,12 @@
         2548
       ],
       "hunkHash": "57e2151aaeaf568a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10511,10 +10641,12 @@
         2559
       ],
       "hunkHash": "948304513c660d0a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10542,10 +10674,12 @@
         2582
       ],
       "hunkHash": "ec5e004952d3e992",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10573,10 +10707,12 @@
         2613
       ],
       "hunkHash": "c056678d19f740e7",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -10604,10 +10740,12 @@
         2641
       ],
       "hunkHash": "51bc4f4d7cd85b51",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - params bag (props.getModelParam in createSpiceL1BjtElement) / setParam",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11069,10 +11207,12 @@
         2904
       ],
       "hunkHash": "7bf5f4c61b014317",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11100,10 +11240,12 @@
         2937
       ],
       "hunkHash": "c066ed0048ad192f",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11131,10 +11273,12 @@
         2957
       ],
       "hunkHash": "2f622a46c2692c90",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11162,10 +11306,12 @@
         2988
       ],
       "hunkHash": "a38cb78d3926857b",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11193,10 +11339,12 @@
         3024
       ],
       "hunkHash": "d5bf5edeeae32928",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11224,10 +11372,12 @@
         3046
       ],
       "hunkHash": "1ec11ed40b0166dc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11255,10 +11405,12 @@
         3060
       ],
       "hunkHash": "b86fa35fa52f7f91",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11286,10 +11438,12 @@
         3076
       ],
       "hunkHash": "aaba2e5c0983f8cc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.setup + model default-value processing",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11534,10 +11688,12 @@
         3374
       ],
       "hunkHash": "ab55c0a5a206b7fc",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11565,10 +11721,12 @@
         3418
       ],
       "hunkHash": "62187c2e0254d066",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11596,10 +11754,12 @@
         3439
       ],
       "hunkHash": "eb0666771cc5b05e",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11627,10 +11787,12 @@
         3447
       ],
       "hunkHash": "c2851799a73525e1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11658,10 +11820,12 @@
         3500
       ],
       "hunkHash": "2729a0e8c3ba7e89",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11689,10 +11853,12 @@
         3584
       ],
       "hunkHash": "f15ae513678d79cf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11720,10 +11886,12 @@
         3610
       ],
       "hunkHash": "c28387982a3db6c0",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11751,10 +11919,12 @@
         3625
       ],
       "hunkHash": "1e4f159c258a5986",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11782,10 +11952,12 @@
         3643
       ],
       "hunkHash": "160688846b2459ee",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11813,10 +11985,12 @@
         3658
       ],
       "hunkHash": "060fc77c8897c153",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11844,10 +12018,12 @@
         3678
       ],
       "hunkHash": "0b85aa15c82d2584",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.computeTemperature / computeBjtTempParams",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -11875,10 +12051,12 @@
         3700
       ],
       "hunkHash": "db65b9245ce548c5",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/semiconductors/bjt.ts - BjtL1Element.getLteTimestep (cktTerr over qbe/qbc/qsub; v41 adds qbcx under intCollResistGiven)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -62821,9 +62999,11 @@
         "bjt/bjtacld.c#h003"
       ],
       "hunkHash": "93572740ed5ae101",
-      "state": "PENDING",
-      "attempts": 0,
-      "verifierNotes": [],
+      "state": "APPLIED",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: harness firstDivergence/acFirstDivergence null across npn-ce-full / npn-ce / pnp-cc / bjt-quasisat (Kull) / bjt-tlev (tlev=3,tlevc=1,dt=-50) transient + DC-OP (solution + limiting events) + AC; narrow parity suite 311/311. Acceptance #8 three-device coverage met; all three pins exercised off-ground (npn-ce-full)."
+      ],
       "rationale": null,
       "escalation": null
     },
