@@ -227,7 +227,7 @@ describeIfDll("Stream Verification -- full pipeline (HWR square wave)", () => {
 
   it("11. limiting events: ngspice captures events (C-side Item 9)", () => {
     const ngSession: CaptureSession =
-      session.ngSessionReindexed ?? session.ngSession;
+      (session.ngSessionReindexed ?? session.ngSession)!;
 
     let foundNgLimiting = false;
     for (const step of ngSession.steps) {
@@ -245,7 +245,7 @@ describeIfDll("Stream Verification -- full pipeline (HWR square wave)", () => {
   it("12. state history: state1Slots and state2Slots populated", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
-      session.ngSessionReindexed ?? session.ngSession;
+      (session.ngSessionReindexed ?? session.ngSession)!;
 
     for (const steps of [ourSteps, ngSession.steps]) {
       let foundState1 = false;
@@ -279,7 +279,7 @@ describeIfDll("Stream Verification -- full pipeline (HWR square wave)", () => {
   it("13. pre-solve RHS: populated and not all zero", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
-      session.ngSessionReindexed ?? session.ngSession;
+      (session.ngSessionReindexed ?? session.ngSession)!;
 
     for (const steps of [ourSteps, ngSession.steps]) {
       let foundNonZero = false;

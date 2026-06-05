@@ -1555,6 +1555,12 @@ export function createSpiceL1BjtElement(
   const ikrGiven = props.isModelParamGiven("IKR");
   const rcGiven = props.isModelParamGiven("RC");
   const reGiven = props.isModelParamGiven("RE");
+  // cite: bjtload.c:598-609 — the base-charge roll-off branch keys off
+  // BJTnkfGiven (whether NKF was specified), not its value: !given → sqrt(arg)
+  // + the gbe/sqarg derivative; given → pow(arg,nkf) + the gbe·2·sqarg·nkf/arg
+  // derivative. The two derivative forms are algebraically equal but round
+  // differently, so a model that gives NKF=0.5 must take the pow arm.
+  const nkfGiven = props.isModelParamGiven("NKF");
   // cite: bjttemp.c:236-243 — tbf*/tbr* given selects the tempco-multiplier beta
   // arm over the bfactor arm.
   const tbf1Given = props.isModelParamGiven("TBF1");
@@ -2239,13 +2245,15 @@ export function createSpiceL1BjtElement(
           const q2 = oik * cbe + oikr * cbc;
           const arg_qb = Math.max(0, 1 + 4 * q2);
           let sqarg = 1;
-          if (params.NKF === 0.5) {
+          // cite: bjtload.c:597-602 — sqarg keys off BJTnkfGiven, not NKF's value.
+          if (!nkfGiven) {
             if (arg_qb !== 0) sqarg = Math.sqrt(arg_qb);
           } else {
             if (arg_qb !== 0) sqarg = Math.pow(arg_qb, params.NKF);
           }
           qb = q1 * (1 + sqarg) / 2;
-          if (params.NKF === 0.5) {
+          // cite: bjtload.c:604-610 — dqbdve/dqbdvc derivative arm by BJTnkfGiven.
+          if (!nkfGiven) {
             const sqargSafe = Math.max(sqarg, 1e-30);
             dqbdve = q1 * (qb * tp.tinvEarlyVoltR + oik * gbe / sqargSafe);
             dqbdvc = q1 * (qb * tp.tinvEarlyVoltF + oikr * gbc / sqargSafe);
