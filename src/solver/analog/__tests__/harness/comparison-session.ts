@@ -3581,6 +3581,11 @@ export class ComparisonSession {
   get ngSession(): CaptureSession | null { return this._ngSession; }
   /** ngspice capture reindexed onto our node ordering, when alignment ran. */
   get ngSessionReindexed(): CaptureSession | null { return this._ngSessionReindexed; }
+  /** Test seam: inject precomputed comparison results so getDivergences()
+   *  pagination/filtering can be exercised without a full engine + ngspice run. */
+  seedComparisonsForTest(comparisons: ComparisonResult[]): void {
+    this._comparisons = comparisons;
+  }
   get engine(): MNAEngine { return this._engine; }
 
   /**

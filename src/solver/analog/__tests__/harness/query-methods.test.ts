@@ -26,7 +26,7 @@ import {
 import { normalizeDeviceType } from "./device-mappings.js";
 import { captureTopology, buildElementLabelMap } from "./capture.js";
 import { ComparisonSession } from "./comparison-session.js";
-import type { ComparedValue } from "./types.js";
+import type { ComparedValue, ComparisonResult } from "./types.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import { buildHwrFixture } from "./hwr-fixture.js";
@@ -57,7 +57,7 @@ async function createHwrSession(): Promise<{ session: ComparisonSession; topolog
     buildCircuit: buildHwrCircuit,
     analysis: "dcop",
   });
-  const topology = (session as any)._ourTopology;
+  const topology = session.ourTopology;
   return { session, topology };
 }
 
@@ -337,17 +337,18 @@ describe("getDivergences", () => {
       relDelta: 0.5,
       withinTol: false,
     }));
-    (session as any)._comparisons = [{
+    session.seedComparisonsForTest([{
       stepIndex: 0,
       iterationIndex: 0,
-      simTime: 0,
+      stepStartTime: 0,
       voltageDiffs: fakeEntries,
       rhsDiffs: [],
       matrixDiffs: [],
       stateDiffs: [],
       allWithinTol: false,
+      timeMismatched: false,
       presence: "both",
-    }];
+    }]);
     const report = session.getDivergences();
     expect(report.totalCount).toBe(200);
     expect(report.entries.length).toBe(100);
@@ -355,31 +356,33 @@ describe("getDivergences", () => {
 
   it("31. opts.step filter: only returns divergences from that step", async () => {
     const { session } = await createHwrSession();
-    const fakeComparisons = [
+    const fakeComparisons: ComparisonResult[] = [
       {
         stepIndex: 0,
         iterationIndex: 0,
-        simTime: 0,
+        stepStartTime: 0,
         voltageDiffs: [{ nodeIndex: 0, label: "N0", ours: 1, theirs: 3, absDelta: 2, relDelta: 0.5, withinTol: false }],
         rhsDiffs: [],
         matrixDiffs: [],
         stateDiffs: [],
         allWithinTol: false,
+        timeMismatched: false,
         presence: "both",
       },
       {
         stepIndex: 1,
         iterationIndex: 0,
-        simTime: 1e-3,
+        stepStartTime: 1e-3,
         voltageDiffs: [{ nodeIndex: 1, label: "N1", ours: 2, theirs: 5, absDelta: 3, relDelta: 0.5, withinTol: false }],
         rhsDiffs: [],
         matrixDiffs: [],
         stateDiffs: [],
         allWithinTol: false,
+        timeMismatched: false,
         presence: "both",
       },
     ];
-    (session as any)._comparisons = fakeComparisons;
+    session.seedComparisonsForTest(fakeComparisons);
     const report = session.getDivergences({ step: 0 });
     expect(report.entries.every((e) => e.stepIndex === 0)).toBe(true);
     expect(report.totalCount).toBe(1);
@@ -430,7 +433,7 @@ describe("traceComponentSlot", () => {
     expect(poolBacked).toBeDefined();
     const slotName = poolBacked!.slotNames[0];
     const trace = session.traceComponentSlot(poolBacked!.label, slotName);
-    const stepCount = (session as any)._ourSession.steps.length;
+    const stepCount = session.ourSession!.steps.length;
     expect(trace.totalSteps).toBe(stepCount);
   });
 
@@ -468,14 +471,14 @@ describe("getStateHistory", () => {
     expect(poolBacked).toBeDefined();
     const report = session.getStateHistory(poolBacked!.label, 0);
     const upperLabel = poolBacked!.label.toUpperCase();
-    const steps = (session as any)._ourSession.steps;
+    const steps = session.ourSession!.steps;
     const step0 = steps[0];
     const finalIter = step0.iterations[step0.iterations.length - 1];
     const es = finalIter.elementStates.find(
       (e: any) => e.label.toUpperCase() === upperLabel,
     );
     expect(es).toBeDefined();
-    expect(report.state0).toEqual(es.slots);
+    expect(report.state0).toEqual(es!.slots);
   });
 
   it("39. Out-of-range step throws 'Step out of range: ...'", async () => {
@@ -578,7 +581,7 @@ describe("getLimitingComparison", () => {
 describe("getConvergenceDetail", () => {
   it("48. Self-comparison with converged circuit: all elements have ourConverged:true", async () => {
     const { session } = await createHwrSession();
-    const steps = (session as any)._ourSession.steps;
+    const steps = session.ourSession!.steps;
     const lastIter = steps[0].iterations.length - 1;
     const report = session.getConvergenceDetail(0, lastIter);
     for (const el of report.elements) {
@@ -588,7 +591,7 @@ describe("getConvergenceDetail", () => {
 
   it("49. disagreementCount is 0 when both engines agree (self-comparison)", async () => {
     const { session } = await createHwrSession();
-    const steps = (session as any)._ourSession.steps;
+    const steps = session.ourSession!.steps;
     const lastIter = steps[0].iterations.length - 1;
     const report = session.getConvergenceDetail(0, lastIter);
     expect(report.disagreementCount).toBe(0);
@@ -634,7 +637,7 @@ describe("toJSON", () => {
     // Self-comparison has no divergences, so default omits all steps
     expect(defaultJson.steps.length).toBe(0);
     // includeAllSteps includes everything
-    const stepCount = (session as any)._ourSession.steps.length;
+    const stepCount = session.ourSession!.steps.length;
     expect(allJson.steps.length).toBe(stepCount);
   });
 });
@@ -766,7 +769,7 @@ describe("Fix 1: simTime reads stepStartTime, not undefined simTime field", () =
       expect(Number.isFinite(summary.firstDivergence.stepStartTime)).toBe(true);
     }
     // Also verify traceNode stepStartTime is non-negative finite for a multi-step DC transient
-    const ourSteps = (session as any)._ourSession.steps;
+    const ourSteps = session.ourSession!.steps;
     expect(ourSteps.length).toBeGreaterThan(0);
     expect(typeof ourSteps[0].stepStartTime).toBe("number");
   });
@@ -781,9 +784,9 @@ describe("Fix 2 & 3: asymmetric step counts- ours shorter than ngspice", () => {
     // Use a freshly built transient self-compare session; simulate asymmetry by injecting
     // extra steps into the ngspice session.
     const { session } = await createHwrSession();
-    const ourSteps: any[] = (session as any)._ourSession.steps;
-    const ngSession = (session as any)._ngSession;
-    const ngReindexed = (session as any)._ngSessionReindexed;
+    const ourSteps: any[] = session.ourSession!.steps;
+    const ngSession = session.ngSession;
+    const ngReindexed = session.ngSessionReindexed;
     const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
     if (ourSteps.length < 1 || ngSteps.length < 1) return; // skip if no steps
 
@@ -806,9 +809,9 @@ describe("Fix 2 & 3: asymmetric step counts- ours shorter than ngspice", () => {
 
   it("64. traceNode step count equals max(ours, ngspice) when ours is shorter", async () => {
     const { session, topology } = await createHwrSession();
-    const ourSteps: any[] = (session as any)._ourSession.steps;
-    const ngSession = (session as any)._ngSession;
-    const ngReindexed = (session as any)._ngSessionReindexed;
+    const ourSteps: any[] = session.ourSession!.steps;
+    const ngSession = session.ngSession;
+    const ngReindexed = session.ngSessionReindexed;
     const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
     if (ourSteps.length < 2 || ngSteps.length < 2) return; // skip if insufficient steps
 
@@ -825,9 +828,9 @@ describe("Fix 2 & 3: asymmetric step counts- ours shorter than ngspice", () => {
 
   it("65. traceNode ngspice-only steps have null ours voltage (NaN raw) and finite ngspice voltage", async () => {
     const { session, topology } = await createHwrSession();
-    const ourSteps: any[] = (session as any)._ourSession.steps;
-    const ngSession = (session as any)._ngSession;
-    const ngReindexed = (session as any)._ngSessionReindexed;
+    const ourSteps: any[] = session.ourSession!.steps;
+    const ngSession = session.ngSession;
+    const ngReindexed = session.ngSessionReindexed;
     const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
     if (ourSteps.length < 2 || ngSteps.length < 2) return;
 
