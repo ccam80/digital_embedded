@@ -3945,6 +3945,168 @@
         "AC-gate verified bit-exact 2026-06-05: harness_run_ac on mosfet-inverter.dts, acFirstDivergence null (solution/matrix/rhs/shape) across 91 points 1Hz-1GHz. MosfetAnalogElement.stampAc (mosfet.ts) verified line-for-line against mos1acld.c."
       ],
       "escalation": null
+    },
+    "asrc/asrc.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "c24a4916e96771d9",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcacld.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "ec88634782ea0da8",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcacld.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "98fc5764c102dfa2",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcacld.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "3d59ec7575da6153",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcconv.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "cef176ed60512faf",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcdefs.h#h001": {
+      "state": "APPLIED",
+      "hunkHash": "0478b2dca7b30a67",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcdefs.h#h002": {
+      "state": "APPLIED",
+      "hunkHash": "cfe6a4d6f0013f7a",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcfbr.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "84057c7c093a1630",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcfbr.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "0b51ad2b93dc45c6",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcload.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "84057c7c093a1630",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcload.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "9f4202bf3f9e5fe6",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcload.c#h003": {
+      "state": "APPLIED",
+      "hunkHash": "082ea3479dc6672d",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcpar.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "71b9fced742ddf25",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcpar.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "441fb4235ce29526",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcset.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "84057c7c093a1630",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrcset.c#h002": {
+      "state": "APPLIED",
+      "hunkHash": "9e0b647af8e031c1",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc/asrctemp.c#h001": {
+      "state": "APPLIED",
+      "hunkHash": "94e5de42d6e86858",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
+    },
+    "asrc#recon/wholeClass": {
+      "state": "APPLIED",
+      "hunkHash": "0e402038f107847c",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
+      "escalation": null
     }
   }
 }

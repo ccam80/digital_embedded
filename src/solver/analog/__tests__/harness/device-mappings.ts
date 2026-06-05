@@ -518,6 +518,8 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
   AcVoltageSource: "vsource",
   DcCurrentSource: "isource",
   AcCurrentSource: "isource",
+  BV: "asrc",
+  BI: "asrc",
   SCR: "scr",
   Triac: "triac",
   SwitchSPST: "vswitch",

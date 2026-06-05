@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated": "2026-06-04T23:20:54.802Z",
+    "generated": "2026-06-05T01:05:31.410Z",
     "base": "032b1c32 (ngspice master @ 2015-03-08, version-string 26)",
     "target": "ngspice-41 tag (2275fb85d)",
     "diffDocs": 34,
@@ -12,7 +12,7 @@
     "decisionsOverlays": 34,
     "totalAdded": 23664,
     "totalRemoved": 18407,
-    "progressEntriesApplied": 418,
+    "progressEntriesApplied": 436,
     "progressEntriesStale": 0,
     "staleItems": []
   },
@@ -6354,10 +6354,12 @@
         99
       ],
       "hunkHash": "c24a4916e96771d9",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: B-source modelRegistry paramDefs (ASRCpTable counterpart) — adds m / reciprocm param rows",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6385,10 +6387,12 @@
         113
       ],
       "hunkHash": "ec88634782ea0da8",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.stampAc() (header/comment hunk for the AC-load function)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6416,10 +6420,12 @@
         137
       ],
       "hunkHash": "98fc5764c102dfa2",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.stampAc() (function-doc hunk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6447,10 +6453,12 @@
         246
       ],
       "hunkHash": "3d59ec7575da6153",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.stampAc() — unit V-source quad + derivative-column AC stamp scaled by temp/multiplier factor",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6540,10 +6548,12 @@
         466
       ],
       "hunkHash": "cef176ed60512faf",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — inline ctx.noncon convergence increment (reltol/voltTol(V)/abstol(I) on parse-tree value vs prev_value)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6571,10 +6581,12 @@
         605
       ],
       "hunkHash": "0478b2dca7b30a67",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: B-source StateSchema (ASRCvOld/ASRCcontVOld slots) + instance fields (type/branch/tree/vars/temp coeffs/m/posPtr) — struct field set incl. v41-new ASRCm/ASRCreciprocm/ASRCvars",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6602,10 +6614,12 @@
         611
       ],
       "hunkHash": "cfe6a4d6f0013f7a",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: ASRC_* param-id enum counterpart (paramDefs id set) — adds ASRC_M / ASRC_RM",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6726,10 +6740,12 @@
         746
       ],
       "hunkHash": "84057c7c093a1630",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — controlling-branch resolution (header/loop-restyle hunk)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6757,10 +6773,12 @@
         779
       ],
       "hunkHash": "0b51ad2b93dc45c6",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — locate/create controlling source branch eq (ctx.makeCur), matching controlled-source-base.ts/CCVS branch-allocation pattern",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6881,10 +6899,12 @@
         953
       ],
       "hunkHash": "84057c7c093a1630",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — module-scratch init + function-doc hunk",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6912,10 +6932,12 @@
         987
       ],
       "hunkHash": "9f4202bf3f9e5fe6",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — function-doc / signature hunk",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -6943,10 +6965,12 @@
         1156
       ],
       "hunkHash": "082ea3479dc6672d",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.load() — parse-tree eval (expression.ts evaluate+differentiate) → rhs+derivs, VCVS/VCCS/CCVS/CCCS Jacobian+RHS stamp, ASRCvars[] indexing, m/reciprocm factor, CKTsrcFact MODETRANOP ramp, acValues store, prev_value set",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7005,10 +7029,12 @@
         1219
       ],
       "hunkHash": "71b9fced742ddf25",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setParam()/constructor — param-setter header/comment hunk",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7036,10 +7062,12 @@
         1298
       ],
       "hunkHash": "441fb4235ce29526",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setParam()/constructor — v/i parse-tree, tc1/tc2/reciproctc, v41-new m/reciprocm, temp/dtemp param cases (hot-loadable)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7129,10 +7157,12 @@
         1452
       ],
       "hunkHash": "84057c7c093a1630",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — TSTALLOC macro / header hunk",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7160,10 +7190,12 @@
         1700
       ],
       "hunkHash": "9e0b647af8e031c1",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.setup() — branch-eq alloc (ctx.makeCur), ASRCposPtr matrix-cell allocation over controlling vars (VCVS/VCCS/CCVS/CCCS), shorted-ASRC error, tc/m defaults, ASRCvars[] population, up-front numVars sizing; ASRCunsetup teardown is NO-COUNTERPART (engine rebuilt per compile)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -7191,10 +7223,12 @@
         1750
       ],
       "hunkHash": "94e5de42d6e86858",
-      "state": "PENDING",
+      "state": "APPLIED",
       "tsFunction": "src/components/active/bsource.ts :: BSourceAnalogElement.computeTemperature() — instance temp default processing (ASRCtemp=CKTtemp unless given; dtemp handling)",
-      "attempts": 0,
-      "verifierNotes": [],
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null,
       "kind": "hunk",
@@ -62665,9 +62699,11 @@
         "asrc/asrctemp.c#h001"
       ],
       "hunkHash": "0e402038f107847c",
-      "state": "PENDING",
-      "attempts": 0,
-      "verifierNotes": [],
+      "state": "APPLIED",
+      "attempts": 1,
+      "verifierNotes": [
+        "Gate-verified bit-exact 2026-06-05: asrc-bsource-gate.dts + asrc-bsource-ac-gate.dts, harness firstDivergence/acFirstDivergence null across DC-OP (branch + node controllers), AC (stampAc), and transient; ours/ngspice iteration counts identical. stampAc method-name/signature corrected to the vsrc-style contract."
+      ],
       "rationale": null,
       "escalation": null
     },

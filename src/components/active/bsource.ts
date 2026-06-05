@@ -41,6 +41,7 @@ import type { CompiledBSourceTree, BSourceVar } from "../../solver/analog/expres
 import { NGSPICE_LOAD_ORDER, type DeviceFamily } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SparseSolverStamp } from "../../solver/analog/sparse-solver.js";
 import { MODETRANOP, MODETRAN, MODEINITSMSIG } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { kelvinToCelsius } from "../../core/model-params.js";
@@ -381,10 +382,18 @@ export class BVAnalogElement extends BSourceAnalogElement {
   /**
    * AC reload (asrcacld.c:57-65): stamp ONLY the Jacobian (no RHS), reading the
    * stored partials `_acValues[i]` with the AC factor (no MODETRANOP srcFact).
+   * The asrc AC Jacobian is frequency-independent, so `omega` is unused; the
+   * branch incidence + controller columns are the same conductance pattern at
+   * every frequency.
    */
-  stampAcJacobian(ctx: LoadContext): void {
+  stampAc(
+    solver: SparseSolverStamp,
+    _omega: number,
+    ctx: LoadContext,
+    _rhsRe: Float64Array,
+    _rhsIm: Float64Array,
+  ): void {
     const factor = this._acFactor(ctx);
-    const solver = ctx.solver;
     solver.stampElement(this._hPosBr, 1.0);  // asrcacld.c:59
     solver.stampElement(this._hNegBr, -1.0); // asrcacld.c:60
     solver.stampElement(this._hBrNeg, -1.0); // asrcacld.c:61
@@ -476,11 +485,17 @@ export class BIAnalogElement extends BSourceAnalogElement {
 
   /**
    * AC reload (asrcacld.c:67-72): stamp the two Jacobian columns per controller
-   * from the stored partials `_acValues[i]` with the AC factor; no RHS.
+   * from the stored partials `_acValues[i]` with the AC factor; no RHS. The asrc
+   * AC Jacobian is frequency-independent, so `omega` is unused.
    */
-  stampAcJacobian(ctx: LoadContext): void {
+  stampAc(
+    solver: SparseSolverStamp,
+    _omega: number,
+    ctx: LoadContext,
+    _rhsRe: Float64Array,
+    _rhsIm: Float64Array,
+  ): void {
     const factor = this._acFactor(ctx);
-    const solver = ctx.solver;
     for (let i = 0; i < this._tree.numVars; i++) {
       solver.stampElement(this._varHandlesPos[i]!, this._acValues[i]! * factor);  // asrcacld.c:70
       solver.stampElement(this._varHandlesNeg[i]!, -this._acValues[i]! * factor); // asrcacld.c:71
