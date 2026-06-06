@@ -178,6 +178,12 @@ function runNR(
   ctx.exactMaxIterations = false;
   ctx.noncon = 1;
   newtonRaphson(ctx);
+  // Accumulate per-solve dispatch counts into the DC-OP total. Every NR solve in
+  // the gmin/source-stepping ladder routes through this single helper, and
+  // dcopResult was reset at the top of solveDcOperatingPoint, so summing here
+  // gives the DC-OP-wide totals without touching each success site.
+  ctx.dcopResult.reorders += ctx.nrResult.reorders;
+  ctx.dcopResult.singularRetries += ctx.nrResult.singularRetries;
   return {
     converged: ctx.nrResult.converged,
     iterations: ctx.nrResult.iterations,

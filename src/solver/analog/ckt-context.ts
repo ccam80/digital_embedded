@@ -128,6 +128,20 @@ export class NRResult {
   largestChangeElement: number = -1;
   /** Index of the node with the largest voltage change; -1 when unknown. */
   largestChangeNode: number = -1;
+  /**
+   * Number of factor dispatches that went through orderAndFactor (the
+   * NISHOULDREORDER route, niiter.c:1093-1142) this solve, as opposed to the
+   * factor() reuse path. Always >= 1 for a normal solve: iter 0 at
+   * MODEINITJCT/MODEINITTRAN forces a reorder (niiter.c:856-859).
+   */
+  reorders: number = 0;
+  /**
+   * Number of times a reuse-path factor() returned spSINGULAR and the loop set
+   * NISHOULDREORDER + `continue`d to retry through orderAndFactor
+   * (niiter.c:888-891). Non-zero only when a reused pivot order went singular
+   * and was recovered by re-deriving the order.
+   */
+  singularRetries: number = 0;
 
   constructor(rhs: Float64Array) {
     this.voltages = rhs;
@@ -139,6 +153,8 @@ export class NRResult {
     this.iterations = 0;
     this.largestChangeElement = -1;
     this.largestChangeNode = -1;
+    this.reorders = 0;
+    this.singularRetries = 0;
   }
 }
 
@@ -166,6 +182,12 @@ export class DcOpResult {
   nodeVoltages: Float64Array;
   /** Diagnostic messages emitted during DC-OP. */
   diagnostics: import("../../compile/types.js").Diagnostic[] = [];
+  /** Total orderAndFactor (reorder) dispatches across every NR solve in this
+   *  DC-OP (summed over the gmin/source-stepping ladder). See NRResult.reorders. */
+  reorders: number = 0;
+  /** Total E_SINGULAR reuse-path retries across every NR solve in this DC-OP.
+   *  See NRResult.singularRetries. */
+  singularRetries: number = 0;
 
   constructor(nodeVoltages: Float64Array) {
     this.nodeVoltages = nodeVoltages;
@@ -177,6 +199,8 @@ export class DcOpResult {
     this.method = "direct";
     this.iterations = 0;
     this.diagnostics.length = 0;
+    this.reorders = 0;
+    this.singularRetries = 0;
   }
 }
 

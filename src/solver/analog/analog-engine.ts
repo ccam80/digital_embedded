@@ -858,6 +858,8 @@ export class MNAEngine implements AnalogEngine {
         iterations: 0,
         nodeVoltages: new Float64Array(0),
         diagnostics: [],
+        reorders: 0,
+        singularRetries: 0,
       };
     }
 
@@ -1022,6 +1024,8 @@ export class MNAEngine implements AnalogEngine {
         iterations: 0,
         nodeVoltages: new Float64Array(0),
         diagnostics: [],
+        reorders: 0,
+        singularRetries: 0,
       };
     }
 

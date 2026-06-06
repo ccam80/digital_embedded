@@ -73,6 +73,8 @@ describe("AnalogEngineTypes", () => {
       iterations: 5,
       nodeVoltages: new Float64Array([0, 3.3, 5.0]),
       diagnostics: [],
+      reorders: 1,
+      singularRetries: 0,
     };
 
     expect(result.converged).toBe(true);
@@ -192,6 +194,8 @@ describe("AnalogEngineTypes", () => {
           iterations: 1,
           nodeVoltages: new Float64Array(0),
           diagnostics: [],
+          reorders: 1,
+          singularRetries: 0,
         };
       },
       get simTime(): number { return 0; },
@@ -312,6 +316,8 @@ describe("AnalogEngineTypes", () => {
         iterations: 100,
         nodeVoltages: new Float64Array(0),
         diagnostics: [],
+        reorders: 0,
+        singularRetries: 0,
       };
       expect(result.method).toBe(method);
     }

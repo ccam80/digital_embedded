@@ -10,9 +10,10 @@
 import { describe, it, expect } from "vitest";
 import { pnjlim, fetlim } from "../newton-raphson.js";
 import { buildFixture } from "./fixtures/build-fixture.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Circuit factories
@@ -325,6 +326,34 @@ describe("fetlim ngspice-exact", () => {
 // ---------------------------------------------------------------------------
 
 describe("NR singular retry", () => {
+  it("singular_topology_emits_singular_matrix_diagnostic", () => {
+    // Two ideal voltage sources pinning the same net make the MNA matrix
+    // structurally singular: the iter-0 orderAndFactor returns spSINGULAR and,
+    // because that factor walked the reorder path, the loop does NOT retry
+    // (newton-raphson.ts:662) and instead emits the singular-matrix runtime
+    // diagnostic (newton-raphson.ts:666-674). buildFixture warm-starts and would
+    // throw on a singular boot, so drive the raw facade like
+    // competing-voltage-constraints.test.ts.
+    const facade = new DefaultSimulatorFacade(createDefaultRegistry());
+    const circuit = facade.build({
+      components: [
+        { id: "vs1", type: "DcVoltageSource", props: { label: "vs1", voltage: 5 } },
+        { id: "vs2", type: "DcVoltageSource", props: { label: "vs2", voltage: 3 } },
+        { id: "r1",  type: "Resistor",        props: { label: "r1", resistance: 1000 } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [
+        ["vs1:pos", "vs2:pos"], ["vs2:pos", "r1:pos"],
+        ["vs1:neg", "vs2:neg"], ["vs2:neg", "r1:neg"], ["r1:neg", "gnd:out"],
+      ],
+    });
+    const coordinator = facade.compile(circuit);
+    try { coordinator.dcOperatingPoint(); } catch { /* singular matrix expected */ }
+    const singular = coordinator
+      .getRuntimeDiagnostics()
+      .filter((d) => d.code === "singular-matrix");
+    expect(singular.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -332,11 +361,21 @@ describe("NR singular retry", () => {
 // ---------------------------------------------------------------------------
 
 describe("NR NISHOULDREORDER lifecycle", () => {
-});
-
-// ---------------------------------------------------------------------------
-// E_SINGULAR recovery via continue
-// ---------------------------------------------------------------------------
-
-describe("NR E_SINGULAR recovery via continue", () => {
+  it("dcop_reorders_at_iter0_then_reuses_factorization", () => {
+    // ngspice sets NISHOULDREORDER at iter 0 (MODEINITJCT, niiter.c:856-859),
+    // routing that factor through orderAndFactor, then clears the bit at the
+    // dispatch (niiter.c:1119) so later iterations reuse the pivot order via
+    // factor(). A converging multi-iteration solve therefore reorders at least
+    // once but strictly fewer times than it iterates, and never hits the
+    // singular reuse-retry path.
+    const fix = buildFixture({
+      build: (reg, facade) => buildDiodeCircuit(reg, facade, 5.0),
+    });
+    const result = fix.coordinator.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
+    expect(result!.reorders).toBeGreaterThanOrEqual(1);
+    expect(result!.reorders).toBeLessThan(result!.iterations);
+    expect(result!.singularRetries).toBe(0);
+  });
 });

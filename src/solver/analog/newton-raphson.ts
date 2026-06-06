@@ -641,6 +641,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     let errorCode: number;
     if (shouldReorder) {
       shouldReorder = false;
+      ctx.nrResult.reorders++;
       errorCode = solver.orderAndFactor(ctx.pivotAbsTol, ctx.diagonalGmin);
     } else {
       errorCode = solver.factor(ctx.pivotAbsTol, ctx.diagonalGmin);
@@ -660,6 +661,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // niiter.c:888-891: on E_SINGULAR in the reuse (SMPluFac) arm, set
       // NISHOULDREORDER and continue to retry through orderAndFactor.
       if (errorCode === spSINGULAR && !solver.lastFactorWalkedReorder) {
+        ctx.nrResult.singularRetries++;
         shouldReorder = true;
         continue;
       }

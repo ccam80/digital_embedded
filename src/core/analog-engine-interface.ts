@@ -368,6 +368,18 @@ export interface DcOpResult {
   nodeVoltages: Float64Array;
   /** Any diagnostics emitted during the DC analysis. */
   diagnostics: Diagnostic[];
+  /**
+   * Total orderAndFactor (reorder) dispatches across every NR solve in this
+   * DC-OP (NISHOULDREORDER routing, niiter.c:1093-1142). >= 1 for any normal
+   * solve: iter 0 forces a reorder (niiter.c:856-859).
+   */
+  reorders: number;
+  /**
+   * Total reuse-path factor() spSINGULAR results that forced a reorder retry
+   * (niiter.c:888-891). Non-zero only when a reused pivot order went singular
+   * and was recovered by re-deriving the order.
+   */
+  singularRetries: number;
 }
 
 // ---------------------------------------------------------------------------
