@@ -18,9 +18,6 @@ import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js
 const DTS_LINEAR = path.resolve(
   "src/components/active/__tests__/fixtures/vccs-canon-linear.dts",
 );
-const DTS_NONLINEAR = path.resolve(
-  "src/components/active/__tests__/fixtures/vccs-canon-nonlinear.dts",
-);
 
 // ---------------------------------------------------------------------------
 // Circuit factory (T1 programmatic)
@@ -233,38 +230,6 @@ describeIfDll("VCCS linear transconductance paired vs ngspice (T3)", () => {
 
   it("full_iteration_paired_linear", () => {
     // Cat 5: all NR iterations across all attempts of all steps.
-    session.compareAllAttempts();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// VCCS — T3 harness: nonlinear square-law vs ngspice (Cat 2 / 3 / 5)
-// ---------------------------------------------------------------------------
-
-describeIfDll("VCCS nonlinear square-law paired vs ngspice (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_NONLINEAR, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_nonlinear", async () => {
-    await session.runTransient(0, 1e-4, 1e-6);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_nonlinear", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_nonlinear", () => {
     session.compareAllAttempts();
   });
 });

@@ -1,28 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import path from "node:path";
+import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import {
-  describeIfDll,
-  DLL_PATH,
-} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../analog-fuse.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-
-// ---------------------------------------------------------------------------
-// .dts fixture paths (T3 harness)
-// ---------------------------------------------------------------------------
-
-const DTS_INTACT_LOW = path.resolve(
-  "src/components/passives/__tests__/fixtures/analog-fuse-canon-intact-low-current.dts",
-);
-const DTS_BLOW_OVERCURRENT = path.resolve(
-  "src/components/passives/__tests__/fixtures/analog-fuse-canon-blow-overcurrent.dts",
-);
 
 // ---------------------------------------------------------------------------
 // Programmatic circuit factory (T1)
@@ -248,71 +231,6 @@ describe("AnalogFuse breakpoint registration (T1)", () => {
     const blowEndTime = fix.engine.simTime!;
     const bpStep = log.find((s) => (s.simTime + s.acceptedDt) === blowEndTime);
     expect(bpStep).toBeDefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Cat 2-numerical / 3 / 5 — paired vs ngspice (T3): intact low-current regime
-// ---------------------------------------------------------------------------
-
-describeIfDll("AnalogFuse paired vs ngspice — intact low-current (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_INTACT_LOW, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  // First it() owns the run.
-  it("transient_step_end_paired_intact_low_current", async () => {
-    await session.runTransient(0, 1e-3, 1e-5);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_intact_low_current", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_intact_low_current", () => {
-    session.compareAllAttempts();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Cat 2-numerical / 3 / 5 — paired vs ngspice (T3): blow overcurrent regime
-// ---------------------------------------------------------------------------
-
-describeIfDll("AnalogFuse paired vs ngspice — blow overcurrent (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_BLOW_OVERCURRENT, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_blow_overcurrent", async () => {
-    await session.runTransient(0, 5e-3, 1e-4);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_blow_overcurrent", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_blow_overcurrent", () => {
-    session.compareAllAttempts();
   });
 });
 

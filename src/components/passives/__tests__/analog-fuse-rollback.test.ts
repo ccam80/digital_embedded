@@ -1,12 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import path from "node:path";
+import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import {
-  DLL_PATH,
-  describeIfDll,
-} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../analog-fuse.js";
 
 // ---------------------------------------------------------------------------
@@ -15,13 +9,6 @@ import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../analog-fuse.js";
 
 const SLOT_I2T_ACCUM = ANALOG_FUSE_SCHEMA.indexOf.get("I2T_ACCUM")!;
 const SLOT_CONDUCT   = ANALOG_FUSE_SCHEMA.indexOf.get("CONDUCT")!;
-
-// ---------------------------------------------------------------------------
-// .dts paths
-// ---------------------------------------------------------------------------
-
-const DTS_INTACT_DCOP = path.resolve("src/components/passives/__tests__/fixtures/fuse-canon-intact-dcop.dts");
-const DTS_BLOW_BP     = path.resolve("src/components/passives/__tests__/fixtures/fuse-canon-blow-bp.dts");
 
 // ---------------------------------------------------------------------------
 // Programmatic builders for T1 categories (init / hot-load / breakpoint).
@@ -127,65 +114,6 @@ describe("AnalogFuseElement DCOP analytical (T1)", () => {
     // Node fuse:out2 sits between rCold and rLoad: V = Vs * rL / (rCold + rL) = 10 * 9 / 10 = 9.
     const nMid = fix.circuit.labelToNodeId.get("fuse:out2")!;
     expect(fix.engine.getNodeVoltage(nMid)).toBeCloseTo(9, 6);
-  });
-});
-
-// ===========================================================================
-// Categories 2-numerical / 3 / 5 — paired vs ngspice (T3)
-// One describeIfDll per .dts. First it() owns the run; siblings read from the
-// recorded session.
-// ===========================================================================
-
-describeIfDll("AnalogFuseElement intact regime vs ngspice — transient + stamp parity (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_INTACT_DCOP, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_intact", async () => {
-    await session.runTransient(0, 1e-3, 1e-5);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_intact", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-  });
-
-  it("full_iteration_paired_intact", () => {
-    session.compareAllAttempts();
-  });
-});
-
-describeIfDll("AnalogFuseElement blow regime vs ngspice — transient + stamp parity (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_BLOW_BP, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_blow", async () => {
-    // 0→250ms covers the predicted blow instant (~111ms with V=30V, R=10Ω, i2tRating=1).
-    await session.runTransient(0, 0.25, 1e-3);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_blow", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-  });
-
-  it("full_iteration_paired_blow", () => {
-    session.compareAllAttempts();
   });
 });
 

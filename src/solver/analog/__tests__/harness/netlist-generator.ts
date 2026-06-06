@@ -460,17 +460,20 @@ function emitElement(
       ? modelEntry.netlist(props)
       : modelEntry.netlist;
 
-    // Map subcircuit port (by label) -> outer global node ID.
+    // Map subcircuit port (by label) -> outer global node ID. Reserved port
+    // labels `gnd` / `GND` auto-bind to node 0 (global ground) when the parent
+    // pinLayout exposes no matching pin, mirroring the compiler's
+    // resolveNetToNode (compiler.ts:461-474) and SPICE's node-0 convention, so
+    // the emitted deck references the same ground node digiTS allocated.
     const portToOuter: number[] = subckt.ports.map((portLabel) => {
       const n = pinNodesByLabel.get(portLabel);
-      if (n === undefined) {
-        throw new Error(
-          `netlist-generator: subcircuit '${typeId}' (label='${rawLabel}') port ` +
-          `'${portLabel}' has no matching outer pin. Subcircuit ports must align ` +
-          `with the parent component's pin labels by name.`
-        );
-      }
-      return n;
+      if (n !== undefined) return n;
+      if (portLabel === "gnd" || portLabel === "GND") return 0;
+      throw new Error(
+        `netlist-generator: subcircuit '${typeId}' (label='${rawLabel}') port ` +
+        `'${portLabel}' has no matching outer pin. Subcircuit ports must align ` +
+        `with the parent component's pin labels by name.`
+      );
     });
 
     // Internal-net IDs reuse what `expandCompositeInstance` (compiler.ts)

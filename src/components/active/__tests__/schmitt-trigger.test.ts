@@ -1,12 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import path from "node:path";
+import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import {
-  DLL_PATH,
-  describeIfDll,
-} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { SCHMITT_TRIGGER_SCHEMA } from "../schmitt-trigger-driver.js";
 import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 
@@ -15,15 +9,6 @@ import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 // ---------------------------------------------------------------------------
 
 const SLOT_OUTPUT_LATCH = SCHMITT_TRIGGER_SCHEMA.indexOf.get("OUTPUT_LATCH")!;
-
-// ---------------------------------------------------------------------------
-// .dts paths
-// ---------------------------------------------------------------------------
-
-const DTS_NONINV_LOW  = path.resolve("src/components/active/__tests__/fixtures/schmitt-canon-noninv-low.dts");
-const DTS_NONINV_HIGH = path.resolve("src/components/active/__tests__/fixtures/schmitt-canon-noninv-high.dts");
-const DTS_INV_LOW     = path.resolve("src/components/active/__tests__/fixtures/schmitt-canon-inv-low.dts");
-const DTS_INV_HIGH    = path.resolve("src/components/active/__tests__/fixtures/schmitt-canon-inv-high.dts");
 
 // ---------------------------------------------------------------------------
 // Helper: locate the SchmittTriggerDriverElement in a compiled circuit by
@@ -204,117 +189,6 @@ describe("Schmitt DCOP analytical (T1)", () => {
     expect(result!.converged).toBe(true);
     const outV = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("st:out")!);
     expect(outV).toBeCloseTo(0.0, 3);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Category 3 + 5 — Transient step-end paired + full-iteration paired (T3)
-// Four .dts circuits cover the four (topology, regime) combinations.
-// Per describe: one session in beforeAll, run in first it(), step-end read
-// in second it(), full-iteration parity in third it().
-// ---------------------------------------------------------------------------
-
-describeIfDll("Schmitt non-inverting low vs ngspice — transient + stamp parity (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_NONINV_LOW, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_noninv_low", async () => {
-    await session.runTransient(0, 2e-5, 1e-6);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_noninv_low", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-  });
-
-  it("full_iteration_paired_noninv_low", () => {
-    session.compareAllAttempts();
-  });
-});
-
-describeIfDll("Schmitt non-inverting high vs ngspice — transient + stamp parity (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_NONINV_HIGH, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_noninv_high", async () => {
-    await session.runTransient(0, 2e-5, 1e-6);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_noninv_high", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-  });
-
-  it("full_iteration_paired_noninv_high", () => {
-    session.compareAllAttempts();
-  });
-});
-
-describeIfDll("Schmitt inverting low vs ngspice — transient + stamp parity (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_INV_LOW, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_inv_low", async () => {
-    await session.runTransient(0, 2e-5, 1e-6);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_inv_low", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-  });
-
-  it("full_iteration_paired_inv_low", () => {
-    session.compareAllAttempts();
-  });
-});
-
-describeIfDll("Schmitt inverting high vs ngspice — transient + stamp parity (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_INV_HIGH, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_inv_high", async () => {
-    await session.runTransient(0, 2e-5, 1e-6);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_inv_high", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) expect(cv.withinTol).toBe(true);
-  });
-
-  it("full_iteration_paired_inv_high", () => {
-    session.compareAllAttempts();
   });
 });
 

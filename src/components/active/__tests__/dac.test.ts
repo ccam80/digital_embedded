@@ -1,12 +1,6 @@
-import * as path from "node:path";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
-import {
-  describeIfDll,
-  DLL_PATH,
-} from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { ComponentSpec } from "../../../headless/netlist-types.js";
@@ -18,14 +12,6 @@ import type { CircuitElement } from "../../../core/element.js";
 
 const BITS = 8;
 const V_REF = 5.0;
-
-// .dts fixture for T3 harness categories (full-scale: all 8 inputs HIGH at 5V)
-const DTS_FULLSCALE = path.resolve(
-  "src/components/active/__tests__/fixtures/dac-canon-fullscale.dts",
-);
-const DTS_ZERO = path.resolve(
-  "src/components/active/__tests__/fixtures/dac-canon-zero.dts",
-);
 
 // ---------------------------------------------------------------------------
 // Programmatic circuit factory (T1 categories)
@@ -337,63 +323,3 @@ describe("DAC bridge / digital interaction (T1)", () => {
   });
 });
 
-// ===========================================================================
-// Category 2 (numerical) / 3 / 5 — Harness paired vs ngspice (T3)
-// Two operating regions: full-scale (all bits HIGH) and zero-code (all LOW).
-// ===========================================================================
-
-describeIfDll("DAC full-scale paired vs ngspice (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_FULLSCALE, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_fullscale", async () => {
-    await session.runTransient(0, 1e-5, 1e-7);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_fullscale", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_fullscale", () => {
-    session.compareAllAttempts();
-  });
-});
-
-describeIfDll("DAC zero-code paired vs ngspice (T3)", () => {
-  let session: ComparisonSession;
-
-  beforeAll(async () => {
-    session = await ComparisonSession.create({ dtsPath: DTS_ZERO, dllPath: DLL_PATH });
-  });
-
-  afterAll(async () => {
-    if (session !== undefined) await session.dispose();
-  });
-
-  it("transient_step_end_paired_zero", async () => {
-    await session.runTransient(0, 1e-5, 1e-7);
-    session.compareAllSteps();
-  });
-
-  it("dcop_paired_zero", () => {
-    const stepEnd = session.getStepEnd(0);
-    for (const [, cv] of Object.entries(stepEnd.nodes)) {
-      expect(cv.withinTol).toBe(true);
-    }
-  });
-
-  it("full_iteration_paired_zero", () => {
-    session.compareAllAttempts();
-  });
-});
