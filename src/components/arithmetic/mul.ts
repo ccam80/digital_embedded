@@ -48,7 +48,12 @@ const COMP_WIDTH = 3;
 // Pin layout
 // ---------------------------------------------------------------------------
 
+// GenericShape: 2 inputs, 3 outputs. a@(0,0), b@(0,1); mul@(3,0), lo@(3,1), hi@(3,2).
+// `mul` is the combined product (low 32 bits of the 2N-bit result); `lo`/`hi` are
+// the low and high N-bit words, so the full 2N-bit product is observable on the
+// independent pins even when 2N exceeds 32 (where `mul` alone truncates).
 function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
+  const wordWidth = Math.min(bitWidth, 32);
   return [
     {
       direction: PinDirection.INPUT,
@@ -63,7 +68,7 @@ function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "b",
       defaultBitWidth: bitWidth,
-      position: { x: 0, y: 2 },
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -72,7 +77,25 @@ function buildMulPinDeclarations(bitWidth: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "mul",
       defaultBitWidth: Math.min(bitWidth * 2, 32),
+      position: { x: 3, y: 0 },
+      isNegatable: false,
+      isClockCapable: false,
+      kind: "signal",
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "lo",
+      defaultBitWidth: wordWidth,
       position: { x: 3, y: 1 },
+      isNegatable: false,
+      isClockCapable: false,
+      kind: "signal",
+    },
+    {
+      direction: PinDirection.OUTPUT,
+      label: "hi",
+      defaultBitWidth: wordWidth,
+      position: { x: 3, y: 2 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -101,14 +124,14 @@ export class MulElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    const b = genericShapeBounds(2, 1, COMP_WIDTH);
+    const b = genericShapeBounds(2, 3, COMP_WIDTH);
     return { x: this.position.x + b.localX, y: this.position.y + b.localY, width: b.width, height: b.height };
   }
 
   draw(ctx: RenderContext): void {
     drawGenericShape(ctx, {
       inputLabels: ["a", "b"],
-      outputLabels: ["mul"],
+      outputLabels: ["mul", "lo", "hi"],
       clockInputIndices: [],
       componentName: "Mul",
       width: 3,
@@ -122,15 +145,12 @@ export class MulElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 // makeExecuteMul- parameterised flat simulation function
 //
-// Inputs: [a, b]    Outputs: [mul_low, mul_high] (each 32-bit)
+// Inputs: [a, b]    Outputs: [mul, lo, hi]
 //
-// For bitWidth <= 16: product fits in 32 bits, only mul_low used.
-// For bitWidth > 16: product can be up to 64 bits; mul_low = low 32 bits,
-//   mul_high = high 32 bits. (The layout must allocate 2 output slots.)
-//
-// The executeFn layout must match: outputCount = 1 for bitWidth <= 16,
-// outputCount = 2 for bitWidth > 16. For the default executeFn (bitWidth=1),
-// outputCount = 1.
+// mul = low 32 bits of the 2N-bit product (the combined-output pin; truncates
+//   when 2N > 32). lo = low N-bit word (product & (2^N-1)). hi = high N-bit word
+//   ((product >> N) & (2^N-1)). The pin layout always declares all three
+//   outputs, so all three slots are written every evaluation.
 // ---------------------------------------------------------------------------
 
 export function makeExecuteMul(
@@ -171,12 +191,13 @@ export function makeExecuteMul(
       : (BigInt(1) << BigInt(outBits)) - BigInt(1);
     const maskedProduct = ((product % (outMask + BigInt(1))) + (outMask + BigInt(1))) % (outMask + BigInt(1));
 
+    const bw = BigInt(bitWidth);
+    const wordMask = (BigInt(1) << bw) - BigInt(1);
+    // mul: low 32 bits of the combined product (truncates when 2*bitWidth > 32).
     state[wt[outBase]] = Number(maskedProduct & BigInt(0xFFFFFFFF)) >>> 0;
-
-    const outCount = layout.outputCount(index);
-    if (outCount >= 2) {
-      state[wt[outBase + 1]] = Number((maskedProduct >> BigInt(32)) & BigInt(0xFFFFFFFF)) >>> 0;
-    }
+    // lo / hi: the low and high `bitWidth`-bit words of the 2N-bit product.
+    state[wt[outBase + 1]] = Number(maskedProduct & wordMask) >>> 0;
+    state[wt[outBase + 2]] = Number((maskedProduct >> bw) & wordMask) >>> 0;
   };
 }
 
@@ -253,13 +274,14 @@ export const MulDefinition: StandaloneComponentDefinition = {
   helpText:
     "Mul- N-bit multiplier producing a 2N-bit product.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +
-    "Output: mul (2*bitWidth-bit product).\n" +
+    "Outputs: mul (combined product, low 32 bits), lo (low N-bit word), " +
+    "hi (high N-bit word).\n" +
     "Supports signed and unsigned modes.",
   models: {
     digital: {
       executeFn: executeMul,
       inputSchema: ["a", "b"],
-      outputSchema: ["mul"],
+      outputSchema: ["mul", "lo", "hi"],
       defaultDelay: 10,
     },
   },
