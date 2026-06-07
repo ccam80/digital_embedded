@@ -140,10 +140,18 @@ describe("Triode DCOP analytical sanity (T1)", () => {
 
 describe("Triode parameter hot-load (T1)", () => {
   function getTriodeCe(fix: ReturnType<typeof buildFixture>) {
-    const { idx } = findTriodeAnalog(fix);
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return ce!;
+    // Resolve the user-facing Triode CircuitElement by label - the same handle
+    // the UI hands to setComponentProperty and the MCP `circuit_patch target:"V1"`
+    // resolves (cf. analog-clock.test.ts). The Triode is a netlist composite, so
+    // elementToCircuitElement maps the wrapper's element index to this element;
+    // setComponentProperty(ce, ...) routes through the wrapper's setParam to the
+    // TriodeAnalog leaf (subcircuit-wrapper-element.ts:150-160). Resolving the
+    // analog leaf instead would miss the map entirely (leaves are unmapped).
+    const ce = [...fix.circuit.elementToCircuitElement.values()].find(
+      (c) => c.getProperties().getOrDefault<string>("label", "") === "V1",
+    );
+    if (ce === undefined) throw new Error("Triode 'V1' not found in elementToCircuitElement");
+    return ce;
   }
 
   it("hotload_mu_changes_plate", () => {
