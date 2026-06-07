@@ -52,7 +52,10 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const vcc = createElement('DcVoltageSource', { x: 0, y:  4 }, { label: 'Vcc', voltage: 5 });
   vcc.getProperties().replaceModelParams({ voltage: 5 });
   const rc  = createElement('Resistor',        { x: 4, y:  4 }, { label: 'Rc',  resistance: 10000 });
-  rc.getProperties().replaceModelParams({ resistance: 10000 });
+  // markGiven so the resistor honours 10k; without RESresGiven ngspice treats
+  // the value as unspecified and clamps to the degenerate 1 mOhm (restemp.c:69-74),
+  // shorting the collector and masking the IS override under test.
+  rc.getProperties().replaceModelParams({ resistance: 10000 }, { markGiven: true });
   const vb  = createElement('DcVoltageSource', { x: 0, y:  8 }, { label: 'Vb',  voltage: 0.7 });
   vb.getProperties().replaceModelParams({ voltage: 0.7 });
   const q1  = createElement('NpnBJT',          { x: 4, y: 12 }, { label: 'Q1' });
