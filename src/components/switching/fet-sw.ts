@@ -32,14 +32,6 @@ const FET_SW_PARAM_DEFS: ParamDef[] = [
   { key: "vOL",        default: 0.0 },
 ];
 
-const FET_SW_DEFAULTS: Record<string, number> = {
-  Ron: 1,
-  Roff: 1e9,
-  invertCtrl: 0,
-  vOH: 5.0,
-  vOL: 0.0,
-};
-
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
@@ -88,20 +80,12 @@ export class FetSWElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._ron = Math.max(
-      props.hasModelParam("Ron") ? props.getModelParam<number>("Ron") : FET_SW_DEFAULTS["Ron"]!,
-      1e-12,
-    );
-    this._roff = Math.max(
-      props.hasModelParam("Roff") ? props.getModelParam<number>("Roff") : FET_SW_DEFAULTS["Roff"]!,
-      1e-12,
-    );
-    this._invertCtrl =
-      (props.hasModelParam("invertCtrl") ? props.getModelParam<number>("invertCtrl") : FET_SW_DEFAULTS["invertCtrl"]!) !== 0;
-    this._vOH =
-      props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : FET_SW_DEFAULTS["vOH"]!;
-    this._vOL =
-      props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : FET_SW_DEFAULTS["vOL"]!;
+    // All keys are declared in FET_SW_PARAM_DEFS — read directly.
+    this._ron = Math.max(props.getModelParam<number>("Ron"), 1e-12);
+    this._roff = Math.max(props.getModelParam<number>("Roff"), 1e-12);
+    this._invertCtrl = props.getModelParam<number>("invertCtrl") !== 0;
+    this._vOH = props.getModelParam<number>("vOH");
+    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -156,7 +140,7 @@ export const FetSWDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: FET_SW_PARAM_DEFS,
-      params: FET_SW_DEFAULTS,
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new FetSWElement(pinNodes, props),
     },

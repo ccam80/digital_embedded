@@ -169,6 +169,8 @@ export type ModelEntry =
       kind: "inline";
       factory: AnalogFactory;
       paramDefs: ParamDef[];
+      /** Explicit model-param overrides beyond paramDefs defaults. paramDefs is
+       *  the single source of default values; default-only entries pass `{}`. */
       params: Record<string, number>;
       branchCount?: number | ((props: PropertyBag) => number);
       /** SPICE-emission overrides for this model. */

@@ -88,14 +88,6 @@ const SCHMITT_TRIGGER_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "inverting", default: 0   },
 ];
 
-const SCHMITT_TRIGGER_DRIVER_DEFAULTS: Record<string, number> = {
-  vTH:       2.0,
-  vTL:       1.0,
-  vOH:       3.3,
-  vOL:       0.0,
-  inverting: 0,
-};
-
 // Stiff Norton conductance: drives nDrive to vOH/vOL through 1 mΩ equivalent.
 const G_NORTON = 1 / 1e-3;
 
@@ -124,11 +116,12 @@ export class SchmittTriggerDriverElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._vTH       = props.hasModelParam("vTH")       ? props.getModelParam<number>("vTH")       : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vTH"]!;
-    this._vTL       = props.hasModelParam("vTL")       ? props.getModelParam<number>("vTL")        : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vTL"]!;
-    this._vOH       = props.hasModelParam("vOH")       ? props.getModelParam<number>("vOH")       : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vOH"]!;
-    this._vOL       = props.hasModelParam("vOL")       ? props.getModelParam<number>("vOL")       : SCHMITT_TRIGGER_DRIVER_DEFAULTS["vOL"]!;
-    this._inverting = props.hasModelParam("inverting") ? props.getModelParam<number>("inverting") : SCHMITT_TRIGGER_DRIVER_DEFAULTS["inverting"]!;
+    // All keys are declared in SCHMITT_TRIGGER_DRIVER_PARAM_DEFS — read directly.
+    this._vTH       = props.getModelParam<number>("vTH");
+    this._vTL       = props.getModelParam<number>("vTL");
+    this._vOH       = props.getModelParam<number>("vOH");
+    this._vOL       = props.getModelParam<number>("vOL");
+    this._inverting = props.getModelParam<number>("inverting");
   }
 
   setup(ctx: SetupContext): void {
@@ -228,7 +221,7 @@ export const SchmittTriggerDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: SCHMITT_TRIGGER_DRIVER_PARAM_DEFS,
-      params: SCHMITT_TRIGGER_DRIVER_DEFAULTS,
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new SchmittTriggerDriverElement(pinNodes, props),
     },

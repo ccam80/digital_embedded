@@ -76,15 +76,6 @@ const COMPARATOR_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "vOL",          default: 0 },
 ];
 
-const COMPARATOR_DRIVER_DEFAULTS: Record<string, number> = {
-  hysteresis: 0,
-  vos: 0.001,
-  rOut: 50,
-  responseTime: 1e-6,
-  vOH: 5,
-  vOL: 0,
-};
-
 const MIN_ROUT = 1e-9;
 const MIN_TAU  = 1e-12;
 
@@ -111,12 +102,14 @@ export class ComparatorDriverElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_DRIVER_DEFAULTS["hysteresis"]!;
-    this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_DRIVER_DEFAULTS["vos"]!;
-    this._rOut       = Math.max(props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : COMPARATOR_DRIVER_DEFAULTS["rOut"]!, MIN_ROUT);
-    this._tau        = Math.max(props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_DRIVER_DEFAULTS["responseTime"]!, MIN_TAU);
-    this._vOH        = props.hasModelParam("vOH")  ? props.getModelParam<number>("vOH")  : COMPARATOR_DRIVER_DEFAULTS["vOH"]!;
-    this._vOL        = props.hasModelParam("vOL")  ? props.getModelParam<number>("vOL")  : COMPARATOR_DRIVER_DEFAULTS["vOL"]!;
+    // Every key is declared in COMPARATOR_DRIVER_PARAM_DEFS, so the unified
+    // instantiation always merges its default into the bag — read directly.
+    this._hysteresis = props.getModelParam<number>("hysteresis");
+    this._vos        = props.getModelParam<number>("vos");
+    this._rOut       = Math.max(props.getModelParam<number>("rOut"), MIN_ROUT);
+    this._tau        = Math.max(props.getModelParam<number>("responseTime"), MIN_TAU);
+    this._vOH        = props.getModelParam<number>("vOH");
+    this._vOL        = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -223,7 +216,7 @@ export const ComparatorDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: COMPARATOR_DRIVER_PARAM_DEFS,
-      params: COMPARATOR_DRIVER_DEFAULTS,
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new ComparatorDriverElement(pinNodes, props),
     },

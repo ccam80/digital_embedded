@@ -78,12 +78,11 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._vDrop = props.hasModelParam("vDrop")
-      ? props.getModelParam<number>("vDrop")
-      : 1.5;
-    this._rOut = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : 100;
-    this._vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : 5;
-    this._vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : 0;
+    // All keys are declared in this driver's paramDefs — read directly.
+    this._vDrop = props.getModelParam<number>("vDrop");
+    this._rOut = props.getModelParam<number>("rOut");
+    this._vOH = props.getModelParam<number>("vOH");
+    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -162,7 +161,7 @@ export const Timer555LatchDriverDefinition: ComponentDefinition = {
         { key: "vOH", default: 5 },
         { key: "vOL", default: 0 },
       ],
-      params: { vDrop: 1.5, rOut: 100, vOH: 5, vOL: 0 },
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new Timer555LatchDriverElement(pinNodes, props),
     },

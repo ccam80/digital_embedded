@@ -117,12 +117,14 @@ export class MemristorElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    const rOn          = props.hasModelParam("rOn")          ? props.getModelParam<number>("rOn")          : MEMRISTOR_DEFAULTS["rOn"]!;
-    const rOff         = props.hasModelParam("rOff")         ? props.getModelParam<number>("rOff")         : MEMRISTOR_DEFAULTS["rOff"]!;
-    const mobility     = props.hasModelParam("mobility")     ? props.getModelParam<number>("mobility")     : MEMRISTOR_DEFAULTS["mobility"]!;
-    const deviceLength = props.hasModelParam("deviceLength") ? props.getModelParam<number>("deviceLength") : MEMRISTOR_DEFAULTS["deviceLength"]!;
-    const windowOrder  = props.hasModelParam("windowOrder")  ? props.getModelParam<number>("windowOrder")  : MEMRISTOR_DEFAULTS["windowOrder"]!;
-    const w0           = props.hasModelParam("initialState") ? props.getModelParam<number>("initialState") : MEMRISTOR_DEFAULTS["initialState"]!;
+    // All keys are declared in MEMRISTOR_PARAM_DEFS, always merged into the bag
+    // by the unified instantiation — read directly.
+    const rOn          = props.getModelParam<number>("rOn");
+    const rOff         = props.getModelParam<number>("rOff");
+    const mobility     = props.getModelParam<number>("mobility");
+    const deviceLength = props.getModelParam<number>("deviceLength");
+    const windowOrder  = props.getModelParam<number>("windowOrder");
+    const w0           = props.getModelParam<number>("initialState");
     this.rOn          = Math.max(rOn,          MIN_R);
     this.rOff         = Math.max(rOff,         MIN_R);
     this.mobility     = Math.max(mobility,     MIN_MOBILITY);

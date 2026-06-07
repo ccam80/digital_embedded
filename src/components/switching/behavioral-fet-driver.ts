@@ -48,14 +48,6 @@ const BEHAVIORAL_FET_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "vOL",      default: 0.0 },
 ];
 
-const BEHAVIORAL_FET_DRIVER_DEFAULTS: Record<string, number> = {
-  Vth: 2.5,
-  isNType: 1,
-  rOut: 100,
-  vOH: 5.0,
-  vOL: 0.0,
-};
-
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
@@ -104,16 +96,12 @@ export class BehavioralFETDriverElement extends PoolBackedAnalogElement {
     super(pinNodes);
     this._gateNode   = pinNodes.get("G")!;
     this._sourceNode = pinNodes.get("S")!;
-    this._vth =
-      props.hasModelParam("Vth") ? props.getModelParam<number>("Vth") : BEHAVIORAL_FET_DRIVER_DEFAULTS["Vth"]!;
-    this._isNType =
-      (props.hasModelParam("isNType") ? props.getModelParam<number>("isNType") : BEHAVIORAL_FET_DRIVER_DEFAULTS["isNType"]!) !== 0;
-    this._rOut =
-      props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : BEHAVIORAL_FET_DRIVER_DEFAULTS["rOut"]!;
-    this._vOH =
-      props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : BEHAVIORAL_FET_DRIVER_DEFAULTS["vOH"]!;
-    this._vOL =
-      props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : BEHAVIORAL_FET_DRIVER_DEFAULTS["vOL"]!;
+    // All keys are declared in BEHAVIORAL_FET_DRIVER_PARAM_DEFS — read directly.
+    this._vth = props.getModelParam<number>("Vth");
+    this._isNType = props.getModelParam<number>("isNType") !== 0;
+    this._rOut = props.getModelParam<number>("rOut");
+    this._vOH = props.getModelParam<number>("vOH");
+    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -164,7 +152,7 @@ export const BehavioralFETDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: BEHAVIORAL_FET_DRIVER_PARAM_DEFS,
-      params: BEHAVIORAL_FET_DRIVER_DEFAULTS,
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new BehavioralFETDriverElement(pinNodes, props),
     },
