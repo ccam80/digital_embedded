@@ -49,8 +49,9 @@ import { kelvinToCelsius } from "../../core/model-params.js";
 /** ngspice CONSTCtoK (const.h): Celsius→Kelvin offset for the `temp` param. */
 const CONSTCtoK = 273.15;
 
-/** ngspice ASRCload reference temperature (asrcload.c:41 — the literal `300.15`,
- *  flagged FIXME in ngspice but reproduced exactly for parity). */
+/** ngspice ASRCload reference temperature: the literal `300.15` hardcoded at
+ *  asrcload.c:41 (ngspice's own source annotates this constant as suspect;
+ *  reproduced exactly here for bit-parity). */
 const ASRC_REF_TEMP = 300.15;
 
 // ---------------------------------------------------------------------------
@@ -158,8 +159,8 @@ abstract class BSourceAnalogElement extends AnalogElement {
    * ngspice's parse-time *Given semantics (asrcpar.c).
    */
   seedParams(props: PropertyBag): void {
-    // given(k) ⇒ the param was explicitly set ⇒ it is present in the bag, so the
-    // read needs no fallback (asrcpar.c parse-time *Given semantics).
+    // given(k) ⇒ the param was explicitly set ⇒ it is present in the bag, so
+    // read() dereferences it directly (asrcpar.c parse-time *Given semantics).
     const given = (k: string): boolean => props.isModelParamGiven(k);
     const read = (k: string): number => props.getModelParam<number>(k);
     if (given("TC1")) { this._tc1 = read("TC1"); this._tc1Given = true; }
@@ -191,7 +192,7 @@ abstract class BSourceAnalogElement extends AnalogElement {
    */
   protected _factor(ctx: LoadContext): number {
     const { temp, dtemp } = this._resolveTemp(ctx);
-    // asrcload.c:41 — difference against the 300.15 reference (FIXME literal).
+    // asrcload.c:41 — difference against the hardcoded 300.15 reference.
     const difference = (temp + dtemp) - ASRC_REF_TEMP;
     // asrcload.c:42-44 — quadratic temperature coefficient.
     let factor = 1.0 + this._tc1 * difference + this._tc2 * difference * difference;

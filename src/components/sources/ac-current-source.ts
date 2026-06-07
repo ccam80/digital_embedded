@@ -341,16 +341,17 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       frequency: props.getModelParam<number>("frequency"),
       phase:     props.getModelParam<number>("phase"),
       dcOffset:  props.getModelParam<number>("dcOffset"),
-      riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
-      fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
-      noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
+      riseTime:  props.getModelParam<number>("riseTime"),
+      fallTime:  props.getModelParam<number>("fallTime"),
+      noiseSampleTime: props.getModelParam<number>("noiseSampleTime"),
       // ISRC AC magnitude / phase defaults mirror ngspice srctemp.c (ISRCacMag = 1,
-      // ISRCacPhase = 0 when an `AC` token is present without explicit values).
-      acMagnitude: props.hasModelParam("acMagnitude") ? props.getModelParam<number>("acMagnitude") : 1,
-      acPhase:     props.hasModelParam("acPhase")     ? props.getModelParam<number>("acPhase")     : 0,
+      // ISRCacPhase = 0); the paramDefs defaults supply those when an `AC` token
+      // has no explicit values.
+      acMagnitude: props.getModelParam<number>("acMagnitude"),
+      acPhase:     props.getModelParam<number>("acPhase"),
       // isrc.c:15 / isrctemp.c:62-63 — ISRCmValue parallel multiplier; the
       // paramDefs default 1 supplies the !ISRCmGiven ⇒ 1 rule.
-      m:           props.hasModelParam("m")           ? props.getModelParam<number>("m")           : 1,
+      m:           props.getModelParam<number>("m"),
     };
     this._amplitude = this._p.amplitude;
     this._frequency = this._p.frequency;
@@ -386,9 +387,10 @@ class AcCurrentSourceAnalogImpl extends AnalogElement {
       }
     }
 
-    // ngspice ISRC DC value / flag (mirrors vsrcpar.c:42-45).
+    // ngspice ISRC DC value / flag (mirrors vsrcpar.c:42-45). ISRCdcGiven is the
+    // parse-time *given* flag — true only when the user explicitly set dcOffset.
     this._dcValue = this._dcOffset;
-    this._dcGiven = props.hasModelParam("dcOffset");
+    this._dcGiven = props.isModelParamGiven("dcOffset");
     // SPICE function token + coefficient model (mirrors vsrcpar.c:79-286).
     this._initCoeffModel(props);
     // isrctemp.c:38-61 — value-presence + DC-vs-transient-time-0 notices.

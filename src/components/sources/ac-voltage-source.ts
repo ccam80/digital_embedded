@@ -932,13 +932,13 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       frequency: props.getModelParam<number>("frequency"),
       phase:     props.getModelParam<number>("phase"),
       dcOffset:  props.getModelParam<number>("dcOffset"),
-      riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
-      fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
-      noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
-      // vsrctemp.c:39, 42 — VSRCacMag defaults to 1 and VSRCacPhase to 0 when
-      // an `AC` token is given without explicit values.
-      acMagnitude: props.hasModelParam("acMagnitude") ? props.getModelParam<number>("acMagnitude") : 1,
-      acPhase:     props.hasModelParam("acPhase")     ? props.getModelParam<number>("acPhase")     : 0,
+      riseTime:  props.getModelParam<number>("riseTime"),
+      fallTime:  props.getModelParam<number>("fallTime"),
+      noiseSampleTime: props.getModelParam<number>("noiseSampleTime"),
+      // vsrctemp.c:39, 42 — VSRCacMag defaults to 1 and VSRCacPhase to 0; the
+      // paramDefs defaults supply those when an `AC` token has no explicit values.
+      acMagnitude: props.getModelParam<number>("acMagnitude"),
+      acPhase:     props.getModelParam<number>("acPhase"),
     };
     this._amplitude = this._p.amplitude;
     this._frequency = this._p.frequency;
@@ -963,11 +963,12 @@ class AcVoltageSourceAnalogImpl extends AnalogElement implements AcVoltageSource
       noiseSampleTime: this._noiseSampleTime,
     };
 
-    // vsrcpar.c:42-45 — VSRC_DC: the source DC value / flag. digiTS folds the
-    // DC value into dcOffset; mark it given whenever a non-default offset is
-    // present so the TRNOISE/TRRANDOM arms add it (vsrcload.c:395, 404).
+    // vsrcpar.c:42-45 — VSRC_DC: the source DC value / flag. digiTS folds the DC
+    // value into dcOffset; VSRCdcGiven (vsrcdefs.h:84) is the parse-time *given*
+    // flag — true only when the user explicitly set dcOffset, so the
+    // TRNOISE/TRRANDOM arms add it only then (vsrcload.c:395, 404).
     this._dcValue = this._dcOffset;
-    this._dcGiven = props.hasModelParam("dcOffset");
+    this._dcGiven = props.isModelParamGiven("dcOffset");
 
     // vsrcpar.c:79-286 — a SPICE-style function token (PULSE/SINE/EXP/SFFM/AM/
     // PWL/TRNOISE/TRRANDOM) populates the coefficient model via applyCoeffs.
