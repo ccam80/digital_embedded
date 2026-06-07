@@ -8,7 +8,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -69,13 +68,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   return n;
 }
 
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
-}
-
 // ---------------------------------------------------------------------------
 // Category 1 — Initialization (T1)
 // ---------------------------------------------------------------------------
@@ -129,14 +121,7 @@ describe("CurrentSource DCOP analytical (T1)", () => {
     });
     const result = fix.coordinator.dcOperatingPoint();
     expect(result!.converged).toBe(true);
-    let isrcIdx = -1;
-    for (let i = 0; i < fix.circuit.elements.length; i++) {
-      if (fix.elementLabels.get(i) === "isrc") {
-        isrcIdx = i;
-        break;
-      }
-    }
-    expect(isrcIdx).toBeGreaterThanOrEqual(0);
+    const isrcIdx = fix.elementIndex("isrc");
     const pinCurrents = fix.engine.getElementPinCurrents(isrcIdx);
     expect(pinCurrents.length).toBe(2);
     expect(pinCurrents[0]).toBeCloseTo(+0.002, 9); // neg
@@ -160,7 +145,7 @@ describe("CurrentSource parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nodeId);
     expect(before).toBeCloseTo(2.0, 6);
 
-    const isrcCe = ceByLabel(fix, "isrc");
+    const isrcCe = fix.element("isrc");
     fix.coordinator.setComponentProperty(isrcCe, "current", 0.005);
     fix.coordinator.step();
 

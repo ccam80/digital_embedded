@@ -4,7 +4,6 @@ import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fix
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // Bench builders
@@ -68,13 +67,6 @@ function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // Closed-form voltage band for a gate driving the LOAD_R resistor to ground.
@@ -239,7 +231,7 @@ describe("Analog gates parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "gate:out");
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vOH", 8.0);
     fix.coordinator.step();
 
@@ -256,7 +248,7 @@ describe("Analog gates parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "gate:out");
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vOL", 1.0);
     fix.coordinator.step();
 

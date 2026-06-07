@@ -8,7 +8,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -73,13 +72,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +198,7 @@ describe("VCVS parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(2.0, 4);
 
-    const vcvsEl = ceByLabel(fix, "vcvs1");
+    const vcvsEl = fix.element("vcvs1");
     fix.coordinator.setComponentProperty(vcvsEl, "gain", 5);
     fix.coordinator.step();
 

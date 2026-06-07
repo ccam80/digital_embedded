@@ -10,7 +10,6 @@ import { NTC_SCHEMA } from "../ntc-thermistor.js";
 import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -107,13 +106,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 function findNtcElement(fix: ReturnType<typeof buildFixture>): PoolBackedAnalogElement {
@@ -220,7 +212,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     // I_before = 1V / 100Ω = 0.01 A (positive into pos pin).
     expect(before[0]).toBeCloseTo(0.01, 6);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "ntc"), "r0", 200);
+    fix.coordinator.setComponentProperty(fix.element("ntc"), "r0", 200);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getElementPinCurrents(ntcIdx);
     // I_after = 1V / 200Ω = 0.005 A. Larger r0 → smaller current.
@@ -249,7 +241,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     );
     const iBefore = fix.engine.getElementPinCurrents(ntcIdx)[0];
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "ntc"), "beta", 6000);
+    fix.coordinator.setComponentProperty(fix.element("ntc"), "beta", 6000);
     fix.coordinator.dcOperatingPoint();
     const iAfter = fix.engine.getElementPinCurrents(ntcIdx)[0];
 
@@ -283,7 +275,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     // R(T0)=r0=100Ω → I=0.01 A at VS=1V.
     expect(iBefore).toBeCloseTo(0.01, 6);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "ntc"), "temperature", 350);
+    fix.coordinator.setComponentProperty(fix.element("ntc"), "temperature", 350);
     fix.coordinator.dcOperatingPoint();
     const iAfter = fix.engine.getElementPinCurrents(ntcIdx)[0];
 
@@ -321,7 +313,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     );
     const iBefore = fix.engine.getElementPinCurrents(ntcIdx)[0];
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "ntc"), "t0", 350);
+    fix.coordinator.setComponentProperty(fix.element("ntc"), "t0", 350);
     fix.coordinator.dcOperatingPoint();
     const iAfter = fix.engine.getElementPinCurrents(ntcIdx)[0];
 
@@ -350,7 +342,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     for (let i = 0; i < 20; i++) fix.coordinator.step();
     const tBefore = fix.pool.state0[el._stateBase + SLOT_TEMPERATURE];
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "ntc"), "thermalResistance", 200);
+    fix.coordinator.setComponentProperty(fix.element("ntc"), "thermalResistance", 200);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
     const tAfter = fix.pool.state0[el._stateBase + SLOT_TEMPERATURE];
 

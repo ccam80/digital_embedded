@@ -10,7 +10,6 @@ import {
 
 import type { Circuit } from "../../../core/circuit.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
-import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // .dts paths (T3 harness fixtures)
@@ -37,13 +36,6 @@ function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 /**
@@ -240,7 +232,7 @@ describe("Optocoupler parameter hot-load (T1)", () => {
     const colNode = nodeOf(fix, "tx:collector");
     const before = fix.engine.getNodeVoltage(colNode);
 
-    const tx = ceByLabel(fix, "tx");
+    const tx = fix.element("tx");
     fix.coordinator.setComponentProperty(tx, "ctr", 5.0);
     fix.coordinator.step();
 
@@ -263,7 +255,7 @@ describe("Optocoupler parameter hot-load (T1)", () => {
     const aNode = nodeOf(fix, "tx:anode");
     const before = fix.engine.getNodeVoltage(aNode);
 
-    const tx = ceByLabel(fix, "tx");
+    const tx = fix.element("tx");
     fix.coordinator.setComponentProperty(tx, "Is", 1e-12);
     fix.coordinator.step();
 
@@ -287,7 +279,7 @@ describe("Optocoupler parameter hot-load (T1)", () => {
     const aNode = nodeOf(fix, "tx:anode");
     const before = fix.engine.getNodeVoltage(aNode);
 
-    const tx = ceByLabel(fix, "tx");
+    const tx = fix.element("tx");
     fix.coordinator.setComponentProperty(tx, "n", 2.0);
     fix.coordinator.step();
 

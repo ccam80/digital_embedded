@@ -165,15 +165,8 @@ describe("DigitalOutputPinLoaded (3-port composite)", () => {
     });
 
     // Warm-start has already run one step with ctrl=0; node is near vOL.
-    // Flip ctrl source to 1 by finding vsCtrl in elementToCircuitElement.
-    let vsCtrlEl: import("../../../core/element.js").CircuitElement | undefined;
-    for (const ce of fix.circuit.elementToCircuitElement.values()) {
-      if (ce.getProperties().getOrDefault<string>("label", "") === "vsCtrl") {
-        vsCtrlEl = ce;
-        break;
-      }
-    }
-    if (vsCtrlEl === undefined) throw new Error("vsCtrl not found in elementToCircuitElement");
+    // Flip ctrl source to 1 via the fixture's label accessor.
+    const vsCtrlEl = fix.element("vsCtrl");
     fix.coordinator.setComponentProperty(vsCtrlEl, "voltage", 1);
 
     // Step through 5τ (50 steps at maxTimeStep = 10 ps each).

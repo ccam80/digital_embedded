@@ -104,16 +104,6 @@ function getAcsrcPosNode(fix: ReturnType<typeof buildFixture>): number {
   return node;
 }
 
-function getAcsrcCircuitElement(fix: ReturnType<typeof buildFixture>) {
-  for (let i = 0; i < fix.circuit.elements.length; i++) {
-    const ce = fix.circuit.elementToCircuitElement.get(i);
-    if (ce === undefined) continue;
-    const label = ce.getProperties().getOrDefault<string>("label", "");
-    if (label === "acsrc") return ce;
-  }
-  throw new Error("AcVoltageSource circuit element 'acsrc' not found");
-}
-
 function getAcsrcAnalogElement(
   fix: ReturnType<typeof buildFixture>,
 ): AcVoltageSourceAnalogElement {
@@ -226,7 +216,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
         waveform: "sine", amplitude: 1, frequency: 1000, phase: 0, dcOffset: 0,
       }),
     });
-    const ce = getAcsrcCircuitElement(fix);
+    const ce = fix.element("acsrc");
     const node = getAcsrcPosNode(fix);
     const before = fix.engine.getNodeVoltage(node);
     fix.coordinator.setComponentProperty(ce, "dcOffset", 2.0);
@@ -244,7 +234,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
         waveform: "sine", amplitude: 1, frequency: 1000, phase: Math.PI / 2, dcOffset: 0,
       }),
     });
-    const ce = getAcsrcCircuitElement(fix);
+    const ce = fix.element("acsrc");
     const node = getAcsrcPosNode(fix);
     const before = fix.engine.getNodeVoltage(node);
     fix.coordinator.setComponentProperty(ce, "amplitude", 4);
@@ -265,7 +255,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
         waveform: "sine", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
       }),
     });
-    const ce = getAcsrcCircuitElement(fix);
+    const ce = fix.element("acsrc");
     const node = getAcsrcPosNode(fix);
     const before = fix.engine.getNodeVoltage(node);
     fix.coordinator.setComponentProperty(ce, "frequency", 5000);
@@ -282,7 +272,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
         waveform: "sine", amplitude: 5, frequency: 1000, phase: 0, dcOffset: 0,
       }),
     });
-    const ce = getAcsrcCircuitElement(fix);
+    const ce = fix.element("acsrc");
     const node = getAcsrcPosNode(fix);
     const before = fix.engine.getNodeVoltage(node);
     fix.coordinator.setComponentProperty(ce, "phase", Math.PI / 2);
@@ -303,7 +293,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
         riseTime: 1e-12, fallTime: 1e-12,
       }),
     });
-    const ce = getAcsrcCircuitElement(fix);
+    const ce = fix.element("acsrc");
     const node = getAcsrcPosNode(fix);
     const before = fix.engine.getNodeVoltage(node);
     fix.coordinator.setComponentProperty(ce, "riseTime", 1e-4);
@@ -336,7 +326,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
       }),
       params: { tStop: 1e-3, maxTimeStep: 1e-5 },
     });
-    const ce = getAcsrcCircuitElement(fix);
+    const ce = fix.element("acsrc");
     const node = getAcsrcPosNode(fix);
     // Advance into the fall ramp (t in the (0.5ms, 0.6ms) fall window).
     while (fix.coordinator.simTime !== null && fix.coordinator.simTime < 5.5e-4) {
@@ -394,7 +384,7 @@ describe("AcVoltageSource parameter hot-load (T1)", () => {
 
     // Hot-load TS to half the period; the cadence must halve (twice as many
     // breakpoints, the first at the new 1e-5 period).
-    fix.coordinator.setComponentProperty(getAcsrcCircuitElement(fix), "noiseSampleTime", 1e-5);
+    fix.coordinator.setComponentProperty(fix.element("acsrc"), "noiseSampleTime", 1e-5);
     const after = el.getBreakpoints(0, 1e-4);
 
     // (1) Directional: the hot-load changed the TRNOISE schedule.

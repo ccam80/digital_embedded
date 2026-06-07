@@ -175,18 +175,9 @@ describe("MOSFET parameter hot-load (T1)", () => {
     });
   }
 
-  function getM1(fix: ReturnType<typeof buildFixture>) {
-    const idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "M1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return { idx, ce: ce! };
-  }
-
   it("hotload_VTO_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "VTO", 2.5);
@@ -199,7 +190,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_KP_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "KP", 240e-6);
@@ -211,7 +202,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_LAMBDA_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "LAMBDA", 0.1);
@@ -222,7 +213,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_W_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "W", 10e-6);
@@ -234,7 +225,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_L_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "L", 5e-6);
@@ -245,7 +236,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_TEMP_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
@@ -256,7 +247,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_PHI_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "PHI", 0.8);
@@ -268,7 +259,7 @@ describe("MOSFET parameter hot-load (T1)", () => {
 
   it("hotload_GAMMA_changes_vd", () => {
     const fix = buildCs();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "GAMMA", 0.5);

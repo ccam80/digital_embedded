@@ -19,16 +19,6 @@ function findMemristor(elements: ReadonlyArray<unknown>): MemristorElement {
   return elements[idx] as MemristorElement;
 }
 
-function getMemCe(fix: ReturnType<typeof buildFixture>) {
-  const wrapperIdx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "mem",
-  );
-  if (wrapperIdx < 0) throw new Error("mem wrapper not found");
-  const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-  if (ce === undefined) throw new Error("mem CircuitElement not in map");
-  return ce;
-}
-
 // ---------------------------------------------------------------------------
 // Cat 1 — Initialization (T1)
 // ---------------------------------------------------------------------------
@@ -269,7 +259,7 @@ describe("Memristor parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(midNodeId);
     expect(before).toBeCloseTo(1000 / 1100, 6);
 
-    fix.coordinator.setComponentProperty(getMemCe(fix), "rOn", 500);
+    fix.coordinator.setComponentProperty(fix.element("mem"), "rOn", 500);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(midNodeId);
     expect(after).toBeCloseTo(1000 / 1500, 4);
@@ -303,7 +293,7 @@ describe("Memristor parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(midNodeId);
     expect(before).toBeCloseTo(1000 / 17000, 6);
 
-    fix.coordinator.setComponentProperty(getMemCe(fix), "rOff", 8000);
+    fix.coordinator.setComponentProperty(fix.element("mem"), "rOff", 8000);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(midNodeId);
     expect(after).toBeCloseTo(1000 / 9000, 4);
@@ -338,7 +328,7 @@ describe("Memristor parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(midNodeId);
     expect(before).toBeCloseTo(1000 / 17000, 6);
 
-    fix.coordinator.setComponentProperty(getMemCe(fix), "initialState", 1);
+    fix.coordinator.setComponentProperty(fix.element("mem"), "initialState", 1);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(midNodeId);
     expect(after).toBeCloseTo(1000 / 1100, 4);

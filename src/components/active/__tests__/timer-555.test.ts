@@ -323,10 +323,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
         }),
     });
 
-    const timerEl = [...fix.circuit.elementToCircuitElement.values()].find(
-      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "t",
-    );
-    expect(timerEl).toBeDefined();
+    const timerEl = fix.element("t");
 
     const outNode = fix.circuit.labelToNodeId.get("t:OUT");
     expect(outNode).toBeDefined();
@@ -336,7 +333,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
     expect(before).toBeGreaterThan(VCC * 0.8); // OUT high
 
     // Hot-load: lower vOH to 4.0V.
-    fix.coordinator.setComponentProperty(timerEl!, "vOH", 4.0);
+    fix.coordinator.setComponentProperty(timerEl, "vOH", 4.0);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode!);
@@ -376,10 +373,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
         }),
     });
 
-    const timerEl = [...fix.circuit.elementToCircuitElement.values()].find(
-      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "t",
-    );
-    expect(timerEl).toBeDefined();
+    const timerEl = fix.element("t");
 
     const outNode = fix.circuit.labelToNodeId.get("t:OUT");
     expect(outNode).toBeDefined();
@@ -389,7 +383,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
     expect(before).toBeLessThan(VCC * 0.2); // OUT low
 
     // Hot-load: raise vOL to 0.5V.
-    fix.coordinator.setComponentProperty(timerEl!, "vOL", 0.5);
+    fix.coordinator.setComponentProperty(timerEl, "vOL", 0.5);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode!);

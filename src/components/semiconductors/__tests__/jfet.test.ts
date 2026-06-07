@@ -240,20 +240,11 @@ describe("JFET parameter hot-load (T1)", () => {
     });
   }
 
-  function getJ1(fix: ReturnType<typeof buildFixture>) {
-    const idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "J1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return { idx, ce: ce! };
-  }
-
   it("hotload_BETA_changes_vd", () => {
     // BETA scales drain current quadratically: cdrain = beta * vgst^2 * (...).
     // Larger BETA → larger Id → V(Drain) drops further below Vdd.
     const fix = buildNJfetCs();
-    const { ce } = getJ1(fix);
+    const ce = fix.element("J1");
     const vdNode = fix.circuit.labelToNodeId.get("J1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "BETA", 4e-4);
@@ -267,7 +258,7 @@ describe("JFET parameter hot-load (T1)", () => {
     // VTO shifts the threshold; raising VTO toward 0 shrinks vgst (= -VTO at
     // gate=0V), reducing Id and pushing V(Drain) closer to Vdd.
     const fix = buildNJfetCs();
-    const { ce } = getJ1(fix);
+    const ce = fix.element("J1");
     const vdNode = fix.circuit.labelToNodeId.get("J1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "VTO", -1.0);
@@ -281,7 +272,7 @@ describe("JFET parameter hot-load (T1)", () => {
     // LAMBDA = channel-length modulation; finite LAMBDA introduces gds slope
     // in saturation. Move from default 0 to 0.05 shifts the operating point.
     const fix = buildNJfetCs();
-    const { ce } = getJ1(fix);
+    const ce = fix.element("J1");
     const vdNode = fix.circuit.labelToNodeId.get("J1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "LAMBDA", 0.05);
@@ -296,7 +287,7 @@ describe("JFET parameter hot-load (T1)", () => {
     // tSatCur, vt. Universal temperature path required of every analog
     // component with temperature-dependent state.
     const fix = buildNJfetCs();
-    const { ce } = getJ1(fix);
+    const ce = fix.element("J1");
     const vdNode = fix.circuit.labelToNodeId.get("J1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
@@ -312,7 +303,7 @@ describe("JFET parameter hot-load (T1)", () => {
     // AREA scales beta and tSatCur via the area factor (instance-partitioned).
     // Larger AREA → larger Id → V(Drain) drops.
     const fix = buildNJfetCs();
-    const { ce } = getJ1(fix);
+    const ce = fix.element("J1");
     const vdNode = fix.circuit.labelToNodeId.get("J1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "AREA", 4);

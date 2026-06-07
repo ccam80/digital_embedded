@@ -81,16 +81,6 @@ function buildInvFixture(opts: { vIn: number; tStop?: number; maxTimeStep?: numb
   });
 }
 
-function getSchmittCe(fix: ReturnType<typeof buildFixture>) {
-  const wrapperIdx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "st",
-  );
-  if (wrapperIdx < 0) throw new Error("Schmitt wrapper element not found");
-  const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-  if (ce === undefined) throw new Error("Schmitt CircuitElement not registered");
-  return ce;
-}
-
 // ---------------------------------------------------------------------------
 // Category 1 — Initialization (T1)
 // Post-warm-start: OUTPUT_LATCH slot holds the committed output level.
@@ -207,7 +197,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(0.0, 3);
 
-    fix.coordinator.setComponentProperty(getSchmittCe(fix), "vTH", 1.0);
+    fix.coordinator.setComponentProperty(fix.element("st"), "vTH", 1.0);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode);
@@ -222,7 +212,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeGreaterThan(3.0);
 
-    fix.coordinator.setComponentProperty(getSchmittCe(fix), "vTL", 2.6);
+    fix.coordinator.setComponentProperty(fix.element("st"), "vTL", 2.6);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode);
@@ -236,7 +226,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
     const outNode = fix.circuit.labelToNodeId.get("st:out")!;
     const before = fix.engine.getNodeVoltage(outNode);
 
-    fix.coordinator.setComponentProperty(getSchmittCe(fix), "vOH", 5.0);
+    fix.coordinator.setComponentProperty(fix.element("st"), "vOH", 5.0);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode);
@@ -252,7 +242,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(0.0, 3);
 
-    fix.coordinator.setComponentProperty(getSchmittCe(fix), "vOL", 0.4);
+    fix.coordinator.setComponentProperty(fix.element("st"), "vOL", 0.4);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode);
@@ -268,7 +258,7 @@ describe("Schmitt parameter hot-load (T1)", () => {
     const outNode = fix.circuit.labelToNodeId.get("st:out")!;
     const before = fix.engine.getNodeVoltage(outNode);
 
-    fix.coordinator.setComponentProperty(getSchmittCe(fix), "rOut", 5000);
+    fix.coordinator.setComponentProperty(fix.element("st"), "rOut", 5000);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode);

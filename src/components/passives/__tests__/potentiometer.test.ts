@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -47,13 +46,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +130,7 @@ describe("Potentiometer parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(wNode);
     expect(before).toBeCloseTo(0.5, 4);
 
-    const potEl = ceByLabel(fix, "POT");
+    const potEl = fix.element("POT");
     fix.coordinator.setComponentProperty(potEl, "position", 0.1);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(wNode);
@@ -163,7 +155,7 @@ describe("Potentiometer parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(wNode);
     expect(before).toBeCloseTo(0.5, 4);
 
-    const potEl = ceByLabel(fix, "POT");
+    const potEl = fix.element("POT");
     // Raise R by 1000x. R_top = R_bottom = 5e6 - now comparable to the 1e8
     // sense load, so V(W) sags below 0.5V noticeably.
     fix.coordinator.setComponentProperty(potEl, "resistance", 1e7);

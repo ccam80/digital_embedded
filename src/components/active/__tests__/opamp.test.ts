@@ -7,7 +7,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -99,13 +98,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +227,7 @@ describe("OpAmp parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(0.5, 4);
 
-    const opampEl = ceByLabel(fix, "opamp");
+    const opampEl = fix.element("opamp");
     fix.coordinator.setComponentProperty(opampEl, "gain", 2000);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
@@ -258,7 +250,7 @@ describe("OpAmp parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(9.0909, 3);
 
-    const opampEl = ceByLabel(fix, "opamp");
+    const opampEl = fix.element("opamp");
     fix.coordinator.setComponentProperty(opampEl, "rOut", 4000);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);

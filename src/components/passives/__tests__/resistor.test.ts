@@ -6,10 +6,7 @@ import {
   describeIfDll,
   DLL_PATH,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
-import { ResistorElement } from "../resistor.js";
-
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -68,25 +65,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   return n;
 }
 
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
-}
-
-function findResistorIndex(fix: ReturnType<typeof buildFixture>, label: string): number {
-  for (const [idx, ce] of fix.circuit.elementToCircuitElement.entries()) {
-    if (
-      ce instanceof ResistorElement &&
-      ce.getProperties().getOrDefault<string>("label", "") === label
-    ) {
-      return idx;
-    }
-  }
-  throw new Error(`ResistorElement with label '${label}' not found`);
-}
-
 // ---------------------------------------------------------------------------
 // Resistor initialization (T1) — Cat 1
 // ---------------------------------------------------------------------------
@@ -130,8 +108,8 @@ describe("Resistor DCOP analytical (T1)", () => {
     expect(vMid).toBeCloseTo(10 * 2000 / 3000, 6);
     expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(10, 6);
 
-    const r1Idx = findResistorIndex(fix, "r1");
-    const r2Idx = findResistorIndex(fix, "r2");
+    const r1Idx = fix.elementIndex("r1");
+    const r2Idx = fix.elementIndex("r2");
     const r1Pins = fix.engine.getElementPinCurrents(r1Idx);
     const r2Pins = fix.engine.getElementPinCurrents(r2Idx);
     const I = 10 / 3000; // closed-form: total loop current.
@@ -162,7 +140,7 @@ describe("Resistor parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(midNode);
     expect(before).toBeCloseTo(10 * 2000 / 3000, 6);
 
-    const r2El = ceByLabel(fix, "r2");
+    const r2El = fix.element("r2");
     fix.coordinator.setComponentProperty(r2El, "resistance", 8000);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(midNode);

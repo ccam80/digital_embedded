@@ -11,7 +11,6 @@ import { DIODE_SCHEMA } from "../diode.js";
 
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // .dts paths
@@ -53,14 +52,12 @@ function buildDiodeRc(facade: DefaultSimulatorFacade, p: DiodeRcOpts): Circuit {
   });
 }
 
-function findDiode(fix: ReturnType<typeof buildFixture>): { idx: number; ce: CircuitElement } {
+function findDiodeLeaf(fix: ReturnType<typeof buildFixture>): { idx: number } {
   const idx = fix.circuit.elements.findIndex(
     (_e, i) => fix.elementLabels.get(i) === "d1",
   );
   expect(idx).toBeGreaterThanOrEqual(0);
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return { idx, ce: ce! };
+  return { idx };
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +77,7 @@ describe("Diode initialization (T1)", () => {
     const fix = buildFixture({
       build: (_r, f) => buildDiodeRc(f, { vSource: 5, rValue: 1000 }),
     });
-    const { idx } = findDiode(fix);
+    const { idx } = findDiodeLeaf(fix);
     const el = fix.circuit.elements[idx]!;
     const vd = fix.pool.state0[el._stateBase + SLOT_VD];
     expect(Number.isFinite(vd)).toBe(true);
@@ -97,7 +94,7 @@ describe("Diode initialization (T1)", () => {
         diodeProps: { CJO: 1e-11, TT: 1e-9 },
       }),
     });
-    const { idx } = findDiode(fix);
+    const { idx } = findDiodeLeaf(fix);
     const el = fix.circuit.elements[idx]!;
     const vd = fix.pool.state0[el._stateBase + SLOT_VD];
     expect(Number.isFinite(vd)).toBe(true);
@@ -150,7 +147,7 @@ describe("Diode parameter hot-load (T1)", () => {
 
   it("hotload_IS_changes_vd", () => {
     const fix = build5V1k();
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
     const before = fix.engine.getNodeVoltage(vAnodeNode);
     fix.coordinator.setComponentProperty(ce, "IS", 1e-11);
@@ -164,7 +161,7 @@ describe("Diode parameter hot-load (T1)", () => {
 
   it("hotload_N_changes_vd", () => {
     const fix = build5V1k();
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
     const before = fix.engine.getNodeVoltage(vAnodeNode);
     fix.coordinator.setComponentProperty(ce, "N", 2);
@@ -177,7 +174,7 @@ describe("Diode parameter hot-load (T1)", () => {
 
   it("hotload_RS_changes_vd", () => {
     const fix = build5V1k();
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
     const before = fix.engine.getNodeVoltage(vAnodeNode);
     // Series resistance RS adds a drop V_RS = Id*RS in series with the
@@ -191,7 +188,7 @@ describe("Diode parameter hot-load (T1)", () => {
 
   it("hotload_AREA_changes_vd", () => {
     const fix = build5V1k();
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
     const before = fix.engine.getNodeVoltage(vAnodeNode);
     // AREA scales IS by AREA; AREA=10 → Vd drops by N*Vt*ln(10) ≈ 60mV.
@@ -207,7 +204,7 @@ describe("Diode parameter hot-load (T1)", () => {
     // Universal derived-state path required of every analog component with
     // temperature-dependent state.
     const fix = build5V1k();
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
     const before = fix.engine.getNodeVoltage(vAnodeNode);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
@@ -223,7 +220,7 @@ describe("Diode parameter hot-load (T1)", () => {
     // re-derives the temperature scaling factor used in dioTemp(), even at
     // default operating TEMP.
     const fix = build5V1k();
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vAnodeNode = fix.circuit.labelToNodeId.get("d1:A")!;
     const before = fix.engine.getNodeVoltage(vAnodeNode);
     fix.coordinator.setComponentProperty(ce, "TNOM", 350);
@@ -253,7 +250,7 @@ describe("Diode parameter hot-load (T1)", () => {
         ],
       }),
     });
-    const { ce } = findDiode(fix);
+    const ce = fix.element("d1");
     const vCathodeNode = fix.circuit.labelToNodeId.get("d1:K")!;
     const before = fix.engine.getNodeVoltage(vCathodeNode);
     fix.coordinator.setComponentProperty(ce, "BV", 5);
@@ -326,7 +323,7 @@ describe("Diode LTE rollback (T1)", () => {
     // Rotation invariant: state0 and state1 are populated post-warm-start
     // and remain finite for the rolled Q charge slot. cktTerr fires on these
     // slots; the LTE path is exercised when cap-bearing transients run.
-    const { idx } = findDiode(fix);
+    const { idx } = findDiodeLeaf(fix);
     const el = fix.circuit.elements[idx]!;
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
     expect(Number.isFinite(fix.pool.state1[el._stateBase + SLOT_Q])).toBe(true);

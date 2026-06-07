@@ -9,7 +9,6 @@ import {
 import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../../passives/analog-fuse.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -68,13 +67,6 @@ function findFuseElement(elements: ReadonlyArray<unknown>): AnalogFuseElement {
   const idx = elements.findIndex((el) => el instanceof AnalogFuseElement);
   if (idx < 0) throw new Error("AnalogFuseElement not found in compiled circuit");
   return elements[idx] as AnalogFuseElement;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +167,7 @@ describe("Fuse parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(5.0 * 9.0 / (9.0 + 0.01), 4);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     fix.coordinator.setComponentProperty(fuseCe, "rCold", 100);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
@@ -207,7 +199,7 @@ describe("Fuse parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "fuse:out2");
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     fix.coordinator.setComponentProperty(fuseCe, "rBlown", 1e6);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
@@ -232,7 +224,7 @@ describe("Fuse parameter hot-load (T1)", () => {
     const fuse = findFuseElement(fix.circuit.elements);
     expect(fuse.blown).toBe(false);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     fix.coordinator.setComponentProperty(fuseCe, "i2tRating", 0.1);
 
     // Step until blown or simTime exceeds the original (rating=10) prediction.
@@ -302,7 +294,7 @@ describe("Fuse bridge / digital interaction (T1)", () => {
       }),
       params: { tStop: 5e-3, maxTimeStep: 1e-4 },
     });
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     expect(fuseCe.getProperties().getOrDefault<boolean>("blown", false)).toBe(false);
 
     const fuse = findFuseElement(fix.circuit.elements);
@@ -434,7 +426,7 @@ describe("Fuse cross-engine writeback (Cat 15)", () => {
     }
     expect(fuse.blown).toBe(true);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     const props = fuseCe.getProperties();
     expect(props.get("blown")).toBe(true);
   });
@@ -449,7 +441,7 @@ describe("Fuse cross-engine writeback (Cat 15)", () => {
       }),
       params: { tStop: 0.5, maxTimeStep: 1e-3 },
     });
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     const props = fuseCe.getProperties();
     // Step a few times to accumulate I2t without blowing (rating=10 A^2 s,
     // I^2 = 9 A^2 s, t_blow = 10/9 = 1.11s; we run < 0.5s).

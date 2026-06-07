@@ -12,7 +12,6 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { CurrentControlledSwitchAnalogElement } from "../current-controlled-switch.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
 
 /**
@@ -62,13 +61,6 @@ function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +314,7 @@ describe("RelayDT parameter hot-load (T1) — Ron", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
     expect(before).toBeCloseTo(100 / 100.01, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relayDT"), "Ron", 900);
+    fix.coordinator.setComponentProperty(fix.element("relayDT"), "Ron", 900);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
 
@@ -346,7 +338,7 @@ describe("RelayDT parameter hot-load (T1) — Roff", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
     expect(before).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relayDT"), "Roff", 10);
+    fix.coordinator.setComponentProperty(fix.element("relayDT"), "Roff", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
 
@@ -373,7 +365,7 @@ describe("RelayDT parameter hot-load (T1) — coilResistance", () => {
     expect(vbBefore).toBeCloseTo(100 / 100.01, 3);
     expect(Math.abs(vcBefore)).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relayDT"), "coilResistance", 1000);
+    fix.coordinator.setComponentProperty(fix.element("relayDT"), "coilResistance", 1000);
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const vbAfter = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
     const vcAfter = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadC:pos"));
@@ -400,7 +392,7 @@ describe("RelayDT parameter hot-load (T1) — pullInI", () => {
     // NO contact OPEN at start → V(rLoadB:pos) collapses toward 0.
     expect(vbBefore).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relayDT"), "pullInI", 0.01);
+    fix.coordinator.setComponentProperty(fix.element("relayDT"), "pullInI", 0.01);
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const vbAfter = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
 
@@ -423,7 +415,7 @@ describe("RelayDT parameter hot-load (T1) — dropOutI", () => {
     const vbBefore = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
     expect(vbBefore).toBeCloseTo(100 / 100.01, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relayDT"), "dropOutI", 1.0);
+    fix.coordinator.setComponentProperty(fix.element("relayDT"), "dropOutI", 1.0);
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const vbAfter = fix.engine.getNodeVoltage(nodeOf(fix, "rLoadB:pos"));
 
@@ -483,8 +475,8 @@ describe("RelayDT parameter hot-load (T1) — inductance", () => {
     // Both warm-started with vSrc=0 (de-energised); hot-load vCoil=10V and
     // step. Fast L (τ=5e-4s) charges quickly → NO closes; slow L (τ=0.5s)
     // lags → NO still open at the same step count.
-    fixFast.coordinator.setComponentProperty(ceByLabel(fixFast, "vSrc"), "voltage", 10);
-    fixSlow.coordinator.setComponentProperty(ceByLabel(fixSlow, "vSrc"), "voltage", 10);
+    fixFast.coordinator.setComponentProperty(fixFast.element("vSrc"), "voltage", 10);
+    fixSlow.coordinator.setComponentProperty(fixSlow.element("vSrc"), "voltage", 10);
     for (let i = 0; i < 200; i++) {
       fixFast.coordinator.step();
       fixSlow.coordinator.step();

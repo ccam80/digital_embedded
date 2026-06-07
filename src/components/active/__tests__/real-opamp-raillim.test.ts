@@ -40,16 +40,6 @@ function findOpAmp(elements: ReadonlyArray<unknown>): PoolBackedAnalogElement {
   return elements[idx] as PoolBackedAnalogElement;
 }
 
-function getOpAmpCe(fix: ReturnType<typeof buildFixture>) {
-  const wrapperIdx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "opamp",
-  );
-  expect(wrapperIdx).toBeGreaterThanOrEqual(0);
-  const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-  expect(ce).toBeDefined();
-  return ce!;
-}
-
 // Programmatic unity-follower build with default (behavioral) RealOpAmp params.
 // Used by Cat 1 / Cat 2-analytical / Cat 4 / Cat 6-own.
 function buildUnityFollower(vinVoltage: number) {
@@ -191,7 +181,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     expect(fix.pool.state0[opamp._stateBase + SLOT_OUT_SAT_FLAG]).toBe(1);
     expect(before).toBeLessThanOrEqual(15 - 1.5 + 1e-9);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "vSatPos", 0.2);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "vSatPos", 0.2);
     for (let i = 0; i < 5; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nOut);
@@ -207,7 +197,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     const nOut = fix.circuit.labelToNodeId.get("opamp:out")!;
     const before = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "vos", 0.5);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "vos", 0.5);
     for (let i = 0; i < 5; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nOut);
@@ -250,7 +240,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     for (let i = 0; i < 5; i++) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "rOut", 750);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "rOut", 750);
     for (let i = 0; i < 5; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nOut);
@@ -267,7 +257,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nOut);
     expect(before).toBeCloseTo(2, 3);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "aol", 100);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "aol", 100);
     for (let i = 0; i < 5; i++) fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nOut);

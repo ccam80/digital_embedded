@@ -8,7 +8,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -78,13 +77,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +200,7 @@ describe("OTA parameter hot-load (T1)", () => {
     const tanhX0  = Math.tanh(vDiff / (2 * vt0));
     expect(before).toBeCloseTo(iBias * tanhX0 * rLoad, 6);
 
-    const otaEl = ceByLabel(fix, "ota1");
+    const otaEl = fix.element("ota1");
     const vt1   = 0.013;
     fix.coordinator.setComponentProperty(otaEl, "vt", vt1);
     fix.coordinator.step();
@@ -241,7 +233,7 @@ describe("OTA parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "ota1:OUT+");
     const before  = fix.engine.getNodeVoltage(outNode);
 
-    const otaEl = ceByLabel(fix, "ota1");
+    const otaEl = fix.element("ota1");
     fix.coordinator.setComponentProperty(otaEl, "gmMax", 1e-4);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);

@@ -59,16 +59,6 @@ function findInductor(elements: ReadonlyArray<unknown>): AnalogInductorElement {
   return elements[idx] as AnalogInductorElement;
 }
 
-function getInductorCe(fix: ReturnType<typeof buildFixture>) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "L1",
-  );
-  expect(idx).toBeGreaterThanOrEqual(0);
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return ce!;
-}
-
 // ===========================================================================
 // Category 1 — Initialization (T1)
 // Post-warm-start state is the converged DCOP. With ideal DC source and
@@ -219,7 +209,7 @@ describe("Inductor parameter hot-load (T1)", () => {
 
     // Hot-load doubles inductance → τ = 2µs at fixed R; voltage at the same
     // simTime is now exp(-simTime/2µs) which is materially larger.
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "inductance", 2e-3);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "inductance", 2e-3);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -254,7 +244,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(lPosNode);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "SCALE", 2);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "SCALE", 2);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -289,7 +279,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(lPosNode);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "M", 2);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "M", 2);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -324,7 +314,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(lPosNode);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "TC1", 0.01);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "TC1", 0.01);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -358,7 +348,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(lPosNode);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "TC2", 1e-4);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "TC2", 1e-4);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -393,7 +383,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(lPosNode);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "modelTnom", 250);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "modelTnom", 250);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
     expect(after).not.toBeCloseTo(before, 3);
@@ -427,7 +417,7 @@ describe("Inductor parameter hot-load (T1)", () => {
     const lPosNode = ind.pinNodes.get("pos")!;
 
     // Hot-load IC to steady-state branch current and step.
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "IC", Vsrc / R);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "IC", Vsrc / R);
     // Step a fraction of τ so the IC seed dominates over any prior history.
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(lPosNode);
@@ -611,7 +601,7 @@ describe("Inductor model-layer parameters (T1)", () => {
       modNt * modNt * ((mu * MU0 * 1e-4) / length) * Lundin(length, 1e-4);
     expect(before / expectedBefore).toBeCloseTo(1, 9);
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "csect", 2e-4);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "csect", 2e-4);
     // Re-run the temperature pass so the rebuilt _mInd folds into _effectiveL.
     fix.engine.setCircuitTemp(fix.engine.circuitTemp);
     const after = ind.inductance;
@@ -631,7 +621,7 @@ describe("Inductor model-layer parameters (T1)", () => {
     const ind = findInductor(fix.circuit.elements);
     const before = ind.inductance;
 
-    fix.coordinator.setComponentProperty(getInductorCe(fix), "mu", 200);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "mu", 200);
     fix.engine.setCircuitTemp(fix.engine.circuitTemp);
     const after = ind.inductance;
     const expectedAfter =

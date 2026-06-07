@@ -204,18 +204,9 @@ describe("VDMOS parameter hot-load (T1)", () => {
     });
   }
 
-  function getM1(fix: ReturnType<typeof buildFixture>) {
-    const idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "M1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return { idx, ce: ce! };
-  }
-
   it("hotload_KP_changes_vd", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "KP", 200);
@@ -226,7 +217,7 @@ describe("VDMOS parameter hot-load (T1)", () => {
 
   it("hotload_VTH_changes_vd", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     // Raise threshold above the 6V gate drive → device turns off → drain rises.
@@ -241,7 +232,7 @@ describe("VDMOS parameter hot-load (T1)", () => {
     // takes effect without a topology change, unlike RD (which gates prime-node
     // allocation and so requires a recompile to alter conductance routing).
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "LAMBDA", 0.1);
@@ -253,7 +244,7 @@ describe("VDMOS parameter hot-load (T1)", () => {
 
   it("hotload_TEMP_changes_vd", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
@@ -264,7 +255,7 @@ describe("VDMOS parameter hot-load (T1)", () => {
 
   it("hotload_THERMAL_flag_toggles_self_heat", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     // Enabling self-heating without recompile is honoured by load()'s selfheat
     // gate (thermal && rthjcGiven). The thermal nodes are not allocated until a

@@ -120,10 +120,7 @@ describe("Clock parameter hot-load (T1)", () => {
     // V(out) should track 5V (still in the first half-period for 1kHz).
     const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
 
-    const clkEl = [...fix.circuit.elementToCircuitElement.values()].find(
-      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "clk",
-    );
-    expect(clkEl).toBeDefined();
+    const clkEl = fix.element("clk");
 
     const outNode = fix.circuit.labelToNodeId.get("clk:out");
     expect(outNode).toBeDefined();
@@ -131,7 +128,7 @@ describe("Clock parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode!);
     expect(before).toBeCloseTo(3.3, 6);
 
-    fix.coordinator.setComponentProperty(clkEl!, "vdd", 5);
+    fix.coordinator.setComponentProperty(clkEl, "vdd", 5);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNode!);
@@ -146,16 +143,13 @@ describe("Clock parameter hot-load (T1)", () => {
     // high half at 1kHz, but the LOW half at 4kHz) and observe V(out).
     const fix = buildLoadedClockFixture({ frequency: 1000, vdd: 3.3, rload: 1000 });
 
-    const clkEl = [...fix.circuit.elementToCircuitElement.values()].find(
-      (ce) => ce.getProperties().getOrDefault<string>("label", "") === "clk",
-    );
-    expect(clkEl).toBeDefined();
+    const clkEl = fix.element("clk");
 
     const outNode = fix.circuit.labelToNodeId.get("clk:out");
     expect(outNode).toBeDefined();
 
     // Hot-load to 4kHz before stepping forward.
-    fix.coordinator.setComponentProperty(clkEl!, "Frequency", 4000);
+    fix.coordinator.setComponentProperty(clkEl, "Frequency", 4000);
 
     // Drive the engine forward to ~0.2ms — past the 4kHz first edge (0.125ms)
     // but well inside the 1kHz first half (0.5ms).

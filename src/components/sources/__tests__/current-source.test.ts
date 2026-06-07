@@ -8,7 +8,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -61,13 +60,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +135,7 @@ describe("CurrentSource parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(node);
     expect(before).toBeCloseTo(10.0, 6);
 
-    const isrcEl = ceByLabel(fix, "isrc");
+    const isrcEl = fix.element("isrc");
     fix.coordinator.setComponentProperty(isrcEl, "current", 0.02);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(node);

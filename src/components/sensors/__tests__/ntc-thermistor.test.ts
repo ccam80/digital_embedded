@@ -10,7 +10,6 @@ import {
 import { NTC_SCHEMA, NTCThermistorElement } from "../ntc-thermistor.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -108,13 +107,6 @@ function findNtcElement(fix: Fixture): NTCThermistorElement {
     if (el instanceof NTCThermistorElement) return el;
   }
   throw new Error("NTCThermistorElement not found in compiled circuit");
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 /** Closed-form NTC resistance from divider node voltage. */
@@ -251,7 +243,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(midNode);
     expect(before).toBeCloseTo(2.5, 4);
 
-    const ntcEl = ceByLabel(fix, "ntc");
+    const ntcEl = fix.element("ntc");
     fix.coordinator.setComponentProperty(ntcEl, "r0", 5000);
     fix.coordinator.dcOperatingPoint();
 
@@ -272,7 +264,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     const midNode = nodeOf(fix, "ntc:pos");
     const before = fix.engine.getNodeVoltage(midNode);
 
-    const ntcEl = ceByLabel(fix, "ntc");
+    const ntcEl = fix.element("ntc");
     fix.coordinator.setComponentProperty(ntcEl, "beta", 4500);
     fix.coordinator.dcOperatingPoint();
 
@@ -295,7 +287,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     const midNode = nodeOf(fix, "ntc:pos");
     const before = fix.engine.getNodeVoltage(midNode);
 
-    const ntcEl = ceByLabel(fix, "ntc");
+    const ntcEl = fix.element("ntc");
     fix.coordinator.setComponentProperty(ntcEl, "temperature", 348.15);
     fix.coordinator.dcOperatingPoint();
 
@@ -319,7 +311,7 @@ describe("NTCThermistor parameter hot-load (T1)", () => {
     const midNode = nodeOf(fix, "ntc:pos");
     const before = fix.engine.getNodeVoltage(midNode);
 
-    const ntcEl = ceByLabel(fix, "ntc");
+    const ntcEl = fix.element("ntc");
     fix.coordinator.setComponentProperty(ntcEl, "t0", 310);
     fix.coordinator.dcOperatingPoint();
 

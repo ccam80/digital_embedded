@@ -9,7 +9,6 @@ import {
 import { SPARK_GAP_SCHEMA } from "../spark-gap.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -71,13 +70,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 function findSparkGapIndex(fix: ReturnType<typeof buildFixture>): number {
@@ -191,7 +183,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
     const sg = fix.circuit.elements[sgIdx]!;
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(0);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sg"), "vBreakdown", 200);
+    fix.coordinator.setComponentProperty(fix.element("sg"), "vBreakdown", 200);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(1);
@@ -206,7 +198,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
       }),
     });
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "sg:pos"));
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sg"), "rOn", 50);
+    fix.coordinator.setComponentProperty(fix.element("sg"), "rOn", 50);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "sg:pos"));
     const expectedAfter = 2000 * 50 / (100 + 50);
@@ -224,7 +216,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
       }),
     });
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "sg:pos"));
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sg"), "rOff", 1000);
+    fix.coordinator.setComponentProperty(fix.element("sg"), "rOff", 1000);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "sg:pos"));
     const expectedAfter = 50 * 1000 / (100 + 1000);
@@ -245,7 +237,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
     const sg = fix.circuit.elements[sgIdx]!;
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(1);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sg"), "iHold", 100);
+    fix.coordinator.setComponentProperty(fix.element("sg"), "iHold", 100);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(0);

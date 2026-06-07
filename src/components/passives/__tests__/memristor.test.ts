@@ -82,19 +82,6 @@ function findMemristor(elements: ReadonlyArray<unknown>): MemristorElement {
   return elements[idx] as MemristorElement;
 }
 
-function findMemristorIndex(fix: ReturnType<typeof buildFixture>): number {
-  const idx = fix.circuit.elements.findIndex((el) => el instanceof MemristorElement);
-  if (idx < 0) throw new Error("MemristorElement not found in compiled circuit");
-  return idx;
-}
-
-function getMemristorCe(fix: ReturnType<typeof buildFixture>) {
-  const idx = findMemristorIndex(fix);
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  if (ce === undefined) throw new Error("CircuitElement not found for MemristorElement");
-  return ce;
-}
-
 // ---------------------------------------------------------------------------
 // Category 1 — Initialization (T1)
 // Post-warm-start: SLOT_W contains initialState; node voltage tracks the
@@ -198,7 +185,7 @@ describe("Memristor parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nMem);
     expect(before).toBeCloseTo(5, 1);
 
-    fix.coordinator.setComponentProperty(getMemristorCe(fix), "rOff", 4000);
+    fix.coordinator.setComponentProperty(fix.element("mem"), "rOff", 4000);
     fix.coordinator.dcOperatingPoint();
 
     const after = fix.engine.getNodeVoltage(nMem);
@@ -223,7 +210,7 @@ describe("Memristor parameter hot-load (T1)", () => {
     // w=0.5: V_mem ~ 0.4984 V (mid-state divider).
     expect(before).toBeCloseTo(0.4984, 2);
 
-    fix.coordinator.setComponentProperty(getMemristorCe(fix), "initialState", 0.0);
+    fix.coordinator.setComponentProperty(fix.element("mem"), "initialState", 0.0);
     // SLOT_W must be reset to the new initialState.
     expect(fix.pool.state1[mem._stateBase + SLOT_W]).toBeCloseTo(0.0, 9);
 

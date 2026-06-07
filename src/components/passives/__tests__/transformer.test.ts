@@ -110,16 +110,6 @@ function nodeOf(fix: Fixture, label: string): number {
   return n;
 }
 
-function getTransformerCe(fix: Fixture) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "TX1",
-  );
-  if (idx < 0) throw new Error("TX1 element not found by label");
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  if (ce === undefined) throw new Error("TX1 elementToCircuitElement entry missing");
-  return ce;
-}
-
 // ===========================================================================
 // Category 1 — Initialization (T1)
 // Post-warm-start: the netlist composite expands to 2 inductors (L1, L2) +
@@ -271,7 +261,7 @@ describe("Transformer parameter hot-load (T1)", () => {
     while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(s1Node);
 
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "turnsRatio", 4.0);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "turnsRatio", 4.0);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(s1Node);
     expect(after).not.toBeCloseTo(before, 3);
@@ -292,7 +282,7 @@ describe("Transformer parameter hot-load (T1)", () => {
     while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(s1Node);
 
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "primaryInductance", 200e-3);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "primaryInductance", 200e-3);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(s1Node);
     expect(after).not.toBeCloseTo(before, 3);
@@ -313,7 +303,7 @@ describe("Transformer parameter hot-load (T1)", () => {
     while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(s1Node);
 
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "couplingCoefficient", 0.3);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "couplingCoefficient", 0.3);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(s1Node);
     expect(after).not.toBeCloseTo(before, 3);
@@ -336,7 +326,7 @@ describe("Transformer parameter hot-load (T1)", () => {
     while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(s1Node);
 
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "primaryResistance", 50);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "primaryResistance", 50);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(s1Node);
     expect(after).not.toBeCloseTo(before, 3);
@@ -358,7 +348,7 @@ describe("Transformer parameter hot-load (T1)", () => {
     while (fix.engine.simTime < 1.5e-3) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(s1Node);
 
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "secondaryResistance", 50);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "secondaryResistance", 50);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(s1Node);
     expect(after).not.toBeCloseTo(before, 3);

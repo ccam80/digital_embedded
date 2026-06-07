@@ -163,16 +163,9 @@ describe("Zener DCOP analytical (T1)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Zener parameter hot-load (T1)", () => {
-  function getZenerCe(fix: ReturnType<typeof buildFixture>) {
-    const { idx } = findZenerAnalog(fix);
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return ce!;
-  }
-
   it("hotload_IS_changes_vf_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
-    const ce = getZenerCe(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -186,7 +179,7 @@ describe("Zener parameter hot-load (T1)", () => {
 
   it("hotload_N_changes_vf_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
-    const ce = getZenerCe(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -200,7 +193,7 @@ describe("Zener parameter hot-load (T1)", () => {
 
   it("hotload_BV_shifts_breakdown_clamp", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerBreakdown(f) });
-    const ce = getZenerCe(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -215,7 +208,7 @@ describe("Zener parameter hot-load (T1)", () => {
 
   it("hotload_NBV_changes_breakdown_response", () => {
     const fix = buildFixture({ build: (_r, f) => buildZenerBreakdown(f) });
-    const ce = getZenerCe(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -232,7 +225,7 @@ describe("Zener parameter hot-load (T1)", () => {
     // triggers _computeZenerTp() which re-derives vt, nVt, nbvVt, tVcrit,
     // vcritBrk, tBV.
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
-    const ce = getZenerCe(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -282,8 +275,7 @@ describe("Zener computeTemperature engine-driven path (T1)", () => {
     // Per-instance TEMP set via setParam must not be overwritten by the
     // engine-driven computeTemperature pass (diotemp.c:84 DIOtempGiven guard).
     const fix = buildFixture({ build: (_r, f) => buildZenerForward(f) });
-    const { idx } = findZenerAnalog(fix);
-    const ce = fix.circuit.elementToCircuitElement.get(idx)!;
+    const ce = fix.element("D1");
 
     // Set per-instance TEMP override to 500 K.
     fix.coordinator.setComponentProperty(ce, "TEMP", 500);

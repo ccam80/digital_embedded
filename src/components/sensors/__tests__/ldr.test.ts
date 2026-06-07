@@ -8,7 +8,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -75,13 +74,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 /** Closed-form LDR resistance: lux ≤ 0 → rDark; else rDark·(lux/luxRef)^(-gamma). */
@@ -199,7 +191,7 @@ describe("LDR parameter hot-load (T1)", () => {
                          / (1e6 + ldrResistance(1e6, 1000, 0.7, 100));
     expect(before).toBeCloseTo(expectedBefore, 6);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "lux", 5000);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "lux", 5000);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(node);
     const expectedAfter = 5 * ldrResistance(1e6, 1000, 0.7, 5000)
@@ -222,7 +214,7 @@ describe("LDR parameter hot-load (T1)", () => {
         vSource: 5, rSeries: 1e6, rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 1000,
       }),
     });
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "lux", 0);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "lux", 0);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "L1:pos"));
     const expectedAfter = 5 * 1e6 / (1e6 + 1e6); // dark-branch divider
@@ -242,7 +234,7 @@ describe("LDR parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(node);
     expect(before).toBeCloseTo(2.5, 6);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "rDark", 4000);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "rDark", 4000);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(node);
     const expectedAfter = 5 * 4000 / (1000 + 4000); // 4.0V
@@ -265,7 +257,7 @@ describe("LDR parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(node);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "luxRef", 100);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "luxRef", 100);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(node);
     const expectedAfter = 5 * 1e6 / (1e6 + 1e6); // 2.5V
@@ -288,7 +280,7 @@ describe("LDR parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(node);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "L1"), "gamma", 1.4);
+    fix.coordinator.setComponentProperty(fix.element("L1"), "gamma", 1.4);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(node);
     const R_after = ldrResistance(1e6, 1000, 1.4, 100);

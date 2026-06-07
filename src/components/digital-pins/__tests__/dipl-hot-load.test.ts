@@ -5,7 +5,6 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { Circuit } from "../../../core/circuit.js";
 import type { Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
-import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // DIPL hot-load tests — Surface 1 (T1 buildFixture)
@@ -38,13 +37,6 @@ function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 function buildBufAt(vInput: number, loaded: number) {
@@ -98,7 +90,7 @@ describe("DIPL Loaded: vIH hot-load reclassifies on next step (T1)", () => {
     expect(before).toBeCloseTo(V_MID, 6);
 
     // Lower vIH to 1.0: now 1.2 > vIH(1.0) → reclassifies to result = 1.0 → V(out) = V_HIGH
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vIH", 1.0);
     fix.coordinator.step();
 
@@ -119,7 +111,7 @@ describe("DIPL Loaded: vIL hot-load reclassifies on next step (T1)", () => {
     expect(before).toBeCloseTo(V_MID, 6);
 
     // Raise vIL to 1.4: now 1.2 < vIL(1.4) → reclassifies to result = 0.0 → V(out) = V_LOW
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vIL", 1.4);
     fix.coordinator.step();
 
@@ -160,7 +152,7 @@ describe("DIPL Loaded: rIn hot-load shifts load-induced node voltage (T1)", () =
 
     // Raise rIn to 1e7: new divider V(In_1) = 5 × 1e7/(4e6+1e7) ≈ 3.57 V > vIH(2.0)
     // → result = 1.0 → V(out) = V_HIGH. Re-run DC-OP to see the steady-state effect.
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "rIn", 1e7);
     const dcAfter = fix.coordinator.dcOperatingPoint();
     expect(dcAfter).not.toBeNull();
@@ -225,19 +217,11 @@ describe("DIPL Loaded: cIn hot-load shifts settling time constant (T1)", () => {
     expect(fix.engine.getNodeVoltage(inNode)).toBeCloseTo(0.0, 6);
 
     // Hot-load cIn = 1e-7 (100 nF), making τ = 0.1 s.
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "cIn", cInLarge);
 
     // Find the vs element and flip it to 5 V to drive a rising edge.
-    let vsEl: CircuitElement | undefined;
-    for (const ce of fix.circuit.elementToCircuitElement.values()) {
-      if (ce.getProperties().getOrDefault<string>("label", "") === "vs") {
-        vsEl = ce;
-        break;
-      }
-    }
-    if (vsEl === undefined) throw new Error("vs not found in elementToCircuitElement");
-    fix.coordinator.setComponentProperty(vsEl, "voltage", 5.0);
+    fix.coordinator.setComponentProperty(fix.element("vs"), "voltage", 5.0);
 
     // Step for t_observe = 5 µs (10 steps at 0.5 µs each).
     for (let i = 0; i < 10; i++) {
@@ -277,7 +261,7 @@ describe("DIPL: two-hop binding — setComponentProperty on parent gate routes t
     // Two-hop binding: gate → inPin_1/inPin_2 DIPL wrappers → thresh sub-elements.
     // Now 1.2 > vIH(1.0) → each thresh emits 1.0 → AND: min(1.0, 1.0) = 1.0
     // → ctrl_out = 1.0 → V(out) = V_HIGH = 5.0 V
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vIH", 1.0);
     fix.coordinator.step();
 
@@ -302,7 +286,7 @@ describe("DIPL Unloaded: vIH hot-load reclassifies on next step (T1)", () => {
     expect(before).toBeCloseTo(V_MID, 6);
 
     // Lower vIH to 1.0: 1.2 > 1.0 → result = 1.0 → V(out) = V_HIGH
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vIH", 1.0);
     fix.coordinator.step();
 
@@ -323,7 +307,7 @@ describe("DIPL Unloaded: vIL hot-load reclassifies on next step (T1)", () => {
     expect(before).toBeCloseTo(V_MID, 6);
 
     // Raise vIL to 1.4: 1.2 < 1.4 → result = 0.0 → V(out) = V_LOW
-    const gate = ceByLabel(fix, "gate");
+    const gate = fix.element("gate");
     fix.coordinator.setComponentProperty(gate, "vIL", 1.4);
     fix.coordinator.step();
 

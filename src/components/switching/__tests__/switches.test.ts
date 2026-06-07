@@ -8,7 +8,6 @@ import { createDefaultRegistry } from "../../register-all.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
@@ -51,13 +50,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +278,7 @@ describe("Switch parameter hot-load (T1) — Ron", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rl:pos"));
     expect(before).toBeCloseTo(10 * 1000 / 1001, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sw1"), "Ron", 100);
+    fix.coordinator.setComponentProperty(fix.element("sw1"), "Ron", 100);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rl:pos"));
 
@@ -310,7 +302,7 @@ describe("Switch parameter hot-load (T1) — Roff", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rl:pos"));
     expect(before).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sw1"), "Roff", 10);
+    fix.coordinator.setComponentProperty(fix.element("sw1"), "Roff", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rl:pos"));
 
@@ -333,7 +325,7 @@ describe("Switch parameter hot-load (T1) — closed toggle", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rl:pos"));
     expect(before).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sw1"), "closed", 1);
+    fix.coordinator.setComponentProperty(fix.element("sw1"), "closed", 1);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rl:pos"));
 
@@ -357,7 +349,7 @@ describe("SwitchDT parameter hot-load (T1) — Ron", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rb:pos"));
     expect(before).toBeCloseTo(10 * 1000 / 1001, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sw1"), "Ron", 100);
+    fix.coordinator.setComponentProperty(fix.element("sw1"), "Ron", 100);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rb:pos"));
 
@@ -382,7 +374,7 @@ describe("SwitchDT parameter hot-load (T1) — closed toggle routes pole", () =>
     expect(vbBefore).toBeCloseTo(10 * 1000 / 1001, 3);
     expect(Math.abs(vcBefore)).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "sw1"), "closed", 0);
+    fix.coordinator.setComponentProperty(fix.element("sw1"), "closed", 0);
     fix.coordinator.dcOperatingPoint();
     const vbAfter = fix.engine.getNodeVoltage(nodeOf(fix, "rb:pos"));
     const vcAfter = fix.engine.getNodeVoltage(nodeOf(fix, "rc:pos"));

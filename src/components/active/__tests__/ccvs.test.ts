@@ -219,17 +219,7 @@ describe("CCVS hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNodeId);
     expect(before).toBeCloseTo(1.0, 4);
 
-    // Resolve the CCVS CircuitElement by label via the compiled circuit's
-    // element-to-CircuitElement map - the same surface buildElementLabels
-    // walks. This avoids reaching into a non-public unified-compiled field.
-    let ccvsCe: import("../../../core/element.js").CircuitElement | undefined;
-    for (const ce of fix.circuit.elementToCircuitElement.values()) {
-      const ceLabel = ce.getProperties().getOrDefault<string>("label", "");
-      if (ceLabel === "ccvs1") { ccvsCe = ce; break; }
-    }
-    expect(ccvsCe).toBeDefined();
-
-    fix.coordinator.setComponentProperty(ccvsCe!, "transresistance", 2000);
+    fix.coordinator.setComponentProperty(fix.element("ccvs1"), "transresistance", 2000);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNodeId);

@@ -4,7 +4,6 @@ import { buildFixture, type Fixture } from "./fixtures/build-fixture.js";
 import type { ComponentRegistry } from "../../../core/registry.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // Bench builders
@@ -75,13 +74,6 @@ function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // Closed-form rail bands for the behavioral driver into a 10 kohm load.
@@ -169,7 +161,7 @@ describe("Behavioral integration parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "and1:out");
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const gate = ceByLabel(fix, "and1");
+    const gate = fix.element("and1");
     fix.coordinator.setComponentProperty(gate, "vOH", 8.0);
     fix.coordinator.step();
 
@@ -184,7 +176,7 @@ describe("Behavioral integration parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "and1:out");
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const gate = ceByLabel(fix, "and1");
+    const gate = fix.element("and1");
     fix.coordinator.setComponentProperty(gate, "vOL", 1.0);
     fix.coordinator.step();
 
@@ -201,7 +193,7 @@ describe("Behavioral integration parameter hot-load (T1)", () => {
     const qbarNode = nodeOf(fix, "dff1:~Q");
     const before = fix.engine.getNodeVoltage(qbarNode);
 
-    const dff = ceByLabel(fix, "dff1");
+    const dff = fix.element("dff1");
     fix.coordinator.setComponentProperty(dff, "rOut", 5_000);
     fix.coordinator.step();
 
@@ -218,7 +210,7 @@ describe("Behavioral integration parameter hot-load (T1)", () => {
     const outNode = nodeOf(fix, "and1:out");
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const gate = ceByLabel(fix, "and1");
+    const gate = fix.element("and1");
     fix.coordinator.setComponentProperty(gate, "vIL", 3.5);
     fix.coordinator.setComponentProperty(gate, "vIH", 4.0);
     fix.coordinator.step();

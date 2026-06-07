@@ -28,16 +28,6 @@ function findComparatorDriver(elements: ReadonlyArray<unknown>): PoolBackedAnalo
   return elements[idx] as PoolBackedAnalogElement;
 }
 
-function getCmpCe(fix: ReturnType<typeof buildFixture>) {
-  const wrapperIdx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "cmp",
-  );
-  if (wrapperIdx < 0) throw new Error("cmp wrapper not found");
-  const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-  if (ce === undefined) throw new Error("cmp CircuitElement not in map");
-  return ce;
-}
-
 // ---------------------------------------------------------------------------
 // Cat 1 — Initialization (T1) — open-collector topology
 // ---------------------------------------------------------------------------
@@ -344,7 +334,7 @@ describe("Comparator parameter hot-load — open-collector (T1)", () => {
     const outNodeId = fix.circuit.labelToNodeId.get("cmp:out")!;
     const before = fix.engine.getNodeVoltage(outNodeId);
     expect(before).toBeLessThan(3.3);
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "rOut", 5000);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "rOut", 5000);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNodeId);
     expect(after).toBeGreaterThan(before);
@@ -409,7 +399,7 @@ describe("Comparator parameter hot-load — open-collector (T1)", () => {
     for (let i = 0; i < 20; i++) fix.coordinator.step();
     const outNodeId = fix.circuit.labelToNodeId.get("cmp:out")!;
     const before = fix.engine.getNodeVoltage(outNodeId);
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "hysteresis", 0.5);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "hysteresis", 0.5);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNodeId);
     expect(after).toBeGreaterThan(before);
@@ -439,7 +429,7 @@ describe("Comparator parameter hot-load — open-collector (T1)", () => {
     for (let i = 0; i < 20; i++) fix.coordinator.step();
     const outNodeId = fix.circuit.labelToNodeId.get("cmp:out")!;
     const before = fix.engine.getNodeVoltage(outNodeId);
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "vos", 0.2);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "vos", 0.2);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNodeId);
     expect(after).toBeGreaterThan(before);
@@ -469,7 +459,7 @@ describe("Comparator parameter hot-load — push-pull (T1)", () => {
     });
     const outNodeId = fix.circuit.labelToNodeId.get("cmp:out")!;
     const before = fix.engine.getNodeVoltage(outNodeId);
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "vOH", 5.0);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "vOH", 5.0);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNodeId);
     expect(after).toBeGreaterThan(before);
@@ -498,7 +488,7 @@ describe("Comparator parameter hot-load — push-pull (T1)", () => {
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const outNodeId = fix.circuit.labelToNodeId.get("cmp:out")!;
     const before = fix.engine.getNodeVoltage(outNodeId);
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "vOL", -1.0);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "vOL", -1.0);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNodeId);
     expect(after).toBeLessThan(before);

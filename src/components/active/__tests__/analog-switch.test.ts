@@ -454,16 +454,6 @@ describe("AnalogSwitchSPST parameter hot-load (T1)", () => {
     });
   }
 
-  function getSwCe(fix: ReturnType<typeof buildSpstOnFixture>) {
-    const wrapperIdx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "sw",
-    );
-    expect(wrapperIdx).toBeGreaterThanOrEqual(0);
-    const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-    expect(ce).toBeDefined();
-    return ce!;
-  }
-
   it("hotload_rOn_raises_sw_in_voltage", () => {
     // Before: rOn=1 => V_sw_in = 5*1/(1000+1) ≈ 0.004995V
     // After setParam("rOn",50): V_sw_in = 5*50/(1000+50) ≈ 0.23810V
@@ -474,7 +464,7 @@ describe("AnalogSwitchSPST parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nodeId);
     expect(before).toBeCloseTo(5 * 1 / 1001, 4);
 
-    fix.coordinator.setComponentProperty(getSwCe(fix), "rOn", 50);
+    fix.coordinator.setComponentProperty(fix.element("sw"), "rOn", 50);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nodeId);
@@ -492,7 +482,7 @@ describe("AnalogSwitchSPST parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nodeId);
     expect(before).toBeCloseTo(5 * 1 / 1001, 4);
 
-    fix.coordinator.setComponentProperty(getSwCe(fix), "rOff", 100);
+    fix.coordinator.setComponentProperty(fix.element("sw"), "rOff", 100);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nodeId);
@@ -509,7 +499,7 @@ describe("AnalogSwitchSPST parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nodeId);
     expect(before).toBeCloseTo(5 * 1 / 1001, 4);
 
-    fix.coordinator.setComponentProperty(getSwCe(fix), "vThreshold", 4.0);
+    fix.coordinator.setComponentProperty(fix.element("sw"), "vThreshold", 4.0);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(nodeId);
@@ -527,7 +517,7 @@ describe("AnalogSwitchSPST parameter hot-load (T1)", () => {
     const sw = findSPSTElement(fix.circuit.elements);
     expect(fix.pool.state0[sw._stateBase + SLOT_STATE]).toBe(1); // REALLY_ON
 
-    fix.coordinator.setComponentProperty(getSwCe(fix), "vHysteresis", 0.5);
+    fix.coordinator.setComponentProperty(fix.element("sw"), "vHysteresis", 0.5);
     fix.coordinator.step();
 
     expect(fix.pool.state0[sw._stateBase + SLOT_STATE]).toBe(1); // still REALLY_ON

@@ -119,16 +119,6 @@ function findCap(elements: ReadonlyArray<AnalogElement>): PoolBackedAnalogElemen
   return findLeafByLabel(elements, "cap:cBody");
 }
 
-function getCapCe(fix: ReturnType<typeof buildFixture>) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "cap",
-  );
-  expect(idx).toBeGreaterThanOrEqual(0);
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return ce!;
-}
-
 // ===========================================================================
 // Category 1 — Initialization (T1)
 // Post-warm-start state pool slot values and node voltages.
@@ -376,7 +366,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     const idxFix = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(idxFix);
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "capacitance", 1e-3);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "capacitance", 1e-3);
     fix.coordinator.step();
     const [iAfter] = fix.engine.getElementPinCurrents(idxFix);
     expect(Math.abs(iAfter)).not.toBeCloseTo(Math.abs(iBefore));
@@ -401,7 +391,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     // I ≈ V/ESR = 10/5 = 2A.
     expect(Math.abs(iBefore)).toBeCloseTo(2, 0);
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "esr", 10);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "esr", 10);
     fix.coordinator.step();
     const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
     // ESR doubled → I ≈ V/ESR = 10/10 = 1A.
@@ -431,7 +421,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
     expect(Math.abs(iBefore)).toBeCloseTo(V / (esr + Vrate / 1e-6), 8);
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "leakageCurrent", 1e-3);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "leakageCurrent", 1e-3);
     fix.coordinator.step();
     const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
     // R_leak dropped 1000× → I rose ~1000×.
@@ -460,7 +450,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
     expect(Math.abs(iBefore)).toBeCloseTo(V / (esr + 25 / Ileak), 8);
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "voltageRating", 50);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "voltageRating", 50);
     fix.coordinator.step();
     const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
     // R_leak doubled → I halved.
@@ -488,7 +478,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
       .filter((d) => d.code === "reverse-biased-cap");
     expect(diagsBefore.length).toBe(0);
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "reverseMax", 1.0);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "reverseMax", 1.0);
     fix.coordinator.step();
 
     const diagsAfter = fix.coordinator.getRuntimeDiagnostics()
@@ -512,7 +502,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     const SLOT_V = SCHEMA.indexOf.get("V")!;
     const vBefore = fix.pool.state0[cap._stateBase + SLOT_V];
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "IC", 2);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "IC", 2);
     fix.coordinator.reset();
     fix.coordinator.step();
     const vAfter = fix.pool.state0[cap._stateBase + SLOT_V];
@@ -543,7 +533,7 @@ describe("PolarizedCap parameter hot-load (T1)", () => {
     const capIdx = findLeafIndexByLabel(fix.circuit.elements, "cap:cBody");
     const [iBefore] = fix.engine.getElementPinCurrents(capIdx);
 
-    fix.coordinator.setComponentProperty(getCapCe(fix), "M", 2);
+    fix.coordinator.setComponentProperty(fix.element("cap"), "M", 2);
     fix.coordinator.step();
     const [iAfter] = fix.engine.getElementPinCurrents(capIdx);
 

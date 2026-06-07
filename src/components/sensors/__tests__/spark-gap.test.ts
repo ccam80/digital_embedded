@@ -207,8 +207,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(0);
 
     // Drop vBreakdown to 200 V -> Vsrc=500 > vBreakdown -> gap should fire.
-    const sgIdx = fix.circuit.elements.indexOf(sg);
-    const sgCe = fix.circuit.elementToCircuitElement.get(sgIdx)!;
+    const sgCe = fix.element("sg");
     fix.coordinator.setComponentProperty(sgCe, "vBreakdown", 200);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
@@ -229,8 +228,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
     const vBefore = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("sg:pos")!);
 
     // Hot-patch rOn from 5 to 50: divider shifts from Vsrc*5/105 to Vsrc*50/150.
-    const sgIdx = fix.circuit.elements.indexOf(sg);
-    const sgCe = fix.circuit.elementToCircuitElement.get(sgIdx)!;
+    const sgCe = fix.element("sg");
     fix.coordinator.setComponentProperty(sgCe, "rOn", 50);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
@@ -254,8 +252,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
     const vBefore = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("sg:pos")!);
 
     // Hot-patch rOff from 1e9 -> 1e11. Closed form: Vsrc*rOff/(rs+rOff) ~ Vsrc.
-    const sgIdx = fix.circuit.elements.indexOf(sg);
-    const sgCe = fix.circuit.elementToCircuitElement.get(sgIdx)!;
+    const sgCe = fix.element("sg");
     fix.coordinator.setComponentProperty(sgCe, "rOff", 1e11);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 
@@ -286,8 +283,7 @@ describe("SparkGap parameter hot-load (T1)", () => {
     expect(fix.pool.state1[sg._stateBase + SLOT_CONDUCTING]).toBe(1);
 
     // Raise iHold above the steady-state current -> gap must extinguish.
-    const sgIdx = fix.circuit.elements.indexOf(sg);
-    const sgCe = fix.circuit.elementToCircuitElement.get(sgIdx)!;
+    const sgCe = fix.element("sg");
     fix.coordinator.setComponentProperty(sgCe, "iHold", 0.5);
     for (let i = 0; i < 20; i++) fix.coordinator.step();
 

@@ -86,13 +86,7 @@ function nodeOf(fix: Fixture, label: string): number {
 }
 
 function getTLineCe(fix: Fixture) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "TL1",
-  );
-  if (idx < 0) throw new Error("TL1 element not found by label");
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  if (ce === undefined) throw new Error("TL1 elementToCircuitElement entry missing");
-  return ce;
+  return fix.element("TL1");
 }
 
 // ===========================================================================

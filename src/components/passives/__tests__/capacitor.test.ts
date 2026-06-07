@@ -9,7 +9,6 @@ import {
 import { AnalogCapacitorElement } from "../capacitor.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -67,13 +66,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 function findCapacitor(fix: ReturnType<typeof buildFixture>): { el: AnalogCapacitorElement; idx: number } {
@@ -163,7 +155,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau0 / 4) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     fix.coordinator.setComponentProperty(capEl, "capacitance", 4 * C0);
     // After the change tau quadruples; charging at the same voltage
     // becomes much slower so node voltage rises more slowly per step.
@@ -204,7 +196,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau0 / 4) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     // Raise TC1 → factor = 1 + TC1*50.15 with TC1=0.01 → ~1.5. C grows,
     // tau grows, charging slows → V(C1:pos) trajectory changes.
     fix.coordinator.setComponentProperty(capEl, "TC1", 0.01);
@@ -241,7 +233,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau0 / 4) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     fix.coordinator.setComponentProperty(capEl, "TC2", 1e-4);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(cPosNode);
@@ -277,7 +269,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau0 / 4) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     // Push TNOM far below operating temp so dT grows ~50 → factor large.
     fix.coordinator.setComponentProperty(capEl, "TNOM", 200);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
@@ -301,7 +293,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau0 / 4) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     fix.coordinator.setComponentProperty(capEl, "SCALE", 4);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(cPosNode);
@@ -325,7 +317,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     while (fix.engine.simTime < tau0 / 4) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     fix.coordinator.setComponentProperty(capEl, "M", 4);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(cPosNode);
@@ -347,7 +339,7 @@ describe("Capacitor parameter hot-load (T1)", () => {
     const cPosNode = nodeOf(fix, "C1:pos");
     const before = fix.engine.getNodeVoltage(cPosNode);
 
-    const capEl = ceByLabel(fix, "C1");
+    const capEl = fix.element("C1");
     fix.coordinator.setComponentProperty(capEl, "IC", 0.4);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(cPosNode);

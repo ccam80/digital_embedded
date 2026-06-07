@@ -11,7 +11,6 @@ import { createDefaultRegistry } from "../../register-all.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
@@ -44,13 +43,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +233,7 @@ describe("TransGate parameter hot-load (T1) — Ron", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
     expect(before).toBeCloseTo(1000 / 1001, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "tg"), "Ron", 200);
+    fix.coordinator.setComponentProperty(fix.element("tg"), "Ron", 200);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
@@ -269,7 +261,7 @@ describe("TransGate parameter hot-load (T1) — Roff", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
     expect(before).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "tg"), "Roff", 10);
+    fix.coordinator.setComponentProperty(fix.element("tg"), "Roff", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 
@@ -294,7 +286,7 @@ describe("TransGate parameter hot-load (T1) — Vth", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
     expect(before).toBeCloseTo(1000 / 1001, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "tg"), "Vth", 2);
+    fix.coordinator.setComponentProperty(fix.element("tg"), "Vth", 2);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rload:pos"));
 

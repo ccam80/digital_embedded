@@ -215,18 +215,9 @@ describe("MOS3 parameter hot-load (T1)", () => {
     });
   }
 
-  function getM1(fix: ReturnType<typeof buildFixture>) {
-    const idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "M1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return { idx, ce: ce! };
-  }
-
   it("hotload_KP_changes_vd", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "KP", 600e-6);
@@ -237,7 +228,7 @@ describe("MOS3 parameter hot-load (T1)", () => {
 
   it("hotload_VTO_changes_vd", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "VTO", 3);
@@ -248,7 +239,7 @@ describe("MOS3 parameter hot-load (T1)", () => {
 
   it("hotload_THETA_takes_effect", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "THETA", 0.5);
@@ -260,7 +251,7 @@ describe("MOS3 parameter hot-load (T1)", () => {
 
   it("hotload_KAPPA_takes_effect", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     fix.coordinator.setComponentProperty(ce, "KAPPA", 1.5);
     fix.coordinator.step();
@@ -270,7 +261,7 @@ describe("MOS3 parameter hot-load (T1)", () => {
 
   it("hotload_VMAX_takes_effect", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "VMAX", 5e4);
@@ -282,7 +273,7 @@ describe("MOS3 parameter hot-load (T1)", () => {
 
   it("hotload_TEMP_changes_vd", () => {
     const fix = buildSwitch();
-    const { ce } = getM1(fix);
+    const ce = fix.element("M1");
     const vdNode = fix.circuit.labelToNodeId.get("M1:D")!;
     const before = fix.engine.getNodeVoltage(vdNode);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);

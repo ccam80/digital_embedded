@@ -4,7 +4,6 @@ import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fi
 import { AnalogFuseElement, ANALOG_FUSE_SCHEMA } from "../analog-fuse.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -52,13 +51,6 @@ function findFuseElement(elements: ReadonlyArray<unknown>): AnalogFuseElement {
   const idx = elements.findIndex((el) => el instanceof AnalogFuseElement);
   if (idx < 0) throw new Error("AnalogFuseElement not found in compiled circuit");
   return elements[idx] as AnalogFuseElement;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +152,7 @@ describe("AnalogFuse parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(outNode);
     expect(before).toBeCloseTo(5.0 * 9.0 / (9.0 + 0.01), 4);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     fix.coordinator.setComponentProperty(fuseCe, "rCold", 100);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
@@ -185,7 +177,7 @@ describe("AnalogFuse parameter hot-load (T1)", () => {
     const fuse = findFuseElement(fix.circuit.elements);
     expect(fuse.blown).toBe(false);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     fix.coordinator.setComponentProperty(fuseCe, "i2tRating", 0.1);
 
     // Step until blown or simTime exceeds the original (rating=10) prediction.
@@ -289,7 +281,7 @@ describe("AnalogFuse cross-engine writeback (Cat 15)", () => {
     }
     expect(fuse.blown).toBe(true);
 
-    const fuseCe = ceByLabel(fix, "fuse");
+    const fuseCe = fix.element("fuse");
     const props = fuseCe.getProperties();
     expect(props.get("blown")).toBe(true);
   });

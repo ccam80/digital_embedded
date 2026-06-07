@@ -131,16 +131,6 @@ function buildInvertingAmp(opts: InvertingAmpOpts) {
   });
 }
 
-function getOpAmpCe(fix: ReturnType<typeof buildUnityFollower>) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "opamp",
-  );
-  expect(idx).toBeGreaterThanOrEqual(0);
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return ce!;
-}
-
 // ===========================================================================
 // Category 1 — Initialization (T1)
 // ===========================================================================
@@ -311,7 +301,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     const expectedBefore = -0.1 * 10 * 100 / (1 + 100 * 11);
     expect(before).toBeCloseTo(expectedBefore, 4);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "aol", 1e6);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "aol", 1e6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
     // High aol drives output to the ideal -Rf/Rin*Vin = -1V.
@@ -335,7 +325,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nOut);
     expect(before).toBeCloseTo(-1, 2);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "vos", 1e-3);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "vos", 1e-3);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
     // Δ ≈ +Vos * (1 + Rf/Rin) = 1e-3 * 11 = 0.011V.
@@ -360,7 +350,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const beforeLowRin = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "rIn", 1e12);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "rIn", 1e12);
     fix.coordinator.dcOperatingPoint();
     const afterHighRin = fix.engine.getNodeVoltage(nOut);
 
@@ -380,7 +370,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nOut);
     expect(before).toBeCloseTo(4, 3);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "rOut", 1000);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "rOut", 1000);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
     expect(after).toBeCloseTo(4, 3);
@@ -401,7 +391,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     expect(before).toBeCloseTo(10, 3);
     expect(fix.pool.state0[opamp._stateBase + SLOT_OUT_SAT_FLAG]).toBe(0);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "vSatPos", 6);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "vSatPos", 6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
     // vRailPos = Vcc+ - vSatPos = 15 - 6 = 9V; output clamps at 9V.
@@ -424,7 +414,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     expect(before).toBeCloseTo(-10, 3);
     expect(fix.pool.state0[opamp._stateBase + SLOT_OUT_SAT_FLAG]).toBe(0);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "vSatNeg", 6);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "vSatNeg", 6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
     // vRailNeg = Vcc- + vSatNeg = -15 + 6 = -9V; output clamps at -9V.
@@ -448,7 +438,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "iBias", 1e-6);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "iBias", 1e-6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
 
@@ -466,7 +456,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "iMax", 1e-3);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "iMax", 1e-3);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
 
@@ -483,7 +473,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "gbw", 10e6);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "gbw", 10e6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
 
@@ -500,7 +490,7 @@ describe("RealOpAmp parameter hot-load (T1)", () => {
     fix.coordinator.dcOperatingPoint();
     const before = fix.engine.getNodeVoltage(nOut);
 
-    fix.coordinator.setComponentProperty(getOpAmpCe(fix), "slewRate", 50e6);
+    fix.coordinator.setComponentProperty(fix.element("opamp"), "slewRate", 50e6);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nOut);
 

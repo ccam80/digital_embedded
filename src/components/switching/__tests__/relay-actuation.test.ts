@@ -12,7 +12,6 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { CurrentControlledSwitchAnalogElement, CSW_SCHEMA } from "../current-controlled-switch.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { SignalValue } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
@@ -51,13 +50,6 @@ function nodeOf(fix: Fixture, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 /** Locate the CurrentControlledSwitch sub-element inside the expanded relay composite. */
@@ -235,7 +227,7 @@ describe("Relay parameter hot-load (T1) — coilResistance", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
     expect(before).toBeCloseTo(100 / 100.01, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "coilResistance", 1000);
+    fix.coordinator.setComponentProperty(fix.element("relay"), "coilResistance", 1000);
     // Step a few times so the inductor's branch current settles to the new
     // V/R steady state and the CSW hysteresis sees |I| < dropOutI.
     for (let i = 0; i < 50; i++) fix.coordinator.step();
@@ -285,7 +277,7 @@ describe("Relay parameter hot-load (T1) — pullInI", () => {
     // Contact OPEN: V(rLoad:pos) collapses toward 0V via Roff.
     expect(before).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "pullInI", 0.01);
+    fix.coordinator.setComponentProperty(fix.element("relay"), "pullInI", 0.01);
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
 
@@ -310,7 +302,7 @@ describe("Relay parameter hot-load (T1) — dropOutI", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
     expect(before).toBeCloseTo(100 / 100.01, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "dropOutI", 1.0);
+    fix.coordinator.setComponentProperty(fix.element("relay"), "dropOutI", 1.0);
     for (let i = 0; i < 50; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
 
@@ -334,7 +326,7 @@ describe("Relay parameter hot-load (T1) — Ron", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
     expect(before).toBeCloseTo(100 / 100.01, 3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "Ron", 900);
+    fix.coordinator.setComponentProperty(fix.element("relay"), "Ron", 900);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
 
@@ -358,7 +350,7 @@ describe("Relay parameter hot-load (T1) — Roff", () => {
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
     expect(before).toBeLessThan(1e-3);
 
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "Roff", 10);
+    fix.coordinator.setComponentProperty(fix.element("relay"), "Roff", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "rLoad:pos"));
 
@@ -487,8 +479,8 @@ describe("Relay parameter hot-load (T1) — inductance", () => {
     // slow L (τ=0.5 s) needs ~5*0.5=2.5s. Same 200×default-dt of steps
     // (default tStop=1ms / 50 → dt≈2e-5 → 200 steps ≈ 4ms) lands the
     // default circuit fully closed and the slow circuit still mid-charge.
-    fixDefaultDriven.coordinator.setComponentProperty(ceByLabel(fixDefaultDriven, "vSrc"), "voltage", 10);
-    fixSlowDriven.coordinator.setComponentProperty(ceByLabel(fixSlowDriven, "vSrc"), "voltage", 10);
+    fixDefaultDriven.coordinator.setComponentProperty(fixDefaultDriven.element("vSrc"), "voltage", 10);
+    fixSlowDriven.coordinator.setComponentProperty(fixSlowDriven.element("vSrc"), "voltage", 10);
     for (let i = 0; i < 200; i++) {
       fixDefaultDriven.coordinator.step();
       fixSlowDriven.coordinator.step();
@@ -603,7 +595,7 @@ describe("Switch.ctrlBranch path (Wave 2.1)", () => {
     const sw = findContactSwitch(fix);
     expect(fix.pool.state1[sw._stateBase + SLOT_CSW_STATE]).toBe(REALLY_ON);
     expect(sw.isClosed()).toBe(true);
-    fix.coordinator.setComponentProperty(ceByLabel(fix, "relay"), "closed", 0);
+    fix.coordinator.setComponentProperty(fix.element("relay"), "closed", 0);
     fix.coordinator.step();
     // CSW_STATE must remain REALLY_ON (not HYST_ON, HYST_OFF, or REALLY_OFF):
     // the "closed" param call was ignored; coil current still above iT+iH.

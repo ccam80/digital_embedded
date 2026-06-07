@@ -69,16 +69,6 @@ function nodeOf(fix: Fixture, label: string): number {
   return n;
 }
 
-function getTransformerCe(fix: Fixture) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "TX1",
-  );
-  if (idx < 0) throw new Error("TX1 element not found by elementLabels");
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  if (ce === undefined) throw new Error("TX1 elementToCircuitElement entry missing");
-  return ce;
-}
-
 function getInductorElement(fix: Fixture, subLabel: string): AnalogInductorElement {
   for (let i = 0; i < fix.circuit.elements.length; i++) {
     const el = fix.circuit.elements[i]!;
@@ -194,7 +184,7 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     //    top-level TransformerElement. Routes through
     //    SubcircuitWrapperElement.setParam("k", 0.50) -> MutualInductorElement
     //    .setParam("k", 0.50) -> _coupling = 0.50 -> recomputeMutFactor().
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "k", K_AFTER);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "k", K_AFTER);
 
     const mutFactorAfter = mutEl.mutFactor;
 
@@ -358,7 +348,7 @@ describe("Transformer hot-load k, L1, L2 via setParam (T1 Category 4)", () => {
     expect(peak0).toBeCloseTo(expectedPeak0, 2);
 
     // Step 1: hot-load k from 0.99 to 0.50
-    fix.coordinator.setComponentProperty(getTransformerCe(fix), "k", K1);
+    fix.coordinator.setComponentProperty(fix.element("TX1"), "k", K1);
     const mutFactor1 = mutEl.mutFactor;
     stepUntil(fix, 5.5e-3);
     const peak1 = samplePeakAbs(fix, s1Node, 6.5e-3);

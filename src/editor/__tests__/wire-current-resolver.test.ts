@@ -66,28 +66,6 @@ function wiresAtPin(
   return touching;
 }
 
-/** Find the visual CircuitElement for a given component label. */
-function ceByLabel(
-  circuit: ConcreteCompiledAnalogCircuit,
-  label: string,
-): CircuitElement {
-  for (const ce of circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`label ${label} not found in compiled circuit`);
-}
-
-/** Find the analog element index for a given component label. */
-function elementIndexByLabel(
-  circuit: ConcreteCompiledAnalogCircuit,
-  label: string,
-): number {
-  for (const [idx, ce] of circuit.elementToCircuitElement) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return idx;
-  }
-  throw new Error(`label ${label} not found among analog elements`);
-}
-
 // ===========================================================================
 // Basic resolver behaviour on real DC circuits
 // ===========================================================================
@@ -116,13 +94,13 @@ describe("WireCurrentResolver - DC behaviour through buildFixture", () => {
     const resolver = new WireCurrentResolver();
     resolver.resolve(ctxOf(fix.coordinator));
 
-    const idxR1 = elementIndexByLabel(fix.circuit, "r1");
+    const idxR1 = fix.elementIndex("r1");
     const I_loop = Math.abs(fix.coordinator.readElementCurrent(idxR1) ?? 0);
     expect(I_loop).toBeGreaterThan(0);
 
     const wires = fix.facade.getCircuit()!.wires;
-    const r1 = ceByLabel(fix.circuit, "r1");
-    const r2 = ceByLabel(fix.circuit, "r2");
+    const r1 = fix.element("r1");
+    const r2 = fix.element("r2");
     for (const w of [
       ...wiresAtPin(fix.circuit, wires, r1, "pos"),
       ...wiresAtPin(fix.circuit, wires, r1, "neg"),
@@ -161,9 +139,9 @@ describe("WireCurrentResolver - DC behaviour through buildFixture", () => {
     const resolver = new WireCurrentResolver();
     resolver.resolve(ctxOf(fix.coordinator));
 
-    const I_R1 = Math.abs(fix.coordinator.readElementCurrent(elementIndexByLabel(fix.circuit, "r1")) ?? 0);
-    const I_R2 = Math.abs(fix.coordinator.readElementCurrent(elementIndexByLabel(fix.circuit, "r2")) ?? 0);
-    const I_R3 = Math.abs(fix.coordinator.readElementCurrent(elementIndexByLabel(fix.circuit, "r3")) ?? 0);
+    const I_R1 = Math.abs(fix.coordinator.readElementCurrent(fix.elementIndex("r1")) ?? 0);
+    const I_R2 = Math.abs(fix.coordinator.readElementCurrent(fix.elementIndex("r2")) ?? 0);
+    const I_R3 = Math.abs(fix.coordinator.readElementCurrent(fix.elementIndex("r3")) ?? 0);
 
     // KCL at the junction.
     expect(Math.abs(I_R1 - I_R2 - I_R3) / I_R1).toBeLessThan(1e-6);
@@ -292,7 +270,7 @@ describe("WireCurrentResolver - 4-node resistor ladder KCL", () => {
     // current - the resolver's tree-trace must not zero out a tree-internal
     // edge in any of these split nodes.
     for (const lbl of ["r1", "r3", "r5"]) {
-      const ce = ceByLabel(fix.circuit, lbl);
+      const ce = fix.element(lbl);
       const adj = wiresAtPin(fix.circuit, wires, ce, "neg");
       expect(adj.length).toBeGreaterThan(0);
       for (const w of adj) {
@@ -355,9 +333,9 @@ describe("WireCurrentResolver - AC transient RLC", () => {
     }
     expect((fix.coordinator.simTime ?? 0)).toBeGreaterThan(settleTime * 0.9);
 
-    const idxR = elementIndexByLabel(fix.circuit, "r");
-    const idxC = elementIndexByLabel(fix.circuit, "c");
-    const idxL = elementIndexByLabel(fix.circuit, "l");
+    const idxR = fix.elementIndex("r");
+    const idxC = fix.elementIndex("c");
+    const idxL = fix.elementIndex("l");
 
     const resolver = new WireCurrentResolver();
     const periodEnd = (fix.coordinator.simTime ?? 0) + 1 / 100;

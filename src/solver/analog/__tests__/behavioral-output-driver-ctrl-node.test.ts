@@ -32,13 +32,6 @@ function nodeOf(fix: Fixture, label: string): number {
   return n;
 }
 
-function ceByLabel(fix: Fixture, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
-}
-
 function findAnalogElementByLabel(fix: Fixture, label: string): AnalogElement {
   for (let i = 0; i < fix.circuit.elements.length; i++) {
     if (fix.elementLabels.get(i) === label) return fix.circuit.elements[i]!;
@@ -298,7 +291,7 @@ describe("non-tri-state BehavioralOutputDriverElement (3-port)", () => {
     expect(fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode))
       .toBeCloseTo(vOH * rLoad / (rLoad + rOut1), 6);
 
-    const drvEl = ceByLabel(fix, "drv");
+    const drvEl = fix.element("drv");
     const rOut2 = 1;
     fix.coordinator.setComponentProperty(drvEl, "rOut", rOut2);
     fix.coordinator.step();
@@ -316,7 +309,7 @@ describe("non-tri-state BehavioralOutputDriverElement (3-port)", () => {
     expect(fix.engine.getNodeVoltage(posNode) - fix.engine.getNodeVoltage(negNode))
       .toBeCloseTo(vOH1 * rLoad / (rLoad + rOut), 6);
 
-    const drvEl = ceByLabel(fix, "drv");
+    const drvEl = fix.element("drv");
     const vOH2 = 3;
     fix.coordinator.setComponentProperty(drvEl, "vOH", vOH2);
     fix.coordinator.step();

@@ -544,20 +544,6 @@ describe("Comparator parameter hot-load (T1)", () => {
     });
   }
 
-  // Locate the VoltageComparator CircuitElement. The composite's wrapper
-  // element has elementLabels entry "cmp" (the parent label) and is the one
-  // mapped in elementToCircuitElement. The driver leaf (label "cmp:drv") is
-  // not in elementToCircuitElement — only the wrapper is.
-  function getCmpCe(fix: ReturnType<typeof buildFixture>) {
-    const wrapperIdx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "cmp",
-    );
-    expect(wrapperIdx).toBeGreaterThanOrEqual(0);
-    const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-    expect(ce).toBeDefined();
-    return ce!;
-  }
-
   it("hotload_rOut_changes_output_voltage", () => {
     // rOut scales G_eff = w/rOut (OC). After running enough steps for weight
     // to build up (responseTime=1e-7, many steps), the output is well below vOH.
@@ -604,7 +590,7 @@ describe("Comparator parameter hot-load (T1)", () => {
     // Weight built up => output is below vOH (sinking active)
     expect(before).toBeLessThan(3.3);
 
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "rOut", 5000);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "rOut", 5000);
     fix.coordinator.step();
 
     const after = fix.engine.getNodeVoltage(outNodeId);
@@ -621,7 +607,7 @@ describe("Comparator parameter hot-load (T1)", () => {
     const latchBefore = fix.pool.state0[cmp._stateBase + SLOT_OUTPUT_LATCH];
     expect(latchBefore).toBe(1);
 
-    fix.coordinator.setComponentProperty(getCmpCe(fix), "hysteresis", 0.5);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "hysteresis", 0.5);
     fix.coordinator.step();
 
     const latchAfter = fix.pool.state0[cmp._stateBase + SLOT_OUTPUT_LATCH];
@@ -674,11 +660,7 @@ describe("Comparator parameter hot-load (T1)", () => {
     expect(voltageBefore).toBeLessThan(3.3);
 
     // vos=1.5: threshold = 1 + 1.5 = 2.5V > V+=2V => latch flips to 0
-    const wrapperIdx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "cmp",
-    );
-    const cmpCe = fix.circuit.elementToCircuitElement.get(wrapperIdx)!;
-    fix.coordinator.setComponentProperty(cmpCe, "vos", 1.5);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "vos", 1.5);
     // Run steps so weight decays to 0 after the latch flip
     for (let i = 0; i < 30; i++) fix.coordinator.step();
 
@@ -729,12 +711,8 @@ describe("Comparator parameter hot-load (T1)", () => {
     const cmp = findComparatorDriver(fix.circuit.elements);
     const weightBefore = fix.pool.state0[cmp._stateBase + SLOT_OUTPUT_WEIGHT];
 
-    const wrapperIdx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "cmp",
-    );
-    const cmpCe = fix.circuit.elementToCircuitElement.get(wrapperIdx)!;
     // Very short tau => alpha ≈ 1 => weight jumps to target in one step
-    fix.coordinator.setComponentProperty(cmpCe, "responseTime", 1e-9);
+    fix.coordinator.setComponentProperty(fix.element("cmp"), "responseTime", 1e-9);
     fix.coordinator.step();
 
     const weightAfter = fix.pool.state0[cmp._stateBase + SLOT_OUTPUT_WEIGHT];

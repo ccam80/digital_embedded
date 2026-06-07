@@ -8,7 +8,6 @@ import {
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -68,20 +67,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   return n;
 }
 
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
-}
-
-function findElementIndexByLabel(fix: ReturnType<typeof buildFixture>, label: string): number {
-  for (const [idx, ce] of fix.circuit.elementToCircuitElement.entries()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return idx;
-  }
-  throw new Error(`element with label '${label}' not found`);
-}
-
 // ---------------------------------------------------------------------------
 // DcVoltageSource initialization (T1) — Cat 1
 // ---------------------------------------------------------------------------
@@ -121,7 +106,7 @@ describe("DcVoltageSource DCOP analytical (T1)", () => {
 
     expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(5.0, 9);
 
-    const vsIdx = findElementIndexByLabel(fix, "vs");
+    const vsIdx = fix.elementIndex("vs");
     const vsPins = fix.engine.getElementPinCurrents(vsIdx);
     const Imag = 5.0 / 1000;
     expect(Math.abs(vsPins[0])).toBeCloseTo(Imag, 9);
@@ -139,7 +124,7 @@ describe("DcVoltageSource DCOP analytical (T1)", () => {
     expect(dc!.converged).toBe(true);
     expect(fix.engine.getNodeVoltage(nodeOf(fix, "vs:pos"))).toBeCloseTo(12.0, 9);
 
-    const vsIdx = findElementIndexByLabel(fix, "vs");
+    const vsIdx = fix.elementIndex("vs");
     const vsPins = fix.engine.getElementPinCurrents(vsIdx);
     const Imag = 12.0 / 470;
     expect(Math.abs(vsPins[0])).toBeCloseTo(Imag, 9);
@@ -169,7 +154,7 @@ describe("DcVoltageSource parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(posNode);
     expect(before).toBeCloseTo(5.0, 9);
 
-    const vsEl = ceByLabel(fix, "vs");
+    const vsEl = fix.element("vs");
     fix.coordinator.setComponentProperty(vsEl, "voltage", 10);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(posNode);

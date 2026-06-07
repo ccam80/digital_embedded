@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import path from "node:path";
 
-import { buildFixture, type Fixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
+import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 import { ComparisonSession } from "../../../solver/analog/__tests__/harness/comparison-session.js";
 import {
   describeIfDll,
 } from "../../../solver/analog/__tests__/ngspice-parity/parity-helpers.js";
 import { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
-import type { CircuitElement } from "../../../core/element.js";
 
 // ---------------------------------------------------------------------------
 // .dts paths
@@ -37,22 +36,6 @@ function findLatchDriver(
     throw new Error("Timer555LatchDriverElement not found in compiled circuit");
   }
   return elements[idx] as PoolBackedAnalogElement;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: resolve the outer Timer555 CircuitElement (the one setComponentProperty
-// expects) by finding the element whose elementLabels entry matches the label.
-// Uses the canonical elementLabels + elementToCircuitElement pattern.
-// ---------------------------------------------------------------------------
-
-function findTimer555Ce(fix: Fixture, label: string): CircuitElement {
-  const wrapperIdx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === label,
-  );
-  if (wrapperIdx < 0) throw new Error(`elementLabels entry '${label}' not found`);
-  const ce = fix.circuit.elementToCircuitElement.get(wrapperIdx);
-  if (ce === undefined) throw new Error(`CircuitElement for '${label}' not in elementToCircuitElement`);
-  return ce;
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +261,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const tElem = findTimer555Ce(fix, "t");
+    const tElem = fix.element("t");
     fix.coordinator.setComponentProperty(tElem, "vOH", 3.3);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
@@ -327,7 +310,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const tElem = findTimer555Ce(fix, "t");
+    const tElem = fix.element("t");
     fix.coordinator.setComponentProperty(tElem, "vOL", 0.5);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(outNode);
@@ -379,7 +362,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(disNode);
 
-    const tElem = findTimer555Ce(fix, "t");
+    const tElem = fix.element("t");
     fix.coordinator.setComponentProperty(tElem, "vDrop", 3.0);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(disNode);
@@ -426,7 +409,7 @@ describe("Timer555 parameter hot-load (T1)", () => {
     for (let i = 0; i < 10; i++) fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(outNode);
 
-    const tElem = findTimer555Ce(fix, "t");
+    const tElem = fix.element("t");
     // Raise rOut from 100Ω default to 10kΩ — divides vOH down through rload=1k.
     fix.coordinator.setComponentProperty(tElem, "rOut", 10000);
     for (let i = 0; i < 10; i++) fix.coordinator.step();

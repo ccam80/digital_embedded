@@ -68,15 +68,13 @@ function buildVaractorReverse(
   });
 }
 
-function findVD(fix: ReturnType<typeof buildFixture>) {
+function findVDLeaf(fix: ReturnType<typeof buildFixture>) {
   const idx = fix.circuit.elements.findIndex(
     (_e, i) => fix.elementLabels.get(i) === "D1",
   );
   expect(idx).toBeGreaterThanOrEqual(0);
   const el = fix.circuit.elements[idx]!;
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return { idx, el, ce: ce! };
+  return { idx, el };
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +90,7 @@ describe("Varactor initialization (T1)", () => {
 
   it("init_varactor_vd_seeded_reverse", () => {
     const fix = buildFixture({ build: (_r, f) => buildVaractorReverse(f) });
-    const { el } = findVD(fix);
+    const { el } = findVDLeaf(fix);
     const vd = fix.pool.state0[el._stateBase + SLOT_VD];
     expect(Number.isFinite(vd)).toBe(true);
     const vA = fix.engine.getNodeVoltage(fix.circuit.labelToNodeId.get("D1:A")!);
@@ -140,7 +138,7 @@ describe("Varactor DCOP analytical (T1)", () => {
 describe("Varactor parameter hot-load (T1)", () => {
   it("hotload_IS_changes_vd_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
-    const { ce } = findVD(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -161,7 +159,7 @@ describe("Varactor parameter hot-load (T1)", () => {
       build: (_r, f) => buildVaractorReverse(f),
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
-    const { ce } = findVD(fix);
+    const ce = fix.element("D1");
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vCath);
@@ -179,7 +177,7 @@ describe("Varactor parameter hot-load (T1)", () => {
       build: (_r, f) => buildVaractorReverse(f),
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
-    const { ce } = findVD(fix);
+    const ce = fix.element("D1");
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vCath);
@@ -196,7 +194,7 @@ describe("Varactor parameter hot-load (T1)", () => {
       build: (_r, f) => buildVaractorReverse(f),
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
-    const { ce } = findVD(fix);
+    const ce = fix.element("D1");
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vCath);
@@ -208,7 +206,7 @@ describe("Varactor parameter hot-load (T1)", () => {
 
   it("hotload_RS_changes_anode_voltage_forward", () => {
     const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
-    const { ce } = findVD(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const before = fix.engine.getNodeVoltage(vAnode);
     fix.coordinator.setComponentProperty(ce, "RS", 50);
@@ -223,7 +221,7 @@ describe("Varactor parameter hot-load (T1)", () => {
     // TEMP is the derived-state-recompute parameter (universal). setParam
     // triggers recomputeTemp() which re-derives tIS / tVJ / tCJO / tVcrit / tBV.
     const fix = buildFixture({ build: (_r, f) => buildVaractorForward(f) });
-    const { ce } = findVD(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -274,7 +272,7 @@ describe("Varactor LTE rollback (T1)", () => {
     });
     fix.coordinator.setConvergenceLogEnabled(true);
     for (let i = 0; i < 10; i++) fix.coordinator.step();
-    const { el } = findVD(fix);
+    const { el } = findVDLeaf(fix);
     expect(Number.isFinite(fix.pool.state0[el._stateBase + SLOT_Q])).toBe(true);
     expect(Number.isFinite(fix.pool.state1[el._stateBase + SLOT_Q])).toBe(true);
   });

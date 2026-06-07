@@ -62,16 +62,6 @@ function findFuse(elements: ReadonlyArray<unknown>): AnalogFuseElement {
   return elements[idx] as AnalogFuseElement;
 }
 
-function getFuseCe(fix: ReturnType<typeof buildFuseFixture>) {
-  const idx = fix.circuit.elements.findIndex(
-    (_e, i) => fix.elementLabels.get(i) === "fuse",
-  );
-  expect(idx).toBeGreaterThanOrEqual(0);
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return ce!;
-}
-
 // ===========================================================================
 // Category 1 — Initialization (T1)
 // Post-warm-start, intact fuse holds CONDUCT=1, I2T_ACCUM small but advanced
@@ -135,7 +125,7 @@ describe("AnalogFuseElement parameter hot-load (T1)", () => {
     const before = fix.engine.getNodeVoltage(nMid);
     expect(before).toBeCloseTo(9, 4);
 
-    fix.coordinator.setComponentProperty(getFuseCe(fix), "rCold", 4);
+    fix.coordinator.setComponentProperty(fix.element("fuse"), "rCold", 4);
     fix.coordinator.dcOperatingPoint();
     const after = fix.engine.getNodeVoltage(nMid);
 
@@ -171,7 +161,7 @@ describe("AnalogFuseElement parameter hot-load (T1)", () => {
 
     // Hot-load rBlown to 1e6: V(out2) = 30 * 9 / (1e6 + 9) ≈ 2.7e-4 V —
     // a 1000x increase from before.
-    fix.coordinator.setComponentProperty(getFuseCe(fix), "rBlown", 1e6);
+    fix.coordinator.setComponentProperty(fix.element("fuse"), "rBlown", 1e6);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nMid);
     expect(after).toBeCloseTo(30 * 9 / (1e6 + 9), 6);
@@ -193,7 +183,7 @@ describe("AnalogFuseElement parameter hot-load (T1)", () => {
     expect(fuse.blown).toBe(false);
 
     // Hot-load to a much larger rating before any significant accumulation.
-    fix.coordinator.setComponentProperty(getFuseCe(fix), "i2tRating", 4);
+    fix.coordinator.setComponentProperty(fix.element("fuse"), "i2tRating", 4);
 
     // Step past the original tBlow (0.111s) and confirm fuse is still intact
     // — the new i2tRating=4 has not yet been crossed.

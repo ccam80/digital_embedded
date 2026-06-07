@@ -228,18 +228,9 @@ describe("BJT parameter hot-load (T1)", () => {
     });
   }
 
-  function getQ1(fix: ReturnType<typeof buildFixture>) {
-    const idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "Q1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(idx);
-    expect(ce).toBeDefined();
-    return { idx, ce: ce! };
-  }
-
   it("hotload_BF_changes_vc", () => {
     const fix = buildCe("spice");
-    const { ce } = getQ1(fix);
+    const ce = fix.element("Q1");
     const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
     const before = fix.engine.getNodeVoltage(vcNode);
     fix.coordinator.setComponentProperty(ce, "BF", 25);
@@ -252,7 +243,7 @@ describe("BJT parameter hot-load (T1)", () => {
 
   it("hotload_IS_changes_vc", () => {
     const fix = buildCe("spice");
-    const { ce } = getQ1(fix);
+    const ce = fix.element("Q1");
     const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
     const before = fix.engine.getNodeVoltage(vcNode);
     fix.coordinator.setComponentProperty(ce, "IS", 1e-13);
@@ -268,7 +259,7 @@ describe("BJT parameter hot-load (T1)", () => {
     // temperature path required of every analog component with
     // temperature-dependent state.
     const fix = buildCe("spice");
-    const { ce } = getQ1(fix);
+    const ce = fix.element("Q1");
     const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
     const before = fix.engine.getNodeVoltage(vcNode);
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
@@ -282,7 +273,7 @@ describe("BJT parameter hot-load (T1)", () => {
   it("hotload_AREA_changes_vc", () => {
     // AREA scales tSatCur via the area factor (instance-partitioned param).
     const fix = buildCe("spice");
-    const { ce } = getQ1(fix);
+    const ce = fix.element("Q1");
     const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
     const before = fix.engine.getNodeVoltage(vcNode);
     fix.coordinator.setComponentProperty(ce, "AREA", 4);
@@ -296,7 +287,7 @@ describe("BJT parameter hot-load (T1)", () => {
     // weakly via the Gummel-Poon QB term, but the recompute path must run
     // and produce an observable shift.
     const fix = buildCe("spice");
-    const { ce } = getQ1(fix);
+    const ce = fix.element("Q1");
     const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
     const before = fix.engine.getNodeVoltage(vcNode);
     fix.coordinator.setComponentProperty(ce, "BR", 0.1);
@@ -311,7 +302,7 @@ describe("BJT parameter hot-load (T1)", () => {
     // Going from infinity (default) to a finite value changes the slope of
     // the IC-VCE characteristic at the operating point.
     const fix = buildCe("spice");
-    const { ce } = getQ1(fix);
+    const ce = fix.element("Q1");
     const vcNode = fix.circuit.labelToNodeId.get("Q1:C")!;
     const before = fix.engine.getNodeVoltage(vcNode);
     fix.coordinator.setComponentProperty(ce, "VAF", 50);
@@ -537,10 +528,7 @@ describe("BJT computeTemperature engine-driven path (T1)", () => {
     // Per-instance TEMP set via setParam locks operating temp regardless of
     // ambient. cite: bjttemp.c:107 — BJTtempGiven guard.
     const fix = buildCeNpn("simple");
-    const q1Idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "Q1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(q1Idx)!;
+    const ce = fix.element("Q1");
 
     // Pin per-instance TEMP at 400 K via setComponentProperty (routes to setParam).
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
@@ -564,10 +552,7 @@ describe("BJT computeTemperature engine-driven path (T1)", () => {
   it("computeTemperature_l1_npn_instance_override_respected", () => {
     // Same guard test as above, L1 model.
     const fix = buildCeNpn("spice");
-    const q1Idx = fix.circuit.elements.findIndex(
-      (_e, i) => fix.elementLabels.get(i) === "Q1",
-    );
-    const ce = fix.circuit.elementToCircuitElement.get(q1Idx)!;
+    const ce = fix.element("Q1");
 
     fix.coordinator.setComponentProperty(ce, "TEMP", 400);
     fix.coordinator.dcOperatingPoint();

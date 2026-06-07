@@ -9,7 +9,6 @@ import {
 import "../../../solver/analog/__tests__/harness/comparison-session-asserts.js";
 
 import type { Circuit } from "../../../core/circuit.js";
-import type { CircuitElement } from "../../../core/element.js";
 import type { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
@@ -68,13 +67,6 @@ function nodeOf(fix: ReturnType<typeof buildFixture>, label: string): number {
   const n = fix.circuit.labelToNodeId.get(label);
   if (n === undefined) throw new Error(`label '${label}' not in labelToNodeId`);
   return n;
-}
-
-function ceByLabel(fix: ReturnType<typeof buildFixture>, label: string): CircuitElement {
-  for (const ce of fix.circuit.elementToCircuitElement.values()) {
-    if (ce.getProperties().getOrDefault<string>("label", "") === label) return ce;
-  }
-  throw new Error(`CircuitElement with label '${label}' not found`);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +148,7 @@ describe("QuartzCrystal parameter hot-load (T1)", () => {
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
 
-    const xtalEl = ceByLabel(fix, "xtal");
+    const xtalEl = fix.element("xtal");
     fix.coordinator.setComponentProperty(xtalEl, "frequency", 1e7);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
@@ -174,7 +166,7 @@ describe("QuartzCrystal parameter hot-load (T1)", () => {
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
 
-    const xtalEl = ceByLabel(fix, "xtal");
+    const xtalEl = fix.element("xtal");
     fix.coordinator.setComponentProperty(xtalEl, "qualityFactor", 50000);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
@@ -192,7 +184,7 @@ describe("QuartzCrystal parameter hot-load (T1)", () => {
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
 
-    const xtalEl = ceByLabel(fix, "xtal");
+    const xtalEl = fix.element("xtal");
     fix.coordinator.setComponentProperty(xtalEl, "motionalCapacitance", 1e-13);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
@@ -210,7 +202,7 @@ describe("QuartzCrystal parameter hot-load (T1)", () => {
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));
 
-    const xtalEl = ceByLabel(fix, "xtal");
+    const xtalEl = fix.element("xtal");
     fix.coordinator.setComponentProperty(xtalEl, "shuntCapacitance", 5e-11);
     fix.coordinator.step();
     const after = fix.engine.getNodeVoltage(nodeOf(fix, "xtal:neg"));

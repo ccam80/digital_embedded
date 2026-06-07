@@ -43,9 +43,7 @@ function findD1(fix: ReturnType<typeof buildFixture>) {
   );
   expect(idx).toBeGreaterThanOrEqual(0);
   const el = fix.circuit.elements[idx]!;
-  const ce = fix.circuit.elementToCircuitElement.get(idx);
-  expect(ce).toBeDefined();
-  return { idx, el, ce: ce! };
+  return { idx, el };
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +105,7 @@ describe("Schottky DCOP analytical (T1)", () => {
 describe("Schottky parameter hot-load (T1)", () => {
   it("hotload_IS_changes_vf", () => {
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
-    const { ce } = findD1(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -121,7 +119,7 @@ describe("Schottky parameter hot-load (T1)", () => {
 
   it("hotload_N_changes_vf", () => {
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
-    const { ce } = findD1(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -135,7 +133,7 @@ describe("Schottky parameter hot-load (T1)", () => {
 
   it("hotload_RS_changes_anode_voltage", () => {
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
-    const { ce } = findD1(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const before = fix.engine.getNodeVoltage(vAnode);
     fix.coordinator.setComponentProperty(ce, "RS", 50);
@@ -154,7 +152,7 @@ describe("Schottky parameter hot-load (T1)", () => {
       build: (_r, f) => buildSchottkyForward(f),
       params: { tStop: 1e-6, maxTimeStep: 1e-8 },
     });
-    const { ce } = findD1(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     fix.coordinator.step();
     const before = fix.engine.getNodeVoltage(vAnode);
@@ -170,7 +168,7 @@ describe("Schottky parameter hot-load (T1)", () => {
     // TEMP is the derived-state-recompute parameter (universal). setParam
     // triggers recomputeTemp() which re-derives tIS / tVJ / tCJO / tVcrit / tBV.
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
-    const { ce } = findD1(fix);
+    const ce = fix.element("D1");
     const vAnode = fix.circuit.labelToNodeId.get("D1:A")!;
     const vCath = fix.circuit.labelToNodeId.get("D1:K")!;
     const before = fix.engine.getNodeVoltage(vAnode) - fix.engine.getNodeVoltage(vCath);
@@ -223,7 +221,7 @@ describe("Schottky computeTemperature engine-driven path (T1)", () => {
     // Per-instance TEMP set via setParam must not be overwritten by the
     // engine-driven computeTemperature pass (diotemp.c:84 DIOtempGiven guard).
     const fix = buildFixture({ build: (_r, f) => buildSchottkyForward(f) });
-    const { ce } = findD1(fix);
+    const ce = fix.element("D1");
 
     // Set per-instance TEMP override to 450 K.
     fix.coordinator.setComponentProperty(ce, "TEMP", 450);
