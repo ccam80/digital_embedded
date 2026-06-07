@@ -139,24 +139,9 @@ describe("Triode DCOP analytical sanity (T1)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Triode parameter hot-load (T1)", () => {
-  function getTriodeCe(fix: ReturnType<typeof buildFixture>) {
-    // Resolve the user-facing Triode CircuitElement by label - the same handle
-    // the UI hands to setComponentProperty and the MCP `circuit_patch target:"V1"`
-    // resolves (cf. analog-clock.test.ts). The Triode is a netlist composite, so
-    // elementToCircuitElement maps the wrapper's element index to this element;
-    // setComponentProperty(ce, ...) routes through the wrapper's setParam to the
-    // TriodeAnalog leaf (subcircuit-wrapper-element.ts:150-160). Resolving the
-    // analog leaf instead would miss the map entirely (leaves are unmapped).
-    const ce = [...fix.circuit.elementToCircuitElement.values()].find(
-      (c) => c.getProperties().getOrDefault<string>("label", "") === "V1",
-    );
-    if (ce === undefined) throw new Error("Triode 'V1' not found in elementToCircuitElement");
-    return ce;
-  }
-
   it("hotload_mu_changes_plate", () => {
     const fix = buildCommonCathode();
-    const ce = getTriodeCe(fix);
+    const ce = fix.element("V1");
     const vpNode = fix.circuit.labelToNodeId.get("V1:P")!;
     const before = fix.engine.getNodeVoltage(vpNode);
     // µ = 100 → 50: lower amplification factor reduces plate-current
@@ -169,7 +154,7 @@ describe("Triode parameter hot-load (T1)", () => {
 
   it("hotload_kp_changes_plate", () => {
     const fix = buildCommonCathode();
-    const ce = getTriodeCe(fix);
+    const ce = fix.element("V1");
     const vpNode = fix.circuit.labelToNodeId.get("V1:P")!;
     const before = fix.engine.getNodeVoltage(vpNode);
     // K_P scales the inner argument of the log1p(exp(...)) Koren term;
@@ -182,7 +167,7 @@ describe("Triode parameter hot-load (T1)", () => {
 
   it("hotload_kg1_changes_plate", () => {
     const fix = buildCommonCathode();
-    const ce = getTriodeCe(fix);
+    const ce = fix.element("V1");
     const vpNode = fix.circuit.labelToNodeId.get("V1:P")!;
     const before = fix.engine.getNodeVoltage(vpNode);
     // K_G1 scales the transconductance: I_P = (E1/K_G1)^EX.
@@ -196,7 +181,7 @@ describe("Triode parameter hot-load (T1)", () => {
 
   it("hotload_ex_changes_plate", () => {
     const fix = buildCommonCathode();
-    const ce = getTriodeCe(fix);
+    const ce = fix.element("V1");
     const vpNode = fix.circuit.labelToNodeId.get("V1:P")!;
     const before = fix.engine.getNodeVoltage(vpNode);
     // EX is the Koren current exponent; raising it from 1.4 to 1.6 increases
@@ -209,7 +194,7 @@ describe("Triode parameter hot-load (T1)", () => {
 
   it("hotload_kvb_changes_plate", () => {
     const fix = buildCommonCathode();
-    const ce = getTriodeCe(fix);
+    const ce = fix.element("V1");
     const vpNode = fix.circuit.labelToNodeId.get("V1:P")!;
     const before = fix.engine.getNodeVoltage(vpNode);
     // K_VB enters the sqrt(K_VB + V_PK²) denominator inside E1; a 10× change
@@ -222,7 +207,7 @@ describe("Triode parameter hot-load (T1)", () => {
 
   it("hotload_rGI_changes_plate", () => {
     const fix = buildCommonCathode();
-    const ce = getTriodeCe(fix);
+    const ce = fix.element("V1");
     const vpNode = fix.circuit.labelToNodeId.get("V1:P")!;
     const before = fix.engine.getNodeVoltage(vpNode);
     // rGI is the grid input resistance (secondary param). Changing it

@@ -22,6 +22,7 @@ import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js"
 import { MNAEngine } from "../../analog-engine.js";
 
 import type { Circuit } from "../../../../core/circuit.js";
+import type { CircuitElement } from "../../../../core/element.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
 import type { SimulationParams } from "../../../../core/analog-engine-interface.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
@@ -59,6 +60,22 @@ export interface Fixture {
   readonly circuit: ConcreteCompiledAnalogCircuit;
   /** Element index → user-visible label for state-capture lookups and assertion messages. */
   readonly elementLabels: ReadonlyMap<number, string>;
+  /**
+   * Resolve a user-facing CircuitElement by its label - the single sanctioned
+   * way for a test to obtain a component handle (e.g. for
+   * `coordinator.setComponentProperty`). This is the same element the UI hands to
+   * the engine on selection and the same identifier the MCP addresses
+   * (`circuit_patch target:"<label>"`). For composites it returns the parent
+   * element (the wrapper's mapping), and setComponentProperty routes the change
+   * to the leaves. Throws when no element, or more than one, carries the label.
+   */
+  element(label: string): CircuitElement;
+  /**
+   * Compiled element index for the labelled component, for index-keyed engine
+   * APIs (`getElementPinCurrents`, `readElementCurrent`). Same resolution and
+   * throw semantics as `element`.
+   */
+  elementIndex(label: string): number;
 }
 
 export function buildFixture(opts: FixtureOptions): Fixture {
@@ -128,6 +145,8 @@ export function buildFixture(opts: FixtureOptions): Fixture {
     throw new Error("buildFixture: compiled.statePool is null after warm-start.");
   }
 
+  const { element, elementIndex } = buildElementAccessors(compiled);
+
   return {
     facade,
     coordinator,
@@ -135,6 +154,46 @@ export function buildFixture(opts: FixtureOptions): Fixture {
     pool,
     circuit: compiled,
     elementLabels: buildElementLabels(compiled),
+    element,
+    elementIndex,
+  };
+}
+
+/**
+ * Build the by-label component accessors over the compiled circuit's
+ * `elementToCircuitElement` map (the user-facing elements the engine resolves
+ * for hot-load). Composite leaves are intentionally absent from that map - only
+ * the parent/wrapper is registered - so a label always resolves to the handle
+ * `setComponentProperty` accepts. Duplicate labels throw rather than silently
+ * returning the first match.
+ */
+function buildElementAccessors(compiled: ConcreteCompiledAnalogCircuit): {
+  element(label: string): CircuitElement;
+  elementIndex(label: string): number;
+} {
+  const byLabel = new Map<string, Array<{ ce: CircuitElement; index: number }>>();
+  for (const [index, ce] of compiled.elementToCircuitElement) {
+    const label = ce.getProperties().getOrDefault<string>("label", "") || ce.instanceId;
+    const bucket = byLabel.get(label);
+    if (bucket) bucket.push({ ce, index });
+    else byLabel.set(label, [{ ce, index }]);
+  }
+
+  const resolve = (label: string): { ce: CircuitElement; index: number } => {
+    const bucket = byLabel.get(label);
+    if (bucket === undefined) {
+      const known = [...byLabel.keys()].sort().join(", ");
+      throw new Error(`fixture.element: no component labelled "${label}". Known labels: ${known}`);
+    }
+    if (bucket.length > 1) {
+      throw new Error(`fixture.element: label "${label}" is ambiguous (${bucket.length} components share it)`);
+    }
+    return bucket[0]!;
+  };
+
+  return {
+    element: (label) => resolve(label).ce,
+    elementIndex: (label) => resolve(label).index,
   };
 }
 
