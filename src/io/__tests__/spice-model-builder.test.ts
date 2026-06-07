@@ -114,13 +114,13 @@ R1 a 0 1k
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit- R element mapping", () => {
-  it("maps R to Resistor with pins A and B", () => {
+  it("maps R to Resistor with pins pos and neg", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 10k\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Resistor");
     expect(el).toBeDefined();
     const pinLabels = el!.getPins().map((p) => p.label);
-    expect(pinLabels).toContain("A");
-    expect(pinLabels).toContain("B");
+    expect(pinLabels).toContain("pos");
+    expect(pinLabels).toContain("neg");
   });
 
   it("sets resistance property from value", () => {
@@ -128,12 +128,12 @@ describe("buildSpiceSubcircuit- R element mapping", () => {
     circuit.elements.find((e) => e.typeId === "Resistor");
   });
 
-  it("Resistor has pins A and B", () => {
+  it("Resistor has pins pos and neg", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 1k\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Resistor");
     const labels = el!.getPins().map((p) => p.label);
-    expect(labels).toContain("A");
-    expect(labels).toContain("B");
+    expect(labels).toContain("pos");
+    expect(labels).toContain("neg");
   });
 });
 

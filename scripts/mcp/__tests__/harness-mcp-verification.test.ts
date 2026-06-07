@@ -294,7 +294,10 @@ describeGate("Harness MCP Verification -- HWR square-wave transient", () => {
 
   // MCP-11: harness_export
   it("MCP-11: export returns sizeBytes, steps, analysis, topology", async () => {
-    const result = await tools.call("harness_export", { handle });
+    // Default export is divergences-only (per the includeAllSteps schema doc); a
+    // well-converged session has none, so request all steps to exercise step
+    // serialization.
+    const result = await tools.call("harness_export", { handle, includeAllSteps: true });
     expect(result.sizeBytes).toBeGreaterThan(0);
     expect(result.steps.length).toBeGreaterThan(0);
     expect(result.analysis).toBe("tran");

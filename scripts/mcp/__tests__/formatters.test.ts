@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { formatDiagnostics, formatNetlist, formatComponentDefinition } from '../formatters.js';
 import type { Netlist, ComponentDescriptor, NetDescriptor, NetPin, PinDescriptor } from '../../../src/headless/netlist-types.js';
 import type { Diagnostic } from '../../../src/compile/types.js';
-import type { ComponentDefinition } from '../../../src/core/registry.js';
+import { ComponentCategory, type ComponentDefinition } from '../../../src/core/registry.js';
 import { PinDirection } from '../../../src/core/pin.js';
 
 // ---------------------------------------------------------------------------
@@ -311,9 +311,9 @@ describe('formatComponentDefinition', () => {
   }
 
   it('shows component name and category', () => {
-    const result = formatComponentDefinition(makeMinimalDef());
+    const result = formatComponentDefinition(makeMinimalDef({ category: ComponentCategory.LOGIC }));
     expect(result).toContain('Component: TestComp');
-    expect(result).toContain('Category: TEST');
+    expect(result).toContain('Category: LOGIC');
   });
 
   it('always shows [N-bit, DIRECTION] for pins regardless of model registry', () => {
