@@ -140,6 +140,18 @@ function resolveComponentRoute(
   return { kind: 'stamp', model: mnaModel, entry };
 }
 
+/**
+ * Model-entry parameter values: registry paramDef defaults overlaid by the model
+ * entry's own params. These are VALUES, not user-given params — both the
+ * standalone instantiation path (runPassA_partition) and the composite-leaf path
+ * (expandCompositeInstance) write them with not-given semantics so a leaf device
+ * is instantiated under the same contract as a standalone one, matching what the
+ * netlist generator emits to ngspice (only explicit, given params on the deck).
+ */
+function modelEntryDefaults(entry: ModelEntry): Record<string, number> {
+  return { ...paramDefDefaults(entry.paramDefs ?? []), ...(entry.params ?? {}) };
+}
+
 
 // ---------------------------------------------------------------------------
 // Composite expansion- compile-time recursive flattening.
@@ -290,10 +302,10 @@ function walkCompositeForNodeAllocation(
     // (model-entry defaults + literal numbers + string refs into subcktParams;
     // sibling-refs aren't walk-relevant so skip them).
     const subProps = new PropertyBag();
-    if (subEntry?.params) {
-      for (const [k, v] of Object.entries(subEntry.params)) {
-        if (typeof v === "number") subProps.setModelParam(k, v);
-      }
+    if (subEntry) {
+      // Registry defaults + entry params as values (not given) — same contract as
+      // expandCompositeInstance / the standalone path. See modelEntryDefaults.
+      subProps.replaceModelParams(modelEntryDefaults(subEntry), { preserveGivenness: true });
     }
     if (sub.params) {
       for (const [paramKey, v] of Object.entries(sub.params)) {
@@ -512,11 +524,15 @@ function expandCompositeInstance(
     // Build the sub-element's PropertyBag: leaf-entry defaults + sub-element
     // param overrides (literal numbers, subcircuit-param refs, sibling refs).
     const subProps = new PropertyBag();
-    if (leafEntry.params) {
-      for (const [k, v] of Object.entries(leafEntry.params)) {
-        if (typeof v === "number") subProps.setModelParam(k, v);
-      }
-    }
+    // Leaf model-entry defaults under the SAME contract as the standalone
+    // instantiation path (runPassA_partition): registry paramDef defaults + the
+    // model entry's params, written as VALUES (not given). A hand-rolled
+    // setModelParam loop would mark them given and falsely activate ngspice
+    // *Given-gated leaf branches the emitted deck never has (e.g. a defaulted
+    // RCO=0.01 sets BJTintCollResistGiven -> the Kull quasi-saturation node split
+    // at bjt.ts:1549 / bjtsetup.c:163-166, an MNA equation ngspice does not).
+    // Only the explicit subEl.params overrides below are marked given.
+    subProps.replaceModelParams(modelEntryDefaults(leafEntry), { preserveGivenness: true });
     if (subEl.params) {
       for (const [paramKey, v] of Object.entries(subEl.params)) {
         if (typeof v === "number") {
@@ -716,7 +732,7 @@ function runPassA_partition(
       case 'stamp': {
         const props = el.getProperties();
         if (route.entry) {
-          const merged: Record<string, number> = { ...paramDefDefaults(route.entry.paramDefs), ...route.entry.params };
+          const merged: Record<string, number> = { ...modelEntryDefaults(route.entry) };
           for (const k of props.getModelParamKeys()) {
             merged[k] = props.getModelParam<number>(k);
           }
@@ -732,10 +748,7 @@ function runPassA_partition(
         // bag still has to carry merged defaults for the wrapper's setParam
         // dispatch and any non-composite read paths.
         const props = el.getProperties();
-        const merged: Record<string, number> = {
-          ...paramDefDefaults(route.entry.paramDefs),
-          ...route.entry.params,
-        };
+        const merged: Record<string, number> = { ...modelEntryDefaults(route.entry) };
         for (const k of props.getModelParamKeys()) {
           merged[k] = props.getModelParam<number>(k);
         }
