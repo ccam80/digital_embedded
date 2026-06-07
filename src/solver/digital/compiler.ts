@@ -506,11 +506,19 @@ export function compileDigitalPartition(
 
       const shadowNetIds: number[] = [];
       for (const driverIdx of drivers) {
+        const driverEl = elements[driverIdx]!;
+        // A pull resistor defines the net's pull floor (the `pull` arg passed to
+        // addBusNet), not an active driver. Still remap its output pin to a
+        // shadow so its executeFn writes a dead slot instead of clobbering the
+        // resolved real net, but keep it OUT of the resolver's driver list so it
+        // never conflicts with a real driver (the floor only applies when every
+        // real driver is high-Z).
+        const isPull = driverEl.typeId === "PullUp" || driverEl.typeId === "PullDown";
         const outNets = componentOutputNets[driverIdx]!;
         for (let pinIdx = 0; pinIdx < outNets.length; pinIdx++) {
           if (outNets[pinIdx] === sharedNetId) {
             const shadowId = nextShadowNetId++;
-            shadowNetIds.push(shadowId);
+            if (!isPull) shadowNetIds.push(shadowId);
             let remap = shadowRemap.get(driverIdx);
             if (remap === undefined) {
               remap = new Map();

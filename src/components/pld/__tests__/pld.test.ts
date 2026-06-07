@@ -103,25 +103,27 @@ function buildDiodeBidirectionalCircuit(facade: DefaultSimulatorFacade, props: {
 }
 
 // PldDiode (bidirectional, INVERTED topology — cathode-driven, anode-observed):
-// Cathode side (out1) driven by In("CATHODE"); anode side (out2) joined to PullUp
-// floor and Out("ANODE") observer.
-// Reverse-direction conduction: cathode driven low → diode actively pulls the
-// anode-side net low against the PullUp floor (the canonical reverse-direction
-// observable for the bidirectional component).
+// Cathode side (out1) driven by In("CATHODE"); anode side (out2) observed by
+// Out("ANODE") and left floating (no pull resistor).
+// Reverse-direction conduction: with the cathode driven low, the diode is the
+// only thing that can put a value on the floating anode net — so a read of 0
+// there proves the diode actively pulled it low. (The anode is deliberately not
+// pulled high: a pulled-high anode against an actively-driven-low cathode is a
+// forward-biased-diode short that equal-strength digital bus resolution cannot
+// represent — that "active driver beats a pull resistor" property is covered by
+// the forward bidirectional test in its own direction.)
 function buildDiodeBidirectionalReverseCircuit(facade: DefaultSimulatorFacade, props: { blown?: boolean } = {}): Circuit {
   return facade.build({
     components: [
       { id: "cin",   type: "In",       props: { label: "CATHODE", bitWidth: 1 } },
       { id: "diode", type: "PldDiode", props: { label: "D",       blown: props.blown ?? false } },
-      { id: "pu",    type: "PullUp",   props: { label: "PU",      bitWidth: 1 } },
       { id: "aout",  type: "Out",      props: { label: "ANODE",   bitWidth: 1 } },
     ],
     connections: [
       // Cathode side (out1): driven by In so CATHODE drives the diode in reverse.
       ["cin:out",     "diode:out1"],
-      // Anode side (out2): observed by Out, with PullUp providing the high floor.
+      // Anode side (out2): observed by Out, floating (diode is its only driver).
       ["diode:out2",  "aout:in"],
-      ["diode:out2",  "pu:out"],
     ],
   });
 }
@@ -232,8 +234,9 @@ describe("PldDiode bidirectional digital bridge — reverse direction (T1) — C
     const coordinator = facade.compile(buildDiodeBidirectionalReverseCircuit(facade));
     coordinator.writeByLabel("CATHODE", digital(0));
     coordinator.step();
-    // Reverse-direction conduction: cathode driven low → diode pulls anode-side
-    // net to 0, overriding the PullUp floor (which would otherwise resolve to 1).
+    // Reverse-direction conduction: cathode driven low → diode actively drives the
+    // floating anode net to 0. The anode has no other driver, so reading 0 (a
+    // definite level, not high-Z/undefined) proves the diode did the pulling.
     expect(coordinator.readByLabel("ANODE")).toMatchObject({ type: "digital", value: 0 });
   });
 });

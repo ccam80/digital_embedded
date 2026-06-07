@@ -191,6 +191,11 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   private _values: Uint32Array = new Uint32Array(0);
   private _highZs: Uint32Array = new Uint32Array(0);
 
+  // Pre-allocated high-Z snapshot for feedback-group change detection, sized to
+  // match sccSnapshotBuffer. Kept off the hot path's allocation budget (the
+  // feedback loop must not allocate per step).
+  private _sccHighZSnapshot: Uint32Array = new Uint32Array(0);
+
   // Per-net undefined flags- 1 = UNDEFINED, 0 = defined.
   // Set by _initSignalsUndefined, cleared when a component writes a net.
   private _undefinedFlags: Uint8Array = new Uint8Array(0);
@@ -315,6 +320,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     const arraySize = circuit.signalArraySize;
     this._values = new Uint32Array(arraySize);
     this._highZs = new Uint32Array(arraySize);
+    this._sccHighZSnapshot = new Uint32Array(circuit.sccSnapshotBuffer.length);
     this._initSignalsUndefined(circuit.netCount, arraySize);
     this._engineState = EngineState.STOPPED;
     this._stepCount = 0;
@@ -740,6 +746,12 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     const outputNets = this._collectOutputNets(indices, layout);
 
     const snapshotBuf = this._compiled!.sccSnapshotBuffer;
+    // Parallel high-Z snapshot: a feedback driver can settle its value while
+    // still flipping its drive state (e.g. a bidirectional bridge retracting to
+    // high-Z, value unchanged at 0). That must still re-resolve the bus, so the
+    // stability test below compares high-Z as well as value — matching
+    // _evaluateGroupOnce. Without it a stale transient bus conflict survives.
+    const highZSnapshot = this._sccHighZSnapshot.subarray(0, outputNets.length);
     const detector = this._oscillationDetector;
     detector.reset();
 
@@ -748,6 +760,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       const snapshot = snapshotBuf.subarray(0, outputNets.length);
       for (let n = 0; n < outputNets.length; n++) {
         snapshot[n] = state[outputNets[n]!]!;
+        highZSnapshot[n] = this._highZs[outputNets[n]!]!;
       }
 
       // Evaluate all components in the group
@@ -759,14 +772,15 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
 
       detector.tick();
 
-      // Check if outputs changed; trigger bus resolution for changed nets
+      // Check if outputs changed (value or high-Z); trigger bus resolution for changed nets
       let stable = true;
       const busResolver = this._compiled!.busResolver;
       for (let n = 0; n < outputNets.length; n++) {
-        if (state[outputNets[n]!] !== snapshot[n]) {
+        const netId = outputNets[n]!;
+        if (state[netId] !== snapshot[n] || this._highZs[netId] !== highZSnapshot[n]) {
           stable = false;
           if (busResolver !== null) {
-            busResolver.onNetChanged(outputNets[n]!, state, this._highZs);
+            busResolver.onNetChanged(netId, state, this._highZs);
           }
         }
       }

@@ -18,10 +18,18 @@
  *   - When in=0 â†’ out drives 0.
  *   - Requires a pull-up resistor on the output net.
  *
- * In the TS engine the bidirectional / high-Z semantics are handled by the bus
- * resolution layer (Phase 3). The executeFn encodes the drive intent into
- * dedicated output slots: outputSlot 0 = driven value, outputSlot 1 = highZ flag
- * (1 = output is high-Z, 0 = output is actively driven).
+ * Bidirectional / high-Z semantics are handled by the bus resolution layer. A
+ * driver communicates with the resolver through two parallel arrays keyed by the
+ * (shadow) net id at its output-pin wiring slot: it writes its driven value into
+ * `state[outNet]` and its drive state into `highZs[outNet]` (0 = actively
+ * driving, 0xFFFFFFFF = high-Z). The resolver ORs together the non-high-Z
+ * drivers and applies the net's pull resistor when every driver is high-Z
+ * (bus-resolution.ts:resolveBusDrivers). A pin that is both read and driven (the
+ * bidirectional Diode's out1/out2) appears in inputSchema (read the resolved
+ * real-net value) and outputSchema (drive a per-driver shadow), mirroring the
+ * bidirectional data bus in ram.ts.
+ *
+ * `blown` is a per-instance property read via layout.getProperty.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -401,114 +409,102 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDiode- flat simulation function
+// executeDiode- flat simulation function (bidirectional PLD diode)
 //
-// The bidirectional Diode's bus interaction is handled by Phase 3 bus resolution.
-// The executeFn encodes the diode's drive intent:
-//   outputSlot 0 (cathode drive value): 1 if anode is high and not blown, else 0
-//   outputSlot 1 (cathode highZ flag):  0 if driving, 1 if high-Z
-//   outputSlot 2 (anode drive value):   0 if cathode is low and not blown, else 0
-//   outputSlot 3 (anode highZ flag):    0 if driving, 1 if high-Z
+// out1 = cathode side, out2 = anode side; both are read (inputSchema) and driven
+// (outputSchema). Forward conduction drives the cathode to 1 when the anode side
+// is actively high; reverse conduction drives the anode to 0 when the cathode
+// side is actively low. Each side is high-Z otherwise, so the net's pull resistor
+// (or another driver) sets the floating value.
 //
-// Input slots: 0=cathodeIn, 1=anodeIn, each encoded as value | (highZ << 16).
+// Input wiring slots index the resolved real nets (cathode=0, anode=1); output
+// wiring slots index this diode's per-driver shadows (cathode=0, anode=1).
 // ---------------------------------------------------------------------------
 
-export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeDiode(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  const outputStart = layout.outputOffset(index);
+  const inBase = layout.inputOffset(index);
+  const outBase = layout.outputOffset(index);
+  const blown = layout.getProperty(index, "blown") === true;
 
-  const cathodeIn = state[wt[inputStart]];
-  const anodeIn = state[wt[inputStart + 1]];
-
-  const cathodeVal = cathodeIn & 0xFFFF;
-  const cathodeHighZ = (cathodeIn >>> 16) & 1;
-  const anodeVal = anodeIn & 0xFFFF;
-  const anodeHighZ = (anodeIn >>> 16) & 1;
-
-  // blown flag stored in output slot 4 as a sentinel (set once by compiler from props)
-  const blown = state[wt[outputStart + 4]] !== 0;
+  const cathodeDriveNet = wt[outBase];
+  const anodeDriveNet = wt[outBase + 1];
 
   if (blown) {
-    // Open circuit- both outputs high-Z
-    state[wt[outputStart]] = 0;
-    state[wt[outputStart + 1]] = 1;
-    state[wt[outputStart + 2]] = 0;
-    state[wt[outputStart + 3]] = 1;
+    // Open circuit- both sides high-Z.
+    state[cathodeDriveNet] = 0;
+    highZs[cathodeDriveNet] = 0xFFFFFFFF;
+    state[anodeDriveNet] = 0;
+    highZs[anodeDriveNet] = 0xFFFFFFFF;
     return;
   }
 
-  // Cathode output: driven to 1 if anode is high (not high-Z)
+  const cathodeVal = state[wt[inBase]] & 1;
+  const cathodeHighZ = (highZs[wt[inBase]] ?? 0xFFFFFFFF) & 1;
+  const anodeVal = state[wt[inBase + 1]] & 1;
+  const anodeHighZ = (highZs[wt[inBase + 1]] ?? 0xFFFFFFFF) & 1;
+
+  // Cathode (out1): forward conduction drives it high when the anode is actively high.
   if (anodeHighZ === 0 && anodeVal !== 0) {
-    state[wt[outputStart]] = 1;
-    state[wt[outputStart + 1]] = 0;
+    state[cathodeDriveNet] = 1;
+    highZs[cathodeDriveNet] = 0;
   } else {
-    state[wt[outputStart]] = 0;
-    state[wt[outputStart + 1]] = 1;
+    state[cathodeDriveNet] = 0;
+    highZs[cathodeDriveNet] = 0xFFFFFFFF;
   }
 
-  // Anode output: driven to 0 if cathode is low (not high-Z)
+  // Anode (out2): reverse conduction drives it low when the cathode is actively low.
   if (cathodeHighZ === 0 && cathodeVal === 0) {
-    state[wt[outputStart + 2]] = 0;
-    state[wt[outputStart + 3]] = 0;
+    state[anodeDriveNet] = 0;
+    highZs[anodeDriveNet] = 0;
   } else {
-    state[wt[outputStart + 2]] = 0;
-    state[wt[outputStart + 3]] = 1;
+    state[anodeDriveNet] = 0;
+    highZs[anodeDriveNet] = 0xFFFFFFFF;
   }
 }
 
 // ---------------------------------------------------------------------------
 // executeDiodeForward- flat simulation function (wired-OR diode)
 //
-// in=1 â†’ out=1 (active drive); in=0 â†’ out=high-Z.
-// Output encoding: slot 0 = value, slot 1 = highZ (1=highZ).
+// in=1 â†’ out drives 1; in=0 (or blown) â†’ out high-Z so the net's pull-down
+// resistor resolves it low.
 // ---------------------------------------------------------------------------
 
-export function executeDiodeForward(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeDiodeForward(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  const outputStart = layout.outputOffset(index);
+  const inBase = layout.inputOffset(index);
+  const outNet = wt[layout.outputOffset(index)];
+  const blown = layout.getProperty(index, "blown") === true;
 
-  const blown = state[wt[outputStart + 2]] !== 0;
-
-  if (blown) {
-    state[wt[outputStart]] = 0;
-    state[wt[outputStart + 1]] = 1;
-    return;
-  }
-
-  const inVal = state[wt[inputStart]] & 1;
-  if (inVal !== 0) {
-    state[wt[outputStart]] = 1;
-    state[wt[outputStart + 1]] = 0;
+  if (!blown && (state[wt[inBase]] & 1) !== 0) {
+    state[outNet] = 1;
+    highZs[outNet] = 0;
   } else {
-    state[wt[outputStart]] = 0;
-    state[wt[outputStart + 1]] = 1;
+    state[outNet] = 0;
+    highZs[outNet] = 0xFFFFFFFF;
   }
 }
 
 // ---------------------------------------------------------------------------
 // executeDiodeBackward- flat simulation function (wired-AND diode)
 //
-// in=1 â†’ out=1 (contributes to pull-up); in=0 â†’ out=0 (pulls down).
+// Actively drives out to the input value (in=1 â†’ 1, in=0 â†’ 0); blown â†’ high-Z.
 // ---------------------------------------------------------------------------
 
-export function executeDiodeBackward(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
+export function executeDiodeBackward(index: number, state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
-  const inputStart = layout.inputOffset(index);
-  const outputStart = layout.outputOffset(index);
-
-  const blown = state[wt[outputStart + 2]] !== 0;
+  const inBase = layout.inputOffset(index);
+  const outNet = wt[layout.outputOffset(index)];
+  const blown = layout.getProperty(index, "blown") === true;
 
   if (blown) {
-    state[wt[outputStart]] = 0;
-    state[wt[outputStart + 1]] = 1;
+    state[outNet] = 0;
+    highZs[outNet] = 0xFFFFFFFF;
     return;
   }
 
-  const inVal = state[wt[inputStart]] & 1;
-  state[wt[outputStart]] = inVal;
-  state[wt[outputStart + 1]] = 0;
+  state[outNet] = state[wt[inBase]] & 1;
+  highZs[outNet] = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -552,8 +548,10 @@ export const PldDiodeDefinition: StandaloneComponentDefinition = {
   models: {
     digital: {
       executeFn: executeDiode,
+      // out1/out2 are bidirectional: read as the resolved real net (inputSchema)
+      // and driven via per-driver shadows (outputSchema), like ram.ts's D bus.
       inputSchema: ["out1", "out2"],
-      outputSchema: [],
+      outputSchema: ["out1", "out2"],
       defaultDelay: 0,
     },
   },
