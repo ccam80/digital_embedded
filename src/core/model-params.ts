@@ -1,7 +1,7 @@
 import { PropertyType } from "./properties.js";
 import type { ParamDef } from "./registry.js";
 
-interface ParamSpec {
+export interface ParamSpec {
   default: number;
   unit?: string;
   description?: string;

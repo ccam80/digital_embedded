@@ -25,10 +25,9 @@ import {
   type AttributeMapping,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import {
   createDiodeElement,
-  DIODE_PARAM_DEFAULTS,
+  defineDiodeVariant,
 } from "./diode.js";
 
 // ---------------------------------------------------------------------------
@@ -40,37 +39,14 @@ import {
 // live in createDiodeElement.
 // ---------------------------------------------------------------------------
 
+// Voltage-controlled-capacitance defaults: larger CJO, lower VJ. Every other
+// diode param is inherited from the base DIODE_PARAM_SPEC so the bag carries the
+// full schema and createDiodeElement reads each param directly (no fallback).
 export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS } =
-  defineModelParams({
-    primary: {
-      CJO: { default: 20e-12, unit: "F",  description: "Zero-bias junction capacitance" },
-      VJ:  { default: 0.7,    unit: "V",  description: "Junction built-in potential" },
-      M:   { default: 0.5,                 description: "Grading coefficient" },
-      IS:  { default: 1e-14,  unit: "A",  description: "Saturation current" },
-      FC:  { default: 0.5,                 description: "Forward-bias capacitance coefficient" },
-      TT:  { default: 0,      unit: "s",  description: "Transit time" },
-    },
+  defineDiodeVariant({
     secondary: {
-      N:   { default: DIODE_PARAM_DEFAULTS.N,    description: "Emission coefficient" },
-      RS:  { default: DIODE_PARAM_DEFAULTS.RS,   unit: "Ω", description: "Ohmic (series) resistance" },
-      BV:  { default: DIODE_PARAM_DEFAULTS.BV,   unit: "V", description: "Reverse breakdown voltage" },
-      IBV: { default: DIODE_PARAM_DEFAULTS.IBV,  unit: "A", description: "Reverse breakdown current" },
-      NBV: { default: DIODE_PARAM_DEFAULTS.NBV,             description: "Breakdown emission coefficient (default=N)" },
-      IKF: { default: DIODE_PARAM_DEFAULTS.IKF,  unit: "A", description: "High-injection knee current (forward)" },
-      IKR: { default: DIODE_PARAM_DEFAULTS.IKR,  unit: "A", description: "High-injection knee current (reverse)" },
-      EG:  { default: DIODE_PARAM_DEFAULTS.EG,   unit: "eV", description: "Activation energy" },
-      XTI: { default: DIODE_PARAM_DEFAULTS.XTI,             description: "Saturation current temperature exponent" },
-      KF:  { default: DIODE_PARAM_DEFAULTS.KF,              description: "Flicker noise coefficient" },
-      AF:  { default: DIODE_PARAM_DEFAULTS.AF,              description: "Flicker noise exponent" },
-      TNOM: { default: DIODE_PARAM_DEFAULTS.TNOM, unit: "K", description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
-      ISW: { default: DIODE_PARAM_DEFAULTS.ISW, unit: "A", spiceName: "JSW", description: "Sidewall saturation current" },
-      NSW: { default: DIODE_PARAM_DEFAULTS.NSW,             description: "Sidewall emission coefficient (default=N)" },
-    },
-    instance: {
-      AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },
-      OFF:  { default: DIODE_PARAM_DEFAULTS.OFF, emit: "flag", description: "Initial condition: device off" },
-      IC:   { default: DIODE_PARAM_DEFAULTS.IC,  unit: "V", description: "Initial condition: junction voltage for UIC" },
-      TEMP: { default: DIODE_PARAM_DEFAULTS.TEMP, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
+      CJO: { default: 20e-12 },
+      VJ:  { default: 0.7 },
     },
   });
 

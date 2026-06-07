@@ -23,43 +23,28 @@ import {
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
-import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "./diode.js";
-import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
+import { createDiodeElement, defineDiodeVariant } from "./diode.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
 // ---------------------------------------------------------------------------
 
-export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS } = defineModelParams({
+// Schottky barrier defaults (metal-semiconductor junction): higher IS, lower
+// forward drop, lower breakdown. Every other diode param is inherited from the
+// base DIODE_PARAM_SPEC so the bag carries the full schema and createDiodeElement
+// reads each param directly (no per-key default fallback).
+export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS } = defineDiodeVariant({
   primary: {
-    IS:  { default: 1e-8,  unit: "A", description: "Saturation current" },
-    N:   { default: 1.05,             description: "Emission coefficient" },
+    IS: { default: 1e-8 },
+    N:  { default: 1.05 },
   },
   secondary: {
-    RS:  { default: 1,     unit: "Ω", description: "Ohmic (series) resistance" },
-    CJO: { default: 1e-12, unit: "F", description: "Zero-bias junction capacitance" },
-    VJ:  { default: 0.6,   unit: "V", description: "Junction built-in potential" },
-    M:   { default: 0.5,              description: "Grading coefficient" },
-    TT:  { default: 0,     unit: "s", description: "Transit time" },
-    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
-    BV:  { default: 40,    unit: "V", description: "Reverse breakdown voltage" },
-    IBV: { default: 1e-3,  unit: "A", description: "Reverse breakdown current" },
-    NBV: { default: DIODE_PARAM_DEFAULTS.NBV,             description: "Breakdown emission coefficient (default=N)" },
-    IKF: { default: DIODE_PARAM_DEFAULTS.IKF, unit: "A", description: "High-injection knee current (forward)" },
-    IKR: { default: DIODE_PARAM_DEFAULTS.IKR, unit: "A", description: "High-injection knee current (reverse)" },
-    EG:  { default: 0.69,  unit: "eV", description: "Activation energy (Schottky barrier)" },
-    XTI: { default: 2,                description: "Saturation current temperature exponent" },
-    KF:  { default: 0,                description: "Flicker noise coefficient" },
-    AF:  { default: 1,                description: "Flicker noise exponent" },
-    TNOM: { default: DIODE_PARAM_DEFAULTS.TNOM, unit: "K", description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
-    ISW: { default: DIODE_PARAM_DEFAULTS.ISW, unit: "A", spiceName: "JSW", description: "Sidewall saturation current" },
-    NSW: { default: DIODE_PARAM_DEFAULTS.NSW,             description: "Sidewall emission coefficient (default=N)" },
-  },
-  instance: {
-    AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },
-    OFF:  { default: DIODE_PARAM_DEFAULTS.OFF, emit: "flag", description: "Initial condition: device off" },
-    IC:   { default: DIODE_PARAM_DEFAULTS.IC,  unit: "V", description: "Initial condition: junction voltage for UIC" },
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
+    RS:  { default: 1 },
+    CJO: { default: 1e-12 },
+    VJ:  { default: 0.6 },
+    BV:  { default: 40 },
+    EG:  { default: 0.69, description: "Activation energy (Schottky barrier)" },
+    XTI: { default: 2 },
   },
 });
 

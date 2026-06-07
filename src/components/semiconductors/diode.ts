@@ -22,6 +22,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
+  type ParamDef,
   type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { PoolBackedAnalogElement } from "../../solver/analog/element.js";
@@ -46,7 +47,7 @@ import { pnjlim, limitlog } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
-import { defineModelParams, kelvinToCelsius, meterToAngstrom } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius, meterToAngstrom, type ParamSpec } from "../../core/model-params.js";
 import {
   defineStateSchema,
   type StateSchema,
@@ -90,7 +91,7 @@ const SLOT_DIDIO_DT = 8;
 // Model parameter declarations
 // ---------------------------------------------------------------------------
 
-export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = defineModelParams({
+const DIODE_PARAM_SPEC = {
   primary: {
     IS:  { default: 1e-14, unit: "A",  description: "Saturation current" },
     N:   { default: 1,                 description: "Emission coefficient" },
@@ -182,7 +183,40 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     // dio.c:26 (DIO_THERMAL, IF_FLAG) — per-instance self-heating mode selector.
     THERMAL: { default: 0, emit: "flag", spiceName: "thermal", description: "Self-heating mode (0=off, 1=on)" },
   },
-});
+} satisfies Parameters<typeof defineModelParams>[0];
+
+export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } =
+  defineModelParams(DIODE_PARAM_SPEC);
+
+/**
+ * Build a diode-variant param schema (schottky / varactor / …). Starts from the
+ * full DIODE_PARAM_SPEC so the variant's property bag carries every diode param
+ * through the standard compiler merge, then applies per-key overrides (variant
+ * default values / metadata). createDiodeElement reads every param directly with
+ * no per-key default fallback. Deck emission is unaffected: a variant default is
+ * a paramDef default (not user-given), and modelCardSuffix emits only given
+ * params, so the generated ngspice .model card is identical.
+ */
+export function defineDiodeVariant(overrides: {
+  primary?: Record<string, Partial<ParamSpec>>;
+  secondary?: Record<string, Partial<ParamSpec>>;
+  instance?: Record<string, Partial<ParamSpec>>;
+}): { paramDefs: ParamDef[]; defaults: Record<string, number> } {
+  const merge = (
+    base: Record<string, ParamSpec>,
+    ov: Record<string, Partial<ParamSpec>> | undefined,
+  ): Record<string, ParamSpec> => {
+    if (!ov) return base;
+    const out: Record<string, ParamSpec> = {};
+    for (const [k, spec] of Object.entries(base)) out[k] = ov[k] ? { ...spec, ...ov[k] } : spec;
+    return out;
+  };
+  return defineModelParams({
+    primary: merge(DIODE_PARAM_SPEC.primary, overrides.primary),
+    secondary: merge(DIODE_PARAM_SPEC.secondary, overrides.secondary),
+    instance: merge(DIODE_PARAM_SPEC.instance, overrides.instance),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // computeJunctionCapacitance — depletion-cap small-signal capacitance
@@ -548,13 +582,10 @@ export function createDiodeElement(
   let nodeCathode = -1;
   let nodeTemp = -1;
 
-  // Read a diode model param, falling back to the registered DIODE default when
-  // the bag lacks the key. Diode-variant models (zener / varactor / schottky /
-  // LED) reuse this factory with a param-def subset; an unspecified
-  // temperature-coefficient / geometry / self-heating param resolves to its
-  // ngspice diosetup.c default, matching `if(!…Given) …=<default>`.
-  const mp = (key: string): number =>
-    props.hasModelParam(key) ? props.getModelParam<number>(key) : DIODE_PARAM_DEFAULTS[key];
+  // Every diode model param is declared in DIODE_PARAM_SPEC; variants
+  // (schottky / varactor / …) extend that full schema via defineDiodeVariant, so
+  // the unified compiler merge populates the bag with all of them. Read directly.
+  const mp = (key: string): number => props.getModelParam<number>(key);
 
   const params: Record<string, number> = {
     IS:  mp("IS"),
@@ -1430,9 +1461,14 @@ export class DiodeElement extends AbstractCircuitElement {
    */
   private _selfHeatingConfigured(): boolean {
     const props = this.getProperties();
+    // getPins runs on the user-facing CircuitElement bag, which- unlike the
+    // compile-merged analog bag- can be bare (factory(new PropertyBag()) in the
+    // registry smoke test; pre-merge during compile pin resolution). Read THERMAL
+    // directly when present, else its paramDef default (DIODE_PARAM_SPEC, the
+    // single source of the value).
     const thermal = props.hasModelParam("THERMAL")
       ? props.getModelParam<number>("THERMAL")
-      : 0;
+      : DIODE_PARAM_DEFAULTS.THERMAL;
     return thermal !== 0 && props.isModelParamGiven("RTH0");
   }
 
