@@ -194,9 +194,12 @@ export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Arr
 // ---------------------------------------------------------------------------
 
 export const buildNfetNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
-  const ron = params.hasModelParam("Ron") ? params.getModelParam<number>("Ron") : 1;
-  const roff = params.hasModelParam("Roff") ? params.getModelParam<number>("Roff") : 1e9;
-  const vth = params.hasModelParam("Vth") ? params.getModelParam<number>("Vth") : 2.5;
+  // Ron/Roff/Vth are declared in paramDefs and merged into the bag by the
+  // unified instantiation — read directly. isNType=1 / invertCtrl=0 below are
+  // device-identity constants (this is the N-channel FET), not params.
+  const ron = params.getModelParam<number>("Ron");
+  const roff = params.getModelParam<number>("Roff");
+  const vth = params.getModelParam<number>("Vth");
 
   return {
     ports: ["G", "D", "S"],
@@ -315,7 +318,7 @@ export const NFETDefinition: StandaloneComponentDefinition = {
         { key: "Roff", default: 1e9 },
         { key: "Vth", default: 2.5 },
       ],
-      params: { Ron: 1, Roff: 1e9, Vth: 2.5 },
+      params: {},
     },
   },
 };

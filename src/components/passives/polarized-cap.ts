@@ -191,12 +191,10 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 export const POLARIZED_CAP_NETLIST_BUILDER = (
   parentParams: PropertyBag,
 ): MnaSubcircuitNetlist => {
-  const voltageRating = parentParams.hasModelParam("voltageRating")
-    ? parentParams.getModelParam<number>("voltageRating")
-    : POLARIZED_CAP_MODEL_DEFAULTS.voltageRating;
-  const leakageCurrent = parentParams.hasModelParam("leakageCurrent")
-    ? parentParams.getModelParam<number>("leakageCurrent")
-    : POLARIZED_CAP_MODEL_DEFAULTS.leakageCurrent;
+  // voltageRating/leakageCurrent are declared in POLARIZED_CAP_PARAM_DEFS and
+  // merged into the bag by the unified instantiation — read directly.
+  const voltageRating = parentParams.getModelParam<number>("voltageRating");
+  const leakageCurrent = parentParams.getModelParam<number>("leakageCurrent");
   const rLeak = leakageCurrent > 0 ? voltageRating / leakageCurrent : 1e12;
 
   return {
@@ -263,9 +261,8 @@ const polarizedCapWrapperHook: AnalogWrapperHookFactory = (
 ): AnalogWrapperHook => {
   const nPos = pinNodes.get("pos");
   const nNeg = pinNodes.get("neg");
-  let reverseMax = props.hasModelParam("reverseMax")
-    ? props.getModelParam<number>("reverseMax")
-    : POLARIZED_CAP_MODEL_DEFAULTS.reverseMax;
+  // reverseMax is declared in POLARIZED_CAP_PARAM_DEFS — read directly.
+  let reverseMax = props.getModelParam<number>("reverseMax");
   let emit: (diag: Diagnostic) => void = () => {};
   let emitted = false;
 
@@ -411,7 +408,7 @@ export const PolarizedCapDefinition: StandaloneComponentDefinition = {
       kind: "netlist",
       netlist: POLARIZED_CAP_NETLIST_BUILDER,
       paramDefs: POLARIZED_CAP_PARAM_DEFS,
-      params: POLARIZED_CAP_MODEL_DEFAULTS,
+      params: {},
     },
   },
   analogWrapperHook: polarizedCapWrapperHook,

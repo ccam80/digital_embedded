@@ -48,9 +48,8 @@ export class FGNFETBlownDriverElement extends AnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._blown = props.hasModelParam("blown")
-      ? props.getModelParam<number>("blown") !== 0
-      : false;
+    // blown is declared in this driver's paramDefs — read directly.
+    this._blown = props.getModelParam<number>("blown") !== 0;
   }
 
   setup(ctx: SetupContext): void {

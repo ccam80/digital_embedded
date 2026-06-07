@@ -68,11 +68,17 @@ const DIGITAL_OUTPUT_PIN_LOADED_PIN_LAYOUT: PinDeclaration[] = [
 export function buildDigitalOutputPinLoadedNetlist(
   params: import("../../core/properties.js").PropertyBag,
 ): MnaSubcircuitNetlist {
-  const vOH = params.hasModelParam("vOH") ? params.getModelParam<number>("vOH") : 5;
-  const vOL = params.hasModelParam("vOL") ? params.getModelParam<number>("vOL") : 0;
+  // Every key is declared in this model's paramDefs, so the unified
+  // instantiation always merges it into the bag — read directly. The subcircuit
+  // params map carries the resolved instance values (not literal defaults) so
+  // the "rOut"/"cOut"/"vOL" string-refs below bind to user-set values.
+  const rOut = params.getModelParam<number>("rOut");
+  const cOut = params.getModelParam<number>("cOut");
+  const vOH = params.getModelParam<number>("vOH");
+  const vOL = params.getModelParam<number>("vOL");
   return {
     ports: ["node", "gnd", "ctrl"],
-    params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0 },
+    params: { rOut, cOut, vOH, vOL },
     elements: [
       // Port indices: node=0, gnd=1, ctrl=2.  Internal nets: nDriveV=3, nLowRail=4.
       {
@@ -119,8 +125,8 @@ const digitalOutputPinLoadedHook: AnalogWrapperHookFactory = (
   _getTime,
   subElementsByName,
 ) => {
-  let vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : 5;
-  let vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : 0;
+  let vOH = props.getModelParam<number>("vOH");
+  let vOL = props.getModelParam<number>("vOL");
   const eDrive = subElementsByName.get("eDrive");
   const writeGain = (): void => {
     eDrive?.setParam("gain", vOH - vOL);
@@ -153,7 +159,7 @@ export const DigitalOutputPinLoadedDefinition: ComponentDefinition = {
         { key: "vOH",  default: 5 },
         { key: "vOL",  default: 0 },
       ],
-      params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0 },
+      params: {},
     },
   },
   defaultModel: "default",

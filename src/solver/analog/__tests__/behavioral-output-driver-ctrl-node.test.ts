@@ -336,7 +336,10 @@ describe("tri-state BehavioralOutputDriverTriStateElement (4-port)", () => {
 
   it("tri-state vEn low collapses to high-Z", () => {
     const vOH = 5, vOL = 0, rLoad = 1000, rOut = 100;
-    const rHiZ = (BehavioralOutputDriverTriStateDefinition.modelRegistry!["default"] as { params: Record<string, number> }).params["rHiZ"]!;
+    // Read the default from paramDefs (the single source of default values);
+    // the model entry's `params` carries only explicit overrides, none here.
+    const rHiZ = BehavioralOutputDriverTriStateDefinition.modelRegistry!["default"]
+      .paramDefs.find((d) => d.key === "rHiZ")!.default;
     // en is low → high-Z stamp; rLoad pull-down to gnd
     // Bound: |vOut| < vOH * (1/rHiZ) * rLoad = 5e-6 V
     const fix = buildFixture({ build: buildTriState(vOH, vOL, rLoad, rOut, vOH, vOL, rHiZ) });

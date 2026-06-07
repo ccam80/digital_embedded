@@ -158,16 +158,17 @@ abstract class BSourceAnalogElement extends AnalogElement {
    * ngspice's parse-time *Given semantics (asrcpar.c).
    */
   seedParams(props: PropertyBag): void {
+    // given(k) ⇒ the param was explicitly set ⇒ it is present in the bag, so the
+    // read needs no fallback (asrcpar.c parse-time *Given semantics).
     const given = (k: string): boolean => props.isModelParamGiven(k);
-    const read = (k: string, fallback: number): number =>
-      props.hasModelParam(k) ? props.getModelParam<number>(k) : fallback;
-    if (given("TC1")) { this._tc1 = read("TC1", 0); this._tc1Given = true; }
-    if (given("TC2")) { this._tc2 = read("TC2", 0); this._tc2Given = true; }
-    if (given("M")) { this._m = read("M", 1); this._mGiven = true; }
-    if (given("RECIPROCTC")) { this._reciproctc = read("RECIPROCTC", 0); this._reciproctcGiven = true; }
-    if (given("RECIPROCM")) { this._reciprocm = read("RECIPROCM", 0); this._reciprocmGiven = true; }
-    if (given("TEMP")) { this._temp = read("TEMP", 27) + CONSTCtoK; this._tempGiven = true; }
-    if (given("DTEMP")) { this._dtemp = read("DTEMP", 0); this._dtempGiven = true; }
+    const read = (k: string): number => props.getModelParam<number>(k);
+    if (given("TC1")) { this._tc1 = read("TC1"); this._tc1Given = true; }
+    if (given("TC2")) { this._tc2 = read("TC2"); this._tc2Given = true; }
+    if (given("M")) { this._m = read("M"); this._mGiven = true; }
+    if (given("RECIPROCTC")) { this._reciproctc = read("RECIPROCTC"); this._reciproctcGiven = true; }
+    if (given("RECIPROCM")) { this._reciprocm = read("RECIPROCM"); this._reciprocmGiven = true; }
+    if (given("TEMP")) { this._temp = read("TEMP") + CONSTCtoK; this._tempGiven = true; }
+    if (given("DTEMP")) { this._dtemp = read("DTEMP"); this._dtempGiven = true; }
   }
 
   /**

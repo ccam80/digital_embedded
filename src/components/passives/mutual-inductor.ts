@@ -151,7 +151,7 @@ export class MutualInductorElement extends AnalogElement implements MutSiblingNo
 
   constructor(_pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(new Map());
-    this._coupling = props.hasModelParam("K") ? props.getModelParam<number>("K") : 1;
+    this._coupling = props.getModelParam<number>("K");
     this._l1Label = props.has("L1_branch") ? props.get<string>("L1_branch") : "";
     this._l2Label = props.has("L2_branch") ? props.get<string>("L2_branch") : "";
     if (!this._l1Label || !this._l2Label) {

@@ -72,25 +72,12 @@ const BEHAVIORAL_OUTPUT_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "rOut", default: 100 },
 ];
 
-const BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS: Record<string, number> = {
-  vOH:  5,
-  vOL:  0,
-  rOut: 100,
-};
-
 const BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_PARAM_DEFS: ParamDef[] = [
   { key: "vOH",  default: 5 },
   { key: "vOL",  default: 0 },
   { key: "rOut", default: 100 },
   { key: "rHiZ", default: 1e9 },
 ];
-
-const BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_DEFAULTS: Record<string, number> = {
-  vOH:  5,
-  vOL:  0,
-  rOut: 100,
-  rHiZ: 1e9,
-};
 
 // ---------------------------------------------------------------------------
 // BehavioralOutputDriverElement (3-port, non-tri-state)
@@ -115,9 +102,10 @@ export class BehavioralOutputDriverElement extends PoolBackedAnalogElement {
     super(pinNodes);
     this._ctrlNode = pinNodes.get("ctrl")!;
     this._gndNode  = pinNodes.get("neg")!;
-    this._vOH  = props.hasModelParam("vOH")  ? props.getModelParam<number>("vOH")  : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["vOH"]!;
-    this._vOL  = props.hasModelParam("vOL")  ? props.getModelParam<number>("vOL")  : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["vOL"]!;
-    this._rOut = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["rOut"]!;
+    // All keys are declared in BEHAVIORAL_OUTPUT_DRIVER_PARAM_DEFS — read directly.
+    this._vOH  = props.getModelParam<number>("vOH");
+    this._vOL  = props.getModelParam<number>("vOL");
+    this._rOut = props.getModelParam<number>("rOut");
   }
 
   setup(ctx: SetupContext): void {
@@ -185,10 +173,11 @@ export class BehavioralOutputDriverTriStateElement extends PoolBackedAnalogEleme
     this._ctrlNode = pinNodes.get("ctrl")!;
     this._gndNode  = pinNodes.get("neg")!;
     this._enNode   = pinNodes.get("en")!;
-    this._vOH  = props.hasModelParam("vOH")  ? props.getModelParam<number>("vOH")  : BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_DEFAULTS["vOH"]!;
-    this._vOL  = props.hasModelParam("vOL")  ? props.getModelParam<number>("vOL")  : BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_DEFAULTS["vOL"]!;
-    this._rOut = props.hasModelParam("rOut") ? props.getModelParam<number>("rOut") : BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_DEFAULTS["rOut"]!;
-    this._rHiZ = props.hasModelParam("rHiZ") ? props.getModelParam<number>("rHiZ") : BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_DEFAULTS["rHiZ"]!;
+    // All keys are declared in BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_PARAM_DEFS — read directly.
+    this._vOH  = props.getModelParam<number>("vOH");
+    this._vOL  = props.getModelParam<number>("vOL");
+    this._rOut = props.getModelParam<number>("rOut");
+    this._rHiZ = props.getModelParam<number>("rHiZ");
   }
 
   setup(ctx: SetupContext): void {
@@ -253,7 +242,7 @@ export const BehavioralOutputDriverDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: BEHAVIORAL_OUTPUT_DRIVER_PARAM_DEFS,
-      params: BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS,
+      params: {},
       branchCount: 0,
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new BehavioralOutputDriverElement(pinNodes, props),
@@ -271,7 +260,7 @@ export const BehavioralOutputDriverTriStateDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_PARAM_DEFS,
-      params: BEHAVIORAL_OUTPUT_DRIVER_TRISTATE_DEFAULTS,
+      params: {},
       branchCount: 0,
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new BehavioralOutputDriverTriStateElement(pinNodes, props),

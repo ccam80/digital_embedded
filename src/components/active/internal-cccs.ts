@@ -27,8 +27,6 @@ const INTERNAL_CCCS_PARAM_DEFS: ParamDef[] = [
   { key: "gain", default: 1 },
 ];
 
-const INTERNAL_CCCS_DEFAULTS: Record<string, number> = { gain: 1 };
-
 // ---------------------------------------------------------------------------
 // Pin layout
 // ---------------------------------------------------------------------------
@@ -62,7 +60,8 @@ export class InternalCccsElement extends AnalogElement {
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
     this._props = props;
-    this._gain = props.hasModelParam("gain") ? props.getModelParam<number>("gain") : 1;
+    // gain is declared in INTERNAL_CCCS_PARAM_DEFS — read directly.
+    this._gain = props.getModelParam<number>("gain");
   }
 
   setup(ctx: SetupContext): void {
@@ -126,7 +125,7 @@ export const InternalCccsDefinition: ComponentDefinition = {
     default: {
       kind: "inline",
       paramDefs: INTERNAL_CCCS_PARAM_DEFS,
-      params: INTERNAL_CCCS_DEFAULTS,
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number): AnalogElement =>
         new InternalCccsElement(pinNodes, props),
     },

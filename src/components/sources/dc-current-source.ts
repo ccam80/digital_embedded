@@ -184,7 +184,7 @@ class DcCurrentSourceAnalogImpl extends AnalogElement {
     // paramDefs default supplies the !ISRCmGiven ⇒ 1 rule).
     this._p = {
       current: props.getModelParam<number>("current"),
-      m: props.hasModelParam("m") ? props.getModelParam<number>("m") : 1,
+      m: props.getModelParam<number>("m"),
     };
   }
 
@@ -259,7 +259,7 @@ export const DcCurrentSourceDefinition: StandaloneComponentDefinition = {
       kind: "inline",
       factory: makeDcCurrentSource,
       paramDefs: DC_CURRENT_SOURCE_PARAM_DEFS,
-      params: DC_CURRENT_SOURCE_DEFAULTS,
+      params: {},
     },
   },
   defaultModel: "behavioral",

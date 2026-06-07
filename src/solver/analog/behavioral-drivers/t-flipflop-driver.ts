@@ -61,9 +61,8 @@ export class BehavioralTFlipflopDriverElement extends PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     super(pinNodes);
-    this._forceToggle = props.hasModelParam("forceToggle")
-      ? (props.getModelParam<number>("forceToggle") >= 0.5 ? 1 : 0)
-      : 0;
+    // forceToggle is declared in this model's paramDefs — read directly.
+    this._forceToggle = props.getModelParam<number>("forceToggle") >= 0.5 ? 1 : 0;
   }
 
   setup(ctx: SetupContext): void {
@@ -119,7 +118,7 @@ export const BehavioralTFlipflopDriverDefinition: ComponentDefinition = {
       paramDefs: [
         { key: "forceToggle", default: 0 },
       ],
-      params: { forceToggle: 0 },
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new BehavioralTFlipflopDriverElement(pinNodes, props),
     },

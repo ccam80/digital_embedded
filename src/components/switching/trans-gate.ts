@@ -221,9 +221,13 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 // ---------------------------------------------------------------------------
 
 export const buildTransGateNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
-  const ron = params.hasModelParam("Ron") ? params.getModelParam<number>("Ron") : 1;
-  const roff = params.hasModelParam("Roff") ? params.getModelParam<number>("Roff") : 1e9;
-  const vth = params.hasModelParam("Vth") ? params.getModelParam<number>("Vth") : 2.5;
+  // Ron/Roff/Vth are declared in paramDefs and merged into the bag by the
+  // unified instantiation — read directly. The isNType / invertCtrl values on
+  // the sub-elements below are device-identity constants (N-path vs P-path),
+  // not params.
+  const ron = params.getModelParam<number>("Ron");
+  const roff = params.getModelParam<number>("Roff");
+  const vth = params.getModelParam<number>("Vth");
 
   return {
     ports: ["p1", "p2", "out1", "out2"],
@@ -362,7 +366,7 @@ export const TransGateDefinition: StandaloneComponentDefinition = {
         { key: "Roff", default: 1e9 },
         { key: "Vth", default: 2.5 },
       ],
-      params: { Ron: 1, Roff: 1e9, Vth: 2.5 },
+      params: {},
     },
   },
 };

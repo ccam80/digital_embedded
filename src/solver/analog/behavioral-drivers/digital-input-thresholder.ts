@@ -58,8 +58,9 @@ export class DigitalInputThresholderElement extends PoolBackedAnalogElement {
     this._inputNode = pinNodes.get("in")!;
     this._gndNode = pinNodes.get("gnd")!;
     this._resultNode = pinNodes.get("result")!;
-    this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
-    this._vIL = props.hasModelParam("vIL") ? props.getModelParam<number>("vIL") : 0.8;
+    // vIH/vIL are declared in this model's paramDefs — read directly.
+    this._vIH = props.getModelParam<number>("vIH");
+    this._vIL = props.getModelParam<number>("vIL");
   }
 
   setup(ctx: SetupContext): void {
@@ -97,7 +98,7 @@ export const DigitalInputThresholderDefinition: ComponentDefinition = {
         { key: "vIH", default: 2.0 },
         { key: "vIL", default: 0.8 },
       ],
-      params: { vIH: 2.0, vIL: 0.8 },
+      params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
         new DigitalInputThresholderElement(pinNodes, props),
     },

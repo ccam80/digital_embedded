@@ -75,11 +75,19 @@ const DIGITAL_OUTPUT_PIN_TRISTATE_LOADED_PIN_LAYOUT: PinDeclaration[] = [
 export function buildDigitalOutputPinTriStateLoadedNetlist(
   params: import("../../core/properties.js").PropertyBag,
 ): MnaSubcircuitNetlist {
-  const vOH = params.hasModelParam("vOH") ? params.getModelParam<number>("vOH") : 5;
-  const vOL = params.hasModelParam("vOL") ? params.getModelParam<number>("vOL") : 0;
+  // Every key is declared in this model's paramDefs, so the unified
+  // instantiation always merges it into the bag — read directly. The subcircuit
+  // params map carries resolved instance values (not literal defaults) so the
+  // string-refs below ("vOL"/"midEn"/"rHiZ"/"rOut"/"cOut") bind to user-set values.
+  const rOut = params.getModelParam<number>("rOut");
+  const cOut = params.getModelParam<number>("cOut");
+  const vOH = params.getModelParam<number>("vOH");
+  const vOL = params.getModelParam<number>("vOL");
+  const rHiZ = params.getModelParam<number>("rHiZ");
+  const midEn = params.getModelParam<number>("midEn");
   return {
     ports: ["node", "gnd", "ctrl", "en"],
-    params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0, rHiZ: 1e9, midEn: 0.5 },
+    params: { rOut, cOut, vOH, vOL, rHiZ, midEn },
     elements: [
       // Port indices: node=0, gnd=1, ctrl=2, en=3.
       // Internal nets: nDriveV=4, nLowRail=5, nSwOut=6.
@@ -139,8 +147,8 @@ const digitalOutputPinTriStateLoadedHook: AnalogWrapperHookFactory = (
   _getTime,
   subElementsByName,
 ) => {
-  let vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : 5;
-  let vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : 0;
+  let vOH = props.getModelParam<number>("vOH");
+  let vOL = props.getModelParam<number>("vOL");
   const eDrive = subElementsByName.get("eDrive");
   const writeGain = (): void => {
     eDrive?.setParam("gain", vOH - vOL);
@@ -175,7 +183,7 @@ export const DigitalOutputPinTriStateLoadedDefinition: ComponentDefinition = {
         { key: "rHiZ",  default: 1e9 },
         { key: "midEn", default: 0.5 },
       ],
-      params: { rOut: 100, cOut: 1e-12, vOH: 5, vOL: 0, rHiZ: 1e9, midEn: 0.5 },
+      params: {},
     },
   },
   defaultModel: "default",
