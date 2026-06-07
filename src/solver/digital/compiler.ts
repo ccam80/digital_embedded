@@ -771,9 +771,13 @@ export function compileDigitalPartition(
   // Step 13: Classify sequential elements
   // -----------------------------------------------------------------------
 
+  // A component is sequential iff its digital model registered a sampleFn — the
+  // single source of truth. sampleFns[typeId] is non-null exactly for those
+  // components (built from def.models.digital.sampleFn above), so the clock-edge
+  // sample pass and this classification cannot drift apart.
   const sequentialIndices: number[] = [];
   for (let i = 0; i < componentCount; i++) {
-    if (isSequentialComponent(elements[i]!.typeId)) {
+    if (sampleFns[typeIds[i]!] != null) {
       sequentialIndices.push(i);
     }
   }
@@ -865,28 +869,3 @@ export function compileDigitalPartition(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Returns true if the component type name indicates a sequential element.
- * Sequential elements are evaluated on clock edges before combinational sweep.
- */
-function isSequentialComponent(typeId: string): boolean {
-  return (
-    typeId.startsWith("Flipflop") ||
-    typeId === "DFF" ||
-    typeId === "DFFSR" ||
-    // TS component names
-    typeId === "D_FF" ||
-    typeId === "JK_FF" ||
-    typeId === "RS_FF" ||
-    typeId === "T_FF" ||
-    typeId === "D_FF_AS" ||
-    typeId === "JK_FF_AS" ||
-    typeId === "RS_FF_AS" ||
-    typeId === "Monoflop" ||
-    typeId.startsWith("Register") ||
-    typeId.startsWith("Counter") ||
-    typeId.startsWith("RAM") ||
-    typeId.startsWith("BlockRAM") ||
-    typeId.startsWith("EEPROM")
-  );
-}

@@ -193,11 +193,13 @@ export function makeExecutePRNG(
 }
 
 export function samplePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  makeSamplePRNG(8)(index, state, _highZs, layout as PRNGLayout);
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 8;
+  makeSamplePRNG(bitWidth)(index, state, _highZs, layout as PRNGLayout);
 }
 
 export function executePRNG(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  makeExecutePRNG(8)(index, state, _highZs, layout as PRNGLayout);
+  const bitWidth = (layout.getProperty(index, "bitWidth") as number | undefined) ?? 8;
+  makeExecutePRNG(bitWidth)(index, state, _highZs, layout as PRNGLayout);
 }
 
 export const PRNG_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
