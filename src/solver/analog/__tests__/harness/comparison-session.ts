@@ -17,6 +17,7 @@ import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import { createDefaultRegistry } from "../../../../components/register-all.js";
 import { ComponentRegistry } from "../../../../core/registry.js";
 import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js";
+import { EngineState } from "../../../../core/engine-interface.js";
 import type { Circuit } from "../../../../core/circuit.js";
 import type { MNAEngine } from "../../analog-engine.js";
 import type { SimulationParams, TfResult } from "../../../../core/analog-engine-interface.js";
@@ -1232,6 +1233,22 @@ export class ComparisonSession {
           delta: this._engine.lastDt,
         });
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
+        break;
+      }
+
+      // Convergence / stagnation failures do not throw: the engine reduces dt to
+      // minTimeStep, emits a diagnostic, and transitions to EngineState.ERROR
+      // (analog-engine.ts:640-663), surfaced via coordinator.getRuntimeDiagnostics
+      // (coordinator.ts:243-246). step() is then a no-op (analog-engine.ts:307),
+      // so without this check the loop spins to maxSteps and records nothing.
+      // Capture the engine's diagnostic as a run error and stop, so a stalled
+      // transient fails loudly instead of yielding a vacuous zero-step comparison.
+      if (this._engine.getState() === EngineState.ERROR) {
+        const diags = this._coordinator.getRuntimeDiagnostics();
+        const last = diags.length > 0 ? diags[diags.length - 1]! : null;
+        this.errors.push(
+          `Our engine entered ERROR at step ${s}: ${last ? `[${last.code}] ${last.message}` : "convergence failure"}`,
+        );
         break;
       }
 

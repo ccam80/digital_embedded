@@ -16,6 +16,17 @@ declare module "./comparison-session.js" {
 
 ComparisonSession.prototype.compareAllSteps = function (this: ComparisonSession): void {
   const { stepCount } = this.getSummary();
+  // A transient that recorded zero steps is a failure, not a vacuous pass: the
+  // loop below would iterate nothing and silently succeed. A stalled / shorted
+  // circuit (engine throws or transitions to EngineState.ERROR before any step
+  // is accepted) captures no steps, so surface it with whatever run errors were
+  // logged.
+  if (stepCount.ours === 0) {
+    throw new Error(
+      `compareAllSteps: run produced 0 comparable steps` +
+        (this.errors.length > 0 ? `:\n  ${this.errors.join("\n  ")}` : ` (transient accepted no step)`),
+    );
+  }
   for (let s = 0; s < stepCount.ours; s++) {
     const stepEnd = this.getStepEnd(s);
     expect(
@@ -52,6 +63,15 @@ ComparisonSession.prototype.compareAllSteps = function (this: ComparisonSession)
 };
 
 ComparisonSession.prototype.compareAllAttempts = function (this: ComparisonSession): void {
+  const { stepCount } = this.getSummary();
+  // Same guard as compareAllSteps: a zero-step run has no attempts to diff, so
+  // getDivergences would return empty and pass vacuously.
+  if (stepCount.ours === 0) {
+    throw new Error(
+      `compareAllAttempts: run produced 0 comparable steps` +
+        (this.errors.length > 0 ? `:\n  ${this.errors.join("\n  ")}` : ` (transient accepted no step)`),
+    );
+  }
   const { entries } = this.getDivergences({ limit: Number.MAX_SAFE_INTEGER });
   if (entries.length === 0) return;
   const first = entries[0];
