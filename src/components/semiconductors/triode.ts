@@ -164,6 +164,7 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function buildTriodePinDeclarations(): PinDeclaration[] {
+  // currentLead waypoints route each terminal to the device body junction at x≈2.
   return [
     {
       direction: PinDirection.OUTPUT,
@@ -173,6 +174,7 @@ function buildTriodePinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: -1 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -182,6 +184,7 @@ function buildTriodePinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -191,6 +194,7 @@ function buildTriodePinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: 1 }],
     },
   ];
 }
@@ -226,6 +230,10 @@ export const TriodeDefinition: StandaloneComponentDefinition = {
   pairedSpiceEquivalent: false,
   factory: triodeCircuitFactory,
   pinLayout: buildTriodePinDeclarations(),
+  voltageProbes: [
+    { name: "Vpk", pos: "P", neg: "K" },
+    { name: "Vgk", pos: "G", neg: "K" },
+  ],
   propertyDefs: TRIODE_PROPERTY_DEFS,
   attributeMap: TRIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

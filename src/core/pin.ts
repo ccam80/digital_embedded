@@ -52,6 +52,15 @@ export interface PinDeclaration {
    * `pinLayout`; non-conditional pins are always exposed.
    */
   readonly conditional?: boolean;
+  /**
+   * Local-space waypoints tracing this pin's lead from the pin position to the
+   * component's internal current junction (bar, channel, body), ordered
+   * pin → junction; the last point is the shared junction. Consumed by the
+   * current-flow animation to route dots along the visible leg geometry of a
+   * multi-terminal device. Omitted for 2-terminal parts (straight pin-to-pin
+   * path) and for devices whose body is a single point.
+   */
+  readonly currentLead?: readonly Point[];
 }
 
 /**
@@ -67,6 +76,8 @@ export interface ResolvedPin {
   readonly wireVertex: { x: number; y: number } | null;
   readonly nodeId: number;
   readonly bitWidth: number;
+  /** Local-space lead waypoints (pin → internal junction); see PinDeclaration.currentLead. */
+  readonly currentLead?: readonly Point[];
 }
 
 /**

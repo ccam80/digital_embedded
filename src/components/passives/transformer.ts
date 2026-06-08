@@ -313,6 +313,10 @@ export const TransformerDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: transformerCircuitFactory,
   pinLayout: buildTransformerPinDeclarations(),
+  voltageProbes: [
+    { name: "Vp", pos: "P1", neg: "P2" },
+    { name: "Vs", pos: "S1", neg: "S2" },
+  ],
   propertyDefs: TRANSFORMER_PROPERTY_DEFS,
   attributeMap: TRANSFORMER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

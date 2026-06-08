@@ -27,14 +27,18 @@ const BIGINT_PREFIX = '_bigint:';
 const POS_INF = '_inf';
 const NEG_INF = '-_inf';
 
-/** Decode Infinity sentinels in a model params record back to numeric Infinity.
- *  Also recovers `null` values- these are legacy artifacts from JSON.stringify
- *  silently nullifying Infinity before the sentinel encoding was introduced. */
+/** Inverse of the serializer's model-param encoding (dts-serializer.ts:33-36,
+ *  141-145): `±Infinity` round-trip through the `_inf`/`-_inf` sentinels, while
+ *  `NaN` — the "unset" sentinel that load() guards read via isNaN() (e.g. diode
+ *  NBV→N, NSW→N; BJT ICVBE/ICVCE; capacitor IC) — has no JSON encoding and
+ *  serializes to bare `null`. So a bare `null` decodes to `NaN`; only the
+ *  sentinels decode to `±Infinity`. */
 function decodeModelParams(params: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(params)) {
-    if ((v as unknown) === POS_INF || v === null) out[k] = Infinity;
+    if ((v as unknown) === POS_INF) out[k] = Infinity;
     else if ((v as unknown) === NEG_INF) out[k] = -Infinity;
+    else if (v === null) out[k] = NaN;
     else out[k] = v;
   }
   return out;

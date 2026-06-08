@@ -29,8 +29,11 @@ export type SignalGroup = "input" | "output" | "probe";
 export interface SignalDescriptor {
   /** Display name shown in the Name column. */
   readonly name: string;
-  /** Signal address used to read the value from the coordinator. */
+  /** Signal address used to read the value from the coordinator.
+   *  For a differential voltage row, the + terminal node. */
   readonly addr: SignalAddress;
+  /** For a differential voltage row: the − terminal node; value = V(addr) − V(negAddr). */
+  readonly negAddr?: SignalAddress;
   /** Bit width of the signal (used for digital signals). */
   readonly width: number;
   /** Component type group. */
@@ -94,9 +97,14 @@ export class DataTablePanel implements MeasurementObserver {
     // Read values eagerly, throttle DOM updates to at most every 50ms.
     for (const row of this._rows) {
       const sv = this._coordinator.readSignal(row.descriptor.addr);
-      row.value = sv.type === 'digital'
-        ? BitVector.fromNumber(sv.value, row.descriptor.width)
-        : sv.voltage;
+      if (sv.type === 'digital') {
+        row.value = BitVector.fromNumber(sv.value, row.descriptor.width);
+      } else if (row.descriptor.negAddr) {
+        const nv = this._coordinator.readSignal(row.descriptor.negAddr);
+        row.value = sv.voltage - (nv.type === 'analog' ? nv.voltage : 0);
+      } else {
+        row.value = sv.voltage;
+      }
     }
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (now - this._lastUpdateTime >= 50) {

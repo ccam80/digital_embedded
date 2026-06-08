@@ -687,6 +687,7 @@ export const ResistorDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: resistorCircuitFactory,
   pinLayout: buildResistorPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: RESISTOR_PROPERTY_DEFS,
   attributeMap: RESISTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

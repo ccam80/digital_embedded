@@ -315,6 +315,10 @@ export const PotentiometerDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: potentiometerCircuitFactory,
   pinLayout: buildPotentiometerPinDeclarations(),
+  voltageProbes: [
+    { name: "V", pos: "pos", neg: "neg" },
+    { name: "Vw", pos: "W", neg: "neg" },
+  ],
   propertyDefs: POTENTIOMETER_PROPERTY_DEFS,
   attributeMap: POTENTIOMETER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

@@ -343,6 +343,7 @@ export const TransGateDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: transGateFactory,
   pinLayout: TRANS_GATE_PIN_DECLARATIONS,
+  voltageProbes: [{ name: "V", pos: "out1", neg: "out2" }],
   propertyDefs: TRANS_GATE_PROPERTY_DEFS,
   attributeMap: TRANS_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,

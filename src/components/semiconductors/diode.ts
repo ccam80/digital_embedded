@@ -1612,6 +1612,7 @@ export const DiodeDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: diodeCircuitFactory,
   pinLayout: buildDiodePinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "A", neg: "K" }],
   propertyDefs: DIODE_PROPERTY_DEFS,
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

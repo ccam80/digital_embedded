@@ -52,76 +52,6 @@ function pointKey(p: { x: number; y: number }): string {
 
 type Pt = { x: number; y: number };
 
-/**
- * Per-pin local-space waypoints from each pin to the component's internal
- * junction (bar, channel, etc.).  Waypoints are ordered pin → junction so
- * that dots entering the component follow the visible lead geometry.
- *
- * Returns null for unknown types (falls back to straight-line paths).
- */
-function branchWaypoints(typeId: string): Pt[][] | null {
-  // Each inner array = waypoints for one pin (in pinLayout order).
-  // The last waypoint of every branch is the shared junction.
-  const ch = 2.625; // MOSFET channel x
-  switch (typeId) {
-    // BJTs- pin order: B, C, E.  Bar at x≈3.
-    case "NpnBJT": return [
-      [{ x: 3, y: 0 }],                           // B(0,0) → bar
-      [{ x: 3, y: -0.375 }],                      // C(4,-1) → bar
-      [{ x: 3, y: 0.375 }],                       // E(4,1) → bar
-    ];
-    case "PnpBJT": return [
-      [{ x: 3, y: 0 }],                           // B(0,0) → bar
-      [{ x: 3, y: 0.375 }],                       // C(4,1) → bar
-      [{ x: 3, y: -0.375 }],                      // E(4,-1) → bar
-    ];
-    // MOSFETs- pin order: G, S, D (NMOS) / G, D, S (PMOS).
-    // Rectangular leads: pin → elbow → channel.
-    case "NMOS": return [
-      [{ x: ch, y: 0 }],                          // G(0,0) → channel
-      [{ x: ch, y: 1 }],                          // S(4,1) → channel
-      [{ x: ch, y: -1 }],                         // D(4,-1) → channel
-    ];
-    case "PMOS": return [
-      [{ x: ch, y: 0 }],                          // G(0,0) → channel
-      [{ x: ch, y: 1 }],                          // D(4,1) → channel
-      [{ x: ch, y: -1 }],                         // S(4,-1) → channel
-    ];
-    // JFETs- pin order: G, S, D (NJFET) / G, D, S (PJFET).
-    // L-shaped leads: pin → elbow → channel.
-    case "NJFET": return [
-      [{ x: 3.375, y: 0 }],                       // G(0,0) → channel
-      [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],  // S(4,1) → elbow → channel
-      [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }], // D(4,-1) → elbow → channel
-    ];
-    case "PJFET": return [
-      [{ x: 3.375, y: 0 }],                       // G(0,0) → channel
-      [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],  // D(4,1) → elbow → channel
-      [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }], // S(4,-1) → elbow → channel
-    ];
-    // SCR- pin order: A, K, G
-    case "SCR": return [
-      [{ x: 2, y: 0 }],                           // A(0,0) → body
-      [{ x: 2, y: 0 }],                           // K(4,0) → body
-      [{ x: 3, y: 0.5 }],                         // G(3,1) → body
-    ];
-    // Triac- pin order: MT2, MT1, G
-    case "Triac": return [
-      [{ x: 2, y: 0 }],                           // MT2(0,0) → body
-      [{ x: 2, y: 0 }],                           // MT1(4,0) → body
-      [{ x: 4, y: -1 }],                          // G(4,-2) → body
-    ];
-    // Triode- pin order: P, G, K
-    case "Triode": return [
-      [{ x: 2, y: -1 }],                          // P(4,-2) → body
-      [{ x: 2, y: 0 }],                           // G(0,0) → body
-      [{ x: 2, y: 1 }],                           // K(3,2) → body
-    ];
-    default:
-      return null;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // WireCurrentResolver
 // ---------------------------------------------------------------------------
@@ -260,23 +190,22 @@ export class WireCurrentResolver {
         //
         // Each branch has stable geometry regardless of current magnitude,
         // so animated dot offsets persist smoothly across zero↔non-zero
-        // transitions.  Pin-specific waypoints trace the visible lead
-        // shape (rectangular MOSFET legs, diagonal BJT leads, etc.).
+        // transitions.  Per-pin lead waypoints (declared on each pin via
+        // PinDeclaration.currentLead) trace the visible lead shape
+        // (rectangular MOSFET legs, diagonal BJT leads, etc.).
         if (cePins.length < 2) continue;
 
-        const bwp = branchWaypoints(ce.typeId);
         const step4ResolvedPins = elementResolvedPins?.get(eIdx);
 
         for (let t = 0; t < Math.min(pinCurrents.length, cePins.length); t++) {
-          const pinPos = (step4ResolvedPins && step4ResolvedPins[t])
-            ? step4ResolvedPins[t].worldPosition
-            : pinWorldPosition(ce, cePins[t]);
+          const rp = step4ResolvedPins?.[t];
+          const pinPos = rp ? rp.worldPosition : pinWorldPosition(ce, cePins[t]);
 
           const pc = pinCurrents[t];
           const mag = Math.abs(pc);
 
           // Build waypoints in world coords (pin → ... → junction).
-          const localWps = bwp ? bwp[t] : null;
+          const localWps = rp?.currentLead ?? null;
           let worldWps: Pt[] | undefined;
           if (localWps && localWps.length > 0) {
             worldWps = localWps.map(lp => pinWorldPosition(ce, { position: lp }));

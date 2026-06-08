@@ -15,6 +15,7 @@ import { AnalogElement } from "../element.js";
 import type { DeviceFamily } from "../ngspice-load-order.js";
 import type { IntegrationMethod } from "../integration.js";
 import type { ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
+import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import type { SparseSolverStamp as ComplexSparseSolver } from "../sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
 import type { LteParams } from "../ckt-terr.js";
@@ -25,24 +26,9 @@ import type { LteParams } from "../ckt-terr.js";
 
 /** Default simulation params matching SimulationParams defaults. */
 const DEFAULT_PARAMS: ResolvedSimulationParams = {
+  ...DEFAULT_SIMULATION_PARAMS,
   maxTimeStep: 5e-6,
   minTimeStep: 1e-14,
-  firstStep: 1e-9,
-  reltol: 1e-3,
-  voltTol: 1e-6,
-  abstol: 1e-12,
-  chargeTol: 1e-14,
-  trtol: 7.0,
-  maxIterations: 100,
-  transientMaxIterations: 10,
-  integrationMethod: "trapezoidal",
-  dcTrcvMaxIter: 50,
-  gmin: 1e-12,
-  nodeDamping: false,
-  xmu: 0.5,
-  temp: 300.15,
-  nomTemp: 300.15,
-  copyNodesets: false,
 };
 
 /**

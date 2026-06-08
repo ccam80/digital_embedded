@@ -181,6 +181,7 @@ export const VaractorDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: varactorCircuitFactory,
   pinLayout: buildVaractorPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "A", neg: "K" }],
   propertyDefs: VARACTOR_PROPERTY_DEFS,
   attributeMap: VARACTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

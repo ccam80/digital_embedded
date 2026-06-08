@@ -1606,6 +1606,7 @@ export const AcVoltageSourceDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.SOURCES,
 
   pinLayout: AC_VOLTAGE_SOURCE_PIN_LAYOUT,
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: AC_VOLTAGE_SOURCE_PROPERTY_DEFS,
   attributeMap: AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP,
 

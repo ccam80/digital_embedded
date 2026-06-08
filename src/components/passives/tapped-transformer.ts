@@ -349,6 +349,12 @@ export const TappedTransformerDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: tappedTransformerCircuitFactory,
   pinLayout: buildTappedTransformerPinDeclarations(),
+  voltageProbes: [
+    { name: "Vp", pos: "P1", neg: "P2" },
+    { name: "Vs", pos: "S1", neg: "S2" },
+    { name: "Vs1", pos: "S1", neg: "CT" },
+    { name: "Vs2", pos: "CT", neg: "S2" },
+  ],
   propertyDefs: TAPPED_TRANSFORMER_PROPERTY_DEFS,
   attributeMap: TAPPED_TRANSFORMER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

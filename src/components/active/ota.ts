@@ -382,6 +382,10 @@ export const OTADefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildOTAPinDeclarations(),
+  voltageProbes: [
+    { name: "Vid", pos: "V+", neg: "V-" },
+    { name: "Vout", pos: "OUT+", neg: "OUT" },
+  ],
   propertyDefs: OTA_PROPERTY_DEFS,
   attributeMap: OTA_ATTRIBUTE_MAPPINGS,
 

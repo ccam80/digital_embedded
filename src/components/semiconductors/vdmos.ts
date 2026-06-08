@@ -1879,6 +1879,10 @@ export const VdmosNDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: vdmosNCircuitFactory,
   pinLayout: buildVdmosNPinDeclarations(),
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+  ],
   propertyDefs: VDMOS_PROPERTY_DEFS,
   attributeMap: VDMOS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
@@ -1905,6 +1909,10 @@ export const VdmosPDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: vdmosPCircuitFactory,
   pinLayout: buildVdmosPPinDeclarations(),
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+  ],
   propertyDefs: VDMOS_PROPERTY_DEFS,
   attributeMap: VDMOS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

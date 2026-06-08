@@ -3006,6 +3006,7 @@ export class PnpBjtElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function buildNpnPinDeclarations(): PinDeclaration[] {
+  // currentLead waypoints route each terminal to the base bar at x≈3.
   return [
     {
       direction: PinDirection.INPUT,
@@ -3015,6 +3016,7 @@ function buildNpnPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -3024,6 +3026,7 @@ function buildNpnPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: -0.375 }],
     },
     {
       direction: PinDirection.OUTPUT,
@@ -3033,11 +3036,13 @@ function buildNpnPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: 0.375 }],
     },
   ];
 }
 
 function buildPnpPinDeclarations(): PinDeclaration[] {
+  // currentLead waypoints route each terminal to the base bar at x≈3.
   return [
     {
       direction: PinDirection.INPUT,
@@ -3047,6 +3052,7 @@ function buildPnpPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: 0 }],
     },
     {
       direction: PinDirection.OUTPUT,
@@ -3056,6 +3062,7 @@ function buildPnpPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: 0.375 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -3065,6 +3072,7 @@ function buildPnpPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: -0.375 }],
     },
   ];
 }
@@ -3111,6 +3119,11 @@ export const NpnBjtDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: npnCircuitFactory,
   pinLayout: buildNpnPinDeclarations(),
+  voltageProbes: [
+    { name: "Vce", pos: "C", neg: "E" },
+    { name: "Vbe", pos: "B", neg: "E" },
+    { name: "Vcb", pos: "C", neg: "B" },
+  ],
   propertyDefs: BJT_PROPERTY_DEFS,
   attributeMap: BJT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
@@ -3171,6 +3184,11 @@ export const PnpBjtDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: pnpCircuitFactory,
   pinLayout: buildPnpPinDeclarations(),
+  voltageProbes: [
+    { name: "Vec", pos: "E", neg: "C" },
+    { name: "Veb", pos: "E", neg: "B" },
+    { name: "Vbc", pos: "B", neg: "C" },
+  ],
   propertyDefs: BJT_PROPERTY_DEFS,
   attributeMap: BJT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

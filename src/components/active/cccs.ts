@@ -142,9 +142,6 @@ export class CCCSAnalogElement extends ControlledSourceElement {
   // cccsdefs.h:42 CCCSmGiven — multiplier-given flag; gates the
   // CCCScoeff *= CCCSmValue fold (cccspar.c:26).
   private _mGiven: boolean = false;
-  // cccsdefs.h:41 CCCScoeffGiven — gain-given flag (cccspar.c:28). Tracks
-  // whether the gain coefficient was netlisted, mirroring CCCScoeffGiven.
-  private _gainGiven: boolean = false;
   // True for the default linear F-element path ("I(sense)"): the stamped
   // coefficient is the bare scalar _effectiveCoeff(), matching cccsload.c:35-36.
   // False for the digiTS-only non-default expression extension.
@@ -186,9 +183,8 @@ export class CCCSAnalogElement extends ControlledSourceElement {
     if (key === "senseSourceLabel" && typeof value === "string") {
       this._senseSourceLabel = value;
     } else if (key === "currentGain" && typeof value === "number") {
-      // cccspar.c:25,28 — store the bare gain coefficient and mark it given.
+      // cccspar.c:25 — store the bare gain coefficient.
       this._gain = value;
-      this._gainGiven = true;
     } else if (key === "M" && typeof value === "number") {
       // cccspar.c:34-35 — store the parallel multiplier and mark it given.
       this._mValue = value;
@@ -427,6 +423,7 @@ export const CCCSDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildCCCSPinDeclarations(),
+  voltageProbes: [{ name: "Vout", pos: "out+", neg: "out-" }],
   propertyDefs: CCCS_PROPERTY_DEFS,
   attributeMap: CCCS_ATTRIBUTE_MAPPINGS,
 

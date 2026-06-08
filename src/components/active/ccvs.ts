@@ -367,6 +367,7 @@ export const CCVSDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildCCVSPinDeclarations(),
+  voltageProbes: [{ name: "Vout", pos: "out+", neg: "out-" }],
   propertyDefs: CCVS_PROPERTY_DEFS,
   attributeMap: CCVS_ATTRIBUTE_MAPPINGS,
 

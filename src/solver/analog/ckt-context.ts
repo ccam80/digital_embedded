@@ -864,15 +864,15 @@ export class CKTCircuitContext {
       noncon: nonconRef,
       limitingCollector: null,
       convergenceCollector: null,
-      cktGmin: params.gmin ?? 1e-12,
-      diagGmin: params.diagGmin ?? 0,
+      cktGmin: params.gmin,
+      diagGmin: params.diagGmin,
       reltol: params.reltol,
       iabstol: params.abstol,
       temp: ctxTemp,
       vt: ctxVt,
       cktFixLimit: false,
       bypass: false,
-      voltTol: 1e-6,
+      voltTol: params.voltTol,
       // ngspice dctran.c:154 (XSPICE) — CKTminBreak = 10 * CKTdelmin where
       // CKTdelmin = 1e-11 * CKTmaxStep (traninit.c:34). Bound to 0 at
       // construction; engine syncs from TimestepController.minBreak each NR
@@ -908,9 +908,9 @@ export class CKTCircuitContext {
 
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;
-    this.diagonalGmin = params.diagGmin ?? 0;
-    this.pivotAbsTol = params.pivotAbsTol ?? 0;
-    this.pivotRelTol = params.pivotRelTol ?? 1e-3;
+    this.diagonalGmin = params.diagGmin;
+    this.pivotAbsTol = params.pivotAbsTol;
+    this.pivotRelTol = params.pivotRelTol;
 
     // Nodesets / ICs (populated by engine after construction)
     this.nodesets = new Map();
@@ -1036,14 +1036,14 @@ export class CKTCircuitContext {
 
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;
-    this.diagonalGmin = params.diagGmin ?? 0;
-    this.pivotAbsTol = params.pivotAbsTol ?? 0;
-    this.pivotRelTol = params.pivotRelTol ?? 1e-3;
+    this.diagonalGmin = params.diagGmin;
+    this.pivotAbsTol = params.pivotAbsTol;
+    this.pivotRelTol = params.pivotRelTol;
 
     // Load-context scalars derived from params
     this.loadCtx.reltol = params.reltol;
     this.loadCtx.iabstol = params.abstol;
-    this.loadCtx.cktGmin = params.gmin ?? 1e-12;
+    this.loadCtx.cktGmin = params.gmin;
     // ngspice CKTstep / CKTfinalTime — re-read on configure() so the
     // independent-source waveform order-guard defaults are hot-loadable when a
     // transient analysis supplies tStop / outputStep after construction.

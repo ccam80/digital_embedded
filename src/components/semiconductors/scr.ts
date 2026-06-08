@@ -132,6 +132,7 @@ export class ScrElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function buildScrPinDeclarations(): PinDeclaration[] {
+  // currentLead waypoints route each terminal to the device body junction at x≈2.
   return [
     {
       direction: PinDirection.INPUT,
@@ -141,6 +142,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -150,6 +152,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -159,6 +162,7 @@ function buildScrPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3, y: 0.5 }],
     },
   ];
 }
@@ -193,6 +197,10 @@ export const ScrDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: scrCircuitFactory,
   pinLayout: buildScrPinDeclarations(),
+  voltageProbes: [
+    { name: "Vak", pos: "A", neg: "K" },
+    { name: "Vgk", pos: "G", neg: "K" },
+  ],
   propertyDefs: SCR_PROPERTY_DEFS,
   attributeMap: SCR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

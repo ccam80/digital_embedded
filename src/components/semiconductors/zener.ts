@@ -710,6 +710,7 @@ export const ZenerDiodeDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: zenerCircuitFactory,
   pinLayout: buildZenerPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "A", neg: "K" }],
   propertyDefs: ZENER_PROPERTY_DEFS,
   attributeMap: ZENER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

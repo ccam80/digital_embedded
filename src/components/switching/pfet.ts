@@ -297,6 +297,10 @@ export const PFETDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: pfetFactory,
   pinLayout: PFET_PIN_DECLARATIONS,
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+  ],
   propertyDefs: PFET_PROPERTY_DEFS,
   attributeMap: PFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,

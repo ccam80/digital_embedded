@@ -413,6 +413,7 @@ export const FuseDefinition: StandaloneComponentDefinition = {
   pairedSpiceEquivalent: false,
   factory: fuseFactory,
   pinLayout: FUSE_PIN_DECLARATIONS,
+  voltageProbes: [{ name: "V", pos: "out1", neg: "out2" }],
   propertyDefs: FUSE_PROPERTY_DEFS,
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,

@@ -238,6 +238,7 @@ export const DcCurrentSourceDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.SOURCES,
 
   pinLayout: DC_CURRENT_SOURCE_PIN_LAYOUT,
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: DC_CURRENT_SOURCE_PROPERTY_DEFS,
   attributeMap: DC_CURRENT_SOURCE_ATTRIBUTE_MAP,
 

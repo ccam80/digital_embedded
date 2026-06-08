@@ -744,6 +744,10 @@ export const RealOpAmpDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildRealOpAmpPinDeclarations(),
+  voltageProbes: [
+    { name: "Vid", pos: "in+", neg: "in-" },
+    { name: "Vsup", pos: "Vcc+", neg: "Vcc-" },
+  ],
   propertyDefs: REAL_OPAMP_PROPERTY_DEFS,
   attributeMap: REAL_OPAMP_ATTRIBUTE_MAPPINGS,
 

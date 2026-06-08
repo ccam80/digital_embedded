@@ -30,7 +30,7 @@ import { drawSpectrum, drawFrequencyAxis } from "./fft-renderer.js";
 // Channel descriptors
 // ---------------------------------------------------------------------------
 
-type ChannelKind = "voltage" | "current" | "elementCurrent" | "digital";
+type ChannelKind = "voltage" | "voltageDiff" | "current" | "elementCurrent" | "digital";
 
 /** Which statistical overlays to draw for a channel. */
 export type OverlayKind = "min" | "max" | "mean" | "rms";
@@ -38,8 +38,11 @@ export type OverlayKind = "min" | "max" | "mean" | "rms";
 interface ScopeChannel {
   label: string;
   kind: ChannelKind;
-  /** For voltage channels: the SignalAddress to read via coordinator.readSignal(). */
+  /** For voltage channels: the SignalAddress to read via coordinator.readSignal().
+   *  For voltageDiff channels: the + terminal node. */
   addr: SignalAddress | null;
+  /** For voltageDiff channels: the − terminal node; value = V(addr) − V(negAddr). */
+  negAddr: SignalAddress | null;
   /** For current/elementCurrent channels: the branch or element index. */
   index: number;
   color: string;
@@ -212,12 +215,41 @@ export class ScopePanel implements MeasurementObserver {
     }));
   }
 
+  /**
+   * Current visible-window Y-ranges, partitioned by axis: voltage channels map
+   * to the left axis, current channels to an independent right axis (null when
+   * there are no current channels). Exposed for tests/diagnostics so the axis
+   * separation can be asserted without rendering.
+   */
+  getAxisRanges(): { voltage: { yMin: number; yMax: number }; current: { yMin: number; yMax: number } | null } {
+    const analog = this._channels.filter(c => c.kind !== "digital");
+    const isCurrent = (c: ScopeChannel) => c.kind === "current" || c.kind === "elementCurrent";
+    const vCh = analog.filter(c => !isCurrent(c));
+    const iCh = analog.filter(isCurrent);
+    const tEnd = this._viewEnd;
+    const tStart = Math.max(0, tEnd - this._viewDuration);
+    return {
+      voltage: this._computeSharedYRange(tStart, tEnd, vCh.length > 0 ? vCh : analog),
+      current: iCh.length > 0 ? this._computeSharedYRange(tStart, tEnd, iCh) : null,
+    };
+  }
+
   isDiscreteMode(): boolean { return this._discreteMode; }
   isFftEnabled(): boolean { return this._fftEnabled; }
   getFftChannelLabel(): string | null { return this._fftChannelLabel; }
 
   addVoltageChannel(addr: SignalAddress, label: string, color?: string): void {
     const ch = this._makeChannel(label, "voltage", addr, 0, color);
+    this._channels.push(ch);
+  }
+
+  /**
+   * Add a differential voltage channel that plots V(posAddr) − V(negAddr).
+   * Used for across-component measurements declared via ComponentDefinition.voltageProbes.
+   */
+  addVoltageDiffChannel(posAddr: SignalAddress, negAddr: SignalAddress, label: string, color?: string): void {
+    const ch = this._makeChannel(label, "voltageDiff", posAddr, 0, color);
+    ch.negAddr = negAddr;
     this._channels.push(ch);
   }
 
@@ -255,6 +287,7 @@ export class ScopePanel implements MeasurementObserver {
       label,
       kind,
       addr,
+      negAddr: null,
       index,
       color: resolvedColor,
       buffer: new AnalogScopeBuffer(65536),
@@ -285,9 +318,13 @@ export class ScopePanel implements MeasurementObserver {
 
     for (const ch of this._channels) {
       let value: number;
-      if (ch.kind === "voltage") {
+      if (ch.kind === "voltage" || ch.kind === "voltageDiff") {
         const sv = this._coordinator.readSignal(ch.addr!);
         value = sv.type === "analog" ? sv.voltage : (sv.value !== 0 ? (ch.vdd ?? 5.0) : 0);
+        if (ch.kind === "voltageDiff" && ch.negAddr) {
+          const nv = this._coordinator.readSignal(ch.negAddr);
+          value -= nv.type === "analog" ? nv.voltage : (nv.value !== 0 ? (ch.vdd ?? 5.0) : 0);
+        }
       } else if (ch.kind === "digital") {
         const sv = this._coordinator.readSignal(ch.addr!);
         value = sv.type === "digital"
@@ -442,35 +479,42 @@ export class ScopePanel implements MeasurementObserver {
     this._drawTimeGrid(ctx, tStart, tEnd, LEFT_MARGIN, offsetY + TOP_MARGIN, drawW, totalDrawH);
 
     // --- Analog region ---
+    // Voltage and current channels render against independent Y-ranges: volts
+    // on the left axis, amps on the right. Sharing one range let a large current
+    // (e.g. a capacitor's edge-spike) crush the voltage traces flat.
     if (hasAnalog && analogH > 0) {
-      const sharedRange = this._computeSharedYRange(tStart, tEnd, analogChannels);
-      const analogVp: ScopeViewport = {
-        x: LEFT_MARGIN,
-        y: offsetY + TOP_MARGIN,
-        width: drawW,
-        height: analogH,
-        tStart,
-        tEnd,
-        yMin: sharedRange.yMin,
-        yMax: sharedRange.yMax,
-      };
+      const isCurrent = (c: ScopeChannel) => c.kind === "current" || c.kind === "elementCurrent";
+      const voltageChannels = analogChannels.filter(c => !isCurrent(c));
+      const currentChannels = analogChannels.filter(isCurrent);
+
+      const vRange = this._computeSharedYRange(
+        tStart, tEnd, voltageChannels.length > 0 ? voltageChannels : analogChannels);
+      const iRange = currentChannels.length > 0
+        ? this._computeSharedYRange(tStart, tEnd, currentChannels)
+        : vRange;
+
+      const base = { x: LEFT_MARGIN, y: offsetY + TOP_MARGIN, width: drawW, height: analogH, tStart, tEnd };
+      const voltageVp: ScopeViewport = { ...base, yMin: vRange.yMin, yMax: vRange.yMax };
+      const currentVp: ScopeViewport = { ...base, yMin: iRange.yMin, yMax: iRange.yMax };
 
       for (const ch of analogChannels) {
+        const vp = isCurrent(ch) ? currentVp : voltageVp;
         const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
         if (samples.time.length >= ENVELOPE_THRESHOLD) {
           const env = ch.buffer.getEnvelope(tStart, tEnd, Math.min(drawW, 512));
-          drawEnvelopeTrace(ctx, env, analogVp, ch.color);
+          drawEnvelopeTrace(ctx, env, vp, ch.color);
         } else {
-          drawPolylineTrace(ctx, samples, analogVp, ch.color);
+          drawPolylineTrace(ctx, samples, vp, ch.color);
         }
         if (ch.overlays.size > 0 && samples.value.length > 0) {
-          this._drawOverlays(ctx, ch, samples.value, analogVp);
+          this._drawOverlays(ctx, ch, samples.value, vp);
         }
       }
 
-      const hasCurrent = analogChannels.some(c => c.kind === "current" || c.kind === "elementCurrent");
-      const unit = hasCurrent ? "V/A" : "V";
-      drawYAxis(ctx, [sharedRange.yMin, sharedRange.yMax], analogVp, unit, "left");
+      drawYAxis(ctx, [vRange.yMin, vRange.yMax], voltageVp, "V", "left");
+      if (currentChannels.length > 0) {
+        drawYAxis(ctx, [iRange.yMin, iRange.yMax], currentVp, "A", "right");
+      }
     }
 
     // --- Digital strips ---

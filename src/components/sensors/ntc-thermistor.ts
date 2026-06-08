@@ -523,6 +523,7 @@ export const NTCThermistorDefinition: StandaloneComponentDefinition = {
   pairedSpiceEquivalent: false,
   factory: ntcCircuitFactory,
   pinLayout: buildNTCPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: NTC_PROPERTY_DEFS,
   attributeMap: NTC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

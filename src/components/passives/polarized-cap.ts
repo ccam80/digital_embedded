@@ -395,6 +395,7 @@ export const PolarizedCapDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: polarizedCapCircuitFactory,
   pinLayout: buildPolarizedCapPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: POLARIZED_CAP_PROPERTY_DEFS,
   attributeMap: POLARIZED_CAP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

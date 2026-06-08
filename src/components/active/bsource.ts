@@ -637,6 +637,7 @@ export const BVDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildBSourcePinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "out+", neg: "out-" }],
   propertyDefs: bsourcePropertyDefs("V"),
   attributeMap: BSOURCE_ATTRIBUTE_MAPPINGS,
 
@@ -672,6 +673,7 @@ export const BIDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildBSourcePinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "out+", neg: "out-" }],
   propertyDefs: bsourcePropertyDefs("I"),
   attributeMap: BSOURCE_ATTRIBUTE_MAPPINGS,
 

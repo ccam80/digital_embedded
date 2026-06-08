@@ -1052,6 +1052,10 @@ export const NMesfetDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: nMesfetCircuitFactory,
   pinLayout: buildMesfetPinDeclarations(),
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+  ],
   propertyDefs: MESFET_PROPERTY_DEFS,
   attributeMap: NMESFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
@@ -1076,6 +1080,10 @@ export const PMesfetDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: pMesfetCircuitFactory,
   pinLayout: buildMesfetPinDeclarations(),
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+  ],
   propertyDefs: MESFET_PROPERTY_DEFS,
   attributeMap: PMESFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

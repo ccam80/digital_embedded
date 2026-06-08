@@ -360,6 +360,7 @@ export const LDRDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: ldrCircuitFactory,
   pinLayout: buildLDRPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: LDR_PROPERTY_DEFS,
   attributeMap: LDR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

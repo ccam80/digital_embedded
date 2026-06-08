@@ -468,6 +468,7 @@ export const CurrentControlledSwitchDefinition: StandaloneComponentDefinition = 
   category: ComponentCategory.SWITCHING,
 
   pinLayout: CSW_PIN_LAYOUT,
+  voltageProbes: [{ name: "V", pos: "A1", neg: "B1" }],
   propertyDefs: CSW_PROPERTY_DEFS,
   attributeMap: CSW_ATTRIBUTE_MAPPINGS,
 

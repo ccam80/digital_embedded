@@ -288,6 +288,7 @@ export const DcVoltageSourceDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.SOURCES,
 
   pinLayout: DC_VOLTAGE_SOURCE_PIN_LAYOUT,
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: DC_VOLTAGE_SOURCE_PROPERTY_DEFS,
   attributeMap: DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP,
 

@@ -380,6 +380,10 @@ export const VCVSDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildVCVSPinDeclarations(),
+  voltageProbes: [
+    { name: "Vctrl", pos: "ctrl+", neg: "ctrl-" },
+    { name: "Vout", pos: "out+", neg: "out-" },
+  ],
   propertyDefs: VCVS_PROPERTY_DEFS,
   attributeMap: VCVS_ATTRIBUTE_MAPPINGS,
 

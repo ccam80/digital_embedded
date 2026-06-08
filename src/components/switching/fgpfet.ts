@@ -314,6 +314,10 @@ export const FGPFETDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: fgpfetFactory,
   pinLayout: FGPFET_PIN_DECLARATIONS,
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+  ],
   propertyDefs: FGPFET_PROPERTY_DEFS,
   attributeMap: FGPFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,

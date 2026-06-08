@@ -270,6 +270,10 @@ export const OptocouplerDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildOptocouplerPinDeclarations(),
+  voltageProbes: [
+    { name: "Vf", pos: "anode", neg: "cathode" },
+    { name: "Vce", pos: "collector", neg: "emitter" },
+  ],
   propertyDefs: OPTOCOUPLER_PROPERTY_DEFS,
   attributeMap: OPTOCOUPLER_ATTRIBUTE_MAPPINGS,
 

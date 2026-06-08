@@ -188,6 +188,7 @@ export const DiacDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: diacCircuitFactory,
   pinLayout: buildDiacPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "A", neg: "B" }],
   propertyDefs: DIAC_PROPERTY_DEFS,
   attributeMap: DIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

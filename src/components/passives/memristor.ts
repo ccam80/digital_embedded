@@ -459,6 +459,7 @@ export const MemristorDefinition: StandaloneComponentDefinition = {
   pairedSpiceEquivalent: false,
   factory: memristorCircuitFactory,
   pinLayout: buildMemristorPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: MEMRISTOR_PROPERTY_DEFS,
   attributeMap: MEMRISTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

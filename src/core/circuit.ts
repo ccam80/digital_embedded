@@ -151,10 +151,15 @@ export interface SavedTrace {
   panelIndex: number;
   /** Signal grouping in the data table. */
   group: 'input' | 'output' | 'probe';
-  /** 'voltage' (default) or 'current'. */
-  kind?: 'voltage' | 'current';
+  /** 'voltage' (default), 'current', or 'voltageDiff' (across-component differential). */
+  kind?: 'voltage' | 'current' | 'voltageDiff';
   /** For current traces: element label for re-resolution after recompile. */
   elementLabel?: string;
+  /** For voltageDiff traces: + and − pin labels, re-resolved to nodes via elementLabel after recompile. */
+  posPin?: string;
+  negPin?: string;
+  /** For voltageDiff traces: the declared probe name (e.g. "Vce"), for the legend. */
+  probeName?: string;
 }
 
 export interface CircuitMetadata {

@@ -335,6 +335,7 @@ export const RelayDTDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: relayDTFactory,
   pinLayout: buildRelayDTPins(1, 1),
+  voltageProbes: [{ name: "Vcoil", pos: "in1", neg: "in2" }],
   propertyDefs: RELAY_DT_PROPERTY_DEFS,
   attributeMap: RELAY_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,

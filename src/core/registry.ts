@@ -383,6 +383,22 @@ export interface ComponentModels {
  *        registry, so an internalOnly typeId can never be picked.
  *   3. harness_describe groups it under its parent composite's label.
  */
+/**
+ * A declared differential voltage measurement across two of a component's pins,
+ * addressed by pin label. The editor surfaces each as a "Trace Voltage" action
+ * that plots V(pos) − V(neg) on the scope. A component may declare several
+ * (e.g. a BJT's Vce / Vbe / Vcb). Purely a UI/measurement declaration- it never
+ * affects the MNA stamp.
+ */
+export interface VoltageProbe {
+  /** Short measurement name shown in the menu/legend (e.g. "V", "Vce"). */
+  readonly name: string;
+  /** Pin label whose node is the + terminal of the measurement. */
+  readonly pos: string;
+  /** Pin label whose node is the − terminal of the measurement. */
+  readonly neg: string;
+}
+
 export interface ComponentDefinition {
   /** Type name. For user-facing components matches the .dig elementName
    *  (e.g. "And", "FlipflopD"). For internal-only sub-elements the name is
@@ -443,6 +459,11 @@ export interface ComponentDefinition {
    *  factory wins. Standalone components express variable shape on the
    *  element class via `getPins()`, not here. */
   pinLayoutFactory?: (props: PropertyBag) => PinDeclaration[];
+  /** Declared differential voltage measurements across named pin pairs.
+   *  See {@link VoltageProbe}. Read by the editor when building a component's
+   *  trace menu; never affects the MNA stamp. When omitted, the component
+   *  offers only per-pin node-to-ground voltage traces. */
+  voltageProbes?: VoltageProbe[];
 }
 
 /**

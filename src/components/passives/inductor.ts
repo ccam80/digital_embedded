@@ -1014,6 +1014,7 @@ export const InductorDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: inductorCircuitFactory,
   pinLayout: buildInductorPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: INDUCTOR_PROPERTY_DEFS,
   attributeMap: INDUCTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

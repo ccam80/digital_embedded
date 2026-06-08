@@ -1482,6 +1482,10 @@ export const Jfet2NDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: jfet2NCircuitFactory,
   pinLayout: buildJfet2NPinDeclarations(),
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+  ],
   propertyDefs: JFET2_PROPERTY_DEFS,
   attributeMap: JFET2_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
@@ -1508,6 +1512,10 @@ export const Jfet2PDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: jfet2PCircuitFactory,
   pinLayout: buildJfet2PPinDeclarations(),
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+  ],
   propertyDefs: JFET2_PROPERTY_DEFS,
   attributeMap: JFET2_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

@@ -1,0 +1,330 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "c761d999-50cc-4b6b-8f1b-c61e87059605",
+        "position": {
+          "x": 25,
+          "y": 17
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "model": "behavioral"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "44d3cde0-5798-442a-afba-bdf9025e96dd",
+        "position": {
+          "x": 23,
+          "y": 24
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.00009999999999999999
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "model": "behavioral"
+        },
+        "rotation": 90,
+        "type": "Capacitor"
+      },
+      {
+        "id": "7af16a24-3393-435e-b2b4-2dedf5a1f70b",
+        "position": {
+          "x": 32,
+          "y": 24
+        },
+        "properties": {
+          "_modelParams": {
+            "inductance": 0.1
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "model": "behavioral"
+        },
+        "rotation": 90,
+        "type": "Inductor"
+      },
+      {
+        "id": "0ff446be-1702-4cf4-aff9-ca34438c97aa",
+        "position": {
+          "x": 16,
+          "y": 24
+        },
+        "properties": {
+          "_modelParams": {
+            "frequency": 10000
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "_pinLoading": {
+            "neg": false,
+            "pos": false
+          },
+          "model": "behavioral",
+          "waveform": "square"
+        },
+        "rotation": 90,
+        "type": "AcVoltageSource"
+      }
+    ],
+    "name": "ac_rlc",
+    "traces": [
+      {
+        "domain": "analog",
+        "group": "probe",
+        "name": "node1",
+        "panelIndex": 0
+      },
+      {
+        "domain": "analog",
+        "group": "probe",
+        "name": "Resistor.pos",
+        "panelIndex": 0
+      }
+    ],
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 20
+          },
+          {
+            "x": 16,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 17
+          },
+          {
+            "x": 23,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 17
+          },
+          {
+            "x": 25,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 20
+          },
+          {
+            "x": 23,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 17
+          },
+          {
+            "x": 32,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 17
+          },
+          {
+            "x": 32,
+            "y": 20
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 24
+          },
+          {
+            "x": 32,
+            "y": 26
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 26
+          },
+          {
+            "x": 16,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 26
+          },
+          {
+            "x": 23,
+            "y": 26
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 26
+          },
+          {
+            "x": 32,
+            "y": 26
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 24
+          },
+          {
+            "x": 23,
+            "y": 26
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

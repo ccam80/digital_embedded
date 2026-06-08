@@ -320,6 +320,7 @@ export const CrystalDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: crystalCircuitFactory,
   pinLayout: buildCrystalPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: CRYSTAL_PROPERTY_DEFS,
   attributeMap: CRYSTAL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

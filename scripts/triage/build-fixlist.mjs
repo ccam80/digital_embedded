@@ -7,7 +7,6 @@
 //      (separates e.g. compiler.ts:517 / :647 / :1571 but merges 165/166).
 //   2. curated cross-file merges (CROSS_MERGE) join known shared causes that
 //      span files (e.g. the rail-level ctrl contract across 3 drivers).
-//   3. curated dispositions (DISPOSITION) tag escalate / test-design items.
 //
 // Output: test-results/fix-list.md (+ .json), sorted by expected test count.
 //
@@ -38,26 +37,6 @@ const CROSS_MERGE = [
   { id: 'adc-thresholder-midpoint', title: 'ADC driver treats 0.5V indeterminate clk_result as logic-high; must threshold above 0.5 midpoint',
     members: ['src/components/active/adc-driver.ts:235', 'src/components/active/adc-driver.ts:290'] },
 ];
-
-// Disposition overrides keyed by canonical id or by file:line cluster key.
-// default disposition is 'engine-fix'.
-const DISPOSITION = {
-  'src/solver/analog/ckt-terr.ts:53': 'escalate',          // GEAR_LTE truncated literals vs exact rationals
-  'src/components/passives/capacitor.ts:641': 'test-design', // probes wrong leaf (cBody CCAP=0 at DC)
-  'src/solver/analog/ckt-load.ts:127': 'test-fixture',     // empty elementsByFamily in MC fixtures
-  'src/components/passives/capacitor.ts:592': 'escalate',   // 1-ULP arithmetic order
-  'src/components/passives/memristor.ts:259': 'test-design',// state0 vs state1 read
-  'src/components/switching/trans-gate.ts:337': 'test-arch',// missing pairedSpiceEquivalent:false -> T2
-  'src/components/semiconductors/mosfet.ts:420': 'escalate',// temp-pass numerics
-  'src/components/semiconductors/mosfet.ts:1375': 'test-design', // PHI/GAMMA no-op for body-tied NMOS GAMMA=0
-  'src/components/memory/program-counter.ts:240': 'test-fixture', // bitWidth:1
-  'src/components/sources/ac-voltage-source.ts:513': 'test-design', // asserts deleted non-deterministic noise contract
-  'src/components/passives/transmission-line-element.ts:268': 'escalate', // 1-ULP arithmetic order
-  'src/components/passives/polarized-cap.ts:207': 'escalate', // 1-ULP value-only divergence
-  'src/components/digital-pins/digital-input-pin-loaded.ts:13': 'test-design', // rIn=1e6 source default vs test 100k assumption
-  'src/test-utils/non-engine-coordinator.ts:126': 'test-fixture', // stub 1-based snapshot IDs vs production 0-based
-  'src/components/passives/capacitor.ts:641': 'test-design',
-};
 
 // ---------------------------------------------------------------------------
 const norm = (s) => (s || '').replace(/\\/g, '/');
@@ -114,12 +93,6 @@ for (const r of findings) {
   if (r.confidence) fx.confidences.push(r.confidence);
 }
 
-function dispositionFor(fx) {
-  if (DISPOSITION[fx.id]) return DISPOSITION[fx.id];
-  for (const c of fx.clusters) if (DISPOSITION[c]) return DISPOSITION[c];
-  return 'engine-fix';
-}
-
 const ranked = [...fixes.values()].sort((a, b) => b.tests.length - a.tests.length);
 
 if (DUMP) {
@@ -135,17 +108,13 @@ if (DUMP) {
 let md = `# Fix worklist\n\n`;
 md += `${ranked.length} distinct fixes covering ${findings.length} failing tests `;
 md += `(from root-cause-inventory.jsonl). Sorted by expected test payoff.\n\n`;
-const eng = ranked.filter((f) => disositionFor(f) === 'engine-fix');
-md += `- engine-fix items: ${eng.length} (cover ${eng.reduce((s, f) => s + f.tests.length, 0)} tests)\n`;
-md += `- escalate / test-design / test-fixture / test-arch items: ${ranked.length - eng.length}\n\n`;
 
 let n = 0;
 for (const fx of ranked) {
   n++;
-  const disp = disositionFor(fx);
   const conf = mode(fx.confidences);
   const locs = [...fx.clusters].join(', ') || fx.id;
-  md += `## ${n}. [${disp}] ${fx.title || (fx.diagnoses[0] || fx.id).slice(0, 110)}\n\n`;
+  md += `## ${n}. ${fx.title || (fx.diagnoses[0] || fx.id).slice(0, 110)}\n\n`;
   md += `- **Root cause:** \`${locs}\`\n`;
   md += `- **Expected to fix:** ${fx.tests.length} test(s) · confidence ${conf}\n`;
   if (fx.title) md += `- **Diagnosis:** ${(fx.diagnoses[0] || '').slice(0, 240)}\n`;
@@ -159,7 +128,7 @@ for (const fx of ranked) {
 
 writeFileSync(resolve('test-results/fix-list.md'), md);
 writeFileSync(resolve('test-results/fix-list.json'), JSON.stringify(
-  ranked.map((f) => ({ id: f.id, title: f.title, disposition: disositionFor(f), locations: [...f.clusters], testCount: f.tests.length, tests: f.tests, fixHint: f.fixHints[0] || '', diagnosis: f.diagnoses[0] || '' })), null, 2));
+  ranked.map((f) => ({ id: f.id, title: f.title, locations: [...f.clusters], testCount: f.tests.length, tests: f.tests, fixHint: f.fixHints[0] || '', diagnosis: f.diagnoses[0] || '' })), null, 2));
 console.log(`wrote ${ranked.length} fixes -> test-results/fix-list.md`);
 
 function mode(arr) {
@@ -167,4 +136,3 @@ function mode(arr) {
   const c = {}; for (const x of arr) c[x] = (c[x] || 0) + 1;
   return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0];
 }
-function disositionFor(fx) { return dispositionFor(fx); }

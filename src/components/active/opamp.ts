@@ -360,6 +360,7 @@ export const OpAmpDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildOpAmpPinDeclarations(),
+  voltageProbes: [{ name: "Vid", pos: "in+", neg: "in-" }],
   propertyDefs: OPAMP_PROPERTY_DEFS,
   attributeMap: OPAMP_ATTRIBUTE_MAPPINGS,
 

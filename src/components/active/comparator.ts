@@ -287,6 +287,7 @@ export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildComparatorPinDeclarations(),
+  voltageProbes: [{ name: "Vid", pos: "in+", neg: "in-" }],
   propertyDefs: COMPARATOR_PROPERTY_DEFS,
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
 

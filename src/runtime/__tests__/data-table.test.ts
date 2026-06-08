@@ -177,6 +177,29 @@ describe("DataTablePanel", () => {
       teardown(container);
     });
 
+    it("reads a differential (across-component) voltage as V(pos) - V(neg)", () => {
+      const container = makeContainer();
+      const coordinator = buildNonEngineCoordinator();
+
+      const posAddr: SignalAddress = { domain: 'analog', nodeId: 1 };
+      const negAddr: SignalAddress = { domain: 'analog', nodeId: 2 };
+      seedAnalog(coordinator, posAddr, 5);
+      seedAnalog(coordinator, negAddr, 2);
+
+      const signals: SignalDescriptor[] = [
+        { name: "V(R1)", addr: posAddr, negAddr, width: 1, group: "probe" },
+      ];
+      const panel = new DataTablePanel(container, coordinator, signals);
+
+      panel.onStep(1);
+
+      // Differential row shows the drop, not the + node's absolute voltage.
+      expect(panel.getDisplayValueByName("V(R1)")).toBe("3.0000 V");
+
+      panel.dispose();
+      teardown(container);
+    });
+
     it("value cells in DOM are updated after onStep()", () => {
       const container = makeContainer();
       const coordinator = buildNonEngineCoordinator();

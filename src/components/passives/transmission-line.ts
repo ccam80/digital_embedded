@@ -269,6 +269,10 @@ export const TransmissionLineDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: transmissionLineCircuitFactory,
   pinLayout: buildTransmissionLinePinDeclarations(),
+  voltageProbes: [
+    { name: "Va", pos: "P1a", neg: "P2a" },
+    { name: "Vb", pos: "P1b", neg: "P2b" },
+  ],
   propertyDefs: TRANSMISSION_LINE_PROPERTY_DEFS,
   attributeMap: TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

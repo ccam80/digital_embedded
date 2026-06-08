@@ -1396,6 +1396,7 @@ export function compileAnalogPartition(
           wireVertex: pinVertices[pi] ?? null,
           nodeId: pinNodeIds[pi],
           bitWidth: pin.bitWidth,
+          ...(decl?.currentLead ? { currentLead: decl.currentLead } : {}),
         });
       }
       elementResolvedPins.set(elementIndex, resolvedPinsOut);

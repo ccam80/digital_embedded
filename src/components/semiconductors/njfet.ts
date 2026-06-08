@@ -335,13 +335,6 @@ class NJFETElement extends PoolBackedAnalogElement {
   private _vtotcGiven: boolean;
   private _betatceGiven: boolean;
   private _xtiGiven: boolean;
-  private _egGiven: boolean;
-
-  // jfetdefs.h instance-struct JFETicVDSGiven / JFETicVGSGiven: track whether
-  // the netlist supplied the IC operating-point seeds, read by the UIC load
-  // branch (jfetload.c:109-114).
-  private _icVDSGiven: boolean;
-  private _icVGSGiven: boolean;
 
   // Internal nodes allocated during setup()- jfetset.c:115-158
   private _sourcePrimeNode = -1;
@@ -367,9 +360,6 @@ class NJFETElement extends PoolBackedAnalogElement {
     this._vtotcGiven = props.isModelParamGiven("VTOTC");
     this._betatceGiven = props.isModelParamGiven("BETATCE");
     this._xtiGiven = props.isModelParamGiven("XTI");
-    this._egGiven = props.isModelParamGiven("EG");
-    this._icVDSGiven = props.isModelParamGiven("ICVDS");
-    this._icVGSGiven = props.isModelParamGiven("ICVGS");
     this._params = {
       VTO:    props.getModelParam<number>("VTO"),
       BETA:   props.getModelParam<number>("BETA"),
@@ -1024,11 +1014,6 @@ class NJFETElement extends PoolBackedAnalogElement {
     if (key === "VTOTC") this._vtotcGiven = true;
     else if (key === "BETATCE") this._betatceGiven = true;
     else if (key === "XTI") this._xtiGiven = true;
-    else if (key === "EG") this._egGiven = true;
-    // jfetpar.c:41-47 JFET_IC_VDS / JFET_IC_VGS — a hot-loaded IC seed sets its
-    // *Given bit so JFETgetic does not overwrite it from the operating point.
-    else if (key === "ICVDS") this._icVDSGiven = true;
-    else if (key === "ICVGS") this._icVGSGiven = true;
     if (key in this._params) {
       this._params[key] = value;
       this._tp = computeJfetTempParams(this._params, {
@@ -1157,6 +1142,7 @@ export class NJfetElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function buildNJfetPinDeclarations(): PinDeclaration[] {
+  // currentLead waypoints route each terminal through an L-bend to the channel at x≈3.375.
   return [
     {
       direction: PinDirection.INPUT,
@@ -1166,6 +1152,7 @@ function buildNJfetPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3.375, y: 0 }],
     },
     {
       direction: PinDirection.OUTPUT,
@@ -1175,6 +1162,7 @@ function buildNJfetPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -1184,6 +1172,7 @@ function buildNJfetPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }],
     },
   ];
 }
@@ -1218,6 +1207,10 @@ export const NJfetDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: njfetCircuitFactory,
   pinLayout: buildNJfetPinDeclarations(),
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+  ],
   propertyDefs: JFET_PROPERTY_DEFS,
   attributeMap: NJFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

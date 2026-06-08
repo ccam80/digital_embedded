@@ -156,6 +156,7 @@ export class TriacElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 function buildTriacPinDeclarations(): PinDeclaration[] {
+  // currentLead waypoints route each terminal to the device body junction at x≈2.
   return [
     {
       direction: PinDirection.INPUT,
@@ -165,6 +166,7 @@ function buildTriacPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -174,6 +176,7 @@ function buildTriacPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 2, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -183,6 +186,7 @@ function buildTriacPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 4, y: -1 }],
     },
   ];
 }
@@ -217,6 +221,10 @@ export const TriacDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: triacCircuitFactory,
   pinLayout: buildTriacPinDeclarations(),
+  voltageProbes: [
+    { name: "V", pos: "MT2", neg: "MT1" },
+    { name: "Vg", pos: "G", neg: "MT1" },
+  ],
   propertyDefs: TRIAC_PROPERTY_DEFS,
   attributeMap: TRIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

@@ -203,6 +203,7 @@ export const SchottkyDiodeDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: schottkyCircuitFactory,
   pinLayout: buildSchottkyPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "A", neg: "K" }],
   propertyDefs: SCHOTTKY_PROPERTY_DEFS,
   attributeMap: SCHOTTKY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

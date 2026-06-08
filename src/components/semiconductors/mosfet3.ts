@@ -1904,6 +1904,11 @@ export const Mosfet3NDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: nmos3CircuitFactory,
   pinLayout: buildMosfet3NPinDeclarations(),
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+    { name: "Vbs", pos: "B", neg: "S" },
+  ],
   propertyDefs: MOSFET3_PROPERTY_DEFS,
   attributeMap: MOSFET3_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
@@ -1929,6 +1934,11 @@ export const Mosfet3PDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: pmos3CircuitFactory,
   pinLayout: buildMosfet3PPinDeclarations(),
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+    { name: "Vsb", pos: "S", neg: "B" },
+  ],
   propertyDefs: MOSFET3_PROPERTY_DEFS,
   attributeMap: MOSFET3_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

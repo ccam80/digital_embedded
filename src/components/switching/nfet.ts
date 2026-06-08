@@ -295,6 +295,10 @@ export const NFETDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: nfetFactory,
   pinLayout: NFET_PIN_DECLARATIONS,
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+  ],
   propertyDefs: NFET_PROPERTY_DEFS,
   attributeMap: NFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,

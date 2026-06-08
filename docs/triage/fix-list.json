@@ -2,7 +2,6 @@
   {
     "id": "composite-leaf-givenness",
     "title": "Composite-leaf givenness: expandCompositeInstance marks leaf-model DEFAULT params as given (setModelParam) -> use markGiven:false. Agents flagged optocoupler.ts:54 and the diac diode.ts:913 0-step failures as the SAME cause (verify by re-run after the compiler fix).",
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/compiler.ts:517",
       "src/components/active/optocoupler.ts:54",
@@ -262,7 +261,6 @@
   {
     "id": "src/solver/analog/behavioral-drivers/digital-input-thresholder.ts:73",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/behavioral-drivers/digital-input-thresholder.ts:73"
     ],
@@ -315,7 +313,6 @@
   {
     "id": "driver-ctrl-contract",
     "title": "Drivers stamp rail-level vTarget onto ctrl_out but DigitalOutputPinLoaded re-applies rail span -> stamp normalized [0,1] level",
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/comparator-driver.ts:193",
       "src/components/active/comparator-pushpull-driver.ts:170",
@@ -370,7 +367,6 @@
   {
     "id": "real-opamp-raillim",
     "title": "RealOpAmp rail saturation never forms a converged fixed point (Jacobian swap vs railLim bisection)",
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/real-opamp.ts:541",
       "src/components/active/real-opamp.ts:485"
@@ -419,7 +415,6 @@
   {
     "id": "src/solver/analog/ckt-terr.ts:53",
     "title": null,
-    "disposition": "escalate",
     "locations": [
       "src/solver/analog/ckt-terr.ts:53"
     ],
@@ -462,7 +457,6 @@
   {
     "id": "src/components/digital-pins/digital-output-pin-loaded.ts:99",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/digital-pins/digital-output-pin-loaded.ts:99"
     ],
@@ -505,7 +499,6 @@
   {
     "id": "src/components/switching/behavioral-fet-driver.ts:135",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/switching/behavioral-fet-driver.ts:135"
     ],
@@ -548,7 +541,6 @@
   {
     "id": "src/solver/analog/ckt-load.ts:127",
     "title": null,
-    "disposition": "test-fixture",
     "locations": [
       "src/solver/analog/ckt-load.ts:127"
     ],
@@ -586,7 +578,6 @@
   {
     "id": "src/solver/analog/dc-operating-point.ts:496",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/dc-operating-point.ts:496"
     ],
@@ -624,7 +615,6 @@
   {
     "id": "schmitt-rout-key",
     "title": "Schmitt netlist maps rOut Resistor with key R (caps with C) but Resistor/Capacitor keys are resistance/capacitance -> mapping never binds, rOut defaults to 1000",
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/schmitt-trigger.ts:83",
       "src/components/active/schmitt-trigger.ts:63"
@@ -663,7 +653,6 @@
   {
     "id": "src/components/sensors/spark-gap.ts:226",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/sensors/spark-gap.ts:226"
     ],
@@ -696,7 +685,6 @@
   {
     "id": "src/components/passives/crystal.ts:195",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/crystal.ts:195"
     ],
@@ -729,7 +717,6 @@
   {
     "id": "src/solver/coordinator.ts:716",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/coordinator.ts:716"
     ],
@@ -762,7 +749,6 @@
   {
     "id": "src/components/passives/capacitor.ts:641",
     "title": null,
-    "disposition": "test-design",
     "locations": [
       "src/components/passives/capacitor.ts:641"
     ],
@@ -795,7 +781,6 @@
   {
     "id": "comparator-latch-polarity",
     "title": "Inverted comparator latch polarity (sink when V+>V- instead of V+<V-)",
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/comparator-driver.ts:165",
       "src/components/active/comparator-pushpull-driver.ts:146"
@@ -829,7 +814,6 @@
   {
     "id": "src/components/active/real-opamp.ts:553",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/real-opamp.ts:553"
     ],
@@ -857,7 +841,6 @@
   {
     "id": "src/test-utils/non-engine-coordinator.ts:126",
     "title": null,
-    "disposition": "test-fixture",
     "locations": [
       "src/test-utils/non-engine-coordinator.ts:126"
     ],
@@ -885,7 +868,6 @@
   {
     "id": "src/solver/analog/dc-operating-point.ts:403",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/dc-operating-point.ts:403"
     ],
@@ -913,7 +895,6 @@
   {
     "id": "src/components/passives/memristor.ts:259",
     "title": null,
-    "disposition": "test-design",
     "locations": [
       "src/components/passives/memristor.ts:259"
     ],
@@ -941,7 +922,6 @@
   {
     "id": "src/components/passives/polarized-cap.ts:207",
     "title": null,
-    "disposition": "escalate",
     "locations": [
       "src/components/passives/polarized-cap.ts:207"
     ],
@@ -964,7 +944,6 @@
   {
     "id": "src/components/passives/inductor.ts:891",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/inductor.ts:891"
     ],
@@ -987,7 +966,6 @@
   {
     "id": "src/solver/analog/ckt-terr.ts:190",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/ckt-terr.ts:190"
     ],
@@ -1010,7 +988,6 @@
   {
     "id": "src/components/active/real-opamp.ts:170",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/real-opamp.ts:170"
     ],
@@ -1033,7 +1010,6 @@
   {
     "id": "src/components/semiconductors/diode.ts:839",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/diode.ts:839"
     ],
@@ -1056,7 +1032,6 @@
   {
     "id": "src/components/semiconductors/zener.ts:230",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/zener.ts:230"
     ],
@@ -1079,7 +1054,6 @@
   {
     "id": "src/components/switching/trans-gate.ts:337",
     "title": null,
-    "disposition": "test-arch",
     "locations": [
       "src/components/switching/trans-gate.ts:337"
     ],
@@ -1102,7 +1076,6 @@
   {
     "id": "src/components/digital-pins/digital-input-pin-loaded.ts:13",
     "title": null,
-    "disposition": "test-design",
     "locations": [
       "src/components/digital-pins/digital-input-pin-loaded.ts:13"
     ],
@@ -1125,7 +1098,6 @@
   {
     "id": "src/components/semiconductors/mosfet.ts:1375",
     "title": null,
-    "disposition": "test-design",
     "locations": [
       "src/components/semiconductors/mosfet.ts:1375"
     ],
@@ -1148,7 +1120,6 @@
   {
     "id": "src/components/gates/and.ts:196",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/gates/and.ts:196"
     ],
@@ -1171,7 +1142,6 @@
   {
     "id": "src/components/passives/transmission-line-element.ts:268",
     "title": null,
-    "disposition": "escalate",
     "locations": [
       "src/components/passives/transmission-line-element.ts:268"
     ],
@@ -1194,7 +1164,6 @@
   {
     "id": "src/components/passives/capacitor.ts:592",
     "title": null,
-    "disposition": "escalate",
     "locations": [
       "src/components/passives/capacitor.ts:592"
     ],
@@ -1217,7 +1186,6 @@
   {
     "id": "adc-thresholder-midpoint",
     "title": "ADC driver treats 0.5V indeterminate clk_result as logic-high; must threshold above 0.5 midpoint",
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/adc-driver.ts:290",
       "src/components/active/adc-driver.ts:235"
@@ -1241,7 +1209,6 @@
   {
     "id": "src/components/semiconductors/mosfet.ts:420",
     "title": null,
-    "disposition": "escalate",
     "locations": [
       "src/components/semiconductors/mosfet.ts:420"
     ],
@@ -1264,7 +1231,6 @@
   {
     "id": "src/solver/analog/ni-integrate.ts:64",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/ni-integrate.ts:64"
     ],
@@ -1287,7 +1253,6 @@
   {
     "id": "src/components/sources/ac-voltage-source.ts:427",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/sources/ac-voltage-source.ts:427"
     ],
@@ -1310,7 +1275,6 @@
   {
     "id": "src/components/sources/ac-voltage-source.ts:513",
     "title": null,
-    "disposition": "test-design",
     "locations": [
       "src/components/sources/ac-voltage-source.ts:513"
     ],
@@ -1333,7 +1297,6 @@
   {
     "id": "src/editor/wire-current-resolver.ts:32",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/editor/wire-current-resolver.ts:32"
     ],
@@ -1356,7 +1319,6 @@
   {
     "id": "src/solver/analog/analog-engine.ts:317",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/analog-engine.ts:317"
     ],
@@ -1379,7 +1341,6 @@
   {
     "id": "src/solver/analog/behavioral-drivers/bridge-output-driver.ts:154",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/behavioral-drivers/bridge-output-driver.ts:154"
     ],
@@ -1402,7 +1363,6 @@
   {
     "id": "src/components/io/clock.ts:306",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/io/clock.ts:306"
     ],
@@ -1425,7 +1385,6 @@
   {
     "id": "src/solver/analog/__tests__/mna-end-to-end.test.ts:435",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/__tests__/mna-end-to-end.test.ts:435"
     ],
@@ -1443,7 +1402,6 @@
   {
     "id": "src/solver/analog/__tests__/harness/comparison-session.ts:1480",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/__tests__/harness/comparison-session.ts:1480"
     ],
@@ -1461,7 +1419,6 @@
   {
     "id": "src/solver/analog/compiler.ts:1571",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/compiler.ts:1571"
     ],
@@ -1479,7 +1436,6 @@
   {
     "id": "src/solver/analog/__tests__/newton-raphson.test.ts:130",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/__tests__/newton-raphson.test.ts:130"
     ],
@@ -1497,7 +1453,6 @@
   {
     "id": "src/components/active/ota.ts:226",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/ota.ts:226"
     ],
@@ -1515,7 +1470,6 @@
   {
     "id": "src/components/passives/analog-fuse.ts:323",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/analog-fuse.ts:323"
     ],
@@ -1533,7 +1487,6 @@
   {
     "id": "src/components/switching/current-controlled-switch.ts:311",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/switching/current-controlled-switch.ts:311"
     ],
@@ -1551,7 +1504,6 @@
   {
     "id": "src/solver/digital/bus-resolution.ts:75",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/digital/bus-resolution.ts:75"
     ],
@@ -1569,7 +1521,6 @@
   {
     "id": "src/components/semiconductors/diode.ts:942",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/diode.ts:942"
     ],
@@ -1587,7 +1538,6 @@
   {
     "id": "UNRESOLVED",
     "title": "Unresolved (no line localized)",
-    "disposition": "engine-fix",
     "locations": [],
     "testCount": 1,
     "tests": [
@@ -1603,7 +1553,6 @@
   {
     "id": "src/solver/analog/analog-engine.ts:2282",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/analog-engine.ts:2282"
     ],
@@ -1621,7 +1570,6 @@
   {
     "id": "src/solver/analog/__tests__/harness/comparison-session.ts:3066",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/__tests__/harness/comparison-session.ts:3066"
     ],
@@ -1639,7 +1587,6 @@
   {
     "id": "src/components/sensors/ntc-thermistor.ts:298",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/sensors/ntc-thermistor.ts:298"
     ],
@@ -1657,7 +1604,6 @@
   {
     "id": "src/components/sources/ac-voltage-source.ts:498",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/sources/ac-voltage-source.ts:498"
     ],
@@ -1675,7 +1621,6 @@
   {
     "id": "src/components/semiconductors/triode-analog-element.ts:311",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/triode-analog-element.ts:311"
     ],
@@ -1693,7 +1638,6 @@
   {
     "id": "src/solver/analog/behavioral-drivers/mux-driver.ts:95",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/behavioral-drivers/mux-driver.ts:95"
     ],
@@ -1711,7 +1655,6 @@
   {
     "id": "src/solver/analog/behavioral-drivers/d-flipflop-driver.ts:85",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/behavioral-drivers/d-flipflop-driver.ts:85"
     ],
@@ -1729,7 +1672,6 @@
   {
     "id": "src/components/semiconductors/__tests__/schottky.test.ts:138",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/__tests__/schottky.test.ts:138"
     ],
@@ -1747,7 +1689,6 @@
   {
     "id": "src/components/semiconductors/__tests__/schottky.test.ts:156",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/__tests__/schottky.test.ts:156"
     ],
@@ -1765,7 +1706,6 @@
   {
     "id": "src/components/semiconductors/diode.ts:1388",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/diode.ts:1388"
     ],
@@ -1783,7 +1723,6 @@
   {
     "id": "src/components/memory/counter.ts:279",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/memory/counter.ts:279"
     ],
@@ -1801,7 +1740,6 @@
   {
     "id": "src/components/active/ccvs.ts:180",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/ccvs.ts:180"
     ],
@@ -1819,7 +1757,6 @@
   {
     "id": "src/components/active/comparator-driver.ts:181",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/comparator-driver.ts:181"
     ],
@@ -1837,7 +1774,6 @@
   {
     "id": "src/solver/analog/timestep.ts:435",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/timestep.ts:435"
     ],
@@ -1855,7 +1791,6 @@
   {
     "id": "src/solver/digital/compiler.ts:647",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/digital/compiler.ts:647"
     ],
@@ -1873,7 +1808,6 @@
   {
     "id": "src/components/memory/program-counter.ts:240",
     "title": null,
-    "disposition": "test-fixture",
     "locations": [
       "src/components/memory/program-counter.ts:240"
     ],
@@ -1891,7 +1825,6 @@
   {
     "id": "src/components/passives/inductor.ts:685",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/inductor.ts:685"
     ],
@@ -1909,7 +1842,6 @@
   {
     "id": "src/components/passives/memristor.ts:226",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/memristor.ts:226"
     ],
@@ -1927,7 +1859,6 @@
   {
     "id": "src/solver/analog/analog-engine.ts:625",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/analog-engine.ts:625"
     ],
@@ -1945,7 +1876,6 @@
   {
     "id": "src/solver/analog/timestep.ts:616",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/timestep.ts:616"
     ],
@@ -1963,7 +1893,6 @@
   {
     "id": "src/solver/analog/analog-engine.ts:1082",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/analog-engine.ts:1082"
     ],
@@ -1981,7 +1910,6 @@
   {
     "id": "src/components/semiconductors/diode.ts:1379",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/diode.ts:1379"
     ],
@@ -1999,7 +1927,6 @@
   {
     "id": "src/components/passives/capacitor.ts:491",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/capacitor.ts:491"
     ],
@@ -2017,7 +1944,6 @@
   {
     "id": "src/components/passives/polarized-cap.ts:641",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/passives/polarized-cap.ts:641"
     ],
@@ -2035,7 +1961,6 @@
   {
     "id": "src/solver/analog/ngspice-load-order.ts:0",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/ngspice-load-order.ts:0"
     ],
@@ -2053,7 +1978,6 @@
   {
     "id": "src/components/semiconductors/diode.ts:1258",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/semiconductors/diode.ts:1258"
     ],
@@ -2071,7 +1995,6 @@
   {
     "id": "src/solver/analog/analog-engine.ts:681",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/analog-engine.ts:681"
     ],
@@ -2089,7 +2012,6 @@
   {
     "id": "src/solver/analog/analog-engine.ts:1091",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/analog-engine.ts:1091"
     ],
@@ -2107,7 +2029,6 @@
   {
     "id": "src/solver/coordinator.ts:915",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/coordinator.ts:915"
     ],
@@ -2125,7 +2046,6 @@
   {
     "id": "src/components/active/dac-driver.ts:196",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/dac-driver.ts:196"
     ],
@@ -2143,7 +2063,6 @@
   {
     "id": "src/components/active/opamp.ts:298",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/opamp.ts:298"
     ],
@@ -2161,7 +2080,6 @@
   {
     "id": "src/components/active/timer-555.ts:56",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/timer-555.ts:56"
     ],
@@ -2179,7 +2097,6 @@
   {
     "id": "src/components/active/vccs.ts:162",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/active/vccs.ts:162"
     ],
@@ -2197,7 +2114,6 @@
   {
     "id": "src/solver/analog/behavioral-drivers/bridge-input-driver.ts:124",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/solver/analog/behavioral-drivers/bridge-input-driver.ts:124"
     ],
@@ -2215,7 +2131,6 @@
   {
     "id": "src/components/flipflops/monoflop.ts:163",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/flipflops/monoflop.ts:163"
     ],
@@ -2233,7 +2148,6 @@
   {
     "id": "src/components/graphics/graphic-card.ts:348",
     "title": null,
-    "disposition": "engine-fix",
     "locations": [
       "src/components/graphics/graphic-card.ts:348"
     ],

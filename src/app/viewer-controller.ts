@@ -28,16 +28,23 @@ import { pinWorldPosition } from '../core/pin.js';
 
 export interface WatchedSignal {
   name: string;
+  /** Primary node address. For voltageDiff, the + terminal node. */
   addr: SignalAddress;
+  /** For voltageDiff: the − terminal node; the scope plots V(addr) − V(negAddr). */
+  negAddr?: SignalAddress;
   width: number;
   group: SignalGroup;
   panelIndex: number;
-  /** 'voltage' (default) or 'current'- determines which scope channel type is created. */
-  kind?: 'voltage' | 'current';
-  /** For current signals: the element label used to re-resolve the element index after recompile. */
+  /** 'voltage' (default), 'current', or 'voltageDiff'- determines which scope channel type is created. */
+  kind?: 'voltage' | 'current' | 'voltageDiff';
+  /** For current/voltageDiff signals: the element label used to re-resolve after recompile. */
   elementLabel?: string;
   /** For current signals: the resolved element index in the compiled analog circuit. */
   elementIndex?: number;
+  /** For voltageDiff signals: the + / − pin labels and declared probe name (re-resolution + legend). */
+  posPin?: string;
+  negPin?: string;
+  probeName?: string;
 }
 
 export interface ViewerController {
@@ -83,6 +90,32 @@ export function resolveSignalName(
   }
 }
 
+/**
+ * Map each of an element's pin labels to its MNA node id by matching pin world
+ * positions against the analog wire→node table. Same matcher used when building
+ * the component trace menu; reused on restore to re-resolve differential probes
+ * after node renumbering.
+ */
+export function resolveElementPinNodes(
+  element: CircuitElement,
+  resolverCtx: CurrentResolverContext,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const pin of element.getPins()) {
+    const wp = pinWorldPosition(element, pin);
+    for (const [wire, nid] of resolverCtx.wireToNodeId) {
+      if (
+        (Math.abs(wire.start.x - wp.x) < 0.5 && Math.abs(wire.start.y - wp.y) < 0.5) ||
+        (Math.abs(wire.end.x - wp.x) < 0.5 && Math.abs(wire.end.y - wp.y) < 0.5)
+      ) {
+        map.set(pin.label, nid);
+        break;
+      }
+    }
+  }
+  return map;
+}
+
 // ---------------------------------------------------------------------------
 // initViewerController
 // ---------------------------------------------------------------------------
@@ -109,13 +142,30 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
   function _syncTracesToMetadata(): void {
     const circuit = ctx.getCircuit();
     if (!circuit) return;
-    circuit.metadata.traces = watchedSignals.map(sig => ({
-      name: sig.name,
-      domain: sig.addr.domain,
-      panelIndex: sig.panelIndex,
-      group: sig.group,
-      ...(sig.kind === 'current' ? { kind: 'current' as const, elementLabel: sig.elementLabel } : {}),
-    }));
+    circuit.metadata.traces = watchedSignals.map(sig => {
+      const base = {
+        name: sig.name,
+        domain: sig.addr.domain,
+        panelIndex: sig.panelIndex,
+        group: sig.group,
+      };
+      if (sig.kind === 'current') {
+        return {
+          ...base, kind: 'current' as const,
+          ...(sig.elementLabel !== undefined ? { elementLabel: sig.elementLabel } : {}),
+        };
+      }
+      if (sig.kind === 'voltageDiff') {
+        return {
+          ...base, kind: 'voltageDiff' as const,
+          ...(sig.elementLabel !== undefined ? { elementLabel: sig.elementLabel } : {}),
+          ...(sig.posPin !== undefined ? { posPin: sig.posPin } : {}),
+          ...(sig.negPin !== undefined ? { negPin: sig.negPin } : {}),
+          ...(sig.probeName !== undefined ? { probeName: sig.probeName } : {}),
+        };
+      }
+      return base;
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -198,6 +248,8 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
         for (const s of signals) {
           if (s.kind === 'current' && s.elementIndex !== undefined) {
             panel.addElementCurrentChannel(s.elementIndex, s.name);
+          } else if (s.kind === 'voltageDiff' && s.negAddr && s.addr.domain === 'analog') {
+            panel.addVoltageDiffChannel(s.addr, s.negAddr, s.name);
           } else if (s.addr.domain === 'analog') {
             panel.addVoltageChannel(s.addr, s.name);
           } else {
@@ -252,6 +304,7 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       const signals: SignalDescriptor[] = watchedSignals.map(s => ({
         name: s.name,
         addr: s.addr,
+        ...(s.kind === 'voltageDiff' && s.negAddr ? { negAddr: s.negAddr } : {}),
         width: s.width,
         group: s.group,
       }));
@@ -492,41 +545,57 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
         showViewerTab('timing');
       };
 
-      // For 2-terminal components: "Trace Voltage: Label" (across the component)
-      // For 3+ terminal: per-pin "Trace Voltage: Label.Pin"
-      if (pinNodeMap.length <= 2 && pinNodeMap.length > 0) {
-        // Use first pin for the voltage trace
-        const { pinLabel, nodeId } = pinNodeMap[0];
-        items.push({
-          label: `Trace Voltage: ${label}`,
-          action: () => addVoltageTrace(pinLabel, nodeId, existingPanels[0]?.index ?? nextPanelIndex()),
-          enabled: true,
-        });
-        if (existingPanels.length > 0) {
-          items.push({
-            label: `Trace Voltage: ${label} (New Panel)`,
-            action: () => addVoltageTrace(pinLabel, nodeId, nextPanelIndex()),
-            enabled: true,
+      // Voltage traces. Differential ("across the component") traces come from
+      // the component's declared voltageProbes; each plots V(pos) − V(neg).
+      // Every pin additionally gets an unambiguous node-to-ground trace.
+      const pinNodeByLabel = new Map<string, number>();
+      for (const { pinLabel, nodeId } of pinNodeMap) pinNodeByLabel.set(pinLabel, nodeId);
+
+      const addDiffTrace = (
+        probe: { name: string; pos: string; neg: string },
+        panelIdx: number,
+      ) => {
+        const posN = pinNodeByLabel.get(probe.pos);
+        const negN = pinNodeByLabel.get(probe.neg);
+        if (posN === undefined || negN === undefined) return;
+        const name = `${label}.${probe.name}`;
+        if (!watchedSignals.some(s => s.name === name)) {
+          watchedSignals.push({
+            name,
+            addr: { domain: 'analog', nodeId: posN },
+            negAddr: { domain: 'analog', nodeId: negN },
+            width: 1, group: 'probe', panelIndex: panelIdx, kind: 'voltageDiff',
+            elementLabel: label, posPin: probe.pos, negPin: probe.neg, probeName: probe.name,
           });
         }
-      } else {
+        rebuildViewers();
+        viewerPanel?.classList.add('open');
+        showViewerTab('timing');
+      };
+
+      const probes = ctx.registry.getStandalone(element.typeId)?.voltageProbes ?? [];
+
+      const emitVoltageItems = (panelFor: () => number, suffix: string) => {
+        for (const probe of probes) {
+          if (pinNodeByLabel.get(probe.pos) === undefined || pinNodeByLabel.get(probe.neg) === undefined) continue;
+          const base = probes.length === 1 && probe.name === 'V'
+            ? `Trace Voltage: ${label}`
+            : `Trace Voltage: ${label} ${probe.name}`;
+          items.push({ label: base + suffix, action: () => addDiffTrace(probe, panelFor()), enabled: true });
+        }
         for (const { pinLabel, nodeId } of pinNodeMap) {
           items.push({
-            label: `Trace Voltage: ${label}.${pinLabel}`,
-            action: () => addVoltageTrace(pinLabel, nodeId, existingPanels[0]?.index ?? nextPanelIndex()),
+            label: `Trace Voltage: ${label}.${pinLabel}${suffix}`,
+            action: () => addVoltageTrace(pinLabel, nodeId, panelFor()),
             enabled: true,
           });
         }
-        if (existingPanels.length > 0 && pinNodeMap.length > 0) {
-          items.push(separator());
-          for (const { pinLabel, nodeId } of pinNodeMap) {
-            items.push({
-              label: `Trace Voltage: ${label}.${pinLabel} (New Panel)`,
-              action: () => addVoltageTrace(pinLabel, nodeId, nextPanelIndex()),
-              enabled: true,
-            });
-          }
-        }
+      };
+
+      emitVoltageItems(() => existingPanels[0]?.index ?? nextPanelIndex(), '');
+      if (existingPanels.length > 0) {
+        items.push(separator());
+        emitVoltageItems(() => nextPanelIndex(), ' (New Panel)');
       }
 
       // Element current trace
@@ -870,6 +939,36 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
           kind: 'current',
           elementLabel: trace.elementLabel,
           elementIndex,
+        });
+      } else if (trace.kind === 'voltageDiff' && trace.elementLabel && trace.posPin && trace.negPin && resolverCtx) {
+        let element: CircuitElement | undefined;
+        for (let i = 0; i < resolverCtx.elements.length; i++) {
+          const ce = resolverCtx.elementToCircuitElement.get(i);
+          if (ce && _elementLabel(ce) === trace.elementLabel) { element = ce; break; }
+        }
+        if (!element) {
+          console.warn(`[trace-restore] voltageDiff element "${trace.elementLabel}" not found, skipping`);
+          continue;
+        }
+        const pinNodes = resolveElementPinNodes(element, resolverCtx);
+        const posN = pinNodes.get(trace.posPin);
+        const negN = pinNodes.get(trace.negPin);
+        if (posN === undefined || negN === undefined) {
+          console.warn(`[trace-restore] voltageDiff pins "${trace.posPin}"/"${trace.negPin}" on "${trace.elementLabel}" unresolved, skipping`);
+          continue;
+        }
+        watchedSignals.push({
+          name: trace.name,
+          addr: { domain: 'analog', nodeId: posN },
+          negAddr: { domain: 'analog', nodeId: negN },
+          width: 1,
+          group: trace.group as SignalGroup,
+          panelIndex: trace.panelIndex,
+          kind: 'voltageDiff',
+          elementLabel: trace.elementLabel,
+          posPin: trace.posPin,
+          negPin: trace.negPin,
+          ...(trace.probeName !== undefined ? { probeName: trace.probeName } : {}),
         });
       } else {
         let addr = labelSignalMap.get(trace.name);

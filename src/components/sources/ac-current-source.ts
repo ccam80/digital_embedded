@@ -954,6 +954,7 @@ export const AcCurrentSourceDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.SOURCES,
 
   pinLayout: AC_CURRENT_SOURCE_PIN_LAYOUT,
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: AC_CURRENT_SOURCE_PROPERTY_DEFS,
   attributeMap: AC_CURRENT_SOURCE_ATTRIBUTE_MAP,
 

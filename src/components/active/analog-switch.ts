@@ -856,6 +856,7 @@ export const SwitchSPSTDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildSPSTPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "in", neg: "out" }],
   propertyDefs: ANALOG_SWITCH_PROPERTY_DEFS,
   attributeMap: ANALOG_SWITCH_ATTRIBUTE_MAPPINGS,
 
@@ -887,6 +888,10 @@ export const SwitchSPDTDefinition: StandaloneComponentDefinition = {
   category: ComponentCategory.ACTIVE,
 
   pinLayout: buildSPDTPinDeclarations(),
+  voltageProbes: [
+    { name: "Vno", pos: "com", neg: "no" },
+    { name: "Vnc", pos: "com", neg: "nc" },
+  ],
   propertyDefs: ANALOG_SWITCH_PROPERTY_DEFS,
   attributeMap: ANALOG_SWITCH_ATTRIBUTE_MAPPINGS,
 

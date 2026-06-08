@@ -2128,17 +2128,17 @@ export class PmosfetElement extends AbstractCircuitElement {
 
 function buildNmosPinDeclarations(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    { direction: PinDirection.OUTPUT, label: "S", defaultBitWidth: 1, position: { x: 4, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: 1, position: { x: 4, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal", currentLead: [{ x: 2.625, y: 0 }] },
+    { direction: PinDirection.OUTPUT, label: "S", defaultBitWidth: 1, position: { x: 4, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal", currentLead: [{ x: 2.625, y: 1 }] },
+    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: 1, position: { x: 4, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal", currentLead: [{ x: 2.625, y: -1 }] },
   ];
 }
 
 function buildPmosPinDeclarations(): PinDeclaration[] {
   return [
-    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: 1, position: { x: 4.0, y: 1.0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
-    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: 1, position: { x: 4.0, y: -1.0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal", currentLead: [{ x: 2.625, y: 0 }] },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: 1, position: { x: 4.0, y: 1.0 }, isNegatable: false, isClockCapable: false, kind: "signal", currentLead: [{ x: 2.625, y: 1 }] },
+    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: 1, position: { x: 4.0, y: -1.0 }, isNegatable: false, isClockCapable: false, kind: "signal", currentLead: [{ x: 2.625, y: -1 }] },
   ];
 }
 
@@ -2174,6 +2174,11 @@ export const NmosfetDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: nmosCircuitFactory,
   pinLayout: buildNmosPinDeclarations(),
+  voltageProbes: [
+    { name: "Vds", pos: "D", neg: "S" },
+    { name: "Vgs", pos: "G", neg: "S" },
+    { name: "Vgd", pos: "G", neg: "D" },
+  ],
   propertyDefs: MOSFET_PROPERTY_DEFS,
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
@@ -2235,6 +2240,11 @@ export const PmosfetDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: pmosCircuitFactory,
   pinLayout: buildPmosPinDeclarations(),
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+    { name: "Vdg", pos: "D", neg: "G" },
+  ],
   propertyDefs: MOSFET_PROPERTY_DEFS,
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

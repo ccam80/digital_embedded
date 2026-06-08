@@ -979,6 +979,7 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 3.375, y: 0 }],
     },
     {
       direction: PinDirection.INPUT,
@@ -988,6 +989,7 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }],
     },
     {
       direction: PinDirection.OUTPUT,
@@ -997,6 +999,7 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
+      currentLead: [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],
     },
   ];
 }
@@ -1023,6 +1026,10 @@ export const PJfetDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: pjfetCircuitFactory,
   pinLayout: buildPJfetPinDeclarations(),
+  voltageProbes: [
+    { name: "Vsd", pos: "S", neg: "D" },
+    { name: "Vsg", pos: "S", neg: "G" },
+  ],
   propertyDefs: JFET_PROPERTY_DEFS,
   attributeMap: PJFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,

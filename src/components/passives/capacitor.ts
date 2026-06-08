@@ -717,6 +717,7 @@ export const CapacitorDefinition: StandaloneComponentDefinition = {
   typeId: -1,
   factory: capacitorCircuitFactory,
   pinLayout: buildCapacitorPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: CAPACITOR_PROPERTY_DEFS,
   attributeMap: CAPACITOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

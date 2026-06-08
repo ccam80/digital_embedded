@@ -406,6 +406,7 @@ export const SparkGapDefinition: StandaloneComponentDefinition = {
   pairedSpiceEquivalent: false,
   factory: sparkGapCircuitFactory,
   pinLayout: buildSparkGapPinDeclarations(),
+  voltageProbes: [{ name: "V", pos: "pos", neg: "neg" }],
   propertyDefs: SPARK_GAP_PROPERTY_DEFS,
   attributeMap: SPARK_GAP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,

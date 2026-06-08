@@ -242,7 +242,7 @@ export interface SimulationParams {
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
 export type ResolvedSimulationParams = SimulationParams &
-  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep" | "temp" | "nomTemp" | "copyNodesets" | "xmu">>;
+  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep" | "temp" | "nomTemp" | "copyNodesets" | "xmu" | "gmin" | "diagGmin" | "pivotAbsTol" | "pivotRelTol">>;
 
 /**
  * Default values for all SimulationParams fields, matching circuits-engine-spec.md section 2.
@@ -268,7 +268,7 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   // identical to cshunt-absent; the injection pass gates on cshunt > 0.
   cshunt: -1,
   diagGmin: 0,
-  pivotAbsTol: 0,
+  pivotAbsTol: 1e-13, // cktntask.c:118 TSKpivotAbsTol
   pivotRelTol: 1e-3,
   initTime: 0,
   maxOrder: 2,
