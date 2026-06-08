@@ -32,7 +32,7 @@ import { createDiodeElement, defineDiodeVariant } from "./diode.js";
 // Schottky barrier defaults (metal-semiconductor junction): higher IS, lower
 // forward drop, lower breakdown. Every other diode param is inherited from the
 // base DIODE_PARAM_SPEC so the bag carries the full schema and createDiodeElement
-// reads each param directly (no per-key default fallback).
+// reads each param directly (no per-key default lookup).
 export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS } = defineDiodeVariant({
   primary: {
     IS: { default: 1e-8 },

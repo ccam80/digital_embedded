@@ -41,7 +41,7 @@ import {
 
 // Voltage-controlled-capacitance defaults: larger CJO, lower VJ. Every other
 // diode param is inherited from the base DIODE_PARAM_SPEC so the bag carries the
-// full schema and createDiodeElement reads each param directly (no fallback).
+// full schema and createDiodeElement reads each param directly (no per-key default lookup).
 export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS } =
   defineDiodeVariant({
     secondary: {

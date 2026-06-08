@@ -38,7 +38,6 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { AnalogWrapperHook, AnalogWrapperHookFactory } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { DIODE_PARAM_DEFAULTS } from "../semiconductors/diode.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -201,7 +200,7 @@ export const POLARIZED_CAP_NETLIST_BUILDER = (
     ports: ["pos", "neg"],
     internalNetCount: 1,
     internalNetLabels: ["nCap"],
-    params: { ...POLARIZED_CAP_MODEL_DEFAULTS, ...DIODE_PARAM_DEFAULTS, CJO: 0, TT: 0 },
+    params: { ...POLARIZED_CAP_MODEL_DEFAULTS },
     elements: [
       {
         typeId: "Resistor", modelRef: "behavioral", subElementName: "rEsr",
@@ -218,14 +217,14 @@ export const POLARIZED_CAP_NETLIST_BUILDER = (
       {
         typeId: "Diode", modelRef: "spice", subElementName: "dClamp",
         // Diode params are passed as literal numbers from DIODE_PARAM_DEFAULTS
-        // (with explicit CJO=0, TT=0 overrides) rather than string-lookups.
-        // String-lookup form would route through parentProps first, and the
-        // PolarizedCap parent has its own `M` (capacitor multiplicity) and
-        // `IC` (cap initial voltage) which collide with diode `M` (grading
-        // coefficient) and `IC` (junction initial voltage). Literal pass-
-        // through bypasses parentProps and uses DIODE_PARAM_DEFAULTS directly.
+        // (with explicit CJO=0, TT=0 overrides) rather than string-lookups. Two
+        // reasons: (1) string-lookup form would route through parentProps first,
+        // and the PolarizedCap parent has its own `M` (capacitor multiplicity)
+        // and `IC` (cap initial voltage) which collide with diode `M` (grading
+        // coefficient) and `IC` (junction initial voltage); (2) passing them as
+        // sub-element params marks them given, so the generated ngspice clamp
+        // .model card emits the full diode model and matches digiTS bit-for-bit.
         params: {
-          ...DIODE_PARAM_DEFAULTS,
           CJO: 0,
           TT: 0,
         },

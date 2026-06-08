@@ -193,7 +193,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } =
  * full DIODE_PARAM_SPEC so the variant's property bag carries every diode param
  * through the standard compiler merge, then applies per-key overrides (variant
  * default values / metadata). createDiodeElement reads every param directly with
- * no per-key default fallback. Deck emission is unaffected: a variant default is
+ * no per-key default lookup. Deck emission is unaffected: a variant default is
  * a paramDef default (not user-given), and modelCardSuffix emits only given
  * params, so the generated ngspice .model card is identical.
  */
