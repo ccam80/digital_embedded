@@ -1,0 +1,192 @@
+src/components/active/__tests__/adc.test.ts::clock_below_vIH_does_not_trigger_conversion
+src/components/active/__tests__/adc.test.ts::hotload_vIH_changes_clock_sensitivity
+src/components/active/__tests__/ccvs.test.ts::hotload_transresistance_changes_vout
+src/components/active/__tests__/comparator-rollback.test.ts::dcop_oc_off_output_near_voh
+src/components/active/__tests__/comparator-rollback.test.ts::dcop_pp_off_output_near_voh
+src/components/active/__tests__/comparator-rollback.test.ts::hotload_hysteresis_flips_latch_when_margin_inside_dead_band
+src/components/active/__tests__/comparator-rollback.test.ts::hotload_responseTime_faster_integration_lowers_output_sooner
+src/components/active/__tests__/comparator-rollback.test.ts::hotload_vos_shifts_threshold_above_input_flips_latch
+src/components/active/__tests__/comparator.test.ts::hotload_responseTime_changes_weight_integration
+src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOH at out when in+ is above in- (not sinking: pull-up holds line high)
+src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOH at out when in+ is above in- (push-pull drives HIGH)
+src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOL at out when in+ is below in- (asserted: sinking pulls line low)
+src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOL at out when in+ is below in- (push-pull drives LOW)
+src/components/active/__tests__/dac.test.ts::hotload_rOut_sags_output_under_load
+src/components/active/__tests__/dac.test.ts::hotload_vIH_shifts_threshold_so_3p3v_reads_low
+src/components/active/__tests__/opamp.test.ts::hotload_rOut_changes_output_divider
+src/components/active/__tests__/ota.test.ts::hotload_gmMax_clamp_changes_vout_in_linear_region
+src/components/active/__tests__/real-opamp-raillim.test.ts::dcop_rail_saturation_clamps_to_vrail_pos
+src/components/active/__tests__/real-opamp-raillim.test.ts::dcop_unity_follower_tracks_vin
+src/components/active/__tests__/real-opamp-raillim.test.ts::hotload_aol_shifts_finite_gain_error
+src/components/active/__tests__/real-opamp-raillim.test.ts::hotload_vSatPos_shifts_rail_clamp
+src/components/active/__tests__/real-opamp-raillim.test.ts::hotload_vos_shifts_unity_follower_output
+src/components/active/__tests__/real-opamp-raillim.test.ts::limiting_railLim_engaged_under_overdrive
+src/components/active/__tests__/real-opamp.test.ts::hotload_aol_changes_inverting_gain_error
+src/components/active/__tests__/real-opamp.test.ts::init_rail_sat_state_out_sat_flag_set
+src/components/active/__tests__/real-opamp.test.ts::preset_OPA2134_shifts_dc_output_by_vos_delta
+src/components/active/__tests__/schmitt-trigger.test.ts::dcop_inv_low_output_near_voh
+src/components/active/__tests__/schmitt-trigger.test.ts::dcop_noninv_high_output_near_voh
+src/components/active/__tests__/schmitt-trigger.test.ts::hotload_rOut_changes_output_divider
+src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vOH_changes_output_high_level
+src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vOL_changes_output_low_level
+src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vTH_shifts_rising_threshold
+src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vTL_shifts_falling_threshold
+src/components/active/__tests__/timer-555-debug.test.ts::hotload_vDrop_changes_dis_base_voltage
+src/components/active/__tests__/timer-555-debug.test.ts::hotload_vOH_changes_output_voltage_when_high
+src/components/active/__tests__/timer-555-debug.test.ts::hotload_vOL_changes_output_voltage_when_low
+src/components/active/__tests__/timer-555.test.ts::hotload_vOH_changes_output_high_voltage
+src/components/active/__tests__/vccs.test.ts::hotload_transconductance_changes_output_voltage
+src/components/digital-pins/__tests__/dipl-hot-load.test.ts::Loaded: setComponentProperty(dipl, 'cIn', 1e-7) slows RC settling — binding is observable in transient
+src/components/flipflops/__tests__/monoflop.test.ts::clock_stays_high_no_trigger
+src/components/graphics/__tests__/graphic-card.test.ts::dataBits_8_truncates_packed_d_low_byte_dataBits_24_preserves_full
+src/components/io/__tests__/analog-clock.test.ts::hotload_Frequency_changes_breakpoint_schedule
+src/components/io/__tests__/analog-clock.test.ts::hotload_vdd_changes_out_voltage
+src/components/memory/__tests__/program-counter.test.ts::jump_then_increment_continues_from_loaded_value
+src/components/passives/__tests__/crystal.test.ts::hotload_frequency_changes_transient_response
+src/components/passives/__tests__/crystal.test.ts::hotload_motionalCapacitance_changes_transient_response
+src/components/passives/__tests__/crystal.test.ts::hotload_qualityFactor_changes_transient_response
+src/components/passives/__tests__/crystal.test.ts::hotload_shuntCapacitance_changes_transient_response
+src/components/passives/__tests__/crystal.test.ts::lte_rollback_state_invariant_after_rejection
+src/components/passives/__tests__/inductor.test.ts::hotload_IC_seeds_uic_initial_branch_current
+src/components/passives/__tests__/inductor.test.ts::lte_rollback_state_invariant
+src/components/passives/__tests__/memristor-rollback.test.ts::dcop_resistive_divider_at_initial_state
+src/components/passives/__tests__/memristor-rollback.test.ts::init_w_seeded_to_initialState_after_warm_start
+src/components/passives/__tests__/memristor.test.ts::init_w_slot_seeded_from_initial_state_edge
+src/components/passives/__tests__/memristor.test.ts::init_w_slot_seeded_from_initial_state_mid
+src/components/passives/__tests__/polarized-cap.test.ts::dcop_dc_current_through_cap_equals_v_over_esr_plus_rleak
+src/components/passives/__tests__/polarized-cap.test.ts::dcop_paired_reverse_bias
+src/components/passives/__tests__/polarized-cap.test.ts::hotload_M_scales_dc_steady_state_current
+src/components/passives/__tests__/polarized-cap.test.ts::hotload_capacitance_changes_first_step_current
+src/components/passives/__tests__/polarized-cap.test.ts::hotload_esr_changes_initial_step_current
+src/components/passives/__tests__/polarized-cap.test.ts::hotload_leakageCurrent_changes_dc_steady_state_current
+src/components/passives/__tests__/polarized-cap.test.ts::hotload_voltageRating_changes_dc_steady_state_current
+src/components/passives/__tests__/polarized-cap.test.ts::limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias
+src/components/passives/__tests__/polarized-cap.test.ts::lte_rollback_q_slot_rotation_invariant
+src/components/passives/__tests__/tapped-transformer.test.ts::dcop_paired_ac_sinusoid
+src/components/passives/__tests__/transformer.test.ts::dcop_paired_ac_step_down
+src/components/semiconductors/__tests__/diac.test.ts::dcop_paired_blocking
+src/components/semiconductors/__tests__/diac.test.ts::dcop_paired_breakover
+src/components/semiconductors/__tests__/diode.test.ts::hotload_BV_changes_reverse_breakdown_vd
+src/components/semiconductors/__tests__/diode.test.ts::hotload_RS_changes_vd
+src/components/semiconductors/__tests__/mosfet.test.ts::hotload_GAMMA_changes_vd
+src/components/semiconductors/__tests__/mosfet.test.ts::hotload_PHI_changes_vd
+src/components/semiconductors/__tests__/schottky.test.ts::computeTemperature_per_instance_override_wins_over_ambient
+src/components/semiconductors/__tests__/schottky.test.ts::hotload_CJO_changes_dynamic_response
+src/components/semiconductors/__tests__/schottky.test.ts::hotload_RS_changes_anode_voltage
+src/components/semiconductors/__tests__/scr.test.ts::limiting_pnjlim_fires_on_q1_or_q2_junction_during_dcop
+src/components/semiconductors/__tests__/triac.test.ts::hotload_AREA_changes_blocking_anode_voltage
+src/components/semiconductors/__tests__/triac.test.ts::hotload_BF_changes_blocking_anode_voltage
+src/components/semiconductors/__tests__/triac.test.ts::hotload_BR_changes_blocking_anode_voltage
+src/components/semiconductors/__tests__/triac.test.ts::hotload_IS_changes_blocking_anode_voltage
+src/components/semiconductors/__tests__/triac.test.ts::hotload_TEMP_changes_blocking_anode_voltage
+src/components/semiconductors/__tests__/triode.test.ts::init_seeded_op_point_slots
+src/components/semiconductors/__tests__/varactor.test.ts::hotload_RS_changes_anode_voltage_forward
+src/components/semiconductors/__tests__/varactor.test.ts::limiting_paired_forward
+src/components/semiconductors/__tests__/zener.test.ts::computeTemperature_ambient_propagates_to_vf
+src/components/semiconductors/__tests__/zener.test.ts::hotload_TEMP_changes_vf_forward
+src/components/sensors/__tests__/ntc-thermistor-rollback.test.ts::hotload_temperature_changes_resistance_in_fixed_mode
+src/components/sensors/__tests__/spark-gap-rollback.test.ts::hotload_iHold_above_steady_current_extinguishes_gap
+src/components/sensors/__tests__/spark-gap-rollback.test.ts::hotload_vBreakdown_lower_below_source_fires_gap
+src/components/sensors/__tests__/spark-gap.test.ts::hotload_iHold_raise_above_steady_current_extinguishes_gap
+src/components/sensors/__tests__/spark-gap.test.ts::hotload_vBreakdown_drop_below_vsrc_fires_blocking_gap
+src/components/sources/__tests__/ac-voltage-extended.test.ts::am_mode_diverges_from_pure_sine_after_warmstart
+src/components/sources/ac-voltage-source.ts::gaussian_distribution_mean_near_zero_stddev_near_amplitude
+src/components/sources/ac-voltage-source.ts::hotload_noiseSampleTime_changes_noise_breakpoint_schedule
+src/components/sources/ac-voltage-source.ts::lag1_autocorrelation_below_threshold
+src/components/sources/ac-voltage-source.ts::noise_mode_produces_finite_node_voltage_distinct_from_sine
+src/components/switching/__tests__/fets.test.ts::blown_property_seeds_state_to_permanently_off
+src/components/switching/__tests__/fets.test.ts::blown_property_seeds_state_to_permanently_off
+src/components/switching/__tests__/fets.test.ts::dcop_gate_low_drives_v_s_near_vs
+src/components/switching/__tests__/fets.test.ts::dcop_gate_on_drives_v_s_near_vs
+src/components/switching/__tests__/fets.test.ts::hotload_Ron_drops_v_s_under_load
+src/components/switching/__tests__/fets.test.ts::hotload_Ron_drops_v_s_under_load
+src/components/switching/__tests__/fets.test.ts::hotload_Vth_above_gate_drive_isolates_channel
+src/components/switching/__tests__/fets.test.ts::hotload_Vth_inverts_channel_state
+src/components/switching/__tests__/fets.test.ts::init_post_warm_start_node_voltage_pass_through_seed
+src/components/switching/__tests__/fets.test.ts::init_post_warm_start_node_voltage_pass_through_seed
+src/components/switching/__tests__/fuse.test.ts::hotload_rBlown_changes_blown_output_voltage
+src/components/switching/__tests__/relay.test.ts::dcop_paired_dt_energised
+src/editor/__tests__/wire-current-resolver.test.ts::every junction's wires carry positive current and KCL is satisfied
+src/editor/__tests__/wire-current-resolver.test.ts::parallel split at junction: branch wires carry their branch's current
+src/headless/__tests__/rlc-lte-path.test.ts::RC step response: exponential charging matches V(1-e^-t/τ)
+src/headless/__tests__/rlc-lte-path.test.ts::RL step response: V_R matches 1-e^-t/τ (R=10, L=1mH, τ=100µs)
+src/runtime/__tests__/timing-diagram.test.ts::restores the closest snapshot to time 0 when jumped to start
+src/runtime/__tests__/timing-diagram.test.ts::restores the closest snapshot when jumpToTime is called
+src/runtime/__tests__/timing-diagram.test.ts::snapshot IDs match what the coordinator returned
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_loaded_structural_property_seeds_pin_subelements
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_rOut_changes_active_output_divider
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_rOut_changes_output_divider_voltage
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_rOut_changes_selected_output_divider
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vIH_shifts_digital_input_threshold
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vOH_changes_active_output_voltage
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vOH_changes_output_high_voltage
+src/solver/analog/__tests__/behavioral-combinational.test.ts::hotload_vOH_changes_selected_output_voltage
+src/solver/analog/__tests__/behavioral-combinational.test.ts::loaded_sel_pin_sags_through_external_series_resistor
+src/solver/analog/__tests__/behavioral-flipflop.test.ts::behavioral_preset_preserves_digital_truth_q_qbar_after_rising_edge_d1
+src/solver/analog/__tests__/behavioral-gate.test.ts::ideal_pin_sees_full_source_voltage
+src/solver/analog/__tests__/behavioral-gate.test.ts::loaded_pin_sees_voltage_sag
+src/solver/analog/__tests__/behavioral-sequential.test.ts::loaded_en_sees_voltage_sag_ideal_clk_clr_see_no_sag
+src/solver/analog/__tests__/ckt-terr.test.ts::cktTerrVoltage_gear_order2_matches_ngspice
+src/solver/analog/__tests__/ckt-terr.test.ts::constant charge history produces finite timestep (not Infinity)- abstol-gated
+src/solver/analog/__tests__/ckt-terr.test.ts::gear_lte_factor_order_3
+src/solver/analog/__tests__/ckt-terr.test.ts::gear_lte_factor_order_5
+src/solver/analog/__tests__/ckt-terr.test.ts::gear_lte_factor_order_6
+src/solver/analog/__tests__/ckt-terr.test.ts::order 1 trapezoidal: returns finite positive timestep for non-trivial charges
+src/solver/analog/__tests__/ckt-terr.test.ts::order 2 gear: applies sqrt root extraction for nonzero 3rd divided difference
+src/solver/analog/__tests__/ckt-terr.test.ts::trapezoidal order 2 and gear order 2 both return positive finite timestep for cubic data
+src/solver/analog/__tests__/convergence-regression.test.ts::RC circuit runs transient steps stably with capacitor near Vs
+src/solver/analog/__tests__/convergence-regression.test.ts::statePool state1 is updated after accepted transient step
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_ac_sinusoid
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_ac_step_down
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_blocking
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_breakover
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_dt_energised
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_isolation
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_matched_load
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_pass_through
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_rail_saturation
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_rail_saturation
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_reverse_bias
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_triangle_rc
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_300_15K_compareAllAttempts
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_350K_compareAllAttempts
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_350K_compareAllAttempts
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_400K_compareAllAttempts
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_400K_compareAllAttempts
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_ac_sinusoid
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_ac_step_down
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_blocking
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_breakover
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_dt_energised
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_matched_load
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_rail_saturation
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_rail_saturation
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_temp_sweep_300_15K_paired
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_temp_sweep_350K_paired
+src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_temp_sweep_400K_paired
+src/solver/analog/__tests__/harness/comparison-session.ts::dcop_paired_rail_saturation
+src/solver/analog/__tests__/harness/comparison-session.ts::dcop_paired_rail_saturation
+src/solver/analog/__tests__/harness/comparison-session.ts::transient_step_end_paired_isolation
+src/solver/analog/__tests__/harness/comparison-session.ts::transient_step_end_paired_pass_through
+src/solver/analog/__tests__/harness/comparison-session.ts::transient_step_end_paired_rc_charge
+src/solver/analog/__tests__/harness/comparison-session.ts::transient_step_end_paired_reverse_bias
+src/solver/analog/__tests__/mna-end-to-end.test.ts::diode_shockley_equation_consistency
+src/solver/analog/__tests__/mna-end-to-end.test.ts::rl_dc_steady_state_tight_tolerance
+src/solver/analog/__tests__/monte-carlo.test.ts::ac_sweep_at_each_value
+src/solver/analog/__tests__/monte-carlo.test.ts::gaussian_distribution
+src/solver/analog/__tests__/monte-carlo.test.ts::linear_sweep
+src/solver/analog/__tests__/monte-carlo.test.ts::log_sweep
+src/solver/analog/__tests__/monte-carlo.test.ts::output_statistics
+src/solver/analog/__tests__/newton-raphson.test.ts::linear_converges_in_two_iterations
+src/solver/analog/__tests__/nr-nodeset-parity.test.ts::nodeset_steers_ngspice_to_latch_state_digiTS_does_not
+src/solver/analog/__tests__/state-pool.test.ts::invariant_persists_across_multiple_accepted_steps
+src/solver/analog/__tests__/state-pool.test.ts::pool_state0_state1_agree_slot_for_slot_after_accepted_step
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): AND → HI
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): NAND → LO
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): NOR → LO
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): OR → HI
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): XNOR → HI (equal)
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (A=MID, B=MID): XOR → LO (equal)
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (In_1=MID): BUF → HI
+src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts::treats above-threshold input as HIGH (in=MID): NOT → LO
+src/solver/digital/bus-resolution.ts::masked_addresses_are_independent_across_distinct_register_slots

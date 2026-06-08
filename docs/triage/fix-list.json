@@ -1,0 +1,2251 @@
+[
+  {
+    "id": "composite-leaf-givenness",
+    "title": "Composite-leaf givenness: expandCompositeInstance marks leaf-model DEFAULT params as given (setModelParam) -> use markGiven:false. Agents flagged optocoupler.ts:54 and the diac diode.ts:913 0-step failures as the SAME cause (verify by re-run after the compiler fix).",
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/compiler.ts:517",
+      "src/components/active/optocoupler.ts:54",
+      "src/components/semiconductors/diode.ts:913"
+    ],
+    "testCount": 49,
+    "tests": [
+      {
+        "test": "init_active_anode_and_collector_finite",
+        "file": "src/components/active/__tests__/optocoupler-cccs.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_photocurrent_couples_through_phototransistor_collector",
+        "file": "src/components/active/__tests__/optocoupler-cccs.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_active",
+        "file": "src/components/active/__tests__/optocoupler-cccs.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_low",
+        "file": "src/components/active/__tests__/optocoupler-cccs.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_ctr_changes_collector_voltage",
+        "file": "src/components/active/__tests__/optocoupler-cccs.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "limiting_events_recorded_during_dcop",
+        "file": "src/components/active/__tests__/optocoupler-cccs.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_photocurrent_couples_through_phototransistor_collector",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_active",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_low",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "limiting_events_recorded_during_dcop",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_active_anode_below_rail_collector_below_rail",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "NAN"
+      },
+      {
+        "test": "hotload_ctr_lowers_collector_voltage",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "NAN"
+      },
+      {
+        "test": "hotload_Is_raises_led_current_lowers_anode_voltage",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_n_changes_led_anode_voltage",
+        "file": "src/components/active/__tests__/optocoupler.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_blocking_node_voltage_near_zero",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "NAN"
+      },
+      {
+        "test": "init_blocking_anode_voltage_tracks_source",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_blocking_current_below_one_milliamp",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_breakover_conducts_above_threshold",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_breakover_symmetric_under_polarity_flip",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_blocking",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_breakover",
+        "file": "src/components/semiconductors/__tests__/diac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "limiting_pnjlim_fires_on_q1_or_q2_junction_during_dcop",
+        "file": "src/components/semiconductors/__tests__/scr.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_blocking",
+        "file": "src/components/semiconductors/__tests__/scr.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_triggered",
+        "file": "src/components/semiconductors/__tests__/scr.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_triggered_anode_voltage_drops_when_gate_biased",
+        "file": "src/components/semiconductors/__tests__/scr.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_blocking_vs_triggered_anode_current_ordering",
+        "file": "src/components/semiconductors/__tests__/scr.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_blocking",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_gated_on",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_paired_reverse_blocking",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_gated_on_conducts",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_BF_changes_blocking_anode_voltage",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_TEMP_changes_blocking_anode_voltage",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_AREA_changes_blocking_anode_voltage",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_IS_changes_blocking_anode_voltage",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_BR_changes_blocking_anode_voltage",
+        "file": "src/components/semiconductors/__tests__/triac.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "full_iteration_paired_active",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_low",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_blocking",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_blocking",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_breakover",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_active",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_low",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_triggered",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_gated_on",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_reverse_blocking",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_blocking",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_triggered",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_gated_on",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_reverse_blocking",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Do not mark leaf-default model params as given during composite expansion. Use a non-given default-seeding path so isModelParamGiven only reports params explicitly set in the netlist or by the user, matching standalone placement.",
+    "diagnosis": "Composite expansion copies every leaf-model DEFAULT param into subProps via setModelParam, which marks it as user-given. For the phototransistor BJT spice model this marks RCO (default 0.01) as given, so bjt.ts:1549 rcoGiven becomes true and the BJT setup splits off the Kull quasi-sat colPrime internal node (bjt.ts:1756). ngspice deck has no RCO so it splits no node. Result is an extra MNA equation (12 vs 11), an orphan node tx:bjtPhoto:collector, a singular subsystem, non-convergence, and NaN node voltages so converged stays false."
+  },
+  {
+    "id": "src/solver/analog/behavioral-drivers/digital-input-thresholder.ts:73",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/behavioral-drivers/digital-input-thresholder.ts:73"
+    ],
+    "testCount": 8,
+    "tests": [
+      {
+        "test": "treats above-threshold input as HIGH (A=MID, B=MID): AND -> HI",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (A=MID, B=MID): OR -> HI",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (A=MID, B=MID): XNOR -> HI (equal)",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (In_1=MID): BUF -> HI",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (A=MID, B=MID): NAND -> LO",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (A=MID, B=MID): NOR -> LO",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (A=MID, B=MID): XOR -> LO (equal)",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "treats above-threshold input as HIGH (in=MID): NOT -> LO",
+        "file": "src/solver/analog/behavioral-drivers/__tests__/gate-driver-ctrl-stamp.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Replace the three-way dead-band classifier with a single midpoint comparison v > 0.5 ? 1.0 : 0.0 (normalized {0,1} contract) and drop the vIH/vIL dead-band defaults; or set gate input thresholds to the normalized midpoint so 1.5V classifies HIGH.",
+    "diagnosis": "DigitalInputThresholder classifies with a CMOS dead-band (vIH=2.0 vIL=0.8 defaults at lines 61-62 fed from and.ts AND_BEHAVIORAL_PARAM_DEFS); MID=1.5V falls between the thresholds so result=0.5 (indeterminate) and propagates through the AND driver to ctrl_out=0.5 instead of HI=1.0. Test contract requires a single normalized 0.5V midpoint with no dead-band."
+  },
+  {
+    "id": "driver-ctrl-contract",
+    "title": "Drivers stamp rail-level vTarget onto ctrl_out but DigitalOutputPinLoaded re-applies rail span -> stamp normalized [0,1] level",
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/comparator-driver.ts:193",
+      "src/components/active/comparator-pushpull-driver.ts:170",
+      "src/components/active/timer-555-latch-driver.ts:129"
+    ],
+    "testCount": 8,
+    "tests": [
+      {
+        "test": "dcop_oc_off_output_near_voh",
+        "file": "src/components/active/__tests__/comparator-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_pp_off_output_near_voh",
+        "file": "src/components/active/__tests__/comparator-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_responseTime_faster_integration_lowers_output_sooner",
+        "file": "src/components/active/__tests__/comparator-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_hysteresis_flips_latch_when_margin_inside_dead_band",
+        "file": "src/components/active/__tests__/comparator-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vos_shifts_threshold_above_input_flips_latch",
+        "file": "src/components/active/__tests__/comparator-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vOH_changes_output_voltage_when_high",
+        "file": "src/components/active/__tests__/timer-555-debug.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vOL_changes_output_voltage_when_low",
+        "file": "src/components/active/__tests__/timer-555-debug.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vOH_changes_output_high_voltage",
+        "file": "src/components/active/__tests__/timer-555.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "The driver must stamp the NORMALIZED logic level onto ctrl_out, not the rail-level vTarget. With latch=0 inactive the logic level is 1 (-> outPin drives vOH) and latch=1 active is 0 (-> vOL), so stamp (1 - wForStamp) as the ctrl target at line 193, letting the outPins eDrive VCVS do the single rail mapping.",
+    "diagnosis": "ComparatorDriver stamps a RAIL-LEVEL Thevenin target vTarget = (1-w)*vOH + w*vOL onto the internal ctrl_out net, but the downstream DigitalOutputPinLoaded.outPin expects ctrl in NORMALIZED [0,1] V (digital-output-pin-loaded.ts:8-11) and re-applies the rail mapping via its eDrive VCVS gain=(vOH-vOL). The rail span is applied twice, so ctrl_out near vOH=5V is multiplied again, driving cmp:out far over rail (15.87V instead of 3.3V)."
+  },
+  {
+    "id": "real-opamp-raillim",
+    "title": "RealOpAmp rail saturation never forms a converged fixed point (Jacobian swap vs railLim bisection)",
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/real-opamp.ts:541",
+      "src/components/active/real-opamp.ts:485"
+    ],
+    "testCount": 7,
+    "tests": [
+      {
+        "test": "dcop_rail_saturation_clamps_to_vrail_pos",
+        "file": "src/components/active/__tests__/real-opamp-raillim.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vSatPos_shifts_rail_clamp",
+        "file": "src/components/active/__tests__/real-opamp-raillim.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "limiting_railLim_engaged_under_overdrive",
+        "file": "src/components/active/__tests__/real-opamp-raillim.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_rail_sat_state_out_sat_flag_set",
+        "file": "src/components/active/__tests__/real-opamp.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "full_iteration_paired_rail_saturation",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_rail_saturation",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "dcop_paired_rail_saturation",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Same fix as the sibling record: replace the hard RHS-branch switch at real-opamp.ts:541-556 with a continuous-Jacobian rail-saturation linearization so the DCOP converges.",
+    "diagnosis": "Duplicate of the other full_iteration_paired_rail_saturation record (same RealOpAmp session). RealOpAmp rail-saturation DCOP errors at step 0 (dt=0 iters=101 converged=false per convergence log) so 0 comparable steps. Root cause is the discontinuous saturated/normal RHS-stamp branch that drops the gain cross-terms from the Jacobian and causes an NR limit cycle between 16V and the 13.5V rail."
+  },
+  {
+    "id": "src/solver/analog/ckt-terr.ts:53",
+    "title": null,
+    "disposition": "escalate",
+    "locations": [
+      "src/solver/analog/ckt-terr.ts:53"
+    ],
+    "testCount": 6,
+    "tests": [
+      {
+        "test": "order 2 gear: applies sqrt root extraction for nonzero 3rd divided difference",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "trapezoidal order 2 and gear order 2 both return positive finite timestep for cubic data",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "gear_lte_factor_order_3",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "gear_lte_factor_order_5",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "gear_lte_factor_order_6",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "cktTerrVoltage_gear_order2_matches_ngspice",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Source line 53 already matches ngspice cktterr.c:25 truncated literal. The test factor 2/9 at test line 233 is the divergent value; per SPICE-correct rule the test reference should use 0.2222222222 not 2/9. Escalate: test encodes non-ngspice constant.",
+    "diagnosis": "Bit-exact mismatch: cktTerrVoltage uses GEAR_LTE_FACTORS[1]=0.2222222222 (truncated decimal, matches ngspice cktterr.c:25) but the test computes its reference with the exact rational 2/9=0.2222222222222. Source matches ngspice; the test reference value diverges from ngspice."
+  },
+  {
+    "id": "src/components/digital-pins/digital-output-pin-loaded.ts:99",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/digital-pins/digital-output-pin-loaded.ts:99"
+    ],
+    "testCount": 6,
+    "tests": [
+      {
+        "test": "hotload_vOH_changes_output_high_voltage",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "hotload_vOH_changes_selected_output_voltage",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "hotload_vOH_changes_active_output_voltage",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "hotload_rOut_changes_output_divider_voltage",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "hotload_rOut_changes_selected_output_divider",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "hotload_rOut_changes_active_output_divider",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Either re-settle to DCOP after setComponentProperty (zero out cOut companion) before reading, or have the test compare against the transient-loaded divider including cOut companion; the source-side cOut companion is in-circuit during step().",
+    "diagnosis": "Hotload test asserts the pure resistive divider vOH*RLOAD/(rOut+RLOAD) but coordinator.step() runs a TRANSIENT step; the outPin cOut capacitor (1e-12) contributes a companion conductance C/dt in parallel with rLoad, pulling the output node below the resistive-divider closed form (got 5.9346 vs expected 5.9405 implies an extra ~1e-5 S shunt at dt approx 1e-7)."
+  },
+  {
+    "id": "src/components/switching/behavioral-fet-driver.ts:135",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/switching/behavioral-fet-driver.ts:135"
+    ],
+    "testCount": 6,
+    "tests": [
+      {
+        "test": "dcop_gate_on_drives_v_s_near_vs",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_post_warm_start_node_voltage_pass_through_seed",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_Ron_drops_v_s_under_load",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_Vth_above_gate_drive_isolates_channel",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_gate_low_drives_v_s_near_vs",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_Vth_inverts_channel_state",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Classify the gate logic level on V(G) against a fixed logic reference (or add hysteresis/continuation smoothing) instead of the source-relative vGS so the source-follower feedback does not create a bistable discontinuity.",
+    "diagnosis": "BehavioralFETDriver.load classifies on a hard discontinuous threshold on vGS=V(G)-V(S); in a source-follower V(S) is the load output so turning on raises V(S) which drops vGS below Vth flipping the driver off again - the discrete switch oscillates between vOH and vOL and Newton-Raphson never converges so dcOperatingPoint returns converged=false."
+  },
+  {
+    "id": "src/solver/analog/ckt-load.ts:127",
+    "title": null,
+    "disposition": "test-fixture",
+    "locations": [
+      "src/solver/analog/ckt-load.ts:127"
+    ],
+    "testCount": 5,
+    "tests": [
+      {
+        "test": "gaussian_distribution",
+        "file": "src/solver/analog/__tests__/monte-carlo.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "output_statistics",
+        "file": "src/solver/analog/__tests__/monte-carlo.test.ts",
+        "category": "NAN"
+      },
+      {
+        "test": "linear_sweep",
+        "file": "src/solver/analog/__tests__/monte-carlo.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "ac_sweep_at_each_value",
+        "file": "src/solver/analog/__tests__/monte-carlo.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "log_sweep",
+        "file": "src/solver/analog/__tests__/monte-carlo.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "The load path is family-bucket driven (runByDeviceFamily over elementsByFamily); the hand-built fixtures must populate elementsByFamily from the elements array (group by deviceFamily as compiler.ts:1509-1515 does) instead of passing new Map(). Source is correct; fixture supplies empty buckets.",
+    "diagnosis": "All 1000 trials report failedTrials. The test fixtures build ConcreteCompiledAnalogCircuit with elementsByFamily set to an empty Map (monte-carlo.test.ts:93). cktLoad drives every element load() solely through runByDeviceFamily(ctx.elementsByFamily) at ckt-load.ts:127; with an empty family map NO element is ever stamped, so the MNA matrix stays empty and DC reports non-converged for trivial resistor dividers."
+  },
+  {
+    "id": "src/solver/analog/dc-operating-point.ts:496",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/dc-operating-point.ts:496"
+    ],
+    "testCount": 5,
+    "tests": [
+      {
+        "test": "full_iteration_paired_ac_sinusoid",
+        "file": "src/components/passives/__tests__/tapped-transformer.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_ac_step_down",
+        "file": "src/components/passives/__tests__/transformer.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_temp_sweep_300_15K_paired",
+        "file": "src/components/passives/__tests__/transformer.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_temp_sweep_350K_paired",
+        "file": "src/components/passives/__tests__/transformer.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_temp_sweep_400K_paired",
+        "file": "src/components/passives/__tests__/transformer.test.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Enable/repair the OPtran pseudo-transient fallback (dc-operating-point.ts lines 496-521 gated by params.optran and ctx.opTranFallback) so the transformer DC-OP branch-current singularity is resolved the way ngspice cktop.c OPtran does. Verify params.optran is set for transient runs and that opTranFallback actually converges; without it the engine cannot escape DC-OP to take the first transient step.",
+    "diagnosis": "Transformer (two coupled inductors LTX1_L1/LTX1_L2 plus mutual) driven by V1 with R_LOAD on the secondary. Our engine stalls at step 0 (1 step 49 iters then dt=0) while ngspice runs 1009 steps. harness_first_divergence earliest is shape attemptCount ours=23 ngspice=238. harness_get_attempt shows ours still in initMode MODETRANOP|MODEINITJCT with delta=0 and ag=[0,..] (DC-OP attempt #22) while ngspice has already advanced to MODETRAN|MODEINITFLOAT with delta=1e-9 and real integration coefficients. The matrix value-only mismatches on LTX1_L1:branch and V1:branch (ours=0 vs ngspice -50000/-200000) are a symptom of being stuck in DC-OP (ag=0 gives inductor companion geq=0) not an inductor-load bug. The ideal-inductor plus mutual DC branch-current singularity cannot be resolved by gmin (node-to-ground); ngspice resolves it via the OPtran pseudo-transient fallback while ours bails after 23 attempts."
+  },
+  {
+    "id": "schmitt-rout-key",
+    "title": "Schmitt netlist maps rOut Resistor with key R (caps with C) but Resistor/Capacitor keys are resistance/capacitance -> mapping never binds, rOut defaults to 1000",
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/schmitt-trigger.ts:83",
+      "src/components/active/schmitt-trigger.ts:63"
+    ],
+    "testCount": 5,
+    "tests": [
+      {
+        "test": "init_noninv_high_input_latch_one",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_inv_low_input_output_high",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vTL_shifts_falling_threshold",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_noninv_high_output_near_voh",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "dcop_inv_low_output_near_voh",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Change the rOut sub-element param map from {R: rOut} to {resistance: rOut} in SCHMITT_NON_INVERTING_NETLIST (and SCHMITT_INVERTING_NETLIST line 63); also fix the cIn/cOut maps from C to capacitance.",
+    "diagnosis": "rOut Resistor sub-element maps params {R: rOut} but the Resistor param key is resistance not R; the mapping never binds so the resistor defaults to 1000 ohm. st:out becomes 3.3*10000/11000.001=2.9999997 instead of 3.3*10000/10050=3.284, so the >3.0 assert fails."
+  },
+  {
+    "id": "src/components/sensors/spark-gap.ts:226",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/sensors/spark-gap.ts:226"
+    ],
+    "testCount": 4,
+    "tests": [
+      {
+        "test": "hotload_iHold_above_steady_current_extinguishes_gap",
+        "file": "src/components/sensors/__tests__/spark-gap-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vBreakdown_lower_below_source_fires_gap",
+        "file": "src/components/sensors/__tests__/spark-gap-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_iHold_raise_above_steady_current_extinguishes_gap",
+        "file": "src/components/sensors/__tests__/spark-gap.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vBreakdown_drop_below_vsrc_fires_blocking_gap",
+        "file": "src/components/sensors/__tests__/spark-gap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Make the CONDUCTING slot written to s0 in load() reach state1 each accepted step (boot DCOP seeds s1 so init tests pass; the transient per-step commit does not). Ensure rotation/seed carries this latch slot so conductingOld (s1) at line 206 and the test read see the committed value.",
+    "diagnosis": "CORRECTION (supersedes prior medium record): direct probe confirms load() recomputes the latch and writes s0[CONDUCTING] every step but state1[CONDUCTING] never updates from its boot value. The discrete CONDUCTING latch written to s0 in load() (spark-gap.ts:226) is not committed into state1 on the per-step transient path so the gap re-evaluates from the stale boot state and never extinguishes. Not a stale-rhsOld convergence issue; it is a broken s0->s1 commit of the latch slot."
+  },
+  {
+    "id": "src/components/passives/crystal.ts:195",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/crystal.ts:195"
+    ],
+    "testCount": 4,
+    "tests": [
+      {
+        "test": "hotload_frequency_changes_transient_response",
+        "file": "src/components/passives/__tests__/crystal.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_qualityFactor_changes_transient_response",
+        "file": "src/components/passives/__tests__/crystal.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_motionalCapacitance_changes_transient_response",
+        "file": "src/components/passives/__tests__/crystal.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_shuntCapacitance_changes_transient_response",
+        "file": "src/components/passives/__tests__/crystal.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Add a setParam path on the composite that recomputes Ls/Rs (crystalMotionalInductance/crystalSeriesResistance) and delegates resistance/inductance/capacitance into the rS/lS/cS/c0 leaves on hot-load.",
+    "diagnosis": "QuartzCrystal is a kind:netlist composite. buildCrystalNetlist derives Ls and Rs from frequency/qualityFactor/motionalCapacitance ONCE at compile time and emits frozen leaf primitives (rS/lS/cS/c0). setComponentProperty(frequency) updates only the wrapper PropertyBag; there is no runtime recompute that pushes new Ls/Rs/C into the compiled leaves, so before==after."
+  },
+  {
+    "id": "src/solver/coordinator.ts:716",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/coordinator.ts:716"
+    ],
+    "testCount": 4,
+    "tests": [
+      {
+        "test": "hotload_vTH_shifts_rising_threshold",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vOH_changes_output_high_level",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_vOL_changes_output_low_level",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_rOut_changes_output_divider",
+        "file": "src/components/active/__tests__/schmitt-trigger.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Composite param hot-load must fan out to every compiled sub-element of the CircuitElement (build a one-to-many map) and route plain model-param keys to the driver sub-element, not just the last-iterated one; also fix schmitt rOut mapping (schmitt-trigger.ts:83) which shifts the baseline.",
+    "diagnosis": "setComponentProperty(st, vTH, 1.0) on a composite resolves via the elementToCircuitElement reverse map which collapses all 4 sub-elements (drv, cIn, rOut, cOut) to one index (last wins = a Capacitor), so el.setParam(vTH) at line 917 hits the wrong sub-element and the driver never sees the new vTH; latch never flips, output stays near vOL (0.0376)."
+  },
+  {
+    "id": "src/components/passives/capacitor.ts:641",
+    "title": null,
+    "disposition": "test-design",
+    "locations": [
+      "src/components/passives/capacitor.ts:641"
+    ],
+    "testCount": 4,
+    "tests": [
+      {
+        "test": "dcop_dc_current_through_cap_equals_v_over_esr_plus_rleak",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_leakageCurrent_changes_dc_steady_state_current",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_voltageRating_changes_dc_steady_state_current",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_M_scales_dc_steady_state_current",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Test targets wrong leaf: probe cap:rLeak (or cap:rEsr) for DC series current, not cap:cBody. Source is correct; if a total-component current is wanted, read it off the wrapper or a resistive leaf.",
+    "diagnosis": "Test reads getElementPinCurrents on the cap:cBody Capacitor leaf expecting the DC leakage current V/(esr+rLeak)=2e-7A, but the Capacitor leaf returns CCAP (companion current) which is 0 at the DC operating point per capload.c:80-81 (DC branch only writes Q). The DC leakage current physically flows through the cap:rLeak resistor leaf, not the capacitor body, so cBody correctly reports 0."
+  },
+  {
+    "id": "comparator-latch-polarity",
+    "title": "Inverted comparator latch polarity (sink when V+>V- instead of V+<V-)",
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/comparator-driver.ts:165",
+      "src/components/active/comparator-pushpull-driver.ts:146"
+    ],
+    "testCount": 4,
+    "tests": [
+      {
+        "test": "stamps vOH at out when in+ is above in- (not sinking: pull-up holds line high)",
+        "file": "src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "stamps vOL at out when in+ is below in- (asserted: sinking pulls line low)",
+        "file": "src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "stamps vOH at out when in+ is above in- (push-pull drives HIGH)",
+        "file": "src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "stamps vOL at out when in+ is below in- (push-pull drives LOW)",
+        "file": "src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Invert the latch transition conditions at lines 165-166: latch should go to 1 (sinking) when vPlus < vTl and release to 0 when vPlus >= vTh, so V+>V- yields not-sinking (HIGH) and V+<V- yields sinking (LOW).",
+    "diagnosis": "Open-collector comparator latch polarity is inverted: latch=1 (active/sinking, drives vOL/LOW) is set when vPlus >= vTh i.e. when in+ is ABOVE in-, but a comparator drives output HIGH when V+ > V-. So in+ above in- wrongly sinks the output low instead of letting the pull-up hold it high."
+  },
+  {
+    "id": "src/components/active/real-opamp.ts:553",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/real-opamp.ts:553"
+    ],
+    "testCount": 3,
+    "tests": [
+      {
+        "test": "hotload_vos_shifts_unity_follower_output",
+        "file": "src/components/active/__tests__/real-opamp-raillim.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_aol_changes_inverting_gain_error",
+        "file": "src/components/active/__tests__/real-opamp.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "preset_OPA2134_shifts_dc_output_by_vos_delta",
+        "file": "src/components/active/__tests__/real-opamp.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In the transient gain-stage the vos offset must propagate through the same loop gain as the steady-state DC path; the line-555 RHS uses aEff (bandwidth-reduced) for vos rather than the integrator-mediated full offset, so the 5-step transient under-realizes the offset. Either drive to DCOP or carry vos through vInt (line 454) consistently into the output without the aEff attenuation at 555.",
+    "diagnosis": "Test sets vos=0.5 then steps 5 times (transient) and expects unity-follower Vout to shift by ~0.5V; actual shift is only 0.155V. In transient (geq_int>0) the gain-stage normal branch uses aEff=aol/(1+g) (line 459) which is a heavily attenuated effective gain, and the vos contribution to the output RHS at line 555 is aEffScaled*G_out*p.vos, so the offset is amplified by the reduced aEff rather than the full open-loop aol. After only 5 small steps the integrator (vInt) has not slewed enough to realize the full 0.5V offset, and the transient vos RHS term uses the bandwidth-reduced aEff. The closed-loop offset is therefore far below 0.5V."
+  },
+  {
+    "id": "src/test-utils/non-engine-coordinator.ts:126",
+    "title": null,
+    "disposition": "test-fixture",
+    "locations": [
+      "src/test-utils/non-engine-coordinator.ts:126"
+    ],
+    "testCount": 3,
+    "tests": [
+      {
+        "test": "snapshot IDs match what the coordinator returned",
+        "file": "src/runtime/__tests__/timing-diagram.test.ts",
+        "category": "OTHER"
+      },
+      {
+        "test": "restores the closest snapshot to time 0 when jumped to start",
+        "file": "src/runtime/__tests__/timing-diagram.test.ts",
+        "category": "OTHER"
+      },
+      {
+        "test": "restores the closest snapshot when jumpToTime is called",
+        "file": "src/runtime/__tests__/timing-diagram.test.ts",
+        "category": "OTHER"
+      }
+    ],
+    "fixHint": "Change non-engine-coordinator.ts line 126 from let nextSnapshotId = 1 to let nextSnapshotId = 0 to match DigitalEngine 0-based snapshot IDs.",
+    "diagnosis": "The non-engine coordinator stub initializes nextSnapshotId to 1 and saveSnapshot returns 1-based IDs (1,2,3), but real production DigitalEngine.saveSnapshot (digital-engine.ts:235,529) starts at 0 and returns 0-based IDs (0,1,2); test expects 0-based so stub diverges from production."
+  },
+  {
+    "id": "src/solver/analog/dc-operating-point.ts:403",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/dc-operating-point.ts:403"
+    ],
+    "testCount": 3,
+    "tests": [
+      {
+        "test": "temp_300_15K_compareAllAttempts",
+        "file": "src/components/semiconductors/__tests__/bjt-canon-temp-sweep.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "temp_350K_compareAllAttempts",
+        "file": "src/components/semiconductors/__tests__/bjt-canon-temp-sweep.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "temp_400K_compareAllAttempts",
+        "file": "src/components/semiconductors/__tests__/bjt-canon-temp-sweep.test.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Compare our dynamicGmin-to-newGmin fallthrough and gillespieSrc backtracking attempt sequence against ngspice cktop.c dynamic_gmin/gillespie_src so our step-0 transient OP runs the same number of sub-attempts and converges to the same point instead of stalling. Verify numGminSteps/numSrcSteps defaults match ngspice for this deck.",
+    "diagnosis": "Transient at step 0 our engine stalls (1 step then dt=0) while ngspice advances 107 steps. harness_first_divergence earliest is shape attemptCount ours=23 ngspice=238 at step0/iter0; the dcopGminDynamic sub-solve is bit-identical to ngspice through every observed iteration so the BJT load and pnjlim limiting match, but the convergence-ladder progression diverges: ngspice keeps running gmin/source sub-attempts and reaches Q1:C=4.69 while ours gives up after far fewer attempts and accepts a wrong OP (Q1:C=0.566) then cannot take a transient step. Divergence is in the gmin fallthrough decision (dynamic-gmin to new-gmin) not the device model."
+  },
+  {
+    "id": "src/components/passives/memristor.ts:259",
+    "title": null,
+    "disposition": "test-design",
+    "locations": [
+      "src/components/passives/memristor.ts:259"
+    ],
+    "testCount": 3,
+    "tests": [
+      {
+        "test": "init_w_seeded_to_initialState_after_warm_start",
+        "file": "src/components/passives/__tests__/memristor-rollback.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_w_slot_seeded_from_initial_state_mid",
+        "file": "src/components/passives/__tests__/memristor.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "init_w_slot_seeded_from_initial_state_edge",
+        "file": "src/components/passives/__tests__/memristor.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Assert the seed against fix.pool.state1[mem._stateBase+SLOT_W] (last-accepted, pre-first-step) instead of state0[W], or relax to verify state0[W] is the seed plus exactly one integration step. The source line 259 is correct ngspice CKTstate0 idiom; the test premise that state0[W] holds the verbatim seed post-warm-start is incompatible with build-fixture.ts:137 always running a transient step.",
+    "diagnosis": "buildFixture warm-start runs DCOP plus one transient step (build-fixture.ts:137 then engine first step). In that transient step memristor load() takes the non-DC branch and at line 259 writes the integrated wNew into state0[W], overwriting the seeded initialState 0.5. The test reads state0[W] at testLine 102 expecting the pristine seed within 5e-10, but it now holds the post-first-step value 0.5000041796 (drift dw*dt with fp=1 at w=0.5). The W slot is evolving correctly; the assertion target is wrong: the pristine seed survives in state1[W] (last-accepted) not state0[W] after a step."
+  },
+  {
+    "id": "src/components/passives/polarized-cap.ts:207",
+    "title": null,
+    "disposition": "escalate",
+    "locations": [
+      "src/components/passives/polarized-cap.ts:207"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "transient_step_end_paired_reverse_bias",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_reverse_bias",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Align the leaf stamp accumulation order on the nCap diagonal with ngspice. The leaf order in POLARIZED_CAP_NETLIST_BUILDER elements[] (polarized-cap.ts:207-235) is rEsr,rLeak,cBody; the compiler reverse-sorts within bucket (compiler.ts:1465 originalIndex DESC) and CAP loads before RES. Verify with harness_matrix_diff that the += order of G_esr/G_leak/geq into the (nCap,nCap) cell matches ngspice cktload device-walk order; the residual is a summation-order ULP, not a structural coord difference.",
+    "diagnosis": "polarizedcap-canon-reverse-bias: both engines run 107 identical steps; the only divergence is a 1-ULP value-only mismatch (absDelta 1.78e-15) at the shared diagonal cell (node nCap, node nCap) at step0/iter0, confirmed by harness_matrix_diff (classification value-only, 9/9 cells, one valueMismatch). That diagonal accumulates += conductance stamps from three leaves on the nCap node - cap_cBody (CAP), Rcap_rEsr and Rcap_rLeak (RES). The float summation order of these three stamps differs from ngspice by one ULP, which then propagates to the node voltage (-0.6928907317946061 vs -0.692890731794606). This is the documented per-device load() accumulation-order-on-a-shared-diagonal class."
+  },
+  {
+    "id": "src/components/passives/inductor.ts:891",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/inductor.ts:891"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "transient_step_end_paired_ac_sinusoid",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_ac_step_down",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Investigate why the transient timestep never advances for coupled inductors (MutualInductor + 3 Inductors): the engine accepts only the t=0 step then stops. Check the first-transient-dt handoff in analog-engine.ts step loop / timestep.getClampedDt for the MUT case, and whether the inductor getLteTimestep (inductor.ts:942-960) or the MUT 3-pass load forces dt to 0. The standalone inductor RL-pulse fixture is not failing, so the differentiator is the mutual coupling.",
+    "diagnosis": "tapped-transformer-canon-ac-sinusoid: our engine does not advance past step 0 (harness: ours 1 step / 49 NR iters / lastDt=0; ngspice 1009 steps). compareAllSteps then reports step 0 dt: ours=0 ngspice=5e-7. harness_first_divergence shows the inductor branch-diagonal cell (LTX1_L1:branch,LTX1_L1:branch) ours=0 vs ngspice=-50000 at step0/iter0 and shape attemptCount ours=23 vs ngspice=238 - ngspice is already on its first transient step (dt=5e-7) while ours is stuck at the t=0 operating point and never produces a nonzero first transient dt for the coupled-inductor (MutualInductor) network. The inductor companion stamp -req at inductor.ts:891 is 0 because ag0/dt is 0 at the stalled step."
+  },
+  {
+    "id": "src/solver/analog/ckt-terr.ts:190",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/ckt-terr.ts:190"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "order 1 trapezoidal: returns finite positive timestep for non-trivial charges",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "constant charge history produces finite timestep (not Infinity)- abstol-gated",
+        "file": "src/solver/analog/__tests__/ckt-terr.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Delete the line 190 early return; let denom=Math.max(abstol, factor*ddiff) clamp to abstol when ddiff===0, matching cktterr.c:69, then return del per order.",
+    "diagnosis": "cktTerr returns Infinity early when ddiff===0 (linear charge history), bypassing ngspice cktterr.c:69 MAX(abstol, factor*diff[0]) clamp which keeps del finite (=trtol*tol/abstol) when diff[0]==0. ngspice has no diff==0 short-circuit."
+  },
+  {
+    "id": "src/components/active/real-opamp.ts:170",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/real-opamp.ts:170"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "dcop_unity_follower_tracks_vin",
+        "file": "src/components/active/__tests__/real-opamp-raillim.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_aol_shifts_finite_gain_error",
+        "file": "src/components/active/__tests__/real-opamp-raillim.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Either the param default vos at real-opamp.ts:170 (1e-3) is non-zero while the test fixture assumes 0, or the gain-stage vos term at line 555 should not be applied at this magnitude; reconcile the default vos with the unity-follower closed-form the test asserts (vos belongs in the offset, so the 1mV default produces the observed 1mV shift).",
+    "diagnosis": "Unity follower Vout reads 2.00098 not ~2.00000. buildUnityFollower (test line 45) passes no vos so the model default vos=1e-3 (param default at real-opamp.ts:170) applies. The closed-loop output is (Vin+vos)*aol/(1+aol) = 2.001 - 20uV ~ 2.00098, so the +0.00098 offset is exactly the +1mV default input offset voltage stamped via the gain stage RHS at line 555 (aEffScaled*G_out*p.vos). The test assumed vos=0 (its 0.0005 finite-gain-error budget) but the behavioral default is 1mV."
+  },
+  {
+    "id": "src/components/semiconductors/diode.ts:839",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/diode.ts:839"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "hotload_RS_changes_vd",
+        "file": "src/components/semiconductors/__tests__/diode.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_RS_changes_anode_voltage_forward",
+        "file": "src/components/semiconductors/__tests__/varactor.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Always allocate the RS internal prime node at setup() regardless of RS value (or re-run topology setup on RS hot-load), so a nonzero RS loaded later actually inserts the series drop. Match diosetup.c node creation but make it unconditional or rebuildable for hot-load.",
+    "diagnosis": "The RS series-resistance internal prime node is allocated only when RS != 0 and only at setup() time (diode.ts:839-844). With varactor default RS=0 no internal node exists so _posPrimeNode == posNode. Hot-loading RS=50 via setParam does not re-run setup so vrs = V[anode]-V[posPrime] stays 0 (diode.ts:1187) and RS has no effect on the solve. The RS topology is not hot-loadable."
+  },
+  {
+    "id": "src/components/semiconductors/zener.ts:230",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/zener.ts:230"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "hotload_TEMP_changes_vf_forward",
+        "file": "src/components/semiconductors/__tests__/zener.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "computeTemperature_ambient_propagates_to_vf",
+        "file": "src/components/semiconductors/__tests__/zener.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Add a tIS (DIOtSatCur) derivation to _computeZenerTp mirroring diotemp.c:175-185 (scale IS by exp((T/TNOM-1)*EG/vt)*(T/TNOM)^(XTI/N)) and use tIS instead of params.IS everywhere current/conductance is computed in load() (zener.ts:309 314 318 forward stamp). Match the diode element which already scales IS in dioTemp.",
+    "diagnosis": "_computeZenerTp (zener.ts:230-248) recomputes the temperature-scaled thermal voltages vt nVt nbvVt and tBV but never derives a temperature-scaled saturation current (ngspice DIOtSatCur diotemp.c:175-185 = IS * exp((T/TNOM-1)*EG/vt) * (T/TNOM)^(XTI/N)). The forward conduction current and conductance use raw params.IS directly (zener.ts:309 and the forward stamp branch). Raising TEMP to 400 raises nVt (kT/q) but leaves IS fixed so forward Vf INCREASES (vfHot=0.8149 > vfCold=0.6294) instead of decreasing. The dominant IS-vs-temperature term is missing."
+  },
+  {
+    "id": "src/components/switching/trans-gate.ts:337",
+    "title": null,
+    "disposition": "test-arch",
+    "locations": [
+      "src/components/switching/trans-gate.ts:337"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "full_iteration_paired_pass_through",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_isolation",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Mark TransGateDefinition pairedSpiceEquivalent:false (like fuse/opamp/ota) and switch these tests from ComparisonSession.create (T3 paired) to createSelfCompare (T2). The numeric stamp at fet-sw.ts:127 is correct; the on-conductance simply has no ngspice deck element to match.",
+    "diagnosis": "TransGateDefinition lacks pairedSpiceEquivalent:false. Its behavioral model (BehavioralFETDriver Norton ctrl rail + FetSW conductance switch) has no ngspice primitive equivalent, so the harness auto-deck drops the four FetSW/driver leaves and emits only 3 linear elements. harness_topology_diff shows ours=7 matrix cells vs ngspice=5 (coord-set-differs), with gmin-only 1e-7 diagonal entries on the gate nodes (rows 2,3) present only on our side; node_4 (vp1 branch) reads our gmin -1e-7 vs ngspice 0, producing 232 spurious per-iteration divergences. The two engines are simulating structurally different circuits."
+  },
+  {
+    "id": "src/components/digital-pins/digital-input-pin-loaded.ts:13",
+    "title": null,
+    "disposition": "test-design",
+    "locations": [
+      "src/components/digital-pins/digital-input-pin-loaded.ts:13"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "hotload_loaded_structural_property_seeds_pin_subelements",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "loaded_sel_pin_sags_through_external_series_resistor",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Reconcile rIn default: either the source default should be 100k or the test must assert the 1MOhm sag (approx 4.9505); the loaded vs unloaded contrast also fails because unloaded has no rIn so both read near 5V. User disposition required on the intended rIn contract.",
+    "diagnosis": "Test expects the loaded sel pin to sag below 4.7V via rIn approx 100k in series with a 10k source resistor, but DigitalInputPinLoaded default rIn is 1e6 (line 13 params, also 37 and 42), so vSel = 5*1e6/1.01e6 = 4.9505 (the observed value), never below 4.7. The test comment assumes 100k; source default is 1MOhm."
+  },
+  {
+    "id": "src/components/semiconductors/mosfet.ts:1375",
+    "title": null,
+    "disposition": "test-design",
+    "locations": [
+      "src/components/semiconductors/mosfet.ts:1375"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "hotload_PHI_changes_vd",
+        "file": "src/components/semiconductors/__tests__/mosfet.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_GAMMA_changes_vd",
+        "file": "src/components/semiconductors/__tests__/mosfet.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Source is ngspice-correct (mos1load.c von formula). The test needs a fixture with nonzero GAMMA and a nonzero Vbs so PHI feeds the body-effect term; otherwise PHI has no OP effect. No source line change is correct.",
+    "diagnosis": "For the spice-l1 fixture GAMMA defaults to 0 and the body is tied to source (vbs=0, setup line 909). With GAMMA=0 the von threshold computation von=tVbi*polarity+GAMMA*sarg (mos1load.c:507) has no PHI dependence at nominal temperature (the body-effect term vanishes and tPhi approximately equals PHI when TEMP=TNOM), so changing PHI leaves the operating point bit-identical. The setParam/computeTemperature hot-load path itself works (KP/LAMBDA/VTO hot-load pass). This is ngspice-correct physics; the test asserts an effect that does not exist for a 3-terminal NMOS with GAMMA=0."
+  },
+  {
+    "id": "src/components/gates/and.ts:196",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/gates/and.ts:196"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "loaded_pin_sees_voltage_sag",
+        "file": "src/solver/analog/__tests__/behavioral-gate.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "ideal_pin_sees_full_source_voltage",
+        "file": "src/solver/analog/__tests__/behavioral-gate.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Have buildAndGateNetlist read the per-pin loaded flag and per-pin ResolvedPinElectrical (the _pinLoading / _pinElectrical maps set on props by compiler.ts) when choosing DigitalInputPinLoaded vs Unloaded and the rIn value per In_i, instead of the single static loaded/rIn model params. Reconcile the gate rIn default (1e6) with the family/closed-form 100k the test asserts.",
+    "diagnosis": "Behavioral AND netlist selects input-pin loading from the static model param loaded (and.ts:196) and a single static rIn default of 1e6 (and.ts:175), ignoring the per-pin _pinLoading and _pinElectrical maps that compiler.ts:1275-1287 resolves from circuit.metadata.digitalPinLoadingOverrides. The In_1 node sags to 5*1e6/(1e6+1e4)=4.9505 instead of the documented 100k -> 4.5454, because the loaded rIn is the gate default 1e6 not 100k and the override never reaches the input pin."
+  },
+  {
+    "id": "src/components/passives/transmission-line-element.ts:268",
+    "title": null,
+    "disposition": "escalate",
+    "locations": [
+      "src/components/passives/transmission-line-element.ts:268"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "transient_step_end_paired_matched_load",
+        "file": "src/components/passives/__tests__/transmission-line.test.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_matched_load",
+        "file": "src/components/passives/__tests__/transmission-line.test.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "This is a zero-tolerance Object.is comparison failing on a 1-ULP delta where ours is more accurate than ngspice. To reach bit-exact match the step-0 DC-OP RHS accumulation order for the TRA MODEDC bridge plus the load resistor must be reordered to match ngspices traload.c MODEDC stamp emission order into the shared internal node row. Escalate as arithmetic-order divergence not a numerical model bug.",
+    "diagnosis": "Pure 1-ULP arithmetic-order divergence not a model bug. Step counts (1004) convergence and iter-0 Jacobian are bit-identical (harness_matrix_diff classification=match zero mismatches). At step1/iter0 the only difference is the RHS internal-node row: ours=1 ngspice=0.9999999999999999 which propagates to node TL1:int2 ours=1 vs 0.9999999999999999 and node R_LOAD:pos ours=0.5 vs 0.49999999999999994. Ours is the exact divider value; ngspice carries a 1-ULP rounding. The TRA load seeds _input1/_input2 from rhsOld (line 268-269) so the step-0 DC-OP RHS accumulation order (MODEDC bridge stamps lines 244-256 plus resistor) is where the 1-ULP first enters; the matrix being bit-identical means per the Sparse-Solver-Settled directive the cause is load/RHS accumulation order not the solver."
+  },
+  {
+    "id": "src/components/passives/capacitor.ts:592",
+    "title": null,
+    "disposition": "escalate",
+    "locations": [
+      "src/components/passives/capacitor.ts:592"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "pool_state0_state1_agree_slot_for_slot_after_accepted_step",
+        "file": "src/solver/analog/__tests__/state-pool.test.ts",
+        "category": "ANALOG-SOLVER"
+      },
+      {
+        "test": "invariant_persists_across_multiple_accepted_steps",
+        "file": "src/solver/analog/__tests__/state-pool.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "The invariant cannot be met through the C*vcap path while node voltages carry 1-ULP solver roundoff between identical steps. Either the recompute must reuse the rotated charge when the converged voltage is unchanged (predictor/INITPRED-style copy s1->s0) so state0 is bit-identical, or the strict slot-equality invariant must be re-derived against what ngspice actually guarantees at steady state. Escalate the disposition.",
+    "diagnosis": "After an accepted DC-steady-state step the test requires state0[C1.Q]===state1[C1.Q] strictly (Object.is). The capacitor recomputes its charge each NR iteration as s0[Q]=C*vcap where vcap=v0-v1 is the freshly NR-solved terminal voltage (line 582). state1[Q] is the rotated copy of the prior step charge. The two NR solves of the identical steady-state system settle on node voltages that differ by 1 ULP so C*vcap yields a Q 1 ULP off (4.999999999999998e-6 vs 4.9999999999999996e-6); strict equality fails. The divergence is in the live-voltage charge recompute, not the rotation."
+  },
+  {
+    "id": "adc-thresholder-midpoint",
+    "title": "ADC driver treats 0.5V indeterminate clk_result as logic-high; must threshold above 0.5 midpoint",
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/adc-driver.ts:290",
+      "src/components/active/adc-driver.ts:235"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "hotload_vIH_changes_clock_sensitivity",
+        "file": "src/components/active/__tests__/adc.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "clock_below_vIH_does_not_trigger_conversion",
+        "file": "src/components/active/__tests__/adc.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "clk_result carries logic levels 0.0/0.5/1.0 from DigitalInputThresholder. The driver must classify clk high only when vClock > 0.5 (above indeterminate midpoint) for edge detection at line 235-237 and clear EOC when vClock <= 0.5 at line 290, instead of the raw-product edge test and the strict < 0.5 compare.",
+    "diagnosis": "After hotloading vIH=4.0 the CLK thresholder outputs the 0.5V indeterminate level for a 3.3V clock (0.8<3.3<4.0). The instant-mode EOC-clear branch tests vClock < 0.5 which is false at exactly 0.5, so EOC never clears and stays true. The driver treats the indeterminate 0.5V clk_result as logic-high."
+  },
+  {
+    "id": "src/components/semiconductors/mosfet.ts:420",
+    "title": null,
+    "disposition": "escalate",
+    "locations": [
+      "src/components/semiconductors/mosfet.ts:420"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "temp_350K_compareAllAttempts",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "temp_400K_compareAllAttempts",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Drill the temp pass tTransconductance (KP/ratio4) tVto and tPhi lines 420 423-430 against mos1temp.c at instanceTemp=350K; the absDelta 3.98 on a source-clamped gate node indicates the temp-shifted operating point sends digiTS NR off vs ngspice. Verify ratio4 and pbfact arithmetic order matches ngspice exactly.",
+    "diagnosis": "At default 300.15K this fixture is bit-exact (harness 110/110 converged, firstDivergence null). The harness injects .options TEMP into the ngspice deck from engine.circuitTemp (comparison-session.ts:779-780) so both sides run at 350K; the divergence is genuine numerics in the mosfet level-1 temperature pass. First divergence is M1 gate node at iter 0 meaning the temp-adjusted device conductances (tTransconductance tVto tPhi) stamped at iter 0 differ from ngspice mos1temp/mos1load."
+  },
+  {
+    "id": "src/solver/analog/ni-integrate.ts:64",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/ni-integrate.ts:64"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "transient_step_end_paired_dt_energised",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "full_iteration_paired_dt_energised",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Drill the first-transient-step ag fed to the inductor load: at MODEINITTRAN the engine ag[0] driving geq (ni-integrate.ts:64) is half of ngspice. Compare our nicomcof/ag0 seeding for the boot step against ngspice nicomcof.c and the inductor newmind path (inductor.ts:856 L/m); the inductor companion conductance must equal ngspice 200 not 100.",
+    "diagnosis": "RelayDT energised (relay.test.ts:556 fixture relay-dt-canon-energised.dts). harness_matrix_diff classification value-only: the four inductor-coil cells (Lrelay_coilL branch diagonal and node couplings) are exactly 2x off, ours=100 ngspice=200. harness_get_attempt step 0 tranInit shows identical ag=[5e8,-5e8], identical method trapezoidal order 1 delta 2e-9, identical PHI=0.005 and branch current 0.1, yet our inductor companion conductance req (geq=ag[0]*cap, ni-integrate.ts:64; cap=newmind=_effectiveL/_M, inductor.ts:856) is half ngspice. _effectiveL=0.05 and _M=1 are correct (PHI matches) so the 2x is in the effective ag[0] the inductor stamp uses at the first transient step vs the captured ag."
+  },
+  {
+    "id": "src/components/sources/ac-voltage-source.ts:427",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/sources/ac-voltage-source.ts:427"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "noise_mode_produces_finite_node_voltage_distinct_from_sine",
+        "file": "src/components/sources/__tests__/ac-voltage-extended.test.ts",
+        "category": "OTHER"
+      },
+      {
+        "test": "hotload_noiseSampleTime_changes_noise_breakpoint_schedule",
+        "file": "src/components/sources/__tests__/ac-voltage-source.test.ts",
+        "category": "OTHER"
+      }
+    ],
+    "fixHint": "Add a case noise arm to enumWaveformCoeffs returning functionType TRNOISE with the seeded coeffs so the noise enum routes onto evaluateNgspiceWaveform; then update the test to assert the deterministic TRNOISE output rather than non-deterministic distinctness.",
+    "diagnosis": "enumWaveformCoeffs default arm returns null for waveform noise instead of building a TRNOISE coefficient vector, so the native noise enum is never routed onto _functionType=TRNOISE and _evaluate falls through to computeWaveformValue noise which throws (line 513). The test builds a noise fixture and reads node voltage, which triggers that throw. It also asserts the removed non-deterministic Box-Muller contract (distinct values across 32 builds) which the deterministic seeded TRNOISE generator does not satisfy."
+  },
+  {
+    "id": "src/components/sources/ac-voltage-source.ts:513",
+    "title": null,
+    "disposition": "test-design",
+    "locations": [
+      "src/components/sources/ac-voltage-source.ts:513"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "gaussian_distribution_mean_near_zero_stddev_near_amplitude",
+        "file": "src/components/sources/__tests__/noise.test.ts",
+        "category": "OTHER"
+      },
+      {
+        "test": "lag1_autocorrelation_below_threshold",
+        "file": "src/components/sources/__tests__/noise.test.ts",
+        "category": "OTHER"
+      }
+    ],
+    "fixHint": "Retarget the statistical audit at the seeded TRNOISE generator via evaluateNgspiceWaveform with a TRNOISE coefficient vector (randnumb recon) instead of computeWaveformValue noise, or delete this test as it asserts the removed non-deterministic contract.",
+    "diagnosis": "Test calls computeWaveformValue noise directly expecting a Box-Muller gaussian return, but the noise arm of computeWaveformValue was removed and replaced with a throw (lines 507-516) because noise is now the deterministic ngspice TRNOISE function evaluated by evaluateNgspiceWaveform. The test exercises the removed live-Math.random Box-Muller contract on a function that no longer has a noise arm."
+  },
+  {
+    "id": "src/editor/wire-current-resolver.ts:32",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/editor/wire-current-resolver.ts:32"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "parallel split at junction: branch wires carry their branch current",
+        "file": "src/editor/__tests__/wire-current-resolver.test.ts",
+        "category": "OTHER"
+      },
+      {
+        "test": "every junction wires carry positive current and KCL is satisfied",
+        "file": "src/editor/__tests__/wire-current-resolver.test.ts",
+        "category": "OTHER"
+      }
+    ],
+    "fixHint": "Add an element identity field (elementIndex or label) to ComponentCurrentPath and populate it at the push sites in resolve() (lines 298 and 304) so consumers map a body path to its element by identity instead of positional index.",
+    "diagnosis": "ComponentCurrentPath carries no element identity (eIdx or label) and resolve() builds _componentPaths skipping elements with fewer than 2 pins (Ground continues at line 302). getComponentPaths() therefore returns fewer paths than elementToCircuitElement has entries and in a non-aligned order, so the test positional pairing paths[pIdx] to the pIdx-th element map entry drifts past the skipped Ground and compares r1 body current against the wrong element current, giving relative error near 0.4."
+  },
+  {
+    "id": "src/solver/analog/analog-engine.ts:317",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/analog-engine.ts:317"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "RC step response: exponential charging matches V(1-e^-t/tau)",
+        "file": "src/headless/__tests__/rlc-lte-path.test.ts",
+        "category": "OTHER"
+      },
+      {
+        "test": "RL step response: V_R matches 1-e^-t/tau (R=10 L=1mH tau=100us)",
+        "file": "src/headless/__tests__/rlc-lte-path.test.ts",
+        "category": "OTHER"
+      }
+    ],
+    "fixHint": "Run the initial transient operating-point solve at init()/compile() time (capturing the source value present then) so a later hot setSignal followed by step() continues the transient from the established reactive-element state rather than re-seeding _seedFromDcop at the changed source value.",
+    "diagnosis": "The warm-start transient DC operating point (_transientDcop -> solveDcOperatingPoint -> _seedFromDcop) is deferred to the first step() via the if (!this._firstStep) gate instead of running at init/compile time. The test compiles with Vs=0, hot-changes Vs to 5 via setSignal, then calls stepToTime; the deferred op runs after the hot change, so the capacitor is initialized to the Vs=5 steady state (cap open, node=5V) at t=0. vcAtTau therefore reads the DC steady state 4.999999999999995 instead of the 3.16V charging value."
+  },
+  {
+    "id": "src/solver/analog/behavioral-drivers/bridge-output-driver.ts:154",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/behavioral-drivers/bridge-output-driver.ts:154"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "transient_step_end_paired_pass_through",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      },
+      {
+        "test": "transient_step_end_paired_isolation",
+        "file": "src/solver/analog/__tests__/harness/comparison-session.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "The bridge boundary drivers inject a parasitic 1/rHiZ (and 1/rOut) conductance that the ngspice deck has no counterpart for. Either suppress the bridge diagonal conductance stamp when the boundary pin is an ideal source (so the matrix matches the ideal-V-source deck), or have the netlist generator emit a matching parasitic. Localize the divergent cells with the 1e-7 stamps at bridge-output-driver.ts:154/162.",
+    "diagnosis": "TransGate compiles in the digital domain so its boundary source pins (vs/vp1/vp2/load) each get a BridgeOutputDriverElement. In Hi-Z the bridge stamps 1/rHiZ=1e-7 on its boundary node diagonal (bridge-output-driver.ts:154; the rOut path at :162 is the driven analog). ngspice models the same .dts as ideal V-sources with no such parasitic, so harness_matrix_diff reports a first-iter coord-set divergence at step0 iter0: ours has 7 matrix entries vs ngspice 5, with extra cells (2,2)=1e-7,(3,3)=1e-7 and (1,1) carrying +1e-7. Confirmed via harness_topology_diff (4 bridge ours-only elements) on trans-gate-canon-pass-through.dts."
+  },
+  {
+    "id": "src/components/io/clock.ts:306",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/io/clock.ts:306"
+    ],
+    "testCount": 2,
+    "tests": [
+      {
+        "test": "hotload_vdd_changes_out_voltage",
+        "file": "src/components/io/__tests__/analog-clock.test.ts",
+        "category": "COMPONENT"
+      },
+      {
+        "test": "hotload_Frequency_changes_breakpoint_schedule",
+        "file": "src/components/io/__tests__/analog-clock.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Make _vdd (and _halfPeriod) mutable and implement setParam: key vdd updates _vdd, key Frequency recomputes _halfPeriod = 1/(2*value). The instantaneousValue/breakpoint math already reads these fields so the change becomes observable immediately.",
+    "diagnosis": "AnalogClockElementImpl.setParam is an empty no-op so setComponentProperty(vdd, 5) is dropped and V(out) stays at 3.3V. Compounding it, _vdd and _halfPeriod are declared readonly (clock.ts:260-261) so they cannot be mutated even if setParam tried."
+  },
+  {
+    "id": "src/solver/analog/__tests__/mna-end-to-end.test.ts:435",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/__tests__/mna-end-to-end.test.ts:435"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "diode_shockley_equation_consistency",
+        "file": "src/solver/analog/__tests__/mna-end-to-end.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Set the test Vt to CONSTKoverQ*300.15 (=0.0258646V) rather than 0.02585, matching the engine REFTEMP of 300.15K (27C). No source change; the diode load uses the correct ngspice thermal voltage.",
+    "diagnosis": "relError 1.4 percent between iOhm=(Vs-Vd)/R and iShockley=Is*(exp(Vd/(n*Vt))-1) at the converged Vd=0.633685V. The engine solves the diode at vte=CONSTKoverQ*REFTEMP with REFTEMP=300.15K (constants.ts:39, diode.ts:363 vt=CONSTKoverQ*T), giving vte=0.025865V, but the test hardcodes Vt=0.02585 (=300.0K). The 0.058 percent vte mismatch is amplified by exp() (factor Vd/vte=24.5) into a 1.4 percent current error. Engine is ngspice-correct; the test constant is wrong."
+  },
+  {
+    "id": "src/solver/analog/__tests__/harness/comparison-session.ts:1480",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/__tests__/harness/comparison-session.ts:1480"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "rl_dc_steady_state_tight_tolerance",
+        "file": "src/solver/analog/__tests__/mna-end-to-end.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Index the 1-based voltages array with row+1 in the branch loop (ourFinal.voltages[row+1] and ngFinal.voltages[row+1]) at comparison-session.ts:1480-1481, or store branch rows 1-based in capture.ts:260. Same off-by-one exists at the sibling branch reads lines 1426-1427 and ~1576.",
+    "diagnosis": "lastStep.branches[l1:branch].ours reads 5.0 (the vs:pos node voltage) instead of the 0.05A inductor branch current, so errorPct=9900. capture.ts:260 keys matrixRowLabels for branch rows 0-based as branchIndex-1, but getStepEnd indexes the 1-based ourFinal.voltages array directly with that 0-based row at comparison-session.ts:1480 (ourFinal.voltages[row]). The off-by-one lands on the node-voltage slot one below the real branch row. Engine transient is physically correct (verified: r1:neg=l1:pos=0V at t=1ms so iL=5V/100=0.05A)."
+  },
+  {
+    "id": "src/solver/analog/compiler.ts:1571",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/compiler.ts:1571"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "nodeset_steers_ngspice_to_latch_state_digiTS_does_not",
+        "file": "src/solver/analog/__tests__/nr-nodeset-parity.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "In the analog compiler, resolve parsed .nodeset net/pin names to MNA node ids and pass a nodesets Map into the ConcreteCompiledAnalogCircuit constructor at compiler.ts:1571 (parallel to how ics should flow). Downstream apply/seed machinery already consumes cac.nodesets correctly.",
+    "diagnosis": "digiTS ignores .nodeset on the production compile path so its NR settles at the symmetric metastable point (Q1:C ours=1.078) while ngspice honours the guess and latches (ngspice=4.609). The full enforcement chain exists and is armed only when cac.nodesets is populated: analog-engine.ts:1924 reads cac.nodesets, ckt-context.ts:1102 derives hadNodeset from size, ckt-load.ts:145 applies the 1e10 clamp, analog-engine.ts:2213 seeds rhs. But compiler.ts never resolves parsed .nodeset directives into the compiled circuit: the ConcreteCompiledAnalogCircuit constructed at compiler.ts:1571 is built with no nodesets field (zero nodeset references in compiler.ts), so cac.nodesets is always undefined and hadNodeset is always false."
+  },
+  {
+    "id": "src/solver/analog/__tests__/newton-raphson.test.ts:130",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/__tests__/newton-raphson.test.ts:130"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "linear_converges_in_two_iterations",
+        "file": "src/solver/analog/__tests__/newton-raphson.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Change the expectation at newton-raphson.test.ts:130 to toBe(3) to match the INITJCT/INITFIX/INITFLOAT ladder both engines run. No source change; newton-raphson.ts iteration count matches ngspice STATnumIter.",
+    "diagnosis": "Test expects 2 NR iterations for a linear resistor divider but the engine returns 3. The DC-OP runs ngspice CKTop INITF ladder INITJCT->INITFIX->INITFLOAT, verified line-for-line: dispatcher at newton-raphson.ts:896-915 mirrors niiter.c:1313-1319. iterno=1 INITJCT forces noncon, iterno=2 INITFIX converges and flips to INITFLOAT, iterno=3 INITFLOAT passes convtest and returns STATnumIter=3 (niiter.c:1308-1311). ngspice returns 3 for the same circuit too. The test comment models only a 2-stage JCT->FLOAT path and omits INITFIX, so the expected value 2 is wrong. Engine is ngspice-correct (confirmed: MCP DC-op of a linear circuit reports Iterations: 3)."
+  },
+  {
+    "id": "src/components/active/ota.ts:226",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/ota.ts:226"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_gmMax_clamp_changes_vout_in_linear_region",
+        "file": "src/components/active/__tests__/ota.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "This is a test-contract error not a source bug: gmMax only bounds the linearization slope and cancels at the fixed point. Either assert on convergence iteration behavior or remove the not.toBeCloseTo expectation; do not alter ota.ts load() which matches the VCCS companion model.",
+    "diagnosis": "The test expects clamping gmMax to change the converged V_out, but gmMax is a Jacobian-only quantity. In load() the Norton offset iNR = iOutNow - gmEff*vDiff (ota.ts:226) plus the gmEff stamp contribution gmEff*vDiff cancel exactly at the NR fixed point, so the net injected output current equals iOut = iBias*tanh(vDiff/2vt), which is independent of gmMax. setParam updates this.p.gmMax correctly (ota.ts:254) and the clamp is applied (ota.ts:223), but the converged V_out = iOut*rLoad is unchanged, so before equals after (difference 0). The test asserts a false contract."
+  },
+  {
+    "id": "src/components/passives/analog-fuse.ts:323",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/analog-fuse.ts:323"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_rBlown_changes_blown_output_voltage",
+        "file": "src/components/switching/__tests__/fuse.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Seed _intact from props.blown: add a blown param to AnalogFuseElement constructor (initializing _intact = !blown) and pass props.getOrDefault blown false through buildAnalogFuseElement and createAnalogFuseElement so a fuse built blown uses _rBlown.",
+    "diagnosis": "createAnalogFuseElement (and buildAnalogFuseElement constructor) never reads the blown property to seed _intact, which is hardcoded true at line 103. Building with blown:true still uses _rCold (0.01), so the fuse is conducting and rBlown is inert; hotloading rBlown via setParam changes a value that never enters the stamp, leaving output voltage unchanged (before==after)."
+  },
+  {
+    "id": "src/components/switching/current-controlled-switch.ts:311",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/switching/current-controlled-switch.ts:311"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "dcop_paired_dt_energised",
+        "file": "src/components/switching/__tests__/relay.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "This is an architectural divergence to escalate, not a numerical bug: the normallyClosed inversion in current-controlled-switch.ts:311 has no ngspice CSW counterpart and the ON keyword at netlist-generator.ts:905 is not equivalent to it. To make the paired fixture comparable, the NC contact must be generated against an ngspice topology that actually inverts conduction (e.g. a complementary control source or a different device), or the relay-dt NC contact must be modeled without the digiTS-only inversion. Present both options to the user.",
+    "diagnosis": "The DC-OP node voltage at rLoadC:pos is 0.9998 (ours) vs 0.9999 (ngspice); harness_first_divergence localizes to the dcopInitFloat contact-path conductance being 100 (ours, one contact closed) vs 200 (ngspice, both contacts closed in parallel). Cause: digiTS models the relay normally-closed contact by inverting CSW conduction at current-controlled-switch.ts:311 (closed = !energised when normallyClosed), so when energised the NC contact opens. ngspice CSW has no normallyClosed concept; the harness netlist generator emits the NC W-card as a plain CSW with only an ON keyword (netlist-generator.ts:905), which sets cold-start state but does NOT invert conduction, so the ngspice NC contact stays conducting in parallel with NO and doubles the path conductance."
+  },
+  {
+    "id": "src/solver/digital/bus-resolution.ts:75",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/digital/bus-resolution.ts:75"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "masked_addresses_are_independent_across_distinct_register_slots",
+        "file": "src/components/memory/__tests__/register.test.ts",
+        "category": "DIGITAL"
+      }
+    ],
+    "fixHint": "Mask each driver value and non-highZ mask to the net declared bit width before the conflict XOR at bus-resolution.ts:75 (carry the net width into resolveBusDrivers and AND driverValue/driverNonHighZ with the width mask), so phantom upper-bit disagreements between a narrow In and a Splitter output on the same net cannot latch a burn. Confirm by checking whether the In and Splitter shadow nets carry bits beyond addrBits at settle.",
+    "diagnosis": "The fixture wires two non-tri-state digital drivers onto rf:Rw (the Splitter output spl:0,1 and the In in_rw:out), so the compiler (compiler.ts:486-531) registers Rw as a multi-driver bus net with both as hard drivers. resolveBusDrivers compares the two driver shadow-net values across all 32 bits with the XOR at bus-resolution.ts:75 and latches a burn on any differing bit; there is no masking of each driver contribution to the net declared bit width (addrBits=2) and no adapter-boundary precedence for a Splitter-output-into-narrow-port sharing a net with a direct In. Bits above the 2-bit address width (or a transient mismatch where the In shadow updates before the Splitter re-evaluates) trigger Bus conflict on net 1 even though the intended low-2-bit values agree."
+  },
+  {
+    "id": "src/components/semiconductors/diode.ts:942",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/diode.ts:942"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "full_iteration_paired_breakover",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Same as full_iteration_paired_blocking: use harness_get_attempt on DIAC1_D_rev across the failing DCOP iters to confirm the breakdown pnjlim operands (diode.ts:942-948 vs dioload.c:219-243). The +66V VD shows vd crossing from reverse-breakdown into forward between iterations.",
+    "diagnosis": "diac-canon-breakover step-0 DCOP fails to converge (ours 2400 NR iters failed; ngspice 5 converged) so compareAllAttempts sees 0 comparable steps. harness_first_divergence: DIAC1_D_rev.VD ours=66.38 vs ngspice=-37.65, with our voltage/rhs/matrix null (engine errored). The reverse breakdown diode is driven to a non-physical +66V; the breakdown pnjlim limiting at diode.ts:942-949 does not converge the two anti-parallel breakdown junctions."
+  },
+  {
+    "id": "UNRESOLVED",
+    "title": "Unresolved (no line localized)",
+    "disposition": "engine-fix",
+    "locations": [],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "RC circuit runs transient steps stably with capacitor near Vs",
+        "file": "src/solver/analog/__tests__/convergence-regression.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Run harness on an equivalent RC .dts (R=1k C=1uF stopTime=5e-3) and compare cap-node voltage trajectory vs ngspice via harness_get_attempt to decide engine-bug vs test-threshold; the 4.4V threshold at 1ms is physically inconsistent with the RC time constant.",
+    "diagnosis": "Test loops while simTime<1e-3 (one RC time constant for R=1k C=1uF) then asserts a node exceeds 4.4V; at t=1ms an ideal RC cap reaches only 5*(1-e^-1)=3.16V, below 4.4V, so the threshold is reachable only if the final accepted step overshoots t well past 1ms. Cannot localize to a source line by code reading: requires harness tracing on a real RC .dts fixture to confirm whether the engine fails to charge or the test threshold/stop-time is mis-specified. No .dts fixture exists for this inline-built circuit."
+  },
+  {
+    "id": "src/solver/analog/analog-engine.ts:2282",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/analog-engine.ts:2282"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "statePool state1 is updated after accepted transient step",
+        "file": "src/solver/analog/__tests__/convergence-regression.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Either the test must take one accepted transient step before reading state1 (its name says after accepted transient step but it builds with analysis dcop and never steps), or dcop convergence must seed state1 from state0. Decide contract; if test name is authoritative, add a step before the state1 read. If dcop should seed state1, add a state0->state1 copy at dcop convergence.",
+    "diagnosis": "Test runs analysis dcop only (no transient step) then reads d1 state1 VD, expecting >0.5. state0->state1 copy lives only in _seedFromDcop (analog-engine.ts:2282), which fires on the dcop->transient transition during step(), never in a pure-dcop run. So after dcop alone state1 stays construction-zero and state1VD===0. ngspice likewise copies CKTstate1=CKTstate0 only at the dctran transient transition (dctran.c:349-350), not at end of dcop."
+  },
+  {
+    "id": "src/solver/analog/__tests__/harness/comparison-session.ts:3066",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/__tests__/harness/comparison-session.ts:3066"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "limiting_paired_forward",
+        "file": "src/components/semiconductors/__tests__/varactor.test.ts",
+        "category": "NAN"
+      }
+    ],
+    "fixHint": "In getLimitingComparison normalize the SPICE type prefix when matching ng events to the requested label (strip leading device-type letter D/Q/M/J for diode/bjt/mos/jfet) or match on the bridge deviceName mapped back to our label, the same way the first_divergence limiting axis pairs by (our-label, junction). The ng bridge stores label=DVD at ngspice-bridge.ts:592; comparison-session.ts:3065-3066 must account for that prefix.",
+    "diagnosis": "Harness evidence: at step0 tranNR iter0 BOTH sides record an identical AK pnjlim event (vBefore=vAfter=0.4992749262783062 wasLimited=false divergenceNorm=0). But ngspice labels the diode DVD (SPICE D-type prefix) while digiTS labels it VD. getLimitingComparison filters ngEvents by label/deviceName equality against upperLabel=VD (line 3065-3066); DVD does not match so ngEvents is empty. allJunctions then contains only AK from our side ngEv is undefined so ngspiceDelta=NaN and limitingDiff=ourDelta-ngspiceDelta=NaN. The solve is bit-exact; the NaN is a label-prefix mismatch in the comparison filter."
+  },
+  {
+    "id": "src/components/sensors/ntc-thermistor.ts:298",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/sensors/ntc-thermistor.ts:298"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_temperature_changes_resistance_in_fixed_mode",
+        "file": "src/components/sensors/__tests__/ntc-thermistor-rollback.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In getPinCurrents branch on _selfHeating like load() does: when !_selfHeating use this._tAmbient for tOld (and computeRFromT) so a hot-loaded temperature is reflected; only read the TEMPERATURE slot in self-heating mode.",
+    "diagnosis": "getPinCurrents (ntc-thermistor.ts:292-304) unconditionally reads tOld from the TEMPERATURE pool slot states[1][SLOT_TEMPERATURE] (line 298-300) instead of mirroring load()s non-self-heating branch which uses the live _tAmbient field (line 264). After setComponentProperty(temperature,350) _tAmbient becomes 350 and load() stamps G=1/R(350)=1/14 but getPinCurrents recomputes G from the stale slot value (298.15) giving R=100 and reports I=G*Vterm=0.01 unchanged. The reported current uses the wrong temperature source in fixed mode."
+  },
+  {
+    "id": "src/components/sources/ac-voltage-source.ts:498",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/sources/ac-voltage-source.ts:498"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "am_mode_diverges_from_pure_sine_after_warmstart",
+        "file": "src/components/sources/__tests__/ac-voltage-extended.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "This is a test-expectation issue: either step the fixture to a non-trivial t (e.g. a few modulation periods, t ~ 1/modFreq) before reading, or relax the AM divergence assertion to the achievable magnitude (~1e-7) / assert relative difference. The AM formula at line 498 is correct and should not be changed.",
+    "diagnosis": "The AM evaluation at ac-voltage-source.ts:498 (dcOffset + (1+depth*sin(2pi*modFreq*t))*amplitude*sin(arg)) is mathematically correct and matches the documented contract. buildFixture takes exactly ONE warm-start step (build-fixture.ts:137) landing at t=firstStep ~3.3e-8 s (back-solved from the observed vSine=0.00104720 = 5*sin(2pi*1000*t)). At that tiny t the AM envelope deviation depth*sin(2pi*100*t) ~2e-5 so vAm-vSine ~1e-7 which is below the toBeCloseTo(...,4) threshold of 5e-5. The values DO differ (1.097e-7) confirming AM is applied; the assertion of 4-digit divergence is unsatisfiable at the warm-start sample time. The defect is the test sampling time/precision not an incorrect source line."
+  },
+  {
+    "id": "src/components/semiconductors/triode-analog-element.ts:311",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/triode-analog-element.ts:311"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "init_seeded_op_point_slots",
+        "file": "src/components/semiconductors/__tests__/triode.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "This is correct SPICE-parity caching - the slot is meant to lag by one iteration. The test expectation at line 98 (cached VPK == final node difference to 5e-10) is wrong; loosen it to the NR convergence tolerance or compare against the pre-solve linearization voltage rather than the post-solve node difference. Do not change load() to recache post-solve - that would break ngspice parity.",
+    "diagnosis": "Cached VPK slot (247.22459) differs from the final converged node difference vP-vK (247.22386) by 0.73 mV vs the 5e-10 tolerance. load() writes s0[SLOT_VPK]=vpkNew where vpkNew=vP-vK reads ctx.rhsOld (line 263) - the PRE-solve linearization voltage that produced THIS iterations stamps. The matrix is then solved producing new node voltages. After the last converged iteration the cached slot therefore holds the second-to-last solutions bias point, one NR step (0.73mV) behind engine.getNodeVoltage(V1:P). This lag is intrinsic SPICE behavior (state slots cache the bias used for linearization, not the post-solve node difference), matching ngspice *vpk=vpk semantics."
+  },
+  {
+    "id": "src/solver/analog/behavioral-drivers/mux-driver.ts:95",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/behavioral-drivers/mux-driver.ts:95"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_vIH_shifts_digital_input_threshold",
+        "file": "src/solver/analog/__tests__/behavioral-combinational.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Re-settle to DCOP after the threshold hotload before reading, or restructure the thresholder/driver chain so a within-step NR fully propagates (chain of rhsOld-fed Norton sources lags one layer per iteration).",
+    "diagnosis": "After raising vIH/vIL so sel=2.5V reclassifies LOW, a single transient step() does not fully propagate the new threshold decision through the feed-forward Norton chain thresholder->mux driver(load reads rhsOld)->output VCVS; the chain lags so the output reads 0.19232 instead of vOL=0. The mux driver load() reads rhsOld and stamps a fixed Norton target, requiring multiple settled NR iterations the single step does not deliver after the param change."
+  },
+  {
+    "id": "src/solver/analog/behavioral-drivers/d-flipflop-driver.ts:85",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/behavioral-drivers/d-flipflop-driver.ts:85"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "behavioral_preset_preserves_digital_truth_q_qbar_after_rising_edge_d1",
+        "file": "src/solver/analog/__tests__/behavioral-flipflop.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Replace the multiplicative edge detector and instance-field _firstSample with the documented NaN-sentinel scheme in SLOT_LAST_CLOCK: detect a true 0->1 edge against the prior accepted-step clock and skip detection only when LAST_CLOCK is NaN; latch q=vD only on a genuine rising edge so ctrl_nq=1-q is 0 when Q=1.",
+    "diagnosis": "Behavioral D-FF preset yields ~Q=1 when Q=1 (expected ~Q=0). The edge detector uses a continuous product risingEdge = vClock*(1-prevClock) plus an instance-field _firstSample (line 53) instead of the NaN sentinel in SLOT_LAST_CLOCK that the schema doc on line 28 specifies. _firstSample is reset on the first load() across NR/timesteps and not pool-backed, so the rising edge is mis/pre-consumed and q is not latched to vD; ctrl_nq=1-q then drives ~Q high. netlist mapping (d.ts:139-140 qPin<-ctrl_q, nqPin<-ctrl_nq) is correct, so the defect is in the driver edge arithmetic/first-sample handling."
+  },
+  {
+    "id": "src/components/semiconductors/__tests__/schottky.test.ts:138",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/__tests__/schottky.test.ts:138"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_RS_changes_anode_voltage",
+        "file": "src/components/semiconductors/__tests__/schottky.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Test-design bug: assert on the diode internal voltage drop (V(D1:A)-V(D1:K)) or the cathode node, not the source-clamped anode node. Diode source RS path is correct.",
+    "diagnosis": "The test reads node D1:A which is wired directly to the ideal voltage source v1:pos (buildSchottkyForward connection v1:pos -> d1:A). That node is clamped to V1 voltage (0.5V) by the ideal source regardless of the diode series resistance, so after equals before exactly (difference 0). RS hot-load on the diode element does recompute conductance (diode.ts:511 in computeTemperature), but its effect appears across the diode/internal prime node, never at the source-pinned anode node."
+  },
+  {
+    "id": "src/components/semiconductors/__tests__/schottky.test.ts:156",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/__tests__/schottky.test.ts:156"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_CJO_changes_dynamic_response",
+        "file": "src/components/semiconductors/__tests__/schottky.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Test-design bug: read a non-source-clamped node (cathode D1:K or the internal prime) to observe the CJO-dependent transient. The diode cap path (diode.ts computeJunctionCapacitance/Charge) is correct.",
+    "diagnosis": "The test reads node D1:A which equals the ideal source node v1:pos (clamped to 0.5V), so before and after are both exactly 0.5 regardless of CJO. Even under transient excitation the anode node is pinned by the ideal voltage source; the junction-cap stamp scaled by CJO acts between the internal/cathode nodes, not at the source-clamped anode."
+  },
+  {
+    "id": "src/components/semiconductors/diode.ts:1388",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/diode.ts:1388"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "computeTemperature_per_instance_override_wins_over_ambient",
+        "file": "src/components/semiconductors/__tests__/schottky.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Borderline NR-tolerance gap, not a temperature-override bug. Either re-run a full DCOP before reading vfAfter, or the single step settles within reltol*Vf+vAbsTol (1e-6 here) - which exceeds the 6-digit assertion. Override-hold logic is correct.",
+    "diagnosis": "vfAfter (0.1081312) differs from vfOverride (0.1081302) by 1.0076e-6, just over the 5e-7 (6-digit) tolerance. The per-instance TEMP=450 override IS held correctly: setParam(TEMP) sets _tempGiven=true (diode.ts:1385) and computeTemperature uses params.TEMP (450) thereafter (diode.ts:1365,888,824). The residual ~1e-6 drift is NR re-convergence noise: vfOverride is read after a full dcOperatingPoint() at 450K, whereas vfAfter is read after a single coordinator.step() following setCircuitTemp(300.15) which re-solves from a warm start to within reltol but not bit-identically to the prior DCOP."
+  },
+  {
+    "id": "src/components/memory/counter.ts:279",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/memory/counter.ts:279"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "loaded_en_sees_voltage_sag_ideal_clk_clr_see_no_sag",
+        "file": "src/solver/analog/__tests__/behavioral-sequential.test.ts",
+        "category": "ANALOG-SOLVER"
+      }
+    ],
+    "fixHint": "Two parts: (1) the analog loading override path requires the behavioral netlist; either the test must set model:behavioral or the override compile path must force the analog model when digitalPinLoadingOverrides target a component. (2) buildCounterNetlist must consume the per-pin _pinLoading and _pinElectrical maps (like the gate fix) so en is loaded with rIn=100k and C/clr are ideal/unloaded.",
+    "diagnosis": "vEN reads 0 because the Counter compiles as its digital model. Counter.defaultModel is digital (counter.ts:432) and the test at line 544 places the Counter without model:behavioral, so en/C/clr are digital nets with no analog rIn loading and readAllSignals returns 0 for ctr:en. Even with the behavioral model, counter.ts:279 selects input-pin loading from the static model param loaded and a single static rIn (1e6, counter.ts:257), ignoring the _pinLoading/_pinElectrical maps compiler.ts:1275-1287 derives from digitalPinLoadingOverrides, so the per-pin loaded/ideal/100k contract would still not be honored."
+  },
+  {
+    "id": "src/components/active/ccvs.ts:180",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/ccvs.ts:180"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_transresistance_changes_vout",
+        "file": "src/components/active/__tests__/ccvs.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Add a transresistance branch to setParam (line 180-184) that, when the expression is the default I(sense) linear shortcut, reparses value * I(sense) and updates the elements compiled expression and derivative (the _compiledExpr/_compiledDeriv that load() reads at lines 246-247), so the new transresistance restamps on the next step. Per project policy all model params must be hot-loadable.",
+    "diagnosis": "CCVSAnalogElement.setParam only handles senseSourceLabel and silently ignores transresistance. The transresistance is baked into the compiled expression (transresistance * I(sense)) inside the factory at lines 388-391, and the element holds the precompiled expr/deriv with no recompile path, so setComponentProperty(transresistance,2000) is a no-op and V_out stays at 1.0."
+  },
+  {
+    "id": "src/components/active/comparator-driver.ts:181",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/comparator-driver.ts:181"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_responseTime_changes_weight_integration",
+        "file": "src/components/active/__tests__/comparator.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "The DC weight collapse pre-saturates OUTPUT_WEIGHT so the transient integration test starts at the target. Either the DC branch should not persist the steady-state weight into the slot used by the subsequent transient integration (write the stamp value but seed the transient slot below target), or the response-time integration recurrence at line 185 must run during the warm-start-to-transient transition so weight ramps from below 1. Escalation: this is an architectural conflict between DCOP convergence (needs w=latch) and the transient-integration test premise.",
+    "diagnosis": "weightBefore and weightAfter are both 1. The buildFixture warm-start runs a DC-family solve and the DC branch sets wNew = latchNew = 1 directly (line 180-181), jamming OUTPUT_WEIGHT to the steady-state target during warm-start. The responseTime transient test then has no headroom: weight is already saturated at 1 so it cannot increase further, and the greater-than assertion fails."
+  },
+  {
+    "id": "src/solver/analog/timestep.ts:435",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/timestep.ts:435"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "full_iteration_paired_triangle_rc",
+        "file": "src/solver/analog/__tests__/harness/comparison-session-asserts.ts",
+        "category": "HARNESS/PARITY"
+      }
+    ],
+    "fixHint": "Replay from the first non-matching delta: compare our computeNewDt (timestep.ts:412-456, 2x growth cap line 440) and getClampedDt post-breakpoint saveDelta clamp (line 529) against ngspice CKTtrunc/dctran.c around the 0.5ms valley to 1.5ms peak breakpoints. ngspice carries lteDt forward to constrain step 29; verify our controller applies the accepted-step terr to the next delta rather than restarting at maxStep.",
+    "diagnosis": "AC triangle-RC (ac-voltage-source.test.ts:567 fixture acvsource-canon-triangle-rc.dts). Steps 0-28 match bit-exact; harness_first_divergence earliest is shape attemptCount (ours 6 vs ngspice 4) and integration delta at step 29 near the 1.5ms triangle peak breakpoint. harness_get_attempt step 29: ngspice accepts with delta=3.18e-5 (lteDt=3.05e-5) while ours uses delta=5e-5 (the maxStep cap) and gets outcome lteRejectedRetry. The source value differs only because each engine evaluates the triangle at a different time. The cktTerr LTE math (ckt-terr.ts) and dctran breakpoint clamp (timestep.ts:500-540) are citation-faithful; the diverging quantity is the next-delta selection feeding step 29."
+  },
+  {
+    "id": "src/solver/digital/compiler.ts:647",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/digital/compiler.ts:647"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "blown_property_seeds_state_to_permanently_off",
+        "file": "src/components/switching/__tests__/fets.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Add an FGPFET (and FGNFET) branch in the Step 8d seeding loop (compiler.ts:645-665) that writes initialStateSlots[stBase+1] = blown property ? 1 : 0, mirroring the Function truth-table seeding.",
+    "diagnosis": "Step 8d compile-time state seeding only handles el.typeId===Function; there is no branch that seeds the FGPFET blown property into state[stBase+1] (read at fgpfet.ts:209), so executeFGPFET always reads blown=0 and a blown FGPFET still conducts (D=1 instead of 0)."
+  },
+  {
+    "id": "src/components/memory/program-counter.ts:240",
+    "title": null,
+    "disposition": "test-fixture",
+    "locations": [
+      "src/components/memory/program-counter.ts:240"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "jump_then_increment_continues_from_loaded_value",
+        "file": "src/components/memory/__tests__/program-counter.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Fixture/test bug: build the PC at bitWidth>=2 so Q=2 is representable. Source line 240 is correct ngspice-style modular increment.",
+    "diagnosis": "Fixture builds the ProgramCounter at bitWidth:1 (test line 77) so mask=1; incrementing the loaded value 1 gives ((1+1)>>>0)&1 = 0, not 2. The increment+mask at line 240 is correct for a 1-bit counter; value 2 is unrepresentable at bitWidth 1."
+  },
+  {
+    "id": "src/components/passives/inductor.ts:685",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/inductor.ts:685"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_IC_seeds_uic_initial_branch_current",
+        "file": "src/components/passives/__tests__/inductor.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In setParam(IC), when stateBase/pool are live, seed s0[PHI]=s1[PHI]=(_effectiveL/_M)*value (mirror the memristor initialState setParam that writes both s0 and s1).",
+    "diagnosis": "setParam(IC) only stores this._IC=value. The IC flux seed s0[PHI]=L/m*IC fires solely in loadFluxInit under MODEUIC+MODEINITTRAN (line 780-783), which is the first transient step already consumed by buildFixture warm-start. Hot-loading IC after warm-start never re-enters MODEINITTRAN, so the branch current is never seeded and V(L_pos)=Vsrc=0.999 instead of 0."
+  },
+  {
+    "id": "src/components/passives/memristor.ts:226",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/memristor.ts:226"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "dcop_resistive_divider_at_initial_state",
+        "file": "src/components/passives/__tests__/memristor-rollback.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In DC mode the memristor must read the last-accepted W from s1 (like the inductor), not s0. Reading s0 only holds the seed on the FIRST load before any rotation; after a warm-start rotation the valid value is in s1. Resolve W from s1 (or seed s1 too) for the DC branch at line 226.",
+    "diagnosis": "After buildFixture warm-start (one transient step) the last-accepted W lives in s1 because rotateStateVectors at the top of the next step recycles states[0]. The second dcOperatingPoint() then re-enters DC mode where load() reads wOld = s0[W] (line 226), which is the recycled/stale buffer not the valid last-accepted W, so DCOP linearizes around a wrong W (driving R toward rOn) and V(mem:neg)=0.834 instead of the w=0.5 value 0.1105."
+  },
+  {
+    "id": "src/solver/analog/analog-engine.ts:625",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/analog-engine.ts:625"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "lte_rollback_state_invariant_after_rejection",
+        "file": "src/components/passives/__tests__/crystal.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Either the rejection path must restore state pool s0 from s1 before the retry to honor the asserted invariant, or the test invariant is wrong (ngspice intentionally does not restore state on LTE reject). Escalate: this is a state-rotation-on-reject semantics decision, not a crystal-component bug.",
+    "diagnosis": "On LTE rejection the engine (analog-engine.ts:625-636) only rewinds simTime and sets dt=newDt; it deliberately does NOT restore the state pool (per the ngspice dctran.c:935-954 comment at line 626-629). So after a rejected step the NR-written s0 differs from the last-accepted s1 on the crystal leaf reactive slots (PHI/Q), giving -5.14e-8 vs -3.22e-8. The test asserts s0==s1 (rollback invariant) which the engine never establishes on the LTE-reject path."
+  },
+  {
+    "id": "src/solver/analog/timestep.ts:616",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/timestep.ts:616"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "lte_rollback_state_invariant",
+        "file": "src/components/passives/__tests__/inductor.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Test-precondition gap, not a source bug: shouldReject and cktTerr match ngspice. To exercise the rollback path the fixture needs sharper flux gradients or smaller minTimeStep so worstRatio exceeds 1.111, or the test must not assume a rejection always occurs. Escalate if a rejection is required by spec.",
+    "diagnosis": "The test asserts an LTE rejection MUST occur for the square-wave RL (L=1e-3,R=1,500Hz,5ms,free-running maxStep), then reads it. No step in the convergence log has lteRejected===true so the lookup returns undefined and toBeDefined fails. shouldReject (timestep.ts:616, reject when worstRatio>=1/0.9) is ngspice-faithful; cktTerr never produced a ratio over 1.111 on this circuit so no rejection fired. The fixture params simply do not drive the LTE controller past the reject threshold."
+  },
+  {
+    "id": "src/solver/analog/analog-engine.ts:1082",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/analog-engine.ts:1082"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "dcop_paired_ac_step_down",
+        "file": "src/components/passives/__tests__/transformer.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Make the transient first-step seeding (currentDt=firstStep and _seedFromDcop) robust to the transformer coupled-inductor DCOP path so MODEINITTRAN and a nonzero first dt are established; root the upstream DCOP convergence for the singular coupled-inductor branch block so result.converged is true after source-sweep as it is in ngspice.",
+    "diagnosis": "Harness on transformer-canon-ac-step-down.dts shows our engine runs only 1 step then stalls (lastDt=0, did not advance) while ngspice runs 1009 steps. Our DCOP limps through 11 gminDynamic + 11 srcSweep attempts ALL accepted=false and we emit NO tranInit phase (ngspice emits 2 tranInit + tranPredictor/tranNR loop). The transient first-step dt seed (_timestep.currentDt = firstStep) and _seedFromDcop MODEINITTRAN seeding at line 1083-1091 are GATED on result.converged; for the coupled-inductor transformer the DCOP does not return a clean converged op (two inductors shorted at DC + mutual coupling form a singular branch block), so currentDt stays at the line-1061 seed value of 0 and getClampedDt returns ~0 at step() line 351, collapsing the first timestep. Matrix divergence confirms our inductor branch diagonal stays at DC req=0 where ngspice has the transient companion -50000."
+  },
+  {
+    "id": "src/components/semiconductors/diode.ts:1379",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/diode.ts:1379"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_BV_changes_reverse_breakdown_vd",
+        "file": "src/components/semiconductors/__tests__/diode.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Make the diode setParam(BV,...) path re-establish the breakdown regime: ensure the finite-BV branch flags/seed used at setup (and the warm-start junction voltage) are refreshed so the next solve re-enters the breakdown arm, matching the compile-time BV=5 result. Verify configure({}) re-runs setup or that load() reads the live params.BV/tBV rather than a setup-captured copy. (Test should also observe the anode, not the source-pinned cathode.)",
+    "diagnosis": "BV hot-load does not propagate into the diode breakdown behavior. MCP evidence: building the same reverse-bias circuit with BV=5 at compile time gives anode=4.958V (breakdown engages); building with default BV=Inf then circuit_patch set BV=5 keeps anode=0.000V (breakdown never engages) even though setComponentProperty routes to el.setParam (coordinator.ts:916-917) which sets params.BV=5 and recomputes tBV via computeTemperature. The breakdown arm in load() therefore stays inactive after hot-load. Separately the test reads d1:K (cathode) which is hard-tied to the 10V source and can never change, so even a working BV change would be invisible at that node - but the underlying source bug is the BV hot-load not engaging breakdown (observable at the anode)."
+  },
+  {
+    "id": "src/components/passives/capacitor.ts:491",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/capacitor.ts:491"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_capacitance_changes_first_step_current",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In capacitor.ts setParam, after setting _nominalC recompute this.C = _nominalC * _SCALE (or have the engine re-run computeTemperature on any param change) so capacitance is truly hot-loadable.",
+    "diagnosis": "Capacitor.setParam(capacitance) updates only _nominalC; the stamped capacitance this.C is recomputed solely in computeTemperature() (capacitor.ts:340/432), which a bare coordinator.step() after setComponentProperty never invokes. So the cBody stamp keeps the OLD capacitance and the post-hotload first-step current is identical (diff exactly 0), failing not.toBeCloseTo. Capacitance hot-load is inert until a temperature recompute fires. (Test also wrongly assumes first-step current is C-sensitive when it is esr-limited at tiny dt.)"
+  },
+  {
+    "id": "src/components/passives/polarized-cap.ts:641",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/passives/polarized-cap.ts:641"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_esr_changes_initial_step_current",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Read the ESR-limited current off cap:rEsr (the resistor in the series path), not the cap:cBody companion current, and read it at the first transient step before charging dominates.",
+    "diagnosis": "Test reads getElementPinCurrents on cap:cBody (the capacitor body) expecting it to track V/esr. esr does hot-load correctly (Resistor.setParam calls updateConduct at resistor.ts:595), but the cBody companion current (CCAP) only equals V/esr at the very first transient step when the cap is a near-short. After the warm-start step plus one more step() the cap is already charging, so cBody CCAP is no longer V/esr and stays ~2 rather than dropping to ~1. The assertion observes the wrong leaf/quantity."
+  },
+  {
+    "id": "src/solver/analog/ngspice-load-order.ts:0",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/ngspice-load-order.ts:0"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "dcop_paired_reverse_bias",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Align the per-leaf load() walk order for the PolarizedCap composite so rEsr/rLeak/cBody stamp the nCap diagonal in the same sequence ngspice loads them (RESload before CAPload); verify expandCompositeInstance/ngspiceLoadOrder leaf ordering matches the emitted SPICE deck.",
+    "diagnosis": "harness_first_divergence earliest = matrix cell (nCap,nCap) at step0/iter0, classification value-only, single cell, absDelta=1.78e-15 (1 ULP). The nCap diagonal accumulates three += stamps: rEsr.G + rLeak.G + cBody.geq. The leaf load order our engine walks differs in associativity from ngspice (R,R load then C load) for this expanded composite, producing a 1-ULP sum on the shared diagonal. Per CLAUDE.md this is the per-device load() accumulation order on a shared diagonal upstream cause, not the sparse solver. The 1.1e-16 node-voltage delta is the downstream symptom."
+  },
+  {
+    "id": "src/components/semiconductors/diode.ts:1258",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/semiconductors/diode.ts:1258"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Make _recordLimit emit the junction name VD (matching the DIOvoltage state-slot name at diode.ts:68 and ngspice diodefs.h:196) instead of the literal AK, so limiting events are identified by the same junction label the rest of the diode model uses.",
+    "diagnosis": "events.length>=1 passes (line 573); the failing assertion is line 574 .some(e.junction===VD || e.junction.startsWith(V)). The diode _recordLimit hardcodes junction:AK (diode.ts:1258), an anode-cathode label that neither equals VD nor starts with V, so .some() returns false. The diode junction state slot is named VD (DIOvoltage, diodefs.h:196, declared at diode.ts:68) but the limiting record uses AK, an inconsistent junction identifier."
+  },
+  {
+    "id": "src/solver/analog/analog-engine.ts:681",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/analog-engine.ts:681"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "lte_rollback_q_slot_rotation_invariant",
+        "file": "src/components/passives/__tests__/polarized-cap.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Confirm via convergence log whether the engine errors on this fixture; if it errors, ensure the error-exit path records a StepRecord so the log is non-empty, or relax the fixture stiffness. If it does not error, audit why accepted steps skip the line-681 record after a post-warm-start setConvergenceLogEnabled(true).",
+    "diagnosis": "Test enables the convergence log via coordinator.setConvergenceLogEnabled(true) (coordinator.ts:482-491) AFTER buildFixture warm-started with logging off, then runs 200 coordinator.step() calls; getConvergenceLog() returns a non-null but EMPTY array (length 0), failing log.length>=1 at line 623. A step records exactly one StepRecord at analog-engine.ts:681 when logging is on and the step is accepted. Empty after 200 steps means the transient body never reached the record (likely the engine hit EngineState.ERROR on the stiff 10V/100uF/esr=0.01 uic fixture, after which step() returns early at analog-engine.ts:307 and most error exits return without recording at line 660). Could not confirm error-vs-non-record split without runtime state capture (harness runs its own deck, not this uic programmatic build)."
+  },
+  {
+    "id": "src/solver/analog/analog-engine.ts:1091",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/analog-engine.ts:1091"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "dcop_paired_ac_sinusoid",
+        "file": "src/components/passives/__tests__/tapped-transformer.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Trace why _params.firstStep (resolveSimulationParams) is 0 for these transformer transient runs so the first-step dt feeds a nonzero ag0; the inductor/mutual stamp code is ngspice-faithful and is not the bug. Engine first-transient-step dt seeding for branch-equation reactive elements is the fix site.",
+    "diagnosis": "harness_run on the tapped-transformer ac-sinusoid fixture: our engine produces only 1 step then errors Our engine did not advance at step 0 (simTime=0 lastDt=0) with 49 NR iterations vs ngspice 1009 steps avg 2.26 iters. harness_matrix_diff classification value-only: every coupled-inductor branch self-term and mutual cross-term is 0 on our side while ngspice has the L*ag0 companion (-200000 self, -160000/-80000 mutual) at step0/iter0. Cause: the first transient dt is 0 so ag[0]=0, making inductor req=ni.geq=ag0*L=0 (inductor.ts:871) and mutual stamps -mutFactor*ag0=0 (mutual-inductor.ts:236-238); the branch-equation diagonal -req=0 leaves the coupled-inductor matrix degenerate and NR stagnates. Confirmed NOT tapped-specific: the plain transformer-canon-ac-step-down fixture stagnates identically. _transientDcop seeds currentDt=_params.firstStep (analog-engine.ts:1091); firstStep is resolving/seeding to 0 for inductor-branch transformer topologies."
+  },
+  {
+    "id": "src/solver/coordinator.ts:915",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/coordinator.ts:915"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_vIH_shifts_threshold_so_3p3v_reads_low",
+        "file": "src/components/active/__tests__/dac.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Make setComponentProperty fan out the param to ALL analog sub-elements whose CircuitElement is the target (iterate elementToCircuitElement collecting every idx for the element, call setParam on each), so composite-nested consumers like the per-bit thresholders receive vIH.",
+    "diagnosis": "setComponentProperty routes a parent hot-load to only ONE flattened analog sub-element. _resolveElementIndex (coordinator.ts:712-719) builds a Map keyed by CircuitElement, so for a composite all sub-elements collapse to the same parent key and only the last-written index survives. The DAC vIH must reach 8 DigitalInputThresholder leaves (two composite levels deep via DigitalInputPinLoaded) but the single setParam call at line 915-918 never fans out, so vIH stays at default 2.0 and 3.3V still reads HIGH (V_OUT stays ~2.5 instead of 0)."
+  },
+  {
+    "id": "src/components/active/dac-driver.ts:196",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/dac-driver.ts:196"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_rOut_sags_output_under_load",
+        "file": "src/components/active/__tests__/dac.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Stamp a Thevenin output (target voltage behind rOut) in DACDriver.load instead of an ideal VSRC branch, and wire the rOut param into the driver so output impedance creates the divider; make rOut hot-loadable via setParam.",
+    "diagnosis": "DACDriver stamps an ideal VSRC branch (V_OUT - V_GND = target exactly, lines 196-200) with no series output resistance, and buildDacNetlist (dac.ts) never wires the rOut param into any element. So the output is a stiff voltage source that cannot sag under load: V_OUT stays at 5.0 instead of 5*1e6/(1e6+1e3)=4.9950. The vIH/rOut hot-load also cannot take effect because DACDriver.setParam is a no-op (dac-driver.ts:159) and rOut is not consumed anywhere."
+  },
+  {
+    "id": "src/components/active/opamp.ts:298",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/opamp.ts:298"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_rOut_changes_output_divider",
+        "file": "src/components/active/__tests__/opamp.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In setParam, when key===rOut update this._rOut (or make load/G read this._p.rOut directly so the live value drives the conductance). The cached _rOut field and _p must not diverge.",
+    "diagnosis": "OpampElement.setParam writes only this._p[key], but load() computes the RES conductance G = 1/this._rOut using the separate constructor-cached field this._rOut (opamp.ts:194,258) which setParam never updates. Hot-loading rOut from 100 to 4000 mutates _p.rOut but the stamp keeps using stale _rOut=100, so V(out) stays at 9.0909 instead of changing to 2.0."
+  },
+  {
+    "id": "src/components/active/timer-555.ts:56",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/timer-555.ts:56"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_vDrop_changes_dis_base_voltage",
+        "file": "src/components/active/__tests__/timer-555-debug.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "The discharge BJT must saturate and pull DIS toward GND when the base is driven to vDrop. Investigate the bjtDis NpnBJT spice-model area/IS defaults and the disBase clamp interaction (latch-driver.ts:123-126 G_base=1 Norton) so collector current actually flows; the base-clamp-only scheme produces a base voltage but no collector conduction.",
+    "diagnosis": "Verified via circuit_dc_op: t:DIS stays pinned at ~5V (VCC) regardless of disBase. disBase correctly tracks vDrop at build time (fresh build vDrop=3 gives node disBase=3.0V, vDrop=1.5 gives 1.5V) yet t:DIS is 5.0V in both cases because the discharge BJT (bjtDis, NpnBJT spice model) sinks ~0 collector current even at Vbe=3V, so DIS is decoupled from the base and the test sees only 1.5e-9 NR-reconverge noise. Separately the hot-load patch path left disBase frozen at 1.5 (setParam routing not reaching latchDrv), but the dominant failure is the non-conducting discharge transistor."
+  },
+  {
+    "id": "src/components/active/vccs.ts:162",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/active/vccs.ts:162"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "hotload_transconductance_changes_output_voltage",
+        "file": "src/components/active/__tests__/vccs.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Implement setParam so key transconductance (and gain/m) rebuilds the linear expression / effectiveGm = transconductance*m used in stampOutput, mirroring how other controlled sources hot-reload; update the cached expression+derivative used by stampOutput.",
+    "diagnosis": "VCCSAnalogElement.setParam is an empty no-op (params underscored, no body), so setComponentProperty(transconductance, 0.02) is silently dropped and V(out+) stays at -1V instead of -2V. The element drives current from a parsed expression / cached gm built at construction; setParam never updates it."
+  },
+  {
+    "id": "src/solver/analog/behavioral-drivers/bridge-input-driver.ts:124",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/solver/analog/behavioral-drivers/bridge-input-driver.ts:124"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "Loaded: setComponentProperty(dipl, cIn, 1e-7) slows RC settling — binding is observable in transient",
+        "file": "src/components/digital-pins/__tests__/dipl-hot-load.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "In setParam case cIn forward the value to the child cap: this._capChild?.setParam(capacitance, value) (and reconcile when _capChild is null but value becomes >0). The spec field alone is not what gets stamped.",
+    "diagnosis": "setParam(cIn) updates only this._spec.cIn but never the child AnalogCapacitorElement which holds its own capacitance baked at construction (line 62) and is what load() actually stamps (line 100-102). So hot-loading cIn=1e-7 does nothing; the RC keeps its default 1e-12 tau=1us and V(In_1) rises to ~2V at 5us instead of staying below 0.01V."
+  },
+  {
+    "id": "src/components/flipflops/monoflop.ts:163",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/flipflops/monoflop.ts:163"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "clock_stays_high_no_trigger",
+        "file": "src/components/flipflops/__tests__/monoflop.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Seed prevClock from the actual initial clock level so a pre-existing high does not register as a rising edge (e.g. initialize prevClock=clock on the first sample, or have the engine prime prevClock from initial inputs before the first executeFn). Edge must require a genuine low-to-high transition.",
+    "diagnosis": "prevClock state slot initializes to 0. When C is set high before any step, the first sampleMonoflop sees clock=1 and prevClock=0 and the rising-edge test (clock!==0 && prevClock===0) fires a spurious trigger, so Q=1 instead of 0. There is no real 0->1 transition; the static high clock is misread as an edge because prevClock was never seeded with the initial clock level."
+  },
+  {
+    "id": "src/components/graphics/graphic-card.ts:348",
+    "title": null,
+    "disposition": "engine-fix",
+    "locations": [
+      "src/components/graphics/graphic-card.ts:348"
+    ],
+    "testCount": 1,
+    "tests": [
+      {
+        "test": "dataBits_8_truncates_packed_d_low_byte_dataBits_24_preserves_full",
+        "file": "src/components/graphics/__tests__/graphic-card.test.ts",
+        "category": "COMPONENT"
+      }
+    ],
+    "fixHint": "Mask the packed output to the data bus width: read dataBits via layout.getProperty(index, dataBits) and AND the result with ((1<<dataBits)-1) (handle dataBits>=32 as full width) before writing state[wt[outputIdx]].",
+    "diagnosis": "executeGraphicCard packs the D output (addr<<0 | str<<16 | clk<<17 | ld<<18 | bank<<19 = 983045 = 0xF0005) into the output slot with no mask to the dataBits bus width. dataBits=8 must truncate to the low byte (0xFF -> 5) but the function never reads dataBits and emits the full packed word, so D reads 983045 instead of 5."
+  }
+]
