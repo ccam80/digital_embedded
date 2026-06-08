@@ -4,8 +4,7 @@
  * voltage (VREF) relative to GND; runs an SAR or instant-conversion FSM
  * advanced by rising CLK edges.
  *
- * Per Composite (phase-composite-architecture.md), J-018
- * (contracts_group_01.md). Canonical shape: Template A-multi-bit-schema
+ * Canonical shape: Template A-multi-bit-schema
  * (counter-driver.ts). No MNA stamps- pure behavioral slot writer.
  *
  * Modes (selected by parent via `sar` and `bipolar` model params):

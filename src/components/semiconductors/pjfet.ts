@@ -2,13 +2,13 @@
  * P-channel JFET analog component.
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/jfet/jfetload.c::JFETload`.
- * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
+ * Single-pass `load()` per device per NR iteration.
  * Gate-junction caps lump inline into the stamps per `jfetload.c:477-492`.
  *
- * Invented cross-method slots deleted per Phase 2.5 Wave 1.4 A1. Only slots
- * with direct ngspice correspondence in `jfetdefs.h:154-166` survive.
+ * Only slots with direct ngspice correspondence in `jfetdefs.h:154-166` are
+ * declared.
  *
- * D-10 (fet-base collapse): NJFET and PJFET are each self-contained closure
+ * NJFET and PJFET are each self-contained closure
  * factories. No shared abstract class. Sign-polarity is a literal `-1`
  * constant below (P-channel, jfetdefs.h:235 `#define PJF -1`); the N-channel
  * sibling in `njfet.ts` carries its own `+1` literal.
@@ -125,7 +125,7 @@ export interface PjfetParams {
 }
 
 // ---------------------------------------------------------------------------
-// State schema  JFET (Phase 2.5 Wave 1.4 A1 post-excision).
+// State schema  JFET.
 //
 // Only slots with direct correspondence in `jfetdefs.h:154-166` JFETstate<n>
 // offsets survive. Same layout as the N-channel sibling  the schema is

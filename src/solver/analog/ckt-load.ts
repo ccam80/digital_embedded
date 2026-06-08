@@ -100,7 +100,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   ctx.loadCtx.cktMode  = ctx.cktMode;   // single source of truth (F3/F4).
   ctx.loadCtx.srcFact  = ctx.srcFact;
   ctx.loadCtx.diagGmin = ctx.diagonalGmin;
-  // H1 (Phase 2.5 W2.2): sync the limiting-event collector into the device-
+  // sync the limiting-event collector into the device-
   // facing LoadContext on every cktLoad call. Devices push into
   // ctx.limitingCollector (the LoadContext param they receive) when they
   // invoke pnjlim/fetlim/limvds- without this propagation, the outer

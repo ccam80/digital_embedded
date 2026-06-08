@@ -40,7 +40,7 @@ export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = d
 });
 
 // ---------------------------------------------------------------------------
-// buildTimer555Netlist- function-form netlist (Composite M5)
+// buildTimer555Netlist- function-form netlist
 //
 // Ports: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
 // Internal nets: nLower, nComp1Out, nComp2Out, nDisBase
@@ -75,8 +75,8 @@ export function buildTimer555Netlist(params: PropertyBag): MnaSubcircuitNetlist 
     params: {
       rOut: params.getModelParam<number>("rOut"),
       cOut: params.getModelParam<number>("cOut"),
-      vOH:  params.getModelParam<number>("vOH"),
-      vOL:  params.getModelParam<number>("vOL"),
+      vOH:  "vOH",
+      vOL:  "vOL",
     },
   });
   netlist.push([5 /* OUT port */, 7 /* GND port */, 12 /* ctrl_out net */]);

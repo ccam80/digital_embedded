@@ -13,7 +13,7 @@
  *   - Rail saturation (output clamps to V_supply ± V_sat) via railLim
  *
  * State is held entirely in StatePool slots (REAL_OPAMP_SCHEMA, 8 slots) per
- * ss1.1; the class is a PoolBackedAnalogElement. There is no `accept()` method-
+ * the class is a PoolBackedAnalogElement. There is no `accept()` method-
  * the bottom-of-load() history write idiom (ngspice CKTstate0,
  * dioload.c:325-326, bjtload.c:744-746) handles slot promotion via StatePool
  * rotation.

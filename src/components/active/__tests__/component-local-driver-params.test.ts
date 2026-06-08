@@ -1,7 +1,6 @@
 /**
- * Param hot-load tests for the 4 component-local driver elements:
- * ComparatorDriverElement, ComparatorPushPullDriverElement,
- * Timer555LatchDriverElement, ADCDriverElement.
+ * Param hot-load tests for the component-local driver elements:
+ * ComparatorPushPullDriverElement, Timer555LatchDriverElement, ADCDriverElement.
  *
  * Asserts that setParam("rOut", 200), setParam("vOH", 3.3), and
  * setParam("vOL", 0.5) do not throw. Phase 1 does not wire these params
@@ -10,7 +9,6 @@
 
 import { describe, it, expect } from "vitest";
 import { PropertyBag } from "../../../core/properties.js";
-import { ComparatorDriverElement } from "../comparator-driver.js";
 import { ComparatorPushPullDriverElement } from "../comparator-pushpull-driver.js";
 import { Timer555LatchDriverElement } from "../timer-555-latch-driver.js";
 import { ADCDriverElement } from "../adc-driver.js";
@@ -61,17 +59,6 @@ function adcPinNodes(): ReadonlyMap<string, number> {
 // ---------------------------------------------------------------------------
 
 describe("component-local-driver-params — accepts rOut/vOH/vOL via setParam without throwing", () => {
-  it("ComparatorDriverElement accepts rOut/vOH/vOL", () => {
-    const props = makeProps({
-      hysteresis: 0, vos: 0.001, responseTime: 1e-6,
-      rOut: 100, vOH: 5, vOL: 0,
-    });
-    const el = new ComparatorDriverElement(comparatorPinNodes(), props);
-    expect(() => el.setParam("rOut", 200)).not.toThrow();
-    expect(() => el.setParam("vOH", 3.3)).not.toThrow();
-    expect(() => el.setParam("vOL", 0.5)).not.toThrow();
-  });
-
   it("ComparatorPushPullDriverElement accepts rOut/vOH/vOL", () => {
     const props = makeProps({
       hysteresis: 0, vos: 0.001, responseTime: 1e-6,

@@ -463,7 +463,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   // -------------------------------------------------------------------------
-  // ss1.11 Convergence logging
+  // Convergence logging
   // -------------------------------------------------------------------------
 
   getElementLabel(index: number): string | undefined {

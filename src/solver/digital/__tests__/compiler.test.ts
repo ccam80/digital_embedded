@@ -1115,7 +1115,7 @@ describe("Compiler- feedback wire mapping", () => {
   });
 
   // -------------------------------------------------------------------------
-  // powerPinsFilteredFromDigitalCompiler (W2.3)
+  // powerPinsFilteredFromDigitalCompiler
   // -------------------------------------------------------------------------
   it("powerPinsFilteredFromDigitalCompiler", () => {
     // Build an AND-like gate whose resolvedPins include VDD and GND power pins

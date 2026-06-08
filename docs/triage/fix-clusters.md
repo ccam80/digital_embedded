@@ -8,10 +8,10 @@ Clusters sorted by remaining (open) test payoff.
 **15 multi-item hubs**, **33 singletons**.
 
 
-## Cluster 1 [HUB] — 10/10 item(s) open · 21/59 tests still failing
+## Cluster 1 [HUB] — 9/10 item(s) open · 15/59 tests still failing
 - themes: opamp-convergence×4, node-mapping×4, deck-emission×2, temperature×2, state-pool×2, param-instantiation×1, integration-tran×1, numeric-ulp×1
 - dirs: src/components/semiconductors (6), src/solver/analog (2), src/solver/analog/__tests__/harness (2), src/components/active (1), src/solver/analog/__tests__ (1)
-  - **[PARTIAL] (11/49t)** `composite-leaf-givenness`
+  - **[PARTIAL] (6/49t)** `composite-leaf-givenness`
     - Do not mark leaf-default model params as given during composite expansion. Use a non-given default-seeding path so isModelParamGiven only re
   - **[OPEN] (2/2t)** `src/components/semiconductors/diode.ts:839`
     - Always allocate the RS internal prime node at setup() regardless of RS value (or re-run topology setup on RS hot-load), so a nonzero RS load
@@ -21,8 +21,6 @@ Clusters sorted by remaining (open) test payoff.
     - Index the 1-based voltages array with row+1 in the branch loop (ourFinal.voltages[row+1] and ngFinal.voltages[row+1]) at comparison-session.
   - **[OPEN] (1/1t)** `src/solver/analog/compiler.ts:1571`
     - In the analog compiler, resolve parsed .nodeset net/pin names to MNA node ids and pass a nodesets Map into the ConcreteCompiledAnalogCircuit
-  - **[OPEN] (1/1t)** `src/components/semiconductors/diode.ts:942`
-    - Same as full_iteration_paired_blocking: use harness_get_attempt on DIAC1_D_rev across the failing DCOP iters to confirm the breakdown pnjlim
   - **[OPEN] (1/1t)** `src/solver/analog/__tests__/harness/comparison-session.ts:3066`
     - In getLimitingComparison normalize the SPICE type prefix when matching ng events to the requested label (strip leading device-type letter D/
   - **[OPEN] (1/1t)** `src/components/semiconductors/diode.ts:1388`
@@ -31,6 +29,8 @@ Clusters sorted by remaining (open) test payoff.
     - Make the diode setParam(BV,...) path re-establish the breakdown regime: ensure the finite-BV branch flags/seed used at setup (and the warm-s
   - **[OPEN] (1/1t)** `src/components/semiconductors/diode.ts:1258`
     - Make _recordLimit emit the junction name VD (matching the DIOvoltage state-slot name at diode.ts:68 and ngspice diodefs.h:196) instead of th
+  - **[DONE] (0/1t)** `src/components/semiconductors/diode.ts:942`
+    - Same as full_iteration_paired_blocking: use harness_get_attempt on DIAC1_D_rev across the failing DCOP iters to confirm the breakdown pnjlim
 
 ## Cluster 2 [HUB] — 4/4 item(s) open · 14/14 tests still failing
 - themes: digital-level-contract×1, opamp-convergence×1, state-pool×1, integration-tran×1

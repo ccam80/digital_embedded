@@ -7,7 +7,6 @@
  * the data to one of N = 2^K output lines. Unselected lines stamp 0; selected
  * stamps `data`.
  *
- * Per Cluster M11 follow-up (j-070-recluster.md), J-144 (contracts_group_10.md).
  */
 
 import {

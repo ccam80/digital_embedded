@@ -2,8 +2,7 @@
  * BehavioralNotDriverElement — pure-truth-function driver leaf for the 1-input
  * NOT gate. See and-driver.ts for the normalized-bit driver-chain architecture.
  *
- * Per Composite M10 (phase-composite-architecture.md), J-152
- * (contracts_group_10.md). N=1 fixed; truth function: 1 - input.
+ * N=1 fixed; truth function: 1 - input.
  */
 
 import {

@@ -1,10 +1,1745 @@
 {
   "summary": {
-    "passed": 24,
-    "failed": 0,
+    "passed": 15679,
+    "failed": 173,
     "skipped": 0,
-    "totalFiles": 2,
-    "durationSeconds": 3.8
+    "totalFiles": 443,
+    "durationSeconds": 61.4
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected 0.3999999999999999 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "parallel split at junction: branch wires carry their branch's current",
+          "line": 163,
+          "column": 66
+        }
+      ]
+    },
+    {
+      "message": "expected 0.9534883720930233 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "every junction's wires carry positive current and KCL is satisfied",
+          "line": 292,
+          "column": 55
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999999999999995 to be less than or equal to 3.223814850025644",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\rlc-lte-path.test.ts",
+          "test": "RC step response: exponential charging matches V(1-e^-t/τ)",
+          "line": 86,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be less than or equal to 0.6447629700051288",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\rlc-lte-path.test.ts",
+          "test": "RL step response: V_R matches 1-e^-t/τ (R=10, L=1mH, τ=100µs)",
+          "line": 136,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be +0 // Object.is equality",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\runtime\\__tests__\\timing-diagram.test.ts",
+          "test": "snapshot IDs match what the coordinator returned",
+          "line": 248,
+          "column": 35
+        },
+        {
+          "file": "src\\runtime\\__tests__\\timing-diagram.test.ts",
+          "test": "restores the closest snapshot to time 0 when jumped to start",
+          "line": 303,
+          "column": 35
+        },
+        {
+          "file": "src\\components\\flipflops\\__tests__\\monoflop.test.ts",
+          "test": "clock_stays_high_no_trigger",
+          "line": 158,
+          "column": 43
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\spark-gap-rollback.test.ts",
+          "test": "hotload_iHold_above_steady_current_extinguishes_gap",
+          "line": 243,
+          "column": 62
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
+          "test": "hotload_iHold_raise_above_steady_current_extinguishes_gap",
+          "line": 290,
+          "column": 62
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-flipflop.test.ts",
+          "test": "behavioral_preset_preserves_digital_truth_q_qbar_after_rising_edge_d1",
+          "line": 198,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected 3 to be 2 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\runtime\\__tests__\\timing-diagram.test.ts",
+          "test": "restores the closest snapshot when jumpToTime is called",
+          "line": 279,
+          "column": 35
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "linear_converges_in_two_iterations",
+          "line": 130,
+          "column": 32
+        }
+      ]
+    },
+    {
+      "message": "expected true to be false // Object.is equality",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\adc.test.ts",
+          "test": "hotload_vIH_changes_clock_sensitivity",
+          "line": 198,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
+          "test": "linear_sweep",
+          "line": 391,
+          "column": 37
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
+          "test": "ac_sweep_at_each_value",
+          "line": 481,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "expected 128 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\adc.test.ts",
+          "test": "clock_below_vIH_does_not_trigger_conversion",
+          "line": 319,
+          "column": 34
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to not be close to 1, received difference is 0, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\ccvs.test.ts",
+          "test": "hotload_transresistance_changes_vout",
+          "line": 226,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 2.5 to be close to +0, received difference is 2.5, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\dac.test.ts",
+          "test": "hotload_vIH_shifts_threshold_so_3p3v_reads_low",
+          "line": 226,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 5 to be close to 4.995004995004995, received difference is 0.004995004995005381, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\dac.test.ts",
+          "test": "hotload_rOut_sags_output_under_load",
+          "line": 247,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 9.090909090909092 to not be close to 9.090909090909092, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\opamp.test.ts",
+          "test": "hotload_rOut_changes_output_divider",
+          "line": 257,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 0.019228398924449188 to not be close to 0.019228398924449188, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\ota.test.ts",
+          "test": "hotload_gmMax_clamp_changes_vout_in_linear_region",
+          "line": 244,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 2.000979990139731 to be close to 2, received difference is 0.0009799901397311572, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
+          "test": "dcop_unity_follower_tracks_vin",
+          "line": 117,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 10,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
+          "test": "dcop_rail_saturation_clamps_to_vrail_pos",
+          "line": 141,
+          "column": 31
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "dcop_paired_reverse_bias",
+          "line": 317,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "limiting_pnjlim_fires_on_clamp_diode_under_reverse_bias",
+          "line": 574,
+          "column": 83
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+          "test": "dcop_paired_ac_sinusoid",
+          "line": 241,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
+          "test": "dcop_paired_ac_step_down",
+          "line": 194,
+          "column": 78
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
+          "test": "limiting_pnjlim_fires_on_q1_or_q2_junction_during_dcop",
+          "line": 218,
+          "column": 24
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "dcop_gate_on_drives_v_s_near_vs",
+          "line": 198,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\relay.test.ts",
+          "test": "dcop_paired_dt_energised",
+          "line": 564,
+          "column": 28
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\convergence-regression.test.ts",
+          "test": "RC circuit runs transient steps stably with capacitor near Vs",
+          "line": 110,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
+          "test": "log_sweep",
+          "line": 445,
+          "column": 40
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 1 // Object.is equality",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
+          "test": "hotload_vSatPos_shifts_rail_clamp",
+          "line": 181,
+          "column": 67
+        },
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+          "test": "init_rail_sat_state_out_sat_flag_set",
+          "line": 173,
+          "column": 24
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\spark-gap-rollback.test.ts",
+          "test": "hotload_vBreakdown_lower_below_source_fires_gap",
+          "line": 189,
+          "column": 62
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
+          "test": "hotload_vBreakdown_drop_below_vsrc_fires_blocking_gap",
+          "line": 214,
+          "column": 62
+        }
+      ]
+    },
+    {
+      "message": "expected 0.15499418771796014 to be close to 0.5, received difference is 0.34500581228203986, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
+          "test": "hotload_vos_shifts_unity_follower_output",
+          "line": 206,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected 2.0009799901349496 to be close to 2, received difference is 0.0009799901349496487, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
+          "test": "hotload_aol_shifts_finite_gain_error",
+          "line": 258,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 1.6000025816870698 to be greater than 13.499999999",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp-raillim.test.ts",
+          "test": "limiting_railLim_engaged_under_overdrive",
+          "line": 308,
+          "column": 26
+        }
+      ]
+    },
+    {
+      "message": "compareAllSteps: run produced 0 comparable steps:",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_rail_saturation",
+          "line": 25,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_rail_saturation",
+          "line": 25,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "message": "Step out of range: 0",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "dcop_paired_rail_saturation",
+          "line": 1400,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "dcop_paired_rail_saturation",
+          "line": 1400,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "compareAllAttempts: run produced 0 comparable steps:",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_rail_saturation",
+          "line": 70,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_rail_saturation",
+          "line": 70,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "message": "expected -0.9002250730671187 to be close to -0.09082652134423251, received difference is 0.8093985517228862, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+          "test": "hotload_aol_changes_inverting_gain_error",
+          "line": 302,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 0.0005359991040041479 to be close to 0.0005, received difference is 0.00003599910400414784, but expected 0.000005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+          "test": "preset_OPA2134_shifts_dc_output_by_vos_delta",
+          "line": 646,
+          "column": 32
+        }
+      ]
+    },
+    {
+      "message": "expected 3.2999993400001326 to be close to 3.283582089552239, received difference is 0.01641725044789366, but expected 0.00005",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "dcop_noninv_high_output_near_voh",
+          "line": 163,
+          "column": 18
+        },
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "dcop_inv_low_output_near_voh",
+          "line": 172,
+          "column": 18
+        }
+      ]
+    },
+    {
+      "message": "expected 3.2999993400001326 to be close to 3.283582089552239, received difference is 0.01641725044789366, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "hotload_vTH_shifts_rising_threshold",
+          "line": 204,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 3.2999993400001326 to be close to +0, received difference is 3.2999993400001326, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "hotload_vTL_shifts_falling_threshold",
+          "line": 219,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999999000000201 to be close to 4.975124378109452, received difference is 0.024874621890748294, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "hotload_vOH_changes_output_high_level",
+          "line": 234,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 0.39999992000001605 to be close to 0.39800995024875624, received difference is 0.0019899697512598125, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "hotload_vOL_changes_output_low_level",
+          "line": 250,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 3.2999993400001326 to be less than 3.2999993400001326",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "hotload_rOut_changes_output_divider",
+          "line": 265,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 0.017960844707480873 to not be close to 0.01804845152882078, received difference is 0.0000876068213399063, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\timer-555-debug.test.ts",
+          "test": "hotload_vDrop_changes_dis_base_voltage",
+          "line": 371,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected -1 to not be close to -1, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\vccs.test.ts",
+          "test": "hotload_transconductance_changes_output_voltage",
+          "line": 169,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 1.9997726088808863 to be less than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\digital-pins\\__tests__\\dipl-hot-load.test.ts",
+          "test": "Loaded: setComponentProperty(dipl, 'cIn', 1e-7) slows RC settling — binding is observable in transient",
+          "line": 235,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "message": "expected 983045 to be 5 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\graphics\\__tests__\\graphic-card.test.ts",
+          "test": "dataBits_8_truncates_packed_d_low_byte_dataBits_24_preserves_full",
+          "line": 204,
+          "column": 29
+        }
+      ]
+    },
+    {
+      "message": "expected 3.3 to not be close to 3.3, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\io\\__tests__\\analog-clock.test.ts",
+          "test": "hotload_vdd_changes_out_voltage",
+          "line": 135,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 3.3 to be close to +0, received difference is 3.3, but expected 5e-7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\io\\__tests__\\analog-clock.test.ts",
+          "test": "hotload_Frequency_changes_breakpoint_schedule",
+          "line": 163,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: +0 } to match object { type: 'digital', value: 2 }",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\memory\\__tests__\\program-counter.test.ts",
+          "test": "jump_then_increment_continues_from_loaded_value",
+          "line": 245,
+          "column": 50
+        }
+      ]
+    },
+    {
+      "message": "Bus conflict on net 1: conflicting drivers",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\digital\\bus-resolution.ts",
+          "test": "masked_addresses_are_independent_across_distinct_register_slots",
+          "line": 229,
+          "column": 12
+        }
+      ]
+    },
+    {
+      "message": "expected 3.8163916471489756e-17 to not be close to 3.729655473350135e-17, received difference is 8.673617379884035e-19, but expected 0.005",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
+          "test": "hotload_frequency_changes_transient_response",
+          "line": 155,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
+          "test": "hotload_qualityFactor_changes_transient_response",
+          "line": 173,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
+          "test": "hotload_motionalCapacitance_changes_transient_response",
+          "line": 191,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
+          "test": "hotload_shuntCapacitance_changes_transient_response",
+          "line": 209,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected -5.148771783408702e-8 to be -3.2260034867001646e-8 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
+          "test": "lte_rollback_state_invariant_after_rejection",
+          "line": 280,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "expected 0.9990007495003123 to be close to +0, received difference is 0.9990007495003123, but expected 5e-7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
+          "test": "hotload_IC_seeds_uic_initial_branch_current",
+          "line": 426,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be defined",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
+          "test": "lte_rollback_state_invariant",
+          "line": 673,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5000000834196892 to be 0.5 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\memristor-rollback.test.ts",
+          "test": "init_w_seeded_to_initialState_after_warm_start",
+          "line": 49,
+          "column": 54
+        }
+      ]
+    },
+    {
+      "message": "expected 0.8341969139810099 to be close to 0.11049723756906077, received difference is 0.7236996764119492, but expected 5e-7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\memristor-rollback.test.ts",
+          "test": "dcop_resistive_divider_at_initial_state",
+          "line": 109,
+          "column": 50
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5000041796469367 to be close to 0.5, received difference is 0.00000417964693666395, but expected 5e-10",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\memristor.test.ts",
+          "test": "init_w_slot_seeded_from_initial_state_mid",
+          "line": 102,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "message": "expected 0.05000015931234776 to be close to 0.05, received difference is 1.5931234775834469e-7, but expected 5e-10",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\memristor.test.ts",
+          "test": "init_w_slot_seeded_from_initial_state_edge",
+          "line": 122,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be close to 1.999999992e-7, received difference is 1.999999992e-7, but expected 5e-9",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "dcop_dc_current_through_cap_equals_v_over_esr_plus_rleak",
+          "line": 224,
+          "column": 28
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "hotload_leakageCurrent_changes_dc_steady_state_current",
+          "line": 422,
+          "column": 31
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "hotload_voltageRating_changes_dc_steady_state_current",
+          "line": 451,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "Matrix-entry value divergence at step=0 attempt=0 iter=0:",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_rc_charge",
+          "line": 3990,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_reverse_bias",
+          "line": 3990,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "739 per-iteration divergence(s); first: voltage step 0/iter 0 cap_cBody:p0/Rcap_rLeak:p0/Rcap_rEsr:p1 ours=-0.692890753762954 ngspice=-0.6928907537629597 absDelta=5.773159728050814e-15: expected 739 t...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_reverse_bias",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 49.999999999995 to not be close to 49.999999999995, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "hotload_capacitance_changes_first_step_current",
+          "line": 372,
+          "column": 34
+        }
+      ]
+    },
+    {
+      "message": "expected 2 to be less than 2",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "hotload_esr_changes_initial_step_current",
+          "line": 398,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected Infinity to be close to 2, received difference is Infinity, but expected 0.05",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "hotload_M_scales_dc_steady_state_current",
+          "line": 542,
+          "column": 50
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than or equal to 1",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+          "test": "lte_rollback_q_slot_rotation_invariant",
+          "line": 623,
+          "column": 26
+        }
+      ]
+    },
+    {
+      "message": "step 0 dt: ours=0 ngspice=5.000000000000001e-7 absDelta=5.000000000000001e-7: expected false to be true // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_ac_sinusoid",
+          "line": 35,
+          "column": 7
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_ac_step_down",
+          "line": 35,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "message": "1029 per-iteration divergence(s); first: voltage step 0/iter 0 LTX1_L2:p0/TX1:S1/R_S1:pos ours=0 ngspice=0.01570793742938211 absDelta=0.01570793742938211: expected 1029 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_ac_sinusoid",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1021 per-iteration divergence(s); first: voltage step 0/iter 0 LTX1_L2:p0/TX1:S1/R_LOAD:pos ours=0 ngspice=0.003769904983051706 absDelta=0.003769904983051706: expected 1021 to be +0 // Object.is equal...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_ac_step_down",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "1020 per-iteration divergence(s); first: voltage step 0/iter 0 LTX1_L2:p0/TX1:S1/R_LOAD:pos ours=0 ngspice=0.003141587485876422 absDelta=0.003141587485876422: expected 1020 to be +0 // Object.is equal...",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_temp_sweep_300_15K_paired",
+          "line": 83,
+          "column": 31
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_temp_sweep_350K_paired",
+          "line": 83,
+          "column": 31
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_temp_sweep_400K_paired",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "step 1 node R_LOAD:pos/TL1:P2b: ours=0.5 ngspice=0.49999999999999994 absDelta=5.551115123125783e-17: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_matched_load",
+          "line": 40,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "2808 per-iteration divergence(s); first: voltage step 1/iter 0 node_3 ours=0.5 ngspice=0.49999999999999994 absDelta=5.551115123125783e-17: expected 2808 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_matched_load",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "131 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/RC:neg ours=0.56591796875 ngspice=4.694871426682985 absDelta=4.128953457932985: expected 131 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "temp_300_15K_compareAllAttempts",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "131 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/RC:neg ours=2.510986328125 ngspice=4.840711589038885 absDelta=2.329725260913885: expected 131 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "temp_350K_compareAllAttempts",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "131 per-iteration divergence(s); first: voltage step 0/iter 0 Q1:B/RC:neg ours=4.9569244384765625 ngspice=4.970149736514418 absDelta=0.013225298037855104: expected 131 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "temp_400K_compareAllAttempts",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 0.6928875988183998 to not be close to 0.6928875985993175, received difference is 2.1908230785072647e-10, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "hotload_RS_changes_vd",
+          "line": 186,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 10 not to be 10 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "hotload_BV_changes_reverse_breakdown_vd",
+          "line": 259,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "253 per-iteration divergence(s); first: voltage step 0/iter 0 M1:G/VGS:pos ours=-2.467168315937042 ngspice=1.5161471935414634 absDelta=3.9833155094785053: expected 253 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "temp_350K_compareAllAttempts",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "353 per-iteration divergence(s); first: voltage step 0/iter 0 M1:G/VGS:pos ours=-370.89683309565027 ngspice=1.6158451782600196 absDelta=372.5126782739103: expected 353 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "temp_400K_compareAllAttempts",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 4.95999999503 not to be 4.95999999503 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "hotload_PHI_changes_vd",
+          "line": 257,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "hotload_GAMMA_changes_vd",
+          "line": 269,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5 to not be close to 0.5, received difference is 0, but expected 5e-7",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
+          "test": "hotload_RS_changes_anode_voltage",
+          "line": 144,
+          "column": 23
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
+          "test": "hotload_RS_changes_anode_voltage_forward",
+          "line": 217,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5 not to be 0.5 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
+          "test": "hotload_CJO_changes_dynamic_response",
+          "line": 164,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 0.1081312120953204 to be close to 0.10813020453069688, received difference is 0.0000010075646235119251, but expected 5e-7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\schottky.test.ts",
+          "test": "computeTemperature_per_instance_override_wins_over_ambient",
+          "line": 242,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999998192631056 to not be close to 4.999998192632443, received difference is 1.3873346915715956e-12, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_BF_changes_blocking_anode_voltage",
+          "line": 286,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999994842667314 to not be close to 4.999998192632443, received difference is 0.00000334996512929564, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_TEMP_changes_blocking_anode_voltage",
+          "line": 306,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.99999816001426 to not be close to 4.999998192632443, received difference is 3.2618182821408936e-8, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_AREA_changes_blocking_anode_voltage",
+          "line": 327,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999997770718008 to not be close to 4.999998192632443, received difference is 4.219144349448811e-7, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_IS_changes_blocking_anode_voltage",
+          "line": 345,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 4.999998192641032 to not be close to 4.999998192632443, received difference is 8.588685318500211e-12, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "hotload_BR_changes_blocking_anode_voltage",
+          "line": 363,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected 247.22459430165773 to be close to 247.2238629653025, received difference is 0.0007313363552441388, but expected 5e-10",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triode.test.ts",
+          "test": "init_seeded_op_point_slots",
+          "line": 98,
+          "column": 55
+        }
+      ]
+    },
+    {
+      "message": "expected NaN to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\varactor.test.ts",
+          "test": "limiting_paired_forward",
+          "line": 370,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected 0.8149076828912373 to be less than 0.6294407107718424",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "hotload_TEMP_changes_vf_forward",
+          "line": 238,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 0.8149076826983528 to be less than 0.6294407107719351",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+          "test": "computeTemperature_ambient_propagates_to_vf",
+          "line": 271,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 0.01 to be close to 0.07118169724938052, received difference is 0.061181697249380516, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor-rollback.test.ts",
+          "test": "hotload_temperature_changes_resistance_in_fixed_mode",
+          "line": 288,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 0.0010473070220507182 to not be close to 0.0010471973597998387, received difference is 1.0966225087944217e-7, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-extended.test.ts",
+          "test": "am_mode_diverges_from_pure_sine_after_warmstart",
+          "line": 132,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "noise waveform is evaluated through the deterministic TRNOISE function type (evaluateNgspiceWaveform), not the extension engine.",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\components\\sources\\ac-voltage-source.ts",
+          "test": "noise_mode_produces_finite_node_voltage_distinct_from_sine",
+          "line": 513,
+          "column": 13
+        },
+        {
+          "file": "src\\components\\sources\\ac-voltage-source.ts",
+          "test": "hotload_noiseSampleTime_changes_noise_breakpoint_schedule",
+          "line": 513,
+          "column": 13
+        },
+        {
+          "file": "src\\components\\sources\\ac-voltage-source.ts",
+          "test": "gaussian_distribution_mean_near_zero_stddev_near_amplitude",
+          "line": 513,
+          "column": 13
+        },
+        {
+          "file": "src\\components\\sources\\ac-voltage-source.ts",
+          "test": "lag1_autocorrelation_below_threshold",
+          "line": 513,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "437 per-iteration divergence(s); first: voltage step 29/iter 0 r1:pos/acsrc:pos ours=0.1046721500039947 ngspice=0.10618152427980311 absDelta=0.0015093742758084117: expected 437 to be +0 // Object.is e...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_triangle_rc",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 9.999989990000021e-7 to be close to 0.999000999000999, received difference is 0.998999999002, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "init_post_warm_start_node_voltage_pass_through_seed",
+          "line": 185,
+          "column": 65
+        }
+      ]
+    },
+    {
+      "message": "expected 5.000001536917821e-7 to be close to 0.999000999000999, received difference is 0.9990004990008453, but expected 0.0005",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "hotload_Ron_drops_v_s_under_load",
+          "line": 241,
+          "column": 20
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "hotload_Vth_above_gate_drive_isolates_channel",
+          "line": 286,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 9.999990000010003e-7 to be close to 0.999000999000999, received difference is 0.998999999001999, but expected 0.0005",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "init_post_warm_start_node_voltage_pass_through_seed",
+          "line": 339,
+          "column": 65
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "dcop_gate_low_drives_v_s_near_vs",
+          "line": 356,
+          "column": 16
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "hotload_Ron_drops_v_s_under_load",
+          "line": 388,
+          "column": 20
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "hotload_Vth_inverts_channel_state",
+          "line": 433,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected { type: 'digital', value: 1 } to match object { type: 'digital', value: +0 }",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "blown_property_seeds_state_to_permanently_off",
+          "line": 531,
+          "column": 37
+        },
+        {
+          "file": "src\\components\\switching\\__tests__\\fets.test.ts",
+          "test": "blown_property_seeds_state_to_permanently_off",
+          "line": 601,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "expected 4.994450610432852 to not be close to 4.994450610432852, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\switching\\__tests__\\fuse.test.ts",
+          "test": "hotload_rBlown_changes_blown_output_voltage",
+          "line": 206,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "step 0 node Wrelay_contactNC:p1/Wrelay_contactNO:p1/rLoadC:pos: ours=0.9998000399920034 ngspice=0.9999000099990002 absDelta=0.00009997000699679681: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "transient_step_end_paired_dt_energised",
+          "line": 40,
+          "column": 9
+        }
+      ]
+    },
+    {
+      "message": "174 per-iteration divergence(s); first: voltage step 0/iter 0 Lrelay_coilL:p0/vSrc:pos/relay:in1 ours=0.9998000399920034 ngspice=0.9999000099990002 absDelta=0.00009997000699679681: expected 174 to be ...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_dt_energised",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_pass_through",
+          "line": 3990,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_step_end_paired_isolation",
+          "line": 3990,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "232 per-iteration divergence(s); first: voltage step 0/iter 0 node_4 ours=-9.99999999998398e-8 ngspice=0 absDelta=9.99999999998398e-8: expected 232 to be +0 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_pass_through",
+          "line": 83,
+          "column": 31
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session-asserts.ts",
+          "test": "full_iteration_paired_isolation",
+          "line": 83,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 5.934652993168346 to be close to 5.9405940594059405, received difference is 0.005941066237594939, but expected 0.00005",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_vOH_changes_output_high_voltage",
+          "line": 319,
+          "column": 19
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_vOH_changes_selected_output_voltage",
+          "line": 448,
+          "column": 19
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_vOH_changes_active_output_voltage",
+          "line": 480,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 4.554695090899679 to be close to 4.545454545454546, received difference is 0.009240545445132753, but expected 0.00005",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_rOut_changes_output_divider_voltage",
+          "line": 336,
+          "column": 19
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_rOut_changes_selected_output_divider",
+          "line": 463,
+          "column": 19
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_rOut_changes_active_output_divider",
+          "line": 495,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 0.19232222916994643 to be close to +0, received difference is 0.19232222916994643, but expected 0.00005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_vIH_shifts_digital_input_threshold",
+          "line": 383,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 4.950495049504951 to be less than 4.7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "hotload_loaded_structural_property_seeds_pin_subelements",
+          "line": 431,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "expected 4.950495049504951 to be close to 4.545454545454545, received difference is 0.40504050405040637, but expected 5e-7",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
+          "test": "loaded_sel_pin_sags_through_external_series_resistor",
+          "line": 636,
+          "column": 18
+        }
+      ]
+    },
+    {
+      "message": "expected 4.9504950495049505 to be close to 4.545454545454545, received difference is 0.4050405040504055, but expected 5e-10",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-gate.test.ts",
+          "test": "loaded_pin_sees_voltage_sag",
+          "line": 268,
+          "column": 40
+        }
+      ]
+    },
+    {
+      "message": "expected 4.9504950495049505 to be close to 5, received difference is 0.04950495049504955, but expected 5e-10",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-gate.test.ts",
+          "test": "ideal_pin_sees_full_source_voltage",
+          "line": 274,
+          "column": 40
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 4.4",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\behavioral-sequential.test.ts",
+          "test": "loaded_en_sees_voltage_sag_ideal_clk_clr_see_no_sag",
+          "line": 574,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "message": "expected Infinity to be 7.000000006999999 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "order 1 trapezoidal: returns finite positive timestep for non-trivial charges",
+          "line": 51,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "constant charge history produces finite timestep (not Infinity)- abstol-gated",
+          "line": 104,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 1.1937318994756891 to be 1.193731899435898 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "order 2 gear: applies sqrt root extraction for nonzero 3rd divided difference",
+          "line": 240,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "trapezoidal order 2 and gear order 2 both return positive finite timestep for cubic data",
+          "line": 300,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 0.1363636364 to be 0.13636363636363635 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "gear_lte_factor_order_3",
+          "line": 433,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected 0.07299270073 to be 0.072992700729927 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "gear_lte_factor_order_5",
+          "line": 470,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected 0.0583090379 to be 0.05830903790087463 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "gear_lte_factor_order_6",
+          "line": 506,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected 1.3664819071200633e-12 to be 1.366481907074514e-12 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "cktTerrVoltage_gear_order2_matches_ngspice",
+          "line": 639,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 0.5",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\convergence-regression.test.ts",
+          "test": "statePool state1 is updated after accepted transient step",
+          "line": 148,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected 9900 to be less than 0.1",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "rl_dc_steady_state_tight_tolerance",
+          "line": 227,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected 0.014238253847495568 to be less than 0.001",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "diode_shockley_equation_consistency",
+          "line": 469,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected 1000 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
+          "test": "gaussian_distribution",
+          "line": 230,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected NaN to be greater than 2.3",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\monte-carlo.test.ts",
+          "test": "output_statistics",
+          "line": 289,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "Q1:C ours=1.0784743166220947 ngspice=4.609060331066524 absDelta=3.530586014444429: ngspice honoured the .nodeset and settled into the latch state; digiTS ignored it and stayed at the symmetric operati...",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\nr-nodeset-parity.test.ts",
+          "test": "nodeset_steers_ngspice_to_latch_state_digiTS_does_not",
+          "line": 102,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "message": "state0[0] (C1.Q) must equal state1[0]: expected 0.000004999999999999998 to be 0.0000049999999999999996 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\state-pool.test.ts",
+          "test": "pool_state0_state1_agree_slot_for_slot_after_accepted_step",
+          "line": 455,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "step 1: state0[0] (C1.Q) must equal state1[0]: expected 0.000004999999999999996 to be 0.000004999999999999998 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\state-pool.test.ts",
+          "test": "invariant_persists_across_multiple_accepted_steps",
+          "line": 481,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5 to be close to 1, received difference is 0.5, but expected 0.00005",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (A=MID, B=MID): AND → HI",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (A=MID, B=MID): OR → HI",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (A=MID, B=MID): XNOR → HI (equal)",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (In_1=MID): BUF → HI",
+          "line": 100,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5 to be close to +0, received difference is 0.5, but expected 0.00005",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (A=MID, B=MID): NAND → LO",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (A=MID, B=MID): NOR → LO",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (A=MID, B=MID): XOR → LO (equal)",
+          "line": 100,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\behavioral-drivers\\__tests__\\gate-driver-ctrl-stamp.test.ts",
+          "test": "treats above-threshold input as HIGH (in=MID): NOT → LO",
+          "line": 100,
+          "column": 17
+        }
+      ]
+    }
+  ]
 }

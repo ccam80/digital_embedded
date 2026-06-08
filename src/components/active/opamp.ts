@@ -144,7 +144,7 @@ export class OpAmpElement extends AbstractCircuitElement {
 
 
 // ---------------------------------------------------------------------------
-// OpampElement  plain AnalogElement class (Wave 11b)
+// OpampElement  plain AnalogElement class
 // ---------------------------------------------------------------------------
 
 class OpampElement extends AnalogElement {

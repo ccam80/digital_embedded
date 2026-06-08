@@ -180,7 +180,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// buildCrystalNetlist  function-form subcircuit (Composite M26)
+// buildCrystalNetlist  function-form subcircuit
 // ---------------------------------------------------------------------------
 
 /**

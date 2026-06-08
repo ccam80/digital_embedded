@@ -1,5 +1,5 @@
 /**
- * Ctrl-stamp tests for Wave 4.5 driver leaves:
+ * Ctrl-stamp tests for driver leaves:
  *   - BehavioralButtonLEDDriverElement (single ctrl_out, no enable)
  *   - BehavioralDriverDriverElement    (ctrl_out + ctrl_en, active-HIGH enable)
  *   - BehavioralDriverInvDriverElement (ctrl_out + ctrl_en, active-LOW enable)

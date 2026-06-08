@@ -1,6 +1,5 @@
 ﻿/**
- * Ctrl-stamp tests for Wave 4.6 component-local driver leaves:
- *   - ComparatorDriverElement     (single ctrl_out, open-collector)
+ * Ctrl-stamp tests for component-local driver leaves:
  *   - ComparatorPushPullDriver    (single ctrl_out, push-pull)
  *   - Timer555LatchDriverElement  (single ctrl_out inside 555-timer latch)
  *   - ADCDriverElement            (ctrl_d_0..ctrl_d_{N-1})
@@ -12,30 +11,6 @@ import { describe, it, expect } from "vitest";
 import { buildFixture } from "../../../solver/analog/__tests__/fixtures/build-fixture.js";
 
 const VOH = 5.0;
-
-function buildComparatorOCFixture(vPlus: number, vMinus: number) {
-  return buildFixture({
-    build: (_r, facade) => facade.build({
-      components: [
-        { id: "cmp",    type: "VoltageComparator", props: { label: "cmp", model: "open-collector", vOH: VOH, vOL: 0 } },
-        { id: "vsPlus", type: "DcVoltageSource",   props: { voltage: vPlus } },
-        { id: "vsMinus",type: "DcVoltageSource",   props: { voltage: vMinus } },
-        { id: "vsVcc",  type: "DcVoltageSource",   props: { voltage: VOH } },
-        { id: "rPull",  type: "Resistor",          props: { resistance: 10000 } },
-        { id: "gnd",    type: "Ground" },
-      ],
-      connections: [
-        ["vsPlus:pos",  "cmp:in+"],
-        ["vsMinus:pos", "cmp:in-"],
-        ["vsVcc:pos",   "rPull:pos"],
-        ["rPull:neg",   "cmp:out"],
-        ["vsPlus:neg",  "gnd:out"],
-        ["vsMinus:neg", "gnd:out"],
-        ["vsVcc:neg",   "gnd:out"],
-      ],
-    }),
-  });
-}
 
 function buildComparatorPPFixture(vPlus: number, vMinus: number) {
   return buildFixture({
@@ -129,30 +104,6 @@ function buildADCFixture(vIn: number, vClk: number) {
     }),
   });
 }
-
-describe("ComparatorDriver (open-collector) — ctrl_out Norton stamp (Cat 2 analytical)", () => {
-  it("stamps vOH at out when in+ is above in- (not sinking: pull-up holds line high)", () => {
-    const fix = buildComparatorOCFixture(4.0, 2.0);
-    const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
-    expect(dc!.converged).toBe(true);
-    fix.coordinator.step();
-    const signals = fix.facade.readAllSignals(fix.coordinator);
-    const vOut = signals["cmp:out"];
-    expect(vOut).toBeGreaterThan(VOH * 0.8);
-  });
-
-  it("stamps vOL at out when in+ is below in- (asserted: sinking pulls line low)", () => {
-    const fix = buildComparatorOCFixture(1.0, 3.0);
-    const dc = fix.coordinator.dcOperatingPoint();
-    expect(dc).not.toBeNull();
-    expect(dc!.converged).toBe(true);
-    fix.coordinator.step();
-    const signals = fix.facade.readAllSignals(fix.coordinator);
-    const vOut = signals["cmp:out"];
-    expect(vOut).toBeLessThan(1.0);
-  });
-});
 
 describe("ComparatorPushPullDriver — ctrl_out Norton stamp (Cat 2 analytical)", () => {
   it("stamps vOH at out when in+ is above in- (push-pull drives HIGH)", () => {

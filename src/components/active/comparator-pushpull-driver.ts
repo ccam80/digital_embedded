@@ -1,26 +1,16 @@
 ﻿/**
- * ComparatorPushPullDriver- push-pull driver leaf for the analog comparator
- * composite. Companion to the open-collector `ComparatorDriver` in
- * `comparator-driver.ts`.
+ * ComparatorPushPullDriver- driver leaf for the analog comparator composite,
+ * emitted by `COMPARATOR_PUSH_PULL_NETLIST` as the sole sub-element.
  *
- * Per Composite M24 (phase-composite-architecture.md), J-020. Emitted by
- * `COMPARATOR_PUSH_PULL_NETLIST` as the sole sub-element.
+ * Stamp: a fixed Norton G = 1/rOut at ctrl_out carrying the NORMALIZED logic
+ * level (in [0,1]). level = 1 - w: at w=0 (latch=0, v+ above threshold) the
+ * level is 1; at w=1 (latch=1, asserted) the level is 0. w is a single-pole
+ * smoothing of the latch held in the OUTPUT_WEIGHT slot (time constant
+ * responseTime). The parent's DigitalOutputPinLoaded maps the [0,1] level to
+ * vOL..vOH, so the rail span is applied once, at the pin boundary.
  *
- * Stamp model differs from open-collector:
- * - Open-collector: G = w/rOut at (out, out), no RHS. Active LOW only;
- *   inactive state is high-Z and needs an external pull-up.
- * - Push-pull (this file): G = 1/rOut at (out, out), RHS = G * vTarget.
- *   The output is driven to a smoothed target between vOL and vOH, with
- *   the smoothing tracked by the existing `OUTPUT_WEIGHT` slot:
- *     vTarget = (1 - w) * vOH + w * vOL
- *   When latch=0 (v+ above threshold), w trends 0 and vTarget -> vOH.
- *   When latch=1 (v+ below threshold, asserted), w trends 1 and vTarget -> vOL.
- *   Latch semantic preserved from the open-collector path: latch=1 means
- *   "asserted/sinking" per the schema doc; in push-pull that maps to "drive
- *   the output low".
- *
- * Hysteresis and weight integration are identical to the open-collector
- * driver- only the matrix/RHS contribution differs.
+ * Hysteresis thresholds derive from the reference, offset (vos), and hysteresis
+ * band; the latch holds until v+ crosses the opposite threshold.
  */
 
 import { PoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
@@ -35,7 +25,7 @@ import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 import { COMPARATOR_SCHEMA } from "./comparator.js";
 
 // ---------------------------------------------------------------------------
-// Slot constants- shared schema with the open-collector driver.
+// Slot constants- comparator schema.
 // ---------------------------------------------------------------------------
 
 const SLOT_OUTPUT_LATCH  = COMPARATOR_SCHEMA.indexOf.get("OUTPUT_LATCH")!;
@@ -61,8 +51,6 @@ const COMPARATOR_PUSHPULL_DRIVER_PARAM_DEFS: ParamDef[] = [
   { key: "vos",          default: 0.001 },
   { key: "rOut",         default: 50 },
   { key: "responseTime", default: 1e-6 },
-  { key: "vOH",          default: 3.3 },
-  { key: "vOL",          default: 0 },
 ];
 
 const MIN_ROUT = 1e-9;
@@ -81,8 +69,6 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
   private _hysteresis: number;
   private _vos: number;
   private _tau: number;
-  private _vOH: number;
-  private _vOL: number;
   private _rOut: number;
 
   private _ctrlOutNode = -1;
@@ -97,8 +83,6 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     this._vos        = props.getModelParam<number>("vos");
     this._rOut       = Math.max(props.getModelParam<number>("rOut"), MIN_ROUT);
     this._tau        = Math.max(props.getModelParam<number>("responseTime"), MIN_TAU);
-    this._vOH        = props.getModelParam<number>("vOH");
-    this._vOL        = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -114,8 +98,6 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
       case "vos":          this._vos = value; break;
       case "rOut":         this._rOut = Math.max(value, MIN_ROUT); break;
       case "responseTime": this._tau = Math.max(value, MIN_TAU); break;
-      case "vOH":          this._vOH = value; break;
-      case "vOL":          this._vOL = value; break;
     }
   }
 
@@ -156,12 +138,15 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
       wForStamp = wOld;
     }
 
-    // Push-pull Norton stamp: fixed G=1/rOut, vTarget blended by weight.
-    // vTarget = (1-w)*vOH + w*vOL: at w=0 (inactive) drives vOH, at w=1
-    // (asserted) drives vOL. Smooth ramp between rails via the trapezoidal
-    // recurrence above, time-constant responseTime.
-    const vTarget = (1 - wForStamp) * this._vOH + wForStamp * this._vOL;
-    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, vTarget);
+    // Push-pull Norton stamp: fixed G=1/rOut toward the NORMALIZED logic level
+    // on ctrl_out. level = w: at w=1 (latch=1, v+ above threshold) level is 1
+    // (the outPin maps it to vOH); at w=0 (v+ below) level is 0 (maps to vOL) -
+    // a non-inverting comparator. DigitalOutputPinLoaded applies the rail span
+    // (vOH-vOL), so stamping a normalized [0,1] level here avoids double-applying
+    // it. Smooth ramp via the trapezoidal recurrence above, time-constant
+    // responseTime.
+    const level = wForStamp;
+    stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode, this._rOut, level);
 
     // Bottom-of-load writes.
     s0[base + SLOT_OUTPUT_LATCH]  = latchNew;
@@ -173,8 +158,8 @@ export class ComparatorPushPullDriverElement extends PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const wOld = s1[this._stateBase + SLOT_OUTPUT_WEIGHT];
     const G = 1 / this._rOut;
-    const vTarget = (1 - wOld) * this._vOH + wOld * this._vOL;
-    const I = G * (rhs[ctrlOutNode] - vTarget);
+    const level = wOld;
+    const I = G * (rhs[ctrlOutNode] - level);
     return [0, 0, I];
   }
 }

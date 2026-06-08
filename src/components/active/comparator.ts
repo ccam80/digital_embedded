@@ -2,17 +2,12 @@
  * Analog Comparator component.
  *
  * Similar to an op-amp but optimized for switching speed: no linear region,
- * open-collector or push-pull output, optional input hysteresis (Schmitt
- * window), and an input offset voltage (vos).
- *
- * Open-collector model (default):
- *   - Output active (sinking):  R_sat to ground   output pulled LOW
- *   - Output inactive (off):    R_off to ground   output pulled HIGH by
- *                                                   external resistor
+ * push-pull output, optional input hysteresis (Schmitt window), and an input
+ * offset voltage (vos).
  *
  * Push-pull model:
- *   - Stamps a Norton current source driving the output to V_OH or V_OL
- *     through R_out (same model as DigitalOutputPinModel, but simpler).
+ *   - The driver stamps the normalized [0,1] logic level on an internal ctrl
+ *     net; a DigitalOutputPinLoaded maps it to vOH/vOL through R_out and cOut.
  *
  * Hysteresis:
  *   - Two thresholds derived from the reference voltage and hysteresis band:
@@ -174,42 +169,6 @@ export class ComparatorElement extends AbstractCircuitElement {
 // Netlist
 // ---------------------------------------------------------------------------
 
-export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
-  ports: ["in+", "in-", "out", "gnd"],
-  params: { ...COMPARATOR_DEFAULTS },
-  elements: [
-    {
-      typeId: "ComparatorDriver",
-      modelRef: "default",
-      subElementName: "drv",
-      params: {
-        hysteresis:   "hysteresis",
-        vos:          "vos",
-        rOut:         "rOut",
-        responseTime: "responseTime",
-      },
-    },
-    {
-      typeId: "DigitalOutputPinLoaded",
-      modelRef: "default",
-      subElementName: "outPin",
-      params: {
-        rOut: "rOut",
-        cOut: "cOut",
-        vOH:  "vOH",
-        vOL:  "vOL",
-      },
-    },
-  ],
-  internalNetCount: 1,
-  internalNetLabels: ["ctrl_out"],
-  // ports: in+=0, in-=1, out=2, gnd=3 (auto-resolves to node 0); ctrl_out internal net=4
-  netlist: [
-    [0, 1, 4], // drv: in+=0, in-=1, ctrl_out=4
-    [2, 3, 4], // outPin: node=out(2), gnd=gnd(3), ctrl=ctrl_out(4)
-  ],
-};
-
 export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
   ports: ["in+", "in-", "out", "gnd"],
   params: { ...COMPARATOR_DEFAULTS },
@@ -223,8 +182,6 @@ export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
         vos:          "vos",
         rOut:         "rOut",
         responseTime: "responseTime",
-        vOH:          "vOH",
-        vOL:          "vOL",
       },
     },
     {
@@ -293,8 +250,7 @@ export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
 
   helpText:
     "Analog Comparator  3-terminal (in+, in-, out). " +
-    "Switches output based on V+ vs V-. Open-collector output requires external pull-up; " +
-    "push-pull drives directly to vOH/vOL. " +
+    "Switches output based on V+ vs V-. Push-pull output drives directly to vOH/vOL. " +
     "Optional hysteresis prevents output chatter on noisy inputs.",
 
   factory(props: PropertyBag): ComparatorElement {
@@ -303,12 +259,6 @@ export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
 
   models: {},
   modelRegistry: {
-    "open-collector": {
-      kind: "netlist",
-      netlist: COMPARATOR_OPEN_COLLECTOR_NETLIST,
-      paramDefs: COMPARATOR_PARAM_DEFS,
-      params: COMPARATOR_DEFAULTS,
-    },
     "push-pull": {
       kind: "netlist",
       netlist: COMPARATOR_PUSH_PULL_NETLIST,
@@ -316,5 +266,5 @@ export const VoltageComparatorDefinition: StandaloneComponentDefinition = {
       params: COMPARATOR_DEFAULTS,
     },
   },
-  defaultModel: "open-collector",
+  defaultModel: "push-pull",
 };

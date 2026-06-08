@@ -1,5 +1,5 @@
 /**
- * Ctrl-stamp tests for Wave 4.7 switching driver leaves:
+ * Ctrl-stamp tests for switching driver leaves:
  *   - BehavioralFETDriver (ctrl_out Norton stamp)
  *   - NFET composite (G above Vth -> D-S conducting)
  *   - PFET composite (G below -Vth -> D-S conducting, inverted polarity)

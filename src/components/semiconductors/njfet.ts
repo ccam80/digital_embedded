@@ -2,13 +2,13 @@
  * N-channel JFET analog component.
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/jfet/jfetload.c::JFETload`.
- * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
+ * Single-pass `load()` per device per NR iteration.
  * Gate-junction caps lump inline into the stamps per `jfetload.c:477-492`.
  *
- * Invented cross-method slots deleted per Phase 2.5 Wave 1.4 A1. Only slots
- * with direct ngspice correspondence in `jfetdefs.h:154-166` survive.
+ * Only slots with direct ngspice correspondence in `jfetdefs.h:154-166` are
+ * declared.
  *
- * D-10 (fet-base collapse): NJFET and PJFET are each self-contained closure
+ * NJFET and PJFET are each self-contained closure
  * factories. No shared abstract class. Sign-polarity is a literal `+1`
  * constant below (N-channel); the P-channel sibling in `pjfet.ts` carries
  * its own `-1` literal.
@@ -139,13 +139,9 @@ export interface JfetParams {
 }
 
 // ---------------------------------------------------------------------------
-// State schema  JFET (Phase 2.5 Wave 1.4 A1 post-excision).
+// State schema  JFET.
 //
-// Only slots with direct correspondence in `jfetdefs.h:154-166` JFETstate<n>
-// offsets survive. The prior fet-base schema's 45 MOSFET-oriented slots
-// (VSB, VBD, GMBS, GBD, GBS, VON, CAPGB, etc.) are excised along with the
-// invented cap-transfer slots (CAP_GEQ_GS/GD, CAP_IEQ_GS/GD, VGS_JUNCTION,
-// GD_JUNCTION, ID_JUNCTION, MEYER_GS/GD/GB, V_GS/V_GD, CCAP_GS/GD). The
+// Slots correspond 1:1 to `jfetdefs.h:154-166` JFETstate<n> offsets. The
 // gate-junction caps lump inline per jfetload.c:477-492.
 //
 // Ngspice jfetdefs.h correspondences:

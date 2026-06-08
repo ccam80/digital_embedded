@@ -6,7 +6,6 @@
  * Mirror of driver-driver.ts; the only behavioural difference is the final
  * invert on the enable line (ctrl_en is HIGH when sel is LOW).
  *
- * Per Composite M13 (phase-composite-architecture.md), J-146 (contracts_group_10.md).
  */
 
 import {

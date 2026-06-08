@@ -167,7 +167,7 @@ export class TransformerElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// buildTransformerNetlist — function-form netlist (Composite M26)
+// buildTransformerNetlist — function-form netlist
 // ---------------------------------------------------------------------------
 
 /**

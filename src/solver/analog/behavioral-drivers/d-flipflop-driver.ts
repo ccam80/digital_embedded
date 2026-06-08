@@ -6,7 +6,6 @@
  * Reads C and D as normalized {0, 1} V. Edge-detects on C against 0.5 V;
  * on rising edge samples D into Q. Stamps ctrl_q at q, ctrl_nq at 1−q.
  *
- * Per Composite M14 (phase-composite-architecture.md), J-142 (contracts_group_10.md).
  */
 
 import {

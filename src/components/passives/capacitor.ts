@@ -229,7 +229,7 @@ export class AnalogCapacitorElement extends PoolBackedAnalogElement {
 
   // Geometric-capacitance model parameters — ngspice CAPmodel
   // (capsetup.c:31-88, captemp.c:55-68). _cj / _narrow / _short may be
-  // overwritten by the setup() default-processing block (Part B.0).
+  // overwritten by the setup() default-processing block.
   private _cj: number;
   private _cjsw: number;
   private _defw: number;

@@ -576,7 +576,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // gating every iteration on the bit.
     solver.preorder();
 
-    // ---- B5 (Phase 2.5 W2.1): NISHOULDREORDER trigger before factor ----
+    // ---- NISHOULDREORDER trigger before factor ----
     // Mechanical port of ngspice niiter.c:856-859, which sits BETWEEN
     // SMPpreOrder (matching our solver.preorder() above) and the
     // SMPreorder/SMPluFac dispatch:
@@ -604,14 +604,14 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     }
 
     // ---- STEP E: Factorize (gmin stamped atomically inside factor()) ----
-    // B3 (Phase 2.5 W2.1): ngspice SMPluFac/SMPreorder call LoadGmin
+    // ngspice SMPluFac/SMPreorder call LoadGmin
     // internally, immediately before spFactor/spOrderAndFactor (spsmp.c:173,
     // 197). The gmin stamp lives inside factor(); there is no external
     // addDiagonalGmin API- the stamp + factor pair is atomic, matching
     // ngspice's invariant that no caller observes a post-gmin, pre-factor
     // matrix.
     //
-    // H2 (Phase 2.5 W2.2)- NR owns the diagonal-Gmin decision points
+    // NR owns the diagonal-Gmin decision points
     // mirroring niiter.c::NIiter:
     //   (a) NISHOULDREORDER routing- niiter.c:856-859 sets the bit on
     //       INITJCT/INITTRAN; STEP E then dispatches to orderAndFactor().
@@ -647,7 +647,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       errorCode = solver.factor(ctx.pivotAbsTol, ctx.diagonalGmin);
     }
     if (errorCode !== spOKAY) {
-      // H2 (Phase 2.5 W2.2)- mirror niiter.c:881-902 in full.
+      // mirror niiter.c:881-902 in full.
       //
       // The else arm of `if (NISHOULDREORDER)` ran SMPluFac (factor, the reuse
       // path); on `error == E_SINGULAR` ngspice sets NISHOULDREORDER and
@@ -914,8 +914,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // does not converge in a single iteration.
       ipass = 1;
     } else if (curInitf === MODEINITTRAN) {
-      // B5 (Phase 2.5 W2.1): the NISHOULDREORDER trigger moved to the top of
-      // the loop (before factor), matching ngspice niiter.c:856-859. Here we
+      // The NISHOULDREORDER trigger sits at the top of the loop (before
+      // factor), matching ngspice niiter.c:856-859. Here we
       // only mirror niiter.c:1073-1075- clear MODEINITTRAN and set MODEINITFLOAT
       // for subsequent iterations:
       //     ckt->CKTmode = (ckt->CKTmode&(~INITF))|MODEINITFLOAT;

@@ -2,8 +2,7 @@
  * SchmittTriggerDriver â€” internal-only hybrid pin+stamp+state driver leaf for
  * the Schmitt Trigger composite (both inverting and non-inverting variants).
  *
- * Per Composite M28 (phase-composite-architecture.md), J-028
- * (contracts_group_02.md). Emitted by `SchmittInvertingDefinition` and
+ * Emitted by `SchmittInvertingDefinition` and
  * `SchmittNonInvertingDefinition` parent netlists (schmitt-trigger.ts) as the
  * single sub-element `drv` in both SCHMITT_INVERTING_NETLIST and
  * SCHMITT_NON_INVERTING_NETLIST.
@@ -16,7 +15,7 @@
  * Schema: SCHMITT_TRIGGER_SCHEMA is owned by this driver (the parent composite
  * has no MNA math and declares no schema of its own). One slot: OUTPUT_LATCH.
  *
- * Spec assumptions made explicit (J-028):
+ * Spec assumptions made explicit:
  *   1. Hysteresis (from schmitt-trigger.ts top-of-file docstring):
  *        Output goes HIGH when input rises above vTH.
  *        Output goes LOW  when input falls below vTL.

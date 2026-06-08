@@ -7,9 +7,6 @@
  * (disBase, disBase) conductance.
  *
  * ngspice peer: bsrcload.c (behavioural source).
- *
- * Per Composite M5 (phase-composite-architecture.md), J-030
- * (contracts_group_02.md).
  */
 
 import {
@@ -68,8 +65,6 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
 
   private _vDrop: number;
   private _rOut: number;
-  private _vOH: number;
-  private _vOL: number;
   // TSTALLOC handle for the (disBase, disBase) conductance stamp.
   private _hDisDis = -1;
   private _ctrlOutNode = -1;
@@ -81,8 +76,6 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
     // All keys are declared in this driver's paramDefs — read directly.
     this._vDrop = props.getModelParam<number>("vDrop");
     this._rOut = props.getModelParam<number>("rOut");
-    this._vOH = props.getModelParam<number>("vOH");
-    this._vOL = props.getModelParam<number>("vOL");
   }
 
   setup(ctx: SetupContext): void {
@@ -124,8 +117,11 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
     ctx.solver.stampElement(this._hDisDis, G_base);
     ctx.rhs[this.pinNodes.get("disBase")!] += targetV * G_base;
 
-    // Norton stamp at ctrl_out: drive latched output level.
-    const ctrlTarget = q ? this._vOH : this._vOL;
+    // Norton stamp at ctrl_out: drive the NORMALIZED latched logic level. q is
+    // 0/1; the DigitalOutputPinLoaded outPin maps [0,1] -> [vOL,vOH], so stamp
+    // the bare level here rather than the rail voltage (avoids double-applying
+    // the span).
+    const ctrlTarget = q;
     stampNortonValue(ctx, this._handles, this._ctrlOutNode, this._gndNode2, this._rOut, ctrlTarget);
 
     s0[base + SLOT_LATCH_Q] = q;
@@ -138,8 +134,6 @@ export class Timer555LatchDriverElement extends PoolBackedAnalogElement {
   setParam(key: string, value: number): void {
     if (key === "vDrop") this._vDrop = value;
     else if (key === "rOut") this._rOut = value;
-    else if (key === "vOH") this._vOH = value;
-    else if (key === "vOL") this._vOL = value;
   }
 }
 
@@ -158,8 +152,6 @@ export const Timer555LatchDriverDefinition: ComponentDefinition = {
       paramDefs: [
         { key: "vDrop", default: 1.5 },
         { key: "rOut", default: 100 },
-        { key: "vOH", default: 5 },
-        { key: "vOL", default: 0 },
       ],
       params: {},
       factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>

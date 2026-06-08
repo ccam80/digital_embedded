@@ -492,7 +492,7 @@ export function createIterationCaptureHook(
       ? convergenceFailedElements.map(l => rawLabelToHumanLabel.get(l) ?? l)
       : convergenceFailedElements;
 
-    // W2.3: diagnostic label decoded from the `cktMode` bitfield (cktdefs.h:165-185).
+    // diagnostic label decoded from the `cktMode` bitfield (cktdefs.h:165-185).
     // bitsToName joins multiple set bits with "|"- e.g. "MODEDCOP|MODEINITJCT".
     const resolvedInitMode = bitsToName(ctx.cktMode);
 

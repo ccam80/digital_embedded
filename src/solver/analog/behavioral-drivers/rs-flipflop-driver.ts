@@ -9,7 +9,6 @@
  *   S=0, R=1 → q=0
  *   S=1, R=1 → forbidden, hold (no diagnostic in pool-backed model)
  *
- * Per Composite M16 (phase-composite-architecture.md), J-156 (contracts_group_10.md).
  */
 
 import {

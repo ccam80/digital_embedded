@@ -9,7 +9,6 @@
  *   J=0, K=1 → q=0
  *   J=1, K=1 → toggle (q = 1−q)
  *
- * Per Composite M18 (phase-composite-architecture.md), J-148 (contracts_group_10.md).
  */
 
 import {

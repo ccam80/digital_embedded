@@ -2,8 +2,7 @@
  * BehavioralNorDriverElement — pure-truth-function driver leaf for the N-input
  * NOR gate. See and-driver.ts for the normalized-bit driver-chain architecture.
  *
- * Per Composite M10 (phase-composite-architecture.md), J-151
- * (contracts_group_10.md).
+ * 
  */
 
 import {

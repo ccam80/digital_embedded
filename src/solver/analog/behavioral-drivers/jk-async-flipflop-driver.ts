@@ -10,8 +10,7 @@
  * load() pass: Set first (high → q=1), Clr second (high → q=0). When both are
  * high, Clr wins.
  *
- * Per Composite M19 (phase-composite-architecture.md), J-147
- * (contracts_group_10.md).
+ * 
  */
 
 import {

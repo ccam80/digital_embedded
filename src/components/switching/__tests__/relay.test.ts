@@ -493,15 +493,15 @@ describe("RelayDT parameter hot-load (T1) — inductance", () => {
 });
 
 // ===========================================================================
-// RelayDT ctrlBranch path (Wave 2.3) — T1 cases against existing fixtures.
+// RelayDT ctrlBranch path — T1 cases against existing fixtures.
 //
-// The Wave 2.3 contract: both contactNO and contactNC Switch sub-elements
+// The contract: both contactNO and contactNC Switch sub-elements
 // read the coilSense V-source's branch current via the ngspice CSW path.
 // contactNO has normallyClosed=false (closes when energised); contactNC has
 // normallyClosed=true + closed=true (closed at rest, opens when energised).
 // ===========================================================================
 
-describe("RelayDT ctrlBranch path (Wave 2.3)", () => {
+describe("RelayDT ctrlBranch path", () => {
   it("contactNO closes when energised", () => {
     const fix = buildFixture({
       build: (_r, facade) => buildRelayDTBench(facade, { vCoil: 10, vTest: 1, rLoad: 100 }),

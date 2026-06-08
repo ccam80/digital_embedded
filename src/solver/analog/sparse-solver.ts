@@ -19,7 +19,7 @@
  *   spSolve (spsolve.c:126-191)         - solve
  *
  * =========================================================================
- * Indexing convention- ngspice 1-based (port-spec stage 7 option a)
+ * Indexing convention- ngspice 1-based
  * =========================================================================
  *
  * Every per-row / per-col / per-slot vector has length `Size + 1`. Slot 0
@@ -58,7 +58,7 @@ import { SparseSolverInstrumentation } from "./sparse-solver-instrumentation.js"
  * `LoadContext.solver` and use the handle-based `allocElement` /
  * `stampElement` API. RHS stamps write directly into `LoadContext.rhs`
  * (ngspice CKTrhs)- see `stamp-helpers.ts::stampRHS(rhs, row, val)` and
- * Phase 6 / B.16. The full `SparseSolver` class below structurally satisfies
+ * The full `SparseSolver` class below structurally satisfies
  * this interface.
  */
 export interface SparseSolverStamp {
@@ -263,8 +263,8 @@ export class SparseSolver {
   // =========================================================================
   // State flags- ngspice MatrixFrame fields (spdefs.h:733-788) + macro :69.
   //
-  // B2 fix (Phase 2.5 W2.1): we no longer conflate Factored + NeedsOrdering
-  // into a single boolean. ngspice's `MatrixFrame` has two orthogonal flags:
+  // Factored and NeedsOrdering are tracked as two orthogonal flags, matching
+  // ngspice's `MatrixFrame`:
   //   Matrix->Factored       (spdefs.h:748) - "matrix has an LU factorization"
   //   Matrix->NeedsOrdering  (spdefs.h:761) - "matrix topology changed; next
   //                                             factor must reorder, not reuse"
@@ -422,7 +422,7 @@ export class SparseSolver {
   private _singletons: number = 0;
 
   // ngspice QuicklySearchDiagonal stack array `TiedElements[MAX_MARKOWITZ_TIES + 1]`
-  // (spfactor.c:1260). Allocated once as class field per architect B.42.
+  // (spfactor.c:1260). Allocated once as class field.
   private _tiedElements: Int32Array = new Int32Array(101);
 
   // =========================================================================
@@ -554,8 +554,7 @@ export class SparseSolver {
 
   /**
    * ngspice spcCreateElement (spbuild.c:767-872)- line-for-line port. Two
-   * complete branches under `if (RowsLinked)` per architect B.22 / port-
-   * spec edit 1.3.5. Each branch:
+   * complete branches under `if (RowsLinked)`. Each branch:
    *   - alloc via spcGetElement (we reuse _newElement for both element and
    *     fill-in pools- ngspice's spcGetFillin falls back to spcGetElement
    *     on FillinsRemaining == 0 per spalloc.c:481-483, and amendment A5
@@ -1181,7 +1180,7 @@ export class SparseSolver {
    *   (*ppTwin1 = pTwin1)->Col = Col;
    *   (*ppTwin2 = pTwin2)->Col = Row;
    * which is the only place ngspice stamps `Element->Col` for a freshly-
-   * allocated element pre-spcLinkRows (architect B.4 carve-out).
+   * allocated element pre-spcLinkRows.
    */
   private _countTwins(col: number): { count: number; pTwin1: number; pTwin2: number } {
     let twins = 0;
@@ -1522,9 +1521,8 @@ export class SparseSolver {
   // =========================================================================
 
   /**
-   * ngspice spcGetElement (spalloc.c:310-364)- pool advance only. Per
-   * architect B.20 / B.21 / port-spec edit 1.3.5, this routine no longer
-   * carries val / flags arguments and does not touch the diagonal: the
+   * ngspice spcGetElement (spalloc.c:310-364)- pool advance only. This
+   * routine carries no val / flags arguments and does not touch the diagonal: the
    * caller (_spcCreateElement) initialises every Element field including
    * the Diag set, mirroring spbuild.c:793/851.
    *

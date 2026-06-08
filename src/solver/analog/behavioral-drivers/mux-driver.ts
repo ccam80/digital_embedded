@@ -3,8 +3,7 @@
  * N-input MUX (where N = 2^selectorBits). See and-driver.ts for the
  * normalized-bit driver-chain architecture.
  *
- * Per Composite M10 (phase-composite-architecture.md), J-149
- * (contracts_group_10.md).
+ * 
  */
 
 import {

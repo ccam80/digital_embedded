@@ -23,8 +23,7 @@
  *     `name` field
  *   - for mux: an additional `selectorBits` param + sel-pin handling
  *
- * Per Composite M10 (phase-composite-architecture.md), J-134
- * (contracts_group_09.md). Strictly 1-bit; multi-bit AND composites
+ * Strictly 1-bit; multi-bit AND composites
  * instantiate this subcircuit per bit (parent emits N copies).
  */
 

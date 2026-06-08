@@ -24,8 +24,8 @@
  *        P-channel rule (on when vGS < -Vth). Switch reads slot with
  *        invertCtrl=0 (driver already encodes "on" as 1).
  *
- * Per PB-TRANSGATE TSTALLOC ordering (Wave 11a spec line 386): NFET path
- * is emitted FIRST (drv + sw) before the PFET path. Both SW elements share
+ * TSTALLOC ordering: the NFET path is emitted FIRST (drv + sw) before the
+ * PFET path. Both SW elements share
  * the same NGSPICE_LOAD_ORDER (SW), so emission order determines stamp order.
  *
  * ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
@@ -210,7 +210,7 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 //
 // Ports: p1=0, p2=1, out1=2, out2=3
 //
-// Elements (NFET path FIRST per PB-TRANSGATE TSTALLOC ordering):
+// Elements (NFET path FIRST TSTALLOC ordering):
 //   nfetDrv (BehavioralFETDriver, isNType=1): pins (G=p1, D=out1, S=out2),
 //        on-condition vGS = V(p1) - V(out2) > Vth.
 //   nfetSW  (FetSW, invertCtrl=0): pins (D=out1, S=out2).
@@ -232,7 +232,7 @@ export const buildTransGateNetlist = (params: PropertyBag): MnaSubcircuitNetlist
   return {
     ports: ["p1", "p2", "out1", "out2"],
     elements: [
-      // NFET path- emitted first per PB-TRANSGATE TSTALLOC ordering.
+      // NFET path- emitted first TSTALLOC ordering.
       {
         typeId: "BehavioralFETDriver",
         modelRef: "default",

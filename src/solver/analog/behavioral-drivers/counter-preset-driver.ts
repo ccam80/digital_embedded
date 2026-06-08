@@ -7,7 +7,6 @@
  * wide-bus pin carrying a packed N-bit integer (digital-engine bus convention,
  * unchanged by the normalization pass). Output bits and ovf stamp at {0, 1} V.
  *
- * Per Composite M12 (J-140, contracts_group_10.md).
  */
 
 import {

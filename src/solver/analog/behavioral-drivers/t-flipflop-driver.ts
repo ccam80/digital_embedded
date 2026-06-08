@@ -11,7 +11,6 @@
  *   forceToggle=1 (withEnable=false): tEff = risingEdge unconditionally;
  *                 the T input is ignored.
  *
- * Per Composite M15 (phase-composite-architecture.md), J-159.
  */
 
 import {

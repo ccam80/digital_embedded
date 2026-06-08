@@ -7,8 +7,7 @@
  * OR-reduced result at ctrl_out as a {0, 1} V Norton source. See and-driver.ts
  * for the architectural notes on the normalized-bit driver chain.
  *
- * Per Composite M10 (phase-composite-architecture.md), J-153
- * (contracts_group_10.md).
+ * 
  */
 
 import {

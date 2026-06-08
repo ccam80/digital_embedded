@@ -549,16 +549,16 @@ describe("Relay digital bridge (T1) — Cat 9", () => {
 });
 
 // ===========================================================================
-// Switch.ctrlBranch path (Wave 2.1) — T1 cases against existing fixtures.
+// Switch.ctrlBranch path — T1 cases against existing fixtures.
 //
-// The Wave 2.1 contract: when the Switch sub-element's `ctrlBranch` is wired
+// The contract: when the Switch sub-element's `ctrlBranch` is wired
 // to a sibling V-source's branch (the coilSense in the rewired RELAY_NETLIST),
 // the ngspice CSW hysteresis on the coil current is the sole driver of the
 // contact state. The user-API `setClosed` becomes a no-op so that direct
 // API calls cannot override the coil-current-driven state.
 // ===========================================================================
 
-describe("Switch.ctrlBranch path (Wave 2.1)", () => {
+describe("Switch.ctrlBranch path", () => {
   it("contactSW closes when |i_coil| > pullInI", () => {
     // vCoil=10V across the 100Ω coil → I_coil=0.1A > pullInI=0.05A. After
     // warm-start the CSW hysteresis is in REALLY_ON (not just HYST_ON):

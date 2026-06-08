@@ -115,7 +115,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
     // null coordinator has nothing to initialize
   }
 
-  // ss1.11 Convergence logging
+  // Convergence logging
   getElementLabel(_index: number): string | undefined { return undefined; }
   supportsConvergenceLog(): boolean { return false; }
   setConvergenceLogEnabled(_enabled: boolean): void { /* no-op */ }

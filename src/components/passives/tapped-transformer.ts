@@ -174,7 +174,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// buildTappedTransformerNetlist  function-form netlist (Composite M26)
+// buildTappedTransformerNetlist  function-form netlist
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Ctrl-stamp tests for Wave 4.3 wiring driver leaves:
+ * Ctrl-stamp tests for wiring driver leaves:
  *   - BehavioralMuxDriverElement     (Multiplexer: selects one of N inputs)
  *   - BehavioralDemuxDriverElement   (Demultiplexer: routes input to one of N outputs)
  *   - BehavioralDecoderDriverElement (Decoder: one-hot encode selector)

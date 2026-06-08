@@ -1,16 +1,6 @@
 src/components/active/__tests__/adc.test.ts::clock_below_vIH_does_not_trigger_conversion
 src/components/active/__tests__/adc.test.ts::hotload_vIH_changes_clock_sensitivity
 src/components/active/__tests__/ccvs.test.ts::hotload_transresistance_changes_vout
-src/components/active/__tests__/comparator-rollback.test.ts::dcop_oc_off_output_near_voh
-src/components/active/__tests__/comparator-rollback.test.ts::dcop_pp_off_output_near_voh
-src/components/active/__tests__/comparator-rollback.test.ts::hotload_hysteresis_flips_latch_when_margin_inside_dead_band
-src/components/active/__tests__/comparator-rollback.test.ts::hotload_responseTime_faster_integration_lowers_output_sooner
-src/components/active/__tests__/comparator-rollback.test.ts::hotload_vos_shifts_threshold_above_input_flips_latch
-src/components/active/__tests__/comparator.test.ts::hotload_responseTime_changes_weight_integration
-src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOH at out when in+ is above in- (not sinking: pull-up holds line high)
-src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOH at out when in+ is above in- (push-pull drives HIGH)
-src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOL at out when in+ is below in- (asserted: sinking pulls line low)
-src/components/active/__tests__/component-local-driver-ctrl-stamp.test.ts::stamps vOL at out when in+ is below in- (push-pull drives LOW)
 src/components/active/__tests__/dac.test.ts::hotload_rOut_sags_output_under_load
 src/components/active/__tests__/dac.test.ts::hotload_vIH_shifts_threshold_so_3p3v_reads_low
 src/components/active/__tests__/opamp.test.ts::hotload_rOut_changes_output_divider
@@ -32,9 +22,6 @@ src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vOL_changes_out
 src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vTH_shifts_rising_threshold
 src/components/active/__tests__/schmitt-trigger.test.ts::hotload_vTL_shifts_falling_threshold
 src/components/active/__tests__/timer-555-debug.test.ts::hotload_vDrop_changes_dis_base_voltage
-src/components/active/__tests__/timer-555-debug.test.ts::hotload_vOH_changes_output_voltage_when_high
-src/components/active/__tests__/timer-555-debug.test.ts::hotload_vOL_changes_output_voltage_when_low
-src/components/active/__tests__/timer-555.test.ts::hotload_vOH_changes_output_high_voltage
 src/components/active/__tests__/vccs.test.ts::hotload_transconductance_changes_output_voltage
 src/components/digital-pins/__tests__/dipl-hot-load.test.ts::Loaded: setComponentProperty(dipl, 'cIn', 1e-7) slows RC settling — binding is observable in transient
 src/components/flipflops/__tests__/monoflop.test.ts::clock_stays_high_no_trigger
@@ -64,8 +51,6 @@ src/components/passives/__tests__/polarized-cap.test.ts::limiting_pnjlim_fires_o
 src/components/passives/__tests__/polarized-cap.test.ts::lte_rollback_q_slot_rotation_invariant
 src/components/passives/__tests__/tapped-transformer.test.ts::dcop_paired_ac_sinusoid
 src/components/passives/__tests__/transformer.test.ts::dcop_paired_ac_step_down
-src/components/semiconductors/__tests__/diac.test.ts::dcop_paired_blocking
-src/components/semiconductors/__tests__/diac.test.ts::dcop_paired_breakover
 src/components/semiconductors/__tests__/diode.test.ts::hotload_BV_changes_reverse_breakdown_vd
 src/components/semiconductors/__tests__/diode.test.ts::hotload_RS_changes_vd
 src/components/semiconductors/__tests__/mosfet.test.ts::hotload_GAMMA_changes_vd
@@ -138,8 +123,6 @@ src/solver/analog/__tests__/convergence-regression.test.ts::RC circuit runs tran
 src/solver/analog/__tests__/convergence-regression.test.ts::statePool state1 is updated after accepted transient step
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_ac_sinusoid
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_ac_step_down
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_blocking
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_breakover
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_dt_energised
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_isolation
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::full_iteration_paired_matched_load
@@ -155,8 +138,6 @@ src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_400K_com
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::temp_400K_compareAllAttempts
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_ac_sinusoid
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_ac_step_down
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_blocking
-src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_breakover
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_dt_energised
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_matched_load
 src/solver/analog/__tests__/harness/comparison-session-asserts.ts::transient_step_end_paired_rail_saturation

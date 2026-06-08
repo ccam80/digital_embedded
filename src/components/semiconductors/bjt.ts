@@ -1367,19 +1367,14 @@ export function createPnpBjtL0Element(
 }
 
 // ---------------------------------------------------------------------------
-// State schema  BJT SPICE L1. Only the slots that have direct ngspice
-// correspondences survive the W1.2 excision. bjtdefs.h offsets:
+// State schema  BJT SPICE L1. Slots correspond directly to ngspice
+// bjtdefs.h offsets:
 //   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5, BJTgm=6,
 //   BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11, BJTqsub=12,
 //   BJTcqsub=13, BJTqbx=14, BJTcqbx=15, BJTgx=16, BJTcexbc=17, BJTgeqcb=18,
 //   BJTgccs=19, BJTgeqbx=20, BJTvsub=21, BJTcdsub=22, BJTgdsub=23.
 //
-// Invented cross-method cap slots (W1.2 A1 excision):
-//   - CAP_GEQ_BE / CAP_IEQ_BE
-//   - CAP_GEQ_BC_INT / CAP_IEQ_BC_INT
-//   - CAP_GEQ_BC_EXT / CAP_IEQ_BC_EXT
-//   - CAP_GEQ_CS / CAP_IEQ_CS
-// All deleted. The lumping goes inline into gpi/gmu/cc/cb per bjtload.c:725-734.
+// Junction-cap charge lumps inline into gpi/gmu/cc/cb per bjtload.c:725-734.
 //
 // Ngspice-correspondent slots kept (in bjtdefs.h order):
 //   VBE, VBC, CC, CB, GPI, GMU, GM, GO, QBE, CQBE, QBC, CQBC, QSUB, CQSUB,

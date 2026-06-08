@@ -6,8 +6,7 @@
  * Canonical reference for **Template A-fixed**: 1-bit pure-truth driver with
  * fixed N=1 input pin count.
  *
- * Per Composite M10 (phase-composite-architecture.md), J-137
- * (contracts_group_09.md).
+ * 
  */
 
 import {

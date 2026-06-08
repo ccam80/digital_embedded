@@ -5,7 +5,6 @@
  * Reads K selector bits (normalized {0, 1} V), assembles `sel`, stamps 1 on
  * the selected output line and 0 on all others.
  *
- * Per Cluster M11 follow-up (j-070-recluster.md), J-143 (contracts_group_10.md).
  */
 
 import {

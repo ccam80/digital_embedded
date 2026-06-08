@@ -664,7 +664,7 @@ export interface AnalogEngine extends Engine {
 // equal the internal IntegrationMethod type exactly (no drift between the
 // UI / MCP / postMessage public surface and the solver-facing type).
 // If this line fails to compile, the two types have diverged- realign
-// before shipping. See spec/phase-3-f2-nr-reorder-xfact.md Wave 3.3.
+// before shipping.
 type _AssertPublicInternalEq =
   SimulationParams["integrationMethod"] extends IntegrationMethod
     ? IntegrationMethod extends SimulationParams["integrationMethod"]

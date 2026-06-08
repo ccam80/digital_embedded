@@ -14,7 +14,6 @@
  * Pin order MUST match buildSplitterNetlist drvNets:
  *   [in_0..in_{N-1}, gnd, ctrl_0..ctrl_{M-1}]
  *
- * Per Composite M13 (contracts_group_10.md), J-158.
  */
 
 import {

@@ -1,5 +1,5 @@
 ﻿/**
- * Ctrl-stamp tests for Wave 4.2 sequential driver leaves:
+ * Ctrl-stamp tests for sequential driver leaves:
  *   - BehavioralDFlipflopDriverElement       (D flip-flop)
  *   - BehavioralJKFlipflopDriverElement      (JK flip-flop)
  *   - BehavioralTFlipflopDriverElement       (T flip-flop, withEnable=true)

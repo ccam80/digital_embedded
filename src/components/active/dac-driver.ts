@@ -2,8 +2,7 @@
  * DACDriver â€” internal-only hybrid pin+stamp+state driver leaf for the N-bit
  * DAC composite.
  *
- * Per Composite M25 (phase-composite-architecture.md), J-022
- * (contracts_group_02.md). Emitted by the `DAC` parent's `buildDacNetlist`
+ * Emitted by the `DAC` parent's `buildDacNetlist`
  * (`dac.ts`) as the single sub-element `drv`.
  *
  * Canonical Template D exemplar — combines Template C's matrix-stamping body
@@ -56,7 +55,7 @@ function getDacSchema(bits: number): StateSchema {
   for (let i = 0; i < bits; i++) {
     slots.push({
       name: `LATCHED_BIT_${i}`,
-      doc: `Float input bit ${i} read from rhsOld[D${i}] - rhsOld[GND]. Lies in {0, 0.5, 1} after Wave 2.3 DIPL wiring.`,
+      doc: `Float input bit ${i} read from rhsOld[D${i}] - rhsOld[GND]. Lies in {0, 0.5, 1}.`,
     });
   }
   slots.push({

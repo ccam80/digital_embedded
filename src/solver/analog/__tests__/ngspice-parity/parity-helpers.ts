@@ -482,7 +482,7 @@ function _inferDeviceType(label: string): string | null {
 interface ModeEntry {
   stepIndex: number;
   iterIndex: number;
-  // W2.3: `initMode` is a human-readable cktMode label from
+  // `initMode` is a human-readable cktMode label from
   // `bitsToName(cktMode)` (cktdefs.h:165-185), e.g. "MODEDCOP|MODEINITJCT".
   initMode: string;
 }

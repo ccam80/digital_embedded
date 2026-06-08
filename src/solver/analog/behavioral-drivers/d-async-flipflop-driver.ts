@@ -6,7 +6,6 @@
  * On rising clock edge: latch D. Async Set / Clr override every load() pass:
  * Set first, Clr second — Clr wins when both are high.
  *
- * Per Composite M20 (phase-composite-architecture.md), J-141 (contracts_group_10.md).
  */
 
 import {

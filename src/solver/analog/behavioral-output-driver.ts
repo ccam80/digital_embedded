@@ -14,9 +14,6 @@
  *     When en is high: same Norton stamp as the 3-port variant.
  *     When en is low:  stamps a 1/rHiZ conductance with I=0 (high-Z).
  *     Carries a hot-loadable rHiZ param (default 1 GΩ).
- *
- * Source spec §3.3 (non-tri-state consumer leaf) and §3.5 (tri-state consumer
- * leaf) of spec/sibling-state-excision.md.
  */
 
 import {

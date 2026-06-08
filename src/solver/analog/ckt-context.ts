@@ -322,7 +322,7 @@ export class CKTCircuitContext {
   dcopResult: DcOpResult;
 
   // -------------------------------------------------------------------------
-  // Load context (Phase 6 Wave 6.1 populates fields; Phase 1 allocates shell)
+  // Load context
   // -------------------------------------------------------------------------
 
   /**

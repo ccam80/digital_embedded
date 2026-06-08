@@ -6,7 +6,6 @@
  * no CMOS model. The behavioral netlist (buildBufNetlist) wires 1 input pin,
  * 1 BehavioralBufDriver leaf, and 1 output pin.
  *
- * Per J-038 (BUF user-facing) + J-137 (Composite M10, contracts_group_09.md).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

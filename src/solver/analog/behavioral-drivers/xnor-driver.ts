@@ -2,8 +2,7 @@
  * BehavioralXnorDriverElement — pure-truth-function driver leaf for the N-input
  * XNOR gate. See and-driver.ts for the normalized-bit driver-chain architecture.
  *
- * Per Composite M10 (phase-composite-architecture.md), J-160
- * (contracts_group_10.md).
+ * 
  */
 
 import {

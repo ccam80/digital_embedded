@@ -6,8 +6,7 @@
  * carrying a packed N-bit integer voltage (digital-engine bus convention,
  * unchanged by the normalization pass). Output bits stamp at {0, 1} V.
  *
- * Per Composite M12 (phase-composite-architecture.md), J-154
- * (contracts_group_10.md).
+ * 
  */
 
 import {

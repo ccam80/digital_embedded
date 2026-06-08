@@ -173,7 +173,7 @@ export interface SimulationCoordinator {
   removeMeasurementObserver(observer: MeasurementObserver): void;
 
   // -------------------------------------------------------------------------
-  // ss1.1 Capability queries
+  // Capability queries
   // -------------------------------------------------------------------------
 
   /** True when the coordinator can perform a micro-step (gate-level single evaluation). */
@@ -192,7 +192,7 @@ export interface SimulationCoordinator {
   supportsTf(): boolean;
 
   // -------------------------------------------------------------------------
-  // ss1.2 Unified feature execution (replace backend reach-through)
+  // Unified feature execution (replace backend reach-through)
   // -------------------------------------------------------------------------
 
   /** Execute a single micro-step (digital gate-level). No-op if not supported. */
@@ -214,7 +214,7 @@ export interface SimulationCoordinator {
   applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void;
 
   // -------------------------------------------------------------------------
-  // ss1.11 Convergence logging
+  // Convergence logging
   // -------------------------------------------------------------------------
 
   /** Return a human-readable label for analog element at the given index, or undefined. */
@@ -297,7 +297,7 @@ export interface SimulationCoordinator {
   getState(): EngineState;
 
   // -------------------------------------------------------------------------
-  // ss1.3 Unified signal snapshot (replace _snapshotSignals branching)
+  // Unified signal snapshot (replace _snapshotSignals branching)
   // -------------------------------------------------------------------------
 
   /**
@@ -349,7 +349,7 @@ export interface SimulationCoordinator {
   formatSpeed(): { value: string; unit: string };
 
   // -------------------------------------------------------------------------
-  // ss1.5 Clock management
+  // Clock management
   // -------------------------------------------------------------------------
 
   /**
@@ -359,7 +359,7 @@ export interface SimulationCoordinator {
   advanceClocks(): void;
 
   // -------------------------------------------------------------------------
-  // ss1.6 Visualization context (replace analog render setup in consumers)
+  // Visualization context (replace analog render setup in consumers)
   // -------------------------------------------------------------------------
 
   /**
@@ -389,7 +389,7 @@ export interface SimulationCoordinator {
   updateVoltageTracking(): void;
 
   // -------------------------------------------------------------------------
-  // ss1.7 Slider context (replace analogCompiled.elementToCircuitElement iteration)
+  // Slider context (replace analogCompiled.elementToCircuitElement iteration)
   // -------------------------------------------------------------------------
 
   /**
@@ -422,7 +422,7 @@ export interface SimulationCoordinator {
   setSourceByLabel(label: string, paramKey: string, value: number): void;
 
   // -------------------------------------------------------------------------
-  // ss1.8 Measurement signal reading (for ScopePanel)
+  // Measurement signal reading (for ScopePanel)
   // -------------------------------------------------------------------------
 
   /**
@@ -444,7 +444,7 @@ export interface SimulationCoordinator {
   readElementPower(elementIndex: number): number | null;
 
   // -------------------------------------------------------------------------
-  // ss1.9 Snapshot management (for TimingDiagramPanel time-cursor scrubbing)
+  // Snapshot management (for TimingDiagramPanel time-cursor scrubbing)
   // -------------------------------------------------------------------------
 
   /**
@@ -459,7 +459,7 @@ export interface SimulationCoordinator {
   restoreSnapshot(id: SnapshotId): void;
 
   // -------------------------------------------------------------------------
-  // ss1.10 Current resolver context (replace direct AnalogEngine reach-through)
+  // Current resolver context (replace direct AnalogEngine reach-through)
   // -------------------------------------------------------------------------
 
   /**

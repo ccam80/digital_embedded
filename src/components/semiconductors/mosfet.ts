@@ -2,7 +2,7 @@
  * MOSFET analog components  N-channel and P-channel MOSFETs (SPICE Level 1).
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/mos1/mos1load.c::MOS1load`.
- * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
+ * Single-pass `load()` per device per NR iteration.
  * Cap companions lump inline into the gpi/gmu-analog MOS stamps per `mos1load.c:900-end`.
  *
  * Only slots with direct ngspice MOS1state<n> correspondence in
@@ -625,7 +625,7 @@ export function devQmeyer(
 }
 
 // ---------------------------------------------------------------------------
-// State schema  MOSFET SPICE L1 (Phase 2.5 W1.3 A1 post-excision).
+// State schema  MOSFET SPICE L1.
 //
 // Only slots with direct correspondence in `mos1defs.h:269-291` MOS1state<n>
 // offsets, plus a small set of DC-op-only scalar slots required by our
@@ -635,17 +635,17 @@ export function devQmeyer(
 // the gate-stamp matrix/RHS entries per `mos1load.c:900-end`.
 //
 // Deleted invented slots (the 11 cited in C-AUD-6):
-//   1. CAP_GEQ_GS   (fet-base.ts SLOT 6)   lumped inline per mos1load.c:930,942
-//   2. CAP_IEQ_GS   (fet-base.ts SLOT 7)   lumped inline into ceqgs
-//   3. CAP_GEQ_GD   (fet-base.ts SLOT 8)   lumped inline per mos1load.c:941
-//   4. CAP_IEQ_GD   (fet-base.ts SLOT 9)   lumped inline into ceqgd
-//   5. CAP_GEQ_GB   (fet-base.ts SLOT 18)  lumped inline per mos1load.c:930,940
-//   6. CAP_IEQ_GB   (fet-base.ts SLOT 19)  lumped inline into ceqgb
-//   7. CAP_GEQ_DB   (fet-base.ts SLOT 12)  lumped into gbd per mos1load.c:717
-//   8. CAP_IEQ_DB   (fet-base.ts SLOT 13)  lumped into cbd per mos1load.c:718-719
-//   9. CAP_GEQ_SB   (fet-base.ts SLOT 14)  lumped into gbs per mos1load.c:723
-//  10. CAP_IEQ_SB   (fet-base.ts SLOT 15)  lumped into cbs per mos1load.c:724
-//  11. MEYER_GB     (fet-base.ts SLOT 37)  ngspice uses CKTstate0/1 capgb
+//   1. CAP_GEQ_GS     lumped inline per mos1load.c:930,942
+//   2. CAP_IEQ_GS     lumped inline into ceqgs
+//   3. CAP_GEQ_GD     lumped inline per mos1load.c:941
+//   4. CAP_IEQ_GD     lumped inline into ceqgd
+//   5. CAP_GEQ_GB    lumped inline per mos1load.c:930,940
+//   6. CAP_IEQ_GB    lumped inline into ceqgb
+//   7. CAP_GEQ_DB    lumped into gbd per mos1load.c:717
+//   8. CAP_IEQ_DB    lumped into cbd per mos1load.c:718-719
+//   9. CAP_GEQ_SB    lumped into gbs per mos1load.c:723
+//  10. CAP_IEQ_SB    lumped into cbs per mos1load.c:724
+//  11. MEYER_GB      ngspice uses CKTstate0/1 capgb
 //                   averaging (mos1load.c:800-806), not a separate half-cap stash
 //
 // Surviving slots have direct mos1defs.h correspondence:

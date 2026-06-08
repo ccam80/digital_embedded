@@ -10,8 +10,7 @@
  *   S=1, R=1 → forbidden state q=0 (matches parent's digital `executeRSAsync`
  *              behavior; both outputs forced low when both inputs are high).
  *
- * Per Composite M17 (phase-composite-architecture.md), J-155
- * (contracts_group_10.md).
+ * 
  */
 
 import {

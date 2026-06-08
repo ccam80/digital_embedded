@@ -238,7 +238,7 @@ export const BJT_MAPPING: DeviceMapping = {
 //   MOS1qbd=13,   MOS1cqbd=14,
 //   MOS1qbs=15,   MOS1cqbs=16
 //
-// Post-W1.3 rename: digiTS schema matches ngspice names exactly for
+// digiTS schema matches ngspice names exactly for
 // slots 0-16. Schema slots 17-27 (CD, CBD, CBS, GBD, GBS, GM, GDS, GMBS,
 // MODE, VON, VDSAT) correspond to MOS1instance struct fields, NOT to
 // CKTstate offsets- they are not comparable via the state-pool path.
@@ -298,9 +298,7 @@ export const MOSFET_MAPPING: DeviceMapping = {
 //   JFETgm=5, JFETgds=6, JFETggs=7, JFETggd=8,
 //   JFETqgs=9, JFETcqgs=10, JFETqgd=11, JFETcqgd=12
 //
-// Post-W1.4 rename: digiTS schema matches ngspice names exactly. The
-// prior fet-base invented slots (IDS, ID_JUNCTION, GD_JUNCTION, MEYER_GS,
-// CCAP_GS/GD, etc.) are A1-excised.
+// digiTS schema matches ngspice names exactly.
 
 // JFET pin currents: CG=JFETcg (gate, slot 2) and CD=JFETcd (drain,
 // slot 3) are directly stored. Source is derived by KCL: Is = -(Ig + Id).

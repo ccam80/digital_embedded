@@ -7,8 +7,8 @@
  * any per-call-site changes.
  *
  * The bridge driver element classes live in:
- *   src/solver/analog/behavioral-drivers/bridge-output-driver.ts  (J-136)
- *   src/solver/analog/behavioral-drivers/bridge-input-driver.ts   (J-135)
+ *   src/solver/analog/behavioral-drivers/bridge-output-driver.ts 
+ *   src/solver/analog/behavioral-drivers/bridge-input-driver.ts  
  */
 
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";

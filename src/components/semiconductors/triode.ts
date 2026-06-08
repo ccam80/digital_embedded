@@ -52,7 +52,7 @@ export const { paramDefs: TRIODE_PARAM_DEFS, defaults: TRIODE_PARAM_DEFAULTS } =
 });
 
 // ---------------------------------------------------------------------------
-// buildTriodeNetlist- function-form netlist (Composite M-style)
+// buildTriodeNetlist- function-form netlist
 // ---------------------------------------------------------------------------
 
 /**

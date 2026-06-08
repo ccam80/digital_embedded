@@ -11,7 +11,6 @@
  *   in(1)       - LED input net (voltage observed for threshold classification)
  *   gnd(2)      - ground reference
  *
- * Per Composite M10 (phase-composite-architecture.md).
  */
 
 import {

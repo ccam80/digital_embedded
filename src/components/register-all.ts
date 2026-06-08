@@ -267,7 +267,6 @@ import { BehavioralDAsyncFlipflopDriverDefinition } from "../solver/analog/behav
 // Analog active drivers (internalOnly)
 import { DACDriverDefinition } from "./active/dac-driver.js";
 import { ADCDriverDefinition } from "./active/adc-driver.js";
-import { ComparatorDriverDefinition } from "./active/comparator-driver.js";
 import { ComparatorPushPullDriverDefinition } from "./active/comparator-pushpull-driver.js";
 import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.js";
 
@@ -571,7 +570,6 @@ export function createDefaultRegistry(
   // Analog active drivers (internalOnly)
   registry.register(DACDriverDefinition);
   registry.register(ADCDriverDefinition);
-  registry.register(ComparatorDriverDefinition);
   registry.register(ComparatorPushPullDriverDefinition);
   registry.register(SchmittTriggerDriverDefinition);
 

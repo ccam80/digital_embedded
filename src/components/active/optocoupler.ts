@@ -39,7 +39,7 @@ export const { paramDefs: OPTOCOUPLER_PARAM_DEFS, defaults: OPTOCOUPLER_PARAM_DE
 });
 
 // ---------------------------------------------------------------------------
-// OPTOCOUPLER_NETLIST- declarative composite (Composite M4)
+// OPTOCOUPLER_NETLIST- declarative composite
 //
 // Ports: [anode, cathode, collector, emitter]      (indices 0..3)
 // Internal nets: senseMid (4), base (5)

@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('total tsc errors:',l.length); l.forEach(x=>console.log('  '+x.slice(0,95)));\"",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== status summary ===\"; git status --short | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(Boolean); const m=l.filter(x=>x[0]==='M'||x[1]==='M'); const a=l.filter(x=>x.startsWith('??')); console.log('modified:',m.length,'untracked:',a.length); console.log('--- submodule/lockfile/state ---'); l.filter(x=>/ref\\/ngspice|package-lock|\\.omc\\/|\\.vitest-failures/.test(x)).forEach(x=>console.log(x));\"; echo \"=== current branch ===\"; git branch --show-current",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== tsc ===\" && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('tsc errors:',l.length);\"; echo \"=== suite ===\" && npm run test:q -- src/ > .pv.txt 2>&1; node -e \"console.log(JSON.stringify(require('./.vitest-failures.json').summary))\"; echo \"=== baseline diff ===\"; node scripts/triage/diff-baseline.mjs 2>&1 | head -4; rm -f .pv.txt",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && echo \"=== tsc ===\" && npx tsc --noEmit 2>&1 | node -e \"const l=require('fs').readFileSync(0,'utf8').split('\\n').filter(x=>/error TS/.test(x)); console.log('tsc errors:',l.length);\"; echo \"=== suite ===\" && npm run test:q -- src/ > .pv.txt 2>&1; node -e \"console.log(JSON.stringify(require('./.vitest-failures.json').summary))\"; echo \"=== baseline diff ===\"; node scripts/triage/diff-baseline.mjs 2>&1 | head -4; rm -f .pv.txt",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
